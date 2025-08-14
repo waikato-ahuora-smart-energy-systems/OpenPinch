@@ -1,0 +1,309 @@
+{
+    "streams": [
+        {
+            "zone": "Flowsheet",
+            "name": "Distillate",
+            "t_supply": {
+                "value": 52,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 70.7934890887794,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Flowsheet",
+            "name": "Distillation Feed",
+            "t_supply": {
+                "value": 181.999999999828,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 107.450832377723,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Flowsheet",
+            "name": "Intermediate Distillate",
+            "t_supply": {
+                "value": 70.7934890887794,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 99.999999999998,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2340,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Flowsheet",
+            "name": "Intermediate Mixture",
+            "t_supply": {
+                "value": 107.450832377723,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 77.9999999999994,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 580,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Flowsheet\\Module 23",
+            "name": "Reactant Feed",
+            "t_supply": {
+                "value": 30,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 76.3058910545671,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Flowsheet\\Module 23",
+            "name": "Hot Product",
+            "t_supply": {
+                "value": 138,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 58.3905079519419,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Flowsheet\\Module 23",
+            "name": "Intermediate Product",
+            "t_supply": {
+                "value": 58.3905079519419,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 29.9999999999959,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1060,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Flowsheet\\Module 23",
+            "name": "Intermediate Reactant",
+            "t_supply": {
+                "value": 76.3058910545671,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80.000000000004,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 240,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 260,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 259.9,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 1,
+                "units": "degC"
+            },
+            "price": {
+                "value": 10,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 10,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 10.1,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 1,
+                "units": "degC"
+            },
+            "price": {
+                "value": 10,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {
+        "main": [],
+        "turbine": [
+            {
+                "key": "PROP_TOP_0",
+                "value": 450
+            },
+            {
+                "key": "PROP_TOP_1",
+                "value": 90
+            },
+            {
+                "key": "PROP_TOP_2",
+                "value": 0.1
+            },
+            {
+                "key": "PROP_TOP_3",
+                "value": 100
+            },
+            {
+                "key": "PROP_TOP_4",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_5",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_6",
+                "value": "Medina-Flores et al. (2010)"
+            },
+            {
+                "key": "PROP_TOP_7",
+                "value": true
+            },
+            {
+                "key": "PROP_TOP_8",
+                "value": false
+            },
+            {
+                "key": "PROP_TOP_9",
+                "value": false
+            }
+        ]
+    }
+}

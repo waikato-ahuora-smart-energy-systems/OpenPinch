@@ -1,0 +1,127 @@
+{
+    "streams": [
+        {
+            "zone": "Plant",
+            "name": "F1",
+            "t_supply": {
+                "value": 140,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2400,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 260,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 259.9,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 1,
+                "units": "degC"
+            },
+            "price": {
+                "value": 10,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 10,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 10.1,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 1,
+                "units": "degC"
+            },
+            "price": {
+                "value": 10,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {
+        "main": [],
+        "turbine": [
+            {
+                "key": "PROP_TOP_0",
+                "value": 450
+            },
+            {
+                "key": "PROP_TOP_1",
+                "value": 90
+            },
+            {
+                "key": "PROP_TOP_2",
+                "value": 0.1
+            },
+            {
+                "key": "PROP_TOP_3",
+                "value": 100
+            },
+            {
+                "key": "PROP_TOP_4",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_5",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_6",
+                "value": "Medina-Flores et al. (2010)"
+            },
+            {
+                "key": "PROP_TOP_7",
+                "value": true
+            },
+            {
+                "key": "PROP_TOP_8",
+                "value": false
+            },
+            {
+                "key": "PROP_TOP_9",
+                "value": false
+            }
+        ]
+    }
+}

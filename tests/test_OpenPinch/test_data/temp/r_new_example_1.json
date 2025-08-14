@@ -1,0 +1,208 @@
+{
+    "targets": [
+        {
+            "name": "new_example_1/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 35.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 35.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1313.3642250411995,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 373.36422504120003,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 5766.6357749588,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 93.91914942929643,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 139998.46135683922,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1313.3642250412004,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 373.36422504120003,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Flowsheet/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 35.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 35.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1313.3642250411995,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 373.36422504120003,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 5766.6357749588,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 93.91914942929643,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 139998.46135683922,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1313.3642250412004,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 373.36422504120003,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "new_example_1/Total Process Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": NaN,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": NaN,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1313.3642250411995,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 373.36422504120003,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 5766.6357749588,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 139998.46135683922,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1313.3642250412004,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 373.36422504120003,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "new_example_1/Total Site Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 10.1,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 259.9,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1313.3642250411995,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 373.36422504120003,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 5766.6357749588005,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 93.91914942929644,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 139998.46135683922,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1313.3642250412004,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 373.36422504120003,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

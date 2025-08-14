@@ -1,0 +1,432 @@
+{
+    "targets": [
+        {
+            "name": "paper_plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 70.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 70.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 4316.8,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 15241.131327543455,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 24202.200000000008,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 91.67745755422348,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4869924.90055832,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 2394.3442307692308,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 1922.4557692307694,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 8369.885521756576,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 6871.245805786879,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 70.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 70.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 4316.8,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 15241.131327543455,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 24202.200000000008,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 91.67745755422348,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4869924.90055832,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 2394.3442307692308,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 1922.4557692307694,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 8369.885521756576,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 6871.245805786879,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "paper_plant/Total Process Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": NaN,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": NaN,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 4316.8,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 15241.131327543455,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 24202.200000000008,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4869924.90055832,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 2394.3442307692308,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 1922.4557692307694,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 8369.885521756576,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 6871.245805786879,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "paper_plant/Total Site Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 50.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 80.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 4316.8,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 15241.131327543455,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 24202.200000000008,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 91.67745755422348,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4869924.90055832,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 2394.3442307692308,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 1922.4557692307694,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HTHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LTHW",
+                    "heat_flow": {
+                        "value": 8369.885521756576,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 6871.245805786879,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

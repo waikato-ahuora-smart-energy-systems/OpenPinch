@@ -1,0 +1,1890 @@
+{
+    "streams": [
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 32,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 92,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 21560,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "T.P.A",
+            "t_supply": {
+                "value": 148,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 88.12,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 21560,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 92,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2830,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "KERO PRO (2)",
+            "t_supply": {
+                "value": 161,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 117,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2830,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "A.G.O.PRO (2)",
+            "t_supply": {
+                "value": 233,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 118,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8830,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 100,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 122,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8830,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "CIR.KER",
+            "t_supply": {
+                "value": 229,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 180,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 119,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 142,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "CIR.ASO",
+            "t_supply": {
+                "value": 283,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 260,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1730,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 174,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 182,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1730,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed Crude Oil",
+            "t_supply": {
+                "value": 181,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 245,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14840,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "ISOMAX FEED(1)",
+            "t_supply": {
+                "value": 271,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 213,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14840,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed Crude Oil",
+            "t_supply": {
+                "value": 248,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 265,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8510,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "VAC.BOIT (1)",
+            "t_supply": {
+                "value": 357,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 282,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8510,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "TV-102 OVERHEAD PRO(1)",
+            "t_supply": {
+                "value": 130.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 18760,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "TV-102 OVERHEAD PRO(2)",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 52,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 600,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "KERO PRO (3A)",
+            "t_supply": {
+                "value": 177,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 470,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "KERO PRO (3B)",
+            "t_supply": {
+                "value": 177,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1670,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "BN PRO(2)",
+            "t_supply": {
+                "value": 65,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 38,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 390,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "A.G.O.PRO (3A)",
+            "t_supply": {
+                "value": 118,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2530,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "A.G.O.PRO(4a)",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 43,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 760,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "CIR.A.G.O",
+            "t_supply": {
+                "value": 295,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 283,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2790,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "KERO",
+            "t_supply": {
+                "value": 235,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 258,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2790,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "B.N",
+            "t_supply": {
+                "value": 199,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 209,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "CIR.A.G.O",
+            "t_supply": {
+                "value": 283,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 230,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "HN PRO (2)",
+            "t_supply": {
+                "value": 120,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 65,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2510,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "A.G.O.PRO (1)",
+            "t_supply": {
+                "value": 275,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 233,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3840,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 4,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed Crude Oil",
+            "t_supply": {
+                "value": 225,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 242,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3840,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 4,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "BN",
+            "t_supply": {
+                "value": 209,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 65,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2510,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 25,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 32,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2510,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": " T.P.A PRO (2)",
+            "t_supply": {
+                "value": 88,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4260,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 142,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 174,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6900,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "KERO.PRO (1)",
+            "t_supply": {
+                "value": 258,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 161,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6900,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "KERO PRO (4)",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 38,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1187,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "HEAVY DIESEL PRO(2)",
+            "t_supply": {
+                "value": 120,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6250,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "HEAVY DIESEL PRO(3)",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 45,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 940,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "ISOMAX FEED(4)",
+            "t_supply": {
+                "value": 151,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 93,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2970,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "VAC.BOIT (3)",
+            "t_supply": {
+                "value": 205,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7570,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed Crude Oil",
+            "t_supply": {
+                "value": 245,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 254,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 4.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "L.D2. PRO(1)",
+            "t_supply": {
+                "value": 363,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 254,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 4.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "L.D1. PRO(2)",
+            "t_supply": {
+                "value": 199,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 93,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1750,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Crude Oil",
+            "t_supply": {
+                "value": 142,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 184,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9160,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "ISOMAX FEED(2)",
+            "t_supply": {
+                "value": 213,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 174,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9160,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed Crude Oil",
+            "t_supply": {
+                "value": 181,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 192,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2550,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "L.D1. PRO(1)",
+            "t_supply": {
+                "value": 327,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 199,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2550,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed Crude Oil",
+            "t_supply": {
+                "value": 192,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 225,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7700,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "VAC.BOIT (2)",
+            "t_supply": {
+                "value": 282,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 205,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7700,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "ISOMAX FEED(3)",
+            "t_supply": {
+                "value": 174,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 151,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5400,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "L.D2. PRO(2)",
+            "t_supply": {
+                "value": 254,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 93,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2660,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "HEAVY DIESEL PRO(1)",
+            "t_supply": {
+                "value": 167,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4550,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "HN PRO (1)",
+            "t_supply": {
+                "value": 180,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3080,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "SPLITTER FEED",
+            "t_supply": {
+                "value": 52,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 102,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3080,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "TV-181 SPUTTER OVERHEAD PRO (2)",
+            "t_supply": {
+                "value": 105.5,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4530,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "A.G.O.PRO (3B)",
+            "t_supply": {
+                "value": 118,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1270,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "TV-181 SPUTTER OVERHEAD PRO (2)",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 43,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 600,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "CIR.A.G.O",
+            "t_supply": {
+                "value": 283,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 210,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8100,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "SPJT.BOTT",
+            "t_supply": {
+                "value": 180,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 183,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8100,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "KERO PRO (3C)",
+            "t_supply": {
+                "value": 177,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1160,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "A.G.O.PRO(4b)",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 43,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 270,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "HN PRO (3)",
+            "t_supply": {
+                "value": 65,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 38,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1130,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed oil",
+            "t_supply": {
+                "value": 265,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 348.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 44700,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Flashed oil",
+            "t_supply": {
+                "value": 265,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 348.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9540,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Reduced oil",
+            "t_supply": {
+                "value": 341.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 402.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 18200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "Reduced oil",
+            "t_supply": {
+                "value": 342,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 403,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "Flue Gas",
+            "type": "Hot",
+            "t_supply": {
+                "value": 600,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 450,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "VHPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 280.8588511847681,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 280.7588511847681,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 233.85844500625205,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 233.75844500625206,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "MPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 179.88563239146663,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 179.78563239146663,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 138.525357946545,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 138.425357946545,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HW",
+            "type": "Both",
+            "t_supply": {
+                "value": 90,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 70,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 30,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {
+        "main": [],
+        "turbine": [
+            {
+                "key": "PROP_TOP_0",
+                "value": 450
+            },
+            {
+                "key": "PROP_TOP_1",
+                "value": 90
+            },
+            {
+                "key": "PROP_TOP_2",
+                "value": 0.1
+            },
+            {
+                "key": "PROP_TOP_3",
+                "value": 100
+            },
+            {
+                "key": "PROP_TOP_4",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_5",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_6",
+                "value": "Medina-Flores et al. (2010)"
+            },
+            {
+                "key": "PROP_TOP_7",
+                "value": true
+            },
+            {
+                "key": "PROP_TOP_8",
+                "value": false
+            },
+            {
+                "key": "PROP_TOP_9",
+                "value": false
+            }
+        ]
+    }
+}

@@ -1,0 +1,51 @@
+{
+    "targets": [
+        {
+            "name": "Flowsheet/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 35.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 35.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1313.3642250411995,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 373.36422504120003,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 5766.6357749588,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 93.91914942929643,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1313.3642250412004,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 373.36422504120003,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

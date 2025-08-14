@@ -1,0 +1,695 @@
+{
+    "streams": [
+        {
+            "zone": "C1[O]",
+            "name": "WW Overflow",
+            "t_supply": {
+                "value": 34,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1282.93806246691,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C2[O]",
+            "name": "RC Waste Water",
+            "t_supply": {
+                "value": 50.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1527.388101983,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C3[O]",
+            "name": "Exhaust Air 1",
+            "t_supply": {
+                "value": 72.62,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8331.552185480807,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C4[O]",
+            "name": "Exhaust Air 2",
+            "t_supply": {
+                "value": 70,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7707.98884017537,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C5[O]",
+            "name": "Press Seal Tank Overflow",
+            "t_supply": {
+                "value": 28,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1217.26413743737,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E1[O]",
+            "name": "Exhaust Air 1",
+            "t_supply": {
+                "value": 80,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 72.62,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1884.2,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E1[O]",
+            "name": "PV Air",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1884.2000000000003,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E2[O]",
+            "name": "Blow Box Air",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2508,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E2[O]",
+            "name": "Exhaust Air 2",
+            "t_supply": {
+                "value": 80,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 70,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2508,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E3[O]",
+            "name": "Bore Water",
+            "t_supply": {
+                "value": 11,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 48,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7951,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E3[O]",
+            "name": "WW Overflow",
+            "t_supply": {
+                "value": 58,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 34,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7951,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E4[O]",
+            "name": "Press Seal Tank Overflow",
+            "t_supply": {
+                "value": 70,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 28,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6306.000000000001,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E4[O]",
+            "name": "Repulper",
+            "t_supply": {
+                "value": 11,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6305.999999999999,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E5[O]",
+            "name": "Other Inputs",
+            "t_supply": {
+                "value": 30,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 727,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "E5[O]",
+            "name": "RC Waste Water",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 727,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "H1[O]",
+            "name": "Bore Water",
+            "t_supply": {
+                "value": 48,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 61,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2794,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "H2[O]",
+            "name": "Hot Water",
+            "t_supply": {
+                "value": 50,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 61,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2032,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "H4[O]",
+            "name": "Blow Box Air",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1255,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "H5[O]",
+            "name": "PV Air",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 125,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3061.8,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 233.85844500625205,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 233.75844500625206,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "MPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 179.88563239146663,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 179.78563239146663,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 138.525357946545,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 138.425357946545,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HTHW",
+            "type": "Both",
+            "t_supply": {
+                "value": 80,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LTHW",
+            "type": "Both",
+            "t_supply": {
+                "value": 40,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 10,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 10.1,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {
+        "main": [],
+        "turbine": [
+            {
+                "key": "PROP_TOP_0",
+                "value": 450
+            },
+            {
+                "key": "PROP_TOP_1",
+                "value": 90
+            },
+            {
+                "key": "PROP_TOP_2",
+                "value": 0.1
+            },
+            {
+                "key": "PROP_TOP_3",
+                "value": 100
+            },
+            {
+                "key": "PROP_TOP_4",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_5",
+                "value": 1
+            },
+            {
+                "key": "PROP_TOP_6",
+                "value": "Medina-Flores et al. (2010)"
+            },
+            {
+                "key": "PROP_TOP_7",
+                "value": true
+            },
+            {
+                "key": "PROP_TOP_8",
+                "value": false
+            },
+            {
+                "key": "PROP_TOP_9",
+                "value": false
+            }
+        ]
+    }
+}

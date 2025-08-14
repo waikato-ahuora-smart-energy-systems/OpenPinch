@@ -1,0 +1,145 @@
+{
+    "targets": [
+        {
+            "name": "Flowsheet/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 57.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 57.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1759.9999999999998,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 2080.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1759.9999999999995,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Flowsheet\\Module 23/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 259.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 11.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3000.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Flowsheet\\Module 23\\Module 24/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 53.4,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 81.3,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 239.99999999999997,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1060.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 239.99999999999994,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 1060.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}
