@@ -6,4 +6,3 @@ OpenPinch can be installed into a Python Environment by running:
 pip install idaes-pse
 ```
 More details to follow. 
-asdasds
