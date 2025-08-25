@@ -3,6 +3,6 @@ OpenPinch is a Python package for pinch analysis and total site integration stud
 OpenPinch can be installed into a Python Environment by running:
 ```bash
 # install latest stable release
-pip install idaes-pse
+pip install OpenPinch
 ```
 More details to follow. 
