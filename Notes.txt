@@ -1,5 +1,0 @@
-
-16 April 2025 - Tim Walmsley
-
-- Everything under unitOpClasses seems obsolete and is not referenced/used anywhere in OpenPinch. Action: ask Ethan about the intention.
-
