@@ -1,11 +1,11 @@
 import pytest
 import pandas as pd
-from src.lib import * 
-from src.classes import *
-from src.analysis.support_methods import *
+from OpenPinch.lib import * 
+from OpenPinch.classes import *
+from OpenPinch.analysis.support_methods import *
 
 
-from src.analysis.process_analysis import _initialise_utility_selected
+from OpenPinch.analysis.process_analysis import _initialise_utility_selected
 
 def test_initialise_utility_selected_returns_first_positive():
     utils = StreamCollection()
@@ -22,7 +22,7 @@ def test_initialise_utility_selected_falls_back_to_last():
     assert selected.name == "U2"
 
 
-from src.analysis.process_analysis import _advance_utility_if_needed
+from OpenPinch.analysis.process_analysis import _advance_utility_if_needed
 
 def test_advance_utility_reduces_current_heat_flow():
     u1 = Stream("U1", 200, 250, heat_flow=150.0)
@@ -50,7 +50,7 @@ def test_advance_utility_falls_back_to_last():
     assert result.name == "U2"  # fallback
 
 
-from src.analysis.process_analysis import _add_net_segment
+from OpenPinch.analysis.process_analysis import _add_net_segment
 
 def test_add_net_segment_single_segment():
     util = Stream("CU1", 200, 250, heat_flow=500)

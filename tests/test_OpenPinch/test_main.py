@@ -1,8 +1,8 @@
 import pytest
 import json, os
-from src.lib import *
-from src.main import *
-from src.analysis.support_methods import get_value
+from OpenPinch.lib import *
+from OpenPinch.main import *
+from OpenPinch.analysis.support_methods import get_value
 
 
 def get_test_filenames():

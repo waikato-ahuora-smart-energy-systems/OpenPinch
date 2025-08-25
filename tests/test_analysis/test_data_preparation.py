@@ -47,9 +47,9 @@ All edge cases aim to test both robustness and realistic behavior. Some tests in
 
 import pytest
 from pydantic import ValidationError
-from src.analysis.data_preparation import prepare_problem_struture, _validate_input_data
-from src.classes import *
-from src.lib import * 
+from OpenPinch.analysis.data_preparation import prepare_problem_struture, _validate_input_data
+from OpenPinch.classes import *
+from OpenPinch.lib import * 
 
 # ---------------- Fixtures ---------------- #
 
@@ -661,7 +661,7 @@ def test_zero_dtcont_and_dtglide():
     assert stream.t_max_star == stream.t_supply
     
 
-from src.analysis.data_preparation import _validate_zone_tree_structure
+from OpenPinch.analysis.data_preparation import _validate_zone_tree_structure
 
 def make_stream(zone: str) -> StreamSchema:
     return StreamSchema(
@@ -723,7 +723,7 @@ def test_nested_path_with_whitespace_trimming():
     assert tree.children[0].children[0].name == "Line A"
 
 
-from src.analysis.data_preparation import _validate_config_data_completed, _validate_streams_passed_in
+from OpenPinch.analysis.data_preparation import _validate_config_data_completed, _validate_streams_passed_in
 
 def test_invalid_config_missing_op_time(dummy_config):
     dummy_config.ANNUAL_OP_TIME = 0
@@ -731,7 +731,7 @@ def test_invalid_config_missing_op_time(dummy_config):
     assert out_config.ANNUAL_OP_TIME > 0
 
 
-from src.analysis.data_preparation import _get_validated_zone_info
+from OpenPinch.analysis.data_preparation import _get_validated_zone_info
 
 @pytest.mark.parametrize(
     "zone_type_str, expected_zone_type",
@@ -771,7 +771,7 @@ def test_non_schema_input_returns_site_zone_type():
     assert actual_zone_type == ZoneType.S.value
 
 
-from src.analysis.data_preparation import _create_nested_zones
+from OpenPinch.analysis.data_preparation import _create_nested_zones
 
 @pytest.fixture
 def config():

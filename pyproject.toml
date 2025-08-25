@@ -2,10 +2,17 @@
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["OpenPinch"]
 [project]
 name = "OpenPinch"
-version = "0.0.1"
+dependencies=[
+  "numpy",
+  "pint",
+  "pandas",
+  "coolprop",
+  "pydantic",
+]
+version = "0.0.8"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -13,7 +20,8 @@ description = "Package for performing Pinch Analysis on stream data"
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
 license = "MIT"

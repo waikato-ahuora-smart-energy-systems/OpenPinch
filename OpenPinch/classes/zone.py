@@ -1,4 +1,3 @@
-from __future__ import annotations
 from ..lib.enums import *
 from ..lib.config import *
 from typing import Optional, TYPE_CHECKING

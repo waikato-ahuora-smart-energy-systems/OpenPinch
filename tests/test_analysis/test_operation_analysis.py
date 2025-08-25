@@ -1,5 +1,5 @@
 import pytest
-from src.classes import *
-from src.lib import *
+from OpenPinch.classes import *
+from OpenPinch.lib import *
 
 

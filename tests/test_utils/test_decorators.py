@@ -3,8 +3,8 @@ import logging
 import time
 import pytest
 from io import StringIO
-from src.utils.decorators import timing_decorator
-import src.lib.config as config
+from OpenPinch.utils.decorators import timing_decorator
+import OpenPinch.lib.config as config
 
 def get_dummy_function():
     @timing_decorator

@@ -1,14 +1,14 @@
 import pytest
 import os, json
 import pandas as pd
-from src.lib import * 
-from src.analysis.support_methods import *
-from src.classes import Zone
-from src.analysis.data_preparation import prepare_problem_struture
+from OpenPinch.lib import * 
+from OpenPinch.analysis.support_methods import *
+from OpenPinch.classes import Zone
+from OpenPinch.analysis.data_preparation import prepare_problem_struture
 
 
 """Tests for target_utility"""
-from src.analysis.utility_targeting import target_utility
+from OpenPinch.analysis.utility_targeting import target_utility
 
 def get_test_filenames():
     test_data_dir = os.path.dirname(__file__) + '/test_utility_targeting_data'
@@ -64,7 +64,7 @@ def test_target_utility(filename):
     pass
 
 """Tests for _calc_GCC_without_pockets."""
-from src.analysis.utility_targeting import _calc_GCC_without_pockets
+from OpenPinch.analysis.utility_targeting import _calc_GCC_without_pockets
 
 def make_df(t_vals, h_net_vals) -> ProblemTable:
     return ProblemTable({
@@ -97,7 +97,7 @@ def test_calc_gcc_without_pockets(t_vals, h_net_vals, expected_middle, expect_fl
     # Pocket flattening check
     if expect_flat_pocket:
         # Get pinch points
-        from src.analysis.support_methods import get_pinch_loc
+        from OpenPinch.analysis.support_methods import get_pinch_loc
         h_idx, c_idx, valid = get_pinch_loc(pt_updated)
 
         if valid and h_idx + 1 < c_idx:
@@ -108,7 +108,7 @@ def test_calc_gcc_without_pockets(t_vals, h_net_vals, expected_middle, expect_fl
             )
 
 
-from src.analysis.utility_targeting import _calc_GCC_with_vertical_heat_transfer
+from OpenPinch.analysis.utility_targeting import _calc_GCC_with_vertical_heat_transfer
 
 def test_calc_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
     pt = ProblemTable({
@@ -125,7 +125,7 @@ def test_calc_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
     assert result.loc[-1, PT.H_NET_V.value] == 50  # Bottom-out should zero
 
 
-from src.analysis.utility_targeting import _calc_GCC_actual
+from OpenPinch.analysis.utility_targeting import _calc_GCC_actual
 
 def test_calc_gcc_actual_combines_columns():
     pt = ProblemTable({
@@ -139,7 +139,7 @@ def test_calc_gcc_actual_combines_columns():
     assert result[PT.H_NET_A.value].to_list() == expected
 
 
-from src.analysis.utility_targeting import _calc_seperated_heat_load_profiles
+from OpenPinch.analysis.utility_targeting import _calc_seperated_heat_load_profiles
 
 def test_calc_separated_heat_profiles_categorises_correctly():
     pt = ProblemTable({

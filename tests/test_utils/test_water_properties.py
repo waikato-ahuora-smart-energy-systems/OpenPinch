@@ -1,5 +1,5 @@
 import pytest
-from src.utils.water_properties import *
+from OpenPinch.utils.water_properties import *
 
 def test_unit_conversions():
     assert toSIunit_p(1.0) == 100000

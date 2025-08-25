@@ -1,8 +1,8 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.lib import *  
-from src.classes import *
+from OpenPinch.lib import *  
+from OpenPinch.classes import *
 
 # Core helper function
 def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
@@ -10,7 +10,7 @@ def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
 
 
 """Tests for the _sum_mcp_between_temperature_boundaries function."""
-from src.analysis.problem_table_analysis import _sum_mcp_between_temperature_boundaries
+from OpenPinch.analysis.problem_table_analysis import _sum_mcp_between_temperature_boundaries
 
 def test_no_overlap_streams_are_skipped():
     T = [300, 200, 100]
@@ -65,7 +65,7 @@ def test_empty_stream_lists_returns_zero():
 
 
 """Tests for calc_problem_table function."""
-from src.analysis.problem_table_analysis import calc_problem_table
+from OpenPinch.analysis.problem_table_analysis import calc_problem_table
 
 def make_simple_problem_table():
     data = {
@@ -114,7 +114,7 @@ def test_shifting_behavior():
 
 
 """Test cases for the _insert_temperature_interval_into_pt_at_constant_h function."""
-from src.analysis.problem_table_analysis import _insert_temperature_interval_into_pt_at_constant_h
+from OpenPinch.analysis.problem_table_analysis import _insert_temperature_interval_into_pt_at_constant_h
 
 def test_insert_constant_h_projection_hcc_to_ccc():
     pt_ls = [
@@ -164,7 +164,7 @@ def test_insert_constant_h_projection_hcc_to_ccc():
 
 
 """Tests for _set_zonal_targets function"""
-from src.analysis.problem_table_analysis import _set_zonal_targets
+from OpenPinch.analysis.problem_table_analysis import _set_zonal_targets
 
 # --- Fixtures & Helpers ---
 
@@ -263,7 +263,7 @@ def test_single_row_problem_table():
 
 
 """Test problem_table_algorithm"""
-from src.analysis.problem_table_analysis import problem_table_algorithm
+from OpenPinch.analysis.problem_table_analysis import problem_table_algorithm
 
 def test_problem_table_algorithm_executes():
     z = Zone(name="Z")
@@ -280,11 +280,11 @@ def test_problem_table_algorithm_executes():
     assert target_values["heat_recovery_target"] == 1.0
 
 """Test _add_temperature_intervals_at_constant_h"""
-from src.analysis.problem_table_analysis import _add_temperature_intervals_at_constant_h
+from OpenPinch.analysis.problem_table_analysis import _add_temperature_intervals_at_constant_h
 
 def test_add_temperature_intervals_skips_when_target_zero(monkeypatch):
     dummy_pt = ProblemTable({PT.T.value: [400, 300], PT.H_HOT.value: [0, 0], PT.H_COLD.value: [0, 0]})
-    monkeypatch.setattr("src.analysis.problem_table_analysis._insert_temperature_interval_into_pt_at_constant_h", lambda *args: args[1])
+    monkeypatch.setattr("OpenPinch.analysis.problem_table_analysis._insert_temperature_interval_into_pt_at_constant_h", lambda *args: args[1])
     
     result_pt, result_pt_real = _add_temperature_intervals_at_constant_h(0.0, dummy_pt.copy, dummy_pt.copy)
     assert result_pt == dummy_pt
@@ -297,7 +297,7 @@ def test_add_temperature_intervals_calls_insert(monkeypatch):
         calls.append(args)
         return args[0]  # Return the full DataFrame, not a column name
 
-    monkeypatch.setattr("src.analysis.problem_table_analysis._insert_temperature_interval_into_pt_at_constant_h", fake_insert)
+    monkeypatch.setattr("OpenPinch.analysis.problem_table_analysis._insert_temperature_interval_into_pt_at_constant_h", fake_insert)
 
     dummy_pt = ProblemTable({PT.T.value: [400, 300], PT.H_HOT.value: [0, 0], PT.H_COLD.value: [0, 0]})
     dummy_pt, _ = _add_temperature_intervals_at_constant_h(50.0, dummy_pt.copy, dummy_pt.copy)
@@ -305,7 +305,7 @@ def test_add_temperature_intervals_calls_insert(monkeypatch):
     assert len(calls) == 2
 
 """Test _correct_pt_composite_curves"""
-from src.analysis.problem_table_analysis import _correct_pt_composite_curves
+from OpenPinch.analysis.problem_table_analysis import _correct_pt_composite_curves
 
 def test_correct_pt_composite_curves_shifts_columns():
     pt = ProblemTable({
@@ -319,7 +319,7 @@ def test_correct_pt_composite_curves_shifts_columns():
 
 
 """Tests for the get_temperature_intervals function."""
-from src.analysis.problem_table_analysis import _get_temperature_intervals 
+from OpenPinch.analysis.problem_table_analysis import _get_temperature_intervals 
 
 def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
     return Stream(

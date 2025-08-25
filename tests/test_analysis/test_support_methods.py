@@ -1,8 +1,8 @@
 import pytest
 import math
-from src.classes import *
-from src.lib import * 
-from src.analysis.support_methods import *
+from OpenPinch.classes import *
+from OpenPinch.lib import * 
+from OpenPinch.analysis.support_methods import *
 
 
 """Test cases for the insert_temperature_interval_into_pt function."""
@@ -113,7 +113,7 @@ def test_random_float_noise():
 
 
 """Tests for get_pinch_temperatures."""
-from src.analysis.operation_analysis import get_pinch_temperatures
+from OpenPinch.analysis.operation_analysis import get_pinch_temperatures
 
 @pytest.mark.parametrize("case, h_vals, t_vals, expected", [
     ("standard_case", [100, 0.0, 100], [300, 250, 200], (250, 250)),
@@ -132,7 +132,7 @@ def test_get_pinch_temperatures(case, h_vals, t_vals, expected):
 
 
 """Tests for shift_heat_cascade."""
-from src.analysis.operation_analysis import shift_heat_cascade
+from OpenPinch.analysis.operation_analysis import shift_heat_cascade
 
 def test_shift_heat_cascade_with_enum_col():
     pt = ProblemTable({

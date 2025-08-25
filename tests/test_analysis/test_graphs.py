@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from src.analysis.graphs import (
+from OpenPinch.analysis.graphs import (
     _clean_composite,
     _create_curve,
     _graph_cc,
@@ -9,8 +9,8 @@ from src.analysis.graphs import (
     visualise_graphs,
     get_output_graphs
 )
-from src.lib import * 
-from src.classes import Zone
+from OpenPinch.lib import * 
+from OpenPinch.classes import Zone
 
 # ----------------------------------------------------------------------------------------------------
 # Unit Tests for Helper Functions
@@ -108,6 +108,6 @@ def test_get_output_graphs_single_zone(monkeypatch):
     zone.subzones = {}
     zone.targets = {TargetType.DI.value: MagicMock(name="TI", graphs={})}
 
-    monkeypatch.setattr("src.analysis.graphs._create_graph_set", lambda z, n: {"name": n, "graphs": []})
+    monkeypatch.setattr("OpenPinch.analysis.graphs._create_graph_set", lambda z, n: {"name": n, "graphs": []})
     result = get_output_graphs(zone)
     assert result == {}

@@ -1,4 +1,4 @@
-from .src import main
+from OpenPinch import main
 
 if __name__ == "__main__":
     filenames = main.get_test_filenames()

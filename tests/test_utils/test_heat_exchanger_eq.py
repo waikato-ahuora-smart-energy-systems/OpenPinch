@@ -1,7 +1,7 @@
 import math
 import pytest
-from src.utils.heat_exchanger_eq import *
-from src.lib import HeatExchangerTypes as HX
+from OpenPinch.utils.heat_exchanger_eq import *
+from OpenPinch.lib import HeatExchangerTypes as HX
 
 def test_Coth():
     assert round(Coth(1), 3) == round((math.exp(2) + 1)/(math.exp(2) - 1), 3)
