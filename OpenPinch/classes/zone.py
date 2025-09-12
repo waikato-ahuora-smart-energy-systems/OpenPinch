@@ -7,12 +7,13 @@ from .target import Target
 
 if TYPE_CHECKING:
     from .stream import Stream
+    from .zone import Zone
 
 
 class Zone():
     """Class representing any type of spatial zone or target (operation, zone, site, region, etc)."""
 
-    def __init__(self, name: str = "Zone", identifier: str = ZoneType.P.value, config: Optional[Configuration] = None, parent_zone: Zone = None):
+    def __init__(self, name: str = "Zone", identifier: str = ZoneType.P.value, config: Optional[Configuration] = None, parent_zone: "Zone" = None):
         
         # === Metadata ===
         self._name = name
@@ -208,7 +209,7 @@ class Zone():
         return self._utility_cost
 
 
-    def _zone_is_equal(self, zone1: Zone, zone2: Zone):
+    def _zone_is_equal(self, zone1: "Zone", zone2: "Zone"):
         """Basic equality check between two zones. Customize as needed."""
         return (
             zone1._hot_streams == zone2._hot_streams and

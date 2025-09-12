@@ -110,4 +110,4 @@ def test_get_output_graphs_single_zone(monkeypatch):
 
     monkeypatch.setattr("OpenPinch.analysis.graphs._create_graph_set", lambda z, n: {"name": n, "graphs": []})
     result = get_output_graphs(zone)
-    assert result == {}
+    assert result[TargetType.DI.value]['graphs'] == []

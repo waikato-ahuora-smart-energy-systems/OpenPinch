@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class Target():
     """Class representing energy targets."""
 
-    def __init__(self, name: str = "untitled", identifier: str = TargetType.DI.value, parent_zone: Zone = None, config: Optional[Configuration] = None):
+    def __init__(self, name: str = "untitled", identifier: str = TargetType.DI.value, parent_zone: "Zone" = None, config: Optional[Configuration] = None):
 
         # === Metadata ===
         self._config = config or Configuration()
