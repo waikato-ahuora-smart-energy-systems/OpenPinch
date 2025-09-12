@@ -1,29 +1,53 @@
 import pytest
 import json, os
+from pathlib import Path
 from OpenPinch.lib import *
 from OpenPinch.main import *
 from OpenPinch.analysis.support_methods import get_value
 
 
-def get_test_filenames():
-    test_data_dir = os.path.dirname(__file__) + '/test_data'
+def get_example_problem_filepaths():
+    test_data_dir = Path(__file__).resolve().parents[2] / "examples" / "stream_data"
     return [
-        filename
-        for filename in os.listdir(test_data_dir)
-        if filename.startswith("p_") and filename.endswith(".json")
+        filepath
+        for filepath in test_data_dir.iterdir()
+        if filepath.name.startswith("p_") and filepath.name.endswith(".json")
     ]
 
-@pytest.mark.parametrize("filename", get_test_filenames())
-def test_pinch_analysis_pipeline(filename):
+def get_results_filepath(problem_filepath: Path) -> Path:
+    """
+    Given a problem file path (e.g. .../examples/stream_data/p_case.json),
+    return the corresponding results file path (.../examples/results/r_case.json).
+    Raise FileNotFoundError if the results file does not exist.
+    """
+    # Go up from stream_data → examples
+    examples_dir = problem_filepath.parent.parent
+    results_dir = examples_dir / "results"
+
+    # Swap prefix p_ → r_
+    result_name = problem_filepath.name.replace("p_", "r_", 1)
+    result_path = results_dir / result_name
+
+    # Validate existence
+    if not result_path.exists():
+        raise FileNotFoundError(
+            f"Expected results file not found: {result_path} "
+            f"(problem file was {problem_filepath})"
+        )
+
+    return result_path
+
+
+@pytest.mark.parametrize("p_filepath", get_example_problem_filepaths())
+def test_pinch_analysis_pipeline(p_filepath: Path):
 
     # Set the file path to the directory of this script
-    filepath = os.path.dirname(__file__) + '/test_data'
-    p_file_path = filepath + '/p_' + filename[2:]
-    r_file_path = filepath + '/r_' + filename[2:]
-    with open(p_file_path) as json_data:
+    with open(p_filepath) as json_data:
         data = json.load(json_data)
 
-    project_name = filename[2:-5]
+    r_filepath = get_results_filepath(p_filepath)
+
+    project_name = p_filepath.stem[2:]
 
     # Validate request data using Pydantic model
     request_data = TargetRequest.model_validate(data)
@@ -41,7 +65,7 @@ def test_pinch_analysis_pipeline(filename):
     res = TargetResponse.model_validate(return_data)
 
     # Get and calidate the format of the "correct" targets from the Open Pinch workbook
-    with open(r_file_path) as json_data:
+    with open(r_filepath) as json_data:
         wkb_res = json.load(json_data)
     wkb_res = TargetResponse.model_validate(wkb_res)
 
