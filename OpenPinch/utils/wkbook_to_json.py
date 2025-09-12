@@ -3,7 +3,75 @@ import json
 import os
 import openpyxl, pyxlsb
 
-def get_column_names_and_units(df_full, sheet_name, row_units=1):
+#######################################################################################################
+# Public API
+#######################################################################################################
+
+def get_problem_from_excel(excel_file, output_json=None):
+    """
+    Reads the 'Streams' and 'Utilities' sheets from `excel_file`, assuming
+    each has:
+      - Row 1 = column names
+      - Row 2 = column units
+      - Row 3 onward = data
+    Then writes a JSON file (similar to the provided example) containing:
+      {
+        "streams": [...],
+        "utilities": [...]
+      }
+    """
+    
+    streams_data = _parse_sheet_with_units(excel_file, sheet_name="Stream Data")
+    utilities_data = _parse_sheet_with_units(excel_file, sheet_name="Utility Data")
+    options_data = _set_options()
+
+    # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
+    output_dict = {
+        "streams": streams_data,
+        "utilities": utilities_data,
+        "options": options_data,
+    }
+
+    if isinstance(output_json, str):
+        # Write the final JSON structure to file
+        with open(output_json, "w", encoding="utf-8") as f:
+            json.dump(output_dict, f, indent=4)
+        print(f"JSON data successfully written to {output_json}")
+    
+    return output_dict
+
+
+def get_results_from_excel(excel_file, output_json, project_name):
+    """
+    Reads the 'Results' sheet from `excel_file`, assuming
+    each has:
+      - Row 1 = column names
+      - Row 2 = column units
+      - Row 3 onward = data
+    Then writes a JSON file (similar to the provided example) containing:
+      {
+        "graphs": [...]
+    """
+    results_data = _parse_sheet_with_units(excel_file, sheet_name="Summary", row_units=2, row_data=4, project_name=project_name)
+
+    # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
+    output_dict = {
+        "targets": results_data,
+    }
+
+    if isinstance(output_json, str):
+        # Write the final JSON structure to file
+        with open(output_json, "w", encoding="utf-8") as f:
+            json.dump(output_dict, f, indent=4)
+        print(f"JSON data successfully written to {output_json}")
+    
+    return output_dict
+
+#######################################################################################################
+# Helper functions
+#######################################################################################################
+
+def _get_column_names_and_units(df_full, sheet_name, row_units=1):
     # First row = column names
     # Second row = units
     if sheet_name == "Stream Data":
@@ -33,7 +101,8 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
     
     return col_names, col_units
 
-def parse_sheet_with_units(excel_file, sheet_name, row_units=1, row_data=2, project_name=None):
+
+def _parse_sheet_with_units(excel_file, sheet_name, row_units=1, row_data=2, project_name=None):
     """
     Reads a sheet from `excel_file` in which:
       - Row 1 = column names
@@ -50,7 +119,7 @@ def parse_sheet_with_units(excel_file, sheet_name, row_units=1, row_data=2, proj
     df_full = pd.read_excel(excel_file, sheet_name=sheet_name, header=None)
 
     # Get the column names and units from the first two rows
-    col_names, col_units = get_column_names_and_units(df_full, sheet_name, row_units)
+    col_names, col_units = _get_column_names_and_units(df_full, sheet_name, row_units)
 
     # The actual data starts from the third row
     df_data: pd.DataFrame = df_full.iloc[row_data:].copy()
@@ -67,11 +136,12 @@ def parse_sheet_with_units(excel_file, sheet_name, row_units=1, row_data=2, proj
     units_map = dict(zip(col_names, col_units))
 
     if sheet_name == "Summary":
-        return write_targets_to_dict_and_list(df_data, units_map, project_name)
+        return _write_targets_to_dict_and_list(df_data, units_map, project_name)
     else:
-        return write_problem_to_dict_and_list(df_data, units_map)
+        return _write_problem_to_dict_and_list(df_data, units_map)
 
-def write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> list:
+
+def _write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> list:
     # Convert each row to a dictionary, attaching units where appropriate
     records = []
     for _, row in df_data.iterrows():
@@ -94,7 +164,8 @@ def write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
 
     return records
 
-def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict, project_name: str) -> list:
+
+def _write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict, project_name: str) -> list:
     # Convert each row to a dictionary, attaching units where appropriate
     records = []
     for _, row in df_data.iterrows():
@@ -181,7 +252,8 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict, proje
         reordered.append(dict(items[2:] + items[:2]))
     return reordered
 
-def set_options():
+
+def _set_options():
     """
     Create and set default options.
     """
@@ -200,71 +272,3 @@ def set_options():
                 {"key": "PROP_TOP_9", "value": False}
             ]
     }
-
-def problem_excel_to_json(excel_file, output_json):
-    """
-    Reads the 'Streams' and 'Utilities' sheets from `excel_file`, assuming
-    each has:
-      - Row 1 = column names
-      - Row 2 = column units
-      - Row 3 onward = data
-    Then writes a JSON file (similar to the provided example) containing:
-      {
-        "streams": [...],
-        "utilities": [...]
-      }
-    """
-    
-    streams_data = parse_sheet_with_units(excel_file, sheet_name="Stream Data")
-    utilities_data = parse_sheet_with_units(excel_file, sheet_name="Utility Data")
-    options_data = set_options()
-
-    # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
-    output_dict = {
-        "streams": streams_data,
-        "utilities": utilities_data,
-        "options": options_data,
-    }
-
-    # Write the final JSON structure to file
-    with open(output_json, "w", encoding="utf-8") as f:
-        json.dump(output_dict, f, indent=4)
-    print(f"JSON data successfully written to {output_json}")
-
-def results_excel_to_json(excel_file, output_json, project_name):
-    """
-    Reads the 'Results' sheet from `excel_file`, assuming
-    each has:
-      - Row 1 = column names
-      - Row 2 = column units
-      - Row 3 onward = data
-    Then writes a JSON file (similar to the provided example) containing:
-      {
-        "graphs": [...]
-    """
-    results_data = parse_sheet_with_units(excel_file, sheet_name="Summary", row_units=2, row_data=4, project_name=project_name)
-
-    # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
-    output_dict = {
-        "targets": results_data,
-    }
-
-    # Write the final JSON structure to file
-    with open(output_json, "w", encoding="utf-8") as f:
-        json.dump(output_dict, f, indent=4)
-    print(f"JSON data successfully written to {output_json}")
-
-# Set the file path to the directory of this script
-filepath_load = os.path.dirname(__file__) + '/OpenPinchWkbs'
-filepath_save = os.path.dirname(os.path.dirname(__file__)) + "/test_OpenPinch/test_data"
-
-for filename in os.listdir(filepath_load):
-    # filename = 'locally_integrated.xlsb'
-    if (filename.endswith(".xlsb") or filename.endswith(".xlsx")) and not filename.startswith("~$"):
-        excel_file = os.path.join(filepath_load, filename)
-        project_name = os.path.splitext(filename)[0]
-        p_json_file = filepath_save + "/p_" + project_name + ".json"
-        problem_excel_to_json(excel_file, p_json_file)
-        
-        r_json_file = filepath_save + "/r_" + project_name + ".json"
-        results_excel_to_json(excel_file, r_json_file, project_name)

@@ -24,20 +24,6 @@ def target(streams: List[StreamSchema], utilities: List[UtilitySchema], options:
     return output_response(master_zone)    
 
 
-########### TODO: This function is untested and not updated since the overhaul of OpenPinch. Broken, most likely.#####
-@timing_decorator
-def visualise(data) -> dict:
-    """Function for building graphs from problem tables as opposed to class instances."""
-    r_data = {'graphs': []}
-    z: Zone
-    for z in data:
-        graph_set = {'name': f"{z.name}", 'graphs': []}
-        for graph in z.graphs:
-            visualise_graphs(graph_set, graph)
-        r_data['graphs'].append(graph_set)
-    return r_data
-
-
 def targeting_analysis_from_pinch_service(data: Any, parent_fs_name: str ='Project') -> TargetResponse:
     """Calculates targets and outputs from inputs and options"""
     # Validate request data using Pydantic model
@@ -57,4 +43,18 @@ def targeting_analysis_from_pinch_service(data: Any, parent_fs_name: str ='Proje
 
     # Return data
     return validated_data
+
+
+########### TODO: This function is untested and not updated since the overhaul of OpenPinch. Broken, most likely.#####
+@timing_decorator
+def visualise(data) -> dict:
+    """Function for building graphs from problem tables as opposed to class instances."""
+    r_data = {'graphs': []}
+    z: Zone
+    for z in data:
+        graph_set = {'name': f"{z.name}", 'graphs': []}
+        for graph in z.graphs:
+            visualise_graphs(graph_set, graph)
+        r_data['graphs'].append(graph_set)
+    return r_data
 

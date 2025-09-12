@@ -256,7 +256,7 @@ def set_options():
             ]
     }
 
-def problem_excel_to_json(excel_file, output_json):
+def get_problem_from_excel(excel_file, output_json):
     """
     Reads the 'Streams' and 'Utilities' sheets from `excel_file`, assuming
     each has:
@@ -288,7 +288,7 @@ def problem_excel_to_json(excel_file, output_json):
         json.dump(output_dict, f, indent=4)
     print(f"JSON data successfully written to {output_json}")
 
-def results_excel_to_json(excel_file, output_json):
+def get_results_from_excel(excel_file, output_json):
     """
     Reads the 'Results' sheet from `excel_file`, assuming
     each has:
@@ -312,8 +312,8 @@ def results_excel_to_json(excel_file, output_json):
     print(f"JSON data successfully written to {output_json}")
 
 # Set the file path to the directory of this script
-filepath_load = os.path.dirname(__file__) + '/OpenPinchWkbs'
-filepath_save = os.path.dirname(os.path.dirname(__file__)) + "/test_analysis/test_utility_targeting_data"
+filepath_load = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + '/OpenPinchWkbs'
+filepath_save = os.path.dirname(__file__) + '/new'
 
 for filename in os.listdir(filepath_load):
     # filename = 'locally_integrated.xlsb'
@@ -321,7 +321,7 @@ for filename in os.listdir(filepath_load):
         excel_file = os.path.join(filepath_load, filename)
 
         p_json_file = filepath_save + "/p_" + os.path.splitext(filename)[0] + ".json"
-        problem_excel_to_json(excel_file, p_json_file)
+        get_problem_from_excel(excel_file, p_json_file)
         
         r_json_file = filepath_save + "/r_" + os.path.splitext(filename)[0] + ".json"
-        results_excel_to_json(excel_file, r_json_file)
+        get_results_from_excel(excel_file, r_json_file)
