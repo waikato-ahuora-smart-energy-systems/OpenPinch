@@ -11,7 +11,6 @@ def run_from_json():
 
     res = main.targeting_analysis_from_pinch_service(input_data)
     
-
     with open(r_file_path) as f:
         wkb_res = json.load(f)
     wkb_res = main.TargetResponse.model_validate(wkb_res)    

@@ -11,6 +11,8 @@ dependencies=[
   "pandas",
   "coolprop",
   "pydantic",
+  "openpyxl", 
+  "pyxlsb",
 ]
 version = "0.0.8"
 authors = [
