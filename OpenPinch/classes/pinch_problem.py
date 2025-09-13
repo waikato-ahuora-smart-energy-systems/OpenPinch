@@ -131,8 +131,8 @@ class PinchProblem:
                 "No input loaded. Call load(...) first."
             )
         if self._results is None:
-            from ..main import targeting_analysis_from_pinch_service
-            self._results = targeting_analysis_from_pinch_service(
+            from ..main import pinch_analysis_service
+            self._results = pinch_analysis_service(
                 self._problem_data
             )
         return self._results

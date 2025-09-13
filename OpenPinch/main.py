@@ -10,8 +10,7 @@ from .analysis import (
     output_response
 )
 
-
-__all__ = ["get_targets", "targeting_analysis_from_pinch_service", "visualise"]
+__all__ = ["get_targets", "pinch_analysis_service", "visualise"]
 
 
 @timing_decorator
@@ -30,7 +29,7 @@ def get_targets(streams: List[StreamSchema], utilities: List[UtilitySchema], opt
     return output_response(master_zone)    
 
 
-def targeting_analysis_from_pinch_service(data: Any, parent_fs_name: str ='Project') -> TargetResponse:
+def pinch_analysis_service(data: Any, parent_fs_name: str ='Project') -> TargetResponse:
     """Calculates targets and outputs from inputs and options"""
     # Validate request data using Pydantic model
     request_data = TargetRequest.model_validate(data)
@@ -42,7 +41,7 @@ def targeting_analysis_from_pinch_service(data: Any, parent_fs_name: str ='Proje
         utilities=request_data.utilities, 
         options=request_data.options,
         name=parent_fs_name,
-        )
+    )
 
     # Validate response data
     validated_data = TargetResponse.model_validate(return_data)
