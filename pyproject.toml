@@ -14,7 +14,7 @@ dependencies=[
   "openpyxl", 
   "pyxlsb",
 ]
-version = "0.0.3"
+version = "0.0.10"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
