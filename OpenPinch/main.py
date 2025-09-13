@@ -10,23 +10,7 @@ from .analysis import (
     output_response
 )
 
-__all__ = ["get_targets", "pinch_analysis_service", "visualise"]
-
-
-@timing_decorator
-def get_targets(streams: List[StreamSchema], utilities: List[UtilitySchema], options: List[Options], name: str ='Project', zone_tree: ZoneTreeSchema = None) -> dict:
-    """Conduct advanced pinch analysis and total site analysis on the given streams and utilities."""
-    master_zone = prepare_problem_struture(streams, utilities, options, name, zone_tree)
-    if master_zone.identifier in [ZoneType.R.value, ZoneType.C.value]:
-        master_zone = get_regional_targets(master_zone)
-    elif master_zone.identifier == ZoneType.S.value:
-        master_zone = get_site_targets(master_zone)
-    elif master_zone.identifier == ZoneType.P.value:
-        master_zone = get_process_pinch_targets(master_zone)
-    else:
-        raise ValueError("No valid zone passed into OpenPinch for analysis.")
-    
-    return output_response(master_zone)    
+__all__ = ["pinch_analysis_service", "get_targets", "visualise"]
 
 
 def pinch_analysis_service(data: Any, parent_fs_name: str ='Project') -> TargetResponse:
@@ -48,6 +32,22 @@ def pinch_analysis_service(data: Any, parent_fs_name: str ='Project') -> TargetR
 
     # Return data
     return validated_data
+
+
+@timing_decorator
+def get_targets(streams: List[StreamSchema], utilities: List[UtilitySchema], options: List[Options], name: str ='Project', zone_tree: ZoneTreeSchema = None) -> dict:
+    """Conduct advanced pinch analysis and total site analysis on the given streams and utilities."""
+    master_zone = prepare_problem_struture(streams, utilities, options, name, zone_tree)
+    if master_zone.identifier in [ZoneType.R.value, ZoneType.C.value]:
+        master_zone = get_regional_targets(master_zone)
+    elif master_zone.identifier == ZoneType.S.value:
+        master_zone = get_site_targets(master_zone)
+    elif master_zone.identifier == ZoneType.P.value:
+        master_zone = get_process_pinch_targets(master_zone)
+    else:
+        raise ValueError("No valid zone passed into OpenPinch for analysis.")
+    
+    return output_response(master_zone)    
 
 
 ########### TODO: This function is untested and not updated since the overhaul of OpenPinch. Broken, most likely.#####
