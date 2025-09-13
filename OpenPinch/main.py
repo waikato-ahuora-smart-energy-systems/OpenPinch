@@ -1,15 +1,21 @@
-import os
-import json
-from .classes import *
+from .classes import Zone
 from .lib import *
 from .utils import *
-from .analysis import prepare_problem_struture, get_site_targets, get_process_pinch_targets, get_regional_targets, visualise_graphs, output_response
+from .analysis import (
+    prepare_problem_struture, 
+    get_site_targets, 
+    get_process_pinch_targets, 
+    get_regional_targets, 
+    visualise_graphs, 
+    output_response
+)
 
 
-__all__ = ["target", "visualise"]
+__all__ = ["get_targets", "targeting_analysis_from_pinch_service", "visualise"]
+
 
 @timing_decorator
-def target(streams: List[StreamSchema], utilities: List[UtilitySchema], options: List[Options], name: str ='Project', zone_tree: ZoneTreeSchema = None) -> dict:
+def get_targets(streams: List[StreamSchema], utilities: List[UtilitySchema], options: List[Options], name: str ='Project', zone_tree: ZoneTreeSchema = None) -> dict:
     """Conduct advanced pinch analysis and total site analysis on the given streams and utilities."""
     master_zone = prepare_problem_struture(streams, utilities, options, name, zone_tree)
     if master_zone.identifier in [ZoneType.R.value, ZoneType.C.value]:
@@ -30,7 +36,7 @@ def targeting_analysis_from_pinch_service(data: Any, parent_fs_name: str ='Proje
     request_data = TargetRequest.model_validate(data)
 
     # Perform advanced pinch analysis and total site analysis
-    return_data = target(
+    return_data = get_targets(
         zone_tree=request_data.zone_tree,
         streams=request_data.streams, 
         utilities=request_data.utilities, 
@@ -58,3 +64,5 @@ def visualise(data) -> dict:
         r_data['graphs'].append(graph_set)
     return r_data
 
+
+########### TODO ends ########### 

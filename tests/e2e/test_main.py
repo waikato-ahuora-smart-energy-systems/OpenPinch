@@ -53,7 +53,7 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
     request_data = TargetRequest.model_validate(data)
 
     # Perform advanced pinch analysis and total site analysis
-    return_data = target(
+    return_data = get_targets(
         zone_tree=request_data.zone_tree,
         streams=request_data.streams,
         utilities=request_data.utilities,

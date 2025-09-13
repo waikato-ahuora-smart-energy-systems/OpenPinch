@@ -1,136 +1,151 @@
-from pydantic import BaseModel
-from typing import Any, List, Optional, Dict
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Union
+from pydantic import BaseModel, Field, ConfigDict
 from .enums import MainOptionsPropKeys, TurbineOptionsPropKeys, StreamType
 
-class ValueWithUnit(BaseModel):
-    value: float | None
-    units: str
+# ---- Common type aliases -----------------------------------------------------
+ScalarOrVU = Union[float, "ValueWithUnit"]
+MaybeVU = Union[float, "ValueWithUnit", None]
 
-# Hot or Cold Utility
+# ---- Core value types --------------------------------------------------------
+class ValueWithUnit(BaseModel):
+    value: Optional[float] = Field(default=None, description="Numeric value (magnitude).")
+    units: str = Field(..., description="Unit string, e.g. 'kW', '°C', 'kJ/s'.")
+
+# ---- Utilities & Pinch temps -------------------------------------------------
 class HeatUtility(BaseModel):
     name: str
-    heat_flow: float | ValueWithUnit
+    heat_flow: ScalarOrVU
 
-# Pinch Temperature/s
 class TempPinch(BaseModel):
-    cold_temp: Optional[float] | Optional[ValueWithUnit] = None
-    hot_temp: Optional[float] | Optional[ValueWithUnit] = None
+    cold_temp: MaybeVU = None
+    hot_temp: MaybeVU = None
 
-# Individual Target Summary
+# ---- Targeting results -------------------------------------------------------
 class TargetResults(BaseModel):
     name: str
-    degree_of_integration: Optional[float] | Optional[ValueWithUnit] = None
-    Qh: float | ValueWithUnit
-    Qc: float | ValueWithUnit
-    Qr: float | ValueWithUnit
-    utility_cost: float | ValueWithUnit = None
-    row_type: str = None
-    hot_utilities: List[HeatUtility]
-    cold_utilities: List[HeatUtility]
-    temp_pinch: TempPinch
-    work_target: float | ValueWithUnit = None
-    turbine_efficiency_target: float | ValueWithUnit = None
-    area: float | ValueWithUnit = None
-    num_units: float = None
-    capital_cost: float = None
-    total_cost: float = None
-    exergy_sources: float | ValueWithUnit = None
-    exergy_sinks: float | ValueWithUnit = None
-    ETE: float = None
-    exergy_req_min: float | ValueWithUnit = None
-    exergy_des_min: float | ValueWithUnit = None
 
-# Coordinate
+    degree_of_integration: MaybeVU = None
+
+    Qh: ScalarOrVU
+    Qc: ScalarOrVU
+    Qr: ScalarOrVU
+
+    utility_cost: MaybeVU = None
+    row_type: Optional[str] = None
+
+    hot_utilities: List[HeatUtility] = Field(default_factory=list)
+    cold_utilities: List[HeatUtility] = Field(default_factory=list)
+
+    temp_pinch: TempPinch
+
+    work_target: MaybeVU = None
+    turbine_efficiency_target: MaybeVU = None
+    area: MaybeVU = None
+
+    num_units: Optional[float] = None
+    capital_cost: Optional[float] = None
+    total_cost: Optional[float] = None
+
+    exergy_sources: MaybeVU = None
+    exergy_sinks: MaybeVU = None
+    ETE: Optional[float] = None
+    exergy_req_min: MaybeVU = None
+    exergy_des_min: MaybeVU = None
+
+# ---- Graphing primitives -----------------------------------------------------
 class DataPoint(BaseModel):
     x: float
     y: float
 
-# Line Segment
 class Segment(BaseModel):
     title: Optional[str] = None
-    colour: Optional[int] = None
-    arrow: Optional[str] = None
-    data_points: Optional[List[DataPoint]] = None
+    colour: Optional[int] = Field(
+        default=None,
+        description="Optional integer colour (e.g., RGB packed int or palette index).",
+    )
+    arrow: Optional[str] = Field(
+        default=None,
+        description="Optional arrow style; consider making this an Enum.",
+    )
+    data_points: List[DataPoint] = Field(default_factory=list)
 
-# Individual Graph
 class Graph(BaseModel):
-    segments: Optional[List[Segment]] = []
+    # Consider making 'type' an Enum (e.g., GCC, CCC, PT, etc.) for safety.
     type: str
+    segments: List[Segment] = Field(default_factory=list)
 
-    class Config:  
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 class GraphSet(BaseModel):
     name: str = "GraphSet"
-    graphs: List[Graph]
+    graphs: List[Graph] = Field(default_factory=list)
 
-# Aggregate request type
+# ---- Aggregate response ------------------------------------------------------
 class TargetResponse(BaseModel):
-    name: str = 'Site'
+    name: str = "Site"
     targets: List[TargetResults]
-    graphs: Dict[str, GraphSet] = None
+    graphs: Optional[Dict[str, GraphSet]] = None
 
-# Single Stream Instance
+# ---- Stream & Utility definitions -------------------------------------------
 class StreamSchema(BaseModel):
     zone: str
     name: str
-    t_supply: float | ValueWithUnit
-    t_target: float | ValueWithUnit
-    heat_flow: float | ValueWithUnit
-    dt_cont: float | ValueWithUnit
-    htc: float | ValueWithUnit
-    active: Optional[bool] = True
 
-# Single Utility Instance
+    t_supply: ScalarOrVU
+    t_target: ScalarOrVU
+    heat_flow: ScalarOrVU
+
+    dt_cont: ScalarOrVU
+    htc: ScalarOrVU
+
+    active: bool = True
+
 class UtilitySchema(BaseModel):
     name: str
     type: StreamType
-    t_supply: float | ValueWithUnit
-    t_target: float | ValueWithUnit
-    heat_flow: Optional[float] | Optional[ValueWithUnit]
-    dt_cont: float | ValueWithUnit
-    htc: float | ValueWithUnit
-    price: float | ValueWithUnit
-    active: Optional[bool] = True
 
-    class Config:  
-        use_enum_values = True
+    t_supply: ScalarOrVU
+    t_target: ScalarOrVU
+    heat_flow: Optional[ScalarOrVU] = None
 
-# Zone relationships and nested tree structure
+    dt_cont: ScalarOrVU
+    htc: ScalarOrVU
+    price: ScalarOrVU
+
+    active: bool = True
+
+    model_config = ConfigDict(use_enum_values=True)
+
+# ---- Zone tree ---------------------------------------------------------------
 class ZoneTreeSchema(BaseModel):
     name: str
     type: str
-    children: Optional[List["ZoneTreeSchema"]] = []
+    children: Optional[List["ZoneTreeSchema"]] = None
 
-# Turbine Option Dict
+# ---- Options -----------------------------------------------------------------
 class TurbineOption(BaseModel):
     key: TurbineOptionsPropKeys
     value: Any
 
-    class Config:  
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
-# Primary Options
 class Options(BaseModel):
-    main: List[MainOptionsPropKeys]
+    main: List[MainOptionsPropKeys] = Field(default_factory=list)
     # graphs: List[GraphOptionsPropKeys]
-    turbine: List[TurbineOption]
+    turbine: List[TurbineOption] = Field(default_factory=list)
 
-    class Config:  
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
-# Complete Request
+# ---- Complete request --------------------------------------------------------
 class TargetRequest(BaseModel):
     streams: List[StreamSchema]
-    utilities: Optional[List[UtilitySchema]] = []  
+    utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[Options] = None
     zone_tree: Optional[ZoneTreeSchema] = None
 
-
-
-
-
-# Test required schema
+# ---- Problem table / TH data (for tests & I/O) -------------------------------
 class THSchema(BaseModel):
     T: List[float]
     H_hot: Optional[List[float]] = None
@@ -146,5 +161,5 @@ class ProblemTableDataSchema(BaseModel):
 class GetInputOutputData(BaseModel):
     plant_profile_data: List[ProblemTableDataSchema]
     streams: List[StreamSchema]
-    utilities: Optional[List[UtilitySchema]] = []  
+    utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[Options] = None
