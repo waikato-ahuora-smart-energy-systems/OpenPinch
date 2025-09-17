@@ -3,9 +3,9 @@ name: CI & Publish
 
 on:
   push:
-    branches: [ main ]
-    tags: [ "v*" ]
-  pull_request:
+    branches: [ "main" ]
+    paths-ignore: [ ".github/**", ".vscode/**" ]
+  workflow_dispatch:
 
 jobs:
   test:
