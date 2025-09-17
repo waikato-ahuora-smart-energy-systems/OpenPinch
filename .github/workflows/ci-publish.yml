@@ -25,9 +25,31 @@ jobs:
       - name: Run tests
         run: pytest -q
 
-  build:
+  bump-project-version:
     runs-on: ubuntu-latest
     needs: test
+    steps:
+      - name: Bump Python project version
+        id: bump
+        uses: callowayproject/bump-my-version@master
+        env:
+          BUMPVERSION_TAG: "true"
+        with:
+          args: "patch"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Report version change
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          echo "Version was bumped from ${{ steps.bump.outputs.previous-version }} to ${{ steps.bump.outputs.current-version }}!"
+
+    outputs:
+      bumped: ${{ steps.bump.outputs.bumped }}
+
+  build:
+    runs-on: ubuntu-latest
+    needs: bump-project-version
+    if: needs.bump-project-version.outputs.bumped == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -47,30 +69,8 @@ jobs:
           name: openpinch-dist
           path: dist/*
 
-  bump-project-version:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Bump Python project version
-        id: bump
-        uses: callowayproject/bump-my-version@master
-        env:
-          BUMPVERSION_TAG: "true"
-        with:
-          args: "patch"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Report version change
-        if: steps.bump.outputs.bumped == 'true'
-        run: |
-          echo "Version was bumped from ${{ steps.bump.outputs.previous-version }} to ${{ steps.bump.outputs.current-version }}!"
-
-    outputs:
-      bumped: ${{ steps.bump.outputs.bumped }}
-
   publish-testpypi:
-    needs: bump-project-version
-    if: needs.bump-project-version.outputs.bumped == 'true'
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # required for Trusted Publishing (even to TestPyPI)
@@ -87,8 +87,7 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    needs: bump-project-version
-    if: needs.bump-project-version.outputs.bumped == 'true'
+    needs: publish-testpypi
     runs-on: ubuntu-latest
     environment:
       name: pypi
