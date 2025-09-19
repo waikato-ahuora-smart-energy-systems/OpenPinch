@@ -9,7 +9,7 @@ __all__ = ["get_piecewise_linearisation_for_streams"]
 # Public API
 #######################################################################################################
 
-def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_data: List[List[float],List[float]], dt_diff_max: float) -> np.array:
+def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_data: list, dt_diff_max: float) -> np.array:
 
     if len(streams) != len(t_h_data):
         raise ValueError(f"Piecewise linearisation failed due to a different number of streams and temperature-enthalpy datasets.")
