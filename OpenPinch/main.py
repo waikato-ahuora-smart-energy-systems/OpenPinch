@@ -13,10 +13,10 @@ from .analysis import (
 __all__ = ["pinch_analysis_service", "get_targets", "get_visualise"]
 
 
-def pinch_analysis_service(data: Any, project_name: str ='Project') -> TargetOutputs:
+def pinch_analysis_service(data: Any, project_name: str ='Project') -> TargetOutput:
     """Calculates targets and outputs from inputs and options"""
     # Validate request data using Pydantic model
-    request_data = TargetInputs.model_validate(data)
+    request_data = TargetInput.model_validate(data)
 
     # Perform advanced pinch analysis and total site analysis
     return_data = get_targets(
@@ -28,7 +28,7 @@ def pinch_analysis_service(data: Any, project_name: str ='Project') -> TargetOut
     )
 
     # Validate response data
-    validated_data = TargetOutputs.model_validate(return_data)
+    validated_data = TargetOutput.model_validate(return_data)
 
     # Return data
     return validated_data
