@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, ConfigDict
-from .enums import MainOptionsPropKeys, TurbineOptionsPropKeys, StreamType, GraphType
+from .enums import MainOptionsPropKeys, TurbineOptionsPropKeys, StreamType
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
@@ -83,7 +83,7 @@ class GraphSet(BaseModel):
     graphs: List[Graph] = Field(default_factory=list)
 
 # ---- Aggregate response ------------------------------------------------------
-class TargetOutputs(BaseModel):
+class TargetOutput(BaseModel):
     name: str = "Site"
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
@@ -139,7 +139,7 @@ class Options(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 # ---- Complete request --------------------------------------------------------
-class TargetInputs(BaseModel):
+class TargetInput(BaseModel):
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[Options] = None
@@ -184,7 +184,7 @@ class LineariseInput(BaseModel):
     mole_flow: float = 1.0
 
 
-class LinearizeOutput(BaseModel):
+class LineariseOutput(BaseModel):
     streams: List[Optional[list]]
     
 

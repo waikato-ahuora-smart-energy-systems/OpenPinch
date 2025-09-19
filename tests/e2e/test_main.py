@@ -50,7 +50,7 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
     project_name = p_filepath.stem[2:]
 
     # Validate request data using Pydantic model
-    request_data = TargetInputs.model_validate(data)
+    request_data = TargetInput.model_validate(data)
 
     # Perform advanced pinch analysis and total site analysis
     return_data = get_targets(
@@ -62,12 +62,12 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
     )
 
     # Validate response data
-    res = TargetOutputs.model_validate(return_data)
+    res = TargetOutput.model_validate(return_data)
 
     # Get and calidate the format of the "correct" targets from the Open Pinch workbook
     with open(r_filepath) as json_data:
         wkb_res = json.load(json_data)
-    wkb_res = TargetOutputs.model_validate(wkb_res)
+    wkb_res = TargetOutput.model_validate(wkb_res)
 
     # Compare targets from Python and Excel implementations of Open Pinch
     if 1:
