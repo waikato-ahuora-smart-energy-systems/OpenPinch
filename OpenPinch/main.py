@@ -10,13 +10,13 @@ from .analysis import (
     output_response
 )
 
-__all__ = ["pinch_analysis_service", "get_targets", "visualise"]
+__all__ = ["pinch_analysis_service", "get_targets", "get_visualise"]
 
 
-def pinch_analysis_service(data: Any, parent_fs_name: str ='Project') -> TargetResponse:
+def pinch_analysis_service(data: Any, project_name: str ='Project') -> TargetOutputs:
     """Calculates targets and outputs from inputs and options"""
     # Validate request data using Pydantic model
-    request_data = TargetRequest.model_validate(data)
+    request_data = TargetInputs.model_validate(data)
 
     # Perform advanced pinch analysis and total site analysis
     return_data = get_targets(
@@ -24,11 +24,11 @@ def pinch_analysis_service(data: Any, parent_fs_name: str ='Project') -> TargetR
         streams=request_data.streams, 
         utilities=request_data.utilities, 
         options=request_data.options,
-        name=parent_fs_name,
+        name=project_name,
     )
 
     # Validate response data
-    validated_data = TargetResponse.model_validate(return_data)
+    validated_data = TargetOutputs.model_validate(return_data)
 
     # Return data
     return validated_data
@@ -52,7 +52,7 @@ def get_targets(streams: List[StreamSchema], utilities: List[UtilitySchema], opt
 
 ########### TODO: This function is untested and not updated since the overhaul of OpenPinch. Broken, most likely.#####
 @timing_decorator
-def visualise(data) -> dict:
+def get_visualise(data) -> dict:
     """Function for building graphs from problem tables as opposed to class instances."""
     r_data = {'graphs': []}
     z: Zone
@@ -62,6 +62,3 @@ def visualise(data) -> dict:
             visualise_graphs(graph_set, graph)
         r_data['graphs'].append(graph_set)
     return r_data
-
-
-########### TODO ends ########### 

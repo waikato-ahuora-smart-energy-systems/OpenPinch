@@ -41,7 +41,7 @@ def test_target_utility(filename):
 
     with open(r_file_path) as json_data:
         wkb_res = json.load(json_data)
-    wkb_res = TargetResponse.model_validate(wkb_res)
+    wkb_res = TargetOutputs.model_validate(wkb_res)
     
     for z0 in wkb_res.targets:
         if "Direct Integration" in z0.name:
