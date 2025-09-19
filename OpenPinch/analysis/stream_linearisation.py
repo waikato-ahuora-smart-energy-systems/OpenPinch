@@ -2,11 +2,14 @@ import numpy as np
 from scipy.optimize import NonlinearConstraint, minimize
 from ..lib import *
 
+__all__ = ["get_piecewise_linearisation_for_streams"]
+
+
 #######################################################################################################
 # Public API
 #######################################################################################################
 
-def get_piecewise_linearisation_of_n_stream(streams: List[NonLinearStream], t_h_data: list, dt_diff_max: float) -> np.array:
+def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_data: List[List[float],List[float]], dt_diff_max: float) -> np.array:
 
     if len(streams) != len(t_h_data):
         raise ValueError(f"Piecewise linearisation failed due to a different number of streams and temperature-enthalpy datasets.")
@@ -17,7 +20,7 @@ def get_piecewise_linearisation_of_n_stream(streams: List[NonLinearStream], t_h_
     for index, s in enumerate(streams):
         is_hot_stream = s.t_supply > s.t_target
         curve_points = t_h_data[index]
-        mask_points = get_piecewise_linearisation_of_one_stream(
+        mask_points = get_piecewise_data_points(
             curve=curve_points, 
             dt_diff_max=dt_diff_max, 
             is_hot_stream=is_hot_stream
@@ -26,7 +29,7 @@ def get_piecewise_linearisation_of_n_stream(streams: List[NonLinearStream], t_h_
 
     return return_data
 
-def get_piecewise_linearisation_of_one_stream(stream_name: str, t_h_data: list, dt_diff_max: float, is_hot_stream:bool) -> np.array:
+def get_piecewise_data_points(t_h_data: list, dt_diff_max: float, is_hot_stream:bool) -> np.array:
     """
     Performs piecewise linearisation on a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
 
@@ -48,7 +51,7 @@ def get_piecewise_linearisation_of_one_stream(stream_name: str, t_h_data: list, 
                 epsilon=dt_diff_max,
             )
         except:
-            raise ValueError(f"Piecewise linearisation failed for {stream_name}")
+            raise ValueError(f"Piecewise linearisation failed.")
 
 #######################################################################################################
 # Helper functions
