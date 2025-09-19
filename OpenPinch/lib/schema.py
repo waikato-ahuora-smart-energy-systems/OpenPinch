@@ -190,19 +190,8 @@ class LinearizeOutput(BaseModel):
 
 # ---- Visualisation schema ---------------------------------------------------
 
-class Graph(BaseModel):
-    type: GraphType
-    data: Any
-
-    class Config:  
-        use_enum_values = True
-
-class Zone(BaseModel):
-    name: str = "Zone"
-    graphs: List[Graph]
-
 class VisualiseInput(BaseModel):
-    zones: List[Zone]
+    zones: list
 
 class VisualiseOutput(BaseModel):
     graphs: List[GraphSet]
