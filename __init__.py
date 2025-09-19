@@ -1,1 +1,1 @@
-from OpenPinch.main import *
+from OpenPinch import *

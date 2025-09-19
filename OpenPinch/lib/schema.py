@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, ConfigDict
-from .enums import MainOptionsPropKeys, TurbineOptionsPropKeys, StreamType
+from .enums import MainOptionsPropKeys, TurbineOptionsPropKeys, StreamType, GraphType
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
@@ -83,7 +83,7 @@ class GraphSet(BaseModel):
     graphs: List[Graph] = Field(default_factory=list)
 
 # ---- Aggregate response ------------------------------------------------------
-class TargetResponse(BaseModel):
+class TargetOutputs(BaseModel):
     name: str = "Site"
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
@@ -139,7 +139,7 @@ class Options(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 # ---- Complete request --------------------------------------------------------
-class TargetRequest(BaseModel):
+class TargetInputs(BaseModel):
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[Options] = None
@@ -163,3 +163,35 @@ class GetInputOutputData(BaseModel):
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[Options] = None
+
+# ---- Linearisation schema ---------------------------------------------------
+
+class NonLinearStream(BaseModel):
+    t_supply: float
+    t_target: float
+    p_supply: float
+    p_target: float
+    h_supply: float
+    h_target: float
+    composition: list[tuple[str, float]]
+
+class LineariseInput(BaseModel):
+    t_h_data: List
+    num_intervals: Optional[int] = 100
+    t_min: Optional[float] = 1
+    streams: List[NonLinearStream]
+    ppKey: str = ""
+    mole_flow: float = 1.0
+
+
+class LinearizeOutput(BaseModel):
+    streams: List[Optional[list]]
+    
+
+# ---- Visualisation schema ---------------------------------------------------
+
+class VisualiseInput(BaseModel):
+    zones: list
+
+class VisualiseOutput(BaseModel):
+    graphs: List[GraphSet]

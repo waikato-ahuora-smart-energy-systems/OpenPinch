@@ -11,7 +11,7 @@ import pandas as pd
 
 def export_target_summary_to_excel_with_units(target_response, out_dir: str = ".") -> str:
     """
-    Export TargetResponse to an Excel workbook with values and units.
+    Export TargetOutputs to an Excel workbook with values and units.
       Sheet 'Summary'       : One row per TargetResults with value/unit columns
       Sheet 'PinchTemps'    : Hot/Cold pinch temps per target
       Sheet 'Utilities'     : Flattened hot & cold utilities (value+unit)
