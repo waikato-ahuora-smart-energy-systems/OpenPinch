@@ -14,6 +14,7 @@ dependencies=[
   "openpyxl", 
   "pyxlsb",
   "matplotlib",
+  "scipy",
 ]
 version = "0.0.12"
 authors = [
