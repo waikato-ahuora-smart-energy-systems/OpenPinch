@@ -29,7 +29,7 @@ def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_
 
     return return_data
 
-def get_piecewise_data_points(t_h_data: list, dt_diff_max: float, is_hot_stream:bool) -> np.array:
+def get_piecewise_data_points(curve: list, dt_diff_max: float, is_hot_stream:bool) -> np.array:
     """
     Performs piecewise linearisation on a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
 
@@ -37,17 +37,17 @@ def get_piecewise_data_points(t_h_data: list, dt_diff_max: float, is_hot_stream:
     :param dt_diff_max: Maximum allowed temperature differential (t_min, tolerance etc)
     :returns: Numpy array of new curve points
     """
-    t_h_data = np.array(t_h_data)
+    curve = np.array(curve)
     try:
         return _get_piecewise_breakpoints(
-            curve=t_h_data, 
+            curve=curve, 
             epsilon=dt_diff_max, 
             is_hot_stream=is_hot_stream
         )
     except:
         try:
             return _rdp(
-                curve=t_h_data, 
+                curve=curve, 
                 epsilon=dt_diff_max,
             )
         except:
