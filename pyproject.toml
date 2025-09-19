@@ -13,6 +13,7 @@ dependencies=[
   "pydantic",
   "openpyxl", 
   "pyxlsb",
+  "matplotlib",
 ]
 version = "0.0.12"
 authors = [
