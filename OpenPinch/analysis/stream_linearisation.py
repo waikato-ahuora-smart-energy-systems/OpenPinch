@@ -34,7 +34,7 @@ def get_piecewise_data_points(curve: list, dt_diff_max: float, is_hot_stream:boo
     Performs piecewise linearisation on a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
 
     :param curve: Numpy array of plot points for th curve
-    :param dt_diff_max: Maximum allowed temperature differential (t_min, tolerance etc)
+    :param dt_diff_max: Maximum allowed temperature differential (dt_diff_max, tolerance etc)
     :returns: Numpy array of new curve points
     """
     curve = np.array(curve)
@@ -62,7 +62,7 @@ def _rdp(curve: np.array, epsilon: float) -> np.array:
     Linearize and simplify a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
 
     :param curve: Array of points (N, 2).
-    :param epsilon: Maximum allowed perpendicular distance for simplification. Can be considered the deviation tolerance or (t_min)
+    :param epsilon: Maximum allowed perpendicular distance for simplification. Can be considered the deviation tolerance or (dt_diff_max)
     :returns: Simplified array of points.
     """
     n = len(curve)
@@ -87,7 +87,7 @@ def _rdp(curve: np.array, epsilon: float) -> np.array:
                 dmax = distance
                 index = i
 
-        # Split if distance > epsilon (t_min) 
+        # Split if distance > epsilon (dt_diff_max) 
         if dmax > epsilon:
             stack.append([start, index])
             stack.append([index, end])
