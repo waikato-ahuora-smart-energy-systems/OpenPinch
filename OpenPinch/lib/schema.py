@@ -178,8 +178,8 @@ class NonLinearStream(BaseModel):
 class LineariseInput(BaseModel):
     t_h_data: List
     num_intervals: Optional[int] = 100
-    t_min: Optional[float] = 1
-    streams: List[NonLinearStream]
+    dt_diff_max: Optional[float] = 1
+    stream_io_props: List[NonLinearStream]
     ppKey: str = ""
     mole_flow: float = 1.0
 
