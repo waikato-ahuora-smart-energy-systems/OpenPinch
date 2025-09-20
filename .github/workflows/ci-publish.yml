@@ -87,12 +87,19 @@ jobs:
         id: commit
         run: echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
+      # Optional: show current branch to help debug
+      - name: Debug current branch
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          echo "Current branch is: $(git rev-parse --abbrev-ref HEAD)"
+          git --no-pager branch -vv
+
       # Push ONLY the release branch + tags (NOT main) using the push action
       - uses: ad-m/github-push-action@master
         if: steps.bump.outputs.bumped == 'true'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.rename.outputs.name }}  # push release/vX.Y.Z
+          branch: ${{ steps.rename.outputs.name }}  # <- ensure we push release/vX.Y.Z
           tags: true                                # push tags created by bump
 
       # Create PR from release branch back to main
