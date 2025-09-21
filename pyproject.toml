@@ -16,7 +16,7 @@ dependencies=[
   "matplotlib",
   "scipy",
 ]
-version = "0.0.17"
+version = "0.0.18"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
