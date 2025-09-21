@@ -1,4 +1,4 @@
-name: PR CI & Version Bump
+name: PR & Version Bump
 
 on:
   pull_request:
@@ -32,13 +32,13 @@ jobs:
         run: pytest -q
 
   bump-version:
-    name: Bump project version on PR branch
+    name: Bump project version on PR branch (no tags)
     needs: test
     if: ${{ github.event.pull_request.draft == false && !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # to push the bump commit to the PR branch
-      pull-requests: write   # to post a comment on the PR
+      contents: write        # push the bump commit to the PR branch
+      pull-requests: write   # post a PR comment
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -52,15 +52,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Bump version (patch)
+      # Optional: ensure we have tags locally (not required once --no-tag is used, but harmless)
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Bump version (patch, no tag)
         id: bump
         uses: callowayproject/bump-my-version@master
         env:
-          BUMPVERSION_COMMIT: "true"
-          BUMPVERSION_PUSH: "true"
-          BUMPVERSION_TAG: "false"  # don't create tags from PRs
+            # Commit and push the bump to the PR branch
+            BUMPVERSION_COMMIT: "true"
+            BUMPVERSION_PUSH: "true"
+            # Hard-disable tagging from PR bumps (tool respects both env + CLI)
+            BUMPVERSION_TAG: "false"
         with:
-          args: "patch"
+          # --no-tag prevents creating git tags (avoids 'tag already exists' errors)
+          args: "patch --no-tag"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Report version change as PR comment
@@ -74,7 +81,7 @@ jobs:
             const pr = context.payload.pull_request.number;
             const prev = process.env.PREV || 'unknown';
             const curr = process.env.CURR || 'unknown';
-            const body = `✅ Version bumped from \`${prev}\` to \`${curr}\` on this PR branch.`;
+            const body = `✅ Version bumped from \`${prev}\` to \`${curr}\` on this PR branch (no tag created).`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
