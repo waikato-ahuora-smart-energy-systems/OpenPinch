@@ -10,7 +10,7 @@ from OpenPinch.analysis.stream_linearisation import *
 
 
 
-def test_build_curve_pure(self):
+def test_build_curve_pure():
     supply_temp = 300 
     target_temp = 500
     composition = [("water", 1)]
