@@ -1,9 +1,9 @@
-name: PR CI & Version Bump
+name: PR & Version Bump
 
 on:
   pull_request:
     branches: [ "main" ]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [ opened, synchronize, reopened, ready_for_review ]
 
 concurrency:
   group: pr-bump-${{ github.event.pull_request.number }}
@@ -37,6 +37,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # 1) Checkout the PR HEAD branch (pushable), not refs/pull/*/merge
       - name: Checkout PR head branch
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -44,6 +45,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           persist-credentials: true
+
+      - name: Debug ref
+        run: |
+          echo "HEAD ref: $(git rev-parse --abbrev-ref --symbolic-full-name HEAD)"
+          git remote -v
 
       - name: Set git identity
         run: |
@@ -55,20 +61,54 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Bump version (patch, no tag) and push
-        id: bump
-        uses: callowayproject/bump-my-version@master
-        env:
-          BUMPVERSION_COMMIT: "true"
-          BUMPVERSION_PUSH:   "true"
-          BUMPVERSION_TAG:    "false"
-        with:
-          args: "patch --no-tag"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install bump-my-version
+        run: pip install "bump-my-version==1.2.3"
 
-      - name: Comment new version on PR
-        if: steps.bump.outputs.bumped == 'true'
-        uses: actions/github-script@v7
+      # Guard against re-bumping in loops: skip if the last commit is our CI bump
+      - name: Guard - skip if already bumped by CI
+        id: guard
+        run: |
+          if git log -1 --pretty=%B | grep -qi '\[ci bump\]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 2) Run the bump locally (no tag), capture versions
+      - name: Bump version (patch, no tag)
+        id: bump
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          prev="$(bump-my-version show current_version)"
+          echo "previous-version=${prev}" >> "$GITHUB_OUTPUT"
+
+          bump-my-version bump patch --no-tag
+
+          curr="$(bump-my-version show current_version)"
+          echo "current-version=${curr}" >> "$GITHUB_OUTPUT"
+
+          if [ "$prev" != "$curr" ]; then
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # If the tool didn't auto-commit, commit changes ourselves
+          if ! git diff --quiet --staged || ! git diff --quiet; then
+            git add -A
+            git commit -m "chore: bump version: ${prev} → ${curr} [ci bump]"
+          fi
+
+      # 3) Push to the PR head branch explicitly (never to refs/pull/*/merge)
+      - name: Push bump commit to PR head
+        if: steps.guard.outputs.skip != 'true' && steps.bump.outputs.bumped == 'true'
+        run: |
+          git push origin "HEAD:refs/heads/${{ github.event.pull_request.head.ref }}"
+
+      - name: Comment on PR with new version
+        if: steps.guard.outputs.skip != 'true' && steps.bump.outputs.bumped == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         env:
           PREV: ${{ steps.bump.outputs.previous-version }}
           CURR: ${{ steps.bump.outputs.current-version }}
