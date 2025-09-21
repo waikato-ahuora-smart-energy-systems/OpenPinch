@@ -14,7 +14,7 @@ def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_
     if len(streams) != len(t_h_data):
         raise ValueError(f"Piecewise linearisation failed due to a different number of streams and temperature-enthalpy datasets.")
 
-    return_data = {"streams": []}
+    return_data = {"t_h_points": []}
 
     # Create and Linearize stream
     for index, s in enumerate(streams):
@@ -25,7 +25,7 @@ def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_
             dt_diff_max=dt_diff_max, 
             is_hot_stream=is_hot_stream
         )
-        return_data["streams"] = mask_points.tolist()
+        return_data["t_h_points"] = mask_points.tolist()
 
     return return_data
 
