@@ -1,21 +1,20 @@
 import pytest
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as np, json, os
 from OpenPinch.analysis.stream_linearisation import *
 
-# TODO 
+def import_t_h_data(filename):
+    json_path = os.path.join(os.path.dirname(__file__), f"test_linearise_stream_data/{filename}.json")
+    with open(json_path, "r") as f:
+        points = [np.array(json.load(f))]
+    return points
 
 def test_build_curve_pure():
-    supply_temp = 300 
-    target_temp = 500
-    composition = [("water", 1)]
-    num_points = 50
-    pressure = 200*1000 #kPa
-    # points = generate_t_h_curve(ppKey="", composition=composition, mole_flow=1, t_supply=supply_temp, t_target=target_temp, p_supply=pressure, p_target=pressure, num_points=num_points)
-    # # Validate number of points (No missing values)
-    # assertEqual(num_points, points[0].size/points[0].ndim, 'Missing temperature/enthalpy value/s')
+    points = import_t_h_data("steam")
+    
+    # assert num_points == points[0].size/points[0].ndim
 
-    # # Validate temperature range
+    # Validate temperature range
     # assertEqual(supply_temp, points[0][0][1], f'Temperature interval range is inaccurate, range starts from {points[0][0][1]} instead of {supply_temp}')
     # assertEqual(target_temp, points[0][-1][1], f'Temperature interval range is inaccurate, range ends at {points[0][-1][1]} instead of {target_temp}')
 
