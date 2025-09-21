@@ -10,19 +10,19 @@ from OpenPinch.analysis.stream_linearisation import *
 
 
 
-# def test_build_curve_pure(self):
-#     supply_temp = 300 
-#     target_temp = 500
-#     composition = [("water", 1)]
-#     num_points = 50
-#     pressure = 200*1000 #kPa
-#     points = generate_t_h_curve(ppKey="", composition=composition, mole_flow=1, t_supply=supply_temp, t_target=target_temp, p_supply=pressure, p_target=pressure, num_points=num_points)
-#     # Validate number of points (No missing values)
-#     self.assertEqual(num_points, points[0].size/points[0].ndim, 'Missing temperature/enthalpy value/s')
+def test_build_curve_pure(self):
+    supply_temp = 300 
+    target_temp = 500
+    composition = [("water", 1)]
+    num_points = 50
+    pressure = 200*1000 #kPa
+    # points = generate_t_h_curve(ppKey="", composition=composition, mole_flow=1, t_supply=supply_temp, t_target=target_temp, p_supply=pressure, p_target=pressure, num_points=num_points)
+    # # Validate number of points (No missing values)
+    # self.assertEqual(num_points, points[0].size/points[0].ndim, 'Missing temperature/enthalpy value/s')
 
-#     # Validate temperature range
-#     self.assertEqual(supply_temp, points[0][0][1], f'Temperature interval range is inaccurate, range starts from {points[0][0][1]} instead of {supply_temp}')
-#     self.assertEqual(target_temp, points[0][-1][1], f'Temperature interval range is inaccurate, range ends at {points[0][-1][1]} instead of {target_temp}')
+    # # Validate temperature range
+    # self.assertEqual(supply_temp, points[0][0][1], f'Temperature interval range is inaccurate, range starts from {points[0][0][1]} instead of {supply_temp}')
+    # self.assertEqual(target_temp, points[0][-1][1], f'Temperature interval range is inaccurate, range ends at {points[0][-1][1]} instead of {target_temp}')
 
 # def test_build_curve_mixture(self):
 #     supply_temp = 300 
