@@ -1,0 +1,83 @@
+name: PR CI & Version Bump
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-bump-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest
+
+      - name: Run tests
+        run: pytest -q
+
+  bump-version:
+    name: Bump project version on PR branch
+    needs: test
+    if: ${{ github.event.pull_request.draft == false && !github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # to push the bump commit to the PR branch
+      pull-requests: write   # to post a comment on the PR
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Bump version (patch)
+        id: bump
+        uses: callowayproject/bump-my-version@master
+        env:
+          BUMPVERSION_COMMIT: "true"
+          BUMPVERSION_PUSH: "true"
+          BUMPVERSION_TAG: "false"  # don't create tags from PRs
+        with:
+          args: "patch"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report version change as PR comment
+        if: steps.bump.outputs.bumped == 'true'
+        uses: actions/github-script@v7
+        env:
+          PREV: ${{ steps.bump.outputs.previous-version }}
+          CURR: ${{ steps.bump.outputs.current-version }}
+        with:
+          script: |
+            const pr = context.payload.pull_request.number;
+            const prev = process.env.PREV || 'unknown';
+            const curr = process.env.CURR || 'unknown';
+            const body = `✅ Version bumped from \`${prev}\` to \`${curr}\` on this PR branch.`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr,
+              body
+            });
