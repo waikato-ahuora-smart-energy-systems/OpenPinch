@@ -179,13 +179,13 @@ class LineariseInput(BaseModel):
     t_h_data: List
     num_intervals: Optional[int] = 100
     dt_diff_max: Optional[float] = 1
-    stream_io_props: List[NonLinearStream]
+    streams_io_props: List[NonLinearStream]
     ppKey: str = ""
     mole_flow: float = 1.0
 
 
 class LineariseOutput(BaseModel):
-    streams: List[Optional[list]]
+    t_h_points: List[Optional[list]]
     
 
 # ---- Visualisation schema ---------------------------------------------------
