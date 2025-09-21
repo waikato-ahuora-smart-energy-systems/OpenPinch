@@ -1,4 +1,4 @@
-name: PR & Version Bump
+name: PR CI & Version Bump
 
 on:
   pull_request:
@@ -37,7 +37,6 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      # ✅ Check out the PR HEAD branch (pushable), not refs/pull/*/merge
       - name: Checkout PR head branch
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -61,13 +60,13 @@ jobs:
         uses: callowayproject/bump-my-version@master
         env:
           BUMPVERSION_COMMIT: "true"
-          BUMPVERSION_PUSH: "true"     # 🚫 no separate push step needed
-          BUMPVERSION_TAG: "false"     # never tag on PRs
+          BUMPVERSION_PUSH:   "true"
+          BUMPVERSION_TAG:    "false"
         with:
           args: "patch --no-tag"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Comment on PR with new version
+      - name: Comment new version on PR
         if: steps.bump.outputs.bumped == 'true'
         uses: actions/github-script@v7
         env:
