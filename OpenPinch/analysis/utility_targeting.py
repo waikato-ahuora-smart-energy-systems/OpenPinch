@@ -11,7 +11,33 @@ __all__ = ["get_zonal_utility_targets, target_utility, calc_GGC_utility"]
 # Public API
 #######################################################################################################
 
-def get_zonal_utility_targets(pt: ProblemTable, pt_real: ProblemTable, hot_utilities: StreamCollection, cold_utilities: StreamCollection, is_process_zone = True) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection, StreamCollection, StreamCollection]:
+def get_zonal_utility_targets(
+    pt: ProblemTable,
+    pt_real: ProblemTable,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    is_process_zone=True,
+) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection]:
+    """Target utility usage and compute GCC variants for a zone.
+
+    Parameters
+    ----------
+    pt, pt_real:
+        Shifted and real problem tables used for constructing composite curves.
+    hot_utilities, cold_utilities:
+        Candidate utility collections that will be targeted across temperature
+        intervals.
+    is_process_zone:
+        When ``True`` (default) the function assumes the zone represents a
+        process area and applies additional targeting logic appropriate for that
+        context.
+
+    Returns
+    -------
+    tuple
+        Updated ``(pt, pt_real, hot_utilities, cold_utilities)`` collections with
+        derived profiles embedded.
+    """
     # Calculate various GCC profiles
     if is_process_zone:
         pt = _calc_GCC_without_pockets(pt)

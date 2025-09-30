@@ -1,3 +1,11 @@
+"""Analysis submodules implementing OpenPinch targeting algorithms.
+
+This package re-exports the most commonly used entry points for preparing
+problem structures, running pinch analysis at different aggregation levels, and
+assembling response payloads.  More specialised helpers remain in their
+respective modules (e.g. ``support_methods`` and ``additional_analysis``).
+"""
+
 from .graphs import visualise_graphs
 from .response import output_response
 from .data_preparation import prepare_problem_struture
@@ -10,4 +18,3 @@ from .region_analysis import get_regional_targets
 from .utility_targeting import get_zonal_utility_targets, target_utility, calc_GGC_utility
 from .support_methods import *
 from .additional_analysis import *
-

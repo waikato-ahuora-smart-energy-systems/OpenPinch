@@ -14,7 +14,13 @@ __all__ = ["get_process_pinch_targets"]
 #######################################################################################################
 
 def get_process_pinch_targets(zone: Zone):
-    """Main function that calls def functions to calculate all process-level Pinch Targets and prepare data for Total Zone."""
+    """Populate a ``Zone`` with detailed process-level pinch targets.
+
+    The function aggregates problem-table calculations, multi-utility targeting,
+    pinch temperature detection, and graph preparation.  Results are cached on
+    the provided ``zone`` via :meth:`Zone.add_target_from_results` and used later
+    by site and regional aggregation routines.
+    """
     config = zone.config
     hot_streams, cold_streams, all_streams = zone.hot_streams, zone.cold_streams, zone.all_streams
     hot_utilities, cold_utilities = zone.hot_utilities, zone.cold_utilities

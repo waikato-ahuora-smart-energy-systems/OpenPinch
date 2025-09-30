@@ -17,13 +17,14 @@ PathLike = Union[str, Path]
 
 @dataclass
 class PinchProblem:
-    """
-    A thin, typed orchestrator for loading pinch-analysis input, running targeting,
-    and exporting results. Supports:
-      • JSON problem files
-      • Excel problem files (same format as your existing tool)
-      • CSV bundles: a directory containing `streams.csv` and `utilities.csv`
-        (or a tuple of two CSV files)
+    """Typed orchestrator for loading input, running targeting, and exporting results.
+
+    Supports the following input formats out of the box:
+
+    - JSON problem files
+    - Excel problem files (same format as the legacy workbook)
+    - CSV bundles: either a directory containing ``streams.csv`` and ``utilities.csv``
+      or an explicit ``(streams_csv_path, utilities_csv_path)`` tuple
     """
     problem_filepath: Optional[Path] = None
     results_dir: Optional[Path] = None
@@ -69,13 +70,16 @@ class PinchProblem:
     def load(self, source: Union[PathLike, Tuple[PathLike, PathLike]]) -> JsonDict:
         """
         Load input data from one of:
-          - JSON file path: *.json
-          - Excel file path: *.xlsx / *.xls / *.xlsb / *.xlsm
-          - CSV bundle:
-              • a directory containing 'streams.csv' and 'utilities.csv', or
-              • a tuple: (streams_csv_path, utilities_csv_path)
 
-        Returns the loaded input JSON-like dict.
+        - JSON file path (``*.json``)
+        - Excel file path (``*.xlsx``, ``*.xls``, ``*.xlsb``, ``*.xlsm``)
+        - CSV bundle: either a directory containing ``streams.csv`` and
+          ``utilities.csv`` or a ``(streams_csv_path, utilities_csv_path)`` tuple
+
+        Returns
+        -------
+        dict
+            The loaded input structure.
         """
         if isinstance(source, tuple) and len(source) == 2:
             # CSV tuple form
