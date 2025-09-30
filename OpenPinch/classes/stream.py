@@ -58,7 +58,7 @@ class Stream():
 
     @property
     def t_supply(self) -> Optional[float]:
-        """Supply temperature."""
+        """Supply temperature (e.g., degC)."""
         return self._t_supply
     @t_supply.setter
     def t_supply(self, value: float):
@@ -67,7 +67,7 @@ class Stream():
 
     @property
     def t_target(self) -> Optional[float]:
-        """Target temperature."""
+        """Target temperature (e.g., degC)."""
         return self._t_target
     @t_target.setter
     def t_target(self, value: float):
@@ -76,7 +76,7 @@ class Stream():
 
     @property
     def dt_cont(self) -> float:
-        """Delta T minimum (approach temperature)."""
+        """Delta T minimum contribution (e.g., degC)."""
         return self._dt_cont
     @dt_cont.setter
     def dt_cont(self, value: float):
@@ -85,7 +85,7 @@ class Stream():
 
     @property
     def heat_flow(self) -> float:
-        """Stream heat flow (kW)."""
+        """Stream heat flow (e.g., kW)."""
         return self._heat_flow
     @heat_flow.setter
     def heat_flow(self, value: float):
@@ -94,7 +94,7 @@ class Stream():
 
     @property
     def htc(self) -> float:
-        """Heat transfer coefficient."""
+        """Heat transfer coefficient (e.g., kW/m^2/K)."""
         return self._htc
     @htc.setter
     def htc(self, value: float):
@@ -103,7 +103,7 @@ class Stream():
 
     @property
     def htr(self) -> float:
-        """Heat transfer coefficient."""
+        """Heat transfer resistance (e.g., m^2.K/kW)."""
         return self._htr
     @htr.setter
     def htr(self, value: float):
@@ -111,7 +111,7 @@ class Stream():
 
     @property
     def price(self) -> float:
-        """Unit energy price ($/MWh or similar)."""
+        """Unit energy price (e.g., $/MWh)."""
         return self._price
     @price.setter
     def price(self, value: float):
@@ -119,7 +119,7 @@ class Stream():
 
     @property
     def ut_cost(self) -> float:
-        """Utility cost contribution (if relevant)."""
+        """Utility cost (e.g., $/y)."""
         return self._ut_cost
     @ut_cost.setter
     def ut_cost(self, value: float):
@@ -127,7 +127,7 @@ class Stream():
 
     @property
     def CP(self) -> float:
-        """Heat capacity flowrate (kW/K)."""
+        """Heat capacity flowrate (e.g., kW/K)."""
         return self._CP
     @CP.setter
     def CP(self, value: float):
@@ -169,7 +169,7 @@ class Stream():
 
     @property
     def t_min_star(self) -> Optional[float]:
-        """Adjusted minimum temperature (accounting for DTmin)."""
+        """Shifted minimum temperature."""
         return self._t_min_star
     @t_min_star.setter
     def t_min_star(self, value: float):
@@ -177,7 +177,7 @@ class Stream():
 
     @property
     def t_max_star(self) -> Optional[float]:
-        """Adjusted maximum temperature (accounting for DTmin)."""
+        """Shifted maximum temperature."""
         return self._t_max_star
     @t_max_star.setter
     def t_max_star(self, value: float):

@@ -29,7 +29,7 @@ def _report(zone: Zone) -> dict:
     targets: List[dict] = []
 
     for t in zone.targets.values():
-        t: Target
+        t: EnergyTarget
         targets.append(t.serialize_json())        
     
     if len(zone.subzones) > 0:

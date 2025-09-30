@@ -6,6 +6,7 @@ Q_ = ureg.Quantity
 
 
 class Value:
+    # TODO: Use Value to convert input and output data. Add docstrings to explain the class.
     def __init__(self, data=None, unit: str = None):
         if data is None:
             self._quantity = Q_(0)

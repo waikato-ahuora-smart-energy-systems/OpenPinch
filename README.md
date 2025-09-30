@@ -1,6 +1,6 @@
 # OpenPinch
 
-OpenPinch is an open-source toolkit for advanced pinch analysis and total site
+OpenPinch is an open-source toolkit for advanced Pinch Analysis and total site
 integration. 
 
 ## History

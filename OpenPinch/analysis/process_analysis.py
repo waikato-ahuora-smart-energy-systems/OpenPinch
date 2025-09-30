@@ -14,7 +14,7 @@ __all__ = ["get_process_pinch_targets"]
 #######################################################################################################
 
 def get_process_pinch_targets(zone: Zone):
-    """Populate a ``Zone`` with detailed process-level pinch targets.
+    """Populate a Zone`` with detailed process-level pinch targets.
 
     The function aggregates problem-table calculations, multi-utility targeting,
     pinch temperature detection, and graph preparation.  Results are cached on

@@ -1,7 +1,7 @@
 from typing import Tuple
 from copy import deepcopy
 from ..lib import *
-from ..classes import Zone, Target, Stream, StreamCollection, ProblemTable
+from ..classes import Zone, EnergyTarget, Stream, StreamCollection, ProblemTable
 from .utility_targeting import get_zonal_utility_targets, calc_GGC_utility
 from .support_methods import key_name
 from .problem_table_analysis import problem_table_algorithm
@@ -51,7 +51,7 @@ def _calc_total_zonal_targets(site: Zone) -> Zone:
 
     for z in site.subzones.values():
         z: Zone
-        t: Target = z.targets[f"{z.name}/{TargetType.DI.value}"]
+        t: EnergyTarget = z.targets[f"{z.name}/{TargetType.DI.value}"]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target
         heat_recovery_target += t.heat_recovery_target
@@ -114,7 +114,7 @@ def _set_sites_targets(hot_utility_target, cold_utility_target, heat_recovery_ta
 
 def _calc_site_net_utility_demand(site: Zone) -> Zone:
     # Unified Total Zone Analysis - Amir's method
-    s_tzt: Target = site.targets[key_name(site.name, TargetType.TZ.value)]
+    s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
     hot_utilities = deepcopy(s_tzt.hot_utilities)
     cold_utilities = deepcopy(s_tzt.cold_utilities)
     

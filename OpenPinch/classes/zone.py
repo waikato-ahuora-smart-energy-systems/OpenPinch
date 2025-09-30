@@ -3,7 +3,7 @@ from ..lib.config import *
 from typing import Optional, TYPE_CHECKING
 from .stream_collection import StreamCollection
 from .value import Value
-from .target import Target
+from .target import EnergyTarget
 
 if TYPE_CHECKING:
     from .stream import Stream
@@ -11,7 +11,10 @@ if TYPE_CHECKING:
 
 
 class Zone():
-    """Class representing any type of spatial zone or target (operation, zone, site, region, etc)."""
+    """
+    Class representing any type of defined spatial zone (i.e., operation, 
+    process zone, site, region, utility zone) with its energy targets.
+    """
 
     def __init__(self, name: str = "Zone", identifier: str = ZoneType.P.value, config: Optional[Configuration] = None, parent_zone: "Zone" = None):
         
@@ -95,10 +98,10 @@ class Zone():
     @cold_utilities.setter
     def cold_utilities(self, data): self._cold_utilities = data    
 
-    # @property
-    # def graphs(self): return self._graphs
-    # @graphs.setter
-    # def graphs(self, data): self._graphs = data  
+    @property
+    def graphs(self): return self._graphs
+    @graphs.setter
+    def graphs(self, data): self._graphs = data  
 
     @property
     def subzones(self): return self._subzones
@@ -174,7 +177,7 @@ class Zone():
             self.add_zone(z, sub)
 
 
-    def add_target(self, target_to_add: Target):
+    def add_target(self, target_to_add: EnergyTarget):
         """Add one target to a specific zone."""
         self._targets[target_to_add.name] = target_to_add
 
@@ -187,7 +190,7 @@ class Zone():
 
     def add_target_from_results(self, target_id: str = None, results: dict = None):
         target_name = f"{self.name}/{target_id}" if target_id is not None else self.name
-        res = Target(target_name, target_id, self.parent_zone, config=self.config)
+        res = EnergyTarget(target_name, target_id, self.parent_zone, config=self.config)
         for key, value in results.items():
             setattr(res, key, value)
         self.add_target(res)

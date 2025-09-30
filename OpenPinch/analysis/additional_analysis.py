@@ -16,17 +16,19 @@ def get_additional_zonal_pinch_analysis(pt: ProblemTable, pt_real: ProblemTable,
     """Calculates additional graphs and targets."""
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
-    area = target_area(pt_real)
-    num_units = min_number_hx(pt)
-    capital_cost = num_units * config.FC + num_units * config.VC * (area / num_units) ** config.EXP
-    annual_capital_cost = capital_cost * capital_recovery_factor(config.DISCOUNT_RATE, config.SERV_LIFE)
+    if config.AREA_BUTTON:
+        area = target_area(pt_real)
+        num_units = min_number_hx(pt)
+        capital_cost = num_units * config.FC + num_units * config.VC * (area / num_units) ** config.EXP
+        annual_capital_cost = capital_cost * capital_recovery_factor(config.DISCOUNT_RATE, config.SERV_LIFE)
 
 
-    # # Target exergy supply, rejection, and destruction
+    # # TODO: Write analysis. Target exergy supply, rejection, and destruction
     # gcc_x = _calc_exergy_gcc(z, pt_real, bcc, z.graphs[GT.GCC_Act.value]) 
     # z.add_graph(GT.GCC_X.value, gcc_x)
 
-    # # Requires review and comparision to previous Excel implementation
+    # # TODO: MOVE to earlier??? Also, requires review and comparision to previous Excel implementation
+    # # Determines the assisted heat transfer (pocket cutting) for within a zone
     # GCC_AI = None
     # if z.config.AHT_BUTTON_SELECTED:
     #     z.add_graph('GCC_AI', GCC_AI)

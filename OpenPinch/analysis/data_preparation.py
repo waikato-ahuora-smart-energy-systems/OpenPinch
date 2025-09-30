@@ -18,7 +18,7 @@ def prepare_problem_struture(
     project_name: str = "Site",
     zone_tree: ZoneTreeSchema = None,
 ):
-    """Build the top-level :class:`~OpenPinch.classes.zone.Zone` hierarchy for analysis.
+    """Build the top-level :class:`OpenPinch.classes.zone.Zone` hierarchy for analysis.
 
     Parameters
     ----------
@@ -35,7 +35,7 @@ def prepare_problem_struture(
         Human-friendly label applied to the root zone when no explicit zone tree is supplied.
     zone_tree:
         Optional :class:`OpenPinch.lib.schema.ZoneTreeSchema` describing the desired zone
-        hierarchy.
+        hierarchy (i.e., Zone A encompasses Zones B and C).
 
     Returns
     -------

@@ -74,8 +74,8 @@ def visualise_graphs(graph_set: dict, graph) -> None:
 # Helper Functions
 #######################################################################################################
 
-def _create_graph_set(t: Target, graphTitle: str) -> dict:
-    """Creates pinch analysis and total site analysis graphs for a specifc zone."""
+def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
+    """Creates Pinch Analysis and total site analysis graphs for a specifc zone."""
     
     graph_set = {
         'name': graphTitle,

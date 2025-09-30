@@ -9,7 +9,7 @@ def dummy_zone():
 
 @pytest.fixture
 def dummy_tar():
-    return Target("Z1")
+    return EnergyTarget("Z1")
 
 @pytest.fixture
 def sample_streams():
@@ -97,7 +97,7 @@ def test_get_site_zones(dummy_zone: Zone):
 
 # === Utility Cost Calculation ===
 
-def test_calc_zonal_utility_cost(dummy_tar: Target, sample_utilities):
+def test_calc_zonal_utility_cost(dummy_tar: EnergyTarget, sample_utilities):
     for u in sample_utilities:
         dummy_tar.hot_utilities.add(u)
     dummy_tar.calc_utility_cost()

@@ -1,7 +1,7 @@
 """Analysis submodules implementing OpenPinch targeting algorithms.
 
 This package re-exports the most commonly used entry points for preparing
-problem structures, running pinch analysis at different aggregation levels, and
+problem structures, running Pinch Analysis at different aggregation levels, and
 assembling response payloads.  More specialised helpers remain in their
 respective modules (e.g. ``support_methods`` and ``additional_analysis``).
 """

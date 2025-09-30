@@ -43,7 +43,7 @@ def pinch_analysis_service(data: Any, project_name: str = "Project") -> TargetOu
     # Validate request data using Pydantic model
     request_data = TargetInput.model_validate(data)
 
-    # Perform advanced pinch analysis and total site analysis
+    # Perform advanced Pinch Analysis and total site analysis
     return_data = get_targets(
         zone_tree=request_data.zone_tree,
         streams=request_data.streams, 
@@ -67,7 +67,7 @@ def get_targets(
     name: str = "Project",
     zone_tree: ZoneTreeSchema = None,
 ) -> dict:
-    """Conduct core pinch analysis and total site targeting.
+    """Conduct core Pinch Analysis and total site targeting.
 
     This function is a lower-level hook compared to :func:`pinch_analysis_service`.
     It expects already validated option blocks and stream/utility schemas, and it

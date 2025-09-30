@@ -10,8 +10,10 @@ from .problem_table import ProblemTable
 if TYPE_CHECKING:
     from .zone import Zone
 
-class Target():
-    """Class representing energy targets."""
+class EnergyTarget():
+    """
+    Class representing energy targets.
+    """
 
     def __init__(self, name: str = "untitled", identifier: str = TargetType.DI.value, parent_zone: "Zone" = None, config: Optional[Configuration] = None):
 
@@ -59,7 +61,6 @@ class Target():
         self._utility_cost = 0.0
 
     # === Properties ===
-
     @property
     def name(self): return self._name
     @name.setter
@@ -119,7 +120,6 @@ class Target():
     @property
     def utility_streams(self):
         return self._hot_utilities + self._cold_utilities 
-
 
     @property
     def area(self): return self._area
@@ -233,7 +233,6 @@ class Target():
         self._target_values = value_dict
         for key, value in value_dict.items():
             setattr(self, key, value)        
-
 
     # === Methods ===
     def add_graph(self, name: str, result):

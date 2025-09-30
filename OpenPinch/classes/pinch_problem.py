@@ -1,5 +1,3 @@
-# from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,12 +15,12 @@ PathLike = Union[str, Path]
 
 @dataclass
 class PinchProblem:
-    """Typed orchestrator for loading input, running targeting, and exporting results.
+    """Typed orchestrator for loading input data, running targeting, and exporting results.
 
     Supports the following input formats out of the box:
 
     - JSON problem files
-    - Excel problem files (same format as the legacy workbook)
+    - Excel problem files (use Excel_Version/Data_input_template.xlsx)
     - CSV bundles: either a directory containing ``streams.csv`` and ``utilities.csv``
       or an explicit ``(streams_csv_path, utilities_csv_path)`` tuple
     """
@@ -128,7 +126,7 @@ class PinchProblem:
     def target(self) -> JsonDict:
         """
         Run the targeting analysis against the loaded input.
-        Lazily computes results and caches them.
+        Computes results and caches them.
         """
         if self._problem_data is None:
             raise RuntimeError(
@@ -144,7 +142,7 @@ class PinchProblem:
 
     def export(self, results_dir: Optional[PathLike] = None) -> Path:
         """
-        Export the (computed) results to JSON. If not yet computed, will run targeting.
+        Export the results to JSON. If not yet computed, it first runs targeting.
         If results_dir is omitted, uses self.results_dir; otherwise updates it.
         Returns the path written.
         """
@@ -159,7 +157,9 @@ class PinchProblem:
         if self._results is None:
             self.target()
 
-        return export_target_summary_to_excel_with_units(self._results, self.results_dir)
+        output_path = export_target_summary_to_excel_with_units(self._results, self.results_dir)
+
+        return output_path
 
 
     @property

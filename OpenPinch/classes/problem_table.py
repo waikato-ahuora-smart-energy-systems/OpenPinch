@@ -4,6 +4,7 @@ from copy import deepcopy
 from ..lib.enums import ProblemTableLabel
 
 class ProblemTable:
+    # TODO: Add docstrings to the ProblemTable class. Highlight that numpy sits below the arrays. 
     def __init__(self, data_input: dict | list = None, add_default_labels: bool = True):
         if add_default_labels:
             self.columns = list([index.value for index in ProblemTableLabel])
@@ -234,7 +235,7 @@ class ProblemTable:
             order = order[::-1]
         self.data = self.data[order]
 
-
+# TODO: could this be a method under ProblemTable, e.g., __eq__(self) as the way to check equality 
 def compare_problem_tables(pt1: ProblemTable, pt2: ProblemTable, atol: float = 1e-6) -> bool:
     """Compares two DataFrames element-wise and reports differences within an absolute tolerance."""
     if pt1.shape != pt2.shape:

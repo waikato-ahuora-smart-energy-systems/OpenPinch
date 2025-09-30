@@ -10,7 +10,7 @@ __all__ = ["get_piecewise_linearisation_for_streams"]
 #######################################################################################################
 
 def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_data: list, dt_diff_max: float) -> np.array:
-
+    # TODO: Missing docstrings
     if len(streams) != len(t_h_data):
         raise ValueError(f"Piecewise linearisation failed due to a different number of streams and temperature-enthalpy datasets.")
 
@@ -154,7 +154,7 @@ def _refine_pw_points_for_heating_or_cooling(curve: np.array, pw_points: np.arra
 def _get_piecewise_breakpoints(curve: np.array, epsilon: float, is_hot_stream: bool=True) -> np.array:
     """
     Get the piecewise breakpoints for a curve using the Ramer-Douglas-Peucker (_rdp) algorithm followed 
-    by an optimisation-based refinement to ensure hot and cold stream integrity for pinch analysis.
+    by an optimisation-based refinement to ensure hot and cold stream integrity for Pinch Analysis.
 
     :param curve: Array of points (N, 2).
     :param epsilon: Maximum allowed perpendicular distance for simplification; the deviation tolerance or delta_t_dev.

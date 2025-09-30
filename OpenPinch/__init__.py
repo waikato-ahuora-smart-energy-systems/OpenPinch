@@ -1,6 +1,6 @@
 """OpenPinch public API surface.
 
-The package exposes a small set of high-level helpers for running pinch analysis
+The package exposes a small set of high-level helpers for running Pinch Analysis
 and working with the structured results.  Detailed configuration and schema
 objects are re-exported from :mod:`OpenPinch.lib` for convenience so downstream
 code can construct validated inputs.

@@ -5,6 +5,9 @@ from .enums import *
 if TYPE_CHECKING:
     from .schema import *
 
+# TODO: This file needs a refactor once the purpose of it is well defined.
+# At present, the config includes many options corresponding to the Excel 
+# workbook, but they are not considered during analysis.
 
 """Global parameters."""
 C_to_K: float = 273.15 # degrees
