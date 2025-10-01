@@ -1,5 +1,3 @@
-# from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,13 +15,14 @@ PathLike = Union[str, Path]
 
 @dataclass
 class PinchProblem:
-    """
-    A thin, typed orchestrator for loading pinch-analysis input, running targeting,
-    and exporting results. Supports:
-      • JSON problem files
-      • Excel problem files (same format as your existing tool)
-      • CSV bundles: a directory containing `streams.csv` and `utilities.csv`
-        (or a tuple of two CSV files)
+    """Typed orchestrator for loading input data, running targeting, and exporting results.
+
+    Supports the following input formats out of the box:
+
+    - JSON problem files
+    - Excel problem files (use Excel_Version/Data_input_template.xlsx)
+    - CSV bundles: either a directory containing ``streams.csv`` and ``utilities.csv``
+      or an explicit ``(streams_csv_path, utilities_csv_path)`` tuple
     """
     problem_filepath: Optional[Path] = None
     results_dir: Optional[Path] = None
@@ -38,6 +37,19 @@ class PinchProblem:
         results_dir: Optional[PathLike] = None,
         run: bool = True,
     ) -> None:
+        """Initialise the orchestrator and optionally run the full targeting workflow.
+
+        Parameters
+        ----------
+        problem_filepath:
+            Path to a JSON/Excel problem definition or tuple/directory handled by :meth:`load`.
+        results_dir:
+            Destination directory for exported Excel summaries. May be ``None`` if export
+            is handled later.
+        run:
+            When ``True`` (default) load the problem immediately, execute targeting, and
+            export results if ``results_dir`` is provided.
+        """
         if problem_filepath is not None:
             self.problem_filepath = Path(problem_filepath)
             self.load(self.problem_filepath)
@@ -67,15 +79,17 @@ class PinchProblem:
     # ----------------------------------------------------------------------------
 
     def load(self, source: Union[PathLike, Tuple[PathLike, PathLike]]) -> JsonDict:
-        """
-        Load input data from one of:
-          - JSON file path: *.json
-          - Excel file path: *.xlsx / *.xls / *.xlsb / *.xlsm
-          - CSV bundle:
-              • a directory containing 'streams.csv' and 'utilities.csv', or
-              • a tuple: (streams_csv_path, utilities_csv_path)
+        """Load input data from one of:
 
-        Returns the loaded input JSON-like dict.
+        - JSON file path (``*.json``)
+        - Excel file path (``*.xlsx``, ``*.xls``, ``*.xlsb``, ``*.xlsm``)
+        - CSV bundle: either a directory containing ``streams.csv`` and
+          ``utilities.csv`` or a ``(streams_csv_path, utilities_csv_path)`` tuple
+
+        Returns
+        -------
+        dict
+            The loaded input structure.
         """
         if isinstance(source, tuple) and len(source) == 2:
             # CSV tuple form
@@ -122,10 +136,7 @@ class PinchProblem:
 
 
     def target(self) -> JsonDict:
-        """
-        Run the targeting analysis against the loaded input.
-        Lazily computes results and caches them.
-        """
+        """Run the targeting analysis against the loaded input and cache the results."""
         if self._problem_data is None:
             raise RuntimeError(
                 "No input loaded. Call load(...) first."
@@ -139,11 +150,7 @@ class PinchProblem:
 
 
     def export(self, results_dir: Optional[PathLike] = None) -> Path:
-        """
-        Export the (computed) results to JSON. If not yet computed, will run targeting.
-        If results_dir is omitted, uses self.results_dir; otherwise updates it.
-        Returns the path written.
-        """
+        """Export the results to JSON. Returns the path written."""
         if results_dir is not None:
             self.results_dir = Path(results_dir)
 
@@ -155,16 +162,20 @@ class PinchProblem:
         if self._results is None:
             self.target()
 
-        return export_target_summary_to_excel_with_units(self._results, self.results_dir)
+        output_path = export_target_summary_to_excel_with_units(self._results, self.results_dir)
+
+        return output_path
 
 
     @property
     def problem_data(self) -> Optional[JsonDict]:
+        """Return the raw problem definition that was loaded or supplied."""
         return self._problem_data
 
 
     @property
     def results(self) -> Optional[JsonDict]:
+        """Return the cached targeting results, if targeting has been executed."""
         return self._results
 
     # ----------------------------------------------------------------------------
@@ -173,24 +184,21 @@ class PinchProblem:
 
     @classmethod
     def from_json(cls, data: JsonDict) -> "PinchProblem":
-        """
-        Build directly from an in-memory JSON-like dict.
-        """
+        """Build directly from an in-memory JSON-like dict."""
         obj = cls(problem_filepath=None, results_dir=None, run=False)
         obj._problem_data = data
         return obj
 
 
     def to_problem_json(self) -> JsonDict:
-        """
-        Return the canonical problem JSON (streams/utilities/options).
-        """
+        """Return the canonical problem JSON (streams/utilities/options)."""
         if self._problem_data is None:
             raise RuntimeError("No problem_data available. Did you call load(...) or from_json(...)?")
         return self._problem_data
     
 
     def __repr__(self) -> str:
+        """Machine-readable summary capturing source, export target, and result cache state."""
         src = (
             str(self.problem_filepath)
             if self.problem_filepath is not None

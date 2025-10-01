@@ -20,11 +20,11 @@ class StreamCollection:
         - Avoid duplicate names automatically.
 
     Example:
-        zone = StreamCollection()
-        zone.add(Stream("H1", 300, 400))
-        zone.set_sort_key(["t_target", "t_supply"], reverse=True)
-        for stream in zone:
-            print(stream.name, stream.t_target)
+        stream_data = StreamCollection()
+        stream_data.add(Stream("H1", 300, 400))
+        stream_data.set_sort_key(["t_target", "t_supply"], reverse=True)
+        for stream in stream_data:
+            print(stream.name, stream.t_supply, stream.t_target)
     """
 
     def __init__(self):

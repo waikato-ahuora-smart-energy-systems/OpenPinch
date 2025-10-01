@@ -52,7 +52,7 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
     # Validate request data using Pydantic model
     request_data = TargetInput.model_validate(data)
 
-    # Perform advanced pinch analysis and total site analysis
+    # Perform advanced Pinch Analysis and total site analysis
     return_data = get_targets(
         zone_tree=request_data.zone_tree,
         streams=request_data.streams,

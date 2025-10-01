@@ -70,6 +70,7 @@ def get_results_from_excel(excel_file, output_json, project_name):
 #######################################################################################################
 
 def _get_column_names_and_units(df_full, sheet_name, row_units=1):
+    """Derive canonical column names and unit strings for a workbook sheet."""
     # First row = column names
     # Second row = units
     if sheet_name == "Stream Data":
@@ -140,6 +141,7 @@ def _parse_sheet_with_units(excel_file, sheet_name, row_units=1, row_data=2, pro
 
 
 def _write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> list:
+    """Convert stream/utility worksheets into JSON-ready row dictionaries with units."""
     # Convert each row to a dictionary, attaching units where appropriate
     records = []
     for _, row in df_data.iterrows():
@@ -164,6 +166,7 @@ def _write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> l
 
 
 def _write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict, project_name: str) -> list:
+    """Convert summary worksheet into structured target records, including utility splits."""
     # Convert each row to a dictionary, attaching units where appropriate
     records = []
     for _, row in df_data.iterrows():

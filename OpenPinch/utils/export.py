@@ -47,6 +47,7 @@ def export_target_summary_to_excel_with_units(target_response, out_dir: str = ".
         row_mid = {}
 
         def _emit_utils(utils: Iterable):
+            """Populate summary row with value/unit pairs for each utility."""
             for u in utils or []:
                 hf_val, hf_unit = _split_vu(u.heat_flow)
                 row_mid[u.name + " (value)"] = hf_val

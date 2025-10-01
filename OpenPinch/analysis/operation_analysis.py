@@ -14,7 +14,8 @@ __all__ = ["get_energy_transfer_retrofit_analysis"]
 #######################################################################################################
 
 def get_energy_transfer_retrofit_analysis(site: Zone):
-    """Calculates the ETD and retrofit targets.
+    """
+    Calculates the ETD and retrofit targets.
     """
     
     # Prepares variables and arrays

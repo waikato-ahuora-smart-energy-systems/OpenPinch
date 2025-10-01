@@ -11,20 +11,36 @@ __all__ = ["prepare_problem_struture"]
 # Public API
 #######################################################################################################
 
-def prepare_problem_struture(streams: List[StreamSchema] = [], utilities: List[UtilitySchema] = [], options: Configuration = None, project_name: str = "Site", zone_tree: ZoneTreeSchema = None):
-    """Prepares an industrial site for pinch analysis by parsing input stream and utility data.
+def prepare_problem_struture(
+    streams: List[StreamSchema] = [],
+    utilities: List[UtilitySchema] = [],
+    options: Configuration = None,
+    project_name: str = "Site",
+    zone_tree: ZoneTreeSchema = None,
+):
+    """Build the top-level :class:`OpenPinch.classes.zone.Zone` hierarchy for analysis.
 
-    This function validates and processes the input stream and utility data, assigning them 
-    to the appropriate zones and generating any required default utilities. It augments 
-    the `Zone` object with hot/cold utilities and process zones suitable for further analysis.
+    Parameters
+    ----------
+    streams:
+        Iterable of validated :class:`OpenPinch.lib.schema.StreamSchema` objects describing
+        the process streams to analyse.
+    utilities:
+        Iterable of :class:`OpenPinch.lib.schema.UtilitySchema` describing candidate hot
+        and cold utilities.
+    options:
+        Optional :class:`OpenPinch.lib.config.Configuration` overrides.  When omitted the
+        defaults from ``Configuration()`` are used.
+    project_name:
+        Human-friendly label applied to the root zone when no explicit zone tree is supplied.
+    zone_tree:
+        Optional :class:`OpenPinch.lib.schema.ZoneTreeSchema` describing the desired zone
+        hierarchy (i.e., Zone A encompasses Zones B and C).
 
-    Args:
-        zone (Zone): An industrial zone object containing configuration settings.
-        streams (List[StreamSchema]): A list of stream inputs, each describing process stream characteristics.
-        utilities (List[UtilitySchema]): A list of utility inputs, including hot and cold utilities.
-
-    Returns:
-        Zone: The updated zone object with streams and utilities assigned to appropriate zones.
+    Returns
+    -------
+    Zone
+        Fully initialised zone tree with streams and utilities attached to each node.
     """
     top_zone_name, top_zone_identifier = _get_validated_zone_info(zone_tree, project_name)
     config = Configuration(
@@ -226,6 +242,7 @@ def _add_default_utilities(utilities: List[UtilitySchema], config: Configuration
 
 
 def _create_default_utility(name: str, ut_type: str, T: float, config: Configuration) -> UtilitySchema:
+    """Construct a default utility entry anchored to the extreme process temperature."""
     a = 1 if ut_type == "Hot" else -1
     return UtilitySchema.model_validate(
         {
@@ -309,6 +326,7 @@ def _set_utilities_for_zone_and_subzones(zone: Zone, hot_utilities: List[Stream]
 
 
 def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: List[StreamSchema] = [], top_zone_name: str = None) -> ZoneTreeSchema:
+    """Normalise a provided zone tree or synthesise one from stream zone paths."""
     if isinstance(zone_tree, ZoneTreeSchema):
         if zone_tree.type == ZoneType.U.value:
             raise ValueError("Pinch analysis does not apply to Utility Zones.")
@@ -338,6 +356,7 @@ def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: Lis
     zone_names = sorted(set(stream.zone for stream in streams if stream.zone))  # Filter empty/null zones
 
     def _split_zone_name(name: str):
+        """Split hierarchical zone strings ("Site/Area/Unit") into clean path components."""
         if "/" in name:
             return [z.strip() for z in name.split("/") if z.strip()]
         return [name]
@@ -355,6 +374,7 @@ def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: Lis
             current = current["children"][z_name]
 
     def _build_tree(node_dict):
+        """Recursively convert the intermediate dict representation into Pydantic models."""
         children = [
             _build_tree(child) for child in node_dict["children"].values()
         ]

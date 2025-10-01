@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class ZoneType(Enum):
-    """Types of zones used in total site analysis."""
+    """Types of zones used to divide the problem."""
     R = "Region"
     C = "Community"
     S = "Site"
@@ -19,8 +19,8 @@ class TargetType(Enum):
     TL = "Thermodynamic Limit Target"
     DI = "Direct Integration"
     TZ = "Total Process Target"
-    TS = "Total Site Target"
-    RT = "Regional Target"
+    TS = "Total Site Target" # Also indirect integration
+    RT = "Regional Target" # Currently the same as TS
     ET = "Energy Transfer Analysis"
 
     def __str__(self):
@@ -48,6 +48,7 @@ class HeatFlowUnits(Enum):
 
 
 class StreamType(Enum):
+    """Steam type"""
     Hot = "Hot"
     Cold = "Cold"
     Both = "Both"
@@ -55,12 +56,14 @@ class StreamType(Enum):
 
 
 class StreamID(Enum):
+    """Stream identity"""
     Process = "Process"
     Utility = "Utility"
     Unassigned = "Unassigned"
 
 
 class StreamLoc(Enum):
+    """Stream set identity"""
     HotStr = "Hot Streams"
     ColdStr = "Cold Streams"
     HotU = "Hot Utility"
@@ -69,6 +72,7 @@ class StreamLoc(Enum):
 
 
 class ProblemTableLabel(Enum):
+    """Problem table column header labels"""
     T = "T"
     DELTA_T = "delta_T"
     CP_HOT = "mcp_hot_tot"
@@ -101,12 +105,13 @@ class ProblemTableLabel(Enum):
     RCP_COLD_NET = "rcp_cold_net"
     RCP_UT_NET = "rcp_ut_net"
     RCP_HOT_UT = "rcp_hot_ut"
-    RCP_COLD_UT = "rcp_cold_ut"  # fixed duplicate value
+    RCP_COLD_UT = "rcp_cold_ut"
 
 PT = ProblemTableLabel
 
 
 class StreamDataLabel(Enum):
+    """Stream data column header labels"""
     TS = "T_supply"
     TT = "T_target"
     TYPE = "stream_type"
@@ -119,12 +124,14 @@ SD = StreamDataLabel
 
 
 class ArrowHead(Enum):
+    """Position of arrow head"""
     START = "Start"
     END = "End"
     NO_ARROW = "None"
 
 
 class LineColour(Enum):
+    """Line colour selection"""
     Hot = 0
     Cold = 1
     Other = 2

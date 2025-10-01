@@ -5,6 +5,9 @@ from .enums import *
 if TYPE_CHECKING:
     from .schema import *
 
+# TODO: This file needs a refactor once the purpose of it is well defined.
+# At present, the config includes many options corresponding to the Excel 
+# workbook, but they are not considered during analysis.
 
 """Global parameters."""
 C_to_K: float = 273.15 # degrees
@@ -14,6 +17,7 @@ ACTIVATE_TIMING = True
 LOG_TIMING = False
 
 class Configuration:
+    """Runtime configuration flags mirroring options from the legacy Excel workbook."""
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
     # TIT_BUTTON_SELECTED: bool = False
@@ -96,12 +100,14 @@ class Configuration:
     OVERRIDEDT_BUTTON_SELECTED: bool = False
 
     def __init__(self, options: Options = None, top_zone_name: str = "Site", top_zone_identifier: str = ZoneType.S.value):
+        """Initialise defaults and optionally apply user-provided options."""
         self.TOP_ZONE_NAME = top_zone_name
         self.TOP_ZONE_IDENTIFIER = top_zone_identifier
         if options:
             self.set_parameters(options)
 
     def set_parameters(self, options: Options) -> None:
+        """Apply checkbox- and turbine-related configuration from :class:`Options`."""
         # Main properties
         main_props = options.main
         self.TIT_BUTTON_SELECTED = "PROP_MOP_0" in main_props
@@ -131,6 +137,7 @@ class Configuration:
         self._set_turbine_parameters(turbine_options)
 
     def _set_turbine_parameters(self, turbine_options: List["TurbineOption"]) -> None:
+        """Populate turbine settings when the turbine work toggle is active."""
         def get_turbine_value(key: str, default=None):
             for option in turbine_options:
                 if option.key == key:  # Access the key attribute directly

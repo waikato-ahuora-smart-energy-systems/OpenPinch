@@ -11,7 +11,33 @@ __all__ = ["get_zonal_utility_targets, target_utility, calc_GGC_utility"]
 # Public API
 #######################################################################################################
 
-def get_zonal_utility_targets(pt: ProblemTable, pt_real: ProblemTable, hot_utilities: StreamCollection, cold_utilities: StreamCollection, is_process_zone = True) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection, StreamCollection, StreamCollection]:
+def get_zonal_utility_targets(
+    pt: ProblemTable,
+    pt_real: ProblemTable,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    is_process_zone=True,
+) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection]:
+    """Target utility usage and compute GCC variants for a zone.
+
+    Parameters
+    ----------
+    pt, pt_real:
+        Shifted and real problem tables used for constructing composite curves.
+    hot_utilities, cold_utilities:
+        Candidate utility collections that will be targeted across temperature
+        intervals.
+    is_process_zone:
+        When ``True`` (default) the function assumes the zone represents a
+        process area and applies additional targeting logic appropriate for that
+        context.
+
+    Returns
+    -------
+    tuple
+        Updated ``(pt, pt_real, hot_utilities, cold_utilities)`` collections with
+        derived profiles embedded.
+    """
     # Calculate various GCC profiles
     if is_process_zone:
         pt = _calc_GCC_without_pockets(pt)
@@ -75,6 +101,7 @@ def calc_GGC_utility(pt: ProblemTable, hot_utilities: List[Stream], cold_utiliti
 #######################################################################################################
 
 def _calc_GCC_without_pockets(pt: ProblemTable, col_H_NP: str =PT.H_NET_NP.value, col_H: str =PT.H_NET.value) -> Tuple[ProblemTable, ProblemTable]:
+    """Flatten GCC pockets by inserting breakpoints so the profile becomes monotonic."""
     pt.col[col_H_NP] = pt.col[col_H]
 
     hot_pinch_loc, cold_pinch_loc, valid = get_pinch_loc(pt)
@@ -96,6 +123,7 @@ def _calc_GCC_without_pockets(pt: ProblemTable, col_H_NP: str =PT.H_NET_NP.value
 
 
 def _remove_pockets_on_one_side_of_the_pinch(pt: ProblemTable, col_H_NP: str =PT.H_NET_NP.value, col_H: str =PT.H_NET.value, hot_pinch_loc: int = None, cold_pinch_loc: int = None, is_above_pinch: bool = True) -> Tuple[ProblemTable, ProblemTable]:
+    """Iteratively eliminate pockets above or below the pinch by flattening enthalpy spans."""
 
     # Settings for removing pocket segments for above/below the pinch
     if is_above_pinch:
@@ -146,6 +174,7 @@ def _remove_pockets_on_one_side_of_the_pinch(pt: ProblemTable, col_H_NP: str =PT
 
 
 def _pocket_exit_index(H_vals: np.ndarray, i_0: int, pinch_loc: int, sgn: int) -> int:
+    """Return index where a pocket terminates when marching in direction ``sgn``."""
     if sgn > 0:
         for i in range(i_0 + 1, pinch_loc + 1):
             if H_vals[i_0] >= H_vals[i] + ZERO:
@@ -177,6 +206,7 @@ def _calc_GCC_actual(pt: ProblemTable, is_process_zone: bool = True, f_horizonta
 
 
 def _calc_GGC_pockets(pt: ProblemTable) -> ProblemTable:
+    """Store GCC pocket contribution (difference between real and pocket-free profiles)."""
     pt.col[PT.H_NET_PK.value] = pt.col[PT.H_NET.value] - pt.col[PT.H_NET_NP.value]
     return pt
 
@@ -291,6 +321,7 @@ def _assign_utility(pt: ProblemTable, col_T: Enum, col_H: Enum, u_ls: List[Strea
 
 
 def _maximise_utility_duty(hl_in: ProblemTable, Ts: float, Tt: float, col_T: Enum, col_H: Enum, is_hot_ut: bool, Q_assigned: float) -> Tuple[float, int]:
+    """Determine remaining heat duty a utility can serve given temperature limits and prior assignments."""
     hl: ProblemTable = hl_in.copy
     sgn = 1 if is_hot_ut else -1
     hl.col["T_out"] = hl.shift(col_T, sgn)

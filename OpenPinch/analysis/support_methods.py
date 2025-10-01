@@ -121,10 +121,12 @@ def insert_temperature_interval_into_pt(pt: ProblemTable, T_ls: List[float] | fl
 
 
 def key_name(zone_name: str, target_type: str = TargetType.DI.value):
+    """Compose the canonical dictionary key for storing zone targets."""
     return f"{zone_name}/{target_type}"
 
 
 def get_value(val: Union[float, dict, ValueWithUnit]) -> float:
+    """Extract a numeric value from raw floats, dict payloads, or :class:`ValueWithUnit`."""
     if isinstance(val, float):
         return val
     elif isinstance(val, dict):

@@ -16,17 +16,19 @@ def get_additional_zonal_pinch_analysis(pt: ProblemTable, pt_real: ProblemTable,
     """Calculates additional graphs and targets."""
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
-    area = target_area(pt_real)
-    num_units = min_number_hx(pt)
-    capital_cost = num_units * config.FC + num_units * config.VC * (area / num_units) ** config.EXP
-    annual_capital_cost = capital_cost * capital_recovery_factor(config.DISCOUNT_RATE, config.SERV_LIFE)
+    if config.AREA_BUTTON:
+        area = target_area(pt_real)
+        num_units = min_number_hx(pt)
+        capital_cost = num_units * config.FC + num_units * config.VC * (area / num_units) ** config.EXP
+        annual_capital_cost = capital_cost * capital_recovery_factor(config.DISCOUNT_RATE, config.SERV_LIFE)
 
 
-    # # Target exergy supply, rejection, and destruction
+    # # TODO: Write analysis. Target exergy supply, rejection, and destruction
     # gcc_x = _calc_exergy_gcc(z, pt_real, bcc, z.graphs[GT.GCC_Act.value]) 
     # z.add_graph(GT.GCC_X.value, gcc_x)
 
-    # # Requires review and comparision to previous Excel implementation
+    # # TODO: MOVE to earlier??? Also, requires review and comparision to previous Excel implementation
+    # # Determines the assisted heat transfer (pocket cutting) for within a zone
     # GCC_AI = None
     # if z.config.AHT_BUTTON_SELECTED:
     #     z.add_graph('GCC_AI', GCC_AI)
@@ -135,6 +137,7 @@ def min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
             T_high, T_low = T_vals[i_0], T_vals[i_1]
 
             def count_crossing(streams):
+                """Count process streams whose adjusted temperatures intersect interval [T_low, T_high]."""
                 t_max = np.array([s.t_max_star for s in streams])
                 t_min = np.array([s.t_min_star for s in streams])
                 return np.sum(
@@ -147,6 +150,7 @@ def min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
             num_hx += count_crossing(z.cold_streams)
 
             def count_utility_crossing(utilities):
+                """Count utility streams whose adjusted temperatures intersect interval [T_low, T_high]."""
                 t_max = np.array([u.t_max_star for u in utilities])
                 t_min = np.array([u.t_min_star for u in utilities])
                 return np.sum(

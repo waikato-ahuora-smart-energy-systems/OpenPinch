@@ -22,10 +22,10 @@ def get_problem_from_csv(
     encoding: str = "utf-8-sig",
 ):
     """
-    Reads two CSV files (streams & utilities) with the same structure you use in Excel:
+    Reads two CSV files (streams & utilities) with the same structure as the Excel template:
       - Row 1 = column names
       - Row 2 = column units
-      - Row 3 onward = data
+      - Row 3 onward = stream data
 
     Parameters
     ----------
@@ -83,12 +83,12 @@ def get_results_from_csv(
     encoding: str = "utf-8-sig",
 ):
     """
-    Reads a CSV equivalent of your 'Summary' sheet with:
+    Reads a CSV equivalent of the Excel 'Summary' sheet with:
       - Row 1 = column names
       - Row 2 = column units
       - Row 3 onward = data
 
-    (Defaults mirror your Excel call where units were on row 2 and data started at row 4.)
+    (Defaults to mirror the Excel Workbook call where units are on row 2 and data starts at row 4.)
 
     Parameters
     ----------
@@ -170,6 +170,7 @@ def _parse_csv_with_units(
     # Convert numeric-looking cells to numbers where appropriate
     # (Excel reader often infers numerics; CSV keeps strings—this helps parity.)
     def _to_number_maybe(x):
+        """Convert numeric-looking strings to int/float, leave others untouched."""
         if isinstance(x, str):
             xs = x.strip()
             if xs == "":
