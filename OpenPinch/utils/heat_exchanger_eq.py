@@ -3,6 +3,7 @@ from ..lib.enums import HeatExchangerTypes as HX
 
 
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
+    """Return heat-exchanger effectiveness for the specified arrangement/NTU/c ratio."""
     if Passes == None:
         Passes = 1
 
@@ -53,6 +54,7 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
 
 
 def HX_NTU(Arrangement, eff, c, Passes=None):
+    """Compute the NTU corresponding to a target effectiveness for a given arrangement."""
     if Passes == None:
         Passes = 1
 
@@ -99,6 +101,7 @@ def HX_NTU(Arrangement, eff, c, Passes=None):
 
 
 def CalcAreaUE(Arrangement, U, C_p, T_p1, T_p2, T_u1, T_u2, Passes):
+    """Estimate area*U product required for the exchanger based on duty and temperatures."""
     Q = C_p * abs(T_p1 - T_p2)
     C_u = Q / abs(T_u1 - T_u2)
     if C_p < C_u:
@@ -114,16 +117,19 @@ def CalcAreaUE(Arrangement, U, C_p, T_p1, T_p2, T_u1, T_u2, Passes):
 
 
 def eNTU_slope_Numerical(Arrangement, Ntu, c, Passes):
+    """Finite-difference slope of effectiveness with respect to NTU for sensitivity analyses."""
     dx = 1e-6
     if Ntu > 0:
         return (HX_Eff(Arrangement, Ntu + dx, c, Passes) - HX_Eff(Arrangement, Ntu, c, Passes)) / dx
 
 
 def Coth(R):
+    """Convenience wrapper for the hyperbolic cotangent function."""
     return (math.exp(2 * R) + 1) / (math.exp(2 * R) - 1)
 
 
 def MultiPassEff(eff, c, Passes):
+    """Convert single-pass effectiveness into equivalent multi-pass effectiveness."""
     if c != 1:
         return (((1 - eff * c) / (1 - eff)) ** Passes - 1) / (((1 - eff * c) / (1 - eff)) ** Passes - c)
     else:
@@ -131,6 +137,7 @@ def MultiPassEff(eff, c, Passes):
 
 
 def MultiPassNTU(Eff_p, c, Passes):
+    """Convert multi-pass effectiveness back to an equivalent single-pass value."""
     if c != 1:
         return (((1 - Eff_p * c) / (1 - Eff_p)) ** (1 / Passes) - 1) / (((1 - Eff_p * c) / (1 - Eff_p)) ** (1 / Passes) - c)
     else:
@@ -138,6 +145,7 @@ def MultiPassNTU(Eff_p, c, Passes):
 
 
 def CrossflowUnmixedEff1(Ntu, c):
+    """Series approximation for cross-flow effectiveness with unmixed streams."""
     Sum_Pn = 0
     for i in range(1, 21):
         Pn = 0
@@ -148,6 +156,7 @@ def CrossflowUnmixedEff1(Ntu, c):
 
 
 def CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_fluid):
+    """Lookup-derived correlations for cross-flow exchangers with finite rows."""
     # ESDU 86018
     if Cmin_fluid == 'Air':
         if Rows == 1:
@@ -182,6 +191,7 @@ def CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_fluid):
 
 
 def HX_NTU_Numerical(Arrangement, eff, c):
+    """Solve for NTU numerically when closed-form expressions are unavailable."""
     NTU1 = 0.001
     NTU2 = 0.1
     eps = 1e-5

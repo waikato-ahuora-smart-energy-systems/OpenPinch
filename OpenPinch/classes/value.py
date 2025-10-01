@@ -6,8 +6,10 @@ Q_ = ureg.Quantity
 
 
 class Value:
-    # TODO: Use Value to convert input and output data. Add docstrings to explain the class.
+    """Thin wrapper around a Pint ``Quantity`` with helpers for serialisation and arithmetic."""
+
     def __init__(self, data=None, unit: str = None):
+        """Create a unit-aware value from a raw number or :class:`ValueWithUnit`."""
         if data is None:
             self._quantity = Q_(0)
         elif isinstance(data, ValueWithUnit):
@@ -21,6 +23,7 @@ class Value:
 
     @property
     def value(self):
+        """Return the magnitude component of the quantity."""
         return self._quantity.magnitude
 
     @value.setter
@@ -29,6 +32,7 @@ class Value:
 
     @property
     def unit(self):
+        """Return the unit in a human-friendly compact representation."""
         return format(self._quantity.units, "~").replace("°","deg").replace(" ","")
 
     @unit.setter
@@ -36,6 +40,7 @@ class Value:
         self._quantity = Q_(self.value, unit_str)
 
     def to(self, new_unit: str) -> "Value":
+        """Return a copy converted to ``new_unit``."""
         return Value(self._quantity.to(new_unit).magnitude, new_unit)
 
     def __str__(self):
@@ -106,10 +111,12 @@ class Value:
         return Value(qty.magnitude, format(qty.units, "~"))
 
     def to_dict(self):
+        """Serialise the value into a JSON-friendly ``{"value", "unit"}`` dictionary."""
         return {"value": self.value, "unit": self.unit}
 
     @classmethod
     def from_dict(cls, data):
+        """Instantiate from a ``{"value", "unit"}`` mapping."""
         return cls(data["value"], data.get("unit"))
 
 

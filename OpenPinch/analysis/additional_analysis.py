@@ -137,6 +137,7 @@ def min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
             T_high, T_low = T_vals[i_0], T_vals[i_1]
 
             def count_crossing(streams):
+                """Count process streams whose adjusted temperatures intersect interval [T_low, T_high]."""
                 t_max = np.array([s.t_max_star for s in streams])
                 t_min = np.array([s.t_min_star for s in streams])
                 return np.sum(
@@ -149,6 +150,7 @@ def min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
             num_hx += count_crossing(z.cold_streams)
 
             def count_utility_crossing(utilities):
+                """Count utility streams whose adjusted temperatures intersect interval [T_low, T_high]."""
                 t_max = np.array([u.t_max_star for u in utilities])
                 t_min = np.array([u.t_min_star for u in utilities])
                 return np.sum(

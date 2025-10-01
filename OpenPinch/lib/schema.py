@@ -10,20 +10,24 @@ MaybeVU = Union[float, "ValueWithUnit", None]
 
 # ---- Core value types --------------------------------------------------------
 class ValueWithUnit(BaseModel):
+    """Container storing a magnitude and its associated unit string."""
     value: Optional[float] = Field(default=None, description="Numeric value (magnitude).")
     units: str = Field(..., description="Unit string, e.g. 'kW', '°C', 'kJ/s'.")
 
 # ---- Utilities & Pinch temps -------------------------------------------------
 class HeatUtility(BaseModel):
+    """Report-friendly representation of a utility contribution."""
     name: str
     heat_flow: ScalarOrVU
 
 class TempPinch(BaseModel):
+    """Hot and cold pinch temperatures attached to a targeting record."""
     cold_temp: MaybeVU = None
     hot_temp: MaybeVU = None
 
 # ---- Targeting results -------------------------------------------------------
 class TargetResults(BaseModel):
+    """Summary metrics for a single zone/target returned by the analysis."""
     name: str
 
     degree_of_integration: MaybeVU = None
@@ -56,10 +60,12 @@ class TargetResults(BaseModel):
 
 # ---- Graphing primitives -----------------------------------------------------
 class DataPoint(BaseModel):
+    """Coordinate used to construct composite curves and other plots."""
     x: float
     y: float
 
 class Segment(BaseModel):
+    """Continuous plot segment optionally annotated with colour/arrows."""
     title: Optional[str] = None
     colour: Optional[int] = Field(
         default=None,
@@ -72,6 +78,7 @@ class Segment(BaseModel):
     data_points: List[DataPoint] = Field(default_factory=list)
 
 class Graph(BaseModel):
+    """Collection of segments representing a single graph (e.g., GCC)."""
     # Consider making 'type' an Enum (e.g., GCC, CCC, PT, etc.) for safety.
     type: str
     segments: List[Segment] = Field(default_factory=list)
@@ -79,17 +86,20 @@ class Graph(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 class GraphSet(BaseModel):
+    """Named group of graphs emitted for a particular zone or context."""
     name: str = "GraphSet"
     graphs: List[Graph] = Field(default_factory=list)
 
 # ---- Aggregate response ------------------------------------------------------
 class TargetOutput(BaseModel):
+    """Top-level payload returned by :func:`OpenPinch.pinch_analysis_service`."""
     name: str = "Site"
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
 
 # ---- Stream & Utility definitions -------------------------------------------
 class StreamSchema(BaseModel):
+    """Process stream definition supplied to the targeting service."""
     zone: str
     name: str
 
@@ -103,6 +113,7 @@ class StreamSchema(BaseModel):
     active: bool = True
 
 class UtilitySchema(BaseModel):
+    """Utility definition including thermal and optional economic attributes."""
     name: str
     type: StreamType
 
@@ -120,18 +131,21 @@ class UtilitySchema(BaseModel):
 
 # ---- Zone tree ---------------------------------------------------------------
 class ZoneTreeSchema(BaseModel):
+    """Recursive description of the zone hierarchy for the analysis."""
     name: str
     type: str
     children: Optional[List["ZoneTreeSchema"]] = None
 
 # ---- Options -----------------------------------------------------------------
 class TurbineOption(BaseModel):
+    """Configure individual turbine properties referenced by key."""
     key: TurbineOptionsPropKeys
     value: Any
 
     model_config = ConfigDict(use_enum_values=True)
 
 class Options(BaseModel):
+    """Primary checkbox-style options plus turbine configuration."""
     main: List[MainOptionsPropKeys] = Field(default_factory=list)
     # graphs: List[GraphOptionsPropKeys]
     turbine: List[TurbineOption] = Field(default_factory=list)
@@ -140,6 +154,7 @@ class Options(BaseModel):
 
 # ---- Complete request --------------------------------------------------------
 class TargetInput(BaseModel):
+    """Validated top-level input payload for :func:`OpenPinch.pinch_analysis_service`."""
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[Options] = None

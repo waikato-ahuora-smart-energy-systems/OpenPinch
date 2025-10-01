@@ -56,6 +56,7 @@ def get_process_pinch_targets(zone: Zone):
 #######################################################################################################
 
 def _get_net_hot_and_cold_segments(zone_identifier: str, pt: ProblemTable, hot_utilities: StreamCollection, cold_utilities: StreamCollection) -> Tuple[StreamCollection, StreamCollection]:
+    """Derive net process streams that represent overall utility demand for site aggregation."""
     total_utility_demand = sum([u.heat_flow for u in hot_utilities]) + sum([u.heat_flow for u in cold_utilities])
     if zone_identifier == ZoneType.P.value and total_utility_demand > ZERO:
         net_hot_streams, net_cold_streams = _save_data_for_total_site_analysis(pt, PT.T.value, PT.H_NET_A.value, hot_utilities, cold_utilities)        
@@ -140,6 +141,7 @@ def _advance_utility_if_needed(dh_used: float, current_u: Stream = None, utiliti
 
 
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
+    """Assemble the problem-table slices required for composite/comparison plots."""
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {

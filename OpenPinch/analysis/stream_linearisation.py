@@ -10,7 +10,7 @@ __all__ = ["get_piecewise_linearisation_for_streams"]
 #######################################################################################################
 
 def get_piecewise_linearisation_for_streams(streams: List[NonLinearStream], t_h_data: list, dt_diff_max: float) -> np.array:
-    # TODO: Missing docstrings
+    """Generate piecewise-linear T-H profiles for each non-linear stream using a tolerance cap."""
     if len(streams) != len(t_h_data):
         raise ValueError(f"Piecewise linearisation failed due to a different number of streams and temperature-enthalpy datasets.")
 
@@ -175,5 +175,4 @@ def _get_piecewise_breakpoints(curve: np.array, epsilon: float, is_hot_stream: b
             break
 
     return pw_points
-
 

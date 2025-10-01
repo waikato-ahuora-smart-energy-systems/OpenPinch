@@ -17,6 +17,7 @@ class Stream():
         price: float = 0.0,
         is_process_stream: bool = True,
     ):
+        """Initialise a stream and determine hot/cold classification from temperatures."""
         self._name: str = name
         self._type: str = None
         self._t_supply: Optional[float] = t_supply

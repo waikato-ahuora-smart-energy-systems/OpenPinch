@@ -242,6 +242,7 @@ def _add_default_utilities(utilities: List[UtilitySchema], config: Configuration
 
 
 def _create_default_utility(name: str, ut_type: str, T: float, config: Configuration) -> UtilitySchema:
+    """Construct a default utility entry anchored to the extreme process temperature."""
     a = 1 if ut_type == "Hot" else -1
     return UtilitySchema.model_validate(
         {
@@ -325,6 +326,7 @@ def _set_utilities_for_zone_and_subzones(zone: Zone, hot_utilities: List[Stream]
 
 
 def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: List[StreamSchema] = [], top_zone_name: str = None) -> ZoneTreeSchema:
+    """Normalise a provided zone tree or synthesise one from stream zone paths."""
     if isinstance(zone_tree, ZoneTreeSchema):
         if zone_tree.type == ZoneType.U.value:
             raise ValueError("Pinch analysis does not apply to Utility Zones.")
@@ -354,6 +356,7 @@ def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: Lis
     zone_names = sorted(set(stream.zone for stream in streams if stream.zone))  # Filter empty/null zones
 
     def _split_zone_name(name: str):
+        """Split hierarchical zone strings ("Site/Area/Unit") into clean path components."""
         if "/" in name:
             return [z.strip() for z in name.split("/") if z.strip()]
         return [name]
@@ -371,6 +374,7 @@ def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: Lis
             current = current["children"][z_name]
 
     def _build_tree(node_dict):
+        """Recursively convert the intermediate dict representation into Pydantic models."""
         children = [
             _build_tree(child) for child in node_dict["children"].values()
         ]

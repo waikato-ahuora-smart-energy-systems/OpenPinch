@@ -1,11 +1,18 @@
-import pandas as pd
-import numpy as np
+import numbers
 from copy import deepcopy
+
+import numpy as np
+import pandas as pd
+
 from ..lib.enums import ProblemTableLabel
 
 class ProblemTable:
-    # TODO: Add docstrings to the ProblemTable class. Highlight that numpy sits below the arrays. 
+    """NumPy-backed representation of the pinch problem table with pandas-like accessors."""
+
+    _DEFAULT_ATOL = 1e-6
+
     def __init__(self, data_input: dict | list = None, add_default_labels: bool = True):
+        """Initialise the table from a dictionary (column keyed) or list-of-columns structure."""
         if add_default_labels:
             self.columns = list([index.value for index in ProblemTableLabel])
         else:
@@ -29,6 +36,7 @@ class ProblemTable:
             self.data = None
 
     class ColumnViewByIndex:
+        """Expose read/write access to columns addressed by integer index."""
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -43,6 +51,7 @@ class ProblemTable:
         return self.ColumnViewByIndex(self)   
     
     class ColumnViewByName:
+        """Expose read/write access to columns addressed by column label."""
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -66,6 +75,7 @@ class ProblemTable:
         return self.ColumnViewByName(self)  
     
     class ColumnsViewByName:
+        """Vectorised view over multiple labelled columns."""
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -91,6 +101,7 @@ class ProblemTable:
         return self.ColumnsViewByName(self)   
     
     class LocationByRowByColName:
+        """Row/column accessor mirroring ``DataFrame.loc`` semantics."""
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
         
@@ -109,6 +120,7 @@ class ProblemTable:
         return self.LocationByRowByColName(self)    
     
     class LocationByRowByCol:
+        """Row/column accessor mirroring ``DataFrame.iloc`` semantics."""
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -142,20 +154,64 @@ class ProblemTable:
             data_input, add_default_labels=False
         )
 
-    def __eq__(self, other):
+    def _equals(self, other: "ProblemTable", *, atol: float | None = None) -> bool:
+        """Return True when two tables match within ``atol`` absolute tolerance."""
         if not isinstance(other, ProblemTable):
             return False
+
         if self.columns != other.columns:
             return False
+
+        if self.data is None or other.data is None:
+            return self.data is None and other.data is None
+
         if self.data.shape != other.data.shape:
             return False
 
-        # NaN-safe elementwise comparison
-        a = self.data
-        b = other.data
-        nan_mask = np.isnan(a) & np.isnan(b)
-        close_mask = np.isclose(a, b, rtol=1e-5, atol=1e-8, equal_nan=False)
-        return np.all(nan_mask | close_mask)
+        atol = self._DEFAULT_ATOL if atol is None else atol
+        left = self.data
+        right = other.data
+
+        if left.size == 0:
+            return True
+
+        if left.dtype != object and right.dtype != object:
+            return np.allclose(left, right, atol=atol, rtol=0.0, equal_nan=True)
+
+        numeric_types = (numbers.Real, np.number)
+        for col_idx in range(left.shape[1]):
+            col_left = left[:, col_idx]
+            col_right = right[:, col_idx]
+
+            if col_left.dtype != object and col_right.dtype != object:
+                if not np.allclose(col_left, col_right, atol=atol, rtol=0.0, equal_nan=True):
+                    return False
+                continue
+
+            try:
+                cast_left = col_left.astype(float)
+                cast_right = col_right.astype(float)
+            except (ValueError, TypeError):
+                pass
+            else:
+                if not np.allclose(cast_left, cast_right, atol=atol, rtol=0.0, equal_nan=True):
+                    return False
+                continue
+
+            for value_left, value_right in zip(col_left, col_right):
+                if pd.isna(value_left) and pd.isna(value_right):
+                    continue
+                if isinstance(value_left, numeric_types) and isinstance(value_right, numeric_types):
+                    if not np.isclose(value_left, value_right, atol=atol):
+                        return False
+                    continue
+                if value_left != value_right:
+                    return False
+
+        return True
+
+    def __eq__(self, other):
+        return self._equals(other)
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -182,6 +238,7 @@ class ProblemTable:
         return data_input
     
     def to_list(self, col: str = None):
+        """Return table data as Python lists; optionally restrict to a single column."""
         if isinstance(col, str):
             ls = self.col[col].T.tolist()
         elif col == None:
@@ -189,6 +246,7 @@ class ProblemTable:
         return ls[0] if len(ls) == 1 else ls
 
     def delta_col(self, key, shift: int =1) -> np.ndarray:
+        """Compute difference between successive entries in a column."""
         idx = self.col_index[key]
         col_values = self.data[:, idx]
         delta = np.roll(col_values, shift) - col_values
@@ -196,6 +254,7 @@ class ProblemTable:
         return delta
     
     def shift(self, key, shift: int =1, filler_value: float = 0.0) -> np.ndarray:
+        """Return a shifted copy of a column filling vacated positions with ``filler_value``."""
         idx = self.col_index[key]
         col_values = self.data[:, idx]
         values = np.roll(col_values, shift)
@@ -208,6 +267,7 @@ class ProblemTable:
         return values
 
     def round(self, decimals):
+        """Round the underlying NumPy buffer in-place."""
         self.data = np.round(self.data, decimals)
 
     def insert(self, row_dict: dict, index: int):
@@ -219,14 +279,17 @@ class ProblemTable:
         self.data = np.insert(self.data, index, new_row, axis=0)
 
     def update_row(self, index: int, row_dict: dict):
+        """Update selected columns for the row at ``index`` using values from ``row_dict``."""
         for key, value in row_dict.items():
             if key in self.col_index:
                 self.data[index, self.col_index[key]] = value
 
     def delete_row(self, index: int):
+        """Remove a row at ``index`` from the buffer."""
         self.data = np.delete(self.data, index, axis=0)
 
     def sort_by_column(self, column: str, ascending: bool = True):
+        """Sort rows in-place by the given column."""
         if column not in self.col_index:
             raise KeyError(f"Column {column} not found")
         col_data = self.data[:, self.col_index[column]]
@@ -235,37 +298,6 @@ class ProblemTable:
             order = order[::-1]
         self.data = self.data[order]
 
-# TODO: could this be a method under ProblemTable, e.g., __eq__(self) as the way to check equality 
 def compare_problem_tables(pt1: ProblemTable, pt2: ProblemTable, atol: float = 1e-6) -> bool:
-    """Compares two DataFrames element-wise and reports differences within an absolute tolerance."""
-    if pt1.shape != pt2.shape:
-        print(f"❌ Shape mismatch: {pt1.shape} vs {pt2.shape}")
-        return False
-
-    if list(pt1.columns) != list(pt2.columns):
-        print("❌ Column mismatch:")
-        print(f"pt1 columns: {pt1.columns}")
-        print(f"pt2 columns: {pt2.columns}")
-        return False
-
-    mismatches = []
-    for i in range(len(pt1)):
-        for col in pt1.columns:
-            v1, v2 = pt1.iloc[i][col], pt2.iloc[i][col]
-            try:
-                if pd.isna(v1) and pd.isna(v2):
-                    continue
-                if not np.isclose(v1, v2, atol=atol):
-                    mismatches.append((i, col, v1, v2))
-            except TypeError:
-                if v1 != v2:
-                    mismatches.append((i, col, v1, v2))
-
-    if mismatches:
-        print(f"⚠️ {len(mismatches)} mismatches found:")
-        for i, col, v1, v2 in mismatches:
-            print(f"Row {i}, Column '{col}': pt1={v1}, pt2={v2}")
-        return False
-
-    print("✅ All values match within tolerance.")
-    return True
+    """Legacy helper that defers to ``ProblemTable.equals`` for comparisons."""
+    return pt1.equals(pt2, atol=atol)

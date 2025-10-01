@@ -170,6 +170,7 @@ def _parse_csv_with_units(
     # Convert numeric-looking cells to numbers where appropriate
     # (Excel reader often infers numerics; CSV keeps strings—this helps parity.)
     def _to_number_maybe(x):
+        """Convert numeric-looking strings to int/float, leave others untouched."""
         if isinstance(x, str):
             xs = x.strip()
             if xs == "":
