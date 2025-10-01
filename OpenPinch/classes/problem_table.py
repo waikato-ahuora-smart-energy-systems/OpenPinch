@@ -298,6 +298,3 @@ class ProblemTable:
             order = order[::-1]
         self.data = self.data[order]
 
-def compare_problem_tables(pt1: ProblemTable, pt2: ProblemTable, atol: float = 1e-6) -> bool:
-    """Legacy helper that defers to ``ProblemTable.equals`` for comparisons."""
-    return pt1.equals(pt2, atol=atol)
