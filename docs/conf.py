@@ -80,9 +80,9 @@ autodoc_mock_imports = [
 ]
 
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", {}),
-    "pandas": ("https://pandas.pydata.org/docs/", {}),
-    "numpy": ("https://numpy.org/doc/stable/", {}),
+    "python": ("https://docs.python.org/3", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
 # -- Options for HTML output -------------------------------------------------
