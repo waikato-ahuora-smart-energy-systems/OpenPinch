@@ -18,7 +18,7 @@ if PROJECT_ROOT not in sys.path:
 
 # -- Project information -----------------------------------------------------
 project = "OpenPinch"
-author = "Tim Walmsley and contributors"
+author = "Tim Walmsley"
 current_year = datetime.now().year
 copyright = f"{current_year}, {author}"
 
