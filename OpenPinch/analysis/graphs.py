@@ -272,8 +272,8 @@ def _graph_gcc(y_vals: List[float], x_vals: List[float], utility_profile: bool =
     y_vals, x_vals = _clean_composite(y_vals, x_vals)
 
     # Find start and end indices of useful data
-    start_idx = next((j for j in range(len(x_vals) - 1) if abs(x_vals[j] - x_vals[j + 1]) > ZERO), 0)
-    end_idx = next((j for j in range(len(x_vals) - 1, 0, -1) if abs(x_vals[j] - x_vals[j - 1]) > ZERO), len(x_vals) - 1)
+    start_idx = next((j for j in range(len(x_vals) - 1) if abs(x_vals[j] - x_vals[j + 1]) > tol), 0)
+    end_idx = next((j for j in range(len(x_vals) - 1, 0, -1) if abs(x_vals[j] - x_vals[j - 1]) > tol), len(x_vals) - 1)
 
     curves = []
     j = start_idx
@@ -285,9 +285,9 @@ def _graph_gcc(y_vals: List[float], x_vals: List[float], utility_profile: bool =
         enthalpy_diff = x_vals[j] - x_vals[j + 1]
         segment_type = None
 
-        if enthalpy_diff > ZERO:
+        if enthalpy_diff > tol:
             segment_type = 'cold_pro' if not utility_profile else 'hot_ut'
-        elif enthalpy_diff < -ZERO:
+        elif enthalpy_diff < -tol:
             segment_type = 'hot_pro'  if not utility_profile else 'cold_ut'
         else:
             segment_type = 'zero'
@@ -297,11 +297,11 @@ def _graph_gcc(y_vals: List[float], x_vals: List[float], utility_profile: bool =
         while next_j < end_idx:
             next_diff = x_vals[next_j] - x_vals[next_j + 1]
             if (
-                (segment_type == 'cold_pro' and next_diff < -ZERO) or
-                (segment_type == 'hot_pro'  and next_diff > ZERO) or
-                (segment_type == 'hot_ut'   and next_diff < -ZERO) or
-                (segment_type == 'cold_ut'  and next_diff > ZERO) or
-                (segment_type == 'zero'     and abs(next_diff) > ZERO)
+                (segment_type == 'cold_pro' and next_diff < -tol) or
+                (segment_type == 'hot_pro'  and next_diff > tol) or
+                (segment_type == 'hot_ut'   and next_diff < -tol) or
+                (segment_type == 'cold_ut'  and next_diff > tol) or
+                (segment_type == 'zero'     and abs(next_diff) > tol)
             ):
                 break
             next_j += 1
@@ -369,26 +369,26 @@ def _clean_composite(y_vals: List[float], x_vals: List[float]) -> Tuple[List[flo
         else:
             # Linear interpolation check
             y_interp = y1 + (y3 - y1) * (x2 - x1) / (x3 - x1)
-            if abs(y2 - y_interp) > ZERO:
+            if abs(y2 - y_interp) > tol:
                 x_clean.append(x2)
                 y_clean.append(y2)
 
     x_clean.append(x_vals[-1])
     y_clean.append(y_vals[-1])
 
-    if abs(x_clean[0] - x_clean[1]) < ZERO:
+    if abs(x_clean[0] - x_clean[1]) < tol:
         x_clean.pop(0)
         y_clean.pop(0)
     
     i = len(x_clean) - 1
-    if abs(x_clean[i] - x_clean[i-1]) < ZERO:
+    if abs(x_clean[i] - x_clean[i-1]) < tol:
         x_clean.pop(i)
         y_clean.pop(i)
 
     # offset = 0
     # for i in range(len(x_clean) - 1):
     #     x1, x2 = x_clean[i - offset], x_clean[i+1 - offset]        
-    #     if abs(x1 - x2) < ZERO:
+    #     if abs(x1 - x2) < tol:
     #         x_clean.pop(i - offset)
     #         y_clean.pop(i - offset)
     #         offset += 1
@@ -400,7 +400,7 @@ def _clean_composite(y_vals: List[float], x_vals: List[float]) -> Tuple[List[flo
     # offset = 0
     # for i in reversed(range(len(x_clean) - 1)):
     #     x1, x2 = x_clean[i - offset], x_clean[i-1 - offset]     
-    #     if abs(x1 - x2) < ZERO:
+    #     if abs(x1 - x2) < tol:
     #         x_clean.pop(i - offset)
     #         y_clean.pop(i - offset)
     #         offset += 1
@@ -528,21 +528,21 @@ def _create_curve(title: str, colour: int, x_vals, y_vals, arrow=ArrowHead.NO_AR
         
 #         if HX_Type == 'R' or HX_Type == 'C':
 #             for j_0 in range(j_0, len(ETD[0])):
-#                 if abs(ETD[x_col - 1][j_0 + 1]) > ZERO:
+#                 if abs(ETD[x_col - 1][j_0 + 1]) > tol:
 #                     break
 
 #         if HX_Type == 'R' or HX_Type == 'H':
 #             for j_1 in range(j_1, 1, -1):
-#                 if abs(ETD[x_col - 1][j_1]) > ZERO:
+#                 if abs(ETD[x_col - 1][j_1]) > tol:
 #                     break
 
 #         j = j_0
 #         while j < j_1:
 #             tmp = ETD[x_col - 1][j + 1]
-#             if tmp > ZERO:
+#             if tmp > tol:
 #                 # Find process heat deficit segments and utility heat supply segments
 #                 seg_type = 1
-#             elif tmp < -ZERO:
+#             elif tmp < -tol:
 #                 # Find process heat surplus segments and utility heat sink segments
 #                 seg_type = 2
 #             else:
@@ -551,13 +551,13 @@ def _create_curve(title: str, colour: int, x_vals, y_vals, arrow=ArrowHead.NO_AR
 
 #             for j in range(j + 1, j_1 - 1):
 #                 if seg_type == 1:
-#                     if ETD[x_col - 1][j + 1] < ZERO:
+#                     if ETD[x_col - 1][j + 1] < tol:
 #                         break
 #                 elif seg_type == 2:
-#                     if ETD[x_col - 1][j + 1] > -ZERO:
+#                     if ETD[x_col - 1][j + 1] > -tol:
 #                         break
 #                 elif seg_type == 3:
-#                     if abs(ETD[x_col - 1][j + 1]) > ZERO:
+#                     if abs(ETD[x_col - 1][j + 1]) > tol:
 #                         break
 
 #             j_i = j
@@ -608,7 +608,7 @@ def _create_curve(title: str, colour: int, x_vals, y_vals, arrow=ArrowHead.NO_AR
 #     else:
 #         x_val = x_val_base
     
-#     if HX_countdown > 1 + ZERO:
+#     if HX_countdown > 1 + tol:
 #         Graph_ETC(ETD, ETD_header, graph, zone_name, stat_row, y_col, x_val, y_val, HX_Type, IncRecoveryHX, HX_countdown - 1)
 #     x_val_base = x_val
 

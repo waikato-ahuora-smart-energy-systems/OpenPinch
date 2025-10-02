@@ -11,8 +11,12 @@ class Stream():
         name: str = "Stream",
         t_supply: Optional[float] = None,
         t_target: Optional[float] = None,
+        P_supply: Optional[float] = None,
+        P_target: Optional[float] = None,
+        h_supply: Optional[float] = None,
+        h_target: Optional[float] = None,
         dt_cont: float = 0.0,
-        heat_flow: float = 0.0,
+        heat_flow: float | list[float, float] = 0.0,
         htc: float = 1.0,
         price: float = 0.0,
         is_process_stream: bool = True,
@@ -22,6 +26,10 @@ class Stream():
         self._type: str = None
         self._t_supply: Optional[float] = t_supply
         self._t_target: Optional[float] = t_target
+        self._P_supply: Optional[float] = P_supply
+        self._P_target: Optional[float] = P_target
+        self._h_supply: Optional[float] = h_supply
+        self._h_target: Optional[float] = h_target
         self._dt_cont: float = dt_cont
         self._heat_flow: float = heat_flow
         self._htc: float = htc if htc != 0.0 else 1.0
@@ -74,6 +82,42 @@ class Stream():
     def t_target(self, value: float):
         self._t_target = value
         self._update_attributes()
+
+    @property
+    def P_supply(self) -> Optional[float]:
+        """Supply pressure (e.g., kPa)."""
+        return self._P_supply
+    @P_supply.setter
+    def P_supply(self, value: float):
+        self._P_supply = value
+        self._update_attributes()
+
+    @property
+    def P_target(self) -> Optional[float]:
+        """Target pressure (e.g., kPa)."""
+        return self._P_target
+    @P_target.setter
+    def P_target(self, value: float):
+        self._P_target = value
+        self._update_attributes()
+
+    @property
+    def h_supply(self) -> Optional[float]:
+        """Supply enthalpy (e.g., kJ/kg)."""
+        return self._h_supply
+    @h_supply.setter
+    def h_supply(self, value: float):
+        self._h_supply = value
+        self._update_attributes()
+
+    @property
+    def h_target(self) -> Optional[float]:
+        """Target enthalpy (e.g., kJ/kg)."""
+        return self._h_target
+    @h_target.setter
+    def h_target(self, value: float):
+        self._h_target = value
+        self._update_attributes()                
 
     @property
     def dt_cont(self) -> float:

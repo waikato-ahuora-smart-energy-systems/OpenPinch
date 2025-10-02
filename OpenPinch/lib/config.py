@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 """Global parameters."""
 C_to_K: float = 273.15 # degrees
-ZERO: float = 0.000001
+tol: float = 0.000001
 T_CRIT: float = 373.9 # C
 ACTIVATE_TIMING = True
 LOG_TIMING = False

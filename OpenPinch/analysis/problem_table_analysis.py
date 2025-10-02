@@ -129,8 +129,8 @@ def _sum_mcp_between_temperature_boundaries(
         upper_bounds = np.array(temperatures[:-1])
 
         # Shape: (intervals, streams)
-        active = (t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + ZERO) & \
-                 (t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - ZERO)
+        active = (t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + tol) & \
+                 (t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - tol)
 
         return active
 
@@ -159,7 +159,7 @@ def _correct_pt_composite_curves(pt: ProblemTable, heat_recovery_target: float, 
 
 
 def _add_temperature_intervals_at_constant_h(heat_recovery_target: float, pt: ProblemTable, pt_real: ProblemTable):
-    if heat_recovery_target > ZERO:
+    if heat_recovery_target > tol:
         pt = _insert_temperature_interval_into_pt_at_constant_h(pt, PT.T.value, PT.H_HOT.value, PT.H_COLD.value)
         pt_real = _insert_temperature_interval_into_pt_at_constant_h(pt_real, PT.T.value, PT.H_HOT.value, PT.H_COLD.value)
     return pt, pt_real
@@ -180,7 +180,7 @@ def _get_composite_curve_starting_points_loc(pt: ProblemTable, col: str = PT.H_H
     """Find the starting index of the composite curve to be projected."""
     i_range = range(1, len(pt)) if hcc else range(len(pt) - 1, 0, -1)
     for i in i_range:
-        if pt.loc[i - 1, col] > pt.loc[i, col] + ZERO:
+        if pt.loc[i - 1, col] > pt.loc[i, col] + tol:
             break
     return i - 1 if hcc else i
 
@@ -197,7 +197,7 @@ def _get_T_value_at_cc_starts(pt: ProblemTable, start_index: int, col_T: str =PT
         j_range = range(len(pt) - 1, 0, -1) if hcc else range(1, len(pt) - 1)
 
         for j in j_range:
-            if abs(pt.loc[j, col1] - h_0) < ZERO:
+            if abs(pt.loc[j, col1] - h_0) < tol:
                 k += 1
                 break
 
@@ -205,7 +205,7 @@ def _get_T_value_at_cc_starts(pt: ProblemTable, start_index: int, col_T: str =PT
             h_j = pt.loc[j + z, col1]
             h_jm1 = pt.loc[j - 1 + z, col1]
 
-            if h_0 < h_jm1 - ZERO and h_0 > h_j + ZERO:
+            if h_0 < h_jm1 - tol and h_0 > h_j + tol:
                 t_j = pt.loc[j + z, col_T]
                 t_jm1 = pt.loc[j - 1 + z, col_T]
                 T_C = linear_interpolation(h_0, h_j, h_jm1, t_j, t_jm1)

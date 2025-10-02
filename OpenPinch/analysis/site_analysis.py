@@ -67,7 +67,7 @@ def _calc_total_zonal_targets(site: Zone) -> Zone:
                 cold_utilities[j].heat_flow + t.cold_utilities[j].heat_flow
             )
 
-        if area > ZERO:
+        if area > tol:
             num_units += t.num_units
             area += t.area
             # capital_cost = t.capital_cost

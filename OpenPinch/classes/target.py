@@ -270,7 +270,7 @@ class EnergyTarget():
         }
 
         if isinstance(self.cold_pinch, float) and isinstance(self.hot_pinch, float):
-            if abs(self.cold_pinch - self.hot_pinch) < ZERO:
+            if abs(self.cold_pinch - self.hot_pinch) < tol:
                 temp_pinch = {'cold_temp': self.cold_pinch}
                 data['temp_pinch'] = temp_pinch
             else:

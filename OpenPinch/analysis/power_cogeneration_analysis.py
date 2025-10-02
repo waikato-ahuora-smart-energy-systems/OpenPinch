@@ -30,7 +30,7 @@ def get_power_cogeneration_above_pinch(z: Zone):
 
     # === Step 4: Assign back to zone ===
     z.work_target = w_total
-    z.turbine_efficiency_target = w_total / Wmax if Wmax > ZERO else 0.0
+    z.turbine_efficiency_target = w_total / Wmax if Wmax > tol else 0.0
 
     return z
 
@@ -70,11 +70,11 @@ def _preprocess_utilities(z: Zone, turbine_params: dict):
     HU_num = 0
     u: Stream
     for u in z.hot_utilities:
-        if u.t_supply < T_CRIT and u.heat_flow > ZERO:
+        if u.t_supply < T_CRIT and u.heat_flow > tol:
             HU_num += 1
             Q_HU += u.heat_flow
 
-    if Q_HU < ZERO:
+    if Q_HU < tol:
         return None  # No turbine opportunity
 
     # Initialize arrays
@@ -95,8 +95,8 @@ def _preprocess_utilities(z: Zone, turbine_params: dict):
 
     s = 0
     for u in z.hot_utilities:
-        if u.t_supply < T_CRIT and u.heat_flow > ZERO:
-            P_out_n = psat_T(u.t_target) if abs(u.t_supply - u.t_target) < 1 + ZERO else psat_T(u.t_target + u.dt_cont * 2)
+        if u.t_supply < T_CRIT and u.heat_flow > tol:
+            P_out_n = psat_T(u.t_target) if abs(u.t_supply - u.t_target) < 1 + tol else psat_T(u.t_target + u.dt_cont * 2)
 
             if P_in >= P_out_n:
                 s += 1
@@ -207,7 +207,7 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
             m_in_est += m_k[j]
 
         i += 1
-        if abs(m_in - m_in_est) < ZERO or i >= 3:
+        if abs(m_in - m_in_est) < tol or i >= 3:
             break
 
     w_total = sum(w_k)
@@ -242,7 +242,7 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 #     for Utility_k in z.hot_utilities:
 #         Q_HU += Utility_k.heat_flow
 #     HU_num = len(z.hot_utilities)
-#     if Q_HU < ZERO:
+#     if Q_HU < tol:
 #         return z
                     
 #     if SelectedModel == 'Sun & Smith (2015)':
@@ -272,9 +272,9 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 #     for i in range(HU_num):
 #         Utility_i = z.hot_utilities[i]
 #         if Utility_i.t_supply < T_CRIT:
-#             P_out_n = psat_T(Utility_i.t_target) if abs(Utility_i.t_supply - Utility_i.t_target) < 1 + ZERO \
+#             P_out_n = psat_T(Utility_i.t_target) if abs(Utility_i.t_supply - Utility_i.t_target) < 1 + tol \
 #                 else psat_T(Utility_i.t_target + Utility_i.dt_cont * 2) # bar
-#             if P_in >= P_out_n and Utility_i.heat_flow > ZERO:
+#             if P_in >= P_out_n and Utility_i.heat_flow > tol:
 #                 s += 1
 #                 for l in [w_k, w_isen_k, eff_k, turbine]:
 #                     l.append(0)
@@ -342,7 +342,7 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 #             m_in_est += m_k[j]    # kg/s
 
 #         i += 1
-#         if (abs(m_in - m_in_est) < ZERO and i >= 100) or i >= 3:
+#         if (abs(m_in - m_in_est) < tol and i >= 100) or i >= 3:
 #             break
     
 #     w = 0
@@ -405,7 +405,7 @@ def Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
     w_act = n * m - W_int
     h_out = h_in - w_act / (n_mech * m)
     
-    if h_out <= h_sat + ZERO and t_type == 1:
+    if h_out <= h_sat + tol and t_type == 1:
         w_act = Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, 2)
     return w_act
 
@@ -437,7 +437,7 @@ def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
         w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size)
 
     h_out = h_in - w_max / (n_mech * m)
-    if h_out <= h_sat + ZERO and t_type == 1:
+    if h_out <= h_sat + tol and t_type == 1:
         t_type = 2
         w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size, t_type)
 

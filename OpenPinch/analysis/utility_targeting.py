@@ -71,13 +71,13 @@ def target_utility(utilities: List[Stream], pt: ProblemTable, col_T: str, col_H:
     pt.round(6)
     hot_pinch_row, cold_pinch_row, _ = get_pinch_loc(pt, col_H)
     
-    if pt.col[col_H].min() < -ZERO:
+    if pt.col[col_H].min() < -tol:
         pt.col[col_H] = pt.col[col_H] * -1
 
-    if utilities[0].type == StreamType.Hot.value and abs(pt.loc[0, col_H]) > ZERO:
+    if utilities[0].type == StreamType.Hot.value and abs(pt.loc[0, col_H]) > tol:
         utilities = _assign_utility(pt, col_T, col_H, utilities, hot_pinch_row, is_hot_ut=True, real_T=real_T)
     
-    elif utilities[0].type == StreamType.Cold.value and abs(pt.loc[-1, col_H]) > ZERO:
+    elif utilities[0].type == StreamType.Cold.value and abs(pt.loc[-1, col_H]) > tol:
         utilities = _assign_utility(pt, col_T, col_H, utilities, cold_pinch_row, is_hot_ut=False, real_T=real_T)
 
     return utilities
@@ -137,14 +137,14 @@ def _remove_pockets_on_one_side_of_the_pinch(pt: ProblemTable, col_H_NP: str =PT
 
     T_vals, H_vals, H_NP_vals = pt.col[PT.T.value], pt.col[col_H], pt.col[col_H_NP]
     
-    if H_vals[i] < ZERO:
+    if H_vals[i] < tol:
         # No heating or cooling required
         return pt, hot_pinch_loc, cold_pinch_loc
 
     for _ in range(i, pinch_loc, sgn):
         di = sgn
         n_int_added = 0
-        if H_vals[i] < H_vals[i + sgn] - ZERO:
+        if H_vals[i] < H_vals[i + sgn] - tol:
             i_0 = i
             i = _pocket_exit_index(H_vals, i, pinch_loc, sgn)
 
@@ -177,12 +177,12 @@ def _pocket_exit_index(H_vals: np.ndarray, i_0: int, pinch_loc: int, sgn: int) -
     """Return index where a pocket terminates when marching in direction ``sgn``."""
     if sgn > 0:
         for i in range(i_0 + 1, pinch_loc + 1):
-            if H_vals[i_0] >= H_vals[i] + ZERO:
+            if H_vals[i_0] >= H_vals[i] + tol:
                 return i - 1
         return pinch_loc
     else:
         for i in range(i_0 - 1, pinch_loc - 1, -1):
-            if H_vals[i_0] >= H_vals[i] + ZERO:
+            if H_vals[i_0] >= H_vals[i] + tol:
                 return i + 1
         return pinch_loc
 
@@ -263,16 +263,16 @@ def _calc_GCC_assisted_integration(pt: ProblemTable, dt_cut: float = 10, dt_cut_
 
     # pt.col[PT.H_NET_PK.value] = pt.col[PT.H_NET.value] - pt.col[PT.H_NET_NP.value]
     
-    # if np.sum(pt.col[PT.H_NET_PK.value]) < ZERO * len(pt):
+    # if np.sum(pt.col[PT.H_NET_PK.value]) < tol * len(pt):
     #     pt.col[PT.H_NET_AI.value] = pt.col[PT.H_NET.value]
     #     return pt
     
     # i = len(pt)
     # while i > 0:
-    #     if pt.loc[i - 1, PT.H_NET_PK.value] > ZERO:
+    #     if pt.loc[i - 1, PT.H_NET_PK.value] > tol:
     #         i_lb = i
     #         for i in range(i, 0, -1):
-    #             if pt.loc[i, PT.H_NET_PK.value] < ZERO:
+    #             if pt.loc[i, PT.H_NET_PK.value] < tol:
     #                 break
     #         i_ub = i
     #         _compute_pocket_temperature_differences
@@ -310,11 +310,11 @@ def _assign_utility(pt: ProblemTable, col_T: Enum, col_H: Enum, u_ls: List[Strea
         )
 
         Q_ut_max = _maximise_utility_duty(hl, Ts, Tt, col_T, col_H, is_hot_ut, Q_assigned)
-        if Q_ut_max > ZERO:
+        if Q_ut_max > tol:
             u.set_heat_flow(Q_ut_max)
             Q_assigned += Q_ut_max
 
-        if abs(hl.loc[0 if is_hot_ut else -1, col_H] - Q_assigned) < ZERO:
+        if abs(hl.loc[0 if is_hot_ut else -1, col_H] - Q_assigned) < tol:
             break
 
     return u_ls
@@ -331,8 +331,8 @@ def _maximise_utility_duty(hl_in: ProblemTable, Ts: float, Tt: float, col_T: Enu
     hl.data = hl.data[1:] if is_hot_ut else hl.data[:-1]
     hl.data = hl.data[
         (hl.shift(col_H, sgn) != hl.col[col_H]) &
-        (hl.col["dt_sup"] >= -ZERO) &
-        (hl.col["Q_pot"] > ZERO)
+        (hl.col["dt_sup"] >= -tol) &
+        (hl.col["Q_pot"] > tol)
     ]
 
     if hl.data.size == 0 or hl.col["dt_tar"].max() < 0:
@@ -343,7 +343,7 @@ def _maximise_utility_duty(hl_in: ProblemTable, Ts: float, Tt: float, col_T: Enu
     Q_ts_max = hl.col["Q_pot"].max()
 
     Q_tt = np.full_like(hl.col["Q_pot"], np.inf)
-    mask = -hl.col["dt_tar"] > ZERO
+    mask = -hl.col["dt_tar"] > tol
     Q_tt[mask] = hl.col["Q_pot"][mask] / -hl.col["dt_tar"][mask] * abs(Tt - Ts)
     Q_tt_max = Q_tt.min()
 

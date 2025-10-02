@@ -12,7 +12,7 @@ def get_pinch_loc(pt: ProblemTable, col=PT.H_NET.value) -> tuple[int, int, bool]
     n     = h_net.size
 
     abs_arr    = np.abs(h_net)
-    zeros_mask = abs_arr < ZERO
+    zeros_mask = abs_arr < tol
 
     if np.all(zeros_mask) == False and np.any(zeros_mask):
         # ---------- Hot-pinch (scan top-down) ----------
@@ -66,7 +66,7 @@ def insert_temperature_interval_into_pt(pt: ProblemTable, T_ls: List[float] | fl
         # Vectorized scan for insert index
         insert_index = None
         for i in range(1, len(T_col)):
-            if T_col[i - 1] - ZERO > T_new > T_col[i] + ZERO:
+            if T_col[i - 1] - tol > T_new > T_col[i] + tol:
                 insert_index = i
                 break
 
@@ -157,11 +157,21 @@ def find_LMTD(T_hot_in: float, T_hot_out: float, T_cold_in: float, T_cold_out: f
     return (delta_T1 - delta_T2) / math.log(delta_T1 / delta_T2)
 
 
-def capital_recovery_factor(interest_rate: float, years: int) -> float:
+def compute_capital_recovery_factor(interest_rate: float, years: int) -> float:
     """Calculates the Capital Recovery Factor (CRF), also known as the annualisation factor."""
     i = interest_rate
     n = years
     return i * (1 + i) ** n / ((1 + i) ** n - 1)
+
+
+def compute_capital_cost(area: float, num_units: int, config: Configuration) -> float:
+    """Determine the capital cost of a heat exchanger."""
+    return num_units * config.FC + num_units * config.VC * (area / num_units) ** config.EXP
+
+
+def compute_annual_capital_cost(area: float, num_units: int, config: Configuration) -> float:
+    """Determine the annualised capital cost of heat exchanger."""
+    return compute_capital_cost(area, num_units, config) * compute_capital_recovery_factor(config.DISCOUNT_RATE, config.SERV_LIFE)
 
 
 def compute_exergetic_temperature(T: float, T_ref_in_C: float = 15.0, units_of_T: str = "C") -> float:

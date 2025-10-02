@@ -3,8 +3,9 @@ from copy import deepcopy
 from ..lib import *
 from ..classes import Zone, StreamCollection, ProblemTable, Stream
 from .problem_table_analysis import problem_table_algorithm
+from .additional_analysis import target_area, min_number_hx
 from .utility_targeting import get_zonal_utility_targets
-from .support_methods import get_pinch_temperatures
+from .support_methods import *
 
 
 __all__ = ["get_process_pinch_targets"]
@@ -30,7 +31,20 @@ def get_process_pinch_targets(zone: Zone):
     net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(zone.identifier, pt, hot_utilities, cold_utilities)
     hot_pinch, cold_pinch = get_pinch_temperatures(pt)
 
-    # z = get_additional_zonal_pinch_analysis(z)
+    # Target heat transfer area and number of exchanger units based on Balanced CC
+    if config.AREA_BUTTON or 1:
+        area = target_area(pt_real)
+        num_units = min_number_hx(pt)
+        capital_cost = compute_capital_cost(area, num_units, config)
+        annual_capital_cost = compute_annual_capital_cost(area, num_units, config)
+        zone.add_target_from_results(TargetType.DI.value, {
+            "capital_cost": capital_cost,
+            "annual_capital_cost": annual_capital_cost,
+            "num_units": num_units,
+            "area": area,
+        })
+
+
     graphs = _save_graph_data(pt, pt_real)
     zone.add_target_from_results(TargetType.DI.value, {
         "pt": pt,
@@ -58,7 +72,7 @@ def get_process_pinch_targets(zone: Zone):
 def _get_net_hot_and_cold_segments(zone_identifier: str, pt: ProblemTable, hot_utilities: StreamCollection, cold_utilities: StreamCollection) -> Tuple[StreamCollection, StreamCollection]:
     """Derive net process streams that represent overall utility demand for site aggregation."""
     total_utility_demand = sum([u.heat_flow for u in hot_utilities]) + sum([u.heat_flow for u in cold_utilities])
-    if zone_identifier == ZoneType.P.value and total_utility_demand > ZERO:
+    if zone_identifier == ZoneType.P.value and total_utility_demand > tol:
         net_hot_streams, net_cold_streams = _save_data_for_total_site_analysis(pt, PT.T.value, PT.H_NET_A.value, hot_utilities, cold_utilities)        
     else:
         net_hot_streams, net_cold_streams = StreamCollection(), StreamCollection()
@@ -69,7 +83,7 @@ def _save_data_for_total_site_analysis(pt: ProblemTable, col_T: str, col_H: str,
     """Constructs net stream segments that require utility input across temperature intervals."""
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
-    #Stephen changed the value from the ZERO constant to a very small number to deal with some janky behaviour
+    #Stephen changed the value from the tol constant to a very small number to deal with some janky behaviour
     if pt.delta_col(col_T)[1:].min() < 0.00000000000000000000000000000000000001:
         raise ValueError("Infeasible temperature interval detected in _store_TSP_data") 
 
@@ -84,9 +98,9 @@ def _save_data_for_total_site_analysis(pt: ProblemTable, col_T: str, col_H: str,
 
     k = 1
     for i, dh in enumerate(dh_vals):
-        if dh > ZERO:
+        if dh > tol:
             hu, hot_utilities, net_cold_streams, k = _add_net_segment(T_vals[i], T_vals[i+1], hu, dh, hot_utilities, net_cold_streams, k)
-        elif -dh > ZERO:
+        elif -dh > tol:
             cu, cold_utilities, net_hot_streams, k = _add_net_segment(T_vals[i], T_vals[i+1], cu, dh, cold_utilities, net_hot_streams, k)
 
     return net_hot_streams, net_cold_streams
@@ -112,7 +126,7 @@ def _add_net_segment(T_ub: float, T_lb: float, curr_u: Stream, dh_req: float, ut
             is_process_stream=True
         )
     )
-    if dh_next > ZERO:
+    if dh_next > tol:
         return _add_net_segment(T_i, T_lb, next_u, dh_next, utilities, net_streams, k, j+1)
     else:
         return next_u, utilities, net_streams, k+1
@@ -121,7 +135,7 @@ def _add_net_segment(T_ub: float, T_lb: float, curr_u: Stream, dh_req: float, ut
 def _initialise_utility_selected(utilities: StreamCollection = None):
     """Returns the first available utility with remaining capacity."""
     for j in range(len(utilities)):
-        if utilities[j].heat_flow > ZERO:
+        if utilities[j].heat_flow > tol:
             return utilities[j]
     return utilities[-1]
 
@@ -129,12 +143,12 @@ def _initialise_utility_selected(utilities: StreamCollection = None):
 def _advance_utility_if_needed(dh_used: float, current_u: Stream = None, utilities: StreamCollection = None) -> Stream:
     """Advances to the next utility if the current one is exhausted."""
     current_u.heat_flow -= abs(dh_used)
-    if current_u.heat_flow > ZERO:
+    if current_u.heat_flow > tol:
         return current_u
 
     k = utilities.get_index(current_u) + 1
     for j in range(k, len(utilities)):
-        if utilities[j].heat_flow > ZERO:
+        if utilities[j].heat_flow > tol:
             return utilities[j]
         
     return utilities[-1]

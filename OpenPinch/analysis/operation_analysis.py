@@ -24,7 +24,7 @@ def get_energy_transfer_retrofit_analysis(site: Zone):
 
     for z in site.subzones:
         # Redefine heat exchanger pockets based on detailed ETD retrofit analysis
-        Req_ut = True if z.hot_utility_target + z.cold_utility_target > ZERO else False
+        Req_ut = True if z.hot_utility_target + z.cold_utility_target > tol else False
         if site.config.GCC_VERT_CUT_KINK_OPTION and not Req_ut:
             z.graphs['GCC_etc'] = site.Reshape_GCC_Pockets(z.graphs['PT_star'], z.graphs['GCC_etc'])
         site.Extract_Pro_ETC(ETD_star, z, z.graphs['PT_star'], Req_ut)
@@ -96,14 +96,14 @@ def Reshape_GCC_Pockets(site, PT_star, GCC_etc):
         if j == 0 or j == len(PT_star[0]):
             GCC_etc[2][j] = 0
         else:
-            if abs(PT_star[9][j]) > ZERO:
+            if abs(PT_star[9][j]) > tol:
                 if PT_star[3][j] > PT_star[6][j]:
                     GCC_etc[2][j] = GCC_etc[2][j - 1] + PT_star[2][j] * PT_star[3][j]
                 else:
                     GCC_etc[2][j] = GCC_etc[2][j - 1] - PT_star[2][j] * PT_star[6][j]
             else:
                 GCC_etc[2][j] = GCC_etc[2][j - 1]
-            if PT_star[3][j] > ZERO and PT_star[6][j] > ZERO:
+            if PT_star[3][j] > tol and PT_star[6][j] > tol:
                 min_H_cross = min(PT_star[11][j], min_H_cross)
                 min_H_cross = min(PT_star[11][j - 1], min_H_cross)
 
@@ -112,7 +112,7 @@ def Reshape_GCC_Pockets(site, PT_star, GCC_etc):
         GCC_etc[2][j] = GCC_etc[2][j] - DH_shift
     
     for j in range(1, len(PT_star[0])):
-        if min_H_cross > (min(GCC_etc[2][j], GCC_etc[2][j - 1])) + ZERO and min_H_cross < (max(GCC_etc[2][j], GCC_etc[2][j - 1])) - ZERO:
+        if min_H_cross > (min(GCC_etc[2][j], GCC_etc[2][j - 1])) + tol and min_H_cross < (max(GCC_etc[2][j], GCC_etc[2][j - 1])) - tol:
             j_0 = j
             h_0 = min_H_cross
             T_new = linear_interpolation(h_0, GCC_etc[2][j_0], GCC_etc[2][j_0 - 1], GCC_etc[1][j_0], GCC_etc[1][j_0 - 1])
@@ -243,7 +243,7 @@ def Compile_ETD_T_int(site, ETD, PT_TIT):
     T_int = T_int.sort(reverse=True)
 
     # TODO: I think this is unnecessary because the None values would be removed in get_ordered_list.
-    # if T_int[0][len(T_int[0])] < ZERO or T_int[0][len(T_int[0])] == None:
+    # if T_int[0][len(T_int[0])] < tol or T_int[0][len(T_int[0])] == None:
     #     for i in range(len(T_int[0]) - 1, -1, -1):
     #         if T_int[0][i] == None:
     #             break
@@ -274,12 +274,12 @@ def Transpose_ETD_T(site, ETD, T_int):
                 ETD_temp[j][i] = 0
                 ETD_temp[j + 1][i] = ETD_temp[j + 1][i - 1]
                 continue
-            if (ETD_temp[0][i - 1] <= ETD[j][k - 1] + ZERO) and (ETD_temp[0][i] >= ETD[j][k] - ZERO):
+            if (ETD_temp[0][i - 1] <= ETD[j][k - 1] + tol) and (ETD_temp[0][i] >= ETD[j][k] - tol):
                 CPnet = ETD[j + 1][k]
                 dt = ETD_temp[0][i - 1] - ETD_temp[0][i]
                 ETD_temp[j][i] = dt * CPnet
                 ETD_temp[j + 1][i] = ETD_temp[j + 1][i - 1] + dt * CPnet
-                if abs(ETD_temp[0][i] - ETD[j][k]) < ZERO:
+                if abs(ETD_temp[0][i] - ETD[j][k]) < tol:
                     k += 1
             else:
                 ETD_temp[j][i] = 0
@@ -293,7 +293,7 @@ def Simplify_ETD(site, ETD):
     # Remove low temperature intervals that exceed the maximum temperatures
     # for i in range(len(ETD[0]) - 1, 1, -1): # Loop from lowerest to highest temperature
     #     for j in range(1, len(ETD), 3):
-    #         if ETD[j][i] > ZERO:
+    #         if ETD[j][i] > tol:
     #             break # Temperature interval cannot be removed if true
     #     else:
     #         continue
@@ -306,7 +306,7 @@ def Simplify_ETD(site, ETD):
     # # Remove high temperature intervals that exceed the maximum temperatures
     # for i in range(2, len(ETD[0])): # Loop from highest to lowerest temperature
     #     for j in range(1, len(ETD), 3):
-    #         if abs(ETD[j][i]) > ZERO:
+    #         if abs(ETD[j][i]) > tol:
     #             break # Temperature interval cannot be removed if true
     #     else:
     #         continue
@@ -325,7 +325,7 @@ def Simplify_ETD(site, ETD):
         for j in range(1, len(ETD), 3):
             CP_0 = ETD[j][i] / (ETD[0][i - 1] - ETD[0][i])
             CP_1 = ETD[j][i - 1] / (ETD[0][i - 2] - ETD[0][i - 1])
-            if abs(CP_0 - CP_1) > ZERO:
+            if abs(CP_0 - CP_1) > tol:
                 break # Temperature interval cannot be removed if true
         else:
             n = i
@@ -400,7 +400,7 @@ def Calc_ACCN(site, ETD, PT_TIT):
     for i in range(1, len(ACC[0])):
         ACC[0][i] = ETD[0][i]
         
-        if abs(ACC[0][i] - PT_TIT[0][i]) > ZERO:
+        if abs(ACC[0][i] - PT_TIT[0][i]) > tol:
             PT_TIT = insert_temperature_interval_into_pt(PT_TIT, ACC[0][i], i)
 
         if i > 1:
@@ -428,19 +428,19 @@ def Characterise_ETC(site, ETD, ETD_header, Hot_Pinch, Cold_Pinch, Col_j, HX_mod
     for i in range(2, len(ETD[0])):
         TH_sub_area = abs(0.5 * (ETD[Col_j][i - 1] + ETD[Col_j][i]) / (ETD[0][i - 1] - ETD[0][i])) # Determine T-H area (row 1)
         # Determine weighting factor
-        if ETD[0][i] > Hot_Pinch + ZERO:
+        if ETD[0][i] > Hot_Pinch + tol:
             w = 1 / (abs((ETD[0][i - 1] + ETD[0][i]) / 2 - Hot_Pinch) / t_const + 1)
-        elif ETD[0][i] < Cold_Pinch - ZERO:
+        elif ETD[0][i] < Cold_Pinch - tol:
             w = 1 / (abs((ETD[0][i - 1] + ETD[0][i]) / 2 - Cold_Pinch) / t_const + 1)
         else:
             w = 1
-            if abs(ETD[Col_j][i]) > ZERO:
+            if abs(ETD[Col_j][i]) > tol:
                 ETD_header[Col_j][4] = 1
         TH_tot_area += TH_sub_area
         TH_w_tot_area += w * TH_sub_area
         if H_max < abs(ETD[Col_j][i]):
             H_max = abs(ETD[Col_j][i])
-        if T_h_max == -1000 and abs(ETD[Col_j - 1][i]) > ZERO:
+        if T_h_max == -1000 and abs(ETD[Col_j - 1][i]) > tol:
             T_h_max = (ETD[0][i - 1] + 273.15) if HX_mode == 'C' else 1 / (ETD[0][i - 1] + 273.15)
 
     ETD_header[Col_j][0] = ETD[Col_j - 1][0]
@@ -489,7 +489,7 @@ def Extract_Pro_ETC(site, ETD, z, PT, Req_ut):
         ETD[j - 1][0] = z.name
         ETD[j][0] = 'CP net'
         if Req_ut:
-            ETD[j + 1][0] = 'H' if PT[10][0] > ZERO else 'C'
+            ETD[j + 1][0] = 'H' if PT[10][0] > tol else 'C'
         else:
             ETD[j + 1][0] = 'R'
 
