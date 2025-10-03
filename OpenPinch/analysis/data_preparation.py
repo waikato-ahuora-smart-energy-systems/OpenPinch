@@ -1,5 +1,5 @@
 import copy
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from ..lib import *
 from .support_methods import get_value
 from ..classes import Zone, Stream, StreamCollection
@@ -12,9 +12,9 @@ __all__ = ["prepare_problem"]
 #######################################################################################################
 
 def prepare_problem(
-    streams: List[StreamSchema] = [],
-    utilities: List[UtilitySchema] = [],
-    options: Configuration = None,
+    streams: Optional[List[StreamSchema]] = None,
+    utilities: Optional[List[UtilitySchema]] = None,
+    options: Optional[Configuration] = None,
     project_name: str = "Site",
     zone_tree: ZoneTreeSchema = None,
 ):
@@ -42,6 +42,9 @@ def prepare_problem(
     Zone
         Fully initialised zone tree with streams and utilities attached to each node.
     """
+    streams = [] if streams is None else list(streams)
+    utilities = [] if utilities is None else list(utilities)
+
     top_zone_name, top_zone_identifier = _get_validated_zone_info(zone_tree, project_name)
     config = Configuration(
         options=options, 
@@ -83,13 +86,22 @@ def _get_validated_zone_info(zone_tree: ZoneTreeSchema, project_name: str = None
     return zone_name, zone_type
 
 
-def _validate_input_data(zone_tree: ZoneTreeSchema = None, streams: List[StreamSchema] = [], utilities: List[UtilitySchema] = [], config: Configuration = Configuration()):
+def _validate_input_data(
+    zone_tree: ZoneTreeSchema = None,
+    streams: Optional[List[StreamSchema]] = None,
+    utilities: Optional[List[UtilitySchema]] = None,
+    config: Optional[Configuration] = None,
+):
     """Checks for logic and completeness of the input data. Where possible, fills in the gaps with general assumptions."""
-    streams = _validate_streams_passed_in(streams)
-    utilities = _validate_utilities_passed_in(utilities)
-    config = _validate_config_data_completed(config)
-    zone_tree = _validate_zone_tree_structure(zone_tree, streams, config.TOP_ZONE_NAME)
-    return zone_tree, streams, utilities, config
+    streams_list = [] if streams is None else list(streams)
+    utilities_list = [] if utilities is None else list(utilities)
+    cfg = config or Configuration()
+
+    streams_list = _validate_streams_passed_in(streams_list)
+    utilities_list = _validate_utilities_passed_in(utilities_list)
+    cfg = _validate_config_data_completed(cfg)
+    zone_tree = _validate_zone_tree_structure(zone_tree, streams_list, cfg.TOP_ZONE_NAME)
+    return zone_tree, streams_list, utilities_list, cfg
 
 
 def _create_nested_zones(parent_zone: Zone, zone_tree: ZoneTreeSchema, config: Configuration) -> Zone:
