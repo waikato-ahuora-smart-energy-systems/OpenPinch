@@ -30,7 +30,7 @@ Analysis Building Blocks
 ------------------------
 
 .. automodule:: OpenPinch.analysis.data_preparation
-   :members: prepare_problem_struture
+   :members: prepare_problem
    :show-inheritance:
 
 .. automodule:: OpenPinch.analysis.process_analysis

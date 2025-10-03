@@ -1,8 +1,8 @@
 """
-Tests for `prepare_problem_struture` in OpenPinch.
+Tests for `prepare_problem` in OpenPinch.
 
 This test suite validates the core functionality and edge behavior of the
-prepare_problem_struture function, which transforms raw stream and utility input 
+prepare_problem function, which transforms raw stream and utility input 
 data into structured Zone objects with zones, utilities, and heat integration attributes.
 
 Test Categories:
@@ -47,7 +47,7 @@ All edge cases aim to test both robustness and realistic behavior. Some tests in
 
 import pytest
 from pydantic import ValidationError
-from OpenPinch.analysis.data_preparation import prepare_problem_struture, _validate_input_data
+from OpenPinch.analysis.data_preparation import prepare_problem, _validate_input_data
 from OpenPinch.classes import *
 from OpenPinch.lib import * 
 
@@ -112,7 +112,7 @@ def dummy_utilities():
 # ---------------- Core Functionality Tests ---------------- #
 
 def test_prepare_site_stream_data(dummy_streams, dummy_utilities):
-    site = prepare_problem_struture(streams=dummy_streams, utilities=dummy_utilities)
+    site = prepare_problem(streams=dummy_streams, utilities=dummy_utilities)
     assert len(site.subzones) > 0
     assert any(z.hot_streams or z.cold_streams for z in site.subzones.values())
     assert len(site.hot_utilities) > 0
@@ -123,7 +123,7 @@ def test_prepare_site_stream_data_raises_with_no_streams(dummy_utilities):
         _validate_input_data(utilities=dummy_utilities)
 
 def test_prepare_site_stream_data_adds_default_utilities(dummy_streams):
-    site = prepare_problem_struture(streams=dummy_streams)    
+    site = prepare_problem(streams=dummy_streams)    
     hu_names = [u.name for u in site.hot_utilities]
     cu_names = [u.name for u in site.cold_utilities]
     assert "HU" in hu_names
@@ -150,14 +150,14 @@ def test_prepare_site_stream_data_handles_extreme_temperatures():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)    
+    site = prepare_problem(streams=streams)    
     assert len(site.hot_utilities) > 0
     assert len(site.cold_utilities) > 0
 
 # ---------------- Stream and Zone Validations ---------------- #
 
 def test_stream_attributes_are_computed_correctly(dummy_streams):
-    site = prepare_problem_struture(streams=dummy_streams)
+    site = prepare_problem(streams=dummy_streams)
     z1 = site.subzones["Z1"]
     hot = next(s for s in z1.hot_streams if s.name == "H1")
     cold = next(s for s in z1.cold_streams if s.name == "C1")
@@ -165,7 +165,7 @@ def test_stream_attributes_are_computed_correctly(dummy_streams):
     assert cold.t_min_star == cold.t_supply + cold.dt_cont
 
 def test_zone_names_and_ordering(dummy_streams):
-    site = prepare_problem_struture(streams=dummy_streams)
+    site = prepare_problem(streams=dummy_streams)
     zone_names = list(site.subzones.keys())
     expected_subzones = {"Z1"}
     expected_this_zone = {f"{TargetType.DI.value}",
@@ -218,7 +218,7 @@ def test_mixed_unit_and_unitless_inputs():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams, utilities=utilities)    
+    site = prepare_problem(streams=streams, utilities=utilities)    
     assert any(u.name == "HU" for u in site.hot_utilities)
     assert any(u.name == "CU" for u in site.cold_utilities)
 
@@ -251,7 +251,7 @@ def test_equal_supply_target_temperature_adjustment():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)
+    site = prepare_problem(streams=streams)
 
     s = next(iter(site.subzones["Z1"].process_streams))
     assert s.t_supply != s.t_target
@@ -277,7 +277,7 @@ def test_duplicate_stream_names():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)
+    site = prepare_problem(streams=streams)
     names = [s.name for z in site.subzones.values() for s in z.process_streams]
     assert names.count("DupStream") == 2
 
@@ -306,7 +306,7 @@ def test_inactive_utilities_are_ignored(dummy_streams):
             "active": True
         })
     ]
-    site = prepare_problem_struture(streams=dummy_streams, utilities=utilities)
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)
 
     hot_names = [u.name for u in site.hot_utilities]
     cold_names = [u.name for u in site.cold_utilities]
@@ -335,7 +335,7 @@ def test_streams_split_across_multiple_zones():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)
+    site = prepare_problem(streams=streams)
     assert "Z1" in site.subzones
     assert "Z2" in site.subzones
     assert any(s.name == "Hot1" for s in site.subzones["Z1"].hot_streams)
@@ -353,7 +353,7 @@ def test_heat_flow_negative_but_temps_suggest_hot():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)    
+    site = prepare_problem(streams=streams)    
     z = site.subzones["Z1"]
     assert len(z.hot_streams) == 1
     assert z.hot_streams[0].name == "MismatchHot"
@@ -370,7 +370,7 @@ def test_htc_zero_stream():
             "htc": 0.0
         })
     ]
-    site = prepare_problem_struture(streams=streams)    
+    site = prepare_problem(streams=streams)    
     stream = site.subzones["Z1"].hot_streams[0]
     assert stream.htc == 1.0
     assert stream.name == "ZeroHTC"
@@ -387,7 +387,7 @@ def test_zone_with_no_streams():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)    
+    site = prepare_problem(streams=streams)    
     assert "Z1" in site.subzones
     assert "Z2" not in site.subzones  # no Z2 given
 
@@ -412,7 +412,7 @@ def test_same_stream_name_different_zones():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)    
+    site = prepare_problem(streams=streams)    
     assert all(any("SharedName" in s.name for s in z.hot_streams + z.cold_streams)
             for z in site.subzones.values() if z.name in ["Z1", "Z2"])
 
@@ -429,7 +429,7 @@ def test_only_one_stream(dummy_site):
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)    
+    site = prepare_problem(streams=streams)    
     assert "Z1" in site.subzones
     assert len(site.subzones["Z1"].hot_streams) == 1
     assert len(site.hot_utilities) > 0
@@ -471,7 +471,7 @@ def test_only_one_active_utility():
             "active": True
         })
     ]
-    site = prepare_problem_struture(streams=streams, utilities=utilities)    
+    site = prepare_problem(streams=streams, utilities=utilities)    
     hot_names = [u.name for u in site.hot_utilities]
     cold_names = [u.name for u in site.cold_utilities]
     assert "HU" in hot_names  # Default added
@@ -490,7 +490,7 @@ def test_utility_equal_supply_target(dummy_streams):
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=dummy_streams, utilities=utilities)    
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)    
     names = [u.name for u in site.hot_utilities]
     assert "FlatUtility" in names
 
@@ -507,7 +507,7 @@ def test_utility_with_zero_price(dummy_streams):
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=dummy_streams, utilities=utilities)    
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)    
     assert any(u.name == "FreeHU" for u in site.hot_utilities)
 
 def test_all_default_utilities_added():
@@ -531,7 +531,7 @@ def test_all_default_utilities_added():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)  
+    site = prepare_problem(streams=streams)  
     hot_names = [u.name for u in site.hot_utilities]
     cold_names = [u.name for u in site.cold_utilities]
     assert "HU" in hot_names
@@ -560,7 +560,7 @@ def test_duplicate_utility_names(dummy_streams):
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=dummy_streams, utilities=utilities)
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)
     names = [u.name for u in site.hot_utilities] + [u.name for u in site.cold_utilities]
     assert names.count("Duplicate") >= 2
 
@@ -587,7 +587,7 @@ def test_utility_sorting_by_temp(dummy_streams):
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=dummy_streams, utilities=utilities)   
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)   
     temps = [u.t_supply for u in site.hot_utilities]
     assert temps == sorted(temps, reverse=True)
 
@@ -621,7 +621,7 @@ def test_zone_name_sort_order():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)
+    site = prepare_problem(streams=streams)
     zone_keys = list(site.subzones.keys())
     assert zone_keys[:3] == sorted(zone_keys[:3])  # check sorting is lexicographic
 
@@ -637,8 +637,8 @@ def test_prepare_site_stream_data_twice(dummy_site):
             "htc": 1
         })
     ]
-    site1 = prepare_problem_struture(streams=streams)
-    site2 = prepare_problem_struture(streams=streams)       
+    site1 = prepare_problem(streams=streams)
+    site2 = prepare_problem(streams=streams)       
     assert len(site2.subzones) == len(site1.subzones)
     assert len(site2.hot_utilities) == len(site1.hot_utilities)
     assert len(site2.cold_utilities) == len(site1.cold_utilities)
@@ -655,7 +655,7 @@ def test_zero_dtcont_and_dtglide():
             "htc": 1
         })
     ]
-    site = prepare_problem_struture(streams=streams)
+    site = prepare_problem(streams=streams)
     stream = site.subzones["Z1"].hot_streams[0]
     assert stream.t_min_star == stream.t_target
     assert stream.t_max_star == stream.t_supply

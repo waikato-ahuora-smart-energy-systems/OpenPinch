@@ -8,8 +8,8 @@ respective modules (e.g. ``support_methods`` and ``additional_analysis``).
 
 from .support_methods import *
 from .graphs import visualise_graphs
-from .response import output_response
-from .data_preparation import prepare_problem_struture
+from .response import extract_results
+from .data_preparation import prepare_problem
 from .problem_table_analysis import get_process_heat_cascade
 from .utility_targeting import get_utility_targets
 from .power_cogeneration_analysis import get_power_cogeneration_above_pinch

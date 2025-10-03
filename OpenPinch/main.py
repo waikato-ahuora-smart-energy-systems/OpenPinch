@@ -10,8 +10,9 @@ from typing import Any
 from .lib import *
 from .utils import *
 from .scales import get_targets
+from .analysis import prepare_problem, extract_results
 
-__all__ = ["pinch_analysis_service", "get_targets", "get_visualise"]
+__all__ = ["pinch_analysis_service"]
 
 
 def pinch_analysis_service(data: Any, project_name: str = "Project") -> TargetOutput:
@@ -34,14 +35,20 @@ def pinch_analysis_service(data: Any, project_name: str = "Project") -> TargetOu
     # Validate request data using Pydantic model
     request_data = TargetInput.model_validate(data)
 
-    # Perform advanced Pinch Analysis and total site analysis
-    return_data = get_targets(
-        zone_tree=request_data.zone_tree,
-        streams=request_data.streams, 
-        utilities=request_data.utilities, 
+    # Formulate the top level zone with all subzones and approperiate input data
+    master_zone = prepare_problem(
+        project_name=project_name, 
+        streams=request_data.streams,
+        utilities=request_data.utilities,
         options=request_data.options,
-        name=project_name,
+        zone_tree=request_data.zone_tree,
     )
+
+    # Perform advanced targeting analysis on the master zone and all subzones
+    master_zone = get_targets(master_zone)
+
+    # Extract the core results from the master zone
+    return_data = extract_results(master_zone)  
 
     # Validate response data
     validated_data = TargetOutput.model_validate(return_data)

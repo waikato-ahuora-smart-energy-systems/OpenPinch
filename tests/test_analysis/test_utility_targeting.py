@@ -4,7 +4,7 @@ import pandas as pd
 from OpenPinch.lib import * 
 from OpenPinch.analysis.support_methods import *
 from OpenPinch.classes import *
-from OpenPinch.analysis.data_preparation import prepare_problem_struture
+from OpenPinch.analysis.data_preparation import prepare_problem
 
 
 """Tests for _target_utility"""
@@ -28,7 +28,7 @@ def test_target_utility(filename):
         input_data = json.load(json_data)
     
     data = GetInputOutputData.model_validate(input_data)
-    site = prepare_problem_struture(streams=data.streams, utilities=data.utilities, options=data.options)
+    site = prepare_problem(streams=data.streams, utilities=data.utilities, options=data.options)
     for plant in data.plant_profile_data:
         z: Zone = site.get_subzone(plant.name)
         # z: Zone = site.subzones[plant.name]

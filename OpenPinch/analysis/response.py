@@ -2,28 +2,28 @@ from typing import List
 from .graphs import get_output_graphs
 from ..classes import *
 
-__all__ = ["output_response"]
+__all__ = ["extract_results"]
 
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
-def output_response(site: Zone) -> dict:
+def extract_results(master_zone: Zone) -> dict:
     """Serializes results data into a dictionaty from options."""
-    results = {}
-    results['name'] = site.name
-    results['targets'] = _report(site)
-    results['utilities'] = _get_default_utilities(site)
-    results['graphs'] = get_output_graphs(site)
-    return results
+    return {
+        'name': master_zone.name,
+        'targets': _get_report(master_zone),
+        'utilities': _get_utilities(master_zone),
+        'graphs': get_output_graphs(master_zone),
+    }
 
 
 #######################################################################################################
 # Helper Functions
 #######################################################################################################
 
-def _report(zone: Zone) -> dict:
+def _get_report(zone: Zone) -> dict:
     """Creates the database summary of zone targets."""
     targets: List[dict] = []
 
@@ -35,15 +35,15 @@ def _report(zone: Zone) -> dict:
         for z in zone.subzones.values():
             z: Zone
             targets.extend(
-                _report(z)
+                _get_report(z)
             )
     
     return targets
 
 
-def _get_default_utilities(site: Zone) -> List[Stream]:
+def _get_utilities(master_zone: Zone) -> List[Stream]:
     """Gets a list of any default utilities generated during the analysis."""
-    utilities: List[Stream] = site.hot_utilities + site.cold_utilities
+    utilities: List[Stream] = master_zone.hot_utilities + master_zone.cold_utilities
     default_hu: Stream = next((u for u in utilities if u.name == 'HU'), None)
     default_cu: Stream = next((u for u in utilities if u.name == 'CU'), None)
     return [default_hu, default_cu]

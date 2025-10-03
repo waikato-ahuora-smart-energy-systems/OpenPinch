@@ -5,13 +5,13 @@ from .support_methods import get_value
 from ..classes import Zone, Stream, StreamCollection
 
 
-__all__ = ["prepare_problem_struture"]
+__all__ = ["prepare_problem"]
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
-def prepare_problem_struture(
+def prepare_problem(
     streams: List[StreamSchema] = [],
     utilities: List[UtilitySchema] = [],
     options: Configuration = None,

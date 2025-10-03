@@ -49,22 +49,12 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
 
     project_name = p_filepath.stem[2:]
 
-    # Validate request data using Pydantic model
-    request_data = TargetInput.model_validate(data)
-
-    # Perform advanced Pinch Analysis and total site analysis
-    return_data = get_targets(
-        zone_tree=request_data.zone_tree,
-        streams=request_data.streams,
-        utilities=request_data.utilities,
-        options=request_data.options,
-        name=project_name,
+    res = pinch_analysis_service(
+        data=data,
+        project_name=project_name
     )
 
-    # Validate response data
-    res = TargetOutput.model_validate(return_data)
-
-    # Get and calidate the format of the "correct" targets from the Open Pinch workbook
+    # Get and validate the format of the "correct" targets from the Open Pinch workbook
     with open(r_filepath) as json_data:
         wkb_res = json.load(json_data)
     wkb_res = TargetOutput.model_validate(wkb_res)
