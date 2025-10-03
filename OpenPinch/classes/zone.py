@@ -10,8 +10,7 @@ if TYPE_CHECKING:
 
 
 class Zone():
-    """
-    Class representing any type of defined spatial zone (i.e., operation, 
+    """Class representing any type of defined spatial zone (i.e., operation, 
     process zone, site, region, utility zone) with its energy targets.
     """
 

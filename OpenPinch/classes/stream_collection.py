@@ -75,9 +75,7 @@ class StreamCollection:
         if isinstance(key, str):
             self._sort_key = lambda s: getattr(s, key)
         elif isinstance(key, list):
-            self._sort_key = lambda s: tuple(
-                -getattr(s, attr) if reverse else getattr(s, attr) for attr in key
-            )
+            self._sort_key = lambda s: tuple(getattr(s, attr) for attr in key)
         else:
             self._sort_key = key
         self._needs_sort = True
