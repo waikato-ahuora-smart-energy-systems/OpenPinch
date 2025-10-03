@@ -5,7 +5,7 @@ from ..lib import *
 from ..classes import *
 from .support_methods import *
 
-__all__ = ["get_process_heat_cascade, get_utility_heat_cascade"]
+__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade"]
 
 
 #######################################################################################################

@@ -63,13 +63,12 @@ class PinchProblem:
         if run:
             try:
                 self.target()
-            except:
+            except Exception as exc:
                 raise ValueError(
-                    "Targeting analysis failed. Check input data format." \
-                    "Report any persisent bugs with problem files " \
-                    "via a Github issue or email (tim.walmlsey@waikato.ac.nz)"
-                )           
-                
+                    "Targeting analysis failed. Check input data format. "
+                    "Report persistent bugs via GitHub issues."
+                ) from exc
+
             if self.results_dir is not None:
                 self.export(self.results_dir)
 

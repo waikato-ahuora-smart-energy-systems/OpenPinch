@@ -337,7 +337,11 @@ def _set_utilities_for_zone_and_subzones(zone: Zone, hot_utilities: List[Stream]
     return zone
 
 
-def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: List[StreamSchema] = [], top_zone_name: str = None) -> ZoneTreeSchema:
+def _validate_zone_tree_structure(
+    zone_tree: ZoneTreeSchema = None,
+    streams: Optional[List[StreamSchema]] = None,
+    top_zone_name: str = None,
+) -> ZoneTreeSchema:
     """Normalise a provided zone tree or synthesise one from stream zone paths."""
     if isinstance(zone_tree, ZoneTreeSchema):
         if zone_tree.type == ZoneType.U.value:
@@ -365,7 +369,8 @@ def _validate_zone_tree_structure(zone_tree: ZoneTreeSchema = None, streams: Lis
         top_zone_name = ZoneType.S.value
 
     root = {"name": top_zone_name, "type": ZoneType.S.value, "children": {}}
-    zone_names = sorted(set(stream.zone for stream in streams if stream.zone))  # Filter empty/null zones
+    stream_iter = streams or []
+    zone_names = sorted({stream.zone for stream in stream_iter if stream.zone})  # Filter empty/null zones
 
     def _split_zone_name(name: str):
         """Split hierarchical zone strings ("Site/Area/Unit") into clean path components."""
