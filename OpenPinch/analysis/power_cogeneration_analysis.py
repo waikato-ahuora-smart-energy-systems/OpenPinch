@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 from ..utils import *
 
@@ -152,99 +152,161 @@ def _preprocess_utilities(z: Zone, turbine_params: dict):
 def _solve_turbine_work(turbine_params: dict, utility_data: dict):
     """Solve turbine mass flow, work production, and efficiency based on utilities and turbine parameters."""
 
-    P_out = utility_data["P_out"]
-    Q_users = utility_data["Q_users"]
-    w_k = utility_data["w_k"]
-    w_isen_k = utility_data["w_isen_k"]
-    m_k = utility_data["m_k"]
-    eff_k = utility_data["eff_k"]
-    dh_is_k = utility_data["dh_is_k"]
-    h_out = utility_data["h_out"]
-    h_tar = utility_data["h_tar"]
-    h_sat = utility_data["h_sat"]
-    s = utility_data["s"]
+    state = _initialise_solver_state(turbine_params, utility_data)
 
-    model = turbine_params["model"]
-    load_frac = turbine_params["load_frac"]
-    n_mech = turbine_params["mech_eff"]
-    min_eff = turbine_params["min_eff"]
-    flash_correction = turbine_params.get("CONDESATE_FLASH_CORRECTION", False)
-
-    m_in_est = utility_data["m_in_est"]
-    i = 0
-
+    iterations = 0
     while True:
-        m_in = m_in_est
-        m_in_k = m_in_est
-        m_in_est = 0
+        previous_m_in = state.m_in_est
+        _iterate_turbine_state(state)
+        iterations += 1
 
-        for j in range(1, s):
-            m_in_k -= m_k[j - 1]
-            dh_is_k[j] = h_out[j - 1] - h_ps(P_out[j], s_ph(P_out[j - 1], h_out[j - 1]))
-            w_isen_k[j] = m_in_k * dh_is_k[j]
-            m_max = m_in_k / load_frac if load_frac > 0 else 0
-
-            if m_in_k > 0:
-                if model == "Sun & Smith (2015)":
-                    w_k[j] = Work_SunModel(
-                        P_out[j - 1],
-                        h_out[j - 1],
-                        P_out[j],
-                        h_sat[j],
-                        m_in_k,
-                        m_max,
-                        dh_is_k[j],
-                        n_mech,
-                    )
-                elif model == "Medina-Flores et al. (2010)":
-                    w_k[j] = Work_MedinaModel(P_out[j - 1], m_in_k, dh_is_k[j])
-                elif model == "Varbanov et al. (2004)":
-                    w_k[j] = Work_THM(
-                        P_out[j - 1],
-                        h_out[j - 1],
-                        P_out[j],
-                        h_sat[j],
-                        m_in_k,
-                        dh_is_k[j],
-                        n_mech,
-                    )
-                elif model == "Fixed Isentropic Turbine":
-                    w_k[j] = w_isen_k[j] * min_eff
-            else:
-                w_k[j] = 0
-
-            if w_isen_k[j] > 0:
-                eff_k[j] = w_k[j] / w_isen_k[j]
-            else:
-                eff_k[j] = min_eff
-
-            if eff_k[j] <= min_eff:
-                w_k[j] = min_eff * w_isen_k[j]
-
-            if m_in_k > 0:
-                h_out[j] = h_out[j - 1] - w_k[j] / (m_in_k * n_mech)
-            else:
-                h_out[j] = h_out[j - 1]
-
-            if m_in_k > 0:
-                if flash_correction:
-                    Q_flash = m_k[j - 1] * (h_tar[j - 1] - h_tar[j])
-                    m_k[j] = (Q_users[j] - Q_flash) / (h_out[j] - h_tar[j])
-                else:
-                    m_k[j] = Q_users[j] / (h_out[j] - h_tar[j])
-            else:
-                m_k[j] = 0
-
-            m_in_est += m_k[j]
-
-        i += 1
-        if abs(m_in - m_in_est) < tol or i >= 3:
+        if abs(previous_m_in - state.m_in_est) < tol or iterations >= 3:
             break
 
-    w_total = sum(w_k)
-    Wmax = sum(w_isen_k)
+    return sum(state.w_k), sum(state.w_isen_k)
 
-    return w_total, Wmax
+
+class _TurbineState:
+    """Mutable turbine calculation state passed between iterations."""
+
+    def __init__(self, params: dict, data: dict):
+        self.P_out = data["P_out"]
+        self.Q_users = data["Q_users"]
+        self.w_k = data["w_k"]
+        self.w_isen_k = data["w_isen_k"]
+        self.m_k = data["m_k"]
+        self.eff_k = data["eff_k"]
+        self.dh_is_k = data["dh_is_k"]
+        self.h_out = data["h_out"]
+        self.h_tar = data["h_tar"]
+        self.h_sat = data["h_sat"]
+        self.s = data["s"]
+
+        self.model = params["model"]
+        self.load_frac = params["load_frac"]
+        self.n_mech = params["mech_eff"]
+        self.min_eff = params["min_eff"]
+        self.flash_correction = params.get("CONDESATE_FLASH_CORRECTION", False)
+
+        self.m_in_est = data["m_in_est"]
+
+    def max_mass_flow(self, mass_flow: float) -> float:
+        return mass_flow / self.load_frac if self.load_frac > 0 else 0.0
+
+
+def _initialise_solver_state(turbine_params: dict, utility_data: dict) -> _TurbineState:
+    return _TurbineState(turbine_params, utility_data)
+
+
+def _iterate_turbine_state(state: _TurbineState) -> None:
+    m_in_remaining = state.m_in_est
+    state.m_in_est = 0
+
+    for j in range(1, state.s):
+        m_in_remaining -= state.m_k[j - 1]
+        state.dh_is_k[j] = state.h_out[j - 1] - h_ps(
+            state.P_out[j], s_ph(state.P_out[j - 1], state.h_out[j - 1])
+        )
+        state.w_isen_k[j] = m_in_remaining * state.dh_is_k[j]
+        m_max = state.max_mass_flow(m_in_remaining)
+
+        work_guess = _segment_work(
+            state,
+            index=j,
+            mass_flow=m_in_remaining,
+            mass_flow_max=m_max,
+        )
+        work, efficiency = _apply_efficiency_limits(
+            work_guess, state.w_isen_k[j], state.min_eff
+        )
+        state.w_k[j] = work
+        state.eff_k[j] = efficiency
+        state.h_out[j] = _segment_enthalpy(
+            state.h_out[j - 1],
+            state.w_k[j],
+            m_in_remaining,
+            state.n_mech,
+        )
+        state.m_k[j] = _segment_mass_flow(
+            state,
+            index=j,
+            mass_flow=m_in_remaining,
+        )
+        state.m_in_est += state.m_k[j]
+
+
+def _segment_work(state: _TurbineState, index: int, mass_flow: float, mass_flow_max: float) -> float:
+    if mass_flow <= 0:
+        return 0.0
+
+    model = state.model
+    if model == "Sun & Smith (2015)":
+        return Work_SunModel(
+            state.P_out[index - 1],
+            state.h_out[index - 1],
+            state.P_out[index],
+            state.h_sat[index],
+            mass_flow,
+            mass_flow_max,
+            state.dh_is_k[index],
+            state.n_mech,
+        )
+    if model == "Medina-Flores et al. (2010)":
+        return Work_MedinaModel(
+            state.P_out[index - 1], mass_flow, state.dh_is_k[index]
+        )
+    if model == "Varbanov et al. (2004)":
+        return Work_THM(
+            state.P_out[index - 1],
+            state.h_out[index - 1],
+            state.P_out[index],
+            state.h_sat[index],
+            mass_flow,
+            state.dh_is_k[index],
+            state.n_mech,
+        )
+    if model == "Fixed Isentropic Turbine":
+        return state.w_isen_k[index] * state.min_eff
+
+    return 0.0
+
+
+def _apply_efficiency_limits(
+    work: float, work_isentropic: float, min_eff: float
+) -> Tuple[float, float]:
+    if work_isentropic <= 0:
+        return 0.0, min_eff
+
+    efficiency = work / work_isentropic
+    if efficiency <= min_eff:
+        return min_eff * work_isentropic, min_eff
+
+    return work, efficiency
+
+
+def _segment_enthalpy(h_prev: float, work: float, mass_flow: float, mech_eff: float) -> float:
+    if mass_flow <= 0:
+        return h_prev
+    return h_prev - work / (mass_flow * mech_eff)
+
+
+def _segment_mass_flow(state: _TurbineState, index: int, mass_flow: float) -> float:
+    if mass_flow <= 0:
+        return 0.0
+
+    if state.flash_correction:
+        Q_flash = state.m_k[index - 1] * (state.h_tar[index - 1] - state.h_tar[index])
+        return (state.Q_users[index] - Q_flash) / (state.h_out[index] - state.h_tar[index])
+
+    return state.Q_users[index] / (state.h_out[index] - state.h_tar[index])
+
+
+def _TurbineState__max_mass_flow(self: _TurbineState, m_in_remaining: float) -> float:
+    return m_in_remaining / self.load_frac if self.load_frac > 0 else 0.0
+
+
+# monkey patch helper for clarity without changing call sites inside _iterate_turbine_state
+_TurbineState._max_mass_flow = _TurbineState__max_mass_flow
 
 
 # def get_power_cogeneration_above_pinch(z: Zone): # type: ignore
