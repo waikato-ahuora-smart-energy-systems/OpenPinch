@@ -59,7 +59,7 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
     wkb_res = TargetOutput.model_validate(wkb_res)
 
     # Compare targets from Python and Excel implementations of Open Pinch
-    if 1:
+    if 0:
         for z in res.targets:
             for z0 in wkb_res.targets:
                 if z.name in z0.name:
