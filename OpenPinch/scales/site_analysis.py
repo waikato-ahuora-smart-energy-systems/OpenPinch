@@ -163,7 +163,6 @@ def _compute_utility_cost(hot_utilities: StreamCollection, cold_utilities: Strea
 
 def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     """Recalculate site-wide utility targets accounting for inter-utility balancing."""
-    s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
 
     # Total site profiles - process side
     site.import_net_hot_and_cold_streams_from_sub_zones()
@@ -178,6 +177,7 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     # )
 
     # Get utility duties based on the summation of subzones
+    s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
     hot_utilities = deepcopy(s_tzt.hot_utilities)
     cold_utilities = deepcopy(s_tzt.cold_utilities)
 
