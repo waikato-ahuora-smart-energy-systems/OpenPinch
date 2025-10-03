@@ -3,7 +3,7 @@
 from typing import List
 
 from ..classes import *
-from .graphs import get_output_graphs
+from ..analysis.graphs import get_output_graphs
 
 __all__ = ["extract_results"]
 

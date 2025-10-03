@@ -8,9 +8,9 @@ in larger workflows.
 
 from typing import Any
 
-from .analysis import extract_results, prepare_problem
+from .analysis import prepare_problem
 from .lib import *
-from .scales import get_targets
+from .scales import get_targets, extract_results
 from .utils import *
 
 __all__ = ["pinch_analysis_service"]

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 from ..lib.config import *
 from ..lib.enums import *
 from .stream_collection import StreamCollection
-from .target import EnergyTarget
+from .energy_target import EnergyTarget
 
 if TYPE_CHECKING:
     from .stream import Stream

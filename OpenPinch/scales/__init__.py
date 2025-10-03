@@ -10,3 +10,4 @@ from .site_analysis import get_site_targets
 from .process_analysis import get_process_targets
 from .unit_operation_analysis import get_unit_operation_targets
 from .entry import get_targets, get_visualise
+from .response import extract_results

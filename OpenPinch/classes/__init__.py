@@ -10,6 +10,6 @@ from .pinch_problem import PinchProblem
 from .problem_table import ProblemTable
 from .stream import Stream
 from .stream_collection import StreamCollection
-from .target import EnergyTarget
+from .energy_target import EnergyTarget
 from .value import Value
 from .zone import Zone

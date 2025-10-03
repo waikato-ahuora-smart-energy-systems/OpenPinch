@@ -13,6 +13,5 @@ from .exchanger_unit_targeting import get_min_number_hx
 from .graphs import visualise_graphs
 from .power_cogeneration_analysis import get_power_cogeneration_above_pinch
 from .problem_table_analysis import get_process_heat_cascade
-from .response import extract_results
 from .support_methods import *
 from .utility_targeting import get_utility_targets

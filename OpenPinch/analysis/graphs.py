@@ -1,6 +1,6 @@
 """Graph construction helpers for composite curves and related plots."""
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from ..classes import *
 from ..lib import *
@@ -33,74 +33,39 @@ def visualise_graphs(graph_set: dict, graph) -> None:
     graph_type = graph.type
 
     match graph_type:
-        case GT.CC.value | GT.SCC.value:
-            curves = [
-                _graph_cc(
-                    StreamType.Hot.value,
-                    graph_data[PT.T.value].to_list(),
-                    graph_data[PT.H_HOT.value].to_list(),
-                ),
-                _graph_cc(
-                    StreamType.Cold.value,
-                    graph_data[PT.T.value].to_list(),
-                    graph_data[PT.H_COLD.value].to_list(),
-                ),
-            ]
+        case GT.CC.value | GT.SCC.value | GT.BCC.value:
             graph_set["graphs"].append(
-                {
-                    "type": graph_type,
-                    "name": f"{graph_type} Graph",
-                    "segments": curves[0] + curves[1],
-                }
-            )
-
-        case GT.BCC.value:
-            curves = [
-                _graph_cc(
-                    StreamType.Hot.value,
-                    graph_data[PT.T.value].to_list(),
-                    graph_data[PT.H_HOT.value].to_list(),
-                    IncludeArrows=False,
-                ),
-                _graph_cc(
-                    StreamType.Cold.value,
-                    graph_data[PT.T.value].to_list(),
-                    graph_data[PT.H_COLD.value].to_list(),
-                    IncludeArrows=False,
-                ),
-            ]
-            graph_set["graphs"].append(
-                {
-                    "type": graph_type,
-                    "name": f"{graph_type} Graph",
-                    "segments": curves[0] + curves[1],
-                }
+                _make_composite_graph(
+                    graph_title="Graph",
+                    key=graph_type,
+                    data=graph_data,
+                    label=graph_type,
+                    name=f"{graph_type} Graph",
+                )
             )
 
         case GT.GCC.value | GT.GCC_NP.value | GT.GCCU.value:
-            segments = _graph_gcc(
-                graph_data[PT.H_NET.value].to_list(), graph_data[PT.T.value].to_list()
-            )
             graph_set["graphs"].append(
-                {
-                    "type": graph_type,
-                    "name": f"{graph_type} Graph",
-                    "segments": segments,
-                }
+                _make_gcc_graph(
+                    graph_title="Graph",
+                    key=graph_type,
+                    data=graph_data,
+                    label=graph_type,
+                    name=f"{graph_type} Graph",
+                    value_field=PT.H_NET.value,
+                )
             )
             if graph_type == GT.GCCU.value:
-                # Add second set with utility profile style
-                segments_ut = _graph_gcc(
-                    graph_data[PT.H_NET.value].to_list(),
-                    graph_data[PT.T.value].to_list(),
-                    utility_profile=True,
-                )
                 graph_set["graphs"].append(
-                    {
-                        "type": f"{graph_type}_Utility",
-                        "name": f"{graph_type} Utility Graph",
-                        "segments": segments_ut,
-                    }
+                    _make_gcc_graph(
+                        graph_title="Utility Graph",
+                        key=f"{graph_type}_Utility",
+                        data=graph_data,
+                        label=f"{graph_type} Utility",
+                        name=f"{graph_type} Utility Graph",
+                        value_field=PT.H_NET.value,
+                        utility_profile=True,
+                    )
                 )
 
 
@@ -112,151 +77,194 @@ def visualise_graphs(graph_set: dict, graph) -> None:
 def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
     """Creates Pinch Analysis and total site analysis graphs for a specifc zone."""
 
-    graph_set = {"name": graphTitle, "graphs": []}
+    graphs: List[dict] = []
 
-    # === Composite Curve ===
     if GT.CC.value in t.graphs:
-        key = GT.CC.value
-        g = {
-            "type": key,
-            "name": f"Composite Curve: {graphTitle}",
-            "segments": _graph_cc(
-                StreamType.Hot.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_HOT.value].to_list(),
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graphTitle,
+                key=GT.CC.value,
+                data=t.graphs[GT.CC.value],
+                label="Composite Curve",
             )
-            + _graph_cc(
-                StreamType.Cold.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_COLD.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        )
 
-    # === Shifted Composite Curve ===
     if GT.SCC.value in t.graphs:
-        key = GT.SCC.value
-        g = {
-            "type": key,
-            "name": f"Shifted Composite Curve: {graphTitle}",
-            "segments": _graph_cc(
-                StreamType.Hot.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_HOT.value].to_list(),
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graphTitle,
+                key=GT.SCC.value,
+                data=t.graphs[GT.SCC.value],
+                label="Shifted Composite Curve",
             )
-            + _graph_cc(
-                StreamType.Cold.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_COLD.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        )
 
-    # === Balanced Composite Curve ===
     if GT.BCC.value in t.graphs:
-        key = GT.BCC.value
-        g = {
-            "type": key,
-            "name": f"Balanced Composite Curve: {graphTitle}",
-            "segments": _graph_cc(
-                StreamType.Hot.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_HOT.value].to_list(),
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graphTitle,
+                key=GT.BCC.value,
+                data=t.graphs[GT.BCC.value],
+                label="Balanced Composite Curve",
+                include_arrows=False,
             )
-            + _graph_cc(
-                StreamType.Cold.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_COLD.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        )
 
-    # === Grand Composite Curve (GCC) ===
     if GT.GCC.value in t.graphs:
-        key = GT.GCC.value
-        g = {
-            "type": key,
-            "name": f"Grand Composite Curve: {graphTitle}",
-            "segments": _graph_gcc(
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_NET.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        graphs.append(
+            _make_gcc_graph(
+                graph_title=graphTitle,
+                key=GT.GCC.value,
+                data=t.graphs[GT.GCC.value],
+                label="Grand Composite Curve",
+                value_field=PT.H_NET.value,
+            )
+        )
 
-    # === Grand Composite Curve with no pockets (GCC_Act and GCC_Ut_star) ===
     if GT.GCC_Act.value in t.graphs:
-        key = GT.GCC_Act.value
-        g = {
-            "type": key,
-            "name": f"Grand Composite Curve: {graphTitle}",
-            "segments": _graph_gcc(
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_NET_A.value].to_list(),
+        graphs.append(
+            _make_dual_gcc_graph(
+                graph_title=graphTitle,
+                key=GT.GCC_Act.value,
+                data=t.graphs[GT.GCC_Act.value],
             )
-            + _graph_gcc(
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_UT_NET.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        )
 
-    # === Grand Composite Curve with vertical CC heat transfer (GCC_Ex and GCC_Ut_star) ===
     if GT.GCC_Ex.value in t.graphs:
-        key = GT.GCC_Ex.value
-        g = {
-            "type": key,
-            "name": f"Grand Composite Curve: {graphTitle}",
-            "segments": _graph_gcc(
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_NET_V.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        graphs.append(
+            _make_gcc_graph(
+                graph_title=graphTitle,
+                key=GT.GCC_Ex.value,
+                data=t.graphs[GT.GCC_Ex.value],
+                label="Grand Composite Curve",
+                value_field=PT.H_NET_V.value,
+            )
+        )
 
-    # === Total Site Profiles ===
     if GT.TSP.value in t.graphs:
-        key = GT.TSP.value
-        g = {
-            "type": key,
-            "name": f"Total Site Profiles: {graphTitle}",
-            "segments": _graph_cc(
-                StreamType.Hot.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_HOT_NET.value].to_list(),
+        graphs.append(
+            _make_total_site_profiles_graph(
+                graph_title=graphTitle,
+                key=GT.TSP.value,
+                data=t.graphs[GT.TSP.value],
             )
-            + _graph_cc(
-                StreamType.Cold.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_COLD_NET.value].to_list(),
-            )
-            + _graph_cc(
-                StreamType.Cold.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_COLD_UT.value].to_list(),
-            )
-            + _graph_cc(
-                StreamType.Hot.value,
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_HOT_UT.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        )
 
-    # === Site Utility Grand Composite Curves ===
     if GT.SUGCC.value in t.graphs:
-        key = GT.SUGCC.value
-        g = {
-            "type": key,
-            "name": f"Site Utility Grand Composite Curve: {graphTitle}",
-            "segments": _graph_gcc(
-                t.graphs[key][PT.T.value].to_list(),
-                t.graphs[key][PT.H_UT_NET.value].to_list(),
-            ),
-        }
-        graph_set["graphs"].append(g)
+        graphs.append(
+            _make_gcc_graph(
+                graph_title=graphTitle,
+                key=GT.SUGCC.value,
+                data=t.graphs[GT.SUGCC.value],
+                label="Site Utility Grand Composite Curve",
+                value_field=PT.H_UT_NET.value,
+            )
+        )
 
-    return graph_set
+    return {"name": graphTitle, "graphs": graphs}
+
+
+def _make_composite_graph(
+    graph_title: str,
+    key: str,
+    data,
+    label: str,
+    *,
+    name: Optional[str] = None,
+    include_arrows: bool = True,
+    decolour: bool = False,
+):
+    temperatures = data[PT.T.value].to_list()
+    hot_segments = _graph_cc(
+        StreamType.Hot.value,
+        temperatures,
+        data[PT.H_HOT.value].to_list(),
+        IncludeArrows=include_arrows,
+        Decolour=decolour,
+    )
+    cold_segments = _graph_cc(
+        StreamType.Cold.value,
+        temperatures,
+        data[PT.H_COLD.value].to_list(),
+        IncludeArrows=include_arrows,
+        Decolour=decolour,
+    )
+    return {
+        "type": key,
+        "name": name or f"{label}: {graph_title}",
+        "segments": hot_segments + cold_segments,
+    }
+
+
+def _make_total_site_profiles_graph(graph_title: str, key: str, data) -> dict:
+    temperatures = data[PT.T.value].to_list()
+    segments = []
+    segments += _graph_cc(
+        StreamType.Hot.value,
+        temperatures,
+        data[PT.H_HOT_NET.value].to_list(),
+    )
+    segments += _graph_cc(
+        StreamType.Cold.value,
+        temperatures,
+        data[PT.H_COLD_NET.value].to_list(),
+    )
+    segments += _graph_cc(
+        StreamType.Cold.value,
+        temperatures,
+        data[PT.H_COLD_UT.value].to_list(),
+    )
+    segments += _graph_cc(
+        StreamType.Hot.value,
+        temperatures,
+        data[PT.H_HOT_UT.value].to_list(),
+    )
+    return {
+        "type": key,
+        "name": f"Total Site Profiles: {graph_title}",
+        "segments": segments,
+    }
+
+
+def _make_gcc_graph(
+    graph_title: str,
+    key: str,
+    data,
+    label: str,
+    *,
+    value_field: str,
+    name: Optional[str] = None,
+    utility_profile: bool = False,
+    decolour: bool = False,
+):
+    segments = _graph_gcc(
+        data[PT.T.value].to_list(),
+        data[value_field].to_list(),
+        utility_profile=utility_profile,
+        decolour=decolour,
+    )
+    return {
+        "type": key,
+        "name": name or f"{label}: {graph_title}",
+        "segments": segments,
+    }
+
+
+def _make_dual_gcc_graph(graph_title: str, key: str, data) -> dict:
+    segments = []
+    segments += _graph_gcc(
+        data[PT.T.value].to_list(),
+        data[PT.H_NET_A.value].to_list(),
+    )
+    segments += _graph_gcc(
+        data[PT.T.value].to_list(),
+        data[PT.H_UT_NET.value].to_list(),
+    )
+    return {
+        "type": key,
+        "name": f"Grand Composite Curve: {graph_title}",
+        "segments": segments,
+    }
 
 
 def _graph_cc(
@@ -336,55 +344,30 @@ def _graph_gcc(
     cold_pro_segs, hot_pro_segs, hot_ut_segs, cold_ut_segs, zero_segs = 0, 0, 0, 0, 0
 
     while j < end_idx:
-        enthalpy_diff = x_vals[j] - x_vals[j + 1]
-        segment_type = None
+        segment_type = _classify_segment(
+            x_vals[j] - x_vals[j + 1], utility_profile
+        )
 
-        if enthalpy_diff > tol:
-            segment_type = "cold_pro" if not utility_profile else "hot_ut"
-        elif enthalpy_diff < -tol:
-            segment_type = "hot_pro" if not utility_profile else "cold_ut"
-        else:
-            segment_type = "zero"
-
-        # Find where this segment ends
         next_j = j + 1
         while next_j < end_idx:
-            next_diff = x_vals[next_j] - x_vals[next_j + 1]
-            if (
-                (segment_type == "cold_pro" and next_diff < -tol)
-                or (segment_type == "hot_pro" and next_diff > tol)
-                or (segment_type == "hot_ut" and next_diff < -tol)
-                or (segment_type == "cold_ut" and next_diff > tol)
-                or (segment_type == "zero" and abs(next_diff) > tol)
-            ):
+            next_type = _classify_segment(
+                x_vals[next_j] - x_vals[next_j + 1], utility_profile
+            )
+            if next_type != segment_type:
                 break
             next_j += 1
 
-        # Extract segment data
         x_seg = x_vals[j : next_j + 1]
         y_seg = y_vals[j : next_j + 1]
 
-        # Segment title and color
-        if segment_type == "cold_pro":
-            cold_pro_segs += 1
-            title = f"Cold Process Segment {cold_pro_segs}"
-            colour = LineColour.Cold.value
-        elif segment_type == "hot_pro":
-            hot_pro_segs += 1
-            title = f"Hot Process Segment {hot_pro_segs}"
-            colour = LineColour.Hot.value
-        elif segment_type == "hot_ut":
-            hot_ut_segs += 1
-            title = f"Hot Utility Segment {hot_ut_segs}"
-            colour = LineColour.Hot.value
-        elif segment_type == "cold_ut":
-            cold_ut_segs += 1
-            title = f"Cold Utility Segment {cold_ut_segs}"
-            colour = LineColour.Cold.value
-        else:  # Zero
-            zero_segs += 1
-            title = f"Vertical Segment {zero_segs}"
-            colour = LineColour.Other.value
+        title, colour, cold_pro_segs, hot_pro_segs, hot_ut_segs, cold_ut_segs, zero_segs = _segment_style(
+            segment_type,
+            cold_pro_segs,
+            hot_pro_segs,
+            hot_ut_segs,
+            cold_ut_segs,
+            zero_segs,
+        )
 
         curves.append(
             _create_curve(
@@ -399,6 +382,78 @@ def _graph_gcc(
         j = next_j
 
     return curves
+
+
+def _classify_segment(enthalpy_diff: float, utility_profile: bool) -> str:
+    if enthalpy_diff > tol:
+        return "cold_pro" if not utility_profile else "hot_ut"
+    if enthalpy_diff < -tol:
+        return "hot_pro" if not utility_profile else "cold_ut"
+    return "zero"
+
+
+def _segment_style(
+    segment_type: str,
+    cold_pro_segs: int,
+    hot_pro_segs: int,
+    hot_ut_segs: int,
+    cold_ut_segs: int,
+    zero_segs: int,
+) -> Tuple[str, int, int, int, int, int, int]:
+    if segment_type == "cold_pro":
+        cold_pro_segs += 1
+        return (
+            f"Cold Process Segment {cold_pro_segs}",
+            LineColour.Cold.value,
+            cold_pro_segs,
+            hot_pro_segs,
+            hot_ut_segs,
+            cold_ut_segs,
+            zero_segs,
+        )
+    if segment_type == "hot_pro":
+        hot_pro_segs += 1
+        return (
+            f"Hot Process Segment {hot_pro_segs}",
+            LineColour.Hot.value,
+            cold_pro_segs,
+            hot_pro_segs,
+            hot_ut_segs,
+            cold_ut_segs,
+            zero_segs,
+        )
+    if segment_type == "hot_ut":
+        hot_ut_segs += 1
+        return (
+            f"Hot Utility Segment {hot_ut_segs}",
+            LineColour.Hot.value,
+            cold_pro_segs,
+            hot_pro_segs,
+            hot_ut_segs,
+            cold_ut_segs,
+            zero_segs,
+        )
+    if segment_type == "cold_ut":
+        cold_ut_segs += 1
+        return (
+            f"Cold Utility Segment {cold_ut_segs}",
+            LineColour.Cold.value,
+            cold_pro_segs,
+            hot_pro_segs,
+            hot_ut_segs,
+            cold_ut_segs,
+            zero_segs,
+        )
+    zero_segs += 1
+    return (
+        f"Vertical Segment {zero_segs}",
+        LineColour.Other.value,
+        cold_pro_segs,
+        hot_pro_segs,
+        hot_ut_segs,
+        cold_ut_segs,
+        zero_segs,
+    )
 
 
 def _clean_composite(
@@ -442,28 +497,6 @@ def _clean_composite(
     if abs(x_clean[i] - x_clean[i - 1]) < tol:
         x_clean.pop(i)
         y_clean.pop(i)
-
-    # offset = 0
-    # for i in range(len(x_clean) - 1):
-    #     x1, x2 = x_clean[i - offset], x_clean[i+1 - offset]
-    #     if abs(x1 - x2) < tol:
-    #         x_clean.pop(i - offset)
-    #         y_clean.pop(i - offset)
-    #         offset += 1
-    #         if offset > 1:
-    #             pass
-    #     else:
-    #         break
-
-    # offset = 0
-    # for i in reversed(range(len(x_clean) - 1)):
-    #     x1, x2 = x_clean[i - offset], x_clean[i-1 - offset]
-    #     if abs(x1 - x2) < tol:
-    #         x_clean.pop(i - offset)
-    #         y_clean.pop(i - offset)
-    #         offset += 1
-    #     else:
-    #         break
 
     return y_clean, x_clean
 
