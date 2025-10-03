@@ -139,35 +139,6 @@ def _set_sites_targets(
     }
 
 
-def _recover_heat_between_matching_utilities(
-    hot_utilities: StreamCollection, cold_utilities: StreamCollection
-) -> float:
-    """Transfer heat between utilities operating across matching temperature windows."""
-    ut_hr = 0.0
-    for u_h in hot_utilities:
-        hot_flow = u_h.heat_flow
-        if hot_flow <= 0.0:
-            continue
-        t_hs = u_h.t_supply
-        t_ht = u_h.t_target
-        for u_c in cold_utilities:
-            cold_flow = u_c.heat_flow
-            if cold_flow <= 0.0:
-                continue
-            if abs(t_hs - u_c.t_target) >= 1 or abs(t_ht - u_c.t_supply) >= 1:
-                continue
-            q_transfer = cold_flow if cold_flow < hot_flow else hot_flow
-            if q_transfer <= 0.0:
-                continue
-            hot_flow -= q_transfer
-            u_h.set_heat_flow(hot_flow)
-            u_c.set_heat_flow(cold_flow - q_transfer)
-            ut_hr += q_transfer
-            if hot_flow <= 0.0:
-                break
-    return ut_hr
-
-
 def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     """Recalculate site-wide utility targets accounting for inter-utility balancing."""
     # Unified Total Zone Analysis - Amir's method
@@ -176,8 +147,21 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     cold_utilities = deepcopy(s_tzt.cold_utilities)
 
     u: Stream
-    ut_hr = _recover_heat_between_matching_utilities(hot_utilities, cold_utilities)
-    utility_cost = 0.0
+    u_h: Stream
+    u_c: Stream
+    ut_hr = utility_cost = 0.0
+
+    # todo: extract as a helper method
+    for u_h in hot_utilities:
+        for u_c in cold_utilities:
+            if (
+                abs(u_h.t_supply - u_c.t_target) < 1
+                and abs(u_h.t_target - u_c.t_supply) < 1
+            ):
+                Q = min(u_h.heat_flow, u_c.heat_flow)
+                u_h.set_heat_flow(u_h.heat_flow - Q)
+                u_c.set_heat_flow(u_c.heat_flow - Q)
+                ut_hr += Q
 
     for u in hot_utilities + cold_utilities:
         utility_cost += u.ut_cost
