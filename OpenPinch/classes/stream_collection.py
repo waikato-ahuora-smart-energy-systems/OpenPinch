@@ -1,3 +1,5 @@
+"""Utility container for managing ordered sets of stream objects."""
+
 from typing import Callable, Dict, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:

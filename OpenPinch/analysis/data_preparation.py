@@ -1,3 +1,11 @@
+"""Construct validated :class:`Zone` trees and attach stream/utility data.
+
+The helpers in this module normalise raw request payloads into the
+class-based structures consumed by the analysis pipeline.  They validate
+inputs, synthesise missing zone hierarchies, instantiate ``Stream`` objects,
+and propagate utility definitions across nested zones.
+"""
+
 import copy
 from typing import List, Tuple, Optional
 from ..lib import *

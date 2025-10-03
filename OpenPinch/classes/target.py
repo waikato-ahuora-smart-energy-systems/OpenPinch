@@ -1,3 +1,5 @@
+"""EnergyTarget captures summary metrics computed for each zone."""
+
 from typing import TYPE_CHECKING
 import pandas as pd
 from ..lib.schema import *

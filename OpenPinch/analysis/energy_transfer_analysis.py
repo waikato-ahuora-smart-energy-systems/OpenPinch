@@ -1,3 +1,5 @@
+"""Placeholder for legacy energy-transfer targeting routines (currently unused)."""
+
 # import copy
 # from typing import Optional
 # from ..utils import *
@@ -503,4 +505,3 @@
 #             ETD[j][i + 1] = PT[8][i]
 
 #         ETD[j + 1][1] = PT[10][0]
-

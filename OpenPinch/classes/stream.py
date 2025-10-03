@@ -1,3 +1,5 @@
+"""Data model representing process and utility streams."""
+
 from typing import Optional
 from ..lib.enums import * 
 from .value import Value

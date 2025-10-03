@@ -1,3 +1,10 @@
+"""Problem-table generation and cascade utilities for pinch analysis.
+
+This module collects the vectorised implementations of the temperature
+interval problem table, cascade shifting logic, and helper routines used when
+deriving zonal targets and plotting data for composite curves.
+"""
+
 import numpy as np
 from typing import Tuple
 from ..utils.water_properties import Tsat_p
@@ -18,7 +25,8 @@ def get_process_heat_cascade(hot_streams: StreamCollection, cold_streams: Stream
     pt, pt_real = _get_temperature_intervals(streams=all_streams, config=config)
     
     # Perform the heat cascade of the problem table
-    pt, pt_real = _problem_table_algorithm(pt, hot_streams, cold_streams), _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
+    pt = _problem_table_algorithm(pt, hot_streams, cold_streams)
+    pt_real = _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
     target_values = _set_zonal_targets(pt, pt_real)
     
     # Correct the location of the cold composite curve and limiting GCC (real temperatures)
@@ -172,6 +180,7 @@ def _correct_pt_composite_curves(pt: ProblemTable, heat_recovery_target: float, 
 
 
 def _add_temperature_intervals_at_constant_h(heat_recovery_target: float, pt: ProblemTable, pt_real: ProblemTable):
+    """Insert breakpoints where composite curves intersect at constant enthalpy."""
     if heat_recovery_target > tol:
         pt = _insert_temperature_interval_into_pt_at_constant_h(pt, PT.T.value, PT.H_HOT.value, PT.H_COLD.value)
         pt_real = _insert_temperature_interval_into_pt_at_constant_h(pt_real, PT.T.value, PT.H_HOT.value, PT.H_COLD.value)

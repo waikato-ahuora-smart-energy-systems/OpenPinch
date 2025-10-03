@@ -1,3 +1,5 @@
+"""Target multiple utilities over a heating or cooler profile starting from the pinch temperature."""
+
 import numpy as np
 from ..utils import *
 from ..lib import *

@@ -1,3 +1,5 @@
+"""Aggregate analysis outputs into serialisable response payloads."""
+
 from typing import List
 from .graphs import get_output_graphs
 from ..classes import *

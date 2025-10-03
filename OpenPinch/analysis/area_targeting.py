@@ -1,3 +1,5 @@
+"""Area targeting methods."""
+
 import pandas as pd
 import numpy as np 
 from ..utils import *

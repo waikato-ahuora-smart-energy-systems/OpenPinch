@@ -1,3 +1,5 @@
+"""Legacy placeholders for additional targeting routines pending refactor."""
+
 # import pandas as pd
 # import numpy as np 
 # from ..utils import *

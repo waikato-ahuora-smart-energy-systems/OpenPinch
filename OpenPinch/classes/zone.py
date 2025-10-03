@@ -1,3 +1,5 @@
+"""Zone data structure capturing nested scopes and their thermal targets."""
+
 from typing import Optional, TYPE_CHECKING
 from ..lib.enums import *
 from ..lib.config import *

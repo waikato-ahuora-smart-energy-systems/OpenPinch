@@ -1,3 +1,5 @@
+"""Graph construction helpers for composite curves and related plots."""
+
 from typing import List, Tuple
 from ..lib import *
 from ..classes import *
@@ -11,7 +13,7 @@ __all__ = ["get_output_graphs, visualise_graphs"]
 # Public API
 #######################################################################################################
 
-def get_output_graphs(zone: Zone, graph_sets: Dict = {}) -> Dict:
+def get_output_graphs(zone: Zone, graph_sets: dict = {}) -> dict:
     """Returns Json data points for each process."""
     for key, t in zone.targets.items():
         graph_sets[key] = _create_graph_set(t, key)

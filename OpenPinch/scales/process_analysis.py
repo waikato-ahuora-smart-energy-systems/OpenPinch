@@ -25,6 +25,7 @@ def get_process_targets(zone: Zone):
     the provided ``zone`` via :meth:`Zone.add_target_from_results` and used later
     by site and regional aggregation routines.
     """
+    # TODO refactor the assignments from zone
     config = zone.config
     hot_streams, cold_streams, all_streams = zone.hot_streams, zone.cold_streams, zone.all_streams
     hot_utilities, cold_utilities = zone.hot_utilities, zone.cold_utilities

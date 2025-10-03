@@ -1,3 +1,5 @@
+"""Heuristics for estimating the minimum number of heat exchangers for the pinch design method."""
+
 import pandas as pd
 import numpy as np 
 from ..utils import *
@@ -81,5 +83,4 @@ def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
         i += 1
 
     return int(num_hx)
-
 

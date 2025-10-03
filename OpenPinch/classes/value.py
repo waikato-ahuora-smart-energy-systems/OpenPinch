@@ -1,3 +1,5 @@
+"""Unit-aware scalar wrapper powered by Pint quantities."""
+
 from pint import UnitRegistry
 from ..lib.schema import ValueWithUnit
 

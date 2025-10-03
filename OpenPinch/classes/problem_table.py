@@ -1,3 +1,5 @@
+"""Lightweight table structure used by the pinch analysis pipeline."""
+
 import numbers
 from copy import deepcopy
 
@@ -48,6 +50,7 @@ class ProblemTable:
     
     @property
     def icol(self):
+        """Return a view for column access by integer position."""
         return self.ColumnViewByIndex(self)   
     
     class ColumnViewByName:
@@ -72,6 +75,7 @@ class ProblemTable:
 
     @property
     def col(self):
+        """Return a view for column access by label."""
         return self.ColumnViewByName(self)  
     
     class ColumnsViewByName:
@@ -98,6 +102,7 @@ class ProblemTable:
 
     @property
     def cols(self):
+        """Return a vectorised view that reads multiple labelled columns."""
         return self.ColumnsViewByName(self)   
     
     class LocationByRowByColName:
@@ -117,6 +122,7 @@ class ProblemTable:
 
     @property
     def loc(self):
+        """Expose row/column access using label semantics (``loc``)."""
         return self.LocationByRowByColName(self)    
     
     class LocationByRowByCol:
@@ -136,15 +142,18 @@ class ProblemTable:
   
     @property
     def iloc(self):
+        """Expose row/column access using positional semantics (``iloc``)."""
         return self.LocationByRowByCol(self)     
 
     def __len__(self):
+        """Return the number of rows stored in the table."""
         if isinstance(self.data, np.ndarray): 
             return self.data.shape[0]
         else:
             return 0
 
     def __getitem__(self, keys):
+        """Extract a subset of columns and return them as a new ``ProblemTable``."""
         data_input = {}
         if isinstance(keys, str):
             keys = [keys]
@@ -211,13 +220,16 @@ class ProblemTable:
         return True
 
     def __eq__(self, other):
+        """Return ``True`` when two tables hold identical values."""
         return self._equals(other)
 
     def __ne__(self, other):
+        """Return ``True`` when two tables differ."""
         return not self.__eq__(other)
 
     @property
     def shape(self):
+        """Tuple describing ``(rows, columns)`` for the buffer."""
         return self.data.shape
 
     @property
@@ -227,9 +239,11 @@ class ProblemTable:
 
     @property
     def copy(self):
+        """Return a deep copy of the table."""
         return deepcopy(self)
     
     def _pad_data_input(self, data_input, n_cols):
+        """Pad a list-of-columns input so it matches ``n_cols`` length."""
         current_cols = len(data_input)
         if current_cols < n_cols:
             n_rows = len(data_input[0])  # assume all rows are same length
@@ -297,4 +311,3 @@ class ProblemTable:
         if not ascending:
             order = order[::-1]
         self.data = self.data[order]
-

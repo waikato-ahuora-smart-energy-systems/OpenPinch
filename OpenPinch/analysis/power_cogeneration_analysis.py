@@ -1,3 +1,5 @@
+"""Utility routines for estimating turbine cogeneration targets."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -478,4 +480,3 @@ def Set_Coeff(SunCoef=None, VarCoef=None):
         VarCoef[1][1][1] = 0.00353
         VarCoef[1][1][2] = 1.22
         VarCoef[1][1][3] = 0.000148
-
