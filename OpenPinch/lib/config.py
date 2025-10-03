@@ -118,7 +118,7 @@ class Configuration:
     def set_parameters(self, options: Options) -> None:
         """Apply checkbox- and turbine-related configuration from :class:`Options`."""
         # Main properties
-        main_props = options.main
+        main_props = set(options.main)
         self.TIT_BUTTON_SELECTED = "PROP_MOP_0" in main_props
         self.TS_BUTTON_SELECTED = "PROP_MOP_1" in main_props
         self.TURBINE_WORK_BUTTON = "PROP_MOP_2" in main_props
@@ -130,16 +130,19 @@ class Configuration:
 
         # Graph properties
         if self.PLOT_GRAPHS:
-            self.CC_CHECKBOX = True
-            self.SCC_CHECKBOX = True
-            self.BCC_CHECKBOX = True
-            self.GCC_CHECKBOX = True
-            self.GCC_NP_CHECKBOX = True
-            self.GCCU_CHECKBOX = True
-            self.LGCC_CHECKBOX = True
-            self.TSC_CHECKBOX = True
-            self.ERC_CHECKBOX = True
-            self.NLC_CHECKBOX = True
+            for checkbox in (
+                "CC_CHECKBOX",
+                "SCC_CHECKBOX",
+                "BCC_CHECKBOX",
+                "GCC_CHECKBOX",
+                "GCC_NP_CHECKBOX",
+                "GCCU_CHECKBOX",
+                "LGCC_CHECKBOX",
+                "TSC_CHECKBOX",
+                "ERC_CHECKBOX",
+                "NLC_CHECKBOX",
+            ):
+                setattr(self, checkbox, True)
 
         # Turbine options
         turbine_options = options.turbine
@@ -148,11 +151,11 @@ class Configuration:
     def _set_turbine_parameters(self, turbine_options: List["TurbineOption"]) -> None:
         """Populate turbine settings when the turbine work toggle is active."""
 
+        option_map = {opt.key: opt.value for opt in turbine_options}
+
         def get_turbine_value(key: str, default=None):
-            for option in turbine_options:
-                if option.key == key:  # Access the key attribute directly
-                    return option.value if option.value is not None else default
-            return default
+            value = option_map.get(key, default)
+            return default if value is None else value
 
         if self.TURBINE_WORK_BUTTON:
             self.T_TURBINE_BOX = get_turbine_value("PROP_TOP_0", self.T_TURBINE_BOX)
