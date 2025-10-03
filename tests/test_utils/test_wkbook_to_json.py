@@ -1,12 +1,12 @@
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
 from OpenPinch.utils.wkbook_to_json import (
     get_problem_from_excel,
     get_results_from_excel,
 )
-
-from pathlib import Path
-from datetime import datetime
-import pandas as pd
-import pytest
 
 
 def _write_test_workbook(path: Path):
@@ -22,32 +22,32 @@ def _write_test_workbook(path: Path):
         # Row 0 (names) is ignored by the parser for this sheet; it supplies its own column names.
         # Row 1 (units) is used.
         stream_units = [
-            None,            # zone (string)
-            None,            # name (string)
-            "degC",          # t_supply
-            "degC",          # t_target
-            "kW",            # heat_flow
-            "K",             # dt_cont
-            "kW/mK",         # htc  (avoid '2' so the simple replace doesn't mutate it)
-            None,            # loc (string)
-            None,            # index (int but without unit string -> stored raw)
+            None,  # zone (string)
+            None,  # name (string)
+            "degC",  # t_supply
+            "degC",  # t_target
+            "kW",  # heat_flow
+            "K",  # dt_cont
+            "kW/mK",  # htc  (avoid '2' so the simple replace doesn't mutate it)
+            None,  # loc (string)
+            None,  # index (int but without unit string -> stored raw)
         ]
-        stream_data = [
-            ["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5, "IN", 1]
-        ]
-        df_stream = pd.DataFrame([["names-ignored"] * len(stream_units), stream_units] + stream_data)
+        stream_data = [["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5, "IN", 1]]
+        df_stream = pd.DataFrame(
+            [["names-ignored"] * len(stream_units), stream_units] + stream_data
+        )
         df_stream.to_excel(xw, sheet_name="Stream Data", header=None, index=False)
 
         # -------------------- Utility Data --------------------
         util_units = [
-            None,            # name
-            None,            # type
-            "degC",          # t_supply
-            "degC",          # t_target
-            "K",             # dt_cont
-            "$/MWh",         # price
-            "kW/mK",         # htc
-            "kW",            # heat_flow
+            None,  # name
+            None,  # type
+            "degC",  # t_supply
+            "degC",  # t_target
+            "K",  # dt_cont
+            "$/MWh",  # price
+            "kW/mK",  # htc
+            "kW",  # heat_flow
         ]
         util_data = [
             ["HP Steam", "Hot", 250.0, 200.0, 10.0, 50.0, 0.8, 75.0],
@@ -64,27 +64,67 @@ def _write_test_workbook(path: Path):
         #   row 4+: data rows
         # Columns 0..5 are fixed: name, temp_pinch, Qh, Qc, Qr, degree_of_integration
         # Then utility columns (index >= 6) until last column, which is utility_cost.
-        row0 = ["Meta", "Meta", "Meta", "Meta", "Meta", "Meta",
-                "Hot Utility", "Hot Utility", "Cold Utility", "Cold Utility", "Meta"]
-        row1 = ["name", "temp_pinch", "Qh", "Qc", "Qr", "degree_of_integration",
-                "Default HU", "MP Steam", "Default CU", "Chilled Water", "utility_cost"]
+        row0 = [
+            "Meta",
+            "Meta",
+            "Meta",
+            "Meta",
+            "Meta",
+            "Meta",
+            "Hot Utility",
+            "Hot Utility",
+            "Cold Utility",
+            "Cold Utility",
+            "Meta",
+        ]
+        row1 = [
+            "name",
+            "temp_pinch",
+            "Qh",
+            "Qc",
+            "Qr",
+            "degree_of_integration",
+            "Default HU",
+            "MP Steam",
+            "Default CU",
+            "Chilled Water",
+            "utility_cost",
+        ]
         row2 = [None, "degC", "kW", "kW", "kW", "%", "kW", "kW", "kW", "kW", "$/h"]
 
         # Data rows start at row index 4 (row_data=4)
         # Two rows: a "Total Site Targets" row and a zone-level row
         # temp_pinch format: "cold; hot"
         data1 = [
-            "Total Site Targets", "85; 125",
-            100.0, 80.0, 20.0, 0.70,      # degree_of_integration -> multiplied by 100 in parser
-            75.0, 55.0, 60.0, 30.0, 1234.0
+            "Total Site Targets",
+            "85; 125",
+            100.0,
+            80.0,
+            20.0,
+            0.70,  # degree_of_integration -> multiplied by 100 in parser
+            75.0,
+            55.0,
+            60.0,
+            30.0,
+            1234.0,
         ]
         data2 = [
-            "Zone A", "60; 120",
-            90.0, 70.0, 15.0, 0.50,
-            50.0, 40.0, 45.0, 25.0, 999.0
+            "Zone A",
+            "60; 120",
+            90.0,
+            70.0,
+            15.0,
+            0.50,
+            50.0,
+            40.0,
+            45.0,
+            25.0,
+            999.0,
         ]
         # Add one filler row (index 3) so data begins at index 4
-        df_summary = pd.DataFrame([row0, row1, row2, ["filler"] * len(row2), data1, data2])
+        df_summary = pd.DataFrame(
+            [row0, row1, row2, ["filler"] * len(row2), data1, data2]
+        )
         df_summary.to_excel(xw, sheet_name="Summary", header=None, index=False)
 
 
@@ -118,7 +158,11 @@ def test_get_problem_from_excel_happy_path(tmp_path: Path):
 
     # Options present with expected shape (don’t overfit exact values)
     opts = out["options"]
-    assert "turbine" in opts and isinstance(opts["turbine"], list) and len(opts["turbine"]) > 0
+    assert (
+        "turbine" in opts
+        and isinstance(opts["turbine"], list)
+        and len(opts["turbine"]) > 0
+    )
 
 
 def test_get_results_from_excel_parses_summary(tmp_path: Path):
@@ -158,7 +202,9 @@ def test_get_results_from_excel_parses_summary(tmp_path: Path):
     assert z["utility_cost"]["units"] == "$/h"
     # Work a sample utility value
     hu0 = z["hot_utilities"][0]
-    assert hu0["heat_flow"]["value"] in (50.0, 40.0) and hu0["heat_flow"]["units"] == "kW"
+    assert (
+        hu0["heat_flow"]["value"] in (50.0, 40.0) and hu0["heat_flow"]["units"] == "kW"
+    )
 
 
 def test_get_results_from_excel_writes_json_when_path_given(tmp_path: Path):

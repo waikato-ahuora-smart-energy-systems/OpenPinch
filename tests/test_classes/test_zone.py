@@ -1,4 +1,5 @@
 import pytest
+
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 
@@ -7,16 +8,19 @@ from OpenPinch.lib import *
 def dummy_zone():
     return Zone(name="Z1")
 
+
 @pytest.fixture
 def dummy_tar():
     return EnergyTarget("Z1")
+
 
 @pytest.fixture
 def sample_streams():
     return [
         Stream(name="Hot1", t_supply=400, t_target=200, heat_flow=1),
-        Stream(name="Cold1", t_supply=100, t_target=300, heat_flow=1)
+        Stream(name="Cold1", t_supply=100, t_target=300, heat_flow=1),
     ]
+
 
 @pytest.fixture
 def sample_utilities():
@@ -29,12 +33,15 @@ def sample_utilities():
 
 # === Basic Instantiation ===
 
+
 def test_dummy_zone_instantiation(dummy_zone: Zone):
     assert dummy_zone.name == "Z1"
     assert isinstance(dummy_zone.hot_streams, StreamCollection)
     assert isinstance(dummy_zone.cold_streams, StreamCollection)
 
+
 # === Property Setters and Getters ===
+
 
 def test_property_setters_getters(dummy_zone: Zone):
     dummy_zone.area = 123.45
@@ -49,23 +56,29 @@ def test_property_setters_getters(dummy_zone: Zone):
     dummy_zone.ETE = 0.75
     assert dummy_zone.ETE == 0.75
 
+
 # === Adding Utilities ===
+
 
 def test_add_single_utility(dummy_zone: Zone, sample_utilities):
     dummy_zone.hot_utilities.add(sample_utilities[0])
     assert "Steam" in dummy_zone.hot_utilities
+
 
 def test_add_multiple_utilities(dummy_zone: Zone, sample_utilities):
     dummy_zone.cold_utilities.add_many(sample_utilities)
     assert "Steam" in dummy_zone.cold_utilities
     assert "CoolingWater" in dummy_zone.cold_utilities
 
+
 # === Adding Zones ===
+
 
 def test_add_zone(dummy_zone: Zone):
     z = Zone(name="SubZone")
     dummy_zone.add_zone(z)
     assert "SubZone" in dummy_zone.subzones
+
 
 def test_add_zone_conflict_naming(dummy_zone: Zone):
     z1 = Zone(name="ZoneX")
@@ -83,11 +96,13 @@ def test_add_zone_invalid(dummy_zone: Zone):
 
 # === Site and Process Zones Filtering ===
 
+
 def test_get_process_zones(dummy_zone: Zone):
     dummy_zone.add_zone(Zone(name="Area1"))
     dummy_zone.add_zone(Zone(name=TargetType.DI.value), sub=False)  # site-level
     assert "Area1" in dummy_zone.subzones
     assert TargetType.DI.value not in dummy_zone.subzones
+
 
 def test_get_site_zones(dummy_zone: Zone):
     dummy_zone.add_zone(Zone(name="Area1"))
@@ -95,7 +110,9 @@ def test_get_site_zones(dummy_zone: Zone):
     assert TargetType.DI.value in dummy_zone.targets
     assert "Area1" not in dummy_zone.targets
 
+
 # === Utility Cost Calculation ===
+
 
 def test_calc_zonal_utility_cost(dummy_tar: EnergyTarget, sample_utilities):
     for u in sample_utilities:
@@ -103,7 +120,9 @@ def test_calc_zonal_utility_cost(dummy_tar: EnergyTarget, sample_utilities):
     dummy_tar.calc_utility_cost()
     assert dummy_tar.utility_cost == 150  # 100 + 50
 
+
 # === Process Streams and Utility Streams Properties ===
+
 
 def test_stream_collections(dummy_zone: Zone, sample_streams, sample_utilities):
     dummy_zone.hot_streams.add(sample_streams[0])
@@ -115,7 +134,9 @@ def test_stream_collections(dummy_zone: Zone, sample_streams, sample_utilities):
     assert len(dummy_zone.utility_streams) == 2
     assert len(dummy_zone.all_streams) == 4
 
+
 # === Gather Streams from Subzones ===
+
 
 def test_get_hot_and_cold_streams_from_subzones(dummy_zone, sample_streams):
     z = Zone(name="Sub1")
@@ -127,7 +148,9 @@ def test_get_hot_and_cold_streams_from_subzones(dummy_zone, sample_streams):
     assert "Sub1.Hot1" in dummy_zone.hot_streams
     assert "Sub1.Cold1" in dummy_zone.cold_streams
 
+
 # === New Tests for Zone ===
+
 
 def test_add_graph(dummy_tar):
     dummy_tar.add_graph("test_graph", {"some": "result"})
@@ -143,7 +166,11 @@ def test_zone_is_equal(dummy_zone):
     assert dummy_zone._zone_is_equal(z1, z2)
 
     # Add a stream to one zone -> now not equal
-    z1.hot_streams.add(Stream(name="H1", t_supply=100, t_target=50, heat_flow=1, is_process_stream=False))
+    z1.hot_streams.add(
+        Stream(
+            name="H1", t_supply=100, t_target=50, heat_flow=1, is_process_stream=False
+        )
+    )
     assert not dummy_zone._zone_is_equal(z1, z2)
 
 

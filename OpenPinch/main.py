@@ -7,10 +7,11 @@ in larger workflows.
 """
 
 from typing import Any
+
+from .analysis import extract_results, prepare_problem
 from .lib import *
-from .utils import *
 from .scales import get_targets
-from .analysis import prepare_problem, extract_results
+from .utils import *
 
 __all__ = ["pinch_analysis_service"]
 
@@ -37,7 +38,7 @@ def pinch_analysis_service(data: Any, project_name: str = "Project") -> TargetOu
 
     # Formulate the top level zone with all subzones and approperiate input data
     master_zone = prepare_problem(
-        project_name=project_name, 
+        project_name=project_name,
         streams=request_data.streams,
         utilities=request_data.utilities,
         options=request_data.options,
@@ -48,7 +49,7 @@ def pinch_analysis_service(data: Any, project_name: str = "Project") -> TargetOu
     master_zone = get_targets(master_zone)
 
     # Extract the core results from the master zone
-    return_data = extract_results(master_zone)  
+    return_data = extract_results(master_zone)
 
     # Validate response data
     validated_data = TargetOutput.model_validate(return_data)

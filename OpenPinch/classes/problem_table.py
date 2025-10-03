@@ -8,6 +8,7 @@ import pandas as pd
 
 from ..lib.enums import ProblemTableLabel
 
+
 class ProblemTable:
     """NumPy-backed representation of the pinch problem table with pandas-like accessors."""
 
@@ -19,7 +20,7 @@ class ProblemTable:
             self.columns = list([index.value for index in ProblemTableLabel])
         else:
             self.columns = list([key for key in data_input.keys()])
-            
+
             for key in self.columns:
                 if np.isnan(data_input[key]).all():
                     data_input.pop(key)
@@ -27,10 +28,12 @@ class ProblemTable:
 
         if isinstance(data_input, dict):
             # Align data from dict into array using columns order
-            self.data = np.array([
-                data_input.get(col, [np.nan] * len(next(iter(data_input.values()))))
-                for col in self.columns
-            ]).T
+            self.data = np.array(
+                [
+                    data_input.get(col, [np.nan] * len(next(iter(data_input.values()))))
+                    for col in self.columns
+                ]
+            ).T
         elif isinstance(data_input, list):
             data_input = self._pad_data_input(data_input, len(self.columns))
             self.data = np.array(data_input).T
@@ -39,6 +42,7 @@ class ProblemTable:
 
     class ColumnViewByIndex:
         """Expose read/write access to columns addressed by integer index."""
+
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -47,14 +51,15 @@ class ProblemTable:
 
         def __setitem__(self, idx, values):
             self.parent.data[:, idx] = values
-    
+
     @property
     def icol(self):
         """Return a view for column access by integer position."""
-        return self.ColumnViewByIndex(self)   
-    
+        return self.ColumnViewByIndex(self)
+
     class ColumnViewByName:
         """Expose read/write access to columns addressed by column label."""
+
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -68,18 +73,23 @@ class ProblemTable:
                 self.parent.data[:, idx] = values
             else:
                 data_input = {col_name: values}
-                self.data = np.array([
-                    data_input.get(col, [np.nan] * len(next(iter(data_input.values()))))
-                    for col in self.parent.columns
-                ]).T
+                self.data = np.array(
+                    [
+                        data_input.get(
+                            col, [np.nan] * len(next(iter(data_input.values())))
+                        )
+                        for col in self.parent.columns
+                    ]
+                ).T
 
     @property
     def col(self):
         """Return a view for column access by label."""
-        return self.ColumnViewByName(self)  
-    
+        return self.ColumnViewByName(self)
+
     class ColumnsViewByName:
         """Vectorised view over multiple labelled columns."""
+
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -95,38 +105,44 @@ class ProblemTable:
                 self.parent.data[:, idx] = values
             else:
                 data_input = {col_name: values}
-                self.data = np.array([
-                    data_input.get(col, [np.nan] * len(next(iter(data_input.values()))))
-                    for col in self.parent.columns
-                ]).T
+                self.data = np.array(
+                    [
+                        data_input.get(
+                            col, [np.nan] * len(next(iter(data_input.values())))
+                        )
+                        for col in self.parent.columns
+                    ]
+                ).T
 
     @property
     def cols(self):
         """Return a vectorised view that reads multiple labelled columns."""
-        return self.ColumnsViewByName(self)   
-    
+        return self.ColumnsViewByName(self)
+
     class LocationByRowByColName:
         """Row/column accessor mirroring ``DataFrame.loc`` semantics."""
+
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
-        
+
         def __getitem__(self, key):
             row_idx, col_key = key
             col_idx = self.parent.col_index[col_key]
             return self.parent.data[row_idx, col_idx]
-        
+
         def __setitem__(self, key, value):
             row_idx, col_key = key
             col_idx = self.parent.col_index[col_key]
-            self.parent.data[row_idx, col_idx] = value    
+            self.parent.data[row_idx, col_idx] = value
 
     @property
     def loc(self):
         """Expose row/column access using label semantics (``loc``)."""
-        return self.LocationByRowByColName(self)    
-    
+        return self.LocationByRowByColName(self)
+
     class LocationByRowByCol:
         """Row/column accessor mirroring ``DataFrame.iloc`` semantics."""
+
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
@@ -134,20 +150,20 @@ class ProblemTable:
             row_idx, col_key = key
             col_idx = self.parent.col_index[col_key]
             return self.parent.data[row_idx, col_idx]
-        
+
         def __setitem__(self, key, value):
             row_idx, col_key = key
             col_idx = self.parent.col_index[col_key]
-            self.parent.data[row_idx, col_idx] = value  
-  
+            self.parent.data[row_idx, col_idx] = value
+
     @property
     def iloc(self):
         """Expose row/column access using positional semantics (``iloc``)."""
-        return self.LocationByRowByCol(self)     
+        return self.LocationByRowByCol(self)
 
     def __len__(self):
         """Return the number of rows stored in the table."""
-        if isinstance(self.data, np.ndarray): 
+        if isinstance(self.data, np.ndarray):
             return self.data.shape[0]
         else:
             return 0
@@ -159,9 +175,7 @@ class ProblemTable:
             keys = [keys]
         for key in keys:
             data_input[key] = self.col[key]
-        return ProblemTable(
-            data_input, add_default_labels=False
-        )
+        return ProblemTable(data_input, add_default_labels=False)
 
     def _equals(self, other: "ProblemTable", *, atol: float | None = None) -> bool:
         """Return True when two tables match within ``atol`` absolute tolerance."""
@@ -193,7 +207,9 @@ class ProblemTable:
             col_right = right[:, col_idx]
 
             if col_left.dtype != object and col_right.dtype != object:
-                if not np.allclose(col_left, col_right, atol=atol, rtol=0.0, equal_nan=True):
+                if not np.allclose(
+                    col_left, col_right, atol=atol, rtol=0.0, equal_nan=True
+                ):
                     return False
                 continue
 
@@ -203,14 +219,18 @@ class ProblemTable:
             except (ValueError, TypeError):
                 pass
             else:
-                if not np.allclose(cast_left, cast_right, atol=atol, rtol=0.0, equal_nan=True):
+                if not np.allclose(
+                    cast_left, cast_right, atol=atol, rtol=0.0, equal_nan=True
+                ):
                     return False
                 continue
 
             for value_left, value_right in zip(col_left, col_right):
                 if pd.isna(value_left) and pd.isna(value_right):
                     continue
-                if isinstance(value_left, numeric_types) and isinstance(value_right, numeric_types):
+                if isinstance(value_left, numeric_types) and isinstance(
+                    value_right, numeric_types
+                ):
                     if not np.isclose(value_left, value_right, atol=atol):
                         return False
                     continue
@@ -241,7 +261,7 @@ class ProblemTable:
     def copy(self):
         """Return a deep copy of the table."""
         return deepcopy(self)
-    
+
     def _pad_data_input(self, data_input, n_cols):
         """Pad a list-of-columns input so it matches ``n_cols`` length."""
         current_cols = len(data_input)
@@ -250,7 +270,7 @@ class ProblemTable:
             padding = [[np.nan] * n_rows for _ in range(n_cols - current_cols)]
             data_input += padding
         return data_input
-    
+
     def to_list(self, col: str = None):
         """Return table data as Python lists; optionally restrict to a single column."""
         if isinstance(col, str):
@@ -259,15 +279,15 @@ class ProblemTable:
             ls = self.data.T.tolist()
         return ls[0] if len(ls) == 1 else ls
 
-    def delta_col(self, key, shift: int =1) -> np.ndarray:
+    def delta_col(self, key, shift: int = 1) -> np.ndarray:
         """Compute difference between successive entries in a column."""
         idx = self.col_index[key]
         col_values = self.data[:, idx]
         delta = np.roll(col_values, shift) - col_values
         delta[0] = 0.0
         return delta
-    
-    def shift(self, key, shift: int =1, filler_value: float = 0.0) -> np.ndarray:
+
+    def shift(self, key, shift: int = 1, filler_value: float = 0.0) -> np.ndarray:
         """Return a shifted copy of a column filling vacated positions with ``filler_value``."""
         idx = self.col_index[key]
         col_values = self.data[:, idx]

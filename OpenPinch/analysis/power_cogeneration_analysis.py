@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+
 from ..utils import *
+
 # from ..classes import *
 from .support_methods import *
 
@@ -16,18 +18,19 @@ __all__ = ["get_power_cogeneration_above_pinch"]
 # Public API --- TODO
 #######################################################################################################
 
+
 def get_power_cogeneration_above_pinch(z: Zone):
     """Calculate the power cogeneration potential above pinch for a given process zone."""
-    
+
     # === Step 1: Prepare turbine and model parameters ===
     turbine_params = _prepare_turbine_parameters(z.config)
     if turbine_params is None:
-        return z  
+        return z
 
     # === Step 2: Preprocess utilities ===
     utility_data = _preprocess_utilities(z, turbine_params)
     if utility_data is None:
-        return z  
+        return z
 
     # === Step 3: Solve turbine work and efficiency ===
     w_total, Wmax = _solve_turbine_work(turbine_params, utility_data)
@@ -43,15 +46,16 @@ def get_power_cogeneration_above_pinch(z: Zone):
 # Helper functions
 #######################################################################################################
 
+
 def _prepare_turbine_parameters(config: Configuration):
     """Load and sanitize turbine parameters from config."""
 
-    P_in = float(config.P_TURBINE_BOX)     # bar
-    T_in = float(config.T_TURBINE_BOX)      # °C
-    min_eff = float(config.MIN_EFF)         # minimum isentropic efficiency (decimal)
+    P_in = float(config.P_TURBINE_BOX)  # bar
+    T_in = float(config.T_TURBINE_BOX)  # °C
+    min_eff = float(config.MIN_EFF)  # minimum isentropic efficiency (decimal)
     model = config.COMBOBOX
 
-    load_frac = min(max(config.LOAD, 0), 1)     # clamp between 0 and 1
+    load_frac = min(max(config.LOAD, 0), 1)  # clamp between 0 and 1
     mech_eff = min(max(config.MECH_EFF, 0), 1)  # clamp between 0 and 1
 
     return {
@@ -61,7 +65,9 @@ def _prepare_turbine_parameters(config: Configuration):
         "model": model,
         "load_frac": load_frac,
         "mech_eff": mech_eff,
-        "CONDESATE_FLASH_CORRECTION": getattr(config, "CONDESATE_FLASH_CORRECTION", False),  # optional
+        "CONDESATE_FLASH_CORRECTION": getattr(
+            config, "CONDESATE_FLASH_CORRECTION", False
+        ),  # optional
     }
 
 
@@ -100,7 +106,11 @@ def _preprocess_utilities(z: Zone, turbine_params: dict):
     s = 0
     for u in z.hot_utilities:
         if u.t_supply < T_CRIT and u.heat_flow > tol:
-            P_out_n = psat_T(u.t_target) if abs(u.t_supply - u.t_target) < 1 + tol else psat_T(u.t_target + u.dt_cont * 2)
+            P_out_n = (
+                psat_T(u.t_target)
+                if abs(u.t_supply - u.t_target) < 1 + tol
+                else psat_T(u.t_target + u.dt_cont * 2)
+            )
 
             if P_in >= P_out_n:
                 s += 1
@@ -175,13 +185,30 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
             m_max = m_in_k / load_frac if load_frac > 0 else 0
 
             if m_in_k > 0:
-                if model == 'Sun & Smith (2015)':
-                    w_k[j] = Work_SunModel(P_out[j-1], h_out[j-1], P_out[j], h_sat[j], m_in_k, m_max, dh_is_k[j], n_mech)
-                elif model == 'Medina-Flores et al. (2010)':
-                    w_k[j] = Work_MedinaModel(P_out[j-1], m_in_k, dh_is_k[j])
-                elif model == 'Varbanov et al. (2004)':
-                    w_k[j] = Work_THM(P_out[j-1], h_out[j-1], P_out[j], h_sat[j], m_in_k, dh_is_k[j], n_mech)
-                elif model == 'Fixed Isentropic Turbine':
+                if model == "Sun & Smith (2015)":
+                    w_k[j] = Work_SunModel(
+                        P_out[j - 1],
+                        h_out[j - 1],
+                        P_out[j],
+                        h_sat[j],
+                        m_in_k,
+                        m_max,
+                        dh_is_k[j],
+                        n_mech,
+                    )
+                elif model == "Medina-Flores et al. (2010)":
+                    w_k[j] = Work_MedinaModel(P_out[j - 1], m_in_k, dh_is_k[j])
+                elif model == "Varbanov et al. (2004)":
+                    w_k[j] = Work_THM(
+                        P_out[j - 1],
+                        h_out[j - 1],
+                        P_out[j],
+                        h_sat[j],
+                        m_in_k,
+                        dh_is_k[j],
+                        n_mech,
+                    )
+                elif model == "Fixed Isentropic Turbine":
                     w_k[j] = w_isen_k[j] * min_eff
             else:
                 w_k[j] = 0
@@ -195,13 +222,13 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
                 w_k[j] = min_eff * w_isen_k[j]
 
             if m_in_k > 0:
-                h_out[j] = h_out[j-1] - w_k[j] / (m_in_k * n_mech)
+                h_out[j] = h_out[j - 1] - w_k[j] / (m_in_k * n_mech)
             else:
-                h_out[j] = h_out[j-1]
+                h_out[j] = h_out[j - 1]
 
             if m_in_k > 0:
                 if flash_correction:
-                    Q_flash = m_k[j-1] * (h_tar[j-1] - h_tar[j])
+                    Q_flash = m_k[j - 1] * (h_tar[j - 1] - h_tar[j])
                     m_k[j] = (Q_users[j] - Q_flash) / (h_out[j] - h_tar[j])
                 else:
                     m_k[j] = Q_users[j] / (h_out[j] - h_tar[j])
@@ -218,8 +245,6 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
     Wmax = sum(w_isen_k)
 
     return w_total, Wmax
-
-
 
 
 # def get_power_cogeneration_above_pinch(z: Zone): # type: ignore
@@ -241,14 +266,14 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 #         n_mech = 1
 #     elif n_mech < 0:
 #         n_mech = 0
-    
+
 #     Q_HU = 0
 #     for Utility_k in z.hot_utilities:
 #         Q_HU += Utility_k.heat_flow
 #     HU_num = len(z.hot_utilities)
 #     if Q_HU < tol:
 #         return z
-                    
+
 #     if SelectedModel == 'Sun & Smith (2015)':
 #         SunCoef = [ [ [None for k in range(3)] for j in range(3)] for i in range(2)]
 #         Set_Coeff(SunCoef, None)
@@ -270,7 +295,7 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 
 #     m_in_est = 0             # kg/s
 #     Q_boiler = 0             # kW
-    
+
 #     # Preparation of data for turbine calculation
 #     s = 0
 #     for i in range(HU_num):
@@ -302,13 +327,13 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 #         m_in = m_in_est
 #         m_in_k = m_in_est
 #         m_in_est = 0
-        
+
 #         for j in range(1, s):
 #             m_in_k -= m_k[j - 1]                                                    # kg/s
 #             dh_is_k[j] = h_out[j - 1] - h_ps(P_out[j], s_ph(P_out[j - 1], h_out[j - 1]))    # kJ/kg
 #             w_isen_k[j] = m_in_k * dh_is_k[j]                                               # kW
 #             m_max = m_in_k / load_frac                                                      # kg/s
-            
+
 #             # Determine the work production based on various Turbine Models
 #             if m_in_k > 0:
 #                 if SelectedModel == 'Sun & Smith (2015)':
@@ -332,7 +357,7 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 #                 h_out[j] = h_out[j - 1] - w_k[j] / (m_in_k * n_mech)
 #             else:
 #                 h_out[j] = h_out[j - 1]    # kJ/kg
-            
+
 #             # Correct for high pressure condensate flash, if selected
 #             if m_in_k > 0:
 #                 if config.CONDESATE_FLASH_CORRECTION:
@@ -342,13 +367,13 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 #                     m_k[j] = Q_users[j] / (h_out[j] - h_tar[j])
 #             else:
 #                 m_k[j] = 0                  # kg/s
-            
+
 #             m_in_est += m_k[j]    # kg/s
 
 #         i += 1
 #         if (abs(m_in - m_in_est) < tol and i >= 100) or i >= 3:
 #             break
-    
+
 #     w = 0
 #     Wmax = 0
 #     for j in range(s):
@@ -367,20 +392,20 @@ def _solve_turbine_work(turbine_params: dict, utility_data: dict):
 # # Helper Functions
 # #######################################################################################################
 
+
 def Work_MedinaModel(P_in, m, dh_is):
-    """'Determines power generation based on the thermodynamic model of Medina-Flores & Picón-Núñez (2010).
-    """
+    """'Determines power generation based on the thermodynamic model of Medina-Flores & Picón-Núñez (2010)."""
     # Reference for Turbine Model 1: Medina-Flores & Picón-Núñez (2010)
     #                               Modelling the power production of single and multiple extraction steam turbines.
     #                               Chemical Engineering Science 65, 2811-2820
     # Part load not used
-    A0 = 185.4 + 43.3 * (P_in * 0.1)        # a0 in kW, P in bar
-    b0 = 1.2057 + 0.0075 * (P_in * 0.1)     # b0 in dimensionless, P in bar
-    return (m * dh_is - A0) / b0            # kW
+    A0 = 185.4 + 43.3 * (P_in * 0.1)  # a0 in kW, P in bar
+    b0 = 1.2057 + 0.0075 * (P_in * 0.1)  # b0 in dimensionless, P in bar
+    return (m * dh_is - A0) / b0  # kW
+
 
 def Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
-    """Determines power generation based on the correlation model of Sun and Smith (2015).
-    """
+    """Determines power generation based on the correlation model of Sun and Smith (2015)."""
     # 'Reference for Turbine Model 2: Sun & Smith (2015)
     # '                               Performance Modeling of New and Existing Steam Turbines
     # '                               I&CE 54, 1908-1915
@@ -395,27 +420,39 @@ def Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
             "a": [1.314991261, -0.001634725, -0.367975103],
             "b": [-437.7746025, 29.00736723, 10.35902331],
             "c": [0.07886297, 0.000528327, -0.703153891],
-        }
+        },
     }
 
     # Model coefficients where P in bar
-    A0 = coeff[t_type]["a"][0] + coeff[t_type]["a"][1] * (P_in) + coeff[t_type]["a"][2] * (P_out)
-    b0 = coeff[t_type]["b"][0] + coeff[t_type]["b"][1] * (P_in) + coeff[t_type]["b"][2] * (P_out)
-    c0 = coeff[t_type]["c"][0] + coeff[t_type]["c"][1] * (P_in) + coeff[t_type]["c"][2] * (P_out)
-    
+    A0 = (
+        coeff[t_type]["a"][0]
+        + coeff[t_type]["a"][1] * (P_in)
+        + coeff[t_type]["a"][2] * (P_out)
+    )
+    b0 = (
+        coeff[t_type]["b"][0]
+        + coeff[t_type]["b"][1] * (P_in)
+        + coeff[t_type]["b"][2] * (P_out)
+    )
+    c0 = (
+        coeff[t_type]["c"][0]
+        + coeff[t_type]["c"][1] * (P_in)
+        + coeff[t_type]["c"][2] * (P_out)
+    )
+
     # Willan's line coefficients and predicted work (after isentropic and mechanical efficiency loss)
     W_int = c0 / A0 * (m_max * dh_is - b0)
     n = (1 + c0) / A0 * (dh_is - b0 / m_max)
     w_act = n * m - W_int
     h_out = h_in - w_act / (n_mech * m)
-    
+
     if h_out <= h_sat + tol and t_type == 1:
         w_act = Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, 2)
     return w_act
 
+
 def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
-    """Determines power generation based on the Turbine Hardware Model of Varbanov et al. (2004).
-    """
+    """Determines power generation based on the Turbine Hardware Model of Varbanov et al. (2004)."""
     # 'Reference for Turbine Model 3: Varbanov et al. (2004)
     # '                               Modelling and Optimization of Utility Systems
     # '                               Trans IChemE, Part A, Chemical Engineering Research and Design, 2004, 82(A5): 561–578
@@ -428,7 +465,7 @@ def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
         "CT": {
             "<2MW": [0, 0.000662, 1.191, 0.000759],
             ">2MW": [-0.463, 0.00353, 1.22, 0.000148],
-        }
+        },
     }
 
     dT_sat = Tsat_p(P_in) - Tsat_p(P_out)
@@ -448,10 +485,8 @@ def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
     return w_max
 
 
-
 def Set_Coeff(SunCoef=None, VarCoef=None):
     """Sets the model coefficients."""
-
 
     if VarCoef != None:
         # Model coefficients for the Varbanov et al. model
@@ -461,20 +496,20 @@ def Set_Coeff(SunCoef=None, VarCoef=None):
         VarCoef[0][0][1] = 0.00108
         VarCoef[0][0][2] = 1.097
         VarCoef[0][0][3] = 0.00172
-        
+
         # > 2MW
         VarCoef[0][1][0] = 0
         VarCoef[0][1][1] = 0.00423
         VarCoef[0][1][2] = 1.155
         VarCoef[0][1][3] = 0.000538
-        
+
         # CT
         # < 2MW
         VarCoef[1][0][0] = 0
         VarCoef[1][0][1] = 0.000662
         VarCoef[1][0][2] = 1.191
         VarCoef[1][0][3] = 0.000759
-        
+
         # > 2MW
         VarCoef[1][1][0] = -0.463
         VarCoef[1][1][1] = 0.00353

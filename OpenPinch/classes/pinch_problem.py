@@ -1,12 +1,12 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union, Tuple, Dict, Any
+from typing import Any, Dict, Optional, Tuple, Union
 
 from ..utils import (
-    get_problem_from_excel, 
-    get_problem_from_csv,
     export_target_summary_to_excel_with_units,
+    get_problem_from_csv,
+    get_problem_from_excel,
 )
 
 JsonDict = Dict[str, Any]
@@ -24,6 +24,7 @@ class PinchProblem:
     - CSV bundles: either a directory containing ``streams.csv`` and ``utilities.csv``
       or an explicit ``(streams_csv_path, utilities_csv_path)`` tuple
     """
+
     problem_filepath: Optional[Path] = None
     results_dir: Optional[Path] = None
 
@@ -72,7 +73,6 @@ class PinchProblem:
             if self.results_dir is not None:
                 self.export(self.results_dir)
 
-
     # ----------------------------------------------------------------------------
     # Public API
     # ----------------------------------------------------------------------------
@@ -93,7 +93,9 @@ class PinchProblem:
         if isinstance(source, tuple) and len(source) == 2:
             # CSV tuple form
             streams_csv, utilities_csv = map(Path, source)
-            self._problem_data = get_problem_from_csv(streams_csv, utilities_csv, output_json=None)
+            self._problem_data = get_problem_from_csv(
+                streams_csv, utilities_csv, output_json=None
+            )
             self.problem_filepath = None  # Not a single-file source
             return self._problem_data
 
@@ -124,29 +126,26 @@ class PinchProblem:
                 raise FileNotFoundError(
                     f"CSV directory '{src_path}' must contain 'streams.csv' and 'utilities.csv'."
                 )
-            self._problem_data = get_problem_from_csv(streams_csv, utilities_csv, output_json=None)
+            self._problem_data = get_problem_from_csv(
+                streams_csv, utilities_csv, output_json=None
+            )
             self.problem_filepath = src_path
             return self._problem_data
-        
+
         raise ValueError(
             f"Unrecognized source '{src_path}'. Provide a JSON/Excel file, "
             f"a directory with 'streams.csv' and 'utilities.csv', or a (streams, utilities) tuple."
         )
 
-
     def target(self) -> JsonDict:
         """Run the targeting analysis against the loaded input and cache the results."""
         if self._problem_data is None:
-            raise RuntimeError(
-                "No input loaded. Call load(...) first."
-            )
+            raise RuntimeError("No input loaded. Call load(...) first.")
         if self._results is None:
             from ..main import pinch_analysis_service
-            self._results = pinch_analysis_service(
-                self._problem_data
-            )
-        return self._results
 
+            self._results = pinch_analysis_service(self._problem_data)
+        return self._results
 
     def export(self, results_dir: Optional[PathLike] = None) -> Path:
         """Export the results to JSON. Returns the path written."""
@@ -161,16 +160,16 @@ class PinchProblem:
         if self._results is None:
             self.target()
 
-        output_path = export_target_summary_to_excel_with_units(self._results, self.results_dir)
+        output_path = export_target_summary_to_excel_with_units(
+            self._results, self.results_dir
+        )
 
         return output_path
-
 
     @property
     def problem_data(self) -> Optional[JsonDict]:
         """Return the raw problem definition that was loaded or supplied."""
         return self._problem_data
-
 
     @property
     def results(self) -> Optional[JsonDict]:
@@ -188,13 +187,13 @@ class PinchProblem:
         obj._problem_data = data
         return obj
 
-
     def to_problem_json(self) -> JsonDict:
         """Return the canonical problem JSON (streams/utilities/options)."""
         if self._problem_data is None:
-            raise RuntimeError("No problem_data available. Did you call load(...) or from_json(...)?")
+            raise RuntimeError(
+                "No problem_data available. Did you call load(...) or from_json(...)?"
+            )
         return self._problem_data
-    
 
     def __repr__(self) -> str:
         """Machine-readable summary capturing source, export target, and result cache state."""

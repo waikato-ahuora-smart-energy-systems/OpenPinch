@@ -1,7 +1,7 @@
 import re
-from pathlib import Path
 from datetime import datetime
-from typing import Any, Tuple, Optional, Iterable
+from pathlib import Path
+from typing import Any, Iterable, Optional, Tuple
 
 import pandas as pd
 
@@ -9,7 +9,10 @@ import pandas as pd
 # Public API
 #######################################################################################################
 
-def export_target_summary_to_excel_with_units(target_response, out_dir: str = ".") -> str:
+
+def export_target_summary_to_excel_with_units(
+    target_response, out_dir: str = "."
+) -> str:
     """
     Export TargetOutput to an Excel workbook with values and units.
       Sheet 'Summary'       : One row per TargetResults with value/unit columns
@@ -33,15 +36,18 @@ def export_target_summary_to_excel_with_units(target_response, out_dir: str = ".
 
         row_front = {
             "Target": t.name,
-
-            "Cold Pinch (value)": cold_val, "Cold Pinch (unit)": cold_unit,
-            "Hot Pinch (value)": hot_val, "Hot Pinch (unit)": hot_unit,
-
-            "Qh (value)": Qh_val, "Qh (unit)": Qh_unit,
-            "Qc (value)": Qc_val, "Qc (unit)": Qc_unit,
-            "Qr (value)": Qr_val, "Qr (unit)": Qr_unit,
-
-            "Degree of Integration (value)": deg_val, "Degree of Integration (unit)": deg_unit,
+            "Cold Pinch (value)": cold_val,
+            "Cold Pinch (unit)": cold_unit,
+            "Hot Pinch (value)": hot_val,
+            "Hot Pinch (unit)": hot_unit,
+            "Qh (value)": Qh_val,
+            "Qh (unit)": Qh_unit,
+            "Qc (value)": Qc_val,
+            "Qc (unit)": Qc_unit,
+            "Qr (value)": Qr_val,
+            "Qr (unit)": Qr_unit,
+            "Degree of Integration (value)": deg_val,
+            "Degree of Integration (unit)": deg_unit,
         }
 
         row_mid = {}
@@ -68,20 +74,26 @@ def export_target_summary_to_excel_with_units(target_response, out_dir: str = ".
         ex_des_val, ex_des_unit = _split_vu(t.exergy_des_min)
 
         row_end = {
-            "Utility Cost (value)": util_cost_val, "Utility Cost (unit)": util_cost_unit,
-            "Area (value)": area_val, "Area (unit)": area_unit,
+            "Utility Cost (value)": util_cost_val,
+            "Utility Cost (unit)": util_cost_unit,
+            "Area (value)": area_val,
+            "Area (unit)": area_unit,
             "Num Units": t.num_units,
             "Capital Cost": t.capital_cost,
             "Total Cost": t.total_cost,
-
-            "Work Target (value)": work_val, "Work Target (unit)": work_unit,
-            "Turbine Eff Target (value)": turb_eff_val, "Turbine Eff Target (unit)": turb_eff_unit,
-
+            "Work Target (value)": work_val,
+            "Work Target (unit)": work_unit,
+            "Turbine Eff Target (value)": turb_eff_val,
+            "Turbine Eff Target (unit)": turb_eff_unit,
             "ETE": t.ETE,
-            "Exergy Sources (value)": ex_src_val, "Exergy Sources (unit)": ex_src_unit,
-            "Exergy Sinks (value)": ex_sink_val, "Exergy Sinks (unit)": ex_sink_unit,
-            "Exergy Req Min (value)": ex_req_val, "Exergy Req Min (unit)": ex_req_unit,
-            "Exergy Des Min (value)": ex_des_val, "Exergy Des Min (unit)": ex_des_unit,
+            "Exergy Sources (value)": ex_src_val,
+            "Exergy Sources (unit)": ex_src_unit,
+            "Exergy Sinks (value)": ex_sink_val,
+            "Exergy Sinks (unit)": ex_sink_unit,
+            "Exergy Req Min (value)": ex_req_val,
+            "Exergy Req Min (unit)": ex_req_unit,
+            "Exergy Des Min (value)": ex_des_val,
+            "Exergy Des Min (unit)": ex_des_unit,
         }
         rows.append(row_front | row_mid | row_end)
 
@@ -101,9 +113,11 @@ def export_target_summary_to_excel_with_units(target_response, out_dir: str = ".
 
     return str(out_path)
 
+
 #######################################################################################################
 # Helpers
 #######################################################################################################
+
 
 def _split_vu(x: Any) -> Tuple[Optional[float], Optional[str]]:
     """Return (value, units) for either a float or ValueWithUnit/None."""
@@ -125,12 +139,14 @@ def _autosize_columns(df: pd.DataFrame, ws):
         max_len = len(str(col))
         for val in df[col].astype(str):
             max_len = max(max_len, len(val))
-        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = min(max_len + 2, 40)
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = min(
+            max_len + 2, 40
+        )
 
 
 def _safe_name(name: str) -> str:
     """Make a filesystem-safe project name (keep letters, numbers, - _ .)."""
     name = name.strip()
     name = re.sub(r"[\\/:*?\"<>|]+", "_", name)  # replace forbidden characters
-    name = re.sub(r"\s+", "_", name)             # spaces -> underscore
+    name = re.sub(r"\s+", "_", name)  # spaces -> underscore
     return name or "Project"

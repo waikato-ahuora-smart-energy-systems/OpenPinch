@@ -1,21 +1,21 @@
-from typing import Tuple
 from copy import deepcopy
-from ..lib import *
-from ..classes import *
-from ..analysis import (
-    get_process_heat_cascade, 
-    get_area_targets, 
-    get_min_number_hx, 
-    get_utility_targets,
-    get_pinch_temperatures,
-)
+from operator import attrgetter
+from typing import Tuple
 
+from ..analysis import (
+    get_pinch_temperatures,
+    get_process_heat_cascade,
+    get_utility_targets,
+)
+from ..classes import *
+from ..lib import *
 
 __all__ = ["get_process_targets"]
 
 #######################################################################################################
 # Public API
 #######################################################################################################
+
 
 def get_process_targets(zone: Zone):
     """Populate a ``Zone`` with detailed process-level pinch targets.
@@ -25,14 +25,35 @@ def get_process_targets(zone: Zone):
     the provided ``zone`` via :meth:`Zone.add_target_from_results` and used later
     by site and regional aggregation routines.
     """
-    # TODO refactor the assignments from zone
-    config = zone.config
-    hot_streams, cold_streams, all_streams = zone.hot_streams, zone.cold_streams, zone.all_streams
-    hot_utilities, cold_utilities = zone.hot_utilities, zone.cold_utilities
+    (
+        config,
+        hot_streams,
+        cold_streams,
+        all_streams,
+        hot_utilities,
+        cold_utilities,
+        zone_identifier,
+        subzones,
+    ) = attrgetter(
+        "config",
+        "hot_streams",
+        "cold_streams",
+        "all_streams",
+        "hot_utilities",
+        "cold_utilities",
+        "identifier",
+        "subzones",
+    )(zone)
 
-    pt, pt_real, target_values = get_process_heat_cascade(hot_streams, cold_streams, all_streams, config)
-    pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(pt, pt_real, hot_utilities, cold_utilities)
-    net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(zone.identifier, pt, hot_utilities, cold_utilities)
+    pt, pt_real, target_values = get_process_heat_cascade(
+        hot_streams, cold_streams, all_streams, config
+    )
+    pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(
+        pt, pt_real, hot_utilities, cold_utilities
+    )
+    net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
+        zone_identifier, pt, hot_utilities, cold_utilities
+    )
     hot_pinch, cold_pinch = get_pinch_temperatures(pt)
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
@@ -50,46 +71,66 @@ def get_process_targets(zone: Zone):
         pass
 
     graphs = _save_graph_data(pt, pt_real)
-    zone.add_target_from_results(TargetType.DI.value, {
-        "pt": pt,
-        "pt_real": pt_real,
-        "target_values": target_values,
-        "graphs": graphs,
-        "hot_utilities": hot_utilities,
-        "cold_utilities": cold_utilities,
-        "net_hot_streams": net_hot_streams,
-        "net_cold_streams": net_cold_streams,
-        "hot_pinch": hot_pinch,
-        "cold_pinch": cold_pinch,
-    })
+    zone.add_target_from_results(
+        TargetType.DI.value,
+        {
+            "pt": pt,
+            "pt_real": pt_real,
+            "target_values": target_values,
+            "graphs": graphs,
+            "hot_utilities": hot_utilities,
+            "cold_utilities": cold_utilities,
+            "net_hot_streams": net_hot_streams,
+            "net_cold_streams": net_cold_streams,
+            "hot_pinch": hot_pinch,
+            "cold_pinch": cold_pinch,
+        },
+    )
 
-    if len(zone.subzones) > 0:
-        for z in zone.subzones.values():
+    if len(subzones) > 0:
+        for z in subzones.values():
             z = get_process_targets(z)
 
     return zone
+
 
 #######################################################################################################
 # Helper functions
 #######################################################################################################
 
-def _get_net_hot_and_cold_segments(zone_identifier: str, pt: ProblemTable, hot_utilities: StreamCollection, cold_utilities: StreamCollection) -> Tuple[StreamCollection, StreamCollection]:
+
+def _get_net_hot_and_cold_segments(
+    zone_identifier: str,
+    pt: ProblemTable,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+) -> Tuple[StreamCollection, StreamCollection]:
     """Derive net process streams that represent overall utility demand for site aggregation."""
-    total_utility_demand = sum([u.heat_flow for u in hot_utilities]) + sum([u.heat_flow for u in cold_utilities])
+    total_utility_demand = sum([u.heat_flow for u in hot_utilities]) + sum(
+        [u.heat_flow for u in cold_utilities]
+    )
     if zone_identifier == ZoneType.P.value and total_utility_demand > tol:
-        net_hot_streams, net_cold_streams = _save_data_for_site_analysis(pt, PT.T.value, PT.H_NET_A.value, hot_utilities, cold_utilities)        
+        net_hot_streams, net_cold_streams = _save_data_for_site_analysis(
+            pt, PT.T.value, PT.H_NET_A.value, hot_utilities, cold_utilities
+        )
     else:
         net_hot_streams, net_cold_streams = StreamCollection(), StreamCollection()
     return net_hot_streams, net_cold_streams
 
 
-def _save_data_for_site_analysis(pt: ProblemTable, col_T: str, col_H: str, hot_utilities: StreamCollection, cold_utilities: StreamCollection) -> Tuple[StreamCollection, StreamCollection]:
+def _save_data_for_site_analysis(
+    pt: ProblemTable,
+    col_T: str,
+    col_H: str,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+) -> Tuple[StreamCollection, StreamCollection]:
     """Constructs net stream segments that require utility input across temperature intervals."""
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
-    
+
     if pt.delta_col(col_T)[1:].min() < tol:
-        raise ValueError("Infeasible temperature interval detected in _store_TSP_data") 
+        raise ValueError("Infeasible temperature interval detected in _store_TSP_data")
 
     T_vals = pt.col[col_T]
     dh_vals = pt.delta_col(col_H)[1:]
@@ -103,17 +144,30 @@ def _save_data_for_site_analysis(pt: ProblemTable, col_T: str, col_H: str, hot_u
     k = 1
     for i, dh in enumerate(dh_vals):
         if dh > tol:
-            hu, hot_utilities, net_cold_streams, k = _add_net_segment(T_vals[i], T_vals[i+1], hu, dh, hot_utilities, net_cold_streams, k)
+            hu, hot_utilities, net_cold_streams, k = _add_net_segment(
+                T_vals[i], T_vals[i + 1], hu, dh, hot_utilities, net_cold_streams, k
+            )
         elif -dh > tol:
-            cu, cold_utilities, net_hot_streams, k = _add_net_segment(T_vals[i], T_vals[i+1], cu, dh, cold_utilities, net_hot_streams, k)
+            cu, cold_utilities, net_hot_streams, k = _add_net_segment(
+                T_vals[i], T_vals[i + 1], cu, dh, cold_utilities, net_hot_streams, k
+            )
 
     return net_hot_streams, net_cold_streams
 
 
-def _add_net_segment(T_ub: float, T_lb: float, curr_u: Stream, dh_req: float, utilities: StreamCollection, net_streams: StreamCollection, k: int, j: int = 0):
+def _add_net_segment(
+    T_ub: float,
+    T_lb: float,
+    curr_u: Stream,
+    dh_req: float,
+    utilities: StreamCollection,
+    net_streams: StreamCollection,
+    k: int,
+    j: int = 0,
+):
     """Adds a net utility segment and recursively handles segmentation if needed."""
     next_u = _advance_utility_if_needed(dh_req, curr_u, utilities)
-    
+
     dh_next = max(-curr_u.heat_flow, 0.0)
     curr_u.heat_flow = max(curr_u.heat_flow, 0.0)
     dh_curr = abs(dh_req) - dh_next
@@ -126,14 +180,16 @@ def _add_net_segment(T_ub: float, T_lb: float, curr_u: Stream, dh_req: float, ut
             t_target=T_ub if curr_u.type == StreamType.Hot.value else T_i,
             heat_flow=dh_curr,
             dt_cont=curr_u.dt_cont,
-            htc=1.0, # Might be a way to calculate this.
-            is_process_stream=True
+            htc=1.0,  # Might be a way to calculate this.
+            is_process_stream=True,
         )
     )
-    if dh_next > tol: # /1000
-        return _add_net_segment(T_i, T_lb, next_u, dh_next, utilities, net_streams, k, j+1)
+    if dh_next > tol:  # /1000
+        return _add_net_segment(
+            T_i, T_lb, next_u, dh_next, utilities, net_streams, k, j + 1
+        )
     else:
-        return next_u, utilities, net_streams, k+1
+        return next_u, utilities, net_streams, k + 1
 
 
 def _initialise_utility_selected(utilities: StreamCollection = None):
@@ -144,7 +200,9 @@ def _initialise_utility_selected(utilities: StreamCollection = None):
     return utilities[-1]
 
 
-def _advance_utility_if_needed(dh_used: float, current_u: Stream = None, utilities: StreamCollection = None) -> Stream:
+def _advance_utility_if_needed(
+    dh_used: float, current_u: Stream = None, utilities: StreamCollection = None
+) -> Stream:
     """Advances to the next utility if the current one is exhausted."""
     current_u.heat_flow -= abs(dh_used)
     if current_u.heat_flow > tol:
@@ -154,7 +212,7 @@ def _advance_utility_if_needed(dh_used: float, current_u: Stream = None, utiliti
     for j in range(k, len(utilities)):
         if utilities[j].heat_flow > tol:
             return utilities[j]
-        
+
     return utilities[-1]
 
 
@@ -169,7 +227,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.GCC_NP.value: pt[[PT.T.value, PT.H_NET_NP.value]],
         GT.GCC_Ex.value: pt[[PT.T.value, PT.H_NET_V.value]],
         GT.GCC_Act.value: pt[[PT.T.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
-        GT.SHL.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value]],   
+        GT.SHL.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value]],
         GT.GCC_Ut.value: pt_real[[PT.T.value, PT.H_UT_NET.value]],
         GT.GCC_Ut_star.value: pt[[PT.T.value, PT.H_UT_NET.value]],
     }

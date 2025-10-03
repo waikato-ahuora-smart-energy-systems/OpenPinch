@@ -1,17 +1,19 @@
-import re
 import logging
+import re
 import time
-import pytest
-from io import StringIO
-from OpenPinch.utils.decorators import timing_decorator
+
 import OpenPinch.lib.config as config
+from OpenPinch.utils.decorators import timing_decorator
+
 
 def get_dummy_function():
     @timing_decorator
     def dummy(x, y):
         time.sleep(0.01)
         return x + y
+
     return dummy
+
 
 def test_timing_decorator_enabled(monkeypatch):
     monkeypatch.setattr(config, "ACTIVATE_TIMING", True)
@@ -19,11 +21,13 @@ def test_timing_decorator_enabled(monkeypatch):
     dummy = get_dummy_function()
     assert dummy(2, 3) == 5
 
+
 def test_timing_decorator_disabled(monkeypatch):
     monkeypatch.setattr(config, "ACTIVATE_TIMING", False)
     monkeypatch.setattr(config, "LOG_TIMING", True)
     dummy = get_dummy_function()
     assert dummy(10, 20) == 30
+
 
 def test_timing_decorator_logging_output(monkeypatch, caplog):
     monkeypatch.setattr(config, "ACTIVATE_TIMING", True)

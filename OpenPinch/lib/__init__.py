@@ -6,6 +6,6 @@ API.  They are re-exported here for consumers that need to construct or inspect
 inputs programmatically.
 """
 
-from .schema import *
-from .enums import *
 from .config import *
+from .enums import *
+from .schema import *

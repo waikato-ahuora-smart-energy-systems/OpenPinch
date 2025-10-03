@@ -1,5 +1,6 @@
-from OpenPinch import PinchProblem
 from pathlib import Path
+
+from OpenPinch import PinchProblem
 
 if __name__ == "__main__":
     P = PinchProblem(

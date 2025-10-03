@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def plot_t_h_curve(points, title: str = "Temperature vs. Enthalpy") -> None:
     """
     Plot Temperature vs. Enthalpy.
@@ -18,7 +19,13 @@ def plot_t_h_curve(points, title: str = "Temperature vs. Enthalpy") -> None:
     plt.yticks(fontsize=12)
     plt.tight_layout()
 
-def plot_t_h_curve_with_piecewise_and_bounds(points: np.array, piecewise_points: np.array, epsilon: float, title: str = "Temperature vs. Enthalpy") -> None:
+
+def plot_t_h_curve_with_piecewise_and_bounds(
+    points: np.array,
+    piecewise_points: np.array,
+    epsilon: float,
+    title: str = "Temperature vs. Enthalpy",
+) -> None:
     """
     Plot the TH curve, its piecewise linearization, and a shaded region ±epsilon around the TH curve.
     :param points: Original TH curve points.
@@ -32,9 +39,24 @@ def plot_t_h_curve_with_piecewise_and_bounds(points: np.array, piecewise_points:
 
     plt.figure(figsize=(10, 6))
     plt.plot(enthalpies, temperatures, label="TH Curve", color="red", linewidth=1.5)
-    plt.plot(piecewise_points[:, 0], piecewise_points[:, 1], label="Piecewise Curve", color="blue",  linestyle="--", marker="o", linewidth=2) ## pwl curve should be dashed and blue
-    plt.fill_between(enthalpies, lower_bound, upper_bound, color="lightblue", alpha=0.3, label=f"±{epsilon} Bounds")
-    
+    plt.plot(
+        piecewise_points[:, 0],
+        piecewise_points[:, 1],
+        label="Piecewise Curve",
+        color="blue",
+        linestyle="--",
+        marker="o",
+        linewidth=2,
+    )  ## pwl curve should be dashed and blue
+    plt.fill_between(
+        enthalpies,
+        lower_bound,
+        upper_bound,
+        color="lightblue",
+        alpha=0.3,
+        label=f"±{epsilon} Bounds",
+    )
+
     plt.title(title, fontsize=16)
     plt.xlabel("Enthalpy (J/mol)", fontsize=14)
     plt.ylabel("Temperature (K)", fontsize=14)

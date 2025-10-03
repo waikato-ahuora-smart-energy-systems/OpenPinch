@@ -7,11 +7,10 @@ code can construct validated inputs.
 """
 
 from .classes import PinchProblem
+from .lib import *
 from .main import pinch_analysis_service
-from .scales import get_targets, get_visualise
+from .scales.entry import get_targets, get_visualise
 from .utils.stream_linearisation import get_piecewise_linearisation_for_streams
-from .lib import * 
-from .scales import *
 
 __all__ = [
     "PinchProblem",

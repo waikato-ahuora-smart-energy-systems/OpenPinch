@@ -1,10 +1,10 @@
 """Heuristics for estimating the minimum number of heat exchangers for the pinch design method."""
 
-import pandas as pd
-import numpy as np 
-from ..utils import *
-from ..lib.enums import *
+import numpy as np
+
 from ..classes import *
+from ..lib.enums import *
+from ..utils import *
 from .support_methods import *
 
 __all__ = ["get_min_number_hx"]
@@ -12,6 +12,7 @@ __all__ = ["get_min_number_hx"]
 #######################################################################################################
 # Public API --- TODO: check implementation
 #######################################################################################################
+
 
 def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
     """
@@ -26,8 +27,8 @@ def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
         int: Minimum number of exchangers.
     """
     T_vals = pt_df.iloc[:, 0].values
-    CCC = bcc_star_df['CCC'].values
-    HCC = bcc_star_df['HCC'].values
+    CCC = bcc_star_df["CCC"].values
+    HCC = bcc_star_df["HCC"].values
 
     num_hx = 0
     i = 0
@@ -50,9 +51,9 @@ def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
                 t_max = np.array([s.t_max_star for s in streams])
                 t_min = np.array([s.t_min_star for s in streams])
                 return np.sum(
-                    ((t_max > T_low + tol) & (t_max <= T_high + tol)) |
-                    ((t_min >= T_low - tol) & (t_min < T_high - tol)) |
-                    ((t_min < T_low - tol) & (t_max > T_high + tol))
+                    ((t_max > T_low + tol) & (t_max <= T_high + tol))
+                    | ((t_min >= T_low - tol) & (t_min < T_high - tol))
+                    | ((t_min < T_low - tol) & (t_max > T_high + tol))
                 )
 
             num_hx += count_crossing(z.hot_streams)
@@ -63,8 +64,8 @@ def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
                 t_max = np.array([u.t_max_star for u in utilities])
                 t_min = np.array([u.t_min_star for u in utilities])
                 return np.sum(
-                    (t_max > T_low + tol) & (t_max <= T_high + tol) |
-                    (t_min >= T_low - tol) & (t_min < T_high - tol)
+                    (t_max > T_low + tol) & (t_max <= T_high + tol)
+                    | (t_min >= T_low - tol) & (t_min < T_high - tol)
                 )
 
             num_hx += count_utility_crossing(z.hot_utilities)
@@ -83,4 +84,3 @@ def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
         i += 1
 
     return int(num_hx)
-

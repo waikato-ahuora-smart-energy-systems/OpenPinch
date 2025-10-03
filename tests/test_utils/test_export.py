@@ -1,23 +1,25 @@
-from OpenPinch.utils.export import (
-    export_target_summary_to_excel_with_units,
-    _split_vu,
-    _safe_name,
-    _autosize_columns,
-)
-
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from datetime import datetime
+
 import pandas as pd
 import pytest
 
+from OpenPinch.utils.export import (
+    _autosize_columns,
+    _safe_name,
+    _split_vu,
+    export_target_summary_to_excel_with_units,
+)
 
 # --------------------------------------------------------------------------------------
 # Fixtures & tiny helpers
 # --------------------------------------------------------------------------------------
 
+
 class VU:
     """Simple value-with-units stub."""
+
     def __init__(self, value, units):
         self.value = value
         self.units = units
@@ -55,7 +57,9 @@ def _make_target(
     return SimpleNamespace(
         name=name,
         temp_pinch=SimpleNamespace(cold_temp=pinch_cold, hot_temp=pinch_hot),
-        Qh=Qh, Qc=Qc, Qr=Qr,
+        Qh=Qh,
+        Qc=Qc,
+        Qr=Qr,
         degree_of_integration=degree_of_integration,
         hot_utilities=hot_utils,
         cold_utilities=cold_utils,
@@ -78,11 +82,13 @@ def _make_target(
 # export_target_summary_to_excel_with_units
 # --------------------------------------------------------------------------------------
 
+
 def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     """
     End-to-end: ensure the Excel file is written with the right filename pattern
     and the Summary sheet contains expected columns/values (values + units).
     """
+
     # Freeze timestamp used in filename
     class _FixedDT:
         @staticmethod
@@ -95,6 +101,7 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
 
     # Patch the datetime reference inside the export module
     import OpenPinch.utils.export as export_mod
+
     monkeypatch.setattr(export_mod, "datetime", _FixedDT, raising=True)
 
     # Project name exercises _safe_name (forbidden chars + spaces)
@@ -105,7 +112,9 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
             _make_target(
                 name="Alt A",
                 hot_utils=[SimpleNamespace(name="MP Steam", heat_flow=VU(55.0, "kW"))],
-                cold_utils=[SimpleNamespace(name="Chilled Water", heat_flow=VU(30.0, "kW"))],
+                cold_utils=[
+                    SimpleNamespace(name="Chilled Water", heat_flow=VU(30.0, "kW"))
+                ],
             ),
         ],
     )
@@ -122,27 +131,47 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     # Expect at least our known columns
     expected_cols = {
         "Target",
-        "Cold Pinch (value)", "Cold Pinch (unit)",
-        "Hot Pinch (value)", "Hot Pinch (unit)",
-        "Qh (value)", "Qh (unit)",
-        "Qc (value)", "Qc (unit)",
-        "Qr (value)", "Qr (unit)",
-        "Degree of Integration (value)", "Degree of Integration (unit)",
-        "Utility Cost (value)", "Utility Cost (unit)",
-        "Area (value)", "Area (unit)",
-        "Num Units", "Capital Cost", "Total Cost",
-        "Work Target (value)", "Work Target (unit)",
-        "Turbine Eff Target (value)", "Turbine Eff Target (unit)",
+        "Cold Pinch (value)",
+        "Cold Pinch (unit)",
+        "Hot Pinch (value)",
+        "Hot Pinch (unit)",
+        "Qh (value)",
+        "Qh (unit)",
+        "Qc (value)",
+        "Qc (unit)",
+        "Qr (value)",
+        "Qr (unit)",
+        "Degree of Integration (value)",
+        "Degree of Integration (unit)",
+        "Utility Cost (value)",
+        "Utility Cost (unit)",
+        "Area (value)",
+        "Area (unit)",
+        "Num Units",
+        "Capital Cost",
+        "Total Cost",
+        "Work Target (value)",
+        "Work Target (unit)",
+        "Turbine Eff Target (value)",
+        "Turbine Eff Target (unit)",
         "ETE",
-        "Exergy Sources (value)", "Exergy Sources (unit)",
-        "Exergy Sinks (value)", "Exergy Sinks (unit)",
-        "Exergy Req Min (value)", "Exergy Req Min (unit)",
-        "Exergy Des Min (value)", "Exergy Des Min (unit)",
+        "Exergy Sources (value)",
+        "Exergy Sources (unit)",
+        "Exergy Sinks (value)",
+        "Exergy Sinks (unit)",
+        "Exergy Req Min (value)",
+        "Exergy Req Min (unit)",
+        "Exergy Des Min (value)",
+        "Exergy Des Min (unit)",
         # Utility columns come from names:
-        "HP Steam (value)", "HP Steam (unit)",
-        "Cooling Water (value)", "Cooling Water (unit)",
-        "MP Steam (value)", "MP Steam (unit)",
-        "Chilled Water (value)", "Chilled Water (unit)",
+        "HP Steam (value)",
+        "HP Steam (unit)",
+        "Cooling Water (value)",
+        "Cooling Water (unit)",
+        "MP Steam (value)",
+        "MP Steam (unit)",
+        "Chilled Water (value)",
+        "Chilled Water (unit)",
     }
     assert expected_cols.issubset(set(df.columns))
 
@@ -171,11 +200,13 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
 # _split_vu
 # --------------------------------------------------------------------------------------
 
+
 def test_split_vu_handles_none_plain_number_and_object():
     assert _split_vu(None) == (None, None)
     assert _split_vu(3) == (3.0, None)
     assert _split_vu(3.14) == (3.14, None)
     assert _split_vu(VU(12.3, "kg/s")) == (12.3, "kg/s")
+
 
 def test_split_vu_non_numeric_unparsable():
     # Strings that cannot be coerced to float return (None, None)
@@ -186,31 +217,37 @@ def test_split_vu_non_numeric_unparsable():
 # _safe_name
 # --------------------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "raw,expected",
     [
         (" Project  X  ", "Project_X"),
         ("data:run/01", "data_run_01"),
-        ("a\\b|c*<d>?\"e", "a_b_c_d_e"),
+        ('a\\b|c*<d>?"e', "a_b_c_d_e"),
         ("", "Project"),
     ],
 )
 def test_safe_name_sanitization(raw, expected):
     assert _safe_name(raw) == expected
 
+
 # --------------------------------------------------------------------------------------
 # _autosize_columns
 # --------------------------------------------------------------------------------------
 
+
 def test_autosize_columns_sets_reasonable_widths(tmp_path: Path):
     # Prepare a small df with long header + long cell to exercise both code paths
-    df = pd.DataFrame({
-        "A" * 50: ["x" * 10, "y" * 30],  # long header, varying cell content
-        "B": ["short", "also short"],
-    })
+    df = pd.DataFrame(
+        {
+            "A" * 50: ["x" * 10, "y" * 30],  # long header, varying cell content
+            "B": ["short", "also short"],
+        }
+    )
 
     # Create a worksheet via openpyxl (used under the hood by pandas writer)
     from openpyxl import Workbook
+
     wb = Workbook()
     ws = wb.active
 

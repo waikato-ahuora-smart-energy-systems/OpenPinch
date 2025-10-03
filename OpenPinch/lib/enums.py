@@ -3,6 +3,7 @@ from enum import Enum
 
 class ZoneType(Enum):
     """Types of zones used to divide the problem."""
+
     R = "Region"
     C = "Community"
     S = "Site"
@@ -16,11 +17,12 @@ class ZoneType(Enum):
 
 class TargetType(Enum):
     """Different target calculation categories."""
+
     TL = "Thermodynamic Limit Target"
     DI = "Direct Integration"
     TZ = "Total Process Target"
-    TS = "Total Site Target" # Also indirect integration
-    RT = "Regional Target" # Currently the same as TS
+    TS = "Total Site Target"  # Also indirect integration
+    RT = "Regional Target"  # Currently the same as TS
     ET = "Energy Transfer Analysis"
 
     def __str__(self):
@@ -29,6 +31,7 @@ class TargetType(Enum):
 
 class HeatExchangerTypes(Enum):
     """Heat exchanger flow arrangements"""
+
     CF = "Counter Flow"
     PF = "Parallel Flow"
     CrFUU = "Crossflow - Both Unmixed"
@@ -41,6 +44,7 @@ class HeatExchangerTypes(Enum):
 
 class HeatFlowUnits(Enum):
     """Heat flow units"""
+
     W = "W"
     kW = "kW"
     MW = "MW"
@@ -49,6 +53,7 @@ class HeatFlowUnits(Enum):
 
 class StreamType(Enum):
     """Steam type"""
+
     Hot = "Hot"
     Cold = "Cold"
     Both = "Both"
@@ -57,6 +62,7 @@ class StreamType(Enum):
 
 class StreamID(Enum):
     """Stream identity"""
+
     Process = "Process"
     Utility = "Utility"
     Unassigned = "Unassigned"
@@ -64,6 +70,7 @@ class StreamID(Enum):
 
 class StreamLoc(Enum):
     """Stream set identity"""
+
     HotStr = "Hot Streams"
     ColdStr = "Cold Streams"
     HotU = "Hot Utility"
@@ -73,6 +80,7 @@ class StreamLoc(Enum):
 
 class ProblemTableLabel(Enum):
     """Problem table column header labels"""
+
     T = "T"
     DELTA_T = "delta_T"
     CP_HOT = "mcp_hot_tot"
@@ -107,11 +115,13 @@ class ProblemTableLabel(Enum):
     RCP_HOT_UT = "rcp_hot_ut"
     RCP_COLD_UT = "rcp_cold_ut"
 
+
 PT = ProblemTableLabel
 
 
 class StreamDataLabel(Enum):
     """Stream data column header labels"""
+
     TS = "T_supply"
     TT = "T_target"
     TYPE = "stream_type"
@@ -120,11 +130,13 @@ class StreamDataLabel(Enum):
     DT_CONT = "delta_T_cont"
     HTC = "heat_transfer_coefficient"
 
+
 SD = StreamDataLabel
 
 
 class ArrowHead(Enum):
     """Position of arrow head"""
+
     START = "Start"
     END = "End"
     NO_ARROW = "None"
@@ -132,6 +144,7 @@ class ArrowHead(Enum):
 
 class LineColour(Enum):
     """Line colour selection"""
+
     Hot = 0
     Cold = 1
     Other = 2
@@ -161,6 +174,7 @@ class GraphType(Enum):
     TSU = "TSU"
     TSU_star = "TSU_star"
     SUGCC = "SUGCC"
+
 
 ResultsType = GT = GraphType
 

@@ -6,10 +6,10 @@ the public API and are designed to be interoperable with the higher-level
 services in :mod:`OpenPinch.main`.
 """
 
+from .pinch_problem import PinchProblem
+from .problem_table import ProblemTable
 from .stream import Stream
-from .zone import Zone
+from .stream_collection import StreamCollection
 from .target import EnergyTarget
 from .value import Value
-from .stream_collection import StreamCollection
-from .problem_table import ProblemTable
-from .pinch_problem import PinchProblem
+from .zone import Zone

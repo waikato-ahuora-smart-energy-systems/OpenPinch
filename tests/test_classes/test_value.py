@@ -1,7 +1,8 @@
-import pytest
 import pandas as pd
-from OpenPinch.classes import * 
-from OpenPinch.lib import * 
+
+from OpenPinch.classes import *
+from OpenPinch.lib import *
+
 
 def test_heatflow_value_behavior():
     v = Value(12.5, "kW")
@@ -14,12 +15,14 @@ def test_heatflow_value_behavior():
     assert int(Value(7)) == 7
     assert round(Value(3.14159), 2) == 3.14
 
+
 def test_temperature_value_behavior():
     v = Value(15, "degC")
     assert v == 15.0
     assert v.unit == "degC"
     assert float(v) == 15
     assert int(v) == 15
+
 
 def test_value_setters():
     v = Value()
@@ -28,11 +31,13 @@ def test_value_setters():
     assert v.value == 99
     assert v.unit in ("m^3/h", "m**3/h")
 
+
 def test_value_equality_and_conversion():
     v1 = Value(1, "kg")
     v2 = Value(1000, "g")
     assert v1 == v2
     assert float(v1 + v2) == 2 or 2000
+
 
 def test_serialization_round_trip():
     v1 = Value(42.0, "mol/s")
@@ -41,6 +46,7 @@ def test_serialization_round_trip():
     assert v1 == v2
     assert v2.unit == "mol/s"
 
+
 def test_multiply():
     cp = Value(4, "kJ/degC")
     t1 = Value(10, "degC")
@@ -48,7 +54,8 @@ def test_multiply():
     assert cp * (t2 - t1) == Value(4000, "J")
     assert cp * (t2 - t1) == Value(4, "kJ")
     assert cp * (t2 - t1) == 4
-    
+
+
 def test_divide():
     q = Value(4, "kW")
     t1 = Value(10, "degK")
@@ -57,13 +64,16 @@ def test_divide():
     assert q / (t2 - t1) == Value(4, "kW/degK")
     assert q / (t2 - t1) == 4
 
+
 def test_pandas():
-    df = pd.DataFrame({
-        "stream": ["A", "B"],
-        "flow": [Value(10, "kW/degC"), Value(20, "kW/K")],
-        "t_in": [Value(100, "degC"), Value(373.15, "K")],
-        "t_out": [Value(120, "degC"), Value(383.15, "K")],
-    })
+    df = pd.DataFrame(
+        {
+            "stream": ["A", "B"],
+            "flow": [Value(10, "kW/degC"), Value(20, "kW/K")],
+            "t_in": [Value(100, "degC"), Value(373.15, "K")],
+            "t_out": [Value(120, "degC"), Value(383.15, "K")],
+        }
+    )
     df["q"] = df["flow"] * (df["t_out"] - df["t_in"])
 
     # Check resulting q values
@@ -78,12 +88,13 @@ def test_pandas():
     assert abs(df.loc[1, "q"].value - 200) < 1e-6
     assert df.loc[1, "q"].unit == "kW"
 
+
 # def test_series_unit_conversion():
 #     series = pd.Series([
 #         Value(10, "kW/degC"),
 #         Value(20, "kW/K")
 #     ])
-    
+
 #     converted = series.as_value.to("kW/K")
 
 #     assert all(isinstance(v, Value) for v in converted)
@@ -118,12 +129,14 @@ def test_pandas():
 #     with pytest.raises(Exception):
 #         s.as_value.to("m^3/h")  # incompatible unit
 
+
 def test_valuewithunit_with_mismatched_unit():
     vw = ValueWithUnit(value=100, units="degC")
     v = Value(vw, unit="K")  # mismatched unit
 
     # It should keep the original "degC" and silently ignore the mismatch
     assert v.unit == "degC"
+
 
 def test_value_from_valuewithunit():
     # Simulate input from schema or external source

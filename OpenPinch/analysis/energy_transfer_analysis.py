@@ -20,7 +20,7 @@
 #     """
 #     Calculates the ETD and retrofit targets.
 #     """
-    
+
 #     # Prepares variables and arrays
 #     ETD = [ [0, 0] for i in range(1 + len(site.subzones) * 3) ]
 #     ETD_star = copy.deepcopy(ETD)
@@ -91,9 +91,9 @@
 #     GCC_etc = GCC_etc[:2]
 #     for i in range(len(GCC_etc)):
 #         GCC_etc[i] = GCC_etc[i][:len(PT_star[0])]
-    
+
 #     min_H_cross = 1E+35
-    
+
 #     for j in range(len(PT_star[0])):
 #         GCC_etc[1][j] = PT_star[1][j]
 #         if j == 0 or j == len(PT_star[0]):
@@ -113,7 +113,7 @@
 #     DH_shift = GCC_etc[2][len(GCC_etc[0])]
 #     for j in range(len(PT_star[0])):
 #         GCC_etc[2][j] = GCC_etc[2][j] - DH_shift
-    
+
 #     for j in range(1, len(PT_star[0])):
 #         if min_H_cross > (min(GCC_etc[2][j], GCC_etc[2][j - 1])) + tol and min_H_cross < (max(GCC_etc[2][j], GCC_etc[2][j - 1])) - tol:
 #             j_0 = j
@@ -178,7 +178,7 @@
 #     #         .Color = 255
 #     #         .TintAndShade = 0
 #     #     End With
-        
+
 #     #     Draw boarders for Table
 #     #     With .Borders(xlEdgeLeft)
 #     #         .LineStyle = xlContinuous
@@ -219,7 +219,7 @@
 #     # End With
 
 # def Compile_ETD_T_int(site, ETD, PT_TIT):
-#     """Grabs temperatures from every process operation GCC with a defined system, 
+#     """Grabs temperatures from every process operation GCC with a defined system,
 #     order, and remove duplicates.
 #     """
 #     T_int = [ [None for i in range(10000)] ]
@@ -257,7 +257,7 @@
 #     """Transposes temperature intervals from individual GCC cascades to a common set of temperature intervals for the entire system.
 #     """
 #     ETD_temp = [ [ None for j in range(len(T_int[0]) + 1)] for i in range(len(ETD))]
-    
+
 #     ETD_temp[0][0] = 'T'
 #     for i in range(1, len(ETD_temp[0])):
 #         ETD_temp[0][i] = T_int[0][i - 1]
@@ -267,11 +267,11 @@
 #         ETD_temp[j][0] = ETD[j][0]
 #         ETD_temp[j + 1][0] = None
 #         ETD_temp[j + 2][0] = ETD[j + 2][0]
-        
+
 #         ETD_temp[j][1] = None
 #         ETD_temp[j + 1][1] = ETD[j + 2][1]
 #         ETD_temp[j + 2][1] = 0
-        
+
 #         for i in range(2, len(ETD_temp[0])):
 #             if k >= len(ETD[0]):
 #                 ETD_temp[j][i] = 0
@@ -290,7 +290,7 @@
 #     return ETD_temp
 
 # def Simplify_ETD(site, ETD):
-#     """Reduces the ETD (and HSDT) to the minimum number of T intervals by removing all 
+#     """Reduces the ETD (and HSDT) to the minimum number of T intervals by removing all
 #     intervals between which there are not changes in CP for all process operations.
 #     """
 #     # Remove low temperature intervals that exceed the maximum temperatures
@@ -347,7 +347,7 @@
 #     """Determine the order and stack individual heat cascades of process operations.
 #     """
 #     Hot_Pinch, Cold_Pinch = get_pinch_temperatures(PT, 10, 0)
-    
+
 #     ETD_header = [ [None for j in range(11)] for i in range(len(ETD))]
 
 #     for j in range(1, len(ETD), 3):
@@ -367,7 +367,7 @@
 #     HX_type_1 = 'C'
 #     HX_type_2 = 'R'
 #     HX_type_3 = 'H'
-    
+
 #     j_0 = 0
 #     for j in range(3, len(ETD), 3):
 #         if ETD[j][0] == HX_type_1[:1] or \
@@ -402,7 +402,7 @@
 
 #     for i in range(1, len(ACC[0])):
 #         ACC[0][i] = ETD[0][i]
-        
+
 #         if abs(ACC[0][i] - PT_TIT[0][i]) > tol:
 #             PT_TIT = insert_temperature_interval_into_pt(PT_TIT, ACC[0][i], i)
 
@@ -416,7 +416,7 @@
 #             ACC[j + 3][i] = ETD[j][i]
 #             ACC[j + 4][i] = ETD[j + 1][i]
 #             ACC[j + 5][i] = ETD[j + 2][i] + ACC[3][i]
-    
+
 #     return ACC
 
 # def Characterise_ETC(site, ETD, ETD_header, Hot_Pinch, Cold_Pinch, Col_j, HX_mode):
@@ -451,7 +451,7 @@
 #     ETD_header[Col_j][2] = TH_tot_area
 #     ETD_header[Col_j][3] = H_max
 #     ETD_header[Col_j][4] = T_h_max
-    
+
 #     ETD_header[Col_j][10] = 1 / T_h_max if HX_mode == 'C' else T_h_max
 
 # def Write_Next_ETC(site, ETD, ETD_temp, ETD_header, ETD_header_temp, k):
@@ -475,7 +475,7 @@
 #                 for i in range(len(ETD_temp[0])):
 #                     ETD[k - 1][i] = ETD_temp[k_1 - 1][i]
 #                     ETD[k][i] = ETD_temp[k_1][i]
-                
+
 #                 ETD[k + 1][0] = ETD_temp[k_1 + 1][0]
 #                 for i in range(len(ETD_header_temp[0])):
 #                     ETD_header[k][i] = ETD_header_temp[k_1][i]

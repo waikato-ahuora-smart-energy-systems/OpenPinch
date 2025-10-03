@@ -1,7 +1,7 @@
 """Legacy placeholders for additional targeting routines pending refactor."""
 
 # import pandas as pd
-# import numpy as np 
+# import numpy as np
 # from ..utils import *
 # from ..lib.enums import *
 # from ..classes import *
@@ -12,9 +12,6 @@
 #######################################################################################################
 # Public API --- TODO
 #######################################################################################################
-
-
-
 
 
 #######################################################################################################
@@ -112,7 +109,6 @@
 #             GCC_X[1][i] = 0
 
 #     return GCC_X
-
 
 
 # def Calc_GCC_AI(z, pt_real, gcc_np):

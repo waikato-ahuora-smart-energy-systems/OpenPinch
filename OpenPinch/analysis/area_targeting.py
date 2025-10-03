@@ -1,16 +1,17 @@
 """Area targeting methods."""
-
 import pandas as pd
 import numpy as np 
-from ..utils import *
-from ..lib import *
+
 from ..classes import *
+from ..lib import *
+from ..utils import *
 
 __all__ = ["get_area_targets"]
 
 #######################################################################################################
 # Public API --- TODO: check accuracy
 #######################################################################################################
+
 
 def get_area_targets(pt: ProblemTable, config: Configuration) -> float:
     """Estimates a heat transfer area target based on counter-current heat transfer using vectorized numpy operations."""

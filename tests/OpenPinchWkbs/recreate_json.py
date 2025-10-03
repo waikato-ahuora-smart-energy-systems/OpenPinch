@@ -1,5 +1,3 @@
-import os
-from OpenPinch.utils import get_problem_from_excel, get_results_from_excel
 
 
 # def recreate_full_example_from_wkbs():
@@ -14,6 +12,6 @@ from OpenPinch.utils import get_problem_from_excel, get_results_from_excel
 #             project_name = os.path.splitext(filename)[0]
 #             p_json_file = filepath_save + "/p_" + project_name + ".json"
 #             get_problem_from_excel(excel_file, p_json_file)
-            
+
 #             r_json_file = filepath_save + "/r_" + project_name + ".json"
 #             get_results_from_excel(excel_file, r_json_file, project_name)

@@ -1,13 +1,15 @@
-import logging
-from time import perf_counter as timer
-from functools import wraps
 import atexit
+import logging
 from collections import defaultdict
+from functools import wraps
+from time import perf_counter as timer
+
 import OpenPinch.lib.config as config
+
 from ..lib import *
 
 logger = logging.getLogger(__name__)
-_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
 def _ensure_logging_configured():
@@ -33,7 +35,9 @@ def _ensure_logging_configured():
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
 
+
 _function_stats = defaultdict(lambda: {"count": 0, "total_time": 0.0})
+
 
 def timing_decorator(func=None, *, activate_overide=False):
     """
@@ -58,15 +62,19 @@ def timing_decorator(func=None, *, activate_overide=False):
 
             if config.LOG_TIMING:
                 _ensure_logging_configured()
-                logger.info(f"Function '{f.__name__}' executed in {exec_time:.6f} seconds.")
+                logger.info(
+                    f"Function '{f.__name__}' executed in {exec_time:.6f} seconds."
+                )
 
             return result
+
         return wrapper
 
     # Handle both @timing_decorator and @timing_decorator(activate_overide=True)
     if callable(func):
         return decorator(func)
     return decorator
+
 
 @atexit.register
 def print_summary():
