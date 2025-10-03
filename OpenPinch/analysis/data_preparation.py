@@ -92,18 +92,20 @@ def _get_validated_zone_info(
 ) -> Tuple[str, str]:
     """Get from input data (zone_tree) the identifier/type for the top level zone."""
     if isinstance(zone_tree, ZoneTreeSchema):
-        if zone_tree.type in ["Zone", "Sub-Zone", "Process Zone"]:
-            zone_type = ZoneType.P.value
-        elif zone_tree.type == "Site":
-            zone_type = ZoneType.S.value
-        elif zone_tree.type == "Community":
-            zone_type = ZoneType.C.value
-        elif zone_tree.type == "Region":
-            zone_type = ZoneType.R.value
-        elif zone_tree.type == "Utility Zone":
-            zone_type = ZoneType.U.value
-        else:
-            raise ValueError("Zone name and type could not be identified correctly.")
+        normalized_type = (zone_tree.type or "").strip()
+        type_map = {
+            "Zone": ZoneType.P.value,
+            "Sub-Zone": ZoneType.P.value,
+            "Process Zone": ZoneType.P.value,
+            "Site": ZoneType.S.value,
+            "Community": ZoneType.C.value,
+            "Region": ZoneType.R.value,
+            "Utility Zone": ZoneType.U.value,
+        }
+        try:
+            zone_type = type_map[normalized_type]
+        except KeyError as exc:
+            raise ValueError("Zone name and type could not be identified correctly.") from exc
         zone_name = zone_tree.name
     else:
         zone_type = ZoneType.S.value
@@ -156,15 +158,13 @@ def _get_process_streams_in_each_subzone(
 ) -> Zone:
     """Extracts all stream data into class instances, creates the required subzones and adds these to the parent zone."""
 
-    def _flatten_zone_hierarchy(parent_zone: Zone) -> List[Zone]:
-        """Recursively flattens the zone tree starting from parent_zone into a list of all Zone objects."""
-        zones = [parent_zone]
+    def _iter_zones(parent_zone: Zone):
+        """Depth-first traversal yielding each zone once."""
+        yield parent_zone
         for subzone in parent_zone.subzones.values():
-            zones.extend(_flatten_zone_hierarchy(subzone))
-        return zones
+            yield from _iter_zones(subzone)
 
-    flat_zones = _flatten_zone_hierarchy(master_zone)
-    for z in flat_zones:
+    for z in _iter_zones(master_zone):
         _add_process_streams_under_zones(z, streams)
     return master_zone
 
@@ -198,10 +198,19 @@ def _add_process_streams_under_zones(z: Zone, streams: List[StreamSchema]) -> Zo
 
     zone_path = _get_zone_path_from_child(z)
 
+    candidate_paths = {z.name, zone_path}
+    if "/" in z.name:
+        candidate_paths.add(z.name.split("/")[-1])
+    candidate_paths.add(zone_path.split("/")[-1])
+
     for s in streams:
+        if not s.zone:
+            continue
+
         stream_zone_name = s.zone.split("/")[-1]
         if (
-            stream_zone_name == z.name or s.zone == z.name or s.zone == zone_path
+            s.zone in candidate_paths
+            or stream_zone_name in candidate_paths
         ):  # or z.name == TargetType.DI.value
             # Create Stream from Data
             stream_j = _create_process_stream(s)
@@ -269,28 +278,27 @@ def _complete_utility_data(
     # Set Defaults
     for utility in utilities:
         utility.t_supply = get_value(utility.t_supply)
-        if get_value(utility.t_target) == None or get_value(
-            utility.t_target
-        ) == get_value(utility.t_supply):
-            utility.t_target = (
-                utility.t_supply - config.DTGLIDE
-                if utility.type == "Hot"
-                else utility.t_supply + config.DTGLIDE
-            )
+
+        t_target = get_value(utility.t_target)
+        if t_target is None or t_target == utility.t_supply:
+            delta = -config.DTGLIDE if utility.type == "Hot" else config.DTGLIDE
+            utility.t_target = utility.t_supply + delta
         else:
-            utility.t_target = get_value(utility.t_target)
-        if get_value(utility.dt_cont) == None:
-            utility.dt_cont = config.DTCONT
-        else:
-            utility.dt_cont = get_value(utility.dt_cont)
-        if get_value(utility.price) == None:
-            utility.price = config.UTILITY_PRICE * config.ANNUAL_OP_TIME
-        else:
-            utility.price = get_value(utility.price)
-        if get_value(utility.htc) == None or get_value(utility.htc) == 0:
-            utility.htc = config.HTC
-        else:
-            utility.htc = get_value(utility.htc)
+            utility.t_target = t_target
+
+        dt_cont = get_value(utility.dt_cont)
+        utility.dt_cont = config.DTCONT if dt_cont is None else dt_cont
+
+        price = get_value(utility.price)
+        utility.price = (
+            config.UTILITY_PRICE * config.ANNUAL_OP_TIME
+            if price is None
+            else price
+        )
+
+        htc = get_value(utility.htc)
+        utility.htc = config.HTC if not htc else htc
+
         if (
             utility.type in ["Hot", "Both"]
             and utility.active
@@ -347,51 +355,37 @@ def _create_utilities_list(
 ) -> Tuple[List[Stream], List[UtilitySchema]]:
     """Creates a sorted list of hot or cold Stream objects based on type."""
     created_utilities = StreamCollection()
-    T_prev = 1e9
 
-    # Find the first utility of the specified type
-    for selected in utilities:
-        if selected.type in ["Both", utility_type] and selected.active:
-            break
+    def _sort_key(selected: UtilitySchema):
+        order = selected.t_supply
+        return -order if utility_type == StreamType.Hot.value else order
 
-    prev_selected_name = ""
+    candidates = sorted(
+        (
+            u
+            for u in utilities
+            if u.active and u.type in ["Both", utility_type]
+        ),
+        key=_sort_key,
+    )
 
-    for _ in range(len(utilities)):
-        # Cycle through all utilities as candidates, comparing each candidate agaist the previous utility selected and the best found (U)
-        for candidate in utilities:
-            is_valid = (
-                candidate.type in ["Both", utility_type]
-                and candidate.t_supply < T_prev
-                and (
-                    candidate.t_supply >= selected.t_supply
-                    or selected.name == prev_selected_name
-                )
-                and candidate.active
-            )
-            if is_valid:
-                selected = candidate
-
-        # If no different utility is identified, break
-        if selected.name == prev_selected_name:
-            break
-
-        T_prev = selected.t_supply
-        if selected.type in [utility_type]:
+    for selected in candidates:
+        if selected.type == utility_type:
             selected.active = False
 
-        if utility_type == "Hot":
+        if utility_type == StreamType.Hot.value:
             t_supply = max(selected.t_supply, selected.t_target)
             t_target = min(selected.t_supply, selected.t_target)
         else:
             t_supply = min(selected.t_supply, selected.t_target)
             t_target = max(selected.t_supply, selected.t_target)
 
-        # Create utility
         key = (
             ".".join([StreamLoc.HotU.value, selected.name])
             if utility_type == StreamType.Hot.value
             else ".".join([StreamLoc.ColdU.value, selected.name])
         )
+
         created_utilities.add(
             Stream(
                 name=selected.name,
@@ -404,7 +398,6 @@ def _create_utilities_list(
             ),
             key,
         )
-        prev_selected_name = selected.name
 
     return created_utilities, utilities
 
@@ -504,14 +497,11 @@ def _validate_utilities_passed_in(utilities: List[UtilitySchema]) -> list:
 def _validate_config_data_completed(config: Configuration) -> Configuration:
     """Validates that the configuration settings make logical sense."""
     # Check if annual operation time is set
-    if (
-        isinstance(config.ANNUAL_OP_TIME, float | int) == False
-        or config.ANNUAL_OP_TIME == 0
-    ):
+    if not isinstance(config.ANNUAL_OP_TIME, (int, float)) or config.ANNUAL_OP_TIME == 0:
         config.ANNUAL_OP_TIME = 365 * 24  # h/y
     # Ensures the inlet pressure to the turbine is below the critical pressure
     # TODO: Add units to the turbine pressure
-    if config.TURBINE_WORK_BUTTON is True and config.P_TURBINE_BOX > 220:
+    if config.TURBINE_WORK_BUTTON and config.P_TURBINE_BOX > 220:
         config.P_TURBINE_BOX = 200
     if config.DTGLIDE <= 0:
         config.DTGLIDE = 0.01
