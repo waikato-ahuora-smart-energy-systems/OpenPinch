@@ -1,8 +1,7 @@
+from typing import Optional, TYPE_CHECKING
 from ..lib.enums import *
 from ..lib.config import *
-from typing import Optional, TYPE_CHECKING
 from .stream_collection import StreamCollection
-from .value import Value
 from .target import EnergyTarget
 
 if TYPE_CHECKING:
@@ -26,6 +25,7 @@ class Zone():
         self._active = True
         self._subzones = {}
         self._targets = {}
+        self._graphs = {}
         
         # === Streams & Utilities ===
         self._hot_streams: StreamCollection = StreamCollection()
@@ -58,15 +58,9 @@ class Zone():
     def parent_zone(self, value): self._parent_zone = value    
 
     @property
-    def active(self) -> bool:
-        """Whether the stream is active in analysis."""
-        if isinstance(self._active, Value):
-            return self._active.value
-        else:
-            return self._active
+    def active(self) -> bool: return bool(self._active)
     @active.setter
-    def active(self, value: bool):
-        self._active = Value(value)
+    def active(self, value: bool): self._active = bool(value)
 
     @property
     def hot_streams(self): return self._hot_streams
@@ -171,12 +165,6 @@ class Zone():
             loc[base_name] = zone_to_add            
 
 
-    def add_zones(self, zones: dict, sub: bool = True):
-        """Add multiple zones. Zones must be iterable of objects with a string .name."""
-        for z in zones:
-            self.add_zone(z, sub)
-
-
     def add_target(self, target_to_add: EnergyTarget):
         """Add one target to a specific zone."""
         self._targets[target_to_add.name] = target_to_add
@@ -198,13 +186,13 @@ class Zone():
 
     def get_subzone(self, loc: str):
         loc_address = loc.split("/")
-        try:
-            z = self
-            for sub in loc_address:
-                z = z.subzones[sub]
-            return z
-        except:
-            return ValueError("Subzone not found.")
+        zone = self
+        for sub in loc_address:
+            try:
+                zone = zone.subzones[sub]
+            except KeyError as exc:
+                raise ValueError(f"Subzone '{loc}' not found.") from exc
+        return zone
 
 
     def calc_utility_cost(self):
