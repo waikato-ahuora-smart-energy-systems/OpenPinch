@@ -3,7 +3,7 @@ from time import perf_counter as timer
 from functools import wraps
 import atexit
 from collections import defaultdict
-from ..lib import config
+from ..lib import *
 
 # Configure logging to both console and file
 logging.basicConfig(

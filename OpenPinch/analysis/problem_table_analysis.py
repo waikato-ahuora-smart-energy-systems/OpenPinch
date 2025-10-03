@@ -2,23 +2,23 @@ import numpy as np
 from typing import Tuple
 from ..utils.water_properties import Tsat_p
 from ..lib import *
-from ..classes import StreamCollection, ProblemTable, Stream
-from .support_methods import insert_temperature_interval_into_pt, linear_interpolation
+from ..classes import *
+from .support_methods import *
 
-__all__ = ["problem_table_algorithm, calc_problem_table"]
+__all__ = ["get_process_heat_cascade, get_utility_heat_cascade"]
 
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
-def problem_table_algorithm(hot_streams: StreamCollection, cold_streams: StreamCollection, all_streams: StreamCollection, config: Configuration) -> Tuple[ProblemTable, ProblemTable, dict]:
-    """Perform the problem table algorithm for a given set of hot and cold streams."""
+def get_process_heat_cascade(hot_streams: StreamCollection, cold_streams: StreamCollection, all_streams: StreamCollection, config: Configuration) -> Tuple[ProblemTable, ProblemTable, dict]:
+    """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
     pt, pt_real = _get_temperature_intervals(streams=all_streams, config=config)
     
     # Perform the heat cascade of the problem table
-    pt, pt_real = calc_problem_table(pt, hot_streams, cold_streams), calc_problem_table(pt_real, hot_streams, cold_streams, False)
+    pt, pt_real = _problem_table_algorithm(pt, hot_streams, cold_streams), _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
     target_values = _set_zonal_targets(pt, pt_real)
     
     # Correct the location of the cold composite curve and limiting GCC (real temperatures)
@@ -30,7 +30,24 @@ def problem_table_algorithm(hot_streams: StreamCollection, cold_streams: StreamC
     return pt, pt_real, target_values
 
 
-def calc_problem_table(pt: ProblemTable, hot_streams: StreamCollection = None, cold_streams: StreamCollection = None, shifted: bool = True) -> ProblemTable:
+def get_utility_heat_cascade(pt: ProblemTable, hot_utilities: List[Stream], cold_utilities: List[Stream], shifted: bool = True) -> ProblemTable:
+    """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
+    pt_temp = _problem_table_algorithm(
+        ProblemTable({PT.T.value: pt.col[PT.T.value]}), 
+        hot_utilities, cold_utilities, shifted
+    )
+    pt.col[PT.H_UT_NET.value] = pt_temp.col[PT.H_NET.value].max() - pt_temp.col[PT.H_NET.value]
+    pt.col[PT.RCP_HOT_UT.value] = pt_temp.col[PT.RCP_HOT.value]
+    pt.col[PT.RCP_COLD_UT.value] = pt_temp.col[PT.RCP_COLD.value]
+    pt.col[PT.RCP_UT_NET.value] = pt_temp.col[PT.RCP_HOT.value] + pt_temp.col[PT.RCP_COLD.value]
+    return pt
+
+
+#######################################################################################################
+# Helper functions
+#######################################################################################################
+
+def _problem_table_algorithm(pt: ProblemTable, hot_streams: StreamCollection = None, cold_streams: StreamCollection = None, shifted: bool = True) -> ProblemTable:
     """Fast calculation of the problem table using vectorized operations."""
 
     # If streams are provided, calculate CP and RCP contributions per temperature interval
@@ -86,10 +103,6 @@ def calc_problem_table(pt: ProblemTable, hot_streams: StreamCollection = None, c
 
     return pt
 
-
-#######################################################################################################
-# Helper functions
-#######################################################################################################
 
 def _get_temperature_intervals(streams: List[Stream] = [], config: Configuration = None) -> Tuple[ProblemTable, ProblemTable]:
     """Returns unordered T and T* intervals for given streams and utilities."""

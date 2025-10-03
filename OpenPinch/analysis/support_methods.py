@@ -1,8 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 import numpy as np
 import math
 from typing import List, Tuple, Union
 from ..lib import *
-from ..classes.problem_table import ProblemTable
+
+if TYPE_CHECKING:
+    from ..classes import *
 
 
 def get_pinch_loc(pt: ProblemTable, col=PT.H_NET.value) -> tuple[int, int, bool]:

@@ -7,9 +7,11 @@ code can construct validated inputs.
 """
 
 from .classes import PinchProblem
-from .main import get_targets, get_visualise, pinch_analysis_service
-from .analysis.stream_linearisation import get_piecewise_linearisation_for_streams
-from .lib import *  # noqa: F401,F403 - re-export schema/config/enum types
+from .main import pinch_analysis_service
+from .scales import get_targets, get_visualise
+from .utils.stream_linearisation import get_piecewise_linearisation_for_streams
+from .lib import * 
+from .scales import *
 
 __all__ = [
     "PinchProblem",

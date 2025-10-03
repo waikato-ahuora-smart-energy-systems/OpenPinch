@@ -64,8 +64,8 @@ def test_empty_stream_lists_returns_zero():
     assert CP_cold == [0, 0, 0]
 
 
-"""Tests for calc_problem_table function."""
-from OpenPinch.analysis.problem_table_analysis import calc_problem_table
+"""Tests for _problem_table_algorithm function."""
+from OpenPinch.analysis.problem_table_analysis import _problem_table_algorithm
 
 def make_simple_problem_table():
     data = {
@@ -85,7 +85,7 @@ def make_simple_problem_table():
 
 def test_calc_problem_table_cascade_correct():
     pt_real = make_simple_problem_table()
-    result = calc_problem_table(pt_real.copy)
+    result = _problem_table_algorithm(pt_real.copy)
 
     # Check composite curves calculated
     assert result.loc[0, PT.H_NET.value] == 0  # GCC starts at 0
@@ -93,12 +93,12 @@ def test_calc_problem_table_cascade_correct():
 
 def test_delta_t_computation():
     pt_real = make_simple_problem_table()
-    result = calc_problem_table(pt_real.copy)
+    result = _problem_table_algorithm(pt_real.copy)
     assert result.col[PT.DELTA_T.value].tolist() == [0, 100, 100]
 
 def test_net_mcp_and_delta_h():
     pt_real = make_simple_problem_table()
-    result = calc_problem_table(pt_real.copy)
+    result = _problem_table_algorithm(pt_real.copy)
     expected_mcp_net = [0, -1.0, 1.0]
     expected_delta_h_net = [0, -100.0, 100.0]
     assert result.col[PT.MCP_NET.value].tolist() == expected_mcp_net
@@ -106,7 +106,7 @@ def test_net_mcp_and_delta_h():
 
 def test_shifting_behavior():
     pt_real = make_simple_problem_table()
-    result = calc_problem_table(pt_real.copy)
+    result = _problem_table_algorithm(pt_real.copy)
     assert result.col[PT.H_NET.value].min() == 0
     assert abs(result.loc[-1, PT.H_COLD.value] - result.loc[-1, PT.H_HOT.value]) < 1e-6  # Should be nearly equal after shift
 
@@ -262,8 +262,8 @@ def test_single_row_problem_table():
     assert isinstance(z["degree_of_int"], float)
 
 
-"""Test problem_table_algorithm"""
-from OpenPinch.analysis.problem_table_analysis import problem_table_algorithm
+"""Test get_process_heat_cascade"""
+from OpenPinch.analysis.problem_table_analysis import get_process_heat_cascade
 
 def test_problem_table_algorithm_executes():
     z = Zone(name="Z")
@@ -274,7 +274,7 @@ def test_problem_table_algorithm_executes():
     z.pt_real = ProblemTable()
 
     
-    _, _, target_values = problem_table_algorithm(z.hot_streams, z.cold_streams, z.all_streams, z.config)
+    _, _, target_values = get_process_heat_cascade(z.hot_streams, z.cold_streams, z.all_streams, z.config)
     assert target_values["hot_utility_target"] == 1.0
     assert target_values["cold_utility_target"] == 0.0
     assert target_values["heat_recovery_target"] == 1.0

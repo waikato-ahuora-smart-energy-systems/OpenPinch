@@ -1,17 +1,21 @@
 import numpy as np
 from ..utils import *
-from ..lib.enums import *
+from ..lib import *
 from ..classes import *
-from .support_methods import *
-from .problem_table_analysis import calc_problem_table
+from .support_methods import (
+    get_pinch_loc, 
+    linear_interpolation,
+    insert_temperature_interval_into_pt,
+)
+from .problem_table_analysis import get_utility_heat_cascade
 
-__all__ = ["get_zonal_utility_targets, target_utility, calc_GGC_utility"]
+__all__ = ["get_utility_targets"]
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
-def get_zonal_utility_targets(
+def get_utility_targets(
     pt: ProblemTable,
     pt_real: ProblemTable,
     hot_utilities: StreamCollection,
@@ -49,20 +53,23 @@ def get_zonal_utility_targets(
 
     # Target multiple utility use
     if is_process_zone:
-        hot_utilities = target_utility(hot_utilities, pt, PT.T.value, PT.H_COLD_NET.value)
-        cold_utilities = target_utility(cold_utilities, pt, PT.T.value, PT.H_HOT_NET.value)
+        hot_utilities = _target_utility(hot_utilities, pt, PT.T.value, PT.H_COLD_NET.value)
+        cold_utilities = _target_utility(cold_utilities, pt, PT.T.value, PT.H_HOT_NET.value)
     
-    pt = calc_GGC_utility(pt, hot_utilities, cold_utilities, shifted=True)
+    pt = get_utility_heat_cascade(pt, hot_utilities, cold_utilities, shifted=True)
     pt = _calc_seperated_heat_load_profiles(pt, col_H_net=PT.H_UT_NET.value, col_H_cold_net=PT.H_COLD_UT.value, col_H_hot_net=PT.H_HOT_UT.value)
     
-    pt_real = calc_GGC_utility(pt_real, hot_utilities, cold_utilities, shifted=False)
+    pt_real = get_utility_heat_cascade(pt_real, hot_utilities, cold_utilities, shifted=False)
     pt_real = _calc_seperated_heat_load_profiles(pt_real, col_H_net=PT.H_UT_NET.value, col_H_cold_net=PT.H_COLD_UT.value, col_H_hot_net=PT.H_HOT_UT.value)
     pt_real = _calc_balanced_CC(pt_real)
 
     return pt, pt_real, hot_utilities, cold_utilities
 
+#######################################################################################################
+# Helper functions: get_utility_targets
+#######################################################################################################
 
-def target_utility(utilities: List[Stream], pt: ProblemTable, col_T: str, col_H: str, real_T=False) -> List[Stream]:
+def _target_utility(utilities: List[Stream], pt: ProblemTable, col_T: str, col_H: str, real_T=False) -> List[Stream]:
     """Targets multiple utility use considering a fixed target temperature."""
     if len(utilities) == 0:
         return utilities
@@ -82,23 +89,6 @@ def target_utility(utilities: List[Stream], pt: ProblemTable, col_T: str, col_H:
 
     return utilities
 
-
-def calc_GGC_utility(pt: ProblemTable, hot_utilities: List[Stream], cold_utilities: List[Stream], shifted: bool = True) -> ProblemTable:
-    """Returns the GCC profile for utility use of a process as a DataFrame."""
-    pt_temp = calc_problem_table(
-        ProblemTable({PT.T.value: pt.col[PT.T.value]}), 
-        hot_utilities, cold_utilities, shifted
-    )
-    pt.col[PT.H_UT_NET.value] = pt_temp.col[PT.H_NET.value].max() - pt_temp.col[PT.H_NET.value]
-    pt.col[PT.RCP_HOT_UT.value] = pt_temp.col[PT.RCP_HOT.value]
-    pt.col[PT.RCP_COLD_UT.value] = pt_temp.col[PT.RCP_COLD.value]
-    pt.col[PT.RCP_UT_NET.value] = pt_temp.col[PT.RCP_HOT.value] + pt_temp.col[PT.RCP_COLD.value]
-    return pt
-
-
-#######################################################################################################
-# Helper functions: get_zonal_utility_targets
-#######################################################################################################
 
 def _calc_GCC_without_pockets(pt: ProblemTable, col_H_NP: str =PT.H_NET_NP.value, col_H: str =PT.H_NET.value) -> Tuple[ProblemTable, ProblemTable]:
     """Flatten GCC pockets by inserting breakpoints so the profile becomes monotonic."""
@@ -258,7 +248,7 @@ def _calc_balanced_CC(pt: ProblemTable) -> ProblemTable:
 # Helper functions: assisted integration
 #######################################################################################################
 
-def _calc_GCC_assisted_integration(pt: ProblemTable, dt_cut: float = 10, dt_cut_min: float = 0) -> ProblemTable:
+def _calc_GCC_with_partial_pockets(pt: ProblemTable, dt_cut: float = 10, dt_cut_min: float = 0) -> ProblemTable:
     """Modify PT in-place to reflect assisted GCC and return the GCC_AI result."""
 
     # pt.col[PT.H_NET_PK.value] = pt.col[PT.H_NET.value] - pt.col[PT.H_NET_NP.value]
@@ -285,7 +275,7 @@ def _calc_GCC_assisted_integration(pt: ProblemTable, dt_cut: float = 10, dt_cut_
 
 
 #######################################################################################################
-# Helper functions: target_utility
+# Helper functions: _target_utility
 #######################################################################################################
 
 def _assign_utility(pt: ProblemTable, col_T: Enum, col_H: Enum, u_ls: List[Stream], pinch_row: int, is_hot_ut: bool, real_T: bool) -> List[Stream]:

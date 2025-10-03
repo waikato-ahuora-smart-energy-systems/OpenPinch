@@ -1,5 +1,5 @@
 import math
-from ..lib.enums import HeatExchangerTypes as HX
+from ..lib import HeatExchangerTypes as HX
 
 
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):

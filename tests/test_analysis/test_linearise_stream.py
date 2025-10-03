@@ -1,7 +1,7 @@
 import pytest
 import matplotlib.pyplot as plt
 import numpy as np, json, os
-from OpenPinch.analysis.stream_linearisation import *
+from OpenPinch.utils.stream_linearisation import *
 
 def import_t_h_data(filename):
     json_path = os.path.join(os.path.dirname(__file__), f"test_linearise_stream_data/{filename}.json")

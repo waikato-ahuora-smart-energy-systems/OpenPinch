@@ -113,7 +113,7 @@ def test_random_float_noise():
 
 
 """Tests for get_pinch_temperatures."""
-from OpenPinch.analysis.operation_analysis import get_pinch_temperatures
+from OpenPinch.scales.unit_operation_analysis import get_pinch_temperatures
 
 @pytest.mark.parametrize("case, h_vals, t_vals, expected", [
     ("standard_case", [100, 0.0, 100], [300, 250, 200], (250, 250)),
@@ -132,7 +132,7 @@ def test_get_pinch_temperatures(case, h_vals, t_vals, expected):
 
 
 """Tests for shift_heat_cascade."""
-from OpenPinch.analysis.operation_analysis import shift_heat_cascade
+from OpenPinch.scales.unit_operation_analysis import shift_heat_cascade
 
 def test_shift_heat_cascade_with_enum_col():
     pt = ProblemTable({
@@ -226,45 +226,45 @@ def test_lmtd_cold_fluid_cools_down_invalid():
         find_LMTD(150, 100, 80, 60)
 
 
-"""Test cases for the capital_recovery_factor function."""  
+"""Test cases for the compute_capital_recovery_factor function."""  
 
 def test_crf_typical_case():
     """Test with typical values for interest and years."""
     i = 0.08
     n = 10
-    result = capital_recovery_factor(i, n)
+    result = compute_capital_recovery_factor(i, n)
     expected = i * (1 + i) ** n / ((1 + i) ** n - 1)
     assert math.isclose(result, expected, rel_tol=1e-9)
 
 def test_crf_high_interest():
     """Test with a high interest rate."""
-    result = capital_recovery_factor(0.2, 5)
+    result = compute_capital_recovery_factor(0.2, 5)
     assert result > 0.2
 
 def test_crf_long_term():
     """Test for long project duration (n=30)."""
-    result = capital_recovery_factor(0.05, 30)
+    result = compute_capital_recovery_factor(0.05, 30)
     assert result < 0.1
 
 def test_crf_short_term():
     """Test with a short project duration (n=1)."""
-    result = capital_recovery_factor(0.1, 1)
+    result = compute_capital_recovery_factor(0.1, 1)
     expected = 1.1
     assert math.isclose(result, expected, rel_tol=1e-9)
 
 def test_crf_zero_interest_raises():
     """Zero interest should raise ZeroDivisionError."""
     with pytest.raises(ZeroDivisionError):
-        capital_recovery_factor(0.0, 10)
+        compute_capital_recovery_factor(0.0, 10)
 
 def test_crf_zero_years_raises():
     """Zero years should raise ZeroDivisionError."""
     with pytest.raises(ZeroDivisionError):
-        capital_recovery_factor(0.08, 0)
+        compute_capital_recovery_factor(0.08, 0)
 
 def test_crf_negative_interest():
     """Negative interest should compute (though rarely used)."""
-    result = capital_recovery_factor(-0.01, 10)
+    result = compute_capital_recovery_factor(-0.01, 10)
     assert isinstance(result, float)
 
 

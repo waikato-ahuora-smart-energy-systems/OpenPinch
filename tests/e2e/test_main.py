@@ -1,8 +1,8 @@
 import pytest
-import json, os
+import json
 from pathlib import Path
 from OpenPinch.lib import *
-from OpenPinch.main import *
+from OpenPinch import *
 from OpenPinch.analysis.support_methods import get_value
 
 

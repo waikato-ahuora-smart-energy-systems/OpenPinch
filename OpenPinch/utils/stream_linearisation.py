@@ -175,4 +175,3 @@ def _get_piecewise_breakpoints(curve: np.array, epsilon: float, is_hot_stream: b
             break
 
     return pw_points
-

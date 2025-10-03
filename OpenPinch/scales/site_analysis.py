@@ -1,11 +1,11 @@
 from typing import Tuple
 from copy import deepcopy
 from ..lib import *
-from ..classes import Zone, EnergyTarget, Stream, StreamCollection, ProblemTable
-from .utility_targeting import get_zonal_utility_targets, calc_GGC_utility
-from .support_methods import key_name
-from .problem_table_analysis import problem_table_algorithm
-from .process_analysis import get_process_pinch_targets, get_pinch_temperatures
+from ..classes import *
+from ..analysis.utility_targeting import get_utility_targets
+from ..analysis.support_methods import key_name, get_pinch_temperatures
+from ..analysis.problem_table_analysis import get_process_heat_cascade, get_utility_heat_cascade
+from .process_analysis import get_process_targets
 
 
 __all__ = ["get_site_targets"]
@@ -16,22 +16,26 @@ __all__ = ["get_site_targets"]
 #######################################################################################################
 
 def get_site_targets(site: Zone):
-    """Targets a Total Site by systematically analysing individual zones and then performing TS-level analysis."""
+    """Targets indirect heat integration, such as for Total Site, 
+    by systematically analysing individual zones and then performing 
+    TS-level analysis.
+    """
     
-    # Totally integrated analysis
-    site = get_process_pinch_targets(site)
+    if site.config.TIT_BUTTON_SELECTED or 1:
+        # Totally integrated analysis for a site
+        site = get_process_targets(site)
     
-    # Targets process level energy & exergy requirements
+    # Targets process level energy requirements
     z: Zone
     for z in site.subzones.values():
-        z = get_process_pinch_targets(z)
+        z = get_process_targets(z)
     
-    # Sums zonal targets
-    site = _calc_total_zonal_targets(site)
+    # Targets the indirect heat recovery potential within the utility network
+    site = _sum_subzone_targets(site)
     
     # Calculates TS targets based on different approaches
     site.import_net_hot_and_cold_streams_from_sub_zones()
-    site = _calc_site_net_utility_demand(site)
+    site = _get_indirect_heat_integration_targets(site)
 
     return site
 
@@ -40,7 +44,7 @@ def get_site_targets(site: Zone):
 # Helper Functions
 #######################################################################################################
 
-def _calc_total_zonal_targets(site: Zone) -> Zone:
+def _sum_subzone_targets(site: Zone) -> Zone:
     """Sums and records zonal targets."""
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = num_units = area = capital_cost = total_cost = 0.0
@@ -113,7 +117,7 @@ def _set_sites_targets(hot_utility_target, cold_utility_target, heat_recovery_ta
     }
 
 
-def _calc_site_net_utility_demand(site: Zone) -> Zone:
+def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     """Recalculate site-wide utility targets accounting for inter-utility balancing."""
     # Unified Total Zone Analysis - Amir's method
     s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
@@ -136,11 +140,11 @@ def _calc_site_net_utility_demand(site: Zone) -> Zone:
     for u in hot_utilities + cold_utilities:
         utility_cost += u.ut_cost
 
-    pt, pt_real, _ = problem_table_algorithm(site.net_hot_streams, site.net_cold_streams, site.all_net_streams, site.config)
-    pt, pt_real, hot_utilities, cold_utilities = get_zonal_utility_targets(pt, pt_real, hot_utilities, cold_utilities)
+    pt, pt_real, _ = get_process_heat_cascade(site.net_hot_streams, site.net_cold_streams, site.all_net_streams, site.config)
+    pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(pt, pt_real, hot_utilities, cold_utilities)
 
-    pt = calc_GGC_utility(pt, hot_utilities, cold_utilities, shifted=True)
-    pt_real = calc_GGC_utility(pt_real, hot_utilities, cold_utilities, shifted=False)
+    pt = get_utility_heat_cascade(pt, hot_utilities, cold_utilities, shifted=True)
+    pt_real = get_utility_heat_cascade(pt_real, hot_utilities, cold_utilities, shifted=False)
     
     hot_utility_target = pt.loc[0, PT.H_UT_NET.value]
     cold_utility_target = pt.loc[-1, PT.H_UT_NET.value]

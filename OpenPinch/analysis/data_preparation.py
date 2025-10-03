@@ -301,10 +301,10 @@ def _create_utilities_list(utilities: List[UtilitySchema], utility_type: str) ->
         key = ".".join([StreamLoc.HotU.value, selected.name]) if utility_type == StreamType.Hot.value else ".".join([StreamLoc.ColdU.value, selected.name])
         created_utilities.add(
             Stream(
-                selected.name,
-                t_supply,
-                t_target,
-                selected.dt_cont,
+                name=selected.name,
+                t_supply=t_supply,
+                t_target=t_target,
+                dt_cont=selected.dt_cont,
                 htc=selected.htc,
                 price=selected.price,
                 is_process_stream=False,

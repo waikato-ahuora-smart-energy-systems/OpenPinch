@@ -2,18 +2,22 @@ import copy
 from typing import Optional
 from ..utils import *
 from ..classes import *
-from .support_methods import *
+from ..analysis.support_methods import *
 
 
 # TODO: Refactor this entire file.
 
-__all__ = ["get_energy_transfer_retrofit_analysis"]
+__all__ = ["get_unit_operation_targets"]
 
 #######################################################################################################
 # Public API --- TODO
 #######################################################################################################
 
-def get_energy_transfer_retrofit_analysis(site: Zone):
+def get_unit_operation_targets(site: Zone):
+    pass
+
+
+def etd(site: Zone):
     """
     Calculates the ETD and retrofit targets.
     """

@@ -3,12 +3,12 @@ import os, json
 import pandas as pd
 from OpenPinch.lib import * 
 from OpenPinch.analysis.support_methods import *
-from OpenPinch.classes import Zone
+from OpenPinch.classes import *
 from OpenPinch.analysis.data_preparation import prepare_problem_struture
 
 
-"""Tests for target_utility"""
-from OpenPinch.analysis.utility_targeting import target_utility
+"""Tests for _target_utility"""
+from OpenPinch.analysis.utility_targeting import _target_utility
 
 def get_test_filenames():
     test_data_dir = os.path.dirname(__file__) + '/test_utility_targeting_data'
@@ -36,8 +36,8 @@ def test_target_utility(filename):
         GHLP_P.col[PT.H_COLD_NET.value] = plant.data.H_cold_net
         GHLP_P.col[PT.H_HOT_NET.value] = plant.data.H_hot_net
 
-        z.hot_utilities = target_utility(z.hot_utilities, GHLP_P, PT.T.value, PT.H_COLD_NET.value)
-        z.cold_utilities = target_utility(z.cold_utilities, GHLP_P, PT.T.value, PT.H_HOT_NET.value)
+        z.hot_utilities = _target_utility(z.hot_utilities, GHLP_P, PT.T.value, PT.H_COLD_NET.value)
+        z.cold_utilities = _target_utility(z.cold_utilities, GHLP_P, PT.T.value, PT.H_HOT_NET.value)
 
     with open(r_file_path) as json_data:
         wkb_res = json.load(json_data)
