@@ -9,6 +9,7 @@ from ..analysis.support_methods import get_pinch_temperatures, key_name
 from ..analysis.utility_targeting import get_utility_targets
 from ..classes import *
 from ..lib import *
+from ..utils import *
 from .process_analysis import get_process_targets
 
 __all__ = ["get_site_targets"]
@@ -18,7 +19,7 @@ __all__ = ["get_site_targets"]
 # Public API
 #######################################################################################################
 
-
+@timing_decorator
 def get_site_targets(site: Zone):
     """Targets indirect heat integration, such as for Total Site,
     by systematically analysing individual zones and then performing
@@ -82,8 +83,6 @@ def _sum_subzone_targets(site: Zone) -> Zone:
             num_units += t.num_units
             area += t.area
             # capital_cost = t.capital_cost
-
-        # total_cost += t.total_cost
 
     heat_recovery_limit = site.targets[
         f"{site.name}/{TargetType.DI.value}"
@@ -170,18 +169,10 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
         site.net_hot_streams, site.net_cold_streams, site.all_net_streams, site.config
     )
 
-    # Conventional total site utility targets
-    # TODO: add an option to config to calculate the conventional total site profiles and targets.
-    # pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(
-    #     pt, pt_real, hot_utilities, cold_utilities
-    # )
-
     # Get utility duties based on the summation of subzones
     s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
     hot_utilities = deepcopy(s_tzt.hot_utilities)
     cold_utilities = deepcopy(s_tzt.cold_utilities)
-
-    # hot_utilities, cold_utilities = _match_utility_gen_and_use_at_same_level(s_tzt)
 
     # Apply the problem table algorithm to the simple sum of subzone utility use 
     pt = get_utility_heat_cascade(
@@ -230,6 +221,7 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
             "cold_utilities": cold_utilities,
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
+            "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
         },
     )
     return site

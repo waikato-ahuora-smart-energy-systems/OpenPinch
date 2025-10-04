@@ -11,7 +11,7 @@ import numpy as np
 
 from ..classes import *
 from ..lib import *
-from ..utils.water_properties import Tsat_p
+from ..utils import *
 from .support_methods import *
 
 __all__ = ["get_process_heat_cascade", "get_utility_heat_cascade"]
@@ -21,7 +21,7 @@ __all__ = ["get_process_heat_cascade", "get_utility_heat_cascade"]
 # Public API
 #######################################################################################################
 
-
+@timing_decorator
 def get_process_heat_cascade(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
@@ -51,7 +51,7 @@ def get_process_heat_cascade(
 
     return pt, pt_real, target_values
 
-
+@timing_decorator
 def get_utility_heat_cascade(
     pt: ProblemTable,
     hot_utilities: List[Stream],

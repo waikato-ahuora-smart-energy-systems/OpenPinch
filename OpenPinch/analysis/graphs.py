@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 
 from ..classes import *
 from ..lib import *
+from ..utils import *
 
 DECIMAL_PLACES = 2
 
@@ -14,7 +15,7 @@ __all__ = ["get_output_graphs, visualise_graphs"]
 # Public API
 #######################################################################################################
 
-
+@timing_decorator
 def get_output_graphs(zone: Zone, graph_sets: dict = {}) -> dict:
     """Returns Json data points for each process."""
     for key, t in zone.targets.items():

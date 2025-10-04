@@ -90,7 +90,7 @@ def get_utility_targets(
 # Helper functions: get_utility_targets
 #######################################################################################################
 
-
+@timing_decorator
 def _target_utility(
     utilities: List[Stream], pt: ProblemTable, col_T: str, col_H: str, real_T=False
 ) -> List[Stream]:
