@@ -3,7 +3,7 @@
 from typing import List
 
 from ..classes import *
-from ..analysis.graphs import get_output_graphs
+from ..analysis.graph_data import get_output_graph_data
 
 __all__ = ["extract_results"]
 
@@ -19,7 +19,7 @@ def extract_results(master_zone: Zone) -> dict:
         "name": master_zone.name,
         "targets": _get_report(master_zone),
         "utilities": _get_utilities(master_zone),
-        "graphs": get_output_graphs(master_zone),
+        "graphs": get_output_graph_data(master_zone),
     }
 
 

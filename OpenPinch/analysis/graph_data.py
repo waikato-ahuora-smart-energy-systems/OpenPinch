@@ -8,7 +8,7 @@ from ..utils import *
 
 DECIMAL_PLACES = 2
 
-__all__ = ["get_output_graphs, visualise_graphs"]
+__all__ = ["get_output_graph_data, visualise_graphs"]
 
 
 #######################################################################################################
@@ -16,14 +16,14 @@ __all__ = ["get_output_graphs, visualise_graphs"]
 #######################################################################################################
 
 @timing_decorator
-def get_output_graphs(zone: Zone, graph_sets: dict = {}) -> dict:
+def get_output_graph_data(zone: Zone, graph_sets: dict = {}) -> dict:
     """Returns Json data points for each process."""
     for key, t in zone.targets.items():
         graph_sets[key] = _create_graph_set(t, key)
 
     if len(zone.subzones) > 0:
         for z in zone.subzones.values():
-            graph_sets = get_output_graphs(z, graph_sets)
+            graph_sets = get_output_graph_data(z, graph_sets)
 
     return graph_sets
 

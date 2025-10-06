@@ -15,6 +15,7 @@ dependencies=[
   "pyxlsb",
   "matplotlib",
   "scipy",
+  "streamlit",
 ]
 version = "0.0.20"
 authors = [

@@ -2,13 +2,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from OpenPinch.analysis.graphs import (
+from OpenPinch.analysis.graph_data import (
     _clean_composite,
     _create_curve,
     _create_graph_set,
     _graph_cc,
     _graph_gcc,
-    get_output_graphs,
+    get_output_graph_data,
     visualise_graphs,
 )
 from OpenPinch.classes import Zone
@@ -112,11 +112,11 @@ def test_visualise_graphs_gcc_utility():
 
 
 # ----------------------------------------------------------------------------------------------------
-# Tests for get_output_graphs
+# Tests for get_output_graph_data
 # ----------------------------------------------------------------------------------------------------
 
 
-def test_get_output_graphs_single_zone(monkeypatch):
+def test_get_output_graph_data_single_zone(monkeypatch):
     zone = MagicMock(spec=Zone)
     zone.name = "Site"
     zone.subzones = {}
@@ -126,5 +126,5 @@ def test_get_output_graphs_single_zone(monkeypatch):
         "OpenPinch.analysis.graphs._create_graph_set",
         lambda z, n: {"name": n, "graphs": []},
     )
-    result = get_output_graphs(zone)
+    result = get_output_graph_data(zone)
     assert result[TargetType.DI.value]["graphs"] == []
