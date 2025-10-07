@@ -142,7 +142,7 @@ def test_export_without_results_dir_raises(sample_problem):
     obj._problem_data = sample_problem
     obj._results = {"ok": True}
     with pytest.raises(ValueError):
-        obj.export(None)
+        obj.export_to_Excel(None)
 
 
 def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
@@ -163,7 +163,7 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
     obj._results = {"foo": "bar"}  # Pretend targeting already ran
     dest = tmp_path / "out"
 
-    path = obj.export(dest)
+    path = obj.export_to_Excel(dest)
 
     assert path == dest / "targets.xlsx"
     assert called["args"][0] == {"foo": "bar"}
@@ -186,11 +186,9 @@ def test_repr_changes_with_state(tmp_path: Path):
     assert "results=no" in r
 
     # set paths / results and check
-    obj.problem_filepath = tmp_path / "p.json"
     obj.results_dir = tmp_path / "out"
     obj._results = {}
     r2 = repr(obj)
-    assert str(obj.problem_filepath) in r2
     assert str(obj.results_dir) in r2
     assert "results=yes" in r2
 

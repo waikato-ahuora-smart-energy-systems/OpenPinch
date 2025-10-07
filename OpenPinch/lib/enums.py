@@ -71,8 +71,8 @@ class StreamID(Enum):
 class StreamLoc(Enum):
     """Stream set identity"""
 
-    HotStr = "Hot Streams"
-    ColdStr = "Cold Streams"
+    HotS = "Hot Streams"
+    ColdS = "Cold Streams"
     HotU = "Hot Utility"
     ColdU = "Cold Utility"
     Unassigned = "Unassigned"
@@ -82,7 +82,7 @@ class ProblemTableLabel(Enum):
     """Problem table column header labels"""
 
     T = "T"
-    DELTA_T = "delta_T"
+    DELTA_T = "\N{GREEK CAPITAL LETTER DELTA}T"
     CP_HOT = "mcp_hot_tot"
     DELTA_H_HOT = "delta_H_hot"
     H_HOT = "H_hot"
@@ -145,35 +145,32 @@ class ArrowHead(Enum):
 class LineColour(Enum):
     """Line colour selection"""
 
-    Hot = 0
-    Cold = 1
-    Other = 2
-    Black = 3
-
+    HotS = 0
+    ColdS = 1
+    HotU = 2
+    ColdU = 3
+    Black = 5
+    Other = 4
 
 class GraphType(Enum):
-    CC = "CC"
-    SCC = "SCC"
-    BCC = "BCC"
-    GCC = "GCC"
-    GCC_NP = "GCC_NP"
-    GCCU = "GCCU"
-    LGCC = "LGCC"
-    ERC = "ERC"
-    NLC = "NLC"
-    EC = "EC"
-    PT = "PT"
-    PT_star = "PT_star"
-    GCC_Ex = "GCC_Ex"
-    GCC_Act = "GCC_Act"
-    GCC_Ut = "GCC_Ut"
-    GCC_Ut_star = "GCC_Ut_star"
-    GCC_X = "GCC_X"
-    SHL = "SHL"
-    TSP = "TSP"
-    TSU = "TSU"
-    TSU_star = "TSU_star"
-    SUGCC = "SUGCC"
+    CC = "Composite Curves"
+    SCC = "Shifted Composite Curves"
+    BCC = "Balanced Composite Curves"
+
+    GCC = "Grand Composite Curve"
+    GCC_N = "Grand Composite Curve (No Pockets)"
+    GCC_V = "Vertical GCC Grand Composite Curve"
+    GCC_A = "Actual Grand Composite Curve"    
+    GCC_U = "Utility Grand Composite Curve"
+    GCC_U_real = "Utility Grand Composite Curve (Real)"
+    GCC_X = "Exergetic Grand Composite Curve"
+    GCC_Lim = "Thermodynamic Limiting GCC"
+
+    NLC = "Net Load Curves"
+    TSP = "Total Site Profiles"
+    TSU = "Total Site Utility"
+    # TSU_real = "Total Site Utility"
+    SUGCC = "Site Utility Grand Composite Curve"
 
 
 ResultsType = GT = GraphType

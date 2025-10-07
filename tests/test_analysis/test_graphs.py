@@ -101,14 +101,14 @@ def test_visualise_graphs_composite():
 def test_visualise_graphs_gcc_utility():
     graph_set = {"graphs": []}
     graph = MagicMock()
-    graph.type = GT.GCCU.value
+    graph.type = GT.GCC_U.value
     graph.data = {
         PT.T.value: MagicMock(to_list=lambda: [100, 200]),
         PT.H_NET.value: MagicMock(to_list=lambda: [0, -100]),
     }
     visualise_graphs(graph_set, graph)
     assert len(graph_set["graphs"]) == 2
-    assert graph_set["graphs"][1]["type"] == f"{GT.GCCU.value}_Utility"
+    assert graph_set["graphs"][1]["type"] == f"{GT.GCC_U.value}_Utility"
 
 
 # ----------------------------------------------------------------------------------------------------
@@ -123,7 +123,7 @@ def test_get_output_graph_data_single_zone(monkeypatch):
     zone.targets = {TargetType.DI.value: MagicMock(name="TI", graphs={})}
 
     monkeypatch.setattr(
-        "OpenPinch.analysis.graphs._create_graph_set",
+        "OpenPinch.analysis.graph_data._create_graph_set",
         lambda z, n: {"name": n, "graphs": []},
     )
     result = get_output_graph_data(zone)

@@ -50,7 +50,7 @@ def get_utility_targets(
     if is_process_zone:
         pt = _calc_GCC_without_pockets(pt)
     pt = _calc_GCC_with_vertical_heat_transfer(pt)
-    pt = _calc_GCC_actual(pt, is_process_zone)
+    pt = _calc_GCC_Aual(pt, is_process_zone)
     pt = _calc_GGC_pockets(pt)
     # Add assisted integration targeting here...
     pt = _calc_seperated_heat_load_profiles(pt, col_H_net=PT.H_NET_A.value)
@@ -241,7 +241,7 @@ def _calc_GCC_with_vertical_heat_transfer(pt: ProblemTable) -> ProblemTable:
     return pt
 
 
-def _calc_GCC_actual(
+def _calc_GCC_Aual(
     pt: ProblemTable, is_process_zone: bool = True, f_horizontal_HT: float = 1.0
 ) -> ProblemTable:
     """Return the actual GCC based on utility usage and heat transfer direction settings."""

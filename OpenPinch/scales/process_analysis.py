@@ -223,11 +223,12 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
     return {
         GT.CC.value: pt_real[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
+        GT.BCC.value: pt[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
         GT.GCC.value: pt[[PT.T.value, PT.H_NET.value]],
-        GT.GCC_NP.value: pt[[PT.T.value, PT.H_NET_NP.value]],
-        GT.GCC_Ex.value: pt[[PT.T.value, PT.H_NET_V.value]],
-        GT.GCC_Act.value: pt[[PT.T.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
-        GT.SHL.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value]],
-        GT.GCC_Ut.value: pt_real[[PT.T.value, PT.H_UT_NET.value]],
-        GT.GCC_Ut_star.value: pt[[PT.T.value, PT.H_UT_NET.value]],
+        GT.GCC_N.value: pt[[PT.T.value, PT.H_NET_NP.value]],
+        GT.GCC_V.value: pt[[PT.T.value, PT.H_NET_V.value]],
+        GT.GCC_A.value: pt[[PT.T.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
+        GT.GCC_U_real.value: pt_real[[PT.T.value, PT.H_UT_NET.value]],
+        GT.GCC_U.value: pt[[PT.T.value, PT.H_UT_NET.value]],
+        GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value]],
     }

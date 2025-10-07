@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Dict, Iterable, Iterator, List, Mapping, MutableMapping, Optional
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -32,8 +31,10 @@ __all__ = [
 
 # Matplotlib-friendly colours keyed by the internal ``LineColour`` palette.
 _SEGMENT_COLOUR_MAP: Dict[int, str] = {
-    LineColour.Hot.value: "#d62728",  # warm red
-    LineColour.Cold.value: "#1f77b4",  # cool blue
+    LineColour.HotS.value: "#d62728",  # warm red
+    LineColour.ColdS.value: "#1f77b4",  # cool blue
+    LineColour.HotU.value: "#d62728",  # warm red
+    LineColour.ColdU.value: "#1f77b4",  # cool blue
     LineColour.Other.value: "#7f7f7f",  # neutral grey
     LineColour.Black.value: "#111111",
 }
@@ -171,15 +172,14 @@ def render_streamlit_dashboard(
                 str(graph.get("name") or graph.get("type") or f"Graph {idx + 1}")
                 for idx, graph in enumerate(graph_set.graphs)
             ]
-            graph_choice = st.selectbox(
-                "Select graph type",
-                graph_names,
-                key=f"graph_select_{base_key}_{selected_target_name}",
-            )
-            graph = graph_set.graphs[graph_names.index(graph_choice)]
-            figure = _build_matplotlib_graph(graph)
-            st.pyplot(figure, clear_figure=True)
-            plt.close(figure)
+            columns = st.columns(2)
+            for idx, graph in enumerate(graph_set.graphs):
+                column = columns[idx % 2]
+                with column:
+                    st.markdown(f"**{graph_names[idx]}**")
+                    figure = _build_matplotlib_graph(graph)
+                    st.pyplot(figure, clear_figure=True)
+                    plt.close(figure)
 
     with tabs[1]:
         pt_df = problem_table_to_dataframe(
@@ -191,14 +191,15 @@ def render_streamlit_dashboard(
         else:
             st.badge("Extended problem table based on shifted process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
             st.dataframe(pt_df, width="stretch")
-            default_loc = f"results/{selected_target_name.replace("/","-")}_shifted.xlsx"
-            
+            default_loc = f"results/{selected_target_name.replace('/', '-')}_shifted.xlsx"
+
             _build_download(
                 st=st,
                 default=default_loc,
                 base_key=base_key,
                 selected_target_name=selected_target_name,
                 df=pt_df,
+                key_suffix="shifted",
             )
 
     with tabs[2]:
@@ -210,7 +211,7 @@ def render_streamlit_dashboard(
         else:
             st.badge("Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
             st.dataframe(pt_real_df, width="stretch")
-            default_loc = f"results/{selected_target_name.replace("/","-")}_real.xlsx"
+            default_loc = f"results/{selected_target_name.replace('/', '-')}_real.xlsx"
 
             _build_download(
                 st=st,
@@ -218,18 +219,27 @@ def render_streamlit_dashboard(
                 base_key=base_key,
                 selected_target_name=selected_target_name,
                 df=pt_real_df,
+                key_suffix="real",
             )
 
 
-def _build_download(st, default: Path, base_key: str, selected_target_name: str, df: pd.DataFrame):
+def _build_download(
+    st,
+    default: str,
+    *,
+    base_key: str,
+    selected_target_name: str,
+    df: pd.DataFrame,
+    key_suffix: str,
+) -> None:
     save_path = st.text_input(
         "Save location",
         default,
-        key=f"save_path_{base_key}_{selected_target_name}",
+        key=f"save_path_{base_key}_{selected_target_name}_{key_suffix}",
     )
     if st.button(
         "Save table as Excel",
-        key=f"save_button_{base_key}_{selected_target_name}",
+        key=f"save_button_{base_key}_{selected_target_name}_{key_suffix}",
     ):
         destination = save_path.strip()
         if not destination:

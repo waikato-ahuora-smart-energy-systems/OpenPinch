@@ -45,7 +45,7 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                 )
             )
 
-        case GT.GCC.value | GT.GCC_NP.value | GT.GCCU.value:
+        case GT.GCC.value | GT.GCC_N.value | GT.GCCU.value:
             graph_set["graphs"].append(
                 _make_gcc_graph(
                     graph_title="Graph",
@@ -86,6 +86,8 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 graph_title=graphTitle,
                 key=GT.CC.value,
                 data=t.graphs[GT.CC.value],
+                col_keys=[PT.H_HOT.value, PT.H_COLD.value],
+                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value],                
                 label="Composite Curve",
             )
         )
@@ -96,6 +98,8 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 graph_title=graphTitle,
                 key=GT.SCC.value,
                 data=t.graphs[GT.SCC.value],
+                col_keys=[PT.H_HOT.value, PT.H_COLD.value],
+                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value],                
                 label="Shifted Composite Curve",
             )
         )
@@ -106,6 +110,8 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 graph_title=graphTitle,
                 key=GT.BCC.value,
                 data=t.graphs[GT.BCC.value],
+                col_keys=[PT.H_HOT_BAL.value, PT.H_COLD_BAL.value],
+                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value],
                 label="Balanced Composite Curve",
                 include_arrows=False,
             )
@@ -122,21 +128,21 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
             )
         )
 
-    if GT.GCC_Act.value in t.graphs:
+    if GT.GCC_A.value in t.graphs:
         graphs.append(
             _make_dual_gcc_graph(
                 graph_title=graphTitle,
-                key=GT.GCC_Act.value,
-                data=t.graphs[GT.GCC_Act.value],
+                key=GT.GCC_A.value,
+                data=t.graphs[GT.GCC_A.value],
             )
         )
 
-    if GT.GCC_Ex.value in t.graphs:
+    if GT.GCC_V.value in t.graphs:
         graphs.append(
             _make_gcc_graph(
                 graph_title=graphTitle,
-                key=GT.GCC_Ex.value,
-                data=t.graphs[GT.GCC_Ex.value],
+                key=GT.GCC_V.value,
+                data=t.graphs[GT.GCC_V.value],
                 label="Grand Composite Curve",
                 value_field=PT.H_NET_V.value,
             )
@@ -144,10 +150,13 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
 
     if GT.TSP.value in t.graphs:
         graphs.append(
-            _make_total_site_profiles_graph(
+            _make_composite_graph(
                 graph_title=graphTitle,
                 key=GT.TSP.value,
                 data=t.graphs[GT.TSP.value],
+                col_keys=[PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
+                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value, StreamLoc.HotU.value, StreamLoc.ColdU.value],                
+                label="Shifted Composite Curve",
             )
         )
 
@@ -170,59 +179,28 @@ def _make_composite_graph(
     key: str,
     data,
     label: str,
+    col_keys: list,
+    stream_types: list,
     *,
     name: Optional[str] = None,
     include_arrows: bool = True,
     decolour: bool = False,
 ):
     temperatures = data[PT.T.value].to_list()
-    hot_segments = _graph_cc(
-        StreamType.Hot.value,
-        temperatures,
-        data[PT.H_HOT.value].to_list(),
-        IncludeArrows=include_arrows,
-        Decolour=decolour,
-    )
-    cold_segments = _graph_cc(
-        StreamType.Cold.value,
-        temperatures,
-        data[PT.H_COLD.value].to_list(),
-        IncludeArrows=include_arrows,
-        Decolour=decolour,
-    )
+    segments = []
+    for i in range(len(col_keys)):
+        segments.append(
+            _graph_cc(
+                stream_types[i],
+                temperatures,
+                data[col_keys[i]].to_list(),
+                IncludeArrows=include_arrows,
+                Decolour=decolour,
+            )
+        )
     return {
         "type": key,
         "name": name or f"{label}: {graph_title}",
-        "segments": hot_segments + cold_segments,
-    }
-
-
-def _make_total_site_profiles_graph(graph_title: str, key: str, data) -> dict:
-    temperatures = data[PT.T.value].to_list()
-    segments = []
-    segments += _graph_cc(
-        StreamType.Hot.value,
-        temperatures,
-        data[PT.H_HOT_NET.value].to_list(),
-    )
-    segments += _graph_cc(
-        StreamType.Cold.value,
-        temperatures,
-        data[PT.H_COLD_NET.value].to_list(),
-    )
-    segments += _graph_cc(
-        StreamType.Cold.value,
-        temperatures,
-        data[PT.H_COLD_UT.value].to_list(),
-    )
-    segments += _graph_cc(
-        StreamType.Hot.value,
-        temperatures,
-        data[PT.H_HOT_UT.value].to_list(),
-    )
-    return {
-        "type": key,
-        "name": f"Total Site Profiles: {graph_title}",
         "segments": segments,
     }
 
@@ -281,11 +259,11 @@ def _graph_cc(
     y_vals, x_vals = _clean_composite(y_vals, x_vals)
 
     # Add Hot CC segment
-    if curve_type == StreamType.Hot.value:
+    if curve_type == StreamLoc.HotS.value:
         return [
             _create_curve(
                 title="Hot CC",
-                colour=LineColour.Hot.value if not Decolour else LineColour.Black.value,
+                colour=LineColour.HotS.value if not Decolour else LineColour.Black.value,
                 arrow=(
                     ArrowHead.END.value if IncludeArrows else ArrowHead.NO_ARROW.value
                 ),
@@ -295,11 +273,11 @@ def _graph_cc(
         ]
 
     # Add Cold CC segment
-    elif curve_type == StreamType.Cold.value:
+    elif curve_type == StreamLoc.ColdS.value:
         return [
             _create_curve(
                 title="Cold CC",
-                colour=LineColour.Cold.value
+                colour=LineColour.ColdS.value
                 if not Decolour
                 else LineColour.Black.value,
                 arrow=(

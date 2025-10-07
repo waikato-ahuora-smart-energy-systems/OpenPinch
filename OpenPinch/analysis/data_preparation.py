@@ -216,10 +216,10 @@ def _add_process_streams_under_zones(z: Zone, streams: List[StreamSchema]) -> Zo
             # Create Stream from Data
             stream_j = _create_process_stream(s)
             if stream_j.type == StreamType.Hot.value:
-                key = ".".join([s.zone, StreamLoc.HotStr.value, s.name])
+                key = ".".join([s.zone, StreamLoc.HotS.value, s.name])
                 z.hot_streams.add(stream_j, key)
             else:
-                key = ".".join([s.zone, StreamLoc.ColdStr.value, s.name])
+                key = ".".join([s.zone, StreamLoc.ColdS.value, s.name])
                 z.cold_streams.add(stream_j)
     return z
 

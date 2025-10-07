@@ -38,9 +38,9 @@ class Configuration:
     SCC_CHECKBOX: bool = True
     BCC_CHECKBOX: bool = False
     GCC_CHECKBOX: bool = True
-    GCC_NP_CHECKBOX: bool = True
+    GCC_N_CHECKBOX: bool = True
     GCCU_CHECKBOX: bool = False
-    LGCC_CHECKBOX: bool = False
+    GCC_Lim_CHECKBOX: bool = False
     TSC_CHECKBOX: bool = False
     ERC_CHECKBOX: bool = False
     NLC_CHECKBOX: bool = False
@@ -135,9 +135,9 @@ class Configuration:
                 "SCC_CHECKBOX",
                 "BCC_CHECKBOX",
                 "GCC_CHECKBOX",
-                "GCC_NP_CHECKBOX",
+                "GCC_N_CHECKBOX",
                 "GCCU_CHECKBOX",
-                "LGCC_CHECKBOX",
+                "GCC_Lim_CHECKBOX",
                 "TSC_CHECKBOX",
                 "ERC_CHECKBOX",
                 "NLC_CHECKBOX",

@@ -22,7 +22,7 @@
 
 
 ############# Review and testing needed!!!!!!!!!!!!!!
-# def _calc_exergy_gcc(z, pt_real, BCC, GCC_Act):
+# def _calc_exergy_gcc(z, pt_real, BCC, GCC_A):
 #     """Determine Exergy Transfer Effectiveness including process and utility streams.
 #     """
 #     # Exergy Transfer Effectiveness proposed by Marmolejo-Correa, D., Gundersen, T., 2012.
@@ -33,7 +33,7 @@
 #     z.exergy_sinks = x_sink
 #     z.ETE = n_ETE
 
-#     GCC_X = z.Calc_ExGCC(GCC_Act)
+#     GCC_X = z.Calc_ExGCC(GCC_A)
 #     x_source, x_sink, n_ETE = _calc_total_exergy(pt_real, Col_T=0, Col_HCC=4, Col_CCC=7)
 
 #     z.exergy_req_min = GCC_X[1][1]
@@ -68,39 +68,39 @@
 
 #     return x_source, x_sink, n_ETE
 
-# def Calc_ExGCC(z, GCC_Act):
+# def Calc_ExGCC(z, GCC_A):
 #     """Transposes a normal GCC (T-h) into a exergy GCC (Tx-X).
 #     """
-#     GCC_X = copy.deepcopy(GCC_Act)
+#     GCC_X = copy.deepcopy(GCC_A)
 #     Min_X = 0
 #     AbovePT = True
-#     GCC_X[0][0] = compute_exergetic_temperature(GCC_Act[0][0] + z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#     GCC_X[0][0] = compute_exergetic_temperature(GCC_A[0][0] + z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
 #     GCC_X[1][0] = 0
 #     i_upper = len(GCC_X[0]) + 1
 
 #     # Transpose to exergetic temperature and exergy flow
 #     i = 1
-#     gcc_act_i = 1
-#     while i <= i_upper and gcc_act_i < len(GCC_Act[0]):
+#     GCC_A_i = 1
+#     while i <= i_upper and GCC_A_i < len(GCC_A[0]):
 #         if AbovePT:
-#             GCC_X[0][i] = compute_exergetic_temperature(GCC_Act[0][gcc_act_i] + z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
-#             GCC_X[1][i] = (GCC_Act[1][gcc_act_i - 1] - GCC_Act[1][gcc_act_i]) / (GCC_Act[0][gcc_act_i - 1] - GCC_Act[0][gcc_act_i])
+#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i] + z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#             GCC_X[1][i] = (GCC_A[1][GCC_A_i - 1] - GCC_A[1][GCC_A_i]) / (GCC_A[0][GCC_A_i - 1] - GCC_A[0][GCC_A_i])
 #             GCC_X[1][i] = GCC_X[1][i - 1] - GCC_X[1][i] * (GCC_X[0][i - 1] - GCC_X[0][i])
-#             if GCC_Act[1][gcc_act_i] < tol:
+#             if GCC_A[1][GCC_A_i] < tol:
 #                 Min_X = GCC_X[1][i]
 #                 for row in GCC_X:
 #                     row += [0, 0]
 #                 i += 2
-#                 gcc_act_i += 1
-#                 GCC_X[0][i] = compute_exergetic_temperature(GCC_Act[0][gcc_act_i - 1] - z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#                 GCC_A_i += 1
+#                 GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
 #                 GCC_X[1][i] = GCC_X[1][i - 1]
 #                 AbovePT = False
 #         else:
-#             GCC_X[0][i] = compute_exergetic_temperature(GCC_Act[0][gcc_act_i - 1] - z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
-#             GCC_X[1][i] = (GCC_Act[1][gcc_act_i - 2] - GCC_Act[1][gcc_act_i - 1]) / (GCC_Act[0][gcc_act_i - 2] - GCC_Act[0][gcc_act_i - 1])
+#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#             GCC_X[1][i] = (GCC_A[1][GCC_A_i - 2] - GCC_A[1][GCC_A_i - 1]) / (GCC_A[0][GCC_A_i - 2] - GCC_A[0][GCC_A_i - 1])
 #             GCC_X[1][i] = GCC_X[1][i - 1] - GCC_X[1][i] * (GCC_X[0][i - 1] - GCC_X[0][i])
 #         i += 1
-#         gcc_act_i += 1
+#         GCC_A_i += 1
 
 #     # Shift Exergy GCC appropriately
 #     for i in range(1, len(GCC_X[0])):
@@ -111,11 +111,11 @@
 #     return GCC_X
 
 
-# def Calc_GCC_AI(z, pt_real, gcc_np):
+# def Calc_GCC_AI(z, pt_real, GCC_N):
 #     """Returns a simplified array for the assisted integration GCC.
 #     """
 #     GCC_AI = [ [ None for j in range(len(pt_real[0]))] for i in range(2)]
 #     for i in range(len(pt_real[0])):
 #         GCC_AI[0][i] = pt_real[0][i]
-#         GCC_AI[1][i] = pt_real[PT.H_NET.value][i] - gcc_np[1][i]
+#         GCC_AI[1][i] = pt_real[PT.H_NET.value][i] - GCC_N[1][i]
 #     return GCC_AI

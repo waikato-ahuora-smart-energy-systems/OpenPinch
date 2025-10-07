@@ -519,7 +519,7 @@ def test_only_one_active_utility():
     streams = [
         StreamSchema.model_validate(
             {
-                "name": "HotStream",
+                "name": "HotSeam",
                 "zone": "Z1",
                 "t_supply": 250,
                 "t_target": 150,
