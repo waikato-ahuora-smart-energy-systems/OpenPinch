@@ -10,13 +10,15 @@ minimal so user projects can layer additional controls as needed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import BytesIO
 from typing import Dict, Iterable, Iterator, List, Mapping, MutableMapping, Optional
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import openpyxl as xl_writer
 
-from ..classes import EnergyTarget, ProblemTable, Zone
+from ..classes import EnergyTarget, ProblemTable, Zone, Stream
 from ..lib.enums import ArrowHead, LineColour
 from .graph_data import get_output_graph_data
 
@@ -121,19 +123,36 @@ def render_streamlit_dashboard(
 
     target_names = sorted(targets.keys())
     selected_target_name = st.sidebar.selectbox(
-        "***Select Zone***",
+        "**Select zone**",
         target_names,
         index=0 if target_names else None,
         key=f"target_select_{base_key}",
     )
     target = targets[selected_target_name]
 
-    st.sidebar.write(f"**Cold Pinch:** {target.cold_pinch:.1f} degC")
-    st.sidebar.write(f"**Hot Pinch:** {target.hot_pinch:.1f} degC")
-    st.sidebar.write(f"**Hot Utility (Total):** {target.hot_utility_target:,.0f} kW")
-    st.sidebar.write(f"**Cold Utility (Total):** {target.cold_utility_target:,.0f} kW")
-    st.sidebar.write(f"**Heat Recovery Target:** {target.heat_recovery_target:,.0f} kW")
-    st.sidebar.write(f"**Degree of Integration:** {target.degree_of_int:.0%}")
+    st.sidebar.divider()
+    st.sidebar.write(f"**Targets**")
+    st.sidebar.write(f"Cold pinch: {target.cold_pinch:.1f} \N{DEGREE SIGN}C")
+    st.sidebar.write(f"Hot pinch: {target.hot_pinch:.1f} \N{DEGREE SIGN}C")
+    st.sidebar.write(f"Hot utility: {target.hot_utility_target:,.0f} kW")
+    st.sidebar.write(f"Cold Utility: {target.cold_utility_target:,.0f} kW")
+    st.sidebar.write(f"Heat Recovery: {target.heat_recovery_target:,.0f} kW")
+    st.sidebar.write(f"Degree of Integration: {target.degree_of_int:.0%}")
+
+    ut_dict ={
+        "Hot utilities" : target.hot_utilities, 
+        "Cold utilities" : target.cold_utilities,
+    }
+    for entry in ut_dict.keys():
+        st.sidebar.divider()
+        st.sidebar.write(f"**{entry}**")
+        if len(ut_dict[entry]):
+            u: Stream
+            for u in ut_dict[entry]:
+                st.sidebar.write(f"{u.name}: {u.heat_flow:,.0f} kW")
+        else:
+            st.sidebar.write(f"{entry} not required.")
+
 
     tabs = st.tabs(
         [
@@ -163,16 +182,24 @@ def render_streamlit_dashboard(
             plt.close(figure)
 
     with tabs[1]:
-        pt_df = problem_table_to_dataframe(target.pt, round_decimals=value_rounding)
+        pt_df = problem_table_to_dataframe(
+            target.pt, round_decimals=value_rounding
+        )
+        # problem_table_to_dataframe(target.pt, round_decimals=value_rounding)
         if pt_df.empty:
             st.info("No shifted problem table data available.")
         else:
             st.badge("Extended problem table based on shifted process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
             st.dataframe(pt_df, width="stretch")
-            st.download_button(
-                label='Download',
-                data=pt_df.to_excel(xl_writer),
-            )            
+            default_loc = f"results/{selected_target_name.replace("/","-")}_shifted.xlsx"
+            
+            _build_download(
+                st=st,
+                default=default_loc,
+                base_key=base_key,
+                selected_target_name=selected_target_name,
+                df=pt_df,
+            )
 
     with tabs[2]:
         pt_real_df = problem_table_to_dataframe(
@@ -183,10 +210,40 @@ def render_streamlit_dashboard(
         else:
             st.badge("Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
             st.dataframe(pt_real_df, width="stretch")
-            st.download_button(
-                label='Download',
-                data=pt_real_df.to_excel(xl_writer),
+            default_loc = f"results/{selected_target_name.replace("/","-")}_real.xlsx"
+
+            _build_download(
+                st=st,
+                default=default_loc,
+                base_key=base_key,
+                selected_target_name=selected_target_name,
+                df=pt_real_df,
             )
+
+
+def _build_download(st, default: Path, base_key: str, selected_target_name: str, df: pd.DataFrame):
+    save_path = st.text_input(
+        "Save location",
+        default,
+        key=f"save_path_{base_key}_{selected_target_name}",
+    )
+    if st.button(
+        "Save table as Excel",
+        key=f"save_button_{base_key}_{selected_target_name}",
+    ):
+        destination = save_path.strip()
+        if not destination:
+            st.error("Please provide a file path to save the table.")
+        else:
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine=xl_writer.__name__) as writer:
+                df.to_excel(writer, index=False, sheet_name="Problem Table")
+            try:
+                with open(destination, "wb") as out_file:
+                    out_file.write(buffer.getvalue())
+                st.success(f"Saved table to {destination}")
+            except OSError as exc:
+                st.error(f"Failed to save file: {exc}")                   
 
 
 def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
@@ -210,7 +267,7 @@ def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
     title = graph.get("name") or graph.get("type") or "Graph"
     ax.set_title(title)
     ax.set_xlabel("Enthalpy / kW")
-    ax.set_ylabel("Temperature / degC")
+    ax.set_ylabel("Temperature / \N{DEGREE SIGN}C")
     ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
