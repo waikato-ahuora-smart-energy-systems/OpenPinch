@@ -168,7 +168,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 data=t.graphs[GT.TSP.value],
                 col_keys=[PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
                 stream_types=[StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU],
-                label="Shifted Composite Curve",
+                label="Total Site Profiles",
             )
         )
 
