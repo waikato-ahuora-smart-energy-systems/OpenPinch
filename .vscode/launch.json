@@ -33,7 +33,7 @@
               "e2e",
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": true
         },    
         {
             "name": "All tests",
@@ -44,7 +44,7 @@
             "args": [
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": true
         },                
     ]
 }

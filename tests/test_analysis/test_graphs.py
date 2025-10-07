@@ -30,9 +30,9 @@ def test_clean_composite_removes_redundant_points():
 def test_create_curve_formats_data_correctly():
     x_vals = [0, 1, 2]
     y_vals = [3.14159, 2.71828, 1.61803]
-    curve = _create_curve("Test Curve", LineColour.Hot.value, x_vals, y_vals)
+    curve = _create_curve("Test Curve", LineColour.HotS.value, x_vals, y_vals)
     assert curve["title"] == "Test Curve"
-    assert curve["colour"] == LineColour.Hot.value
+    assert curve["colour"] == LineColour.HotS.value
     assert all("x" in pt and "y" in pt for pt in curve["data_points"])
     assert curve["data_points"][0] == {"x": 0, "y": 3.14}
 

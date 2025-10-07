@@ -57,7 +57,7 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                 )
             )
 
-        case GT.GCC.value | GT.GCC_N.value | GT.GCCU.value:
+        case GT.GCC.value | GT.GCC_N.value | GT.GCC_U.value:
             graph_set["graphs"].append(
                 _make_gcc_graph(
                     graph_title="Graph",
@@ -68,7 +68,7 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                     value_field=PT.H_NET.value,
                 )
             )
-            if graph_type == GT.GCCU.value:
+            if graph_type == GT.GCC_U.value:
                 graph_set["graphs"].append(
                     _make_gcc_graph(
                         graph_title="Utility Graph",
@@ -198,14 +198,14 @@ def _make_composite_graph(
     include_arrows: bool = True,
     decolour: bool = False,
 ):
-    temperatures = data[PT.T.value].to_list()
+    temperatures = _column_to_list(data, PT.T.value)
     segments: List[dict] = []
     for stream_loc, col_key in zip(stream_types, col_keys):
         segments.extend(
             _graph_cc(
                 stream_loc,
                 temperatures,
-                data[col_key].to_list(),
+                _column_to_list(data, col_key),
                 include_arrows=include_arrows,
                 decolour=decolour,
             )
@@ -229,8 +229,8 @@ def _make_gcc_graph(
     decolour: bool = False,
 ):
     segments = _graph_gcc(
-        data[PT.T.value].to_list(),
-        data[value_field].to_list(),
+        _column_to_list(data, PT.T.value),
+        _column_to_list(data, value_field),
         utility_profile=utility_profile,
         decolour=decolour,
     )
@@ -244,12 +244,12 @@ def _make_gcc_graph(
 def _make_dual_gcc_graph(graph_title: str, key: str, data) -> dict:
     segments = []
     segments += _graph_gcc(
-        data[PT.T.value].to_list(),
-        data[PT.H_NET_A.value].to_list(),
+        _column_to_list(data, PT.T.value),
+        _column_to_list(data, PT.H_NET_A.value),
     )
     segments += _graph_gcc(
-        data[PT.T.value].to_list(),
-        data[PT.H_UT_NET.value].to_list(),
+        _column_to_list(data, PT.T.value),
+        _column_to_list(data, PT.H_UT_NET.value),
     )
     return {
         "type": key,
@@ -379,6 +379,32 @@ def _graph_gcc(
         j = next_j
 
     return curves
+
+
+def _column_to_list(data, column_key: str) -> List[float]:
+    """Return the requested column from ``data`` as a Python list."""
+    if not isinstance(column_key, str):
+        column_key = getattr(column_key, "value", column_key)
+
+    try:
+        if isinstance(data, ProblemTable):
+            column = data.col[column_key]
+        elif hasattr(data, "col") and hasattr(data, "columns") and column_key in getattr(
+            data, "columns", []
+        ):
+            column = data.col[column_key]
+        elif isinstance(data, dict):
+            column = data[column_key]
+        else:
+            column = data[column_key]
+    except (KeyError, AttributeError, TypeError) as exc:
+        raise KeyError(f"Column '{column_key}' not found in graph data payload.") from exc
+
+    if hasattr(column, "to_list"):
+        return column.to_list()
+    if hasattr(column, "tolist"):
+        return column.tolist()
+    return list(column)
 
 
 def _classify_segment(enthalpy_diff: float, utility_profile: bool) -> str:

@@ -31,10 +31,10 @@ __all__ = [
 
 # Matplotlib-friendly colours keyed by the internal ``LineColour`` palette.
 _SEGMENT_COLOUR_MAP: Dict[int, str] = {
-    LineColour.HotS.value: "#d62728",  # warm red
-    LineColour.ColdS.value: "#1f77b4",  # cool blue
-    LineColour.HotU.value: "#d62728",  # warm red
-    LineColour.ColdU.value: "#1f77b4",  # cool blue
+    LineColour.HotS.value: "#dd4242",  # warm red
+    LineColour.ColdS.value: "#0d76c1",  # cool blue
+    LineColour.HotU.value: "#7F0D0D",  # warm red
+    LineColour.ColdU.value: "#0c2a82",  # cool blue
     LineColour.Other.value: "#7f7f7f",  # neutral grey
     LineColour.Black.value: "#111111",
 }
@@ -276,10 +276,9 @@ def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
 
     title = graph.get("name") or graph.get("type") or "Graph"
     ax.set_title(title)
-    ax.set_xlabel("Enthalpy / kW")
+    ax.set_xlabel("Heat Flow / kW")
     ax.set_ylabel("Temperature / \N{DEGREE SIGN}C")
     ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
-    ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
 
     fig.tight_layout()
