@@ -70,6 +70,7 @@ def get_utility_targets(
         col_H_net=PT.H_UT_NET.value,
         col_H_cold_net=PT.H_COLD_UT.value,
         col_H_hot_net=PT.H_HOT_UT.value,
+        is_process_stream=False,
     )
 
     pt_real = get_utility_heat_cascade(
@@ -80,6 +81,7 @@ def get_utility_targets(
         col_H_net=PT.H_UT_NET.value,
         col_H_cold_net=PT.H_COLD_UT.value,
         col_H_hot_net=PT.H_HOT_UT.value,
+        is_process_stream=False,
     )
     pt_real = _calc_balanced_CC(pt_real)
 
@@ -268,6 +270,7 @@ def _calc_seperated_heat_load_profiles(
     col_RCP_net: str = PT.RCP_UT_NET.value,
     col_RCP_hot_net: str = PT.RCP_HOT_UT.value,
     col_RCP_cold_net: str = PT.RCP_COLD_UT.value,
+    is_process_stream: bool = True,
 ) -> ProblemTable:
     """Determines the gross required heating or cooling profile of a system from the GCC."""
 
@@ -275,8 +278,12 @@ def _calc_seperated_heat_load_profiles(
     dh_diff = pt.delta_col(col_H_net, 1)
 
     # Determine whether each row corresponds to a hot-side or cold-side enthalpy change
-    is_hot = dh_diff <= 0
-    is_cold = ~is_hot
+    if is_process_stream:
+        is_hot = dh_diff <= 0
+        is_cold = ~is_hot
+    else:
+        is_cold = dh_diff <= 0
+        is_hot = ~is_cold
 
     # Compute cumulative enthalpy change
     pt.col[col_H_hot_net] = np.cumsum(-dh_diff * is_hot)
@@ -287,9 +294,14 @@ def _calc_seperated_heat_load_profiles(
     pt.col[col_RCP_cold_net] = pt.col[col_RCP_net] * is_cold
 
     # Normalize HU profile so it starts at zero
-    pt.col[col_H_hot_net] *= -1
-    HUt_max = -pt.loc[-1, col_H_cold_net]
-    pt.col[col_H_cold_net] += HUt_max
+    if is_process_stream:
+        pt.col[col_H_hot_net] *= -1
+        HUt_max = -pt.loc[-1, col_H_cold_net]
+        pt.col[col_H_cold_net] += HUt_max
+    else:
+        pt.col[col_H_cold_net] *= -1
+        HUt_max = -pt.loc[-1, col_H_hot_net]
+        pt.col[col_H_hot_net] += HUt_max      
 
     return pt
 

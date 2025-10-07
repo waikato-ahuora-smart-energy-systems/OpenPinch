@@ -228,3 +228,9 @@ def linear_interpolation(x: float, x1: float, x2: float, y1: float, y2: float) -
     m = (y1 - y2) / (x1 - x2)
     c = y1 - m * x1
     return m * x + c
+
+
+def get_balanced_cc(pt: ProblemTable) -> ProblemTable:
+    pt.col[PT.H_HOT_BAL.value] = pt.col[PT.H_HOT.value] + pt.col[PT.H_HOT_UT.value] 
+    pt.col[PT.H_COLD_BAL.value] = pt.col[PT.H_COLD.value] + pt.col[PT.H_COLD_UT.value]
+    return pt

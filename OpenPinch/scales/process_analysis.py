@@ -6,6 +6,7 @@ from ..analysis import (
     get_pinch_temperatures,
     get_process_heat_cascade,
     get_utility_targets,
+    get_balanced_cc,
 )
 from ..classes import *
 from ..lib import *
@@ -53,6 +54,12 @@ def get_process_targets(zone: Zone):
     )
     net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
         zone_identifier, pt, hot_utilities, cold_utilities
+    )
+    pt = get_balanced_cc(
+        pt
+    )
+    pt_real = get_balanced_cc(
+        pt_real
     )
     hot_pinch, cold_pinch = get_pinch_temperatures(pt)
 
@@ -223,12 +230,12 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
     return {
         GT.CC.value: pt_real[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
-        GT.BCC.value: pt[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
+        GT.BCC.value: pt_real[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
         GT.GCC.value: pt[[PT.T.value, PT.H_NET.value]],
         GT.GCC_N.value: pt[[PT.T.value, PT.H_NET_NP.value]],
         GT.GCC_V.value: pt[[PT.T.value, PT.H_NET_V.value]],
         GT.GCC_A.value: pt[[PT.T.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
         GT.GCC_U_real.value: pt_real[[PT.T.value, PT.H_UT_NET.value]],
         GT.GCC_U.value: pt[[PT.T.value, PT.H_UT_NET.value]],
-        GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value]],
+        GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
     }

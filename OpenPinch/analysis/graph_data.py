@@ -125,7 +125,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 col_keys=[PT.H_HOT_BAL.value, PT.H_COLD_BAL.value],
                 stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Balanced Composite Curve",
-                include_arrows=False,
+                include_arrows=True,
             )
         )
 
@@ -160,6 +160,19 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
             )
         )
 
+    if GT.NLC.value in t.graphs:
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graphTitle,
+                key=GT.NLC.value,
+                data=t.graphs[GT.NLC.value],
+                col_keys=[PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
+                stream_types=[StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU],
+                label="Net Load Curves",
+                include_arrows=True,
+            )
+        )
+
     if GT.TSP.value in t.graphs:
         graphs.append(
             _make_composite_graph(
@@ -169,6 +182,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 col_keys=[PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
                 stream_types=[StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU],
                 label="Total Site Profiles",
+                include_arrows=True,
             )
         )
 
