@@ -84,13 +84,13 @@ class ProblemTableLabel(Enum):
     T = "T"
     DELTA_T = "\N{GREEK CAPITAL LETTER DELTA}T"
     CP_HOT = "mcp_hot_tot"
-    DELTA_H_HOT = "delta_H_hot"
+    DELTA_H_HOT = "\N{GREEK CAPITAL LETTER DELTA}H_hot"
     H_HOT = "H_hot"
     CP_COLD = "mcp_cold_tot"
-    DELTA_H_COLD = "delta_H_cold"
+    DELTA_H_COLD = "\N{GREEK CAPITAL LETTER DELTA}H_cold"
     H_COLD = "H_cold"
     MCP_NET = "mcp_net"
-    DELTA_H_NET = "delta_H_net"
+    DELTA_H_NET = "\N{GREEK CAPITAL LETTER DELTA}H_net"
     H_NET = "H_net"
 
     H_NET_NP = "H_net_np"
@@ -127,7 +127,7 @@ class StreamDataLabel(Enum):
     TYPE = "stream_type"
     CP = "heat_capacity_flowrate"
     H = "heat_flow"
-    DT_CONT = "delta_T_cont"
+    DT_CONT = "\N{GREEK CAPITAL LETTER DELTA}T_cont"
     HTC = "heat_transfer_coefficient"
 
 
@@ -159,7 +159,7 @@ class GraphType(Enum):
 
     GCC = "Grand Composite Curve"
     GCC_N = "Grand Composite Curve (No Pockets)"
-    GCC_V = "Vertical GCC Grand Composite Curve"
+    GCC_V = "Vertical Grand Composite Curve"
     GCC_A = "Actual Grand Composite Curve"    
     GCC_U = "Utility Grand Composite Curve"
     GCC_U_real = "Utility Grand Composite Curve (Real)"

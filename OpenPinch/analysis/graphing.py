@@ -31,10 +31,10 @@ __all__ = [
 
 # Matplotlib-friendly colours keyed by the internal ``LineColour`` palette.
 _SEGMENT_COLOUR_MAP: Dict[int, str] = {
-    LineColour.HotS.value: "#dd4242",  # warm red
-    LineColour.ColdS.value: "#0d76c1",  # cool blue
-    LineColour.HotU.value: "#7F0D0D",  # warm red
-    LineColour.ColdU.value: "#0c2a82",  # cool blue
+    LineColour.HotS.value: "#e66e6e",  # warm red
+    LineColour.ColdS.value: "#5ca5d9",  # cool blue
+    LineColour.HotU.value: "#C22323",  # warm red
+    LineColour.ColdU.value: "#244abd",  # cool blue
     LineColour.Other.value: "#7f7f7f",  # neutral grey
     LineColour.Black.value: "#111111",
 }
@@ -271,7 +271,7 @@ def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
         colour_idx = segment.get("colour")
         colour = _SEGMENT_COLOUR_MAP.get(colour_idx, "#333333")
         label = segment.get("title")
-        ax.plot(x_vals, y_vals, color=colour, linewidth=2.0)
+        ax.plot(x_vals, y_vals, color=colour, linewidth=1.25)
         _maybe_draw_arrow(ax, x_vals, y_vals, segment.get("arrow"), colour)
 
     title = graph.get("name") or graph.get("type") or "Graph"

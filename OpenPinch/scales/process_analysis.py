@@ -232,6 +232,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.BCC.value: pt_real[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
         GT.GCC.value: pt[[PT.T.value, PT.H_NET.value]],
+        GT.GCC_Lim.value: pt_real[[PT.T.value, PT.H_NET.value]],
         GT.GCC_N.value: pt[[PT.T.value, PT.H_NET_NP.value]],
         GT.GCC_V.value: pt[[PT.T.value, PT.H_NET_V.value]],
         GT.GCC_A.value: pt[[PT.T.value, PT.H_NET_A.value, PT.H_UT_NET.value]],

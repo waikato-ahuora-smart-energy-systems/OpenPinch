@@ -77,7 +77,7 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                         label=f"{graph_type} Utility",
                         name=f"{graph_type} Utility Graph",
                         value_field=PT.H_NET.value,
-                        utility_profile=True,
+                        is_utility_profile=True,
                     )
                 )
 
@@ -137,6 +137,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 data=t.graphs[GT.GCC.value],
                 label="Grand Composite Curve",
                 value_field=PT.H_NET.value,
+                is_utility_profile=False,
             )
         )
 
@@ -157,6 +158,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 data=t.graphs[GT.GCC_V.value],
                 label="Grand Composite Curve",
                 value_field=PT.H_NET_V.value,
+                is_utility_profile=False,
             )
         )
 
@@ -194,6 +196,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 data=t.graphs[GT.SUGCC.value],
                 label="Site Utility Grand Composite Curve",
                 value_field=PT.H_UT_NET.value,
+                is_utility_profile=True,
             )
         )
 
@@ -217,6 +220,7 @@ def _make_composite_graph(
     for stream_loc, col_key in zip(stream_types, col_keys):
         segments.extend(
             _graph_cc(
+                key,
                 stream_loc,
                 temperatures,
                 _column_to_list(data, col_key),
@@ -239,13 +243,13 @@ def _make_gcc_graph(
     *,
     value_field: str,
     name: Optional[str] = None,
-    utility_profile: bool = False,
+    is_utility_profile: bool = False,
     decolour: bool = False,
 ):
     segments = _graph_gcc(
         _column_to_list(data, PT.T.value),
         _column_to_list(data, value_field),
-        utility_profile=utility_profile,
+        is_utility_profile=is_utility_profile,
         decolour=decolour,
     )
     return {
@@ -273,6 +277,7 @@ def _make_dual_gcc_graph(graph_title: str, key: str, data) -> dict:
 
 
 def _graph_cc(
+    key: str,
     stream_loc,
     y_vals: List[float],
     x_vals: List[float],
@@ -305,12 +310,20 @@ def _graph_cc(
         StreamLoc.HotU: "Hot Utility",
         StreamLoc.ColdU: "Cold Utility",
     }
-    arrow_map = {
-        StreamLoc.HotS: ArrowHead.END.value,
-        StreamLoc.HotU: ArrowHead.END.value,
-        StreamLoc.ColdS: ArrowHead.START.value,
-        StreamLoc.ColdU: ArrowHead.START.value,
-    }
+    if key not in [GT.TSP.value]:
+        arrow_map = {
+            StreamLoc.HotS: ArrowHead.END.value,
+            StreamLoc.HotU: ArrowHead.END.value,
+            StreamLoc.ColdS: ArrowHead.START.value,
+            StreamLoc.ColdU: ArrowHead.START.value,
+        }
+    else:
+        arrow_map = {
+            StreamLoc.HotS: ArrowHead.START.value,
+            StreamLoc.HotU: ArrowHead.START.value,
+            StreamLoc.ColdS: ArrowHead.END.value,
+            StreamLoc.ColdU: ArrowHead.END.value,
+        }        
 
     if stream_loc not in title_map:
         raise ValueError("Unrecognised composite curve stream location.")
@@ -333,7 +346,7 @@ def _graph_cc(
 def _graph_gcc(
     y_vals: List[float],
     x_vals: List[float],
-    utility_profile: bool = False,
+    is_utility_profile: bool = False,
     decolour: bool = False,
 ) -> list:
     """Creates segments for a Grand Composite Curve."""
@@ -357,11 +370,11 @@ def _graph_gcc(
     cold_pro_segs, hot_pro_segs, hot_ut_segs, cold_ut_segs, zero_segs = 0, 0, 0, 0, 0
 
     while j < end_idx:
-        segment_type = _classify_segment(x_vals[j] - x_vals[j + 1], utility_profile)
+        segment_type = _classify_segment(x_vals[j] - x_vals[j + 1], is_utility_profile)
 
         next_j = j + 1
         while next_j < end_idx:
-            next_type = _classify_segment(x_vals[next_j] - x_vals[next_j + 1], utility_profile)
+            next_type = _classify_segment(x_vals[next_j] - x_vals[next_j + 1], is_utility_profile)
             if next_type != segment_type:
                 break
             next_j += 1
@@ -421,11 +434,11 @@ def _column_to_list(data, column_key: str) -> List[float]:
     return list(column)
 
 
-def _classify_segment(enthalpy_diff: float, utility_profile: bool) -> str:
+def _classify_segment(enthalpy_diff: float, is_utility_profile: bool) -> str:
     if enthalpy_diff > tol:
-        return "cold_pro" if not utility_profile else "hot_ut"
+        return StreamLoc.ColdS if not is_utility_profile else StreamLoc.HotU
     if enthalpy_diff < -tol:
-        return "hot_pro" if not utility_profile else "cold_ut"
+        return StreamLoc.HotS if not is_utility_profile else StreamLoc.ColdU
     return "zero"
 
 
@@ -437,7 +450,7 @@ def _segment_style(
     cold_ut_segs: int,
     zero_segs: int,
 ) -> Tuple[StreamLoc, str, int, int, int, int, int]:
-    if segment_type == "cold_pro":
+    if segment_type == StreamLoc.ColdS:
         cold_pro_segs += 1
         return (
             StreamLoc.ColdS,
@@ -448,7 +461,7 @@ def _segment_style(
             cold_ut_segs,
             zero_segs,
         )
-    if segment_type == "hot_pro":
+    if segment_type == StreamLoc.HotS:
         hot_pro_segs += 1
         return (
             StreamLoc.HotS,
@@ -459,7 +472,7 @@ def _segment_style(
             cold_ut_segs,
             zero_segs,
         )
-    if segment_type == "hot_ut":
+    if segment_type == StreamLoc.HotU:
         hot_ut_segs += 1
         return (
             StreamLoc.HotU,
@@ -470,7 +483,7 @@ def _segment_style(
             cold_ut_segs,
             zero_segs,
         )
-    if segment_type == "cold_ut":
+    if segment_type == StreamLoc.ColdU:
         cold_ut_segs += 1
         return (
             StreamLoc.ColdU,
