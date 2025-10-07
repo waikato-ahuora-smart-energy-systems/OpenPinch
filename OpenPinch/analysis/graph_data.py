@@ -8,7 +8,7 @@ from ..utils import *
 
 DECIMAL_PLACES = 2
 
-__all__ = ["get_output_graph_data, visualise_graphs"]
+__all__ = ["get_output_graph_data", "visualise_graphs"]
 
 
 #######################################################################################################
@@ -87,7 +87,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.CC.value,
                 data=t.graphs[GT.CC.value],
                 col_keys=[PT.H_HOT.value, PT.H_COLD.value],
-                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value],                
+                stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Composite Curve",
             )
         )
@@ -99,7 +99,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.SCC.value,
                 data=t.graphs[GT.SCC.value],
                 col_keys=[PT.H_HOT.value, PT.H_COLD.value],
-                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value],                
+                stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Shifted Composite Curve",
             )
         )
@@ -111,7 +111,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.BCC.value,
                 data=t.graphs[GT.BCC.value],
                 col_keys=[PT.H_HOT_BAL.value, PT.H_COLD_BAL.value],
-                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value],
+                stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Balanced Composite Curve",
                 include_arrows=False,
             )
@@ -155,7 +155,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.TSP.value,
                 data=t.graphs[GT.TSP.value],
                 col_keys=[PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
-                stream_types=[StreamLoc.HotS.value, StreamLoc.ColdS.value, StreamLoc.HotU.value, StreamLoc.ColdU.value],                
+                stream_types=[StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU],
                 label="Shifted Composite Curve",
             )
         )
@@ -187,15 +187,15 @@ def _make_composite_graph(
     decolour: bool = False,
 ):
     temperatures = data[PT.T.value].to_list()
-    segments = []
-    for i in range(len(col_keys)):
-        segments.append(
+    segments: List[dict] = []
+    for stream_loc, col_key in zip(stream_types, col_keys):
+        segments.extend(
             _graph_cc(
-                stream_types[i],
+                stream_loc,
                 temperatures,
-                data[col_keys[i]].to_list(),
-                IncludeArrows=include_arrows,
-                Decolour=decolour,
+                data[col_key].to_list(),
+                include_arrows=include_arrows,
+                decolour=decolour,
             )
         )
     return {
@@ -247,49 +247,66 @@ def _make_dual_gcc_graph(graph_title: str, key: str, data) -> dict:
 
 
 def _graph_cc(
-    curve_type: str,
+    stream_loc,
     y_vals: List[float],
     x_vals: List[float],
-    IncludeArrows: bool = True,
-    Decolour: bool = False,
-) -> list:
+    *,
+    include_arrows: bool = True,
+    decolour: bool = False,
+) -> List[dict]:
     """Plots a (shifted) hot or cold composite curve."""
 
     # Clean composite
     y_vals, x_vals = _clean_composite(y_vals, x_vals)
 
-    # Add Hot CC segment
-    if curve_type == StreamLoc.HotS.value:
-        return [
-            _create_curve(
-                title="Hot CC",
-                colour=LineColour.HotS.value if not Decolour else LineColour.Black.value,
-                arrow=(
-                    ArrowHead.END.value if IncludeArrows else ArrowHead.NO_ARROW.value
-                ),
-                x_vals=x_vals,
-                y_vals=y_vals,
-            )
-        ]
+    if not isinstance(stream_loc, StreamLoc):
+        candidate = getattr(stream_loc, "value", stream_loc)
+        try:
+            stream_loc = StreamLoc(candidate)
+        except ValueError:
+            aliases = {
+                "Hot": StreamLoc.HotS,
+                "Cold": StreamLoc.ColdS,
+            }
+            if candidate in aliases:
+                stream_loc = aliases[candidate]
+            else:
+                raise ValueError("Unrecognised composite curve stream location.") from None
 
-    # Add Cold CC segment
-    elif curve_type == StreamLoc.ColdS.value:
-        return [
-            _create_curve(
-                title="Cold CC",
-                colour=LineColour.ColdS.value
-                if not Decolour
-                else LineColour.Black.value,
-                arrow=(
-                    ArrowHead.START.value if IncludeArrows else ArrowHead.NO_ARROW.value
-                ),
-                x_vals=x_vals,
-                y_vals=y_vals,
-            )
-        ]
+    title_map = {
+        StreamLoc.HotS: "Hot CC",
+        StreamLoc.ColdS: "Cold CC",
+        StreamLoc.HotU: "Hot Utility",
+        StreamLoc.ColdU: "Cold Utility",
+    }
+    colour_map = {
+        StreamLoc.HotS: LineColour.HotS.value,
+        StreamLoc.ColdS: LineColour.ColdS.value,
+        StreamLoc.HotU: LineColour.HotU.value,
+        StreamLoc.ColdU: LineColour.ColdU.value,
+    }
+    arrow_map = {
+        StreamLoc.HotS: ArrowHead.END.value,
+        StreamLoc.HotU: ArrowHead.END.value,
+        StreamLoc.ColdS: ArrowHead.START.value,
+        StreamLoc.ColdU: ArrowHead.START.value,
+    }
 
-    else:
-        raise ValueError("Unrecognised composite curve type.")
+    if stream_loc not in title_map:
+        raise ValueError("Unrecognised composite curve stream location.")
+
+    colour = LineColour.Black.value if decolour else colour_map[stream_loc]
+    arrow = arrow_map[stream_loc] if include_arrows else ArrowHead.NO_ARROW.value
+
+    return [
+        _create_curve(
+            title=title_map[stream_loc],
+            colour=colour,
+            arrow=arrow,
+            x_vals=x_vals,
+            y_vals=y_vals,
+        )
+    ]
 
 
 def _graph_gcc(
@@ -383,7 +400,7 @@ def _segment_style(
         cold_pro_segs += 1
         return (
             f"Cold Process Segment {cold_pro_segs}",
-            LineColour.Cold.value,
+            LineColour.ColdS.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
@@ -394,7 +411,7 @@ def _segment_style(
         hot_pro_segs += 1
         return (
             f"Hot Process Segment {hot_pro_segs}",
-            LineColour.Hot.value,
+            LineColour.HotS.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
@@ -405,7 +422,7 @@ def _segment_style(
         hot_ut_segs += 1
         return (
             f"Hot Utility Segment {hot_ut_segs}",
-            LineColour.Hot.value,
+            LineColour.HotU.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
@@ -416,7 +433,7 @@ def _segment_style(
         cold_ut_segs += 1
         return (
             f"Cold Utility Segment {cold_ut_segs}",
-            LineColour.Cold.value,
+            LineColour.ColdU.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
