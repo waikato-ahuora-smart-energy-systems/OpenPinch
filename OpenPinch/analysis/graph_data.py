@@ -35,6 +35,15 @@ def visualise_graphs(graph_set: dict, graph) -> None:
 
     match graph_type:
         case GT.CC.value | GT.SCC.value | GT.BCC.value:
+            if graph_type == GT.BCC.value:
+                col_keys = [PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]
+                stream_types = [StreamLoc.HotS, StreamLoc.ColdS]
+                include_arrows = False
+            else:
+                col_keys = [PT.H_HOT.value, PT.H_COLD.value]
+                stream_types = [StreamLoc.HotS, StreamLoc.ColdS]
+                include_arrows = True
+
             graph_set["graphs"].append(
                 _make_composite_graph(
                     graph_title="Graph",
@@ -42,6 +51,9 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                     data=graph_data,
                     label=graph_type,
                     name=f"{graph_type} Graph",
+                    col_keys=col_keys,
+                    stream_types=stream_types,
+                    include_arrows=include_arrows,
                 )
             )
 
@@ -279,12 +291,6 @@ def _graph_cc(
         StreamLoc.HotU: "Hot Utility",
         StreamLoc.ColdU: "Cold Utility",
     }
-    colour_map = {
-        StreamLoc.HotS: LineColour.HotS.value,
-        StreamLoc.ColdS: LineColour.ColdS.value,
-        StreamLoc.HotU: LineColour.HotU.value,
-        StreamLoc.ColdU: LineColour.ColdU.value,
-    }
     arrow_map = {
         StreamLoc.HotS: ArrowHead.END.value,
         StreamLoc.HotU: ArrowHead.END.value,
@@ -295,7 +301,8 @@ def _graph_cc(
     if stream_loc not in title_map:
         raise ValueError("Unrecognised composite curve stream location.")
 
-    colour = LineColour.Black.value if decolour else colour_map[stream_loc]
+    base_colour = _streamloc_colour(stream_loc)
+    colour = LineColour.Black.value if decolour else base_colour
     arrow = arrow_map[stream_loc] if include_arrows else ArrowHead.NO_ARROW.value
 
     return [
@@ -325,11 +332,7 @@ def _graph_gcc(
         (j for j in range(len(x_vals) - 1) if abs(x_vals[j] - x_vals[j + 1]) > tol), 0
     )
     end_idx = next(
-        (
-            j
-            for j in range(len(x_vals) - 1, 0, -1)
-            if abs(x_vals[j] - x_vals[j - 1]) > tol
-        ),
+        (j for j in range(len(x_vals) - 1, 0, -1) if abs(x_vals[j] - x_vals[j - 1]) > tol),
         len(x_vals) - 1,
     )
 
@@ -340,15 +343,11 @@ def _graph_gcc(
     cold_pro_segs, hot_pro_segs, hot_ut_segs, cold_ut_segs, zero_segs = 0, 0, 0, 0, 0
 
     while j < end_idx:
-        segment_type = _classify_segment(
-            x_vals[j] - x_vals[j + 1], utility_profile
-        )
+        segment_type = _classify_segment(x_vals[j] - x_vals[j + 1], utility_profile)
 
         next_j = j + 1
         while next_j < end_idx:
-            next_type = _classify_segment(
-                x_vals[next_j] - x_vals[next_j + 1], utility_profile
-            )
+            next_type = _classify_segment(x_vals[next_j] - x_vals[next_j + 1], utility_profile)
             if next_type != segment_type:
                 break
             next_j += 1
@@ -356,19 +355,21 @@ def _graph_gcc(
         x_seg = x_vals[j : next_j + 1]
         y_seg = y_vals[j : next_j + 1]
 
-        title, colour, cold_pro_segs, hot_pro_segs, hot_ut_segs, cold_ut_segs, zero_segs = _segment_style(
-            segment_type,
-            cold_pro_segs,
-            hot_pro_segs,
-            hot_ut_segs,
-            cold_ut_segs,
-            zero_segs,
+        stream_loc, title_prefix, cold_pro_segs, hot_pro_segs, hot_ut_segs, cold_ut_segs, zero_segs = (
+            _segment_style(
+                segment_type,
+                cold_pro_segs,
+                hot_pro_segs,
+                hot_ut_segs,
+                cold_ut_segs,
+                zero_segs,
+            )
         )
 
         curves.append(
             _create_curve(
-                title=title,
-                colour=colour if not decolour else LineColour.Black.value,
+                title=title_prefix,
+                colour=LineColour.Black.value if decolour else _streamloc_colour(stream_loc),
                 x_vals=x_seg,
                 y_vals=y_seg,
                 arrow=ArrowHead.NO_ARROW.value,
@@ -395,12 +396,12 @@ def _segment_style(
     hot_ut_segs: int,
     cold_ut_segs: int,
     zero_segs: int,
-) -> Tuple[str, int, int, int, int, int, int]:
+) -> Tuple[StreamLoc, str, int, int, int, int, int]:
     if segment_type == "cold_pro":
         cold_pro_segs += 1
         return (
+            StreamLoc.ColdS,
             f"Cold Process Segment {cold_pro_segs}",
-            LineColour.ColdS.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
@@ -410,8 +411,8 @@ def _segment_style(
     if segment_type == "hot_pro":
         hot_pro_segs += 1
         return (
+            StreamLoc.HotS,
             f"Hot Process Segment {hot_pro_segs}",
-            LineColour.HotS.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
@@ -421,8 +422,8 @@ def _segment_style(
     if segment_type == "hot_ut":
         hot_ut_segs += 1
         return (
+            StreamLoc.HotU,
             f"Hot Utility Segment {hot_ut_segs}",
-            LineColour.HotU.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
@@ -432,8 +433,8 @@ def _segment_style(
     if segment_type == "cold_ut":
         cold_ut_segs += 1
         return (
+            StreamLoc.ColdU,
             f"Cold Utility Segment {cold_ut_segs}",
-            LineColour.ColdU.value,
             cold_pro_segs,
             hot_pro_segs,
             hot_ut_segs,
@@ -442,14 +443,27 @@ def _segment_style(
         )
     zero_segs += 1
     return (
+        StreamLoc.Unassigned,
         f"Vertical Segment {zero_segs}",
-        LineColour.Other.value,
         cold_pro_segs,
         hot_pro_segs,
         hot_ut_segs,
         cold_ut_segs,
         zero_segs,
     )
+
+
+def _streamloc_colour(stream_loc: StreamLoc) -> int:
+    """Return the default colour for a given stream location."""
+    if stream_loc == StreamLoc.HotS:
+        return LineColour.HotS.value
+    if stream_loc == StreamLoc.ColdS:
+        return LineColour.ColdS.value
+    if stream_loc == StreamLoc.HotU:
+        return LineColour.HotU.value
+    if stream_loc == StreamLoc.ColdU:
+        return LineColour.ColdU.value
+    return LineColour.Other.value
 
 
 def _clean_composite(
