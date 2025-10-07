@@ -116,9 +116,14 @@ def render_streamlit_dashboard(
         for name, payload in graph_payload.items()
     }
 
+    base_key = f"{zone.name}_{id(zone)}"
+
     target_names = sorted(targets.keys())
     selected_target_name = st.sidebar.selectbox(
-        "Target", target_names, index=0 if target_names else None
+        "Target",
+        target_names,
+        index=0 if target_names else None,
+        key=f"target_select_{base_key}",
     )
     target = targets[selected_target_name]
 
@@ -143,7 +148,11 @@ def render_streamlit_dashboard(
                 str(graph.get("name") or graph.get("type") or f"Graph {idx + 1}")
                 for idx, graph in enumerate(graph_set.graphs)
             ]
-            graph_choice = st.selectbox("Graph type", graph_names, key="graph_select")
+            graph_choice = st.selectbox(
+                "Graph type",
+                graph_names,
+                key=f"graph_select_{base_key}_{selected_target_name}",
+            )
             graph = graph_set.graphs[graph_names.index(graph_choice)]
             figure = _build_matplotlib_graph(graph)
             st.pyplot(figure, clear_figure=True)
@@ -154,7 +163,7 @@ def render_streamlit_dashboard(
         if pt_df.empty:
             st.info("No shifted problem table data available.")
         else:
-            st.dataframe(pt_df, use_container_width=True)
+            st.dataframe(pt_df, width="stretch")
 
     with tabs[2]:
         pt_real_df = problem_table_to_dataframe(
@@ -163,7 +172,7 @@ def render_streamlit_dashboard(
         if pt_real_df.empty:
             st.info("No real-temperature problem table data available.")
         else:
-            st.dataframe(pt_real_df, use_container_width=True)
+            st.dataframe(pt_real_df, width="stretch")
 
 
 def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:

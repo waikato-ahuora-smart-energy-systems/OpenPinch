@@ -16,7 +16,7 @@ from .utils import *
 __all__ = ["pinch_analysis_service"]
 
 
-def pinch_analysis_service(data: Any, project_name: str = "Project") -> TargetOutput:
+def pinch_analysis_service(data: Any, project_name: str = "Project", is_return_full_results: bool = False) -> TargetOutput:
     """Validate user data, run the targeting workflow, and return structured results.
 
     Parameters
@@ -55,4 +55,4 @@ def pinch_analysis_service(data: Any, project_name: str = "Project") -> TargetOu
     validated_data = TargetOutput.model_validate(return_data)
 
     # Return data
-    return validated_data
+    return validated_data if not is_return_full_results else (validated_data, master_zone)
