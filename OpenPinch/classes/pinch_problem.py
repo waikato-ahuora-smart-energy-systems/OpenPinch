@@ -83,8 +83,6 @@ class PinchProblem:
 
             if self.results_dir is not None:
                 self.export_to_Excel(self.results_dir)
-            
-            self.render_streamlit_dashboard()
 
 
     # ----------------------------------------------------------------------------

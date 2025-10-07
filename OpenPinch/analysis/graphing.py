@@ -14,6 +14,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, MutableMapping, Opti
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import openpyxl as xl_writer
 
 from ..classes import EnergyTarget, ProblemTable, Zone
 from ..lib.enums import ArrowHead, LineColour
@@ -120,22 +121,25 @@ def render_streamlit_dashboard(
 
     target_names = sorted(targets.keys())
     selected_target_name = st.sidebar.selectbox(
-        "Target",
+        "***Select Zone***",
         target_names,
         index=0 if target_names else None,
         key=f"target_select_{base_key}",
     )
     target = targets[selected_target_name]
 
-    st.sidebar.write(f"**Cold Pinch:** {target.cold_pinch:.2f}")
-    st.sidebar.write(f"**Hot Pinch:** {target.hot_pinch:.2f}")
-    st.sidebar.write(f"**Heat Recovery Target:** {target.heat_recovery_target:.2f}")
+    st.sidebar.write(f"**Cold Pinch:** {target.cold_pinch:.1f} degC")
+    st.sidebar.write(f"**Hot Pinch:** {target.hot_pinch:.1f} degC")
+    st.sidebar.write(f"**Hot Utility (Total):** {target.hot_utility_target:,.0f} kW")
+    st.sidebar.write(f"**Cold Utility (Total):** {target.cold_utility_target:,.0f} kW")
+    st.sidebar.write(f"**Heat Recovery Target:** {target.heat_recovery_target:,.0f} kW")
+    st.sidebar.write(f"**Degree of Integration:** {target.degree_of_int:.0%}")
 
     tabs = st.tabs(
         [
             "Graphs",
             "Problem Table (Shifted)",
-            "Problem Table (Real Temperatures)",
+            "Problem Table (Real)",
         ]
     )
 
@@ -149,7 +153,7 @@ def render_streamlit_dashboard(
                 for idx, graph in enumerate(graph_set.graphs)
             ]
             graph_choice = st.selectbox(
-                "Graph type",
+                "Select graph type",
                 graph_names,
                 key=f"graph_select_{base_key}_{selected_target_name}",
             )
@@ -163,7 +167,12 @@ def render_streamlit_dashboard(
         if pt_df.empty:
             st.info("No shifted problem table data available.")
         else:
+            st.badge("Extended problem table based on shifted process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
             st.dataframe(pt_df, width="stretch")
+            st.download_button(
+                label='Download',
+                data=pt_df.to_excel(xl_writer),
+            )            
 
     with tabs[2]:
         pt_real_df = problem_table_to_dataframe(
@@ -172,15 +181,20 @@ def render_streamlit_dashboard(
         if pt_real_df.empty:
             st.info("No real-temperature problem table data available.")
         else:
+            st.badge("Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
             st.dataframe(pt_real_df, width="stretch")
+            st.download_button(
+                label='Download',
+                data=pt_real_df.to_excel(xl_writer),
+            )
 
 
 def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
     """Create a matplotlib figure for the provided graph payload."""
-    fig, ax = plt.subplots()
+    scaled_size = plt.rcParams.get("figure.figsize", [5, 3])
+    fig, ax = plt.subplots(figsize=scaled_size)
 
     segments: Iterable[Mapping[str, object]] = graph.get("segments", [])
-    show_legend = False
 
     for segment in segments:
         x_vals, y_vals = _extract_segment_xy(segment)
@@ -190,19 +204,16 @@ def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
         colour_idx = segment.get("colour")
         colour = _SEGMENT_COLOUR_MAP.get(colour_idx, "#333333")
         label = segment.get("title")
-        ax.plot(x_vals, y_vals, color=colour, linewidth=2.0, label=label)
+        ax.plot(x_vals, y_vals, color=colour, linewidth=2.0)
         _maybe_draw_arrow(ax, x_vals, y_vals, segment.get("arrow"), colour)
-        if label:
-            show_legend = True
 
     title = graph.get("name") or graph.get("type") or "Graph"
     ax.set_title(title)
-    ax.set_xlabel("Enthalpy")
-    ax.set_ylabel("Temperature")
+    ax.set_xlabel("Enthalpy / kW")
+    ax.set_ylabel("Temperature / degC")
     ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
-
-    if show_legend:
-        ax.legend(loc="best", frameon=False)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
 
     fig.tight_layout()
     return fig
