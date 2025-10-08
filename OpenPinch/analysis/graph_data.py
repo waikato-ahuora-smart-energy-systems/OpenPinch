@@ -65,7 +65,8 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                     data=graph_data,
                     label=graph_type,
                     name=f"{graph_type} Graph",
-                    value_field=PT.H_NET.value,
+                    value_field=[PT.H_NET.value],
+                    is_utility_profile=[False],
                 )
             )
             if graph_type == GT.GCC_U.value:
@@ -76,8 +77,8 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                         data=graph_data,
                         label=f"{graph_type} Utility",
                         name=f"{graph_type} Utility Graph",
-                        value_field=PT.H_NET.value,
-                        is_utility_profile=True,
+                        value_field=[PT.H_NET.value],
+                        is_utility_profile=[True],
                     )
                 )
 
@@ -136,17 +137,20 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.GCC.value,
                 data=t.graphs[GT.GCC.value],
                 label="Grand Composite Curve",
-                value_field=PT.H_NET.value,
-                is_utility_profile=False,
+                value_field=[PT.H_NET.value],
+                is_utility_profile=[False],
             )
         )
 
     if GT.GCC_A.value in t.graphs:
         graphs.append(
-            _make_dual_gcc_graph(
+            _make_gcc_graph(
                 graph_title=graphTitle,
                 key=GT.GCC_A.value,
                 data=t.graphs[GT.GCC_A.value],
+                label="Grand Composite Curve",
+                value_field=[PT.H_NET_A.value, PT.H_UT_NET.value],
+                is_utility_profile=[False, True],
             )
         )
 
@@ -157,8 +161,8 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.GCC_V.value,
                 data=t.graphs[GT.GCC_V.value],
                 label="Grand Composite Curve",
-                value_field=PT.H_NET_V.value,
-                is_utility_profile=False,
+                value_field=[PT.H_NET_V.value],
+                is_utility_profile=[False],
             )
         )
 
@@ -195,8 +199,8 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.SUGCC.value,
                 data=t.graphs[GT.SUGCC.value],
                 label="Site Utility Grand Composite Curve",
-                value_field=PT.H_UT_NET.value,
-                is_utility_profile=True,
+                value_field=[PT.H_UT_NET.value],
+                is_utility_profile=[True],
             )
         )
 
@@ -241,37 +245,39 @@ def _make_gcc_graph(
     data,
     label: str,
     *,
-    value_field: str,
+    value_field,
     name: Optional[str] = None,
     is_utility_profile: bool = False,
     decolour: bool = False,
 ):
-    segments = _graph_gcc(
-        _column_to_list(data, PT.T.value),
-        _column_to_list(data, value_field),
-        is_utility_profile=is_utility_profile,
-        decolour=decolour,
+    temperatures = _column_to_list(data, PT.T.value)
+
+    value_fields = (
+        [value_field] if isinstance(value_field, str) or not hasattr(value_field, "__iter__") else list(value_field)
     )
+
+    if isinstance(is_utility_profile, bool) or is_utility_profile is None:
+        is_utility_profiles = [bool(is_utility_profile)] * len(value_fields)
+    else:
+        is_utility_profiles = list(is_utility_profile)
+
+    if len(is_utility_profiles) != len(value_fields):
+        raise ValueError("`value_field` and `is_utility_profile` must have the same length.")
+
+    segments: List[dict] = []
+    for field, utility_flag in zip(value_fields, is_utility_profiles):
+        segments.extend(
+            _graph_gcc(
+                temperatures,
+                _column_to_list(data, field),
+                is_utility_profile=utility_flag,
+                decolour=decolour,
+            )
+        )
+
     return {
         "type": key,
         "name": name or f"{label}: {graph_title}",
-        "segments": segments,
-    }
-
-
-def _make_dual_gcc_graph(graph_title: str, key: str, data) -> dict:
-    segments = []
-    segments += _graph_gcc(
-        _column_to_list(data, PT.T.value),
-        _column_to_list(data, PT.H_NET_A.value),
-    )
-    segments += _graph_gcc(
-        _column_to_list(data, PT.T.value),
-        _column_to_list(data, PT.H_UT_NET.value),
-    )
-    return {
-        "type": key,
-        "name": f"Grand Composite Curve: {graph_title}",
         "segments": segments,
     }
 
@@ -310,7 +316,7 @@ def _graph_cc(
         StreamLoc.HotU: "Hot Utility",
         StreamLoc.ColdU: "Cold Utility",
     }
-    
+
     if key not in [GT.TSP.value]:
         arrow_map = {
             StreamLoc.HotS: ArrowHead.END.value,
