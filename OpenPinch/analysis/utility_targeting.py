@@ -46,12 +46,14 @@ def get_utility_targets(
         Updated ``(pt, pt_real, hot_utilities, cold_utilities)`` collections with
         derived profiles embedded.
     """
+    
     # Calculate various GCC profiles
     if is_process_zone:
         pt = _calc_GCC_without_pockets(pt)
     pt = _calc_GCC_with_vertical_heat_transfer(pt)
     pt = _calc_GCC_Aual(pt, is_process_zone)
     pt = _calc_GGC_pockets(pt)
+
     # Add assisted integration targeting here...
     pt = _calc_seperated_heat_load_profiles(pt, col_H_net=PT.H_NET_A.value)
 
@@ -64,7 +66,13 @@ def get_utility_targets(
             cold_utilities, pt, PT.T.value, PT.H_HOT_NET.value
         )
 
-    pt = get_utility_heat_cascade(pt, hot_utilities, cold_utilities, shifted=True)
+    pt = get_utility_heat_cascade(
+        pt, 
+        hot_utilities, 
+        cold_utilities, 
+        shifted=True
+    )
+
     pt = _calc_seperated_heat_load_profiles(
         pt,
         col_H_net=PT.H_UT_NET.value,
@@ -76,6 +84,7 @@ def get_utility_targets(
     pt_real = get_utility_heat_cascade(
         pt_real, hot_utilities, cold_utilities, shifted=False
     )
+
     pt_real = _calc_seperated_heat_load_profiles(
         pt_real,
         col_H_net=PT.H_UT_NET.value,
@@ -83,7 +92,10 @@ def get_utility_targets(
         col_H_hot_net=PT.H_HOT_UT.value,
         is_process_stream=False,
     )
-    pt_real = _calc_balanced_CC(pt_real)
+
+    pt_real = _calc_balanced_CC(
+        pt_real
+    )
 
     return pt, pt_real, hot_utilities, cold_utilities
 

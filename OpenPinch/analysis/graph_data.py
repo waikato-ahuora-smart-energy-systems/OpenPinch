@@ -310,6 +310,7 @@ def _graph_cc(
         StreamLoc.HotU: "Hot Utility",
         StreamLoc.ColdU: "Cold Utility",
     }
+    
     if key not in [GT.TSP.value]:
         arrow_map = {
             StreamLoc.HotS: ArrowHead.END.value,
@@ -436,9 +437,9 @@ def _column_to_list(data, column_key: str) -> List[float]:
 
 def _classify_segment(enthalpy_diff: float, is_utility_profile: bool) -> str:
     if enthalpy_diff > tol:
-        return StreamLoc.ColdS if not is_utility_profile else StreamLoc.HotU
+        return StreamLoc.ColdS if not is_utility_profile else StreamLoc.ColdU
     if enthalpy_diff < -tol:
-        return StreamLoc.HotS if not is_utility_profile else StreamLoc.ColdU
+        return StreamLoc.HotS if not is_utility_profile else StreamLoc.HotU
     return "zero"
 
 
