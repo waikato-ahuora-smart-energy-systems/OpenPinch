@@ -62,9 +62,13 @@ def test_graph_gcc_creates_segments():
 def test_classify_segment_utility_profile_colours():
     assert _classify_segment(5, is_utility_profile=False) == StreamLoc.ColdS
     assert _classify_segment(-5, is_utility_profile=False) == StreamLoc.HotS
-    assert _classify_segment(-5, is_utility_profile=True) == StreamLoc.HotU
-    assert _classify_segment(5, is_utility_profile=True) == StreamLoc.ColdU
+    assert _classify_segment(0, is_utility_profile=False) == StreamLoc.Unassigned
+    assert _classify_segment(0, is_utility_profile=False) == StreamLoc.Unassigned
 
+    assert _classify_segment(5, is_utility_profile=True) == StreamLoc.HotU
+    assert _classify_segment(-5, is_utility_profile=True) == StreamLoc.ColdU
+    assert _classify_segment(0, is_utility_profile=True) == StreamLoc.Unassigned
+    assert _classify_segment(0, is_utility_profile=True) == StreamLoc.Unassigned
 
 # ----------------------------------------------------------------------------------------------------
 # Integration Tests for Graph Set Creation

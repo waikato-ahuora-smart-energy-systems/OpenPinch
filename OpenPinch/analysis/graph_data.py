@@ -1,7 +1,9 @@
 """Graph construction helpers for composite curves and related plots."""
 
+from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from ..classes import *
 from ..lib import *
@@ -10,12 +12,24 @@ from ..utils import *
 DECIMAL_PLACES = 2
 GCC_VERTICAL_TOL = 1e-3
 
-GCC_SERIES_LEGEND = {
-    PT.H_NET.value: (LegendSeries.GCC, None),
-    PT.H_NET_NP.value: (LegendSeries.GCC_N, None),
-    PT.H_NET_V.value: (LegendSeries.GCC_V, None),
-    PT.H_NET_A.value: (LegendSeries.GCC_A, None),
-    PT.H_UT_NET.value: (LegendSeries.GCC_U, StreamLoc.HotU),
+
+@dataclass(frozen=True)
+class GCCSeriesMeta:
+    label: str
+    description: str
+    preferred_stream_loc: Optional[StreamLoc] = None
+
+
+GCC_SERIES_LEGEND: dict[str, GCCSeriesMeta] = {
+    PT.H_NET.value: GCCSeriesMeta(LegendSeries.GCC.name, LegendSeries.GCC.value),
+    PT.H_NET_NP.value: GCCSeriesMeta(LegendSeries.GCC_N.name, LegendSeries.GCC_N.value),
+    PT.H_NET_V.value: GCCSeriesMeta(LegendSeries.GCC_V.name, LegendSeries.GCC_V.value),
+    PT.H_NET_A.value: GCCSeriesMeta(LegendSeries.GCC_A.name, LegendSeries.GCC_A.value),
+    PT.H_UT_NET.value: GCCSeriesMeta(
+        LegendSeries.GCC_U.name,
+        LegendSeries.GCC_U.value,
+        StreamLoc.HotU,
+    ),
 }
 
 __all__ = ["get_output_graph_data", "visualise_graphs"]
@@ -200,6 +214,135 @@ def _make_composite_graph(
     }
 
 
+def _normalise_gcc_fields(value_field) -> List:
+    if isinstance(value_field, str) or not hasattr(value_field, "__iter__"):
+        return [value_field]
+    return list(value_field)
+
+
+def _normalise_gcc_flags(flag, count: int) -> List[bool]:
+    if isinstance(flag, bool) or flag is None:
+        return [bool(flag)] * count
+    flags = list(flag)
+    if len(flags) != count:
+        raise ValueError("`value_field` and `is_utility_profile` must have the same length.")
+    return [bool(item) for item in flags]
+
+
+def _column_key(field) -> str:
+    return getattr(field, "value", field)
+
+
+def _series_meta_from_key(column_key: str) -> GCCSeriesMeta:
+    meta = GCC_SERIES_LEGEND.get(column_key)
+    if meta is not None:
+        return meta
+    label = str(column_key)
+    return GCCSeriesMeta(label, label)
+
+
+def _build_gcc_segments(
+    y_vals: Iterable[float],
+    x_vals: Iterable[float],
+    *,
+    series_id: str,
+    meta: GCCSeriesMeta,
+    is_utility_profile: bool,
+    decolour: bool,
+) -> List[dict]:
+    y_vals, x_vals = _clean_composite(list(y_vals), list(x_vals))
+    counts: dict[StreamLoc, int] = defaultdict(int)
+    segments: List[dict] = []
+    for stream_loc, is_vertical, x_seg, y_seg in _iter_gcc_segment_slices(
+        x_vals,
+        y_vals,
+        is_utility_profile,
+        meta.preferred_stream_loc,
+    ):
+        counts[stream_loc] += 1
+        title = _format_segment_title(meta, counts[stream_loc])
+        colour = LineColour.Black.value if decolour else _streamloc_colour(stream_loc)
+        segments.append(
+            _create_curve(
+                title=title,
+                colour=colour,
+                x_vals=x_seg,
+                y_vals=y_seg,
+                arrow=ArrowHead.NO_ARROW.value,
+                series_label=meta.label,
+                series_id=series_id,
+                series_description=meta.description,
+                is_vertical=is_vertical,
+                is_utility_stream=stream_loc in {StreamLoc.HotU, StreamLoc.ColdU},
+            )
+        )
+    return segments
+
+
+def _iter_gcc_segment_slices(
+    x_vals: List[float],
+    y_vals: List[float],
+    is_utility_profile: bool,
+    preferred_stream_loc: Optional[StreamLoc],
+):
+    start, end = _segment_bounds(x_vals)
+    j = start
+    while j < end:
+        classified = _classify_segment(x_vals[j] - x_vals[j + 1], is_utility_profile)
+        next_j = j + 1
+        while next_j < end:
+            next_class = _classify_segment(x_vals[next_j] - x_vals[next_j + 1], is_utility_profile)
+            if next_class != classified:
+                break
+            next_j += 1
+        raw_loc = _segment_streamloc(classified)
+        is_vertical = raw_loc == StreamLoc.Unassigned
+        stream_loc = preferred_stream_loc if is_vertical and preferred_stream_loc else raw_loc
+        yield stream_loc, is_vertical, x_vals[j : next_j + 1], y_vals[j : next_j + 1]
+        j = next_j
+
+
+def _segment_bounds(x_vals: List[float]) -> Tuple[int, int]:
+    start = next((i for i in range(len(x_vals) - 1) if abs(x_vals[i] - x_vals[i + 1]) > tol), 0)
+    end = next(
+        (i for i in range(len(x_vals) - 1, 0, -1) if abs(x_vals[i] - x_vals[i - 1]) > tol),
+        len(x_vals) - 1,
+    )
+    return start, end
+
+
+def _format_segment_title(meta: GCCSeriesMeta, index: int) -> str:
+    base = meta.description or meta.label or "Segment"
+    return f"{base} {index}"
+
+
+def _graph_gcc(
+    y_vals: Iterable[float],
+    x_vals: Iterable[float],
+    *,
+    series_label: str = "GCC",
+    series_id: str = "GCC",
+    series_description: Optional[str] = None,
+    preferred_stream_loc: Optional[StreamLoc] = None,
+    is_utility_profile: bool = False,
+    decolour: bool = False,
+) -> List[dict]:
+    """Backward-compatible wrapper retained for tests and legacy callers."""
+    meta = GCCSeriesMeta(
+        label=series_label,
+        description=series_description or series_label,
+        preferred_stream_loc=preferred_stream_loc,
+    )
+    return _build_gcc_segments(
+        list(y_vals),
+        list(x_vals),
+        series_id=series_id,
+        meta=meta,
+        is_utility_profile=is_utility_profile,
+        decolour=decolour,
+    )
+
+
 def _make_gcc_graph(
     graph_title: str,
     key: str,
@@ -212,43 +355,18 @@ def _make_gcc_graph(
     decolour: bool = False,
 ):
     temperatures = _column_to_list(data, PT.T.value)
-
-    value_fields = (
-        [value_field] if isinstance(value_field, str) or not hasattr(value_field, "__iter__") else list(value_field)
-    )
-
-    if isinstance(is_utility_profile, bool) or is_utility_profile is None:
-        is_utility_profiles = [bool(is_utility_profile)] * len(value_fields)
-    else:
-        is_utility_profiles = list(is_utility_profile)
-
-    if len(is_utility_profiles) != len(value_fields):
-        raise ValueError("`value_field` and `is_utility_profile` must have the same length.")
-
+    fields = _normalise_gcc_fields(value_field)
+    flags = _normalise_gcc_flags(is_utility_profile, len(fields))
     segments: List[dict] = []
-    for field, utility_flag in zip(value_fields, is_utility_profiles):
-        column_key = getattr(field, "value", field)
-        series_id = f"{key}:{column_key}"
-        legend_entry = GCC_SERIES_LEGEND.get(column_key)
-        preferred_loc: Optional[StreamLoc] = None
-        if legend_entry is not None:
-            if isinstance(legend_entry, tuple):
-                series_enum, preferred_loc = legend_entry
-            else:
-                series_enum = legend_entry
-            series_label = series_enum.name
-            series_description = series_enum.value
-        else:
-            series_label = str(column_key)
-            series_description = None
+    for field, utility_flag in zip(fields, flags):
+        column_key = _column_key(field)
+        meta = _series_meta_from_key(column_key)
         segments.extend(
-            _graph_gcc(
+            _build_gcc_segments(
                 temperatures,
                 _column_to_list(data, column_key),
-                series_label=series_label,
-                series_id=str(series_id),
-                series_description=series_description,
-                preferred_stream_loc=preferred_loc,
+                series_id=f"{key}:{column_key}",
+                meta=meta,
                 is_utility_profile=utility_flag,
                 decolour=decolour,
             )
@@ -329,86 +447,6 @@ def _graph_cc(
     ]
 
 
-def _graph_gcc(
-    y_vals: List[float],
-    x_vals: List[float],
-    *,
-    series_label: str,
-    series_id: str,
-    series_description: Optional[str] = None,
-    preferred_stream_loc: Optional[StreamLoc] = None,
-    is_utility_profile: bool = False,
-    decolour: bool = False,
-) -> list:
-    """Creates segments for a Grand Composite Curve."""
-
-    # Clean composite
-    y_vals, x_vals = _clean_composite(y_vals, x_vals)
-
-    # Find start and end indices of useful data
-    start_idx = next(
-        (j for j in range(len(x_vals) - 1) if abs(x_vals[j] - x_vals[j + 1]) > tol), 0
-    )
-    end_idx = next(
-        (j for j in range(len(x_vals) - 1, 0, -1) if abs(x_vals[j] - x_vals[j - 1]) > tol),
-        len(x_vals) - 1,
-    )
-
-    curves = []
-    j = start_idx
-
-    # Counters for segment naming
-    segment_counts = {
-        StreamLoc.ColdS: 0,
-        StreamLoc.HotS: 0,
-        StreamLoc.HotU: 0,
-        StreamLoc.ColdU: 0,
-        StreamLoc.Unassigned: 0,
-    }
-
-    while j < end_idx:
-        segment_type = _classify_segment(x_vals[j] - x_vals[j + 1], is_utility_profile)
-
-        next_j = j + 1
-        while next_j < end_idx:
-            next_type = _classify_segment(x_vals[next_j] - x_vals[next_j + 1], is_utility_profile)
-            if next_type != segment_type:
-                break
-            next_j += 1
-
-        x_seg = x_vals[j : next_j + 1]
-        y_seg = y_vals[j : next_j + 1]
-
-        raw_stream_loc = _segment_streamloc(segment_type)
-        stream_loc = (
-            preferred_stream_loc
-            if preferred_stream_loc is not None and raw_stream_loc == StreamLoc.Unassigned
-            else raw_stream_loc
-        )
-        if stream_loc not in segment_counts:
-            segment_counts[stream_loc] = 0
-        segment_counts[stream_loc] += 1
-        segment_index = segment_counts[stream_loc]
-        segment_title = f"{series_label} Segment {segment_index}"
-
-        curves.append(
-            _create_curve(
-                title=segment_title,
-                colour=LineColour.Black.value if decolour else _streamloc_colour(stream_loc),
-                x_vals=x_seg,
-                y_vals=y_seg,
-                arrow=ArrowHead.NO_ARROW.value,
-                series_label=series_label,
-                series_id=series_id,
-                series_description=series_description,
-            )
-        )
-
-        j = next_j
-
-    return curves
-
-
 def _column_to_list(data, column_key: str) -> List[float]:
     """Return the requested column from ``data`` as a Python list."""
     if not isinstance(column_key, str):
@@ -442,7 +480,7 @@ def _classify_segment(enthalpy_diff: float, is_utility_profile: bool) -> str:
         return StreamLoc.ColdS if not is_utility_profile else StreamLoc.HotU
     if enthalpy_diff < 0:
         return StreamLoc.HotS if not is_utility_profile else StreamLoc.ColdU
-    return "zero"
+    return StreamLoc.Unassigned
 
 
 def _segment_streamloc(segment_type: str) -> StreamLoc:
@@ -527,6 +565,8 @@ def _create_curve(
     series_label: Optional[str] = None,
     series_id: Optional[str] = None,
     series_description: Optional[str] = None,
+    is_vertical: Optional[bool] = None,
+    is_utility_stream: Optional[bool] = None,
 ) -> dict:
     """Creates an individual curve from data points."""
     curve = {"title": title, "colour": colour, "arrow": arrow}
@@ -536,6 +576,10 @@ def _create_curve(
         curve["series_id"] = series_id
     if series_description is not None:
         curve["series_description"] = series_description
+    if is_vertical is not None:
+        curve["is_vertical"] = bool(is_vertical)
+    if is_utility_stream is not None:
+        curve["is_utility_stream"] = bool(is_utility_stream)
     curve["data_points"] = [
         {"x": round(x, DECIMAL_PLACES), "y": round(y, DECIMAL_PLACES)}
         for x, y in zip(x_vals, y_vals)

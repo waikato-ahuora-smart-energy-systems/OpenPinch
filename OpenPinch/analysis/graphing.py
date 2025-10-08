@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from io import BytesIO
-from typing import Dict, Iterable, Iterator, List, Mapping, MutableMapping, Optional
+from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tuple
 
 import plotly.graph_objects as go
 import pandas as pd
@@ -263,74 +263,104 @@ def _build_download(
 def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
     """Create a Plotly figure for the provided graph payload."""
     fig = go.Figure()
-
-    segments: Iterable[Mapping[str, object]] = graph.get("segments", [])
-
     legend_seen: Dict[str, bool] = {}
+    for segment in graph.get("segments", []):
+        trace = _segment_trace(segment, graph, legend_seen)
+        if trace is not None:
+            fig.add_trace(trace)
+    _apply_default_layout(fig)
+    return fig
 
-    for segment in segments:
-        x_vals, y_vals = _extract_segment_xy(segment)
-        if not x_vals or not y_vals:
-            continue
 
-        colour_idx = segment.get("colour")
-        colour = _SEGMENT_COLOUR_MAP.get(colour_idx, "#333333")
-        title = segment.get("title") or graph.get("type") or "Segment"
-        series_label = segment.get("series")
-        series_description = segment.get("series_description")
-        series_label_str = str(series_label).strip() if series_label else ""
-        legend_label = series_label_str or _legend_group_name(title)
-        series_id = str(segment.get("series_id") or legend_label)
-        show_legend = not legend_seen.get(series_id, False)
-        legend_seen[series_id] = True
+def _segment_trace(
+    segment: Mapping[str, object],
+    graph: Mapping[str, object],
+    legend_seen: Dict[str, bool],
+) -> Optional[go.Scatter]:
+    x_vals, y_vals = _extract_segment_xy(segment)
+    if not x_vals or not y_vals:
+        return None
+    title = segment.get("title") or graph.get("type") or "Segment"
+    colour = _segment_colour(segment)
+    legend_label, series_id, show = _legend_details(segment, title, legend_seen)
+    mode, marker = _segment_mode_and_markers(segment, x_vals, y_vals, colour)
+    return go.Scatter(
+        x=x_vals,
+        y=y_vals,
+        mode=mode,
+        name=legend_label,
+        line=_line_style(segment, colour),
+        marker=marker,
+        hovertemplate=_hover_template(segment, title, legend_label),
+        legendgroup=series_id,
+        showlegend=show,
+    )
 
-        arrow = segment.get("arrow")
-        has_arrow = arrow in {ArrowHead.END.value, ArrowHead.START.value}
-        mode = "lines+markers" if has_arrow else "lines"
-        marker_kwargs = {}
 
-        if has_arrow and len(x_vals) >= 2:
-            if arrow == ArrowHead.END.value:
-                tip_idx, ref_idx = len(x_vals) - 1, len(x_vals) - 2
-            else:  # ArrowHead.START
-                tip_idx, ref_idx = 0, 1
+def _segment_colour(segment: Mapping[str, object]) -> str:
+    colour_idx = segment.get("colour")
+    return _SEGMENT_COLOUR_MAP.get(colour_idx, "#333333")
 
-            dx = x_vals[tip_idx] - x_vals[ref_idx]
-            dy = y_vals[tip_idx] - y_vals[ref_idx]
-            angle = math.degrees(math.atan2(dy, dx))
 
-            marker_sizes = [0.0] * len(x_vals)
-            marker_angles = [0.0] * len(x_vals)
-            marker_sizes[tip_idx] = 12
-            marker_angles[tip_idx] = angle
+def _legend_details(
+    segment: Mapping[str, object],
+    title: str,
+    legend_seen: Dict[str, bool],
+) -> Tuple[str, str, bool]:
+    series_label = segment.get("series")
+    legend_label = str(series_label).strip() if series_label else _legend_group_name(title)
+    series_id = str(segment.get("series_id") or legend_label)
+    show = not legend_seen.get(series_id, False)
+    legend_seen[series_id] = True
+    return legend_label, series_id, show
 
-            marker_kwargs = {
-                "symbol": ["triangle-right"] * len(x_vals),
-                "size": marker_sizes,
-                "angle": marker_angles,
-                "color": colour,
-                "line": {"width": 0},
-            }
 
-        trace_kwargs = {
-            "x": x_vals,
-            "y": y_vals,
-            "mode": mode,
-            "name": legend_label,
-            "line": {"color": colour, "width": 2},
-            "hovertemplate": (
-                f"{(series_description or legend_label or title)}<br>"
-                "Heat Flow / kW: %{x}<br>"
-                "Temperature / °C: %{y}<extra></extra>"
-            ),
-            "legendgroup": series_id,
-            "showlegend": show_legend,
-        }
-        if marker_kwargs:
-            trace_kwargs["marker"] = marker_kwargs
+def _segment_mode_and_markers(
+    segment: Mapping[str, object],
+    x_vals: List[float],
+    y_vals: List[float],
+    colour: str,
+) -> Tuple[str, Optional[dict]]:
+    arrow = segment.get("arrow")
+    if arrow not in {ArrowHead.END.value, ArrowHead.START.value} or len(x_vals) < 2:
+        return "lines", None
+    tip_idx, ref_idx = _arrow_indices(arrow, len(x_vals))
+    dx = x_vals[tip_idx] - x_vals[ref_idx]
+    dy = y_vals[tip_idx] - y_vals[ref_idx]
+    angle = math.degrees(math.atan2(dy, dx))
+    marker = {
+        "symbol": ["triangle-right"] * len(x_vals),
+        "size": [12 if i == tip_idx else 0.0 for i in range(len(x_vals))],
+        "angle": [angle if i == tip_idx else 0.0 for i in range(len(x_vals))],
+        "color": colour,
+        "line": {"width": 0},
+    }
+    return "lines+markers", marker
 
-        fig.add_trace(go.Scatter(**trace_kwargs))
 
+def _arrow_indices(arrow: str, length: int) -> Tuple[int, int]:
+    if arrow == ArrowHead.START.value:
+        return 0, 1
+    return length - 1, length - 2
+
+
+def _line_style(segment: Mapping[str, object], colour: str) -> dict:
+    style = {"color": colour, "width": 2}
+    if segment.get("is_vertical") and segment.get("is_utility_stream"):
+        style["dash"] = "dash"
+    return style
+
+
+def _hover_template(segment: Mapping[str, object], title: str, legend_label: str) -> str:
+    descriptor = segment.get("series_description") or legend_label or title
+    return (
+        f"{descriptor}<br>"
+        "Heat Flow / kW: %{x}<br>"
+        "Temperature / °C: %{y}<extra></extra>"
+    )
+
+
+def _apply_default_layout(fig: go.Figure) -> None:
     fig.update_layout(
         xaxis_title="Heat Flow / kW",
         yaxis_title="Temperature / \N{DEGREE SIGN}C",
@@ -340,8 +370,6 @@ def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
         margin={"l": 40, "r": 20, "t": 60, "b": 40},
     )
     fig.update_yaxes(rangemode="tozero")
-
-    return fig
 
 
 def _extract_segment_xy(segment: Mapping[str, object]) -> tuple[List[float], List[float]]:
