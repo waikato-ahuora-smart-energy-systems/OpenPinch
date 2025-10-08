@@ -57,7 +57,7 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                 )
             )
 
-        case GT.GCC.value | GT.GCC_N.value | GT.GCC_U.value:
+        case GT.GCC.value:
             graph_set["graphs"].append(
                 _make_gcc_graph(
                     graph_title="Graph",
@@ -65,22 +65,10 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                     data=graph_data,
                     label=graph_type,
                     name=f"{graph_type} Graph",
-                    value_field=[PT.H_NET.value],
-                    is_utility_profile=[False],
+                    value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_UT_NET.value],
+                    is_utility_profile=[False, False, False, False, True],
                 )
             )
-            if graph_type == GT.GCC_U.value:
-                graph_set["graphs"].append(
-                    _make_gcc_graph(
-                        graph_title="Utility Graph",
-                        key=f"{graph_type}_Utility",
-                        data=graph_data,
-                        label=f"{graph_type} Utility",
-                        name=f"{graph_type} Utility Graph",
-                        value_field=[PT.H_NET.value],
-                        is_utility_profile=[True],
-                    )
-                )
 
 
 #######################################################################################################
@@ -137,45 +125,8 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.GCC.value,
                 data=t.graphs[GT.GCC.value],
                 label="Grand Composite Curve",
-                value_field=[PT.H_NET.value],
-                is_utility_profile=[False],
-            )
-        )
-
-    if GT.GCC_A.value in t.graphs:
-        graphs.append(
-            _make_gcc_graph(
-                graph_title=graphTitle,
-                key=GT.GCC_A.value,
-                data=t.graphs[GT.GCC_A.value],
-                label="Grand Composite Curve",
-                value_field=[PT.H_NET_A.value, PT.H_UT_NET.value],
-                is_utility_profile=[False, True],
-            )
-        )
-
-    if GT.GCC_V.value in t.graphs:
-        graphs.append(
-            _make_gcc_graph(
-                graph_title=graphTitle,
-                key=GT.GCC_V.value,
-                data=t.graphs[GT.GCC_V.value],
-                label="Grand Composite Curve",
-                value_field=[PT.H_NET_V.value],
-                is_utility_profile=[False],
-            )
-        )
-
-    if GT.NLC.value in t.graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graphTitle,
-                key=GT.NLC.value,
-                data=t.graphs[GT.NLC.value],
-                col_keys=[PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
-                stream_types=[StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU],
-                label="Net Load Curves",
-                include_arrows=True,
+                value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_UT_NET.value],
+                is_utility_profile=[False, False, False, False, True],
             )
         )
 

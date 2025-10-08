@@ -109,14 +109,20 @@ def test_visualise_graphs_composite():
 def test_visualise_graphs_gcc_utility():
     graph_set = {"graphs": []}
     graph = MagicMock()
-    graph.type = GT.GCC_U.value
+    graph.type = GT.GCC.value
     graph.data = {
         PT.T.value: MagicMock(to_list=lambda: [100, 200]),
         PT.H_NET.value: MagicMock(to_list=lambda: [0, -100]),
+        PT.H_NET_A.value: MagicMock(to_list=lambda: [0, -100]),
+        PT.H_NET_AI.value: MagicMock(to_list=lambda: [0, -100]),
+        PT.H_NET_NP.value: MagicMock(to_list=lambda: [0, -100]),
+        PT.H_NET_V.value: MagicMock(to_list=lambda: [0, -100]),
+        PT.H_NET_PK.value: MagicMock(to_list=lambda: [0, -100]), 
+        PT.H_UT_NET.value: MagicMock(to_list=lambda: [0, -100]), 
     }
     visualise_graphs(graph_set, graph)
-    assert len(graph_set["graphs"]) == 2
-    assert graph_set["graphs"][1]["type"] == f"{GT.GCC_U.value}_Utility"
+    assert len(graph_set["graphs"]) == 1
+    assert graph_set["graphs"][0]["type"] == f"{GT.GCC.value}"
 
 
 # ----------------------------------------------------------------------------------------------------

@@ -77,14 +77,14 @@ def get_process_targets(zone: Zone):
         # })
         pass
 
-    graphs = _save_graph_data(pt, pt_real)
+    graph_data = _save_graph_data(pt, pt_real)
     zone.add_target_from_results(
         TargetType.DI.value,
         {
             "pt": pt,
             "pt_real": pt_real,
             "target_values": target_values,
-            "graphs": graphs,
+            "graphs": graph_data,
             "hot_utilities": hot_utilities,
             "cold_utilities": cold_utilities,
             "net_hot_streams": net_hot_streams,
@@ -231,12 +231,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.CC.value: pt_real[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.BCC.value: pt_real[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
-        GT.GCC.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET.value]],
-        GT.GCC_Lim.value: pt_real[[PT.T.value, PT.H_NET.value]],
-        GT.GCC_N.value: pt[[PT.T.value, PT.H_NET_NP.value]],
-        GT.GCC_V.value: pt[[PT.T.value, PT.H_NET_V.value]],
-        GT.GCC_A.value: pt[[PT.T.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
-        GT.GCC_U_real.value: pt_real[[PT.T.value, PT.H_UT_NET.value]],
-        GT.GCC_U.value: pt[[PT.T.value, PT.H_UT_NET.value]],
+        GT.GCC.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
+        GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_UT_NET.value]],
         GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
     }
