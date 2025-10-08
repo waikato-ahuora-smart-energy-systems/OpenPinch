@@ -10,10 +10,11 @@ minimal so user projects can layer additional controls as needed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from io import BytesIO
 from typing import Dict, Iterable, Iterator, List, Mapping, MutableMapping, Optional
 
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import pandas as pd
 import openpyxl as xl_writer
 
@@ -29,7 +30,7 @@ __all__ = [
 ]
 
 
-# Matplotlib-friendly colours keyed by the internal ``LineColour`` palette.
+# Plotly-friendly colours keyed by the internal ``LineColour`` palette.
 _SEGMENT_COLOUR_MAP: Dict[int, str] = {
     LineColour.HotS.value: "#e66e6e",  # warm red
     LineColour.ColdS.value: "#5ca5d9",  # cool blue
@@ -177,9 +178,12 @@ def render_streamlit_dashboard(
                 column = columns[idx % 2]
                 with column:
                     st.markdown(f"**{graph_names[idx]}**")
-                    figure = _build_matplotlib_graph(graph)
-                    st.pyplot(figure, clear_figure=True)
-                    plt.close(figure)
+                    figure = _build_plotly_graph(graph)
+                    st.plotly_chart(
+                        figure,
+                        use_container_width=True,
+                        config={"displaylogo": False},
+                    )
 
     with tabs[1]:
         pt_df = problem_table_to_dataframe(
@@ -256,12 +260,13 @@ def _build_download(
                 st.error(f"Failed to save file: {exc}")                   
 
 
-def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
-    """Create a matplotlib figure for the provided graph payload."""
-    scaled_size = plt.rcParams.get("figure.figsize", [5, 3])
-    fig, ax = plt.subplots(figsize=scaled_size)
+def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
+    """Create a Plotly figure for the provided graph payload."""
+    fig = go.Figure()
 
     segments: Iterable[Mapping[str, object]] = graph.get("segments", [])
+
+    legend_seen: Dict[str, bool] = {}
 
     for segment in segments:
         x_vals, y_vals = _extract_segment_xy(segment)
@@ -270,18 +275,72 @@ def _build_matplotlib_graph(graph: Mapping[str, object]) -> plt.Figure:
 
         colour_idx = segment.get("colour")
         colour = _SEGMENT_COLOUR_MAP.get(colour_idx, "#333333")
-        label = segment.get("title")
-        ax.plot(x_vals, y_vals, color=colour, linewidth=1.25)
-        _maybe_draw_arrow(ax, x_vals, y_vals, segment.get("arrow"), colour)
+        title = segment.get("title") or graph.get("type") or "Segment"
+        series_label = segment.get("series")
+        series_description = segment.get("series_description")
+        series_label_str = str(series_label).strip() if series_label else ""
+        legend_label = series_label_str or _legend_group_name(title)
+        series_id = str(segment.get("series_id") or legend_label)
+        show_legend = not legend_seen.get(series_id, False)
+        legend_seen[series_id] = True
 
-    title = graph.get("name") or graph.get("type") or "Graph"
-    ax.set_title(title)
-    ax.set_xlabel("Heat Flow / kW")
-    ax.set_ylabel("Temperature / \N{DEGREE SIGN}C")
-    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
-    ax.set_ylim(bottom=0)
+        arrow = segment.get("arrow")
+        has_arrow = arrow in {ArrowHead.END.value, ArrowHead.START.value}
+        mode = "lines+markers" if has_arrow else "lines"
+        marker_kwargs = {}
 
-    fig.tight_layout()
+        if has_arrow and len(x_vals) >= 2:
+            if arrow == ArrowHead.END.value:
+                tip_idx, ref_idx = len(x_vals) - 1, len(x_vals) - 2
+            else:  # ArrowHead.START
+                tip_idx, ref_idx = 0, 1
+
+            dx = x_vals[tip_idx] - x_vals[ref_idx]
+            dy = y_vals[tip_idx] - y_vals[ref_idx]
+            angle = math.degrees(math.atan2(dy, dx))
+
+            marker_sizes = [0.0] * len(x_vals)
+            marker_angles = [0.0] * len(x_vals)
+            marker_sizes[tip_idx] = 12
+            marker_angles[tip_idx] = angle
+
+            marker_kwargs = {
+                "symbol": ["triangle-right"] * len(x_vals),
+                "size": marker_sizes,
+                "angle": marker_angles,
+                "color": colour,
+                "line": {"width": 0},
+            }
+
+        trace_kwargs = {
+            "x": x_vals,
+            "y": y_vals,
+            "mode": mode,
+            "name": legend_label,
+            "line": {"color": colour, "width": 2},
+            "hovertemplate": (
+                f"{(series_description or legend_label or title)}<br>"
+                "Heat Flow / kW: %{x}<br>"
+                "Temperature / °C: %{y}<extra></extra>"
+            ),
+            "legendgroup": series_id,
+            "showlegend": show_legend,
+        }
+        if marker_kwargs:
+            trace_kwargs["marker"] = marker_kwargs
+
+        fig.add_trace(go.Scatter(**trace_kwargs))
+
+    fig.update_layout(
+        xaxis_title="Heat Flow / kW",
+        yaxis_title="Temperature / \N{DEGREE SIGN}C",
+        template="plotly_white",
+        hovermode="closest",
+        legend={"title": "", "orientation": "h", "yanchor": "bottom", "y": 1.02},
+        margin={"l": 40, "r": 20, "t": 60, "b": 40},
+    )
+    fig.update_yaxes(rangemode="tozero")
+
     return fig
 
 
@@ -293,27 +352,11 @@ def _extract_segment_xy(segment: Mapping[str, object]) -> tuple[List[float], Lis
     return x_vals, y_vals
 
 
-def _maybe_draw_arrow(
-    ax: plt.Axes,
-    x_vals: List[float],
-    y_vals: List[float],
-    arrow: Optional[str],
-    colour: str,
-) -> None:
-    """Annotate a curve with directional arrows when requested."""
-    if arrow is None or len(x_vals) < 2 or len(y_vals) < 2:
-        return
-
-    if arrow == ArrowHead.END.value:
-        start_idx, end_idx = -2, -1
-    elif arrow == ArrowHead.START.value:
-        start_idx, end_idx = 1, 0
-    else:
-        return
-
-    ax.annotate(
-        "",
-        xy=(x_vals[end_idx], y_vals[end_idx]),
-        xytext=(x_vals[start_idx], y_vals[start_idx]),
-        arrowprops=dict(arrowstyle="->", color=colour, shrinkA=0, shrinkB=0),
-    )
+def _legend_group_name(title: str) -> str:
+    """Return a legend label grouping sequential segments with incremented suffixes."""
+    if not title:
+        return "Segment"
+    base, _, suffix = title.rpartition(" ")
+    if suffix.isdigit() and base:
+        return base
+    return title

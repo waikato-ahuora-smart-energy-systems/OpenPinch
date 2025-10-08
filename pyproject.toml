@@ -13,7 +13,6 @@ dependencies=[
   "pydantic",
   "openpyxl", 
   "pyxlsb",
-  "matplotlib",
   "scipy",
   "streamlit",
   "plotly",

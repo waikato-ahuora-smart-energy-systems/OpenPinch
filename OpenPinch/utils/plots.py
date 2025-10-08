@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import numpy as np
 
 
@@ -9,15 +9,22 @@ def plot_t_h_curve(points, title: str = "Temperature vs. Enthalpy") -> None:
     :param title: Title of the graph.
     :returns: None
     """
-    plt.figure(figsize=(10, 6))
-    plt.plot(points[:, 0], points[:, 1], marker="o", linestyle="-")
-    plt.title(title, fontsize=16)
-    plt.ylabel("Temperature (K)", fontsize=14)
-    plt.xlabel("Enthalpy (kJ/mol)", fontsize=14)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.tight_layout()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=points[:, 0],
+            y=points[:, 1],
+            mode="lines+markers",
+            name="T-H Curve",
+        )
+    )
+    fig.update_layout(
+        title=title,
+        xaxis_title="Heat Flow / kW",
+        yaxis_title="Temperature / \N{DEGREE SIGN}C",
+        template="plotly_white",
+    )
+    fig.show()
 
 
 def plot_t_h_curve_with_piecewise_and_bounds(
@@ -37,30 +44,42 @@ def plot_t_h_curve_with_piecewise_and_bounds(
     upper_bound = [e + epsilon for e in temperatures]
     lower_bound = [e - epsilon for e in temperatures]
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(enthalpies, temperatures, label="TH Curve", color="red", linewidth=1.5)
-    plt.plot(
-        piecewise_points[:, 0],
-        piecewise_points[:, 1],
-        label="Piecewise Curve",
-        color="blue",
-        linestyle="--",
-        marker="o",
-        linewidth=2,
-    )  ## pwl curve should be dashed and blue
-    plt.fill_between(
-        enthalpies,
-        lower_bound,
-        upper_bound,
-        color="lightblue",
-        alpha=0.3,
-        label=f"±{epsilon} Bounds",
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=enthalpies,
+            y=temperatures,
+            mode="lines",
+            name="TH Curve",
+            line={"color": "red", "width": 1.5},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=piecewise_points[:, 0],
+            y=piecewise_points[:, 1],
+            mode="lines+markers",
+            name="Piecewise Curve",
+            line={"color": "blue", "width": 2, "dash": "dash"},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=list(enthalpies) + list(reversed(enthalpies)),
+            y=upper_bound + list(reversed(lower_bound)),
+            fill="toself",
+            fillcolor="rgba(135, 206, 250, 0.3)",
+            line={"color": "rgba(135, 206, 250, 0.3)"},
+            hoverinfo="skip",
+            showlegend=True,
+            name=f"±{epsilon} Bounds",
+        )
     )
 
-    plt.title(title, fontsize=16)
-    plt.xlabel("Enthalpy (J/mol)", fontsize=14)
-    plt.ylabel("Temperature (K)", fontsize=14)
-    plt.legend(fontsize=12)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.tight_layout()
-    plt.show()
+    fig.update_layout(
+        title=title,
+        xaxis_title="Heat Flow / kW",
+        yaxis_title="Temperature / \N{DEGREE SIGN}C",
+        template="plotly_white",
+    )
+    fig.show()

@@ -152,6 +152,7 @@ class LineColour(Enum):
     Black = 5
     Other = 4
 
+
 class GraphType(Enum):
     CC = "Composite Curves"
     SCC = "Shifted Composite Curves"
@@ -174,6 +175,16 @@ class GraphType(Enum):
 
 
 ResultsType = GT = GraphType
+
+
+class LegendSeries(Enum):
+    """Legend labels for multi-series graphs."""
+
+    GCC = "GCC"
+    GCC_N = "GCC (No Pockets)"
+    GCC_V = "Vertical GCC"
+    GCC_A = "Assisted GCC"
+    GCC_U = "Utility GCC"
 
 
 class SummaryRowType(Enum):
