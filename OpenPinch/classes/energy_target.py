@@ -391,7 +391,7 @@ class EnergyTarget:
             data["work_target"] = self.work_target
             data["turbine_efficiency_target"] = self.turbine_efficiency_target * 100
 
-        if self.config.AREA_BUTTON:
+        if self.config.DO_AREA_TARGETING:
             data["area"] = self.area
             data["num_units"] = self.num_units
             data["capital_cost"] = self.capital_cost

@@ -24,27 +24,38 @@ class Configuration:
 
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
+
+    DO_AREA_TARGETING: bool = False
+    DO_HP_TARGETING: bool = False
+
+    # TODO: Implement methods for the following:
+    DO_TURBINE_TARGETING: bool = False
+    DO_EXERGY_TARGETING: bool = False
+
+
+    ### OLD CONFIG -- Review ###
+
     # TIT_BUTTON_SELECTED: bool = False
     # TS_BUTTON_SELECTED: bool = False
-    TURBINE_WORK_BUTTON: bool = False
-    AREA_BUTTON: bool = False
-    ENERGY_RETROFIT_BUTTON: bool = False
-    EXERGY_BUTTON: bool = False
+    # TURBINE_WORK_BUTTON: bool = False
+    
+    # ENERGY_RETROFIT_BUTTON: bool = False
+    
     # PRINT_PTS: bool = False
-    PLOT_GRAPHS: bool = True
+    # PLOT_GRAPHS: bool = True
     DECIMAL_PLACES: int = 2
 
-    CC_CHECKBOX: bool = True
-    SCC_CHECKBOX: bool = True
-    BCC_CHECKBOX: bool = False
-    GCC_CHECKBOX: bool = True
-    GCC_N_CHECKBOX: bool = True
-    GCCU_CHECKBOX: bool = False
-    GCC_Lim_CHECKBOX: bool = False
-    TSC_CHECKBOX: bool = False
-    ERC_CHECKBOX: bool = False
-    NLC_CHECKBOX: bool = False
-    MAX_GRAPHS: int = 128
+    # CC_CHECKBOX: bool = True
+    # SCC_CHECKBOX: bool = True
+    # BCC_CHECKBOX: bool = False
+    # GCC_CHECKBOX: bool = True
+    # GCC_N_CHECKBOX: bool = True
+    # GCCU_CHECKBOX: bool = False
+    # GCC_Lim_CHECKBOX: bool = False
+    # TSC_CHECKBOX: bool = False
+    # ERC_CHECKBOX: bool = False
+    # NLC_CHECKBOX: bool = False
+    # MAX_GRAPHS: int = 128
 
     T_TURBINE_BOX: float = 450
     P_TURBINE_BOX: float = 90
@@ -61,31 +72,31 @@ class Configuration:
     # PF_SELECTED: bool = False
     # SHELL_AND_TUBE: bool = False
 
-    HHT_OPTION: bool = True
-    VHT_OPTION: bool = False
-    AUTOREORDER: bool = False
-    AUTOREORDER_1: bool = False
-    AUTOREORDER_2: bool = False
-    AUTOREORDER_3: bool = False
-    AUTOREORDER_4: bool = False
-    GCC_REG_FULL_POCKET: bool = True
-    GCC_VERT_CUT_KINK_OPTION: bool = False
-    SET_MIN_DH_THRES: bool = False
-    SET_MIN_TH_AREA: bool = False
-    AUTOMATED_RETROFIT_TARGETING_BUTTON: bool = False
-    THRESHOLD: float = 0
-    AREA_THRESHOLD: float = 0
+    # HHT_OPTION: bool = True
+    # VHT_OPTION: bool = False
+    # AUTOREORDER: bool = False
+    # AUTOREORDER_1: bool = False
+    # AUTOREORDER_2: bool = False
+    # AUTOREORDER_3: bool = False
+    # AUTOREORDER_4: bool = False
+    # GCC_REG_FULL_POCKET: bool = True
+    # GCC_VERT_CUT_KINK_OPTION: bool = False
+    # SET_MIN_DH_THRES: bool = False
+    # SET_MIN_TH_AREA: bool = False
+    # AUTOMATED_RETROFIT_TARGETING_BUTTON: bool = False
+    # THRESHOLD: float = 0
+    # AREA_THRESHOLD: float = 0
 
-    Q_MIN: float = 400
-    NUM_HX: float = 6
-    AREA_RATIO: float = 0
-    PRICE_UTILITIES: float = 220
-    MAX_RBBRIDGE: float = 100000
-    RECORD: bool = True
-    PARETO: bool = False
-    QUANTIFY_AREA: bool = False
-    ACCELERATION: bool = True
-    HEURISTICS: bool = True
+    # Q_MIN: float = 400
+    # NUM_HX: float = 6
+    # AREA_RATIO: float = 0
+    # PRICE_UTILITIES: float = 220
+    # MAX_RBBRIDGE: float = 100000
+    # RECORD: bool = True
+    # PARETO: bool = False
+    # QUANTIFY_AREA: bool = False
+    # ACCELERATION: bool = True
+    # HEURISTICS: bool = True
 
     FC: float = 0
     VC: float = 10000
@@ -100,8 +111,8 @@ class Configuration:
     UTILITY_PRICE: float = 40
     TEMP_REF: float = 15
     PRESSURE_REF: float = 101
-    AHT_BUTTON_SELECTED: bool = False
-    OVERRIDEDT_BUTTON_SELECTED: bool = False
+    # AHT_BUTTON_SELECTED: bool = False
+    # OVERRIDEDT_BUTTON_SELECTED: bool = False
 
     def __init__(
         self,
@@ -122,7 +133,7 @@ class Configuration:
         self.TIT_BUTTON_SELECTED = "PROP_MOP_0" in main_props
         self.TS_BUTTON_SELECTED = "PROP_MOP_1" in main_props
         self.TURBINE_WORK_BUTTON = "PROP_MOP_2" in main_props
-        self.AREA_BUTTON = "PROP_MOP_3" in main_props
+        self.DO_AREA_TARGETING = "PROP_MOP_3" in main_props
         self.ENERGY_RETROFIT_BUTTON = "PROP_MOP_4" in main_props
         self.EXERGY_BUTTON = "PROP_MOP_5" in main_props
         self.PRINT_PTS = "PROP_MOP_6" in main_props

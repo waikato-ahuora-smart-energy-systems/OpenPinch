@@ -64,7 +64,7 @@ def get_process_targets(zone: Zone):
     hot_pinch, cold_pinch = get_pinch_temperatures(pt)
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
-    if config.AREA_BUTTON and 0:
+    if config.DO_AREA_TARGETING and 0:
         # area = get_area_targets(pt_real, config)
         # num_units = get_min_number_hx(pt)
         # capital_cost = compute_capital_cost(area, num_units, config)
