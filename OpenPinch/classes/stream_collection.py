@@ -1,7 +1,9 @@
-from typing import Callable, Dict, List, Union, TYPE_CHECKING
+"""Utility container for managing ordered sets of stream objects."""
+
+from typing import TYPE_CHECKING, Callable, Dict, List, Union
 
 if TYPE_CHECKING:
-    from ..classes import Stream, Stream
+    from ..classes import Stream
 
 
 class StreamCollection:
@@ -46,7 +48,7 @@ class StreamCollection:
         self._streams[key] = stream
         self._needs_sort = True
 
-    def add_many(self, streams, keys = None, prevent_overwrite: bool = True):
+    def add_many(self, streams, keys=None, prevent_overwrite: bool = True):
         if keys == None:
             for stream in streams:
                 self.add(stream, prevent_overwrite=prevent_overwrite)
@@ -75,9 +77,7 @@ class StreamCollection:
         if isinstance(key, str):
             self._sort_key = lambda s: getattr(s, key)
         elif isinstance(key, list):
-            self._sort_key = lambda s: tuple(
-                -getattr(s, attr) if reverse else getattr(s, attr) for attr in key
-            )
+            self._sort_key = lambda s: tuple(getattr(s, attr) for attr in key)
         else:
             self._sort_key = key
         self._needs_sort = True
@@ -101,7 +101,7 @@ class StreamCollection:
     def __iter__(self):
         self._ensure_sorted()
         return iter(self._sorted_cache)
-    
+
     def __add__(self, other):
         if not isinstance(other, StreamCollection):
             return NotImplemented
@@ -125,14 +125,16 @@ class StreamCollection:
             # Allow accessing by stream name
             return self._streams[key]
         else:
-            raise TypeError(f"Invalid key type {type(key)}. Must be str (name) or int (index).")
+            raise TypeError(
+                f"Invalid key type {type(key)}. Must be str (name) or int (index)."
+            )
 
     def __contains__(self, stream_name: str):
         return stream_name in self._streams
 
     def __repr__(self):
         return f"StreamCollection({list(self._streams.keys())})"
-    
+
     def __eq__(self, other):
         if not isinstance(other, StreamCollection):
             return NotImplemented

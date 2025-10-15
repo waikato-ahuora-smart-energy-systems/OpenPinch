@@ -3,6 +3,7 @@ from enum import Enum
 
 class ZoneType(Enum):
     """Types of zones used to divide the problem."""
+
     R = "Region"
     C = "Community"
     S = "Site"
@@ -16,11 +17,12 @@ class ZoneType(Enum):
 
 class TargetType(Enum):
     """Different target calculation categories."""
+
     TL = "Thermodynamic Limit Target"
     DI = "Direct Integration"
     TZ = "Total Process Target"
-    TS = "Total Site Target" # Also indirect integration
-    RT = "Regional Target" # Currently the same as TS
+    TS = "Total Site Target"  # Also indirect integration
+    RT = "Regional Target"  # Currently the same as TS
     ET = "Energy Transfer Analysis"
 
     def __str__(self):
@@ -29,6 +31,7 @@ class TargetType(Enum):
 
 class HeatExchangerTypes(Enum):
     """Heat exchanger flow arrangements"""
+
     CF = "Counter Flow"
     PF = "Parallel Flow"
     CrFUU = "Crossflow - Both Unmixed"
@@ -41,6 +44,7 @@ class HeatExchangerTypes(Enum):
 
 class HeatFlowUnits(Enum):
     """Heat flow units"""
+
     W = "W"
     kW = "kW"
     MW = "MW"
@@ -49,6 +53,7 @@ class HeatFlowUnits(Enum):
 
 class StreamType(Enum):
     """Steam type"""
+
     Hot = "Hot"
     Cold = "Cold"
     Both = "Both"
@@ -57,6 +62,7 @@ class StreamType(Enum):
 
 class StreamID(Enum):
     """Stream identity"""
+
     Process = "Process"
     Utility = "Utility"
     Unassigned = "Unassigned"
@@ -64,8 +70,9 @@ class StreamID(Enum):
 
 class StreamLoc(Enum):
     """Stream set identity"""
-    HotStr = "Hot Streams"
-    ColdStr = "Cold Streams"
+
+    HotS = "Hot Streams"
+    ColdS = "Cold Streams"
     HotU = "Hot Utility"
     ColdU = "Cold Utility"
     Unassigned = "Unassigned"
@@ -73,16 +80,17 @@ class StreamLoc(Enum):
 
 class ProblemTableLabel(Enum):
     """Problem table column header labels"""
+
     T = "T"
-    DELTA_T = "delta_T"
+    DELTA_T = "\N{GREEK CAPITAL LETTER DELTA}T"
     CP_HOT = "mcp_hot_tot"
-    DELTA_H_HOT = "delta_H_hot"
+    DELTA_H_HOT = "\N{GREEK CAPITAL LETTER DELTA}H_hot"
     H_HOT = "H_hot"
     CP_COLD = "mcp_cold_tot"
-    DELTA_H_COLD = "delta_H_cold"
+    DELTA_H_COLD = "\N{GREEK CAPITAL LETTER DELTA}H_cold"
     H_COLD = "H_cold"
     MCP_NET = "mcp_net"
-    DELTA_H_NET = "delta_H_net"
+    DELTA_H_NET = "\N{GREEK CAPITAL LETTER DELTA}H_net"
     H_NET = "H_net"
 
     H_NET_NP = "H_net_np"
@@ -107,24 +115,28 @@ class ProblemTableLabel(Enum):
     RCP_HOT_UT = "rcp_hot_ut"
     RCP_COLD_UT = "rcp_cold_ut"
 
+
 PT = ProblemTableLabel
 
 
 class StreamDataLabel(Enum):
     """Stream data column header labels"""
+
     TS = "T_supply"
     TT = "T_target"
     TYPE = "stream_type"
     CP = "heat_capacity_flowrate"
     H = "heat_flow"
-    DT_CONT = "delta_T_cont"
+    DT_CONT = "\N{GREEK CAPITAL LETTER DELTA}T_cont"
     HTC = "heat_transfer_coefficient"
+
 
 SD = StreamDataLabel
 
 
 class ArrowHead(Enum):
     """Position of arrow head"""
+
     START = "Start"
     END = "End"
     NO_ARROW = "None"
@@ -132,37 +144,47 @@ class ArrowHead(Enum):
 
 class LineColour(Enum):
     """Line colour selection"""
-    Hot = 0
-    Cold = 1
-    Other = 2
-    Black = 3
+
+    HotS = 0
+    ColdS = 1
+    HotU = 2
+    ColdU = 3
+    Black = 5
+    Other = 4
 
 
 class GraphType(Enum):
-    CC = "CC"
-    SCC = "SCC"
-    BCC = "BCC"
-    GCC = "GCC"
-    GCC_NP = "GCC_NP"
-    GCCU = "GCCU"
-    LGCC = "LGCC"
-    ERC = "ERC"
-    NLC = "NLC"
-    EC = "EC"
-    PT = "PT"
-    PT_star = "PT_star"
-    GCC_Ex = "GCC_Ex"
-    GCC_Act = "GCC_Act"
-    GCC_Ut = "GCC_Ut"
-    GCC_Ut_star = "GCC_Ut_star"
-    GCC_X = "GCC_X"
-    SHL = "SHL"
-    TSP = "TSP"
-    TSU = "TSU"
-    TSU_star = "TSU_star"
-    SUGCC = "SUGCC"
+    CC = "Composite Curves"
+    SCC = "Shifted Composite Curves"
+    BCC = "Balanced Composite Curves"
+    GCC = "Grand Composite Curve"
+    GCC_R = "Grand Composite Curve (Real)"
+    GCC_X = "Exergetic Grand Composite Curve"
+    # GCC_N = "Grand Composite Curve (No Pockets)"
+    # GCC_V = "Vertical Grand Composite Curve"
+    # GCC_A = "Actual Grand Composite Curve"    
+    # GCC_U = "Utility Grand Composite Curve"
+    # GCC_U_real = "Utility Grand Composite Curve (Real)"
+    # GCC_Lim = "Thermodynamic Limiting GCC"
+    NLC = "Net Load Curves"
+
+    TSP = "Total Site Profiles"
+    TSU = "Total Site Utility"
+    # TSU_real = "Total Site Utility"
+    SUGCC = "Site Utility Grand Composite Curve"
+
 
 ResultsType = GT = GraphType
+
+
+class LegendSeries(Enum):
+    """Legend labels for multi-series graphs."""
+
+    GCC = "GCC"
+    GCC_N = "GCC (No Pockets)"
+    GCC_V = "Vertical GCC"
+    GCC_A = "Assisted GCC"
+    GCC_U = "Utility GCC"
 
 
 class SummaryRowType(Enum):

@@ -1,23 +1,27 @@
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List
+
 from .enums import *
+
 if TYPE_CHECKING:
     from .schema import *
 
 # TODO: This file needs a refactor once the purpose of it is well defined.
-# At present, the config includes many options corresponding to the Excel 
+# At present, the config includes many options corresponding to the Excel
 # workbook, but they are not considered during analysis.
 
 """Global parameters."""
-C_to_K: float = 273.15 # degrees
-ZERO: float = 0.000001
-T_CRIT: float = 373.9 # C
+C_to_K: float = 273.15  # degrees
+tol: float = 1e-6
+T_CRIT: float = 373.9  # C
 ACTIVATE_TIMING = True
 LOG_TIMING = False
 
+
 class Configuration:
     """Runtime configuration flags mirroring options from the legacy Excel workbook."""
+
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
     # TIT_BUTTON_SELECTED: bool = False
@@ -34,9 +38,9 @@ class Configuration:
     SCC_CHECKBOX: bool = True
     BCC_CHECKBOX: bool = False
     GCC_CHECKBOX: bool = True
-    GCC_NP_CHECKBOX: bool = True
+    GCC_N_CHECKBOX: bool = True
     GCCU_CHECKBOX: bool = False
-    LGCC_CHECKBOX: bool = False
+    GCC_Lim_CHECKBOX: bool = False
     TSC_CHECKBOX: bool = False
     ERC_CHECKBOX: bool = False
     NLC_CHECKBOX: bool = False
@@ -99,7 +103,12 @@ class Configuration:
     AHT_BUTTON_SELECTED: bool = False
     OVERRIDEDT_BUTTON_SELECTED: bool = False
 
-    def __init__(self, options: Options = None, top_zone_name: str = "Site", top_zone_identifier: str = ZoneType.S.value):
+    def __init__(
+        self,
+        options: Options = None,
+        top_zone_name: str = "Site",
+        top_zone_identifier: str = ZoneType.S.value,
+    ):
         """Initialise defaults and optionally apply user-provided options."""
         self.TOP_ZONE_NAME = top_zone_name
         self.TOP_ZONE_IDENTIFIER = top_zone_identifier
@@ -109,7 +118,7 @@ class Configuration:
     def set_parameters(self, options: Options) -> None:
         """Apply checkbox- and turbine-related configuration from :class:`Options`."""
         # Main properties
-        main_props = options.main
+        main_props = set(options.main)
         self.TIT_BUTTON_SELECTED = "PROP_MOP_0" in main_props
         self.TS_BUTTON_SELECTED = "PROP_MOP_1" in main_props
         self.TURBINE_WORK_BUTTON = "PROP_MOP_2" in main_props
@@ -121,16 +130,19 @@ class Configuration:
 
         # Graph properties
         if self.PLOT_GRAPHS:
-            self.CC_CHECKBOX = True
-            self.SCC_CHECKBOX = True
-            self.BCC_CHECKBOX = True
-            self.GCC_CHECKBOX = True
-            self.GCC_NP_CHECKBOX = True
-            self.GCCU_CHECKBOX = True
-            self.LGCC_CHECKBOX = True
-            self.TSC_CHECKBOX = True
-            self.ERC_CHECKBOX = True
-            self.NLC_CHECKBOX = True
+            for checkbox in (
+                "CC_CHECKBOX",
+                "SCC_CHECKBOX",
+                "BCC_CHECKBOX",
+                "GCC_CHECKBOX",
+                "GCC_N_CHECKBOX",
+                "GCCU_CHECKBOX",
+                "GCC_Lim_CHECKBOX",
+                "TSC_CHECKBOX",
+                "ERC_CHECKBOX",
+                "NLC_CHECKBOX",
+            ):
+                setattr(self, checkbox, True)
 
         # Turbine options
         turbine_options = options.turbine
@@ -138,20 +150,29 @@ class Configuration:
 
     def _set_turbine_parameters(self, turbine_options: List["TurbineOption"]) -> None:
         """Populate turbine settings when the turbine work toggle is active."""
+
+        option_map = {opt.key: opt.value for opt in turbine_options}
+
         def get_turbine_value(key: str, default=None):
-            for option in turbine_options:
-                if option.key == key:  # Access the key attribute directly
-                    return option.value if option.value is not None else default
-            return default
+            value = option_map.get(key, default)
+            return default if value is None else value
 
         if self.TURBINE_WORK_BUTTON:
             self.T_TURBINE_BOX = get_turbine_value("PROP_TOP_0", self.T_TURBINE_BOX)
             self.P_TURBINE_BOX = get_turbine_value("PROP_TOP_1", self.P_TURBINE_BOX)
             self.MIN_EFF = get_turbine_value("PROP_TOP_2", self.MIN_EFF)
-            self.ELECTRICITY_PRICE = get_turbine_value("PROP_TOP_3", self.ELECTRICITY_PRICE)
+            self.ELECTRICITY_PRICE = get_turbine_value(
+                "PROP_TOP_3", self.ELECTRICITY_PRICE
+            )
             self.LOAD = get_turbine_value("PROP_TOP_4", self.LOAD)
             self.MECH_EFF = get_turbine_value("PROP_TOP_5", self.MECH_EFF)
             self.COMBOBOX = get_turbine_value("PROP_TOP_6", self.COMBOBOX)
-            self.ABOVE_PINCH_CHECKBOX = get_turbine_value("PROP_TOP_7", self.ABOVE_PINCH_CHECKBOX)
-            self.BELOW_PINCH_CHECKBOX = get_turbine_value("PROP_TOP_8", self.BELOW_PINCH_CHECKBOX)
-            self.CONDESATE_FLASH_CORRECTION = get_turbine_value("PROP_TOP_9", self.CONDESATE_FLASH_CORRECTION)
+            self.ABOVE_PINCH_CHECKBOX = get_turbine_value(
+                "PROP_TOP_7", self.ABOVE_PINCH_CHECKBOX
+            )
+            self.BELOW_PINCH_CHECKBOX = get_turbine_value(
+                "PROP_TOP_8", self.BELOW_PINCH_CHECKBOX
+            )
+            self.CONDESATE_FLASH_CORRECTION = get_turbine_value(
+                "PROP_TOP_9", self.CONDESATE_FLASH_CORRECTION
+            )

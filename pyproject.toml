@@ -13,10 +13,11 @@ dependencies=[
   "pydantic",
   "openpyxl", 
   "pyxlsb",
-  "matplotlib",
   "scipy",
+  "streamlit",
+  "plotly",
 ]
-version = "0.0.20"
+version = "0.0.21"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -34,3 +35,25 @@ license-files = ["LICEN[CS]E*"]
 [project.urls]
 Homepage = "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch"
 Issues = "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/issues"
+
+[project.optional-dependencies]
+dev = [
+  "black>=23.9",
+  "ruff>=0.1.8",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E203"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

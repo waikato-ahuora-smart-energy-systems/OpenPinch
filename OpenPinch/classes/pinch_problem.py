@@ -1,13 +1,20 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union, Tuple, Dict, Any
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
 from ..utils import (
-    get_problem_from_excel, 
-    get_problem_from_csv,
     export_target_summary_to_excel_with_units,
+    get_problem_from_csv,
+    get_problem_from_excel,
 )
+from ..analysis.graphing import (
+    render_streamlit_dashboard as _render_streamlit_dashboard,
+)
+from ..main import pinch_analysis_service
+
+if TYPE_CHECKING:
+    from .zone import Zone
 
 JsonDict = Dict[str, Any]
 PathLike = Union[str, Path]
@@ -24,18 +31,21 @@ class PinchProblem:
     - CSV bundles: either a directory containing ``streams.csv`` and ``utilities.csv``
       or an explicit ``(streams_csv_path, utilities_csv_path)`` tuple
     """
+
     problem_filepath: Optional[Path] = None
     results_dir: Optional[Path] = None
 
     # Internal state
     problem_data: Optional[JsonDict] = None
+    _project_name: str = 'Untitled'
     _results: Optional[JsonDict] = None
+    _master_zone: Optional["Zone"] = None
 
     def __init__(
         self,
         problem_filepath: Optional[PathLike] = None,
         results_dir: Optional[PathLike] = None,
-        run: bool = True,
+        run: bool = False,
     ) -> None:
         """Initialise the orchestrator and optionally run the full targeting workflow.
 
@@ -51,27 +61,28 @@ class PinchProblem:
             export results if ``results_dir`` is provided.
         """
         if problem_filepath is not None:
-            self.problem_filepath = Path(problem_filepath)
-            self.load(self.problem_filepath)
+            self.load(
+                source=Path(problem_filepath)
+            )
         else:
-            self.problem_filepath = None
+            self._problem_filepath = None
             self._problem_data = None
 
         self.results_dir = Path(results_dir) if results_dir is not None else None
         self._results = None
+        self._master_zone = None
 
         if run:
             try:
                 self.target()
-            except:
+            except Exception as exc:
                 raise ValueError(
-                    "Targeting analysis failed. Check input data format." \
-                    "Report any persisent bugs with problem files " \
-                    "via a Github issue or email (tim.walmlsey@waikato.ac.nz)"
-                )           
-                
+                    "Targeting analysis failed. Check input data format. "
+                    "Report persistent bugs via GitHub issues."
+                ) from exc
+
             if self.results_dir is not None:
-                self.export(self.results_dir)
+                self.export_to_Excel(self.results_dir)
 
 
     # ----------------------------------------------------------------------------
@@ -94,11 +105,14 @@ class PinchProblem:
         if isinstance(source, tuple) and len(source) == 2:
             # CSV tuple form
             streams_csv, utilities_csv = map(Path, source)
-            self._problem_data = get_problem_from_csv(streams_csv, utilities_csv, output_json=None)
-            self.problem_filepath = None  # Not a single-file source
+            self._problem_data = get_problem_from_csv(
+                streams_csv, utilities_csv, output_json=None
+            )
+            self._problem_filepath = None  # Not a single-file source
             return self._problem_data
 
         src_path = Path(source)
+        self._project_name = src_path.name
 
         # 1) JSON
         if src_path.suffix.lower() == ".json":
@@ -107,14 +121,14 @@ class PinchProblem:
                     self._problem_data = json.load(f)
             except Exception as e:
                 raise ValueError(f"Failed to parse JSON from {src_path}: {e}") from e
-            self.problem_filepath = src_path
+            self._problem_filepath = src_path
             return self._problem_data
 
         # 2) Excel
         elif src_path.suffix.lower() in {".xlsx", ".xls", ".xlsb", ".xlsm"}:
             # Reuse your existing Excel reader; writes options, streams, utilities
             self._problem_data = get_problem_from_excel(src_path, output_json=None)
-            self.problem_filepath = src_path
+            self._problem_filepath = src_path
             return self._problem_data
 
         # 3) CSV bundle via directory lookup
@@ -125,31 +139,30 @@ class PinchProblem:
                 raise FileNotFoundError(
                     f"CSV directory '{src_path}' must contain 'streams.csv' and 'utilities.csv'."
                 )
-            self._problem_data = get_problem_from_csv(streams_csv, utilities_csv, output_json=None)
-            self.problem_filepath = src_path
+            self._problem_data = get_problem_from_csv(
+                streams_csv, utilities_csv, output_json=None
+            )
+            self._problem_filepath = src_path
             return self._problem_data
-        
+
         raise ValueError(
             f"Unrecognized source '{src_path}'. Provide a JSON/Excel file, "
             f"a directory with 'streams.csv' and 'utilities.csv', or a (streams, utilities) tuple."
         )
 
-
     def target(self) -> JsonDict:
         """Run the targeting analysis against the loaded input and cache the results."""
         if self._problem_data is None:
-            raise RuntimeError(
-                "No input loaded. Call load(...) first."
-            )
+            raise RuntimeError("No input loaded. Call load(...) first.")
         if self._results is None:
-            from ..main import pinch_analysis_service
-            self._results = pinch_analysis_service(
-                self._problem_data
+            self._results, self._master_zone = pinch_analysis_service(
+                data=self._problem_data,
+                project_name=self._project_name,
+                is_return_full_results=True,
             )
         return self._results
 
-
-    def export(self, results_dir: Optional[PathLike] = None) -> Path:
+    def export_to_Excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Export the results to JSON. Returns the path written."""
         if results_dir is not None:
             self.results_dir = Path(results_dir)
@@ -162,21 +175,31 @@ class PinchProblem:
         if self._results is None:
             self.target()
 
-        output_path = export_target_summary_to_excel_with_units(self._results, self.results_dir)
+        output_path = export_target_summary_to_excel_with_units(
+            self._results, self.results_dir
+        )
 
         return output_path
 
+    @property
+    def problem_filepath(self) -> Optional[JsonDict]:
+        """Return the filepath of the problem that was loaded or supplied."""
+        return self._problem_filepath
 
     @property
     def problem_data(self) -> Optional[JsonDict]:
         """Return the raw problem definition that was loaded or supplied."""
         return self._problem_data
 
-
     @property
     def results(self) -> Optional[JsonDict]:
         """Return the cached targeting results, if targeting has been executed."""
         return self._results
+
+    @property
+    def master_zone(self) -> Optional["Zone"]:
+        """Return the analysed Zone hierarchy after a successful ``target()`` run."""
+        return self._master_zone
 
     # ----------------------------------------------------------------------------
     # Convenience helpers
@@ -189,21 +212,60 @@ class PinchProblem:
         obj._problem_data = data
         return obj
 
-
     def to_problem_json(self) -> JsonDict:
         """Return the canonical problem JSON (streams/utilities/options)."""
         if self._problem_data is None:
-            raise RuntimeError("No problem_data available. Did you call load(...) or from_json(...)?")
+            raise RuntimeError(
+                "No problem_data available. Did you call load(...) or from_json(...)?"
+            )
         return self._problem_data
-    
 
     def __repr__(self) -> str:
         """Machine-readable summary capturing source, export target, and result cache state."""
         src = (
-            str(self.problem_filepath)
-            if self.problem_filepath is not None
+            str(self._problem_filepath)
+            if self._problem_filepath is not None
             else "<in-memory or CSV tuple>"
         )
         tgt = str(self.results_dir) if self.results_dir is not None else "<unset>"
         has_results = "yes" if self._results is not None else "no"
         return f"PinchProblem(source={src}, export={tgt}, results={has_results})"
+
+    # ----------------------------------------------------------------------------
+    # Visualisation helpers
+    # ----------------------------------------------------------------------------
+
+    def render_streamlit_dashboard(
+        self,
+        *,
+        zone: Optional["Zone"] = None,
+        graph_payload: Optional[Dict[str, Any]] = None,
+        page_title: Optional[str] = None,
+        value_rounding: int = 2,
+    ) -> None:
+        """Launch the Streamlit dashboard for the analysed problem."""
+
+
+        active_zone = zone or self._master_zone
+        if active_zone is None:
+            raise RuntimeError(
+                "No analysed zone is available. Run target() before rendering."
+            )
+
+        payload = graph_payload
+        if payload is None and self._results is not None:
+            graphs = getattr(self._results, "graphs", None)
+            if graphs:
+                payload = {
+                    key: value.model_dump()
+                    if hasattr(value, "model_dump")
+                    else dict(value)
+                    for key, value in graphs.items()
+                }
+
+        _render_streamlit_dashboard(
+            active_zone,
+            graph_payload=payload,
+            page_title=page_title,
+            value_rounding=value_rounding,
+        )

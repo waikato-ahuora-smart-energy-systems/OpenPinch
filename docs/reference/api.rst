@@ -30,13 +30,13 @@ Analysis Building Blocks
 ------------------------
 
 .. automodule:: OpenPinch.analysis.data_preparation
-   :members: prepare_problem_struture
+   :members: prepare_problem
    :show-inheritance:
 
 .. automodule:: OpenPinch.analysis.process_analysis
-   :members: get_process_pinch_targets
+   :members: get_process_targets
    :show-inheritance:
 
 .. automodule:: OpenPinch.analysis.utility_targeting
-   :members: get_zonal_utility_targets, target_utility, calc_GGC_utility
+   :members: get_utility_targets, _target_utility, get_utility_heat_cascade
    :show-inheritance:

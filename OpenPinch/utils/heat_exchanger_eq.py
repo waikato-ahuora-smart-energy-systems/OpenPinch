@@ -1,5 +1,6 @@
 import math
-from ..lib.enums import HeatExchangerTypes as HX
+
+from ..lib import HeatExchangerTypes as HX
 
 
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
@@ -13,7 +14,9 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
         if Arrangement == HX.CF.value:
             # test = c * math.exp(-Ntu * (1 - c))
             if c != 1 and c * math.exp(-Ntu * (1 - c)) != 1:
-                eff = (1 - math.exp(-Ntu * (1 - c))) / (1 - c * math.exp(-Ntu * (1 - c)))
+                eff = (1 - math.exp(-Ntu * (1 - c))) / (
+                    1 - c * math.exp(-Ntu * (1 - c))
+                )
             else:
                 eff = Ntu / (1 + Ntu)
         # Parallel Flow - Single Pass Effectiveness
@@ -27,7 +30,9 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
                 eff = CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_Phase)
         # Cross Flow - Both Streams Mixed Effectiveness
         elif Arrangement == HX.CrFMM:
-            eff = (1 / (1 - math.exp(-Ntu)) + c / (1 - math.exp(-Ntu * c)) - 1 / Ntu) ** -1
+            eff = (
+                1 / (1 - math.exp(-Ntu)) + c / (1 - math.exp(-Ntu * c)) - 1 / Ntu
+            ) ** -1
         # Cross Flow - Stream Cmax Unmixed Effectiveness
         elif Arrangement == HX.CrFMUmax:
             eff = 1 - math.exp(-1 / c * (1 - math.exp(-Ntu * c)))
@@ -36,8 +41,8 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
             eff = 1 / c * (1 - math.exp(-c * (1 - math.exp(-Ntu))))
         # Shell and Tube - One Shell Pass; 2,4,6, etc., Tube Passes Effectiveness
         elif Arrangement == HX.ShellTube.value:
-            d = (1 + c ** 2) ** 0.5
-            eff = 2 / ((1 + c) + d ** 0.5 * Coth(Ntu * d / 2))
+            d = (1 + c**2) ** 0.5
+            eff = 2 / ((1 + c) + d**0.5 * Coth(Ntu * d / 2))
         # Condensing or Evaporating of One Fluid
         elif Arrangement == HX.CondEvap:
             eff = 1 - math.exp(-Ntu)
@@ -86,9 +91,9 @@ def HX_NTU(Arrangement, eff, c, Passes=None):
             Ntu = -math.log(1 + 1 / c * math.log(1 - eff * c))
         # Shell and Tube - One Shell Pass; 2,4,6, etc., Tube Passes NTU
         elif Arrangement == HX.ShellTube.value:
-            D1 = 1 + c - (1 + c ** 2) ** (1 / 4)
-            D2 = 1 + c + (1 + c ** 2) ** (1 / 4)
-            Ntu = (1 + c ** 2) ** -0.5 * math.log((2 - eff * D1) / (2 - eff * D2))
+            D1 = 1 + c - (1 + c**2) ** (1 / 4)
+            D2 = 1 + c + (1 + c**2) ** (1 / 4)
+            Ntu = (1 + c**2) ** -0.5 * math.log((2 - eff * D1) / (2 - eff * D2))
         # Condensing or Evaporating of One Fluid
         elif Arrangement == HX.CondEvap:
             Ntu = -math.log(1 - eff)
@@ -120,7 +125,10 @@ def eNTU_slope_Numerical(Arrangement, Ntu, c, Passes):
     """Finite-difference slope of effectiveness with respect to NTU for sensitivity analyses."""
     dx = 1e-6
     if Ntu > 0:
-        return (HX_Eff(Arrangement, Ntu + dx, c, Passes) - HX_Eff(Arrangement, Ntu, c, Passes)) / dx
+        return (
+            HX_Eff(Arrangement, Ntu + dx, c, Passes)
+            - HX_Eff(Arrangement, Ntu, c, Passes)
+        ) / dx
 
 
 def Coth(R):
@@ -131,7 +139,9 @@ def Coth(R):
 def MultiPassEff(eff, c, Passes):
     """Convert single-pass effectiveness into equivalent multi-pass effectiveness."""
     if c != 1:
-        return (((1 - eff * c) / (1 - eff)) ** Passes - 1) / (((1 - eff * c) / (1 - eff)) ** Passes - c)
+        return (((1 - eff * c) / (1 - eff)) ** Passes - 1) / (
+            ((1 - eff * c) / (1 - eff)) ** Passes - c
+        )
     else:
         return Passes * eff / (1 + eff * (Passes - 1))
 
@@ -139,7 +149,9 @@ def MultiPassEff(eff, c, Passes):
 def MultiPassNTU(Eff_p, c, Passes):
     """Convert multi-pass effectiveness back to an equivalent single-pass value."""
     if c != 1:
-        return (((1 - Eff_p * c) / (1 - Eff_p)) ** (1 / Passes) - 1) / (((1 - Eff_p * c) / (1 - Eff_p)) ** (1 / Passes) - c)
+        return (((1 - Eff_p * c) / (1 - Eff_p)) ** (1 / Passes) - 1) / (
+            ((1 - Eff_p * c) / (1 - Eff_p)) ** (1 / Passes) - c
+        )
     else:
         return Eff_p / (Passes - Eff_p * (Passes - 1))
 
@@ -150,7 +162,9 @@ def CrossflowUnmixedEff1(Ntu, c):
     for i in range(1, 21):
         Pn = 0
         for j in range(1, i):
-            Pn = Pn + c ** i / math.factorial(i + 1) * (i - j + 1) / math.factorial(j) * Ntu ** (i + j)
+            Pn = Pn + c**i / math.factorial(i + 1) * (i - j + 1) / math.factorial(
+                j
+            ) * Ntu ** (i + j)
         Sum_Pn = Sum_Pn + Pn
     return 1 - math.exp(-Ntu) - math.exp(-(1 + c) * Ntu) * Sum_Pn
 
@@ -158,18 +172,39 @@ def CrossflowUnmixedEff1(Ntu, c):
 def CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_fluid):
     """Lookup-derived correlations for cross-flow exchangers with finite rows."""
     # ESDU 86018
-    if Cmin_fluid == 'Air':
+    if Cmin_fluid == "Air":
         if Rows == 1:
             eff = 1 / c * (1 - math.exp(-c * (1 - math.exp(-Ntu))))
         elif Rows == 2:
             k = 1 - math.exp(-Ntu / 2)
-            eff = 1 / c * (1 - math.exp(-2 * k * c) * (1 + c * k ** 2))
+            eff = 1 / c * (1 - math.exp(-2 * k * c) * (1 + c * k**2))
         elif Rows == 3:
             k = 1 - math.exp(-Ntu / 3)
-            eff = 1 / c * (1 - math.exp(-3 * k * c) * (1 + c * k ** 2 * (3 - k) + (3 * c ** 2 * k ** 4) / 2))
+            eff = (
+                1
+                / c
+                * (
+                    1
+                    - math.exp(-3 * k * c)
+                    * (1 + c * k**2 * (3 - k) + (3 * c**2 * k**4) / 2)
+                )
+            )
         elif Rows == 4:
             k = 1 - math.exp(-Ntu / 4)
-            eff = 1 / c * (1 - math.exp(-4 * k * c) * (1 + c * k ** 2 * (6 - 4 * k + k ** 2) + 4 * c ** 2 * k ** 4 * (2 - k) + (8 * c ** 3 * k ** 6) / 3))
+            eff = (
+                1
+                / c
+                * (
+                    1
+                    - math.exp(-4 * k * c)
+                    * (
+                        1
+                        + c * k**2 * (6 - 4 * k + k**2)
+                        + 4 * c**2 * k**4 * (2 - k)
+                        + (8 * c**3 * k**6) / 3
+                    )
+                )
+            )
         elif Rows > 4:
             eff = CrossflowUnmixedEff1(Ntu, c)
     else:
@@ -177,13 +212,20 @@ def CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_fluid):
             eff = 1 - math.exp(-1 / c * (1 - math.exp(-Ntu * c)))
         elif Rows == 2:
             k = 1 - math.exp(-Ntu * c / 2)
-            eff = 1 - math.exp(-2 * k / c) * (1 + (k ** 2) / c)
+            eff = 1 - math.exp(-2 * k / c) * (1 + (k**2) / c)
         elif Rows == 3:
             k = 1 - math.exp(-Ntu * c / 3)
-            eff = 1 - math.exp(-3 * k / c) * (1 + k ** 2 * (3 - k) / c + (3 * k ** 4) / (2 * c ** 2))
+            eff = 1 - math.exp(-3 * k / c) * (
+                1 + k**2 * (3 - k) / c + (3 * k**4) / (2 * c**2)
+            )
         elif Rows == 4:
             k = 1 - math.exp(-Ntu * c / 4)
-            eff = 1 - math.exp(-4 * k / c) * (1 + k ** 2 * (6 - 4 * k + k ** 2) / c + 4 * k ** 4 * (2 - k) / c ** 2 + (8 * k ** 6) / (3 * c ** 3))
+            eff = 1 - math.exp(-4 * k / c) * (
+                1
+                + k**2 * (6 - 4 * k + k**2) / c
+                + 4 * k**4 * (2 - k) / c**2
+                + (8 * k**6) / (3 * c**3)
+            )
         elif Rows > 4:
             eff = CrossflowUnmixedEff1(Ntu, c)
 
@@ -211,6 +253,6 @@ def HX_NTU_Numerical(Arrangement, eff, c):
         F2 = F3
         count += 1
         if count > 50:
-            raise ValueError('Solution does not converge')
+            raise ValueError("Solution does not converge")
 
     return NTU3

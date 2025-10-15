@@ -1,23 +1,43 @@
-import logging
-from time import perf_counter as timer
-from functools import wraps
 import atexit
+import logging
 from collections import defaultdict
-from ..lib import config
+from functools import wraps
+from time import perf_counter as timer
 
-# Configure logging to both console and file
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("timing.log"),
-        logging.StreamHandler()
-    ]
-)
+import OpenPinch.lib.config as config
+
+from ..lib import *
 
 logger = logging.getLogger(__name__)
+_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+
+
+def _ensure_logging_configured():
+    """Attach timing handlers lazily so we only emit when requested."""
+    for handler in list(logger.handlers):
+        stream = getattr(handler, "stream", None)
+        if stream is not None and getattr(stream, "closed", False):
+            logger.removeHandler(handler)
+            handler.close()
+
+    if logger.handlers:
+        return
+
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter(_LOG_FORMAT)
+
+    file_handler = logging.FileHandler("timing.log", delay=True)
+    file_handler.setFormatter(formatter)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+
 
 _function_stats = defaultdict(lambda: {"count": 0, "total_time": 0.0})
+
 
 def timing_decorator(func=None, *, activate_overide=False):
     """
@@ -41,9 +61,13 @@ def timing_decorator(func=None, *, activate_overide=False):
             stats["total_time"] += exec_time
 
             if config.LOG_TIMING:
-                logger.info(f"Function '{f.__name__}' executed in {exec_time:.6f} seconds.")
+                _ensure_logging_configured()
+                logger.info(
+                    f"Function '{f.__name__}' executed in {exec_time:.6f} seconds."
+                )
 
             return result
+
         return wrapper
 
     # Handle both @timing_decorator and @timing_decorator(activate_overide=True)
@@ -51,8 +75,13 @@ def timing_decorator(func=None, *, activate_overide=False):
         return decorator(func)
     return decorator
 
+
 @atexit.register
 def print_summary():
+    if not _function_stats:
+        return
+
+    _ensure_logging_configured()
     logger.info("==== Execution Time Summary ====")
     for func_name, stats in _function_stats.items():
         avg_time = stats["total_time"] / stats["count"]

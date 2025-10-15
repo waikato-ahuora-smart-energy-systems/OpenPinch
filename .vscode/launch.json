@@ -12,6 +12,18 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "Specific Test",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "cwd": "${workspaceFolder}/tests/", 
+            "args": [
+              "test_analysis/test_utility_targeting.py",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },   
+        {
             "name": "e2e Tests",
             "type": "debugpy",
             "request": "launch",
@@ -21,7 +33,7 @@
               "e2e",
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": true
         },    
         {
             "name": "All tests",
@@ -32,7 +44,7 @@
             "args": [
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": true
         },                
     ]
 }

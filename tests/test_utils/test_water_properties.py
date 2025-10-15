@@ -1,5 +1,5 @@
-import pytest
 from OpenPinch.utils.water_properties import *
+
 
 def test_unit_conversions():
     assert toSIunit_p(1.0) == 100000
@@ -10,6 +10,7 @@ def test_unit_conversions():
     assert fromSIunit_h(1000) == 1.0
     assert toSIunit_s(2.5) == 2.5
     assert fromSIunit_s(2.5) == 2.5
+
 
 def test_thermo_functions():
     P = 1.0  # bar

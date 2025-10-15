@@ -1,16 +1,19 @@
-import pandas as pd
 import json
-from typing import Union, IO
+from typing import IO, Union
+
+import pandas as pd
+
 from .wkbook_to_json import (
-    _set_options, 
-    _get_column_names_and_units, 
-    _write_problem_to_dict_and_list, 
+    _get_column_names_and_units,
+    _set_options,
+    _write_problem_to_dict_and_list,
     _write_targets_to_dict_and_list,
 )
 
 #######################################################################################################
 # Public API
 #######################################################################################################
+
 
 def get_problem_from_csv(
     streams_csv: Union[str, IO],
@@ -52,10 +55,18 @@ def get_problem_from_csv(
         }
     """
     streams_data = _parse_csv_with_units(
-        streams_csv, kind="Stream Data", row_units=row_units, row_data=row_data, encoding=encoding
+        streams_csv,
+        kind="Stream Data",
+        row_units=row_units,
+        row_data=row_data,
+        encoding=encoding,
     )
     utilities_data = _parse_csv_with_units(
-        utilities_csv, kind="Utility Data", row_units=row_units, row_data=row_data, encoding=encoding
+        utilities_csv,
+        kind="Utility Data",
+        row_units=row_units,
+        row_data=row_data,
+        encoding=encoding,
     )
     options_data = _set_options()
 
@@ -137,6 +148,7 @@ def get_results_from_csv(
 # Helpers
 #######################################################################################################
 
+
 def _parse_csv_with_units(
     csv_file: Union[str, IO],
     *,
@@ -155,15 +167,17 @@ def _parse_csv_with_units(
     df_full = pd.read_csv(csv_file, header=None, encoding=encoding, dtype=object)
 
     # Build column names & units using your existing logic keyed by 'kind'
-    col_names, col_units = _get_column_names_and_units(df_full, sheet_name=kind, row_units=row_units)
+    col_names, col_units = _get_column_names_and_units(
+        df_full, sheet_name=kind, row_units=row_units
+    )
 
     # Slice data rows
     df_data: pd.DataFrame = df_full.iloc[row_data:].copy()
 
     # Trim or pad columns to match expected 'col_names'
     for i in range(len(df_data.columns), len(col_names), -1):
-        df_data = df_data.drop(columns=i-1)
-    df_data.columns = col_names[:len(df_data.columns)]
+        df_data = df_data.drop(columns=i - 1)
+    df_data.columns = col_names[: len(df_data.columns)]
     for i in range(len(df_data.columns), len(col_names)):
         df_data[col_names[i]] = 0
 

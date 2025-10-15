@@ -1,4 +1,7 @@
+"""Unit-aware scalar wrapper powered by Pint quantities."""
+
 from pint import UnitRegistry
+
 from ..lib.schema import ValueWithUnit
 
 ureg = UnitRegistry()
@@ -33,7 +36,7 @@ class Value:
     @property
     def unit(self):
         """Return the unit in a human-friendly compact representation."""
-        return format(self._quantity.units, "~").replace("°","deg").replace(" ","")
+        return format(self._quantity.units, "~").replace("°", "deg").replace(" ", "")
 
     @unit.setter
     def unit(self, unit_str):

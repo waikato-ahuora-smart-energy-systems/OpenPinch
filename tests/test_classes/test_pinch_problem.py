@@ -1,10 +1,12 @@
-from OpenPinch.classes.pinch_problem import PinchProblem 
-
 import json
-from pathlib import Path
+
 # import types
 import sys
+from pathlib import Path
+
 import pytest
+
+from OpenPinch.classes.pinch_problem import PinchProblem
 
 
 @pytest.fixture
@@ -30,7 +32,9 @@ def test_load_json(tmp_path: Path, sample_problem):
     assert obj.to_problem_json() == sample_problem
 
 
-def test_load_excel_calls_reader_and_sets_path(monkeypatch, tmp_path: Path, sample_problem):
+def test_load_excel_calls_reader_and_sets_path(
+    monkeypatch, tmp_path: Path, sample_problem
+):
     # Patch the module-level symbol imported in the class' module:
     # inside PinchProblem, get_problem_from_excel is a *name* in the module namespace
     mod = sys.modules[PinchProblem.__module__]
@@ -64,8 +68,10 @@ def test_load_csv_tuple_calls_reader(monkeypatch, tmp_path: Path, sample_problem
 
     monkeypatch.setattr(mod, "get_problem_from_csv", fake_csv_reader, raising=True)
 
-    s = tmp_path / "streams.csv"; s.write_text("name,supply_T,target_T,cp\n", encoding="utf-8")
-    u = tmp_path / "utilities.csv"; u.write_text("name,T,cost\n", encoding="utf-8")
+    s = tmp_path / "streams.csv"
+    s.write_text("name,supply_T,target_T,cp\n", encoding="utf-8")
+    u = tmp_path / "utilities.csv"
+    u.write_text("name,T,cost\n", encoding="utf-8")
 
     obj = PinchProblem(run=False)
     out = obj.load((s, u))
@@ -73,7 +79,9 @@ def test_load_csv_tuple_calls_reader(monkeypatch, tmp_path: Path, sample_problem
     assert out == sample_problem
     # CSV tuple is "not a single-file source"
     assert obj.problem_filepath is None
-    assert called["args"][0] == s and called["args"][1] == u and called["args"][2] is None
+    assert (
+        called["args"][0] == s and called["args"][1] == u and called["args"][2] is None
+    )
 
 
 def test_load_csv_directory_bundle(monkeypatch, tmp_path: Path, sample_problem):
@@ -103,7 +111,8 @@ def test_load_csv_directory_bundle(monkeypatch, tmp_path: Path, sample_problem):
 
 
 def test_load_csv_directory_missing_files_raises(tmp_path: Path):
-    d = tmp_path / "bundle"; d.mkdir()
+    d = tmp_path / "bundle"
+    d.mkdir()
     # intentionally missing utilities.csv
     (d / "streams.csv").write_text("", encoding="utf-8")
 
@@ -133,7 +142,7 @@ def test_export_without_results_dir_raises(sample_problem):
     obj._problem_data = sample_problem
     obj._results = {"ok": True}
     with pytest.raises(ValueError):
-        obj.export(None)
+        obj.export_to_Excel(None)
 
 
 def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
@@ -146,13 +155,15 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
         # we don't actually write, just return a path
         return output_path
 
-    monkeypatch.setattr(mod, "export_target_summary_to_excel_with_units", fake_writer, raising=True)
+    monkeypatch.setattr(
+        mod, "export_target_summary_to_excel_with_units", fake_writer, raising=True
+    )
 
     obj = PinchProblem(run=False)
     obj._results = {"foo": "bar"}  # Pretend targeting already ran
     dest = tmp_path / "out"
 
-    path = obj.export(dest)
+    path = obj.export_to_Excel(dest)
 
     assert path == dest / "targets.xlsx"
     assert called["args"][0] == {"foo": "bar"}
@@ -175,11 +186,9 @@ def test_repr_changes_with_state(tmp_path: Path):
     assert "results=no" in r
 
     # set paths / results and check
-    obj.problem_filepath = tmp_path / "p.json"
     obj.results_dir = tmp_path / "out"
     obj._results = {}
     r2 = repr(obj)
-    assert str(obj.problem_filepath) in r2
     assert str(obj.results_dir) in r2
     assert "results=yes" in r2
 
