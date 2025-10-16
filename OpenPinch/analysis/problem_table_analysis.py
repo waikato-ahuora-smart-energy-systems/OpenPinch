@@ -102,39 +102,25 @@ def _problem_table_algorithm(
         pt.col[PT.CP_COLD.value] = cp_cold
         pt.col[PT.RCP_COLD.value] = rcp_cold
 
-    T_col = pt.col[PT.T.value]
-    delta_T = np.empty_like(T_col)
-    delta_T[0] = 0.0
-    np.subtract(T_col[:-1], T_col[1:], out=delta_T[1:])
-    pt.col[PT.DELTA_T.value] = delta_T
+    pt.col[PT.DELTA_T.value] = pt.delta_col(PT.T.value)
 
-    cp_hot = pt.col[PT.CP_HOT.value]
-    cp_cold = pt.col[PT.CP_COLD.value]
+    pt.col[PT.DELTA_H_HOT.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_HOT.value]
 
-    delta_H_hot = delta_T * cp_hot
-    pt.col[PT.DELTA_H_HOT.value] = delta_H_hot
+    pt.col[PT.DELTA_H_COLD.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_COLD.value]
 
-    delta_H_cold = delta_T * cp_cold
-    pt.col[PT.DELTA_H_COLD.value] = delta_H_cold
+    pt.col[PT.H_HOT.value] = np.cumsum(pt.col[PT.DELTA_H_HOT.value])
+    pt.col[PT.H_COLD.value] = np.cumsum(pt.col[PT.DELTA_H_COLD.value])
 
-    H_hot = np.cumsum(delta_H_hot)
-    H_cold = np.cumsum(delta_H_cold)
-    pt.col[PT.H_HOT.value] = H_hot
-    pt.col[PT.H_COLD.value] = H_cold
+    pt.col[PT.MCP_NET.value] = pt.col[PT.CP_COLD.value] - pt.col[PT.CP_HOT.value]
+    pt.col[PT.DELTA_H_NET.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.MCP_NET.value]
+    pt.col[PT.H_NET.value] = -np.cumsum(pt.col[PT.DELTA_H_NET.value])
 
-    mcp_net = cp_cold - cp_hot
-    delta_H_net = delta_T * mcp_net
-    H_net = -np.cumsum(delta_H_net)
-    pt.col[PT.MCP_NET.value] = mcp_net
-    pt.col[PT.DELTA_H_NET.value] = delta_H_net
-    pt.col[PT.H_NET.value] = H_net
+    min_H = pt.col[PT.H_NET.value].min()
+    shift = pt.col[PT.H_NET.value][-1] - min_H
 
-    min_H = H_net.min()
-    shift = H_net[-1] - min_H
-
-    pt.col[PT.H_HOT.value] = H_hot[-1] - H_hot
-    pt.col[PT.H_COLD.value] = H_cold[-1] + shift - H_cold
-    pt.col[PT.H_NET.value] = H_net - min_H
+    pt.col[PT.H_HOT.value] = pt.col[PT.H_HOT.value][-1] - pt.col[PT.H_HOT.value]
+    pt.col[PT.H_COLD.value] = pt.col[PT.H_COLD.value][-1] + shift - pt.col[PT.H_COLD.value]
+    pt.col[PT.H_NET.value] = pt.col[PT.H_NET.value] - min_H
 
     return pt
 
