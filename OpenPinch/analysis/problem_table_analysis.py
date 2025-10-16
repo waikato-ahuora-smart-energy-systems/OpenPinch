@@ -85,59 +85,55 @@ def _problem_table_algorithm(
     pt: ProblemTable,
     hot_streams: StreamCollection = None,
     cold_streams: StreamCollection = None,
-    is_shifted: bool = True, # TODO: change to is_shifted
+    is_shifted: bool = True,
 ) -> ProblemTable:
-    """Fast calculation of the problem table using vectorized operations."""
-
-    # If streams are provided, calculate CP and RCP contributions per temperature interval
-    if hot_streams is not None and cold_streams is not None:
-        cp_hot, rcp_hot, cp_cold, rcp_cold = _sum_mcp_between_temperature_boundaries(
-            pt.col[PT.T.value], hot_streams, cold_streams, is_shifted
+    
+    if hot_streams is not None:
+        cp_hot, rcp_hot = _sum_mcp_between_temperature_boundaries(
+            pt.col[PT.T.value], hot_streams, is_shifted
         )
         pt.col[PT.CP_HOT.value] = cp_hot
         pt.col[PT.RCP_HOT.value] = rcp_hot
+
+    if cold_streams is not None:
+        cp_cold, rcp_cold = _sum_mcp_between_temperature_boundaries(
+            pt.col[PT.T.value], cold_streams, is_shifted
+        )    
         pt.col[PT.CP_COLD.value] = cp_cold
         pt.col[PT.RCP_COLD.value] = rcp_cold
 
-    # Extract numeric arrays for fast computation
     T_col = pt.col[PT.T.value]
+    delta_T = np.empty_like(T_col)
+    delta_T[0] = 0.0
+    np.subtract(T_col[:-1], T_col[1:], out=delta_T[1:])
+    pt.col[PT.DELTA_T.value] = delta_T
+
     cp_hot = pt.col[PT.CP_HOT.value]
     cp_cold = pt.col[PT.CP_COLD.value]
 
-    # ΔT = T_i - T_i+1, with first value set to 0.0
-    delta_T = np.empty_like(T_col)
-    delta_T[0] = 0.0
-    delta_T[1:] = T_col[:-1] - T_col[1:]
-    pt.col[PT.DELTA_T.value] = delta_T
-
-    # ΔH_HOT = ΔT * CP_HOT
     delta_H_hot = delta_T * cp_hot
-    H_hot = np.cumsum(delta_H_hot)
     pt.col[PT.DELTA_H_HOT.value] = delta_H_hot
-    pt.col[PT.H_HOT.value] = H_hot
 
-    # ΔH_COLD = ΔT * CP_COLD
     delta_H_cold = delta_T * cp_cold
-    H_cold = np.cumsum(delta_H_cold)
     pt.col[PT.DELTA_H_COLD.value] = delta_H_cold
+
+    H_hot = np.cumsum(delta_H_hot)
+    H_cold = np.cumsum(delta_H_cold)
+    pt.col[PT.H_HOT.value] = H_hot
     pt.col[PT.H_COLD.value] = H_cold
 
-    # MCP_NET = CP_COLD - CP_HOT
     mcp_net = cp_cold - cp_hot
-    pt.col[PT.MCP_NET.value] = mcp_net
-
-    # ΔH_NET = ΔT * MCP_NET
     delta_H_net = delta_T * mcp_net
     H_net = -np.cumsum(delta_H_net)
+    pt.col[PT.MCP_NET.value] = mcp_net
     pt.col[PT.DELTA_H_NET.value] = delta_H_net
     pt.col[PT.H_NET.value] = H_net
 
-    # Find minimum H_NET (for cascade shifting)
     min_H = H_net.min()
+    shift = H_net[-1] - min_H
 
-    # Shift the composite curves for alignment
     pt.col[PT.H_HOT.value] = H_hot[-1] - H_hot
-    pt.col[PT.H_COLD.value] = H_cold[-1] + (H_net[-1] - min_H) - H_cold
+    pt.col[PT.H_COLD.value] = H_cold[-1] + shift - H_cold
     pt.col[PT.H_NET.value] = H_net - min_H
 
     return pt
@@ -157,7 +153,7 @@ def _get_temperature_intervals(
             Tsat_val = Tsat_p(config.P_TURBINE_BOX)
             T_star.extend([T_val, Tsat_val])
             T.extend([T_val, Tsat_val])
-            
+
         if config.DO_EXERGY_TARGETING:
             T_star.append(config.T_ENV)
             T.append(config.T_ENV)
@@ -170,8 +166,7 @@ def _get_temperature_intervals(
 
 def _sum_mcp_between_temperature_boundaries(
     temperatures: List[float],
-    hot_streams: List[Stream],
-    cold_streams: List[Stream],
+    streams: List[Stream],
     is_shifted: bool = True,
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """Vectorized CP and rCP summation across temperature intervals."""
@@ -196,14 +191,10 @@ def _sum_mcp_between_temperature_boundaries(
         cp_sum = active @ cp
         rcp_sum = active @ rcp
         return np.insert(cp_sum, 0, 0.0), np.insert(rcp_sum, 0, 0.0)
-
-    hot_active = calc_active_matrix(hot_streams, is_shifted)
-    cold_active = calc_active_matrix(cold_streams, is_shifted)
-
-    cp_hot, rcp_hot = sum_cp_rcp(hot_streams, hot_active)
-    cp_cold, rcp_cold = sum_cp_rcp(cold_streams, cold_active)
-
-    return cp_hot.tolist(), rcp_hot.tolist(), cp_cold.tolist(), rcp_cold.tolist()
+    
+    is_active = calc_active_matrix(streams, is_shifted)
+    cp_array, rcp_array = sum_cp_rcp(streams, is_active)
+    return cp_array.tolist(), rcp_array.tolist()
 
 
 def _shift_pt_real_composite_curves(

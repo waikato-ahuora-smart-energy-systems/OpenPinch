@@ -28,8 +28,11 @@ def test_no_overlap_streams_are_skipped():
     hot = [make_stream("H1", 400, 500, 2)]
     cold = [make_stream("C1", 10, 80, 1.5)]
 
-    CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, is_shifted=False
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
+        T, hot, is_shifted=False
+    )
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
+        T, cold, is_shifted=False
     )
 
     assert all(m == 0 for m in CP_hot)
@@ -41,8 +44,11 @@ def test_stream_with_zero_cp_does_not_affect_result():
     hot = [make_stream("H1", 150, 250, 0)]
     cold = [make_stream("C1", 100, 200, 0)]
 
-    CP_hot, rCP_hot, CP_cold, rCP_cold = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, is_shifted=False
+    CP_hot, rCP_hot = _sum_mcp_between_temperature_boundaries(
+        T, hot, is_shifted=False
+    )
+    CP_cold, rCP_cold = _sum_mcp_between_temperature_boundaries(
+        T, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 0, 0]
@@ -56,8 +62,11 @@ def test_stream_on_boundary_is_included():
     hot = [make_stream("H1", 300, 200, 0, 1)]
     cold = [make_stream("C1", 100, 200, 0, 1)]
 
-    CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, is_shifted=False
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
+        T, hot, is_shifted=False
+    )
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
+        T, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 1, 0]
@@ -69,8 +78,11 @@ def test_stream_spanning_multiple_intervals():
     hot = [make_stream("H1", 160, 290, 0, 2)]
     cold = []
 
-    CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, is_shifted=False
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
+        T, hot, is_shifted=False
+    )
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
+        T, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 2, 2, 2]
@@ -81,8 +93,11 @@ def test_empty_stream_lists_returns_zero():
     T = [300, 200, 100]
     hot, cold = [], []
 
-    CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, is_shifted=False
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
+        T, hot, is_shifted=False
+    )
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
+        T, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 0, 0]
