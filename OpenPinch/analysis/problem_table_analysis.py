@@ -38,7 +38,7 @@ def get_process_heat_cascade(
     target_values = _set_zonal_targets(pt, pt_real)
 
     # Correct the location of the cold composite curve and limiting GCC (real temperatures)
-    pt_real = _correct_pt_composite_curves(
+    pt_real = _shift_pt_real_composite_curves(
         pt_real,
         target_values["heat_recovery_target"],
         target_values["heat_recovery_limit"],
@@ -56,14 +56,14 @@ def get_utility_heat_cascade(
     pt: ProblemTable,
     hot_utilities: List[Stream],
     cold_utilities: List[Stream],
-    shifted: bool = True,
+    is_shifted: bool = True,
 ) -> ProblemTable:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
     pt_temp = _problem_table_algorithm(
         ProblemTable({PT.T.value: pt.col[PT.T.value]}),
         hot_utilities,
         cold_utilities,
-        shifted,
+        is_shifted,
     )
     pt.col[PT.H_UT_NET.value] = (
         pt_temp.col[PT.H_NET.value].max() - pt_temp.col[PT.H_NET.value]
@@ -85,14 +85,14 @@ def _problem_table_algorithm(
     pt: ProblemTable,
     hot_streams: StreamCollection = None,
     cold_streams: StreamCollection = None,
-    shifted: bool = True,
+    is_shifted: bool = True, # TODO: change to is_shifted
 ) -> ProblemTable:
     """Fast calculation of the problem table using vectorized operations."""
 
     # If streams are provided, calculate CP and RCP contributions per temperature interval
     if hot_streams is not None and cold_streams is not None:
         cp_hot, rcp_hot, cp_cold, rcp_cold = _sum_mcp_between_temperature_boundaries(
-            pt.col[PT.T.value], hot_streams, cold_streams, shifted
+            pt.col[PT.T.value], hot_streams, cold_streams, is_shifted
         )
         pt.col[PT.CP_HOT.value] = cp_hot
         pt.col[PT.RCP_HOT.value] = rcp_hot
@@ -152,14 +152,15 @@ def _get_temperature_intervals(
     T = [t for s in streams for t in (s.t_min, s.t_max)]
 
     if isinstance(config, Configuration):
-        if config.TURBINE_WORK_BUTTON:
+        if config.DO_TURBINE_WORK:
             T_val = config.T_TURBINE_BOX
             Tsat_val = Tsat_p(config.P_TURBINE_BOX)
             T_star.extend([T_val, Tsat_val])
             T.extend([T_val, Tsat_val])
-
-        T_star.append(config.TEMP_REF)
-        T.append(config.TEMP_REF)
+            
+        if config.DO_EXERGY_TARGETING:
+            T_star.append(config.T_ENV)
+            T.append(config.T_ENV)
 
     pt = ProblemTable({PT.T.value: sorted(set(T_star), reverse=True)})
     pt_real = ProblemTable({PT.T.value: sorted(set(T), reverse=True)})
@@ -171,7 +172,7 @@ def _sum_mcp_between_temperature_boundaries(
     temperatures: List[float],
     hot_streams: List[Stream],
     cold_streams: List[Stream],
-    shifted: bool = True,
+    is_shifted: bool = True,
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """Vectorized CP and rCP summation across temperature intervals."""
 
@@ -196,8 +197,8 @@ def _sum_mcp_between_temperature_boundaries(
         rcp_sum = active @ rcp
         return np.insert(cp_sum, 0, 0.0), np.insert(rcp_sum, 0, 0.0)
 
-    hot_active = calc_active_matrix(hot_streams, shifted)
-    cold_active = calc_active_matrix(cold_streams, shifted)
+    hot_active = calc_active_matrix(hot_streams, is_shifted)
+    cold_active = calc_active_matrix(cold_streams, is_shifted)
 
     cp_hot, rcp_hot = sum_cp_rcp(hot_streams, hot_active)
     cp_cold, rcp_cold = sum_cp_rcp(cold_streams, cold_active)
@@ -205,7 +206,7 @@ def _sum_mcp_between_temperature_boundaries(
     return cp_hot.tolist(), rcp_hot.tolist(), cp_cold.tolist(), rcp_cold.tolist()
 
 
-def _correct_pt_composite_curves(
+def _shift_pt_real_composite_curves(
     pt: ProblemTable, heat_recovery_target: float, heat_recovery_limit: float
 ) -> ProblemTable:
     """Shift H_COLD and H_NET columns to match targeted heat recovery levels."""
@@ -220,83 +221,61 @@ def _add_temperature_intervals_at_constant_h(
 ):
     """Insert breakpoints where composite curves intersect at constant enthalpy."""
     if heat_recovery_target > tol:
-        pt = _insert_temperature_interval_into_pt_at_constant_h(
-            pt, PT.T.value, PT.H_HOT.value, PT.H_COLD.value
-        )
-        pt_real = _insert_temperature_interval_into_pt_at_constant_h(
-            pt_real, PT.T.value, PT.H_HOT.value, PT.H_COLD.value
-        )
+        _insert_temperature_interval_into_pt_at_constant_h(pt)
+        _insert_temperature_interval_into_pt_at_constant_h(pt_real)
     return pt, pt_real
 
 
-def _insert_temperature_interval_into_pt_at_constant_h(
-    pt: ProblemTable,
-    col_T: str = PT.T.value,
-    col_HCC: str = PT.H_HOT.value,
-    col_CCC: str = PT.H_COLD.value,
-) -> ProblemTable:
+def _insert_temperature_interval_into_pt_at_constant_h(pt: ProblemTable) -> ProblemTable:
     """Insert temperature intervals into the process table where HCC and CCC intersect at constant enthalpy."""
     # --- HCC to CCC projection ---
-    i = _get_composite_curve_starting_points_loc(pt, col_HCC, hcc=True)
-    pt = _get_T_value_at_cc_starts(pt, i, col_T, col_HCC, col_CCC, hcc=True)
+    if pt.col[PT.H_HOT.value][0] > 0.0:
+        _insert_cc_start_on_opposite_cc(pt, pt.col[PT.H_HOT.value][0], PT.H_COLD.value)
     # --- CCC to HCC projection ---
-    i = _get_composite_curve_starting_points_loc(pt, col_CCC, hcc=False)
-    pt = _get_T_value_at_cc_starts(pt, i, col_T, col_HCC, col_CCC, hcc=False)
+    if pt.col[PT.H_COLD.value][-1] > 0.0:
+        _insert_cc_start_on_opposite_cc(pt, pt.col[PT.H_COLD.value][-1], PT.H_HOT.value)
     return pt
 
 
-def _get_composite_curve_starting_points_loc(
-    pt: ProblemTable, col: str = PT.H_HOT.value, hcc: bool = True
-) -> int:
-    """Find the starting index of the composite curve to be projected."""
-    i_range = range(1, len(pt)) if hcc else range(len(pt) - 1, 0, -1)
-    for i in i_range:
-        if pt.loc[i - 1, col] > pt.loc[i, col] + tol:
-            break
-    return i - 1 if hcc else i
-
-
-def _get_T_value_at_cc_starts(
+def _insert_cc_start_on_opposite_cc(
     pt: ProblemTable,
-    start_index: int,
+    h0: float,
+    col_CC: str,
     col_T: str = PT.T.value,
-    col_HCC: str = PT.H_HOT.value,
-    col_CCC: str = PT.H_COLD.value,
-    hcc: bool = True,
 ) -> ProblemTable:
     """Find and insert the temperature value where composite curves intersect at constant enthalpy."""
-    col0, col1 = (col_HCC, col_CCC) if hcc else (col_CCC, col_HCC)
 
-    # T_insert_vals = []
-    i = start_index
-    k = 0
-    while 0 < i < len(pt) and k < 2:
-        h_0 = pt.loc[i, col0]
-        j_range = range(len(pt) - 1, 0, -1) if hcc else range(1, len(pt) - 1)
+    temp_cc = pt.col[col_CC] - h0
 
-        for j in j_range:
-            if abs(pt.loc[j, col1] - h_0) < tol:
-                k += 1
-                break
+    if temp_cc.size < 2:
+        return pt
 
-            z = 0 if hcc else 1
-            h_j = pt.loc[j + z, col1]
-            h_jm1 = pt.loc[j - 1 + z, col1]
+    zero_hits = np.flatnonzero(np.abs(temp_cc) < tol)
+    if zero_hits.size > 0:
+        return pt
 
-            if h_0 < h_jm1 - tol and h_0 > h_j + tol:
-                t_j = pt.loc[j + z, col_T]
-                t_jm1 = pt.loc[j - 1 + z, col_T]
-                T_C = linear_interpolation(h_0, h_j, h_jm1, t_j, t_jm1)
-                # T_insert_vals.append(T_C)
-                pt, n_int_added = insert_temperature_interval_into_pt(pt, [T_C])
-                k += n_int_added
-                break
-        i = j
+    transitions = np.flatnonzero((temp_cc[:-1] >= tol) & (temp_cc[1:] <= -tol))
 
-    # for T_C in T_insert_vals:
-    #     pt = insert_temperature_interval_into_pt(pt, T_C)
+    if transitions.size != 1:
+        pass
+        return pt
 
+    idx = int(transitions[0])
+
+    cc_vals = pt.col[col_CC]
+    T_vals = pt.col[col_T]
+
+    T_new = linear_interpolation( 
+        h0,
+        cc_vals[idx],
+        cc_vals[idx + 1],
+        T_vals[idx],
+        T_vals[idx + 1],
+    )
+
+    pt, _ = insert_temperature_interval_into_pt(pt, [T_new])
     return pt
+
 
 
 def _set_zonal_targets(pt: ProblemTable, pt_real: ProblemTable) -> dict:

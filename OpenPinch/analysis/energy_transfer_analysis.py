@@ -343,7 +343,7 @@
 #             for row in ETD:
 #                 row.pop()
 
-# def Stack_ETD(site, ETD, PT, Diagram_type, shifted):
+# def Stack_ETD(site, ETD, PT, Diagram_type, is_shifted):
 #     """Determine the order and stack individual heat cascades of process operations.
 #     """
 #     Hot_Pinch, Cold_Pinch = get_pinch_temperatures(PT, 10, 0)
@@ -377,9 +377,9 @@
 #                 j_0 = j
 #             for i in range(1, len(ETD[0])):
 #                 if j == j_0:
-#                     ETD[j][i] = 0 if ETD_header[j - 1][5] == 1 and shifted else ETD[j - 1][i]
+#                     ETD[j][i] = 0 if ETD_header[j - 1][5] == 1 and is_shifted else ETD[j - 1][i]
 #                 else:
-#                     ETD[j][i] = ETD[j_0][i] if ETD_header[j - 1][5] == 1 and shifted else ETD[j - 1][i] + ETD[j_0][i]
+#                     ETD[j][i] = ETD[j_0][i] if ETD_header[j - 1][5] == 1 and is_shifted else ETD[j - 1][i] + ETD[j_0][i]
 #             j_0 = j
 
 #     return ETD_header

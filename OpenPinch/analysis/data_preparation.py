@@ -502,7 +502,7 @@ def _validate_config_data_completed(config: Configuration) -> Configuration:
         config.ANNUAL_OP_TIME = 365 * 24  # h/y
     # Ensures the inlet pressure to the turbine is below the critical pressure
     # TODO: Add units to the turbine pressure
-    if config.TURBINE_WORK_BUTTON and config.P_TURBINE_BOX > 220:
+    if config.DO_TURBINE_WORK and config.P_TURBINE_BOX > 220:
         config.P_TURBINE_BOX = 200
     if config.DTGLIDE <= 0:
         config.DTGLIDE = 0.01

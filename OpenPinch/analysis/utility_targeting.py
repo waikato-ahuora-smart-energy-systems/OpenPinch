@@ -24,7 +24,8 @@ def get_utility_targets(
     pt_real: ProblemTable,
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
-    is_process_zone=True,
+    is_process_zone: bool = True,
+    config: Configuration = Configuration(),
 ) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection]:
     """Target utility usage and compute GCC variants for a zone.
 
@@ -50,10 +51,12 @@ def get_utility_targets(
     # Calculate various GCC profiles
     if is_process_zone:
         pt = _calc_GCC_without_pockets(pt)
-    pt = _calc_GCC_with_vertical_heat_transfer(pt)
-    pt = _calc_GCC_Aual(pt, is_process_zone)
-    pt = _calc_GGC_pockets(pt)
-
+    if config.DO_VERT_GCC:
+        pt = _calc_GCC_with_vertical_heat_transfer(pt)
+    if config.DO_ASSITED_HT:
+        pt = _calc_GGC_pockets(pt)
+    pt = _calc_GCC_needing_utility(pt, config.GCC_FOR_TARGETING)
+    
     # Add assisted integration targeting here...
     pt = _calc_seperated_heat_load_profiles(pt, col_H_net=PT.H_NET_A.value)
 
@@ -70,7 +73,7 @@ def get_utility_targets(
         pt, 
         hot_utilities, 
         cold_utilities, 
-        shifted=True
+        is_shifted=True
     )
 
     pt = _calc_seperated_heat_load_profiles(
@@ -82,7 +85,7 @@ def get_utility_targets(
     )
 
     pt_real = get_utility_heat_cascade(
-        pt_real, hot_utilities, cold_utilities, shifted=False
+        pt_real, hot_utilities, cold_utilities, is_shifted=False
     )
 
     pt_real = _calc_seperated_heat_load_profiles(
@@ -255,16 +258,9 @@ def _calc_GCC_with_vertical_heat_transfer(pt: ProblemTable) -> ProblemTable:
     return pt
 
 
-def _calc_GCC_Aual(
-    pt: ProblemTable, is_process_zone: bool = True, f_horizontal_HT: float = 1.0
-) -> ProblemTable:
+def _calc_GCC_needing_utility(pt: ProblemTable, selected_gcc: str = PT.H_NET_NP.value) -> ProblemTable:
     """Return the actual GCC based on utility usage and heat transfer direction settings."""
-    pt.col[PT.H_NET_A.value] = (
-        pt.col[PT.H_NET_NP.value] if is_process_zone else pt.col[PT.H_NET.value]
-    )
-    pt.col[PT.H_NET_A.value] = pt.col[PT.H_NET_NP.value] * f_horizontal_HT + pt.col[
-        PT.H_NET_V.value
-    ] * (1 - f_horizontal_HT)
+    pt.col[PT.H_NET_A.value] = pt.col[selected_gcc]
     return pt
 
 

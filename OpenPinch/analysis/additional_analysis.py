@@ -45,8 +45,8 @@
 # def _calc_total_exergy(z: Zone, CC, x_source=0, x_sink=0, n_ETE=0, Col_T=0, Col_HCC=2, Col_CCC=4):
 #     """Determines the source and sink exergy of a balanced CC."""
 #     for i in range(1, len(CC[0])):
-#         T_ex1 = compute_exergetic_temperature(CC[Col_T][i - 1], T_ref=z.config.TEMP_REF)
-#         T_ex2 = compute_exergetic_temperature(CC[Col_T][i], T_ref=z.config.TEMP_REF)
+#         T_ex1 = compute_exergetic_temperature(CC[Col_T][i - 1], T_ref=z.config.T_ENV)
+#         T_ex2 = compute_exergetic_temperature(CC[Col_T][i], T_ref=z.config.T_ENV)
 #         CP_hot = (CC[Col_HCC][i - 1] - CC[Col_HCC][i]) / (CC[Col_T][i - 1] - CC[Col_T][i])
 #         CP_cold = (CC[Col_CCC][i - 1] - CC[Col_CCC][i]) / (CC[Col_T][i - 1] - CC[Col_T][i])
 
@@ -74,7 +74,7 @@
 #     GCC_X = copy.deepcopy(GCC_A)
 #     Min_X = 0
 #     AbovePT = True
-#     GCC_X[0][0] = compute_exergetic_temperature(GCC_A[0][0] + z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#     GCC_X[0][0] = compute_exergetic_temperature(GCC_A[0][0] + z.config.DTCONT / 2, T_ref=z.config.T_ENV)
 #     GCC_X[1][0] = 0
 #     i_upper = len(GCC_X[0]) + 1
 
@@ -83,7 +83,7 @@
 #     GCC_A_i = 1
 #     while i <= i_upper and GCC_A_i < len(GCC_A[0]):
 #         if AbovePT:
-#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i] + z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i] + z.config.DTCONT / 2, T_ref=z.config.T_ENV)
 #             GCC_X[1][i] = (GCC_A[1][GCC_A_i - 1] - GCC_A[1][GCC_A_i]) / (GCC_A[0][GCC_A_i - 1] - GCC_A[0][GCC_A_i])
 #             GCC_X[1][i] = GCC_X[1][i - 1] - GCC_X[1][i] * (GCC_X[0][i - 1] - GCC_X[0][i])
 #             if GCC_A[1][GCC_A_i] < tol:
@@ -92,11 +92,11 @@
 #                     row += [0, 0]
 #                 i += 2
 #                 GCC_A_i += 1
-#                 GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#                 GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.T_ENV)
 #                 GCC_X[1][i] = GCC_X[1][i - 1]
 #                 AbovePT = False
 #         else:
-#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.TEMP_REF)
+#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.T_ENV)
 #             GCC_X[1][i] = (GCC_A[1][GCC_A_i - 2] - GCC_A[1][GCC_A_i - 1]) / (GCC_A[0][GCC_A_i - 2] - GCC_A[0][GCC_A_i - 1])
 #             GCC_X[1][i] = GCC_X[1][i - 1] - GCC_X[1][i] * (GCC_X[0][i - 1] - GCC_X[0][i])
 #         i += 1

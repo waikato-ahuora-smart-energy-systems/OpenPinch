@@ -192,7 +192,7 @@ def test_serialize_json_basic(dummy_tar):
 
 def test_serialize_json_with_area_and_exergy(dummy_tar):
     dummy_tar.config.DO_AREA_TARGETING = True
-    dummy_tar.config.EXERGY_BUTTON = True
+    dummy_tar.config.DO_EXERGY_TARGETING = True
 
     dummy_tar.area = 120
     dummy_tar.num_units = 3

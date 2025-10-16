@@ -89,7 +89,7 @@ def _sum_subzone_targets(site: Zone) -> Zone:
     ].heat_recovery_limit
 
     # Target co-generation of heat and power
-    # if config.TURBINE_WORK_BUTTON:
+    # if config.DO_TURBINE_WORK:
     #     st = get_power_cogeneration_above_pinch(st)
     #     utility_cost = utility_cost - work_target / 1000 * config.ELECTRICITY_PRICE * config.ANNUAL_OP_TIME
 
@@ -176,10 +176,10 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
 
     # Apply the problem table algorithm to the simple sum of subzone utility use 
     pt = get_utility_heat_cascade(
-        pt, hot_utilities, cold_utilities, shifted=True
+        pt, hot_utilities, cold_utilities, is_shifted=True
     )
     pt_real = get_utility_heat_cascade(
-        pt_real, hot_utilities, cold_utilities, shifted=False
+        pt_real, hot_utilities, cold_utilities, is_shifted=False
     )
 
     # Apply the utility targeting method to determine the net utility use and generation 
@@ -195,7 +195,7 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     )
     hot_pinch, cold_pinch = get_pinch_temperatures(pt, col_H=PT.H_UT_NET.value)
 
-    # if config.TURBINE_WORK_BUTTON:
+    # if config.DO_TURBINE_WORK:
     #     work_target = 0.0
     #     if config.ABOVE_PINCH_CHECKBOX:
     #         pass

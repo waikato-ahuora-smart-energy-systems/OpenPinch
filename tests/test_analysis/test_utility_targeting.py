@@ -191,15 +191,15 @@ def test_calc_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
     assert result.loc[-1, PT.H_NET_V.value] == 50  # Bottom-out should zero
 
 
-from OpenPinch.analysis.utility_targeting import _calc_GCC_Aual
+from OpenPinch.analysis.utility_targeting import _calc_GCC_needing_utility
 
 
-def test_calc_GCC_Aual_combines_columns():
+def test_calc_GCC_needing_utility_combines_columns():
     pt = ProblemTable(
         {PT.H_NET_NP.value: [100, 200, 300], PT.H_NET_V.value: [300, 200, 100]}
     )
 
-    result = _calc_GCC_Aual(pt.copy)
+    result = _calc_GCC_needing_utility(pt.copy)
 
     expected = [100, 200, 300]  # Because f_horizontal = 1.0
     assert result[PT.H_NET_A.value].to_list() == expected

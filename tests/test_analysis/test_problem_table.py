@@ -29,7 +29,7 @@ def test_no_overlap_streams_are_skipped():
     cold = [make_stream("C1", 10, 80, 1.5)]
 
     CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, shifted=False
+        T, hot, cold, is_shifted=False
     )
 
     assert all(m == 0 for m in CP_hot)
@@ -42,7 +42,7 @@ def test_stream_with_zero_cp_does_not_affect_result():
     cold = [make_stream("C1", 100, 200, 0)]
 
     CP_hot, rCP_hot, CP_cold, rCP_cold = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, shifted=False
+        T, hot, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 0, 0]
@@ -57,7 +57,7 @@ def test_stream_on_boundary_is_included():
     cold = [make_stream("C1", 100, 200, 0, 1)]
 
     CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, shifted=False
+        T, hot, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 1, 0]
@@ -70,7 +70,7 @@ def test_stream_spanning_multiple_intervals():
     cold = []
 
     CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, shifted=False
+        T, hot, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 2, 2, 2]
@@ -82,7 +82,7 @@ def test_empty_stream_lists_returns_zero():
     hot, cold = [], []
 
     CP_hot, _, CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, cold, shifted=False
+        T, hot, cold, is_shifted=False
     )
 
     assert CP_hot == [0, 0, 0]
@@ -335,11 +335,9 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             235.0,
             210.0,
             195.0,
-            192.5,
             191.67,
             185.0,
             145.0,
-            122.0,
             99.0,
             85.0,
             75.0,
@@ -358,11 +356,9 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             4.99,
             25.0,
             15.0,
-            2.5,
             0.83,
             6.67,
             40.0,
-            23.0,
             23.0,
             14.0,
             10.0,
@@ -387,8 +383,6 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             40.0,
             40.0,
             40.0,
-            40.0,
-            40.0,
             15.0,
             0,
             0,
@@ -399,8 +393,6 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             0,
             0,
             0,
-            1.0,
-            1.0,
             1.0,
             1.0,
             1.0,
@@ -427,11 +419,9 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             6000.0,
             5625.0,
             5400.0,
-            5300.0,
             5266.67,
             5000.0,
             3400.0,
-            2480.0,
             1560.0,
             1000.0,
             600.0,
@@ -448,8 +438,6 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             0,
             0,
             0,
-            30.0,
-            30.0,
             30.0,
             30.0,
             30.0,
@@ -483,8 +471,6 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             1.0,
             1.0,
             1.0,
-            1.0,
-            1.0,
             0,
         ],
         [
@@ -496,11 +482,9 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             6900.0,
             6150.0,
             5700.0,
-            5625.0,
             5600.0,
             5400.0,
             3400.0,
-            2940.0,
             2480.0,
             2200.0,
             2000.0,
@@ -521,9 +505,7 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             -15.0,
             10.0,
             10.0,
-            10.0,
             -10.0,
-            20.0,
             20.0,
             20.0,
             20.0,
@@ -542,11 +524,9 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             74.85,
             -375.0,
             -225.0,
-            25.0,
             8.33,
             66.67,
             -400.0,
-            460.0,
             460.0,
             280.0,
             200.0,
@@ -565,11 +545,9 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             900.0,
             525.0,
             300.0,
-            325.0,
             333.33,
             400.0,
             0,
-            460.0,
             920.0,
             1200.0,
             1400.0,
@@ -593,7 +571,7 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             if pd.isna(expected_val) and pd.isna(result_val):
                 continue
 
-            assert expected_val == result_val or (
+            assert expected_val == result_val or ( # 210, 6150, 85, 1000
                 isinstance(expected_val, float)
                 and isinstance(result_val, float)
                 and abs(expected_val - result_val) < 1e-2
@@ -778,13 +756,13 @@ def test_add_temperature_intervals_calls_insert(monkeypatch):
     assert len(calls) == 2
 
 
-"""Test _correct_pt_composite_curves"""
-from OpenPinch.analysis.problem_table_analysis import _correct_pt_composite_curves
+"""Test _shift_pt_real_composite_curves"""
+from OpenPinch.analysis.problem_table_analysis import _shift_pt_real_composite_curves
 
 
 def test_correct_pt_composite_curves_shifts_columns():
     pt = ProblemTable({PT.H_COLD.value: [10, 20], PT.H_NET.value: [5, 15]})
-    corrected: ProblemTable = _correct_pt_composite_curves(
+    corrected: ProblemTable = _shift_pt_real_composite_curves(
         pt.copy, heat_recovery_target=30, heat_recovery_limit=50
     )
 
@@ -833,14 +811,15 @@ def test_includes_utilities():
 
 def test_includes_turbine_config():
     config = Configuration()
-    config.TURBINE_WORK_BUTTON = True
+    config.DO_TURBINE_WORK = True
     config.T_TURBINE_BOX = 200
     config.P_TURBINE_BOX = 5  # pressure in bar
+    config.DO_EXERGY_TARGETING = True
 
     T_star, _ = _get_temperature_intervals(config=config)
 
     assert config.T_TURBINE_BOX in T_star[PT.T.value].to_list()
-    assert config.TEMP_REF in T_star[PT.T.value].to_list()
+    assert config.T_ENV in T_star[PT.T.value].to_list()
 
 
 def test_empty_inputs():

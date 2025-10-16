@@ -27,24 +27,35 @@ class Configuration:
 
     DO_AREA_TARGETING: bool = False
     DO_HP_TARGETING: bool = False
-
-    # TODO: Implement methods for the following:
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
+    DO_VERT_GCC: bool = False
+    DO_ASSITED_HT: bool = False
+    DO_TURBINE_WORK: bool = False
 
+    GCC_FOR_TARGETING: str = PT.H_NET_NP.value
+
+
+    ANNUAL_OP_TIME: float = 8300
+
+    DTCONT: float = 5
+    DTGLIDE: float = 0.01
+    HTC: float = 1.0
+    UTILITY_PRICE: float = 40
+    T_ENV: float = 15
+    P_ENV: float = 101
+
+    DECIMAL_PLACES: int = 2
 
     ### OLD CONFIG -- Review ###
 
     # TIT_BUTTON_SELECTED: bool = False
     # TS_BUTTON_SELECTED: bool = False
-    # TURBINE_WORK_BUTTON: bool = False
     
     # ENERGY_RETROFIT_BUTTON: bool = False
-    
+
     # PRINT_PTS: bool = False
     # PLOT_GRAPHS: bool = True
-    DECIMAL_PLACES: int = 2
-
     # CC_CHECKBOX: bool = True
     # SCC_CHECKBOX: bool = True
     # BCC_CHECKBOX: bool = False
@@ -57,16 +68,16 @@ class Configuration:
     # NLC_CHECKBOX: bool = False
     # MAX_GRAPHS: int = 128
 
-    T_TURBINE_BOX: float = 450
-    P_TURBINE_BOX: float = 90
-    MIN_EFF: float = 0.1
-    ELECTRICITY_PRICE: float = 100
-    LOAD: float = 1
-    MECH_EFF: float = 1
-    COMBOBOX: str = "Medina-Flores et al. (2010)"
-    ABOVE_PINCH_CHECKBOX: bool = False
-    BELOW_PINCH_CHECKBOX: bool = False
-    CONDESATE_FLASH_CORRECTION: bool = False
+    # T_TURBINE_BOX: float = 450
+    # P_TURBINE_BOX: float = 90
+    # MIN_EFF: float = 0.1
+    # ELECTRICITY_PRICE: float = 100
+    # LOAD: float = 1
+    # MECH_EFF: float = 1
+    # COMBOBOX: str = "Medina-Flores et al. (2010)"
+    # ABOVE_PINCH_CHECKBOX: bool = False
+    # BELOW_PINCH_CHECKBOX: bool = False
+    # CONDESATE_FLASH_CORRECTION: bool = False
 
     # CF_SELECTED: bool = True
     # PF_SELECTED: bool = False
@@ -98,19 +109,12 @@ class Configuration:
     # ACCELERATION: bool = True
     # HEURISTICS: bool = True
 
-    FC: float = 0
-    VC: float = 10000
-    EXP: float = 0.7
-    DISCOUNT_RATE: float = 0.07
-    SERV_LIFE: float = 10
-    ANNUAL_OP_TIME: float = 8300
+    # FC: float = 0
+    # VC: float = 10000
+    # EXP: float = 0.7
+    # DISCOUNT_RATE: float = 0.07
+    # SERV_LIFE: float = 10
 
-    DTCONT: float = 5
-    DTGLIDE: float = 0.01
-    HTC: float = 1.0
-    UTILITY_PRICE: float = 40
-    TEMP_REF: float = 15
-    PRESSURE_REF: float = 101
     # AHT_BUTTON_SELECTED: bool = False
     # OVERRIDEDT_BUTTON_SELECTED: bool = False
 
@@ -132,10 +136,10 @@ class Configuration:
         main_props = set(options.main)
         self.TIT_BUTTON_SELECTED = "PROP_MOP_0" in main_props
         self.TS_BUTTON_SELECTED = "PROP_MOP_1" in main_props
-        self.TURBINE_WORK_BUTTON = "PROP_MOP_2" in main_props
+        self.DO_TURBINE_WORK = "PROP_MOP_2" in main_props
         self.DO_AREA_TARGETING = "PROP_MOP_3" in main_props
         self.ENERGY_RETROFIT_BUTTON = "PROP_MOP_4" in main_props
-        self.EXERGY_BUTTON = "PROP_MOP_5" in main_props
+        self.DO_EXERGY_TARGETING = "PROP_MOP_5" in main_props
         self.PRINT_PTS = "PROP_MOP_6" in main_props
         self.PLOT_GRAPHS = True
 
@@ -168,7 +172,7 @@ class Configuration:
             value = option_map.get(key, default)
             return default if value is None else value
 
-        if self.TURBINE_WORK_BUTTON:
+        if self.DO_TURBINE_WORK:
             self.T_TURBINE_BOX = get_turbine_value("PROP_TOP_0", self.T_TURBINE_BOX)
             self.P_TURBINE_BOX = get_turbine_value("PROP_TOP_1", self.P_TURBINE_BOX)
             self.MIN_EFF = get_turbine_value("PROP_TOP_2", self.MIN_EFF)

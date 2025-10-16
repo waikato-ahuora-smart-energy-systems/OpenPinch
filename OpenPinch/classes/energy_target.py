@@ -387,7 +387,7 @@ class EnergyTarget:
             temp_pinch = {"hot_temp": self.hot_pinch}
             data["temp_pinch"] = temp_pinch
 
-        if self.config.TURBINE_WORK_BUTTON:
+        if self.config.DO_TURBINE_WORK:
             data["work_target"] = self.work_target
             data["turbine_efficiency_target"] = self.turbine_efficiency_target * 100
 
@@ -397,7 +397,7 @@ class EnergyTarget:
             data["capital_cost"] = self.capital_cost
             data["total_cost"] = self.total_cost
 
-        if self.config.EXERGY_BUTTON:
+        if self.config.DO_EXERGY_TARGETING:
             data["exergy_sources"] = self.exergy_sources
             data["exergy_sinks"] = self.exergy_sinks
             data["ETE"] = self.ETE * 100
