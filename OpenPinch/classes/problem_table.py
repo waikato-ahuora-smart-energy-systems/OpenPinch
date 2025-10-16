@@ -284,13 +284,7 @@ class ProblemTable:
         idx = self.col_index[key]
         col_values = self.data[:, idx]
         delta = np.roll(col_values, shift) - col_values
-        delta[0] = 0.0
-
-        # T_col = pt.col[PT.T.value]
-        # delta_T = np.empty_like(T_col)
-        # delta_T[0] = 0.0
-        # np.subtract(T_col[:-1], T_col[1:], out=delta_T[1:])      
-          
+        delta[0] = 0.0          
         return delta
 
     def shift(self, key, shift: int = 1, filler_value: float = 0.0) -> np.ndarray:

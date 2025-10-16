@@ -30,24 +30,23 @@ def get_process_heat_cascade(
 ) -> Tuple[ProblemTable, ProblemTable, dict]:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
-    pt, pt_real = _get_temperature_intervals(streams=all_streams, config=config)
+    pt, pt_real = _get_temperature_intervals(all_streams, config)
 
     # Perform the heat cascade of the problem table
-    pt = _problem_table_algorithm(pt, hot_streams, cold_streams)
-    pt_real = _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
+    _problem_table_algorithm(pt, hot_streams, cold_streams)
+    _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
     target_values = _set_zonal_targets(pt, pt_real)
 
     # Correct the location of the cold composite curve and limiting GCC (real temperatures)
-    pt_real = _shift_pt_real_composite_curves(
+    _shift_pt_real_composite_curves(
         pt_real,
         target_values["heat_recovery_target"],
         target_values["heat_recovery_limit"],
     )
 
     # Add additional temperature intervals for ease in targeting utility etc
-    pt, pt_real = _add_temperature_intervals_at_constant_h(
-        target_values["heat_recovery_target"], pt, pt_real
-    )
+    _add_temperature_intervals_at_constant_h(pt, target_values["heat_recovery_target"])
+    _add_temperature_intervals_at_constant_h(pt_real, target_values["heat_recovery_target"])
 
     return pt, pt_real, target_values
 
@@ -59,20 +58,13 @@ def get_utility_heat_cascade(
     is_shifted: bool = True,
 ) -> ProblemTable:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
-    pt_temp = _problem_table_algorithm(
-        ProblemTable({PT.T.value: pt.col[PT.T.value]}),
-        hot_utilities,
-        cold_utilities,
-        is_shifted,
-    )
-    pt.col[PT.H_UT_NET.value] = (
-        pt_temp.col[PT.H_NET.value].max() - pt_temp.col[PT.H_NET.value]
-    )
-    pt.col[PT.RCP_HOT_UT.value] = pt_temp.col[PT.RCP_HOT.value]
-    pt.col[PT.RCP_COLD_UT.value] = pt_temp.col[PT.RCP_COLD.value]
-    pt.col[PT.RCP_UT_NET.value] = (
-        pt_temp.col[PT.RCP_HOT.value] + pt_temp.col[PT.RCP_COLD.value]
-    )
+    pt_ut = ProblemTable({PT.T.value: pt.col[PT.T.value]})
+    _problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
+
+    pt.col[PT.H_UT_NET.value] = pt_ut.col[PT.H_NET.value].max() - pt_ut.col[PT.H_NET.value]
+    pt.col[PT.RCP_HOT_UT.value] = pt_ut.col[PT.RCP_HOT.value]
+    pt.col[PT.RCP_COLD_UT.value] = pt_ut.col[PT.RCP_COLD.value]
+    pt.col[PT.RCP_UT_NET.value] = pt_ut.col[PT.RCP_HOT.value] + pt_ut.col[PT.RCP_COLD.value]
     return pt
 
 
@@ -87,7 +79,9 @@ def _problem_table_algorithm(
     cold_streams: StreamCollection = None,
     is_shifted: bool = True,
 ) -> ProblemTable:
-    
+    """Fast calculation of the problem table using vectorized cascade formulas."""
+
+    # Sum m_dot*Cp contributions from hot streams per interval (sets CP_HOT and rCP_HOT)
     if hot_streams is not None:
         cp_hot, rcp_hot = _sum_mcp_between_temperature_boundaries(
             pt.col[PT.T.value], hot_streams, is_shifted
@@ -95,6 +89,7 @@ def _problem_table_algorithm(
         pt.col[PT.CP_HOT.value] = cp_hot
         pt.col[PT.RCP_HOT.value] = rcp_hot
 
+    # Sum m_dot*Cp contributions from cold streams per interval (sets CP_COLD and rCP_COLD)
     if cold_streams is not None:
         cp_cold, rcp_cold = _sum_mcp_between_temperature_boundaries(
             pt.col[PT.T.value], cold_streams, is_shifted
@@ -102,19 +97,31 @@ def _problem_table_algorithm(
         pt.col[PT.CP_COLD.value] = cp_cold
         pt.col[PT.RCP_COLD.value] = rcp_cold
 
+    # ΔT_i = T_{i-1} - T_i
     pt.col[PT.DELTA_T.value] = pt.delta_col(PT.T.value)
-
+    
+    # ΔH_hot = ΔT * CP_hot
     pt.col[PT.DELTA_H_HOT.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_HOT.value]
 
+    # H_hot = Σ ΔH_hot
+    pt.col[PT.H_HOT.value] = np.cumsum(pt.col[PT.DELTA_H_HOT.value])
+
+    # ΔH_cold = ΔT * CP_cold
     pt.col[PT.DELTA_H_COLD.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_COLD.value]
 
-    pt.col[PT.H_HOT.value] = np.cumsum(pt.col[PT.DELTA_H_HOT.value])
+    # H_cold = Σ ΔH_cold
     pt.col[PT.H_COLD.value] = np.cumsum(pt.col[PT.DELTA_H_COLD.value])
 
+    # MCP_net = CP_cold - CP_hot
     pt.col[PT.MCP_NET.value] = pt.col[PT.CP_COLD.value] - pt.col[PT.CP_HOT.value]
+
+    # ΔH_net = ΔT * MCP_net
     pt.col[PT.DELTA_H_NET.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.MCP_NET.value]
+
+    # H_net = -Σ ΔH_net
     pt.col[PT.H_NET.value] = -np.cumsum(pt.col[PT.DELTA_H_NET.value])
 
+    # Shift cascades so the minimum H_net equals zero, aligning hot/cold composites at the pinch
     min_H = pt.col[PT.H_NET.value].min()
     shift = pt.col[PT.H_NET.value][-1] - min_H
 
@@ -128,24 +135,24 @@ def _problem_table_algorithm(
 def _get_temperature_intervals(
     streams: List[Stream] = [], config: Configuration = None
 ) -> Tuple[ProblemTable, ProblemTable]:
-    """Returns unordered T and T* intervals for given streams and utilities."""
+    """Returns ordered T and T* intervals for given streams and utilities."""
 
     T_star = [t for s in streams for t in (s.t_min_star, s.t_max_star)]
-    T = [t for s in streams for t in (s.t_min, s.t_max)]
+    T_real = [t for s in streams for t in (s.t_min, s.t_max)]
 
     if isinstance(config, Configuration):
         if config.DO_TURBINE_WORK:
             T_val = config.T_TURBINE_BOX
             Tsat_val = Tsat_p(config.P_TURBINE_BOX)
             T_star.extend([T_val, Tsat_val])
-            T.extend([T_val, Tsat_val])
+            T_real.extend([T_val, Tsat_val])
 
         if config.DO_EXERGY_TARGETING:
             T_star.append(config.T_ENV)
-            T.append(config.T_ENV)
+            T_real.append(config.T_ENV)
 
     pt = ProblemTable({PT.T.value: sorted(set(T_star), reverse=True)})
-    pt_real = ProblemTable({PT.T.value: sorted(set(T), reverse=True)})
+    pt_real = ProblemTable({PT.T.value: sorted(set(T_real), reverse=True)})
 
     return pt, pt_real
 
@@ -194,16 +201,17 @@ def _shift_pt_real_composite_curves(
 
 
 def _add_temperature_intervals_at_constant_h(
-    heat_recovery_target: float, pt: ProblemTable, pt_real: ProblemTable
-):
+    pt: ProblemTable,
+    heat_recovery_target: float,
+) -> ProblemTable:
     """Insert breakpoints where composite curves intersect at constant enthalpy."""
     if heat_recovery_target > tol:
         _insert_temperature_interval_into_pt_at_constant_h(pt)
-        _insert_temperature_interval_into_pt_at_constant_h(pt_real)
-    return pt, pt_real
 
 
-def _insert_temperature_interval_into_pt_at_constant_h(pt: ProblemTable) -> ProblemTable:
+def _insert_temperature_interval_into_pt_at_constant_h(
+        pt: ProblemTable
+) -> ProblemTable:
     """Insert temperature intervals into the process table where HCC and CCC intersect at constant enthalpy."""
     # --- HCC to CCC projection ---
     if pt.col[PT.H_HOT.value][0] > 0.0:
@@ -254,18 +262,15 @@ def _insert_cc_start_on_opposite_cc(
     return pt
 
 
-
 def _set_zonal_targets(pt: ProblemTable, pt_real: ProblemTable) -> dict:
     """Assign thermal targets and integration degree to the zone based on process table data."""
     return {
         "hot_utility_target": pt.loc[0, PT.H_NET.value],
         "cold_utility_target": pt.loc[-1, PT.H_NET.value],
         "heat_recovery_target": pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value],
-        "heat_recovery_limit": pt_real.loc[0, PT.H_HOT.value]
-        - pt_real.loc[-1, PT.H_NET.value],
+        "heat_recovery_limit": pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value],
         "degree_of_int": (
-            (pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value])
-            / (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value])
+            (pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value]) / (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value])
             if (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value]) > 0
             else 1.0
         ),

@@ -741,12 +741,9 @@ def test_add_temperature_intervals_skips_when_target_zero(monkeypatch):
         "OpenPinch.analysis.problem_table_analysis._insert_temperature_interval_into_pt_at_constant_h",
         lambda *args: args[1],
     )
-
-    result_pt, result_pt_real = _add_temperature_intervals_at_constant_h(
-        0.0, dummy_pt.copy, dummy_pt.copy
-    )
+    result_pt = dummy_pt.copy
+    _add_temperature_intervals_at_constant_h(result_pt, 0.0)
     assert result_pt == dummy_pt
-    assert result_pt_real == dummy_pt
 
 
 def test_add_temperature_intervals_calls_insert(monkeypatch):
@@ -764,11 +761,10 @@ def test_add_temperature_intervals_calls_insert(monkeypatch):
     dummy_pt = ProblemTable(
         {PT.T.value: [400, 300], PT.H_HOT.value: [0, 0], PT.H_COLD.value: [0, 0]}
     )
-    dummy_pt, _ = _add_temperature_intervals_at_constant_h(
-        50.0, dummy_pt.copy, dummy_pt.copy
-    )
+    dummy_pt = dummy_pt.copy
+    _add_temperature_intervals_at_constant_h(dummy_pt, 50.0)
 
-    assert len(calls) == 2
+    assert len(calls) == 1
 
 
 """Test _shift_pt_real_composite_curves"""
