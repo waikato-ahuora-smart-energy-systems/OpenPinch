@@ -119,8 +119,13 @@ class StreamCollection:
 
     def __getitem__(self, key):
         if isinstance(key, int):
-            # Allow indexing by integer
-            return list(self._streams.values())[key]
+            self._ensure_sorted()
+            try:
+                return self._sorted_cache[key]
+            except IndexError as exc:
+                raise IndexError(
+                    f"Stream index {key} out of range for collection of size {len(self._sorted_cache)}."
+                ) from exc
         elif isinstance(key, str):
             # Allow accessing by stream name
             return self._streams[key]
