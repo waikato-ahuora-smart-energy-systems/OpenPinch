@@ -116,7 +116,7 @@ def _target_utility(
         return utilities
 
     pt = pt.copy
-    pt.round(6)
+    # pt.round(6)
     hot_pinch_row, cold_pinch_row, _ = get_pinch_loc(pt, col_H)
 
     if pt.col[col_H].min() < -tol:
@@ -301,7 +301,7 @@ def _calc_seperated_heat_load_profiles(
     pt.col[col_RCP_hot_net] = pt.col[col_RCP_net] * is_hot
     pt.col[col_RCP_cold_net] = pt.col[col_RCP_net] * is_cold
 
-    # Normalize HU profile so it starts at zero
+    # Normalize hot profile to start at x=0 and cold profile to end at x=0
     if is_process_stream:
         pt.col[col_H_hot_net] *= -1
         HUt_max = -pt.loc[-1, col_H_cold_net]
@@ -371,19 +371,16 @@ def _assign_utility(
     real_T: bool,
 ) -> List[Stream]:
     """Assigns utility heat duties based on vertical heat transfer across a pinch."""
-    hl = ProblemTable(
-        {
-            col_T: pt.col[col_T],
-            col_H: pt.col[col_H],
-            "T_out": np.nan,
-            "Q_pot": np.nan,
-            "dt_tar": np.nan,
-            "dt_sup": np.nan,
-            "Q_tt": np.nan,
-        },
-        add_default_labels=False,
-    )
-    hl.data = hl.data[: pinch_row + 1] if is_hot_ut else hl.data[pinch_row - 1 :]
+    col_T_values = pt.col[col_T]
+    col_H_values = pt.col[col_H]
+    if is_hot_ut:
+        T_segment = col_T_values[: pinch_row + 1]
+        H_segment = col_H_values[: pinch_row + 1]
+        segment_limit = H_segment[0]
+    else:
+        T_segment = col_T_values[pinch_row - 1:]
+        H_segment = col_H_values[pinch_row - 1:]
+        segment_limit = H_segment[-1]
 
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
@@ -394,51 +391,76 @@ def _assign_utility(
         )
 
         Q_ut_max = _maximise_utility_duty(
-            hl, Ts, Tt, col_T, col_H, is_hot_ut, Q_assigned
+            T_segment,
+            H_segment,
+            Ts,
+            Tt,
+            is_hot_ut,
+            Q_assigned,
         )
         if Q_ut_max > tol:
             u.set_heat_flow(Q_ut_max)
             Q_assigned += Q_ut_max
 
-        if abs(hl.loc[0 if is_hot_ut else -1, col_H] - Q_assigned) < tol:
+        if abs(segment_limit - Q_assigned) < tol:
             break
 
     return u_ls
 
 
 def _maximise_utility_duty(
-    hl_in: ProblemTable,
+    T_segment: np.ndarray,
+    H_segment: np.ndarray,
     Ts: float,
     Tt: float,
-    col_T: Enum,
-    col_H: Enum,
     is_hot_ut: bool,
     Q_assigned: float,
-) -> Tuple[float, int]:
+) -> float:
     """Determine remaining heat duty a utility can serve given temperature limits and prior assignments."""
-    hl: ProblemTable = hl_in.copy
-    sgn = 1 if is_hot_ut else -1
-    hl.col["T_out"] = hl.shift(col_T, sgn)
-    hl.col["Q_pot"] = hl.shift(col_H, sgn) - Q_assigned
-    hl.col["dt_tar"] = (Tt - hl.col[col_T]) * sgn
-    hl.col["dt_sup"] = (Ts - hl.shift(col_T, sgn)) * sgn
-    hl.data = hl.data[1:] if is_hot_ut else hl.data[:-1]
-    hl.data = hl.data[
-        (hl.shift(col_H, sgn) != hl.col[col_H])
-        & (hl.col["dt_sup"] >= -tol)
-        & (hl.col["Q_pot"] > tol)
-    ]
-
-    if hl.data.size == 0 or hl.col["dt_tar"].max() < 0:
+    if T_segment.size < 2:
         return 0.0
 
-    if hl.col["dt_tar"].max() < 0:
+    if is_hot_ut:
+        current_T = T_segment[1:]
+        previous_T = T_segment[:-1]
+        current_H = H_segment[1:]
+        adjacent_H = H_segment[:-1]
+        Q_pot = adjacent_H - Q_assigned
+        dt_tar = Tt - current_T
+        dt_sup = Ts - previous_T
+    else:
+        current_T = T_segment[:-1]
+        next_T = T_segment[1:]
+        current_H = H_segment[:-1]
+        adjacent_H = H_segment[1:]
+        Q_pot = adjacent_H - Q_assigned
+        dt_tar = current_T - Tt
+        dt_sup = next_T - Ts
+
+    valid_mask = (
+        (adjacent_H != current_H)
+        & (dt_sup >= -tol)
+        & (Q_pot > tol)
+    )
+    if not np.any(valid_mask):
         return 0.0
-    Q_ts_max = hl.col["Q_pot"].max()
 
-    Q_tt = np.full_like(hl.col["Q_pot"], np.inf)
-    mask = -hl.col["dt_tar"] > tol
-    Q_tt[mask] = hl.col["Q_pot"][mask] / -hl.col["dt_tar"][mask] * abs(Tt - Ts)
-    Q_tt_max = Q_tt.min()
+    dt_tar_valid = dt_tar[valid_mask]
+    Q_pot_valid = Q_pot[valid_mask]
 
-    return min(Q_ts_max, Q_tt_max) if hl.col["dt_tar"].max() >= 0 else 0.0
+    if dt_tar_valid.max() < 0:
+        return 0.0
+
+    Q_ts_max = Q_pot_valid.max()
+
+    Q_tt = np.full_like(Q_pot_valid, np.inf, dtype=float)
+    slope_mask = (-dt_tar_valid) > tol
+    if np.any(slope_mask):
+        Q_tt[slope_mask] = (
+            Q_pot_valid[slope_mask]
+            / (-dt_tar_valid[slope_mask])
+            * abs(Tt - Ts)
+        )
+    Q_tt_max = Q_tt.min() if Q_tt.size > 0 else np.inf
+
+    return min(Q_ts_max, Q_tt_max) if dt_tar_valid.max() >= 0 else 0.0
