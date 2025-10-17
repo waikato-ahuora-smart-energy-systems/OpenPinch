@@ -1,6 +1,5 @@
-from copy import deepcopy
 from operator import attrgetter
-from typing import Tuple
+from typing import List, Tuple
 
 from ..analysis import (
     get_pinch_temperatures,
@@ -142,21 +141,37 @@ def _save_data_for_site_analysis(
     T_vals = pt.col[col_T]
     dh_vals = pt.delta_col(col_H)[1:]
 
-    hot_utilities = deepcopy(hot_utilities)
-    cold_utilities = deepcopy(cold_utilities)
+    hot_utilities_seq = list(hot_utilities)
+    cold_utilities_seq = list(cold_utilities)
+    hot_remaining = [u.heat_flow for u in hot_utilities_seq]
+    cold_remaining = [u.heat_flow for u in cold_utilities_seq]
 
-    hu: Stream = _initialise_utility_selected(hot_utilities)
-    cu: Stream = _initialise_utility_selected(cold_utilities)
+    hu_idx = _initialise_utility_selected(hot_utilities_seq, hot_remaining)
+    cu_idx = _initialise_utility_selected(cold_utilities_seq, cold_remaining)
 
     k = 1
     for i, dh in enumerate(dh_vals):
-        if dh > tol:
-            hu, hot_utilities, net_cold_streams, k = _add_net_segment(
-                T_vals[i], T_vals[i + 1], hu, dh, hot_utilities, net_cold_streams, k
+        if dh > tol and hu_idx >= 0:
+            hu_idx, k = _add_net_segment(
+                T_vals[i],
+                T_vals[i + 1],
+                hu_idx,
+                dh,
+                hot_utilities_seq,
+                hot_remaining,
+                net_cold_streams,
+                k,
             )
-        elif -dh > tol:
-            cu, cold_utilities, net_hot_streams, k = _add_net_segment(
-                T_vals[i], T_vals[i + 1], cu, dh, cold_utilities, net_hot_streams, k
+        elif -dh > tol and cu_idx >= 0:
+            cu_idx, k = _add_net_segment(
+                T_vals[i],
+                T_vals[i + 1],
+                cu_idx,
+                abs(dh),
+                cold_utilities_seq,
+                cold_remaining,
+                net_hot_streams,
+                k,
             )
 
     return net_hot_streams, net_cold_streams
@@ -165,20 +180,43 @@ def _save_data_for_site_analysis(
 def _add_net_segment(
     T_ub: float,
     T_lb: float,
-    curr_u: Stream,
+    curr_idx: int,
     dh_req: float,
-    utilities: StreamCollection,
+    utilities: List[Stream],
+    remaining: List[float],
     net_streams: StreamCollection,
     k: int,
     j: int = 0,
 ):
     """Adds a net utility segment and recursively handles segmentation if needed."""
-    next_u = _advance_utility_if_needed(dh_req, curr_u, utilities)
+    if curr_idx < 0 or not utilities or dh_req <= tol:
+        return curr_idx, k
 
-    dh_next = max(-curr_u.heat_flow, 0.0)
-    curr_u.heat_flow = max(curr_u.heat_flow, 0.0)
-    dh_curr = abs(dh_req) - dh_next
-    T_i = T_ub - (dh_curr / abs(dh_req)) * (T_ub - T_lb)
+    curr_u = utilities[curr_idx]
+    available = remaining[curr_idx] if curr_idx < len(remaining) else 0.0
+
+    if available <= tol:
+        next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
+        if next_idx == curr_idx:
+            return curr_idx, k
+        return _add_net_segment(
+            T_ub,
+            T_lb,
+            next_idx,
+            dh_req,
+            utilities,
+            remaining,
+            net_streams,
+            k,
+            j,
+        )
+
+    dh_curr = min(dh_req, available)
+    remaining[curr_idx] = max(available - dh_curr, 0.0)
+    dh_next = dh_req - dh_curr
+
+    T_span = T_ub - T_lb
+    T_i = T_ub - (dh_curr / dh_req) * T_span if T_span and dh_req > tol else T_lb
 
     net_streams.add(
         Stream(
@@ -187,40 +225,55 @@ def _add_net_segment(
             t_target=T_ub if curr_u.type == StreamType.Hot.value else T_i,
             heat_flow=dh_curr,
             dt_cont=curr_u.dt_cont,
-            htc=1.0,  # Might be a way to calculate this.
+            htc=1.0,
             is_process_stream=True,
         )
     )
-    if dh_next > tol:  # /1000
+
+    if dh_next > tol:
+        next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
+        if next_idx == curr_idx:
+            return curr_idx, k + 1
         return _add_net_segment(
-            T_i, T_lb, next_u, dh_next, utilities, net_streams, k, j + 1
+            T_i,
+            T_lb,
+            next_idx,
+            dh_next,
+            utilities,
+            remaining,
+            net_streams,
+            k,
+            j + 1,
         )
-    else:
-        return next_u, utilities, net_streams, k + 1
+
+    next_idx = (
+        curr_idx
+        if remaining[curr_idx] > tol
+        else _find_next_available_utility(curr_idx + 1, utilities, remaining)
+    )
+    return next_idx, k + 1
 
 
-def _initialise_utility_selected(utilities: StreamCollection = None):
-    """Returns the first available utility with remaining capacity."""
-    for j in range(len(utilities)):
-        if utilities[j].heat_flow > tol:
-            return utilities[j]
-    return utilities[-1]
+def _initialise_utility_selected(
+    utilities: List[Stream], remaining: List[float]
+) -> int:
+    """Returns the index of the first available utility with remaining capacity."""
+    for idx, residual in enumerate(remaining):
+        if residual > tol:
+            return idx
+    return len(utilities) - 1 if utilities else -1
 
 
-def _advance_utility_if_needed(
-    dh_used: float, current_u: Stream = None, utilities: StreamCollection = None
-) -> Stream:
-    """Advances to the next utility if the current one is exhausted."""
-    current_u.heat_flow -= abs(dh_used)
-    if current_u.heat_flow > tol:
-        return current_u
-
-    k = utilities.get_index(current_u) + 1
-    for j in range(k, len(utilities)):
-        if utilities[j].heat_flow > tol:
-            return utilities[j]
-
-    return utilities[-1]
+def _find_next_available_utility(
+    start: int, utilities: List[Stream], remaining: List[float]
+) -> int:
+    """Return the index of the next utility that still has remaining duty."""
+    if not utilities:
+        return -1
+    for idx in range(max(start, 0), len(utilities)):
+        if remaining[idx] > tol:
+            return idx
+    return len(utilities) - 1
 
 
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
