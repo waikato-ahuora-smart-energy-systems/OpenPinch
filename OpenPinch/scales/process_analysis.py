@@ -54,12 +54,8 @@ def get_process_targets(zone: Zone):
     net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
         zone_identifier, pt, hot_utilities, cold_utilities
     )
-    pt = get_balanced_cc(
-        pt
-    )
-    pt_real = get_balanced_cc(
-        pt_real
-    )
+    get_balanced_cc(pt)
+    get_balanced_cc(pt_real)
     hot_pinch, cold_pinch = get_pinch_temperatures(pt)
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
@@ -146,13 +142,13 @@ def _save_data_for_site_analysis(
     hot_remaining = [u.heat_flow for u in hot_utilities_seq]
     cold_remaining = [u.heat_flow for u in cold_utilities_seq]
 
-    hu_idx = _initialise_utility_selected(hot_utilities_seq, hot_remaining)
-    cu_idx = _initialise_utility_selected(cold_utilities_seq, cold_remaining)
+    hu_idx = _initialise_utility_index(hot_utilities_seq, hot_remaining)
+    cu_idx = _initialise_utility_index(cold_utilities_seq, cold_remaining)
 
     k = 1
     for i, dh in enumerate(dh_vals):
         if dh > tol and hu_idx >= 0:
-            hu_idx, k = _add_net_segment(
+            hu_idx, k = _add_net_segment_stateful(
                 T_vals[i],
                 T_vals[i + 1],
                 hu_idx,
@@ -163,7 +159,7 @@ def _save_data_for_site_analysis(
                 k,
             )
         elif -dh > tol and cu_idx >= 0:
-            cu_idx, k = _add_net_segment(
+            cu_idx, k = _add_net_segment_stateful(
                 T_vals[i],
                 T_vals[i + 1],
                 cu_idx,
@@ -177,7 +173,7 @@ def _save_data_for_site_analysis(
     return net_hot_streams, net_cold_streams
 
 
-def _add_net_segment(
+def _add_net_segment_stateful(
     T_ub: float,
     T_lb: float,
     curr_idx: int,
@@ -199,7 +195,7 @@ def _add_net_segment(
         next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
         if next_idx == curr_idx:
             return curr_idx, k
-        return _add_net_segment(
+        return _add_net_segment_stateful(
             T_ub,
             T_lb,
             next_idx,
@@ -234,7 +230,7 @@ def _add_net_segment(
         next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
         if next_idx == curr_idx:
             return curr_idx, k + 1
-        return _add_net_segment(
+        return _add_net_segment_stateful(
             T_i,
             T_lb,
             next_idx,
@@ -254,7 +250,7 @@ def _add_net_segment(
     return next_idx, k + 1
 
 
-def _initialise_utility_selected(
+def _initialise_utility_index(
     utilities: List[Stream], remaining: List[float]
 ) -> int:
     """Returns the index of the first available utility with remaining capacity."""
