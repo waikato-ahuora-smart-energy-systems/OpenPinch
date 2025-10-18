@@ -6,11 +6,7 @@ from ..classes import *
 from ..lib import *
 from ..utils import *
 from .problem_table_analysis import get_utility_heat_cascade
-from .support_methods import (
-    get_pinch_loc,
-    insert_temperature_interval_into_pt,
-    linear_interpolation,
-)
+
 
 __all__ = ["get_utility_targets"]
 
@@ -117,7 +113,7 @@ def _target_utility(
 
     pt = pt.copy
     # pt.round(6)
-    hot_pinch_row, cold_pinch_row, _ = get_pinch_loc(pt, col_H)
+    hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(col_H)
 
     if pt.col[col_H].min() < -tol:
         pt.col[col_H] = pt.col[col_H] * -1
@@ -140,8 +136,8 @@ def _calc_GCC_without_pockets(
 ) -> Tuple[ProblemTable, ProblemTable]:
     """Flatten GCC pockets by inserting breakpoints so the profile becomes monotonic."""
     pt.col[col_H_NP] = pt.col[col_H]
-
-    hot_pinch_loc, cold_pinch_loc, valid = get_pinch_loc(pt)
+    
+    hot_pinch_loc, cold_pinch_loc, valid = pt.pinch_idx(col_H)
     if not valid:
         return pt
 
@@ -200,7 +196,7 @@ def _remove_pockets_on_one_side_of_the_pinch(
                 T0 = linear_interpolation(
                     H_vals[i_0], H_vals[i], H_vals[i + sgn], T_vals[i], T_vals[i + sgn]
                 )
-                pt, n_int_added = insert_temperature_interval_into_pt(pt, T0)
+                pt, n_int_added = pt.insert_temperature_interval(T0)
 
             if n_int_added > 0:
                 T_vals, H_vals, H_NP_vals = (

@@ -8,30 +8,30 @@ from ..classes import ProblemTable
 from ..lib import *
 
 
-def get_pinch_loc(pt: ProblemTable, col=PT.H_NET.value) -> tuple[int, int, bool]:
-    """Returns the row indices of the Hot and Cold Pinch Temperatures."""
-    return pt.get_pinch_loc(col)
+# def get_pinch_loc(pt: ProblemTable, col=PT.H_NET.value) -> tuple[int, int, bool]:
+#     """Returns the row indices of the Hot and Cold Pinch Temperatures."""
+#     return pt.get_pinch_loc(col)
 
 
-def get_pinch_temperatures(
-    pt: ProblemTable, col_T: str = PT.T.value, col_H=PT.H_NET.value
-) -> tuple[float | None, float | None]:
-    """Determines the hottest hot Pinch Temperature and coldest cold Pinch Temperature and return both values."""
-    return pt.get_pinch_temperatures(col_T=col_T, col_H=col_H)
+# def get_pinch_temperatures(
+#     pt: ProblemTable, col_T: str = PT.T.value, col_H=PT.H_NET.value
+# ) -> tuple[float | None, float | None]:
+#     """Determines the hottest hot Pinch Temperature and coldest cold Pinch Temperature and return both values."""
+#     return pt.get_pinch_temperatures(col_T=col_T, col_H=col_H)
 
 
-def shift_heat_cascade(
-    pt: ProblemTable, dh: float, col: Union[int, str, Enum]
-) -> ProblemTable:
-    """Shifts a column in a heat cascade DataFrame by dH."""
-    return pt.shift_heat_cascade(dh, col)
+# def shift_heat_cascade(
+#     pt: ProblemTable, dh: float, col: Union[int, str, Enum]
+# ) -> ProblemTable:
+#     """Shifts a column in a heat cascade DataFrame by dH."""
+#     return pt.shift_heat_cascade(dh, col)
 
 
-def insert_temperature_interval_into_pt(
-    pt: ProblemTable, T_ls: List[float] | float
-) -> Tuple[ProblemTable, int]:
-    """Efficient insert into a ProblemTable assuming strictly descending T column."""
-    return pt.insert_temperature_interval(T_ls)
+# def insert_temperature_interval_into_pt(
+#     pt: ProblemTable, T_ls: List[float] | float
+# ) -> Tuple[ProblemTable, int]:
+#     """Efficient insert into a ProblemTable assuming strictly descending T column."""
+#     return pt.insert_temperature_interval(T_ls)
 
 
 def key_name(zone_name: str, target_type: str = TargetType.DI.value):

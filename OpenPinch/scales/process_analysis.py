@@ -2,7 +2,6 @@ from operator import attrgetter
 from typing import List, Tuple
 
 from ..analysis import (
-    get_pinch_temperatures,
     get_process_heat_cascade,
     get_utility_targets,
 )
@@ -56,7 +55,7 @@ def get_process_targets(zone: Zone):
     )
     _get_balanced_cc(pt)
     _get_balanced_cc(pt_real)
-    hot_pinch, cold_pinch = get_pinch_temperatures(pt)
+    hot_pinch, cold_pinch = pt.pinch_temperatures()
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
     config: Configuration

@@ -159,9 +159,7 @@ def test_calc_gcc_without_pockets(
     # Pocket flattening check
     if expect_flat_pocket:
         # Get pinch points
-        from OpenPinch.analysis.support_methods import get_pinch_loc
-
-        h_idx, c_idx, valid = get_pinch_loc(pt_updated)
+        h_idx, c_idx, valid = pt_updated.pinch_idx()
 
         if valid and h_idx + 1 < c_idx:
             values = pt_updated.loc[h_idx + 1 : c_idx - 1, PT.H_NET_NP.value]

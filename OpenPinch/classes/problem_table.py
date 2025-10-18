@@ -11,6 +11,7 @@ import pandas as pd
 
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
+from ..utils.interpolator import linear_interpolation
 
 PT = ProblemTableLabel
 
@@ -310,16 +311,7 @@ class ProblemTable:
         """Round the underlying NumPy buffer in-place."""
         self.data = np.round(self.data, decimals)
 
-    @staticmethod
-    def linear_interpolation(x: float, x1: float, x2: float, y1: float, y2: float) -> float:
-        """Perform linear interpolation to estimate ``y`` at ``x``."""
-        if x1 == x2:
-            raise ValueError("Cannot perform interpolation when x1 == x2 (undefined slope).")
-        m = (y1 - y2) / (x1 - x2)
-        c = y1 - m * x1
-        return m * x + c
-
-    def get_pinch_loc(
+    def pinch_idx(
         self, col: Union[int, str, ProblemTableLabel] = PT.H_NET.value
     ) -> Tuple[int, int, bool]:
         """Return the row indices of the hot and cold pinch temperatures."""
@@ -356,16 +348,17 @@ class ProblemTable:
         valid = row_h <= row_c
         return row_h, row_c, valid
 
-    def get_pinch_temperatures(
+    def pinch_temperatures(
         self,
         col_T: str = PT.T.value,
         col_H: Union[int, str, ProblemTableLabel] = PT.H_NET.value,
     ) -> Tuple[float | None, float | None]:
         """Determine the hottest hot and coldest cold pinch temperatures."""
-        hot_idx, cold_idx, valid = self.get_pinch_loc(col_H)
+        hot_idx, cold_idx, valid = self.pinch_idx(col_H)
         if valid:
             return self.loc[hot_idx, col_T], self.loc[cold_idx, col_T]
         return None, None
+
 
     def shift_heat_cascade(
         self, dh: float, col: Union[int, str, ProblemTableLabel]
@@ -431,7 +424,7 @@ class ProblemTable:
             ]:
                 idx = col[key]
                 if not np.isnan(row_bot[idx]):
-                    row_dict[key] = self.linear_interpolation(
+                    row_dict[key] = linear_interpolation(
                         T_new, row_bot[icol_T], row_top[icol_T], row_bot[idx], row_top[idx]
                     )
 

@@ -247,7 +247,7 @@ def test_insert_temperature_interval_gcc_basic():
 )
 def test_get_pinch_loc(input_vals, expected):
     table = ProblemTable({PT.H_NET.value: input_vals})
-    assert table.get_pinch_loc() == expected
+    assert table.pinch_idx() == expected
 
 
 @pytest.mark.parametrize(
@@ -262,7 +262,7 @@ def test_get_pinch_loc(input_vals, expected):
 )
 def test_get_pinch_temperatures(case, h_vals, t_vals, expected):
     table = ProblemTable({PT.T.value: t_vals, PT.H_NET.value: h_vals})
-    assert table.get_pinch_temperatures() == expected, case
+    assert table.pinch_temperatures() == expected, case
 
 
 def test_shift_heat_cascade_with_enum_col():

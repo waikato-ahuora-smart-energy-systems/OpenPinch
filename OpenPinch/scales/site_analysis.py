@@ -5,7 +5,7 @@ from ..analysis.problem_table_analysis import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
 )
-from ..analysis.support_methods import get_pinch_temperatures, key_name
+from ..analysis.support_methods import key_name
 from ..analysis.utility_targeting import get_utility_targets
 from ..classes import *
 from ..lib import *
@@ -193,7 +193,7 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     heat_recovery_target = s_tzt.heat_recovery_target + (
         s_tzt.hot_utility_target - hot_utility_target
     )
-    hot_pinch, cold_pinch = get_pinch_temperatures(pt, col_H=PT.H_UT_NET.value)
+    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_UT_NET.value)
 
     # if config.DO_TURBINE_WORK:
     #     work_target = 0.0
