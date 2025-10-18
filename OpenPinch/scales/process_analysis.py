@@ -5,10 +5,10 @@ from ..analysis import (
     get_pinch_temperatures,
     get_process_heat_cascade,
     get_utility_targets,
-    get_balanced_cc,
 )
 from ..classes import *
 from ..lib import *
+from ..utils import timing_decorator
 
 __all__ = ["get_process_targets"]
 
@@ -54,11 +54,12 @@ def get_process_targets(zone: Zone):
     net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
         zone_identifier, pt, hot_utilities, cold_utilities
     )
-    get_balanced_cc(pt)
-    get_balanced_cc(pt_real)
+    _get_balanced_cc(pt)
+    _get_balanced_cc(pt_real)
     hot_pinch, cold_pinch = get_pinch_temperatures(pt)
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
+    config: Configuration
     if config.DO_AREA_TARGETING and 0:
         # area = get_area_targets(pt_real, config)
         # num_units = get_min_number_hx(pt)
@@ -100,7 +101,7 @@ def get_process_targets(zone: Zone):
 # Helper functions
 #######################################################################################################
 
-
+@timing_decorator
 def _get_net_hot_and_cold_segments(
     zone_identifier: str,
     pt: ProblemTable,
@@ -272,6 +273,7 @@ def _find_next_available_utility(
     return len(utilities) - 1
 
 
+@timing_decorator
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
     """Assemble the problem-table slices required for composite/comparison plots."""
     pt.round(decimals=4)
@@ -284,3 +286,10 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_UT_NET.value]],
         GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
     }
+
+
+def _get_balanced_cc(pt: ProblemTable) -> ProblemTable:
+    """Returns the balanced composite curves of both process and utility streams"""
+    pt.col[PT.H_HOT_BAL.value] = pt.col[PT.H_HOT.value] + pt.col[PT.H_HOT_UT.value] 
+    pt.col[PT.H_COLD_BAL.value] = pt.col[PT.H_COLD.value] + pt.col[PT.H_COLD_UT.value]
+    return pt

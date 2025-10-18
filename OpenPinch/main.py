@@ -16,6 +16,7 @@ from .utils import *
 __all__ = ["pinch_analysis_service"]
 
 
+@timing_decorator
 def pinch_analysis_service(data: Any, project_name: str = "Project", is_return_full_results: bool = False) -> TargetOutput:
     """Validate user data, run the targeting workflow, and return structured results.
 
