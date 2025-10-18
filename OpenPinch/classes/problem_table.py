@@ -1,12 +1,18 @@
 """Lightweight table structure used by the pinch analysis pipeline."""
 
+from __future__ import annotations
+
 import numbers
 from copy import deepcopy
+from typing import List, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
+from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
+
+PT = ProblemTableLabel
 
 
 class ProblemTable:
@@ -303,6 +309,140 @@ class ProblemTable:
     def round(self, decimals):
         """Round the underlying NumPy buffer in-place."""
         self.data = np.round(self.data, decimals)
+
+    @staticmethod
+    def linear_interpolation(x: float, x1: float, x2: float, y1: float, y2: float) -> float:
+        """Perform linear interpolation to estimate ``y`` at ``x``."""
+        if x1 == x2:
+            raise ValueError("Cannot perform interpolation when x1 == x2 (undefined slope).")
+        m = (y1 - y2) / (x1 - x2)
+        c = y1 - m * x1
+        return m * x + c
+
+    def get_pinch_loc(
+        self, col: Union[int, str, ProblemTableLabel] = PT.H_NET.value
+    ) -> Tuple[int, int, bool]:
+        """Return the row indices of the hot and cold pinch temperatures."""
+        column = col.value if isinstance(col, ProblemTableLabel) else col
+        h_net = (
+            np.asarray(self.col[column]) if isinstance(column, str) else np.asarray(self.icol[column])
+        )
+        n = h_net.size
+
+        abs_arr = np.abs(h_net)
+        zeros_mask = abs_arr < tol
+
+        has_zero = np.any(zeros_mask)
+        all_zero = np.all(zeros_mask)
+
+        if has_zero and not all_zero:
+            first_zero = np.flatnonzero(zeros_mask)[0]
+            if first_zero > 0:
+                row_h = first_zero
+            else:
+                nz_after = np.flatnonzero(~zeros_mask)
+                row_h = nz_after[0] - 1 if nz_after.size else n - 1
+
+            last_zero = np.flatnonzero(zeros_mask)[-1]
+            if last_zero < n - 1:
+                row_c = last_zero
+            else:
+                nz_before_rev = np.flatnonzero(~zeros_mask[::-1])
+                row_c = n - nz_before_rev[0] if nz_before_rev.size else 0
+        else:
+            row_h = n - 1
+            row_c = 0
+
+        valid = row_h <= row_c
+        return row_h, row_c, valid
+
+    def get_pinch_temperatures(
+        self,
+        col_T: str = PT.T.value,
+        col_H: Union[int, str, ProblemTableLabel] = PT.H_NET.value,
+    ) -> Tuple[float | None, float | None]:
+        """Determine the hottest hot and coldest cold pinch temperatures."""
+        hot_idx, cold_idx, valid = self.get_pinch_loc(col_H)
+        if valid:
+            return self.loc[hot_idx, col_T], self.loc[cold_idx, col_T]
+        return None, None
+
+    def shift_heat_cascade(
+        self, dh: float, col: Union[int, str, ProblemTableLabel]
+    ) -> "ProblemTable":
+        """Shift a column in the heat cascade by ``dh`` and return a copy of the table."""
+        if isinstance(col, ProblemTableLabel):
+            target = col.value
+            self.col[target] += dh
+        elif isinstance(col, str):
+            self.col[col] += dh
+        else:
+            self.icol[col] += dh
+        return self.copy
+
+    def insert_temperature_interval(
+        self, T_ls: List[float] | float
+    ) -> Tuple["ProblemTable", int]:
+        """Insert temperature intervals assuming a strictly descending ``T`` column."""
+        values = [T_ls] if isinstance(T_ls, float) else T_ls
+
+        for T_new in values:
+            col = self.col_index
+            T_col = self.data[:, col[PT.T.value]]
+
+            insert_index = None
+            for i in range(1, len(T_col)):
+                if T_col[i - 1] - tol > T_new > T_col[i] + tol:
+                    insert_index = i
+                    break
+
+            if insert_index is None:
+                return self, 0
+
+            row_top = self.data[insert_index - 1]
+            row_bot = self.data[insert_index]
+
+            cp_hot = row_bot[col[PT.CP_HOT.value]]
+            cp_cold = row_bot[col[PT.CP_COLD.value]]
+            mcp_net = row_bot[col[PT.MCP_NET.value]]
+
+            delta_above = row_top[col[PT.T.value]] - T_new
+            delta_below = T_new - row_bot[col[PT.T.value]]
+
+            row_dict = {
+                PT.T.value: T_new,
+                PT.DELTA_T.value: delta_above,
+                PT.CP_HOT.value: cp_hot,
+                PT.DELTA_H_HOT.value: delta_above * cp_hot,
+                PT.CP_COLD.value: cp_cold,
+                PT.DELTA_H_COLD.value: delta_above * cp_cold,
+                PT.MCP_NET.value: mcp_net,
+                PT.DELTA_H_NET.value: delta_above * mcp_net,
+            }
+
+            icol_T = col[PT.T.value]
+            for key in [
+                PT.H_HOT.value,
+                PT.H_COLD.value,
+                PT.H_NET.value,
+                PT.H_NET_NP.value,
+                PT.H_NET_A.value,
+                PT.H_NET_V.value,
+            ]:
+                idx = col[key]
+                if not np.isnan(row_bot[idx]):
+                    row_dict[key] = self.linear_interpolation(
+                        T_new, row_bot[icol_T], row_top[icol_T], row_bot[idx], row_top[idx]
+                    )
+
+            self.insert(row_dict, insert_index)
+
+            self.data[insert_index + 1, col[PT.DELTA_T.value]] = delta_below
+            self.data[insert_index + 1, col[PT.DELTA_H_HOT.value]] = delta_below * cp_hot
+            self.data[insert_index + 1, col[PT.DELTA_H_COLD.value]] = delta_below * cp_cold
+            self.data[insert_index + 1, col[PT.DELTA_H_NET.value]] = delta_below * mcp_net
+
+        return self, 1
 
     def insert(self, row_dict: dict, index: int):
         """Insert a single row (dict of column: value) at the specified index."""

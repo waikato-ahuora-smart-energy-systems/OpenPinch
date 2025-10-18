@@ -158,6 +158,129 @@ def test_shifting_behavior():
     )  # Should be nearly equal after shift
 
 
+"""Tests for ProblemTable pinch-related helpers."""
+
+
+def test_insert_temperature_interval_basic():
+    pt_ls = [
+        [250, 200, 100],
+        [None, 50, 100],
+        [None, 2.0, 1.0],
+        [None, 2.0, 1.0],
+        [200.0, 100.0, 0.0],
+        [None, 3.0, 2.0],
+        [None, 3.0, 2.0],
+        [350.0, 200.0, 0],
+        [None, -1.0, -1.0],
+        [None, -50.0, -100.0],
+        [150.0, 100.0, 0.0],
+    ]
+
+    expected_ls = [
+        [250, 225.0, 200, 100],
+        [None, 25.0, 25.0, 100],
+        [None, 2.0, 2.0, 1.0],
+        [None, 2.0, 2.0, 1.0],
+        [200.0, 150.0, 100.0, 0.0],
+        [None, 3.0, 3.0, 2.0],
+        [None, 3.0, 3.0, 2.0],
+        [350.0, 275.0, 200.0, 0],
+        [None, -1.0, -1.0, -1.0],
+        [None, -25.0, -25.0, -100.0],
+        [150.0, 125.0, 100.0, 0.0],
+    ]
+
+    pt_real = ProblemTable(pt_ls)
+    expected = ProblemTable(expected_ls)
+
+    result, inserted = pt_real.insert_temperature_interval([225.0])
+    assert inserted == 1
+
+    for row_index in range(expected.shape[0]):
+        for col in [PT.T.value, PT.H_COLD.value, PT.H_HOT.value, PT.H_NET.value]:
+            expected_val = expected.loc[row_index, col]
+            result_val = result.loc[row_index, col]
+
+            if pd.isna(expected_val) and pd.isna(result_val):
+                continue
+
+            if isinstance(expected_val, float) and isinstance(result_val, float):
+                assert result_val == pytest.approx(expected_val, abs=1e-6)
+            else:
+                assert result_val == expected_val
+
+
+def test_insert_temperature_interval_gcc_basic():
+    pt_ls = [[250, 200, 100], [150.0, 100.0, 0.0]]
+    expected_ls = [[250, 225.0, 200, 100], [150.0, 125.0, 100.0, 0.0]]
+
+    pt_real = ProblemTable(pt_ls)
+    expected = ProblemTable(expected_ls)
+
+    result, inserted = pt_real.insert_temperature_interval([225.0])
+    assert inserted == 1
+
+    for row_index in range(expected.shape[0]):
+        for col in [PT.T.value, PT.H_NET.value]:
+            expected_val = expected.loc[row_index, col]
+            result_val = result.loc[row_index, col]
+
+            if pd.isna(expected_val) and pd.isna(result_val):
+                continue
+
+            if isinstance(expected_val, float) and isinstance(result_val, float):
+                assert result_val == pytest.approx(expected_val, abs=1e-6)
+            else:
+                assert result_val == expected_val
+
+
+@pytest.mark.parametrize(
+    "input_vals, expected",
+    [
+        ([0.0, 10.0, 20.0], (0, 0, True)),
+        ([10.0, 5.0, 0.0], (2, 2, True)),
+        ([10.0, 1e-7, -1e-7, 15.0], (1, 2, True)),
+        ([10.0, 5.0, 1.0], (2, 0, False)),
+        ([0.0, 0.0, 0.0], (2, 0, False)),
+        ([1e-9, 2e-9, -1e-9, 5e-7], (3, 0, False)),
+    ],
+)
+def test_get_pinch_loc(input_vals, expected):
+    table = ProblemTable({PT.H_NET.value: input_vals})
+    assert table.get_pinch_loc() == expected
+
+
+@pytest.mark.parametrize(
+    "case, h_vals, t_vals, expected",
+    [
+        ("standard_case", [100, 0.0, 100], [300, 250, 200], (250, 250)),
+        ("pinch_at_bottom", [100, 50, 0.0], [300, 250, 200], (200, 200)),
+        ("pinch_at_top", [0.0, 50, 100], [300, 250, 200], (300, 300)),
+        ("no_pinch", [100, 100, 100], [300, 250, 200], (None, None)),
+        ("hot_below_cold", [100, 0.0, 0.0], [300, 250, 200], (250, 250)),
+    ],
+)
+def test_get_pinch_temperatures(case, h_vals, t_vals, expected):
+    table = ProblemTable({PT.T.value: t_vals, PT.H_NET.value: h_vals})
+    assert table.get_pinch_temperatures() == expected, case
+
+
+def test_shift_heat_cascade_with_enum_col():
+    table = ProblemTable({PT.H_NET.value: [0, 100, 200], PT.H_HOT.value: [0, 50, 150]})
+    shifted = table.shift_heat_cascade(10.0, PT.H_NET.value)
+
+    assert shifted[PT.H_NET.value].to_list() == [10.0, 110.0, 210.0]
+    assert shifted[PT.H_HOT.value].to_list() == [0, 50, 150]
+
+
+def test_shift_heat_cascade_with_str_col():
+    table = ProblemTable({PT.H_NET.value: [0, 100, 200], PT.H_HOT.value: [0, 50, 150]})
+    shifted = table.shift_heat_cascade(-25.0, PT.H_NET.value)
+
+    assert shifted[PT.H_NET.value].to_list() == [-25.0, 75.0, 175.0]
+    assert shifted[PT.H_HOT.value].to_list() == [0, 50, 150]
+
+
 """Test cases for the _insert_temperature_interval_into_pt_at_constant_h function."""
 from OpenPinch.analysis.problem_table_analysis import (
     _insert_temperature_interval_into_pt_at_constant_h,

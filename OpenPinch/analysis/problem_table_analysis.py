@@ -257,11 +257,10 @@ def _get_T_start_on_opposite_cc(
     cc_vals = pt.col[col_CC]
     T_vals = pt.col[col_T]
 
-    # todo: check interp
-    T_new = np.interp( 
+    T_new = linear_interpolation( 
         h0,
-        (cc_vals[idx], cc_vals[idx + 1]),
-        (T_vals[idx], T_vals[idx + 1]),
+        cc_vals[idx], cc_vals[idx + 1],
+        T_vals[idx], T_vals[idx + 1],
     )
 
     return T_new
