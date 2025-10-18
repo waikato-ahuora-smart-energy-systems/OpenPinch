@@ -12,7 +12,7 @@ import numpy as np
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from .support_methods import *
+
 
 __all__ = ["get_process_heat_cascade", "get_utility_heat_cascade"]
 
@@ -213,53 +213,58 @@ def _insert_temperature_interval_into_pt_at_constant_h(
         pt: ProblemTable
 ) -> ProblemTable:
     """Insert temperature intervals into the process table where HCC and CCC intersect at constant enthalpy."""
+    T_new = []
     # --- HCC to CCC projection ---
     if pt.col[PT.H_HOT.value][0] > 0.0:
-        _insert_cc_start_on_opposite_cc(pt, pt.col[PT.H_HOT.value][0], PT.H_COLD.value)
+        T_new.append(
+            _get_T_start_on_opposite_cc(pt, pt.col[PT.H_HOT.value][0], PT.H_COLD.value)
+        )
     # --- CCC to HCC projection ---
     if pt.col[PT.H_COLD.value][-1] > 0.0:
-        _insert_cc_start_on_opposite_cc(pt, pt.col[PT.H_COLD.value][-1], PT.H_HOT.value)
+        T_new.append(
+            _get_T_start_on_opposite_cc(pt, pt.col[PT.H_COLD.value][-1], PT.H_HOT.value)
+        )
+    T_new = [t for t in T_new if t is not None]
+    if len(T_new) > 0:
+        pt.insert_temperature_interval(T_new)
     return pt
 
 
-def _insert_cc_start_on_opposite_cc(
+def _get_T_start_on_opposite_cc(
     pt: ProblemTable,
     h0: float,
     col_CC: str,
     col_T: str = PT.T.value,
-) -> ProblemTable:
+) -> float:
     """Find and insert the temperature value where composite curves intersect at constant enthalpy."""
 
     temp_cc = pt.col[col_CC] - h0
 
     if temp_cc.size < 2:
-        return pt
+        return None
 
     zero_hits = np.flatnonzero(np.abs(temp_cc) < tol)
     if zero_hits.size > 0:
-        return pt
+        return None
 
     transitions = np.flatnonzero((temp_cc[:-1] >= tol) & (temp_cc[1:] <= -tol))
 
     if transitions.size != 1:
-        pass
-        return pt
+        return None
 
     idx = int(transitions[0])
 
     cc_vals = pt.col[col_CC]
     T_vals = pt.col[col_T]
 
-    T_new = linear_interpolation( 
+    # todo: check interp
+    T_new = np.interp( 
         h0,
-        cc_vals[idx],
-        cc_vals[idx + 1],
-        T_vals[idx],
-        T_vals[idx + 1],
+        (cc_vals[idx], cc_vals[idx + 1]),
+        (T_vals[idx], T_vals[idx + 1]),
     )
 
-    pt, _ = insert_temperature_interval_into_pt(pt, [T_new])
-    return pt
+    return T_new
 
 
 def _set_zonal_targets(pt: ProblemTable, pt_real: ProblemTable) -> dict:
