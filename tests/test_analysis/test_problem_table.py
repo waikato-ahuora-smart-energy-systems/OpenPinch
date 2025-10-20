@@ -193,9 +193,10 @@ def test_insert_temperature_interval_basic():
     pt_real = ProblemTable(pt_ls)
     expected = ProblemTable(expected_ls)
 
-    result, inserted = pt_real.insert_temperature_interval([225.0])
+    inserted = pt_real.insert_temperature_interval([225.0])
     assert inserted == 1
 
+    result = pt_real
     for row_index in range(expected.shape[0]):
         for col in [PT.T.value, PT.H_COLD.value, PT.H_HOT.value, PT.H_NET.value]:
             expected_val = expected.loc[row_index, col]
@@ -217,9 +218,10 @@ def test_insert_temperature_interval_gcc_basic():
     pt_real = ProblemTable(pt_ls)
     expected = ProblemTable(expected_ls)
 
-    result, inserted = pt_real.insert_temperature_interval([225.0])
+    inserted = pt_real.insert_temperature_interval([225.0])
     assert inserted == 1
 
+    result = pt_real
     for row_index in range(expected.shape[0]):
         for col in [PT.T.value, PT.H_NET.value]:
             expected_val = expected.loc[row_index, col]

@@ -12,7 +12,7 @@ from typing import List, Optional, Tuple
 from ..classes import Stream, StreamCollection, Zone
 from ..lib import *
 from ..utils import *
-from .support_methods import get_value
+from ..utils.miscellaneous import get_value
 
 __all__ = ["prepare_problem"]
 

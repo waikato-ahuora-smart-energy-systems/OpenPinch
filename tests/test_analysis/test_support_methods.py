@@ -2,9 +2,11 @@ import math
 
 import pytest
 
-from OpenPinch.analysis.support_methods import *
+from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.utils import *
+from OpenPinch.analysis.exergy_targeting import *
 
 """Test cases for the get_value function."""
 
@@ -44,7 +46,7 @@ def test_lmtd_typical_counterflow():
     """Basic counter-current case with distinct ΔT1 and ΔT2."""
     T_hot_in, T_hot_out = 150, 50
     T_cold_in, T_cold_out = 30, 80
-    result = find_LMTD(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
+    result = compute_LMTD(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
     dT1 = T_hot_in - T_cold_out
     dT2 = T_hot_out - T_cold_in
     expected = (dT1 - dT2) / math.log(dT1 / dT2)
@@ -57,7 +59,7 @@ def test_lmtd_equal_temperature_difference_returns_deltaT():
     T_hot_out = 80
     T_cold_in = 40
     T_cold_out = 60
-    result = find_LMTD(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
+    result = compute_LMTD(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
     expected = 40  # ΔT1 = ΔT2 = 40
     assert math.isclose(result, expected, rel_tol=1e-6)
 
@@ -66,7 +68,7 @@ def test_lmtd_one_deltaT_zero_returns_half_sum():
     """If one ΔT is zero, fall back to arithmetic mean."""
     T_hot_in, T_hot_out = 150, 50
     T_cold_in, T_cold_out = 30, 30
-    result = find_LMTD(
+    result = compute_LMTD(
         T_hot_in, T_hot_out, T_cold_in, T_cold_out
     )  # Cold fluid at constant temperature (phase change)
     dT1 = T_hot_in - T_cold_out
@@ -78,17 +80,17 @@ def test_lmtd_one_deltaT_zero_returns_half_sum():
 def test_lmtd_negative_temperature_difference_raises_error():
     """Raise error if either ΔT1 or ΔT2 < 0."""
     with pytest.raises(ValueError, match="must heat up"):
-        find_LMTD(100, 80, 90, 70)  # cold fluid cooling
+        compute_LMTD(100, 80, 90, 70)  # cold fluid cooling
 
 
 def test_lmtd_hot_fluid_heats_up_invalid():
     with pytest.raises(ValueError, match="Hot fluid must cool down"):
-        find_LMTD(90, 100, 40, 80)
+        compute_LMTD(90, 100, 40, 80)
 
 
 def test_lmtd_cold_fluid_cools_down_invalid():
     with pytest.raises(ValueError, match="Cold fluid must heat up"):
-        find_LMTD(150, 100, 80, 60)
+        compute_LMTD(150, 100, 80, 60)
 
 
 """Test cases for the compute_capital_recovery_factor function."""

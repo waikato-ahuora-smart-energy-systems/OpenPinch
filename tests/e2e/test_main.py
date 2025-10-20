@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from OpenPinch import *
-from OpenPinch.analysis.support_methods import get_value
+from OpenPinch.utils.miscellaneous import get_value
 from OpenPinch.lib import *
 
 
