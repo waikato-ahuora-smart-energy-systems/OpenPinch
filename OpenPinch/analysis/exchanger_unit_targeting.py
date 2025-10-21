@@ -5,7 +5,7 @@ import numpy as np
 from ..classes import *
 from ..lib.enums import *
 from ..utils import *
-from .support_methods import *
+from ..utils.miscellaneous import *
 
 __all__ = ["get_min_number_hx"]
 

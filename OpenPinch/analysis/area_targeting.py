@@ -6,13 +6,21 @@ from ..classes import *
 from ..lib import *
 from ..utils import *
 
-__all__ = ["get_area_targets"]
+__all__ = ["get_balanced_CC", "get_area_targets"]
 
 #######################################################################################################
-# Public API --- TODO: check accuracy
+# Public API
 #######################################################################################################
 
 
+def get_balanced_CC(pt: ProblemTable) -> ProblemTable:
+    """Creates the balanced Composite Curve (CC) using both process and utility streams."""
+    pt.col[PT.H_HOT_BAL.value] = pt.col[PT.H_HOT.value] + pt.col[PT.H_HOT_UT.value]
+    pt.col[PT.H_COLD_BAL.value] = pt.col[PT.H_COLD.value] + pt.col[PT.H_COLD_UT.value]
+    return pt
+
+
+# TODO: check accuracy
 def get_area_targets(pt: ProblemTable, config: Configuration) -> float:
     """Estimates a heat transfer area target based on counter-current heat transfer using vectorized numpy operations."""
     # if abs(pt['HCC'].iloc[0] - pt['CCC'].iloc[0]) > tol:

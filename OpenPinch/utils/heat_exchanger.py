@@ -2,6 +2,29 @@ import math
 
 from ..lib import HeatExchangerTypes as HX
 
+def compute_LMTD(
+    T_hot_in: float, T_hot_out: float, T_cold_in: float, T_cold_out: float
+) -> float:
+    """Returns the log mean temperature difference (LMTD) for a counterflow heat exchanger."""
+    # Check temperature directions for counter-current assumption
+    if T_hot_in < T_hot_out:
+        raise ValueError("Hot fluid must cool down (T_hot_in > T_hot_out)")
+    if T_cold_out < T_cold_in:
+        raise ValueError("Cold fluid must heat up (T_cold_out > T_cold_in)")
+
+    delta_T1 = T_hot_in - T_cold_out  # Inlet diff (hottest hot - hottest cold)
+    delta_T2 = T_hot_out - T_cold_in  # Outlet diff (coldest hot - coldest cold)
+
+    if delta_T1 <= 0 or delta_T2 <= 0:
+        raise ValueError(
+            f"Invalid temperature differences: ΔT1={delta_T1}, ΔT2={delta_T2}"
+        )
+
+    if math.isclose(delta_T1, delta_T2, rel_tol=1e-6):
+        return delta_T1  # or delta_T2 — they're equal
+
+    return (delta_T1 - delta_T2) / math.log(delta_T1 / delta_T2)
+
 
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
     """Return heat-exchanger effectiveness for the specified arrangement/NTU/c ratio."""

@@ -5,7 +5,7 @@ from ..analysis.problem_table_analysis import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
 )
-from ..analysis.support_methods import key_name
+from ..utils.miscellaneous import key_name
 from ..analysis.utility_targeting import get_utility_targets
 from ..classes import *
 from ..lib import *

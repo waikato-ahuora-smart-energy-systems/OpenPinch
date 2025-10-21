@@ -3,7 +3,7 @@ import math
 import pytest
 
 from OpenPinch.lib import HeatExchangerTypes as HX
-from OpenPinch.utils.heat_exchanger_eq import *
+from OpenPinch.utils.heat_exchanger import *
 
 
 def test_Coth():

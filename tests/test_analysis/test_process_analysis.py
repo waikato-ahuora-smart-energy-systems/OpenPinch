@@ -1,4 +1,4 @@
-from OpenPinch.analysis.support_methods import *
+from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.scales.process_analysis import (

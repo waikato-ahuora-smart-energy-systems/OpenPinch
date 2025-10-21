@@ -1,4 +1,4 @@
-from ..analysis.support_methods import *
+from ..utils.miscellaneous import *
 from ..classes import *
 from ..utils import *
 

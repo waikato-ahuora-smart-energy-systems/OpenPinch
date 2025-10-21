@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Tuple
 from ..utils import *
 
 # from ..classes import *
-from .support_methods import *
+from ..utils.miscellaneous import *
 
 if TYPE_CHECKING:
     from ..classes import *
