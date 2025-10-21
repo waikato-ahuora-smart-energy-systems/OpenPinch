@@ -10,6 +10,10 @@ from CoolProp.Plots.Common import EURunits, KSIunits, PropertyDict, SIunits, pro
 from CoolProp.Plots.SimpleCycles import StateContainer
 import numpy as np
 
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
+
+
 __all__ = ['HeatPumpCycle']
 
 class HeatPumpCycle:
@@ -23,12 +27,13 @@ class HeatPumpCycle:
         'EUR': EURunits(),
     }
 
-    def __init__(self, fluid_ref: str = 'Ammonia', unit_system: str | PropertyDict = 'EUR'):
+    def __init__(self, fluid_ref: str = 'Ammonia', unit_system: str | PropertyDict = 'EUR', Q_total: float = 1e6):
         self._system = self._parse_unit_system(unit_system)
         self._state = process_fluid_state(fluid_ref)
         self._cycle_states = StateContainer(unit_system=self._system)
         self._w_net: Optional[float] = None
         self._q_evap: Optional[float] = None
+        self._Q_total: Optional[float] = Q_total
         self._solved = False
 
     @property
@@ -322,9 +327,10 @@ class HeatPumpCycle:
         self.fill_states()
 
         condenser_profile = self._build_condenser_profile()
+        condenser_sc = self._build_stream_collection(condenser_profile)
         evaporator_profile = self._build_evaporator_profile()
 
-        return condenser_profile, evaporator_profile
+        return condenser_sc, evaporator_profile
 
     def _build_condenser_profile(self) -> np.ndarray:
         """Construct a four-point condenser T-h polyline."""
@@ -353,6 +359,26 @@ class HeatPumpCycle:
         )
 
         return condenser_profile
+
+    def _build_stream_collection(self,array):
+        m_dot = self._Q_total / (array[0,0] - array[-1,0])
+        sc = StreamCollection()
+        for i in range(len(array) - 1):
+            h1, T1 = array[i]
+            h2, T2 = array[i + 1]
+
+            # Do we need a name?
+            name = f"Segment_{i + 1}"
+
+            s = Stream(
+                name=name,
+                t_supply=T1,
+                t_target=T2,
+                heat_flow=m_dot*(h1 - h2),  # or m_dot * (h1 - h2), depending on your model
+            )
+
+            sc.add(s)
+        return sc
 
     def _build_evaporator_profile(self) -> np.ndarray:
         """Construct a four-point evaporator T-h polyline."""
