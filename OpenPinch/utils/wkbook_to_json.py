@@ -180,25 +180,28 @@ def _parse_sheet_with_units(
 
 def _write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> list:
     """Convert stream/utility worksheets into JSON-ready row dictionaries with units."""
-    # Convert each row to a dictionary, attaching units where appropriate
-    records = []
-    for _, row in df_data.iterrows():
-        entry = {}
-        for col in df_data.columns.to_list():
-            value = row[col]
-            unit = units_map[col]
+    if df_data.empty:
+        return []
 
-            # If the column is numeric, we store a dict with { value, units }
-            # You can refine this check, e.g. exclude columns known to be text.
-            if isinstance(unit, str) and unit.strip():
-                entry[col] = {
-                    "value": value if pd.api.types.is_number(value) else None,
-                    "units": unit,
-                }
-            else:
-                # If it's not numeric or there's no unit string, just store the raw data
-                entry[col] = value if not (pd.isna(value)) else None
-        records.append(entry)
+    clean_df = df_data.replace({pd.NA: None}).reset_index(drop=True)
+    records = clean_df.to_dict(orient="records")
+
+    for col, unit in units_map.items():
+        if col not in clean_df.columns:
+            continue
+
+        column_values = clean_df[col]
+        if isinstance(unit, str) and unit.strip():
+            numeric_values = pd.to_numeric(column_values, errors="coerce")
+            payloads = [
+                {"value": (None if pd.isna(val) else float(val)), "units": unit}
+                for val in numeric_values
+            ]
+            for record, payload in zip(records, payloads):
+                record[col] = payload
+        else:
+            for record, value in zip(records, column_values):
+                record[col] = value if not pd.isna(value) else None
 
     return records
 
@@ -207,93 +210,118 @@ def _write_targets_to_dict_and_list(
     df_data: pd.DataFrame, units_map: dict, project_name: str
 ) -> list:
     """Convert summary worksheet into structured target records, including utility splits."""
-    # Convert each row to a dictionary, attaching units where appropriate
-    records = []
-    for _, row in df_data.iterrows():
-        if (
-            not isinstance(row["name"], str)
-            or row["name"] == "Individual Process Targets"
-        ):
-            continue
+    if df_data.empty:
+        return []
 
-        if row["name"] == "Total Site Targets":
-            row["name"] = f"{project_name}/Total Site Target"
-        elif row["name"] == "Total Process Targets":
-            row["name"] = f"{project_name}/Total Process Target"
-        elif row["name"] == "Total Integrated Targets":
-            row["name"] = f"{project_name}/Direct Integration"
-        else:
-            zone_name = row["name"]
-            row["name"] = f"{zone_name}/Direct Integration"
+    name_series = df_data["name"]
+    mask_valid = name_series.map(lambda x: isinstance(x, str))
+    mask_skip = name_series.eq("Individual Process Targets")
+    filtered = df_data.loc[mask_valid & ~mask_skip].reset_index(drop=True).copy()
 
-        entry = {}
-        entry["hot_utilities"] = []
-        entry["cold_utilities"] = []
-        for col in df_data.columns.to_list():
-            value = row[col]
-            unit = units_map[col]
+    if filtered.empty:
+        return []
 
-            # If the column is numeric, we store a dict with { value, units }
-            # You can refine this check, e.g. exclude columns known to be text.
-            if col[0:4] == "HU::":
+    original_names = filtered["name"].copy()
+    filtered.loc[original_names == "Total Site Targets", "name"] = (
+        f"{project_name}/Total Site Target"
+    )
+    filtered.loc[original_names == "Total Process Targets", "name"] = (
+        f"{project_name}/Total Process Target"
+    )
+    filtered.loc[original_names == "Total Integrated Targets", "name"] = (
+        f"{project_name}/Direct Integration"
+    )
+    mask_direct = ~original_names.isin(
+        ["Total Site Targets", "Total Process Targets", "Total Integrated Targets"]
+    )
+    filtered.loc[mask_direct, "name"] = (
+        original_names[mask_direct].astype(str) + "/Direct Integration"
+    )
+
+    hot_cols = [col for col in filtered.columns if col.startswith("HU::")]
+    cold_cols = [col for col in filtered.columns if col.startswith("CU::")]
+    other_cols = [
+        col
+        for col in filtered.columns
+        if col not in hot_cols + cold_cols
+    ]
+
+    clean_df = filtered.replace({pd.NA: None})
+    clean_df = clean_df.where(~clean_df.isna(), None)
+    base_records = clean_df[other_cols].to_dict(orient="records")
+
+    hot_units = {col: units_map[col] for col in hot_cols}
+    cold_units = {col: units_map[col] for col in cold_cols}
+
+    hot_matrix = clean_df[hot_cols].to_numpy(dtype=float) if hot_cols else None
+    cold_matrix = clean_df[cold_cols].to_numpy(dtype=float) if cold_cols else None
+
+    results = []
+    for idx, record in enumerate(base_records):
+        entry = {
+            "hot_utilities": [],
+            "cold_utilities": [],
+        }
+
+        if hot_matrix is not None:
+            entry["hot_utilities"] = []
+            for col_idx, col in enumerate(hot_cols):
                 entry["hot_utilities"].append(
                     {
-                        "name": col[4 : len(col)],
+                        "name": col[4:],
                         "heat_flow": {
-                            "value": float(value),
-                            "units": unit,
+                            "value": hot_matrix[idx, col_idx],
+                            "units": hot_units[col],
                         },
                     }
                 )
-            elif col[0:4] == "CU::":
+
+        if cold_matrix is not None:
+            entry["cold_utilities"] = []
+            for col_idx, col in enumerate(cold_cols):
                 entry["cold_utilities"].append(
                     {
-                        "name": col[4 : len(col)],
+                        "name": col[4:],
                         "heat_flow": {
-                            "value": float(value),
-                            "units": unit,
+                            "value": cold_matrix[idx, col_idx],
+                            "units": cold_units[col],
                         },
                     }
                 )
-            elif col == "temp_pinch":
-                val = str(value).split("; ")
-                if row["name"] == "Total Process Target":
-                    val[0] = None
-                    val[-1] = None
+
+        for col, value in record.items():
+            unit = units_map.get(col)
+            if col == "temp_pinch" and value not in (None, ""):
+                parts = str(value).split("; ")
+                is_process_target = record["name"] == f"{project_name}/Total Process Target"
+                if is_process_target:
+                    parts[0] = None
+                    parts[-1] = None
                 else:
-                    val[0] = float(val[0])
-                    val[-1] = float(val[-1])
+                    parts[0] = float(parts[0])
+                    parts[-1] = float(parts[-1])
                 entry[col] = {
-                    "cold_temp": {
-                        "value": val[0],
-                        "units": unit,
-                    },
-                    "hot_temp": {
-                        "value": val[-1],
-                        "units": unit,
-                    },
+                    "cold_temp": {"value": parts[0], "units": unit},
+                    "hot_temp": {"value": parts[-1], "units": unit},
                 }
             elif col == "degree_of_integration":
-                if pd.isna(value):
-                    value = None
+                if value is None or pd.isna(value):
+                    entry[col] = {"value": None, "units": unit}
                 else:
-                    value = float(value) * 100
-                entry[col] = {"value": value, "units": unit}
-
+                    entry[col] = {"value": float(value) * 100, "units": unit}
             elif (
-                pd.api.types.is_number(value) and isinstance(unit, str) and unit.strip()
+                pd.api.types.is_number(value)
+                and isinstance(unit, str)
+                and unit
             ):
                 entry[col] = {"value": float(value), "units": unit}
             else:
-                # If it's not numeric or there's no unit string, just store the raw data
-                entry[col] = value if not (pd.isna(value)) else None
-        records.append(entry)
+                entry[col] = value if value is not None else None
 
-    reordered = []
-    for r in records:
-        items = list(r.items())
-        reordered.append(dict(items[2:] + items[:2]))
-    return reordered
+        items = list(entry.items())
+        results.append(dict(items[2:] + items[:2]))
+
+    return results
 
 
 def _set_options():

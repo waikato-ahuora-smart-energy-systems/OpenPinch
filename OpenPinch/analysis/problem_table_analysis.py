@@ -61,6 +61,7 @@ def get_utility_heat_cascade(
     pt_ut = ProblemTable({PT.T.value: pt.col[PT.T.value]})
     _problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
 
+    # TODO: refactor to return these cols as a dict instead of pt
     pt.col[PT.H_UT_NET.value] = pt_ut.col[PT.H_NET.value].max() - pt_ut.col[PT.H_NET.value]
     pt.col[PT.RCP_HOT_UT.value] = pt_ut.col[PT.RCP_HOT.value]
     pt.col[PT.RCP_COLD_UT.value] = pt_ut.col[PT.RCP_COLD.value]

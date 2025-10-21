@@ -10,6 +10,10 @@ from CoolProp.Plots.Common import EURunits, KSIunits, PropertyDict, SIunits, pro
 from CoolProp.Plots.SimpleCycles import StateContainer
 import numpy as np
 
+from .stream import Stream
+from .stream_collection import StreamCollection
+
+
 __all__ = ['HeatPumpCycle']
 
 class HeatPumpCycle:
