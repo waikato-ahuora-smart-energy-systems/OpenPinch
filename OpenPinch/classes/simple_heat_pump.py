@@ -322,17 +322,22 @@ class HeatPumpCycle:
             self._cycle_states[1, 'H'] - self._cycle_states[0, 'H']
         )
 
+    def get_hp_hot_and_cold_streams(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return hot and cold streams that define the external heating and cooling provided by a heat pump."""
+        condenser_profile, evaporator_profile = self.get_hp_th_profiles()
+        return (
+            self._build_stream_collection(condenser_profile,is_hot=True),
+            self._build_stream_collection(evaporator_profile,is_hot=False),
+        )
+
     def get_hp_th_profiles(self) -> tuple[np.ndarray, np.ndarray]:
         """Return simplified condenser and evaporator T-h profiles."""
         self._require_solution()
         self.fill_states()
-
-        condenser_profile = self._build_condenser_profile()
-        condenser_sc = self._build_stream_collection(condenser_profile,is_hot=True)
-        evaporator_profile = self._build_evaporator_profile()
-        evaporator_sc = self._build_stream_collection(evaporator_profile,is_hot=False)
-
-        return condenser_sc, evaporator_sc
+        return (
+            self._build_condenser_profile(),
+            self._build_evaporator_profile(),
+        )
 
     def _build_condenser_profile(self) -> np.ndarray:
         """Construct a four-point condenser T-h polyline."""
