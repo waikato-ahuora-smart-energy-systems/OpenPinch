@@ -114,7 +114,7 @@ def get_GGC_pockets(pt: ProblemTable) -> Dict[str, np.ndarray]:
         PT.H_NET_PK.value: h_net_pk
     }
 
-
+# TODO: pass in columns of data instead of the full pt (ProblemTable).
 def get_seperated_gcc_heat_load_profiles(
     pt: ProblemTable,
     col_H_net: str = PT.H_NET_A.value,

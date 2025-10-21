@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Tuple
 
-from ..utils import *
-
+from ..lib import *
 # from ..classes import *
-from ..utils.miscellaneous import *
+from ..utils import *
 
 if TYPE_CHECKING:
     from ..classes import *

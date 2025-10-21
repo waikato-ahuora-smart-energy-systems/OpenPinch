@@ -31,7 +31,8 @@ def get_temperature_driving_forces(
         H_cold = H_cold - H_cold[-1]
 
     # Collect H_val intervals and sort
-    h_vals = pd.Series(H_hot[:-1].tolist() + H_cold[:-1].tolist()).sort_values().reset_index(drop=True)
+    h_vals = pd.Series(H_hot[:-1].tolist() + H_cold[:-1].tolist()).sort_values().reset_index(drop=True) # TODO: check this code
+    # h_vals = sorted(set(H_hot[:-1].tolist() + H_cold[:-1].tolist()), reverse=False)
     h_start = h_vals[:-1].values
     h_end = h_vals[1:].values
     dh_vals = h_start - h_end

@@ -14,7 +14,7 @@ from ..lib import *
 from ..utils import *
 
 
-__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_problem_tables_with_temperature_int"]
+__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_problem_table_with_t_int"]
 
 
 #######################################################################################################
@@ -30,10 +30,16 @@ def get_process_heat_cascade(
 ) -> Tuple[ProblemTable, ProblemTable, dict]:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
-    pt, pt_real = create_problem_tables_with_temperature_int(
-        all_streams, 
-        config
+    pt = create_problem_table_with_t_int(
+        all_streams,
+        True,
+        config,
     )
+    pt_real = create_problem_table_with_t_int(
+        all_streams, 
+        False,
+        config,
+    )    
 
     # Perform the heat cascade of the problem table
     _problem_table_algorithm(pt, hot_streams, cold_streams)
@@ -79,29 +85,34 @@ def get_utility_heat_cascade(
     }
 
 
-def create_problem_tables_with_temperature_int(
-    streams: List[Stream] = [], config: Configuration = None
+def create_problem_table_with_t_int(
+    streams: List[Stream] = [], 
+    is_shifted: bool = True,
+    config: Configuration = None,
 ) -> Tuple[ProblemTable, ProblemTable]:
     """Returns ordered T and T* intervals for given streams and utilities."""
 
-    T_star = [t for s in streams for t in (s.t_min_star, s.t_max_star)]
-    T_real = [t for s in streams for t in (s.t_min, s.t_max)]
+    T_vals = [
+        t 
+        for s in streams 
+        for t in ((s.t_min_star, s.t_max_star) if is_shifted else (s.t_min, s.t_max))
+    ]
 
     if isinstance(config, Configuration):
         if config.DO_TURBINE_WORK:
-            T_val = config.T_TURBINE_BOX
-            Tsat_val = Tsat_p(config.P_TURBINE_BOX)
-            T_star.extend([T_val, Tsat_val])
-            T_real.extend([T_val, Tsat_val])
+            T_vals.extend([
+                config.T_TURBINE_BOX, 
+                Tsat_p(config.P_TURBINE_BOX),
+            ])
 
         if config.DO_EXERGY_TARGETING:
-            T_star.append(config.T_ENV)
-            T_real.append(config.T_ENV)
+            T_vals.append(config.T_ENV)\
 
-    pt = ProblemTable({PT.T.value: sorted(set(T_star), reverse=True)})
-    pt_real = ProblemTable({PT.T.value: sorted(set(T_real), reverse=True)})
-
-    return pt, pt_real
+    return ProblemTable(
+        {
+            PT.T.value: sorted(set(T_vals), reverse=True)
+        }
+    )
 
 
 #######################################################################################################

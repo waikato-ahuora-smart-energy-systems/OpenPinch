@@ -60,7 +60,6 @@ def get_utility_targets(
         )
 
     if config.DO_ASSITED_HT:
-        # Add assisted integration targeting here...
         pt.update(
             get_GGC_pockets(pt)
         )
@@ -139,7 +138,7 @@ def get_utility_targets(
 
 
 #######################################################################################################
-# Helper functions: get_utility_targets
+# Helper functions
 #######################################################################################################
 
 
