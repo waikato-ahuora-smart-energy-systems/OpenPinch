@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import pytest
 
 from OpenPinch.classes import *
@@ -15,6 +16,27 @@ def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
         abs(cp * (t_supply - t_target)),
         htc if htc > 0 else 1,
     )
+
+
+def _make_problem_table_for_interval_tests():
+    nan = float("nan")
+    data = {
+        PT.T.value: [300.0, 200.0, 100.0],
+        PT.DELTA_T.value: [nan, 100.0, 100.0],
+        PT.CP_HOT.value: [1.0, 1.0, 0.5],
+        PT.DELTA_H_HOT.value: [nan, 100.0, 50.0],
+        PT.CP_COLD.value: [0.5, 0.5, 0.2],
+        PT.DELTA_H_COLD.value: [nan, 50.0, 20.0],
+        PT.MCP_NET.value: [-0.5, -0.5, -0.3],
+        PT.DELTA_H_NET.value: [nan, -50.0, -30.0],
+        PT.H_HOT.value: [200.0, 100.0, 50.0],
+        PT.H_COLD.value: [20.0, 10.0, 5.0],
+        PT.H_NET.value: [180.0, 90.0, 45.0],
+        PT.H_NET_NP.value: [175.0, 85.0, 40.0],
+        PT.H_NET_A.value: [170.0, 80.0, 35.0],
+        PT.H_NET_V.value: [165.0, 75.0, 30.0],
+    }
+    return ProblemTable(data)
 
 
 """Tests for the _sum_mcp_between_temperature_boundaries function."""
@@ -234,6 +256,123 @@ def test_insert_temperature_interval_gcc_basic():
                 assert result_val == pytest.approx(expected_val, abs=1e-6)
             else:
                 assert result_val == expected_val
+
+
+def test_insert_temperature_interval_adds_top_interval_with_zero_heat():
+    pt = _make_problem_table_for_interval_tests()
+    labels = [
+        PT.H_HOT.value,
+        PT.H_COLD.value,
+        PT.H_NET.value,
+        PT.H_NET_NP.value,
+        PT.H_NET_A.value,
+        PT.H_NET_V.value,
+    ]
+    original_first = {label: pt.loc[0, label] for label in labels}
+
+    inserted = pt.insert_temperature_interval(350.0)
+
+    assert inserted == 1
+    assert pt.shape[0] == 4
+    assert pt.loc[0, PT.T.value] == pytest.approx(350.0)
+    assert pt.loc[0, PT.DELTA_T.value] == pytest.approx(
+        pt.loc[0, PT.T.value] - pt.loc[1, PT.T.value]
+    )
+    assert pt.loc[1, PT.DELTA_T.value] == pytest.approx(
+        pt.loc[0, PT.T.value] - pt.loc[1, PT.T.value]
+    )
+
+    for label in (PT.CP_HOT.value, PT.CP_COLD.value, PT.MCP_NET.value):
+        assert pt.loc[0, label] == pytest.approx(0.0)
+
+    for label in (PT.DELTA_H_HOT.value, PT.DELTA_H_COLD.value, PT.DELTA_H_NET.value):
+        assert pt.loc[0, label] == pytest.approx(0.0)
+
+    for label in labels:
+        expected = original_first[label]
+        actual = pt.loc[0, label]
+        if np.isnan(expected):
+            assert np.isnan(actual)
+        else:
+            assert actual == pytest.approx(expected)
+
+
+def test_insert_temperature_interval_appends_bottom_interval_with_zero_heat():
+    pt = _make_problem_table_for_interval_tests()
+    labels = [
+        PT.H_HOT.value,
+        PT.H_COLD.value,
+        PT.H_NET.value,
+        PT.H_NET_NP.value,
+        PT.H_NET_A.value,
+        PT.H_NET_V.value,
+    ]
+    last_idx_before = pt.shape[0] - 1
+    last_temperature = pt.loc[last_idx_before, PT.T.value]
+    original_last = {label: pt.loc[last_idx_before, label] for label in labels}
+
+    inserted = pt.insert_temperature_interval(50.0)
+
+    assert inserted == 1
+    assert pt.shape[0] == 4
+
+    last_idx = pt.shape[0] - 1
+    assert pt.loc[last_idx, PT.T.value] == pytest.approx(50.0)
+    assert pt.loc[last_idx, PT.DELTA_T.value] == pytest.approx(
+        pt.loc[last_idx - 1, PT.T.value] - pt.loc[last_idx, PT.T.value]
+    )
+    assert pt.loc[last_idx - 1, PT.DELTA_T.value] == pytest.approx(
+        last_temperature - pt.loc[last_idx, PT.T.value]
+    )
+
+    for label in (PT.CP_HOT.value, PT.CP_COLD.value, PT.MCP_NET.value):
+        assert pt.loc[last_idx, label] == pytest.approx(0.0)
+
+    for label in (PT.DELTA_H_HOT.value, PT.DELTA_H_COLD.value, PT.DELTA_H_NET.value):
+        assert pt.loc[last_idx, label] == pytest.approx(0.0)
+
+    for label in labels:
+        expected = original_last[label]
+        actual = pt.loc[last_idx, label]
+        if np.isnan(expected):
+            assert np.isnan(actual)
+        else:
+            assert actual == pytest.approx(expected)
+
+
+def test_insert_temperature_interval_vectorises_across_top_middle_and_bottom():
+    pt = _make_problem_table_for_interval_tests()
+
+    inserted = pt.insert_temperature_interval([350.0, 250.0, 50.0, 250.0])
+
+    assert inserted == 3
+    assert pt.shape[0] == 6
+    assert pt.col[PT.T.value].tolist() == [350.0, 300.0, 250.0, 200.0, 100.0, 50.0]
+
+    zero_columns = (
+        PT.CP_HOT.value,
+        PT.CP_COLD.value,
+        PT.MCP_NET.value,
+        PT.DELTA_H_HOT.value,
+        PT.DELTA_H_COLD.value,
+        PT.DELTA_H_NET.value,
+    )
+    for idx in (0, -1):
+        for label in zero_columns:
+            assert pt.loc[idx, label] == pytest.approx(0.0)
+
+    mid_idx = int(np.where(np.isclose(pt.col[PT.T.value], 250.0))[0][0])
+    assert pt.loc[mid_idx, PT.CP_HOT.value] == pytest.approx(pt.loc[mid_idx + 1, PT.CP_HOT.value])
+    assert pt.loc[mid_idx, PT.CP_COLD.value] == pytest.approx(pt.loc[mid_idx + 1, PT.CP_COLD.value])
+    assert pt.loc[mid_idx, PT.DELTA_T.value] == pytest.approx(
+        pt.loc[mid_idx - 1, PT.T.value] - pt.loc[mid_idx, PT.T.value]
+    )
+    assert pt.loc[mid_idx, PT.DELTA_H_HOT.value] == pytest.approx(
+        pt.loc[mid_idx, PT.DELTA_T.value] * pt.loc[mid_idx, PT.CP_HOT.value]
+    )
+    assert pt.loc[mid_idx, PT.H_HOT.value] == pytest.approx(150.0)
+    assert pt.loc[mid_idx, PT.H_COLD.value] == pytest.approx(15.0)
+    assert pt.loc[mid_idx, PT.H_NET.value] == pytest.approx(135.0)
 
 
 @pytest.mark.parametrize(
