@@ -1045,8 +1045,8 @@ def test_correct_pt_composite_curves_shifts_columns():
     assert (corrected.col[PT.H_NET.value] == [25, 35]).all()
 
 
-"""Tests for the get_temperature_intervals function."""
-from OpenPinch.analysis.problem_table_analysis import _get_temperature_intervals
+"""Tests for the create_problem_tables_with_temperature_int function."""
+from OpenPinch.analysis.problem_table_analysis import create_problem_tables_with_temperature_int
 
 
 def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
@@ -1065,7 +1065,7 @@ def test_returns_correct_intervals_basic():
     cold = [make_stream("C1", 100, 200, 10)]
     T_star: ProblemTable
     T: ProblemTable
-    T_star, T = _get_temperature_intervals(hot + cold)
+    T_star, T = create_problem_tables_with_temperature_int(hot + cold)
 
     assert PT.T.value in T_star.columns
     assert PT.T.value in T.columns
@@ -1078,7 +1078,7 @@ def test_includes_utilities():
     cu = [make_stream("CU", 30, 70, 10)]
     T_star: ProblemTable
     T: ProblemTable
-    T_star, T = _get_temperature_intervals(hu + cu)
+    T_star, T = create_problem_tables_with_temperature_int(hu + cu)
 
     assert T_star[PT.T.value].to_list() == [540, 490, 80, 40]
     assert T[PT.T.value].to_list() == [550, 500, 70, 30]
@@ -1091,13 +1091,13 @@ def test_includes_turbine_config():
     config.P_TURBINE_BOX = 5  # pressure in bar
     config.DO_EXERGY_TARGETING = True
 
-    T_star, _ = _get_temperature_intervals(config=config)
+    T_star, _ = create_problem_tables_with_temperature_int(config=config)
 
     assert config.T_TURBINE_BOX in T_star[PT.T.value].to_list()
     assert config.T_ENV in T_star[PT.T.value].to_list()
 
 
 def test_empty_inputs():
-    T_star, T = _get_temperature_intervals()
+    T_star, T = create_problem_tables_with_temperature_int()
     assert T_star.data.size == 0
     assert T.data.size == 0

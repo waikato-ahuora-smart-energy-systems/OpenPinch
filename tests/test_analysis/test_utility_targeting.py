@@ -36,16 +36,29 @@ def test_target_utility(filename):
     )
     for plant in data.plant_profile_data:
         z: Zone = site.get_subzone(plant.name)
-        # z: Zone = site.subzones[plant.name]
         GHLP_P = ProblemTable({PT.T.value: plant.data.T})
         GHLP_P.col[PT.H_COLD_NET.value] = plant.data.H_cold_net
         GHLP_P.col[PT.H_HOT_NET.value] = plant.data.H_hot_net
 
+        _, cold_pinch_row, _ = GHLP_P.pinch_idx(PT.H_HOT_NET.value)
+        hot_pinch_row, _, _ = GHLP_P.pinch_idx(PT.H_COLD_NET.value)
+
+        is_real_temperatures = False
         z.hot_utilities = _target_utility(
-            z.hot_utilities, GHLP_P, PT.T.value, PT.H_COLD_NET.value
+            z.hot_utilities,
+            GHLP_P.col[PT.T.value], 
+            GHLP_P.col[PT.H_COLD_NET.value],
+            hot_pinch_row, 
+            cold_pinch_row,
+            is_real_temperatures,            
         )
         z.cold_utilities = _target_utility(
-            z.cold_utilities, GHLP_P, PT.T.value, PT.H_HOT_NET.value
+            z.cold_utilities,
+            GHLP_P.col[PT.T.value], 
+            GHLP_P.col[PT.H_HOT_NET.value],
+            hot_pinch_row, 
+            cold_pinch_row,
+            is_real_temperatures,            
         )
 
     with open(r_file_path) as json_data:

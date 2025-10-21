@@ -10,8 +10,8 @@ from CoolProp.Plots.Common import EURunits, KSIunits, PropertyDict, SIunits, pro
 from CoolProp.Plots.SimpleCycles import StateContainer
 import numpy as np
 
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.stream_collection import StreamCollection
+from .stream import Stream
+from .stream_collection import StreamCollection
 
 
 __all__ = ['HeatPumpCycle']

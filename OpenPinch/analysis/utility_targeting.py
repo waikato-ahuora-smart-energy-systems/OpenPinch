@@ -48,56 +48,93 @@ def get_utility_targets(
     
     # Calculate various GCC profiles
     if is_process_zone:
-        pt = get_GCC_without_pockets(pt)
+        get_GCC_without_pockets(pt)
+        
     if config.DO_VERT_GCC:
-        pt = get_GCC_with_vertical_heat_transfer(pt)
+        pt.update(
+            get_GCC_with_vertical_heat_transfer(
+                pt.col[PT.H_COLD.value],
+                pt.col[PT.H_HOT.value],
+                pt.col[PT.H_NET.value],
+            )
+        )
+
     if config.DO_ASSITED_HT:
-        pt = get_GGC_pockets(pt)
-    pt = get_GCC_needing_utility(pt, config.GCC_FOR_TARGETING)
-    
-    # Add assisted integration targeting here...
-    pt = get_seperated_gcc_heat_load_profiles(pt, col_H_net=PT.H_NET_A.value)
+        # Add assisted integration targeting here...
+        pt.update(
+            get_GGC_pockets(pt)
+        )
+
+    pt.update(
+        get_GCC_needing_utility(
+            pt.col[PT.H_NET_NP.value]
+        )
+    )    
+    pt.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt, 
+            col_H_net=PT.H_NET_A.value
+        )
+    )
 
     # Target multiple utility use
     if is_process_zone:
+        hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(PT.H_NET_A)
+        is_real_temperatures = False
         hot_utilities = _target_utility(
-            hot_utilities, pt, PT.T.value, PT.H_COLD_NET.value
+            hot_utilities, 
+            pt.col[PT.T.value], 
+            pt.col[PT.H_COLD_NET.value],
+            hot_pinch_row, 
+            cold_pinch_row,
+            is_real_temperatures,
         )
         cold_utilities = _target_utility(
-            cold_utilities, pt, PT.T.value, PT.H_HOT_NET.value
+            cold_utilities, 
+            pt.col[PT.T.value], 
+            pt.col[PT.H_HOT_NET.value],
+            hot_pinch_row, 
+            cold_pinch_row,
+            is_real_temperatures,
         )
 
-    pt = get_utility_heat_cascade(
-        pt, 
-        hot_utilities, 
-        cold_utilities, 
-        is_shifted=True
+    pt.update(
+        get_utility_heat_cascade(
+            pt.col[PT.T.value],
+            hot_utilities,
+            cold_utilities,
+            is_shifted=True,
+        )
     )
-
-    pt = get_seperated_gcc_heat_load_profiles(
-        pt,
-        col_H_net=PT.H_UT_NET.value,
-        col_H_cold_net=PT.H_COLD_UT.value,
-        col_H_hot_net=PT.H_HOT_UT.value,
-        is_process_stream=False,
+    pt.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt,
+            col_H_net=PT.H_UT_NET.value,
+            col_H_cold_net=PT.H_COLD_UT.value,
+            col_H_hot_net=PT.H_HOT_UT.value,
+            is_process_stream=False,
+        )
     )
-
-    pt_real = get_utility_heat_cascade(
-        pt_real, hot_utilities, cold_utilities, is_shifted=False
+    pt_real.update(
+        get_utility_heat_cascade(
+            pt_real.col[PT.T.value], 
+            hot_utilities, 
+            cold_utilities, 
+            is_shifted=False
+        )
     )
-
-    pt_real = get_seperated_gcc_heat_load_profiles(
-        pt_real,
-        col_H_net=PT.H_UT_NET.value,
-        col_H_cold_net=PT.H_COLD_UT.value,
-        col_H_hot_net=PT.H_HOT_UT.value,
-        is_process_stream=False,
+    pt_real.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt_real,
+            col_H_net=PT.H_UT_NET.value,
+            col_H_cold_net=PT.H_COLD_UT.value,
+            col_H_hot_net=PT.H_HOT_UT.value,
+            is_process_stream=False,
+        )
     )
-
     pt_real = get_balanced_CC(
         pt_real
     )
-
     return pt, pt_real, hot_utilities, cold_utilities
 
 
@@ -107,59 +144,57 @@ def get_utility_targets(
 
 
 def _target_utility(
-    utilities: List[Stream], pt: ProblemTable, col_T: str, col_H: str, real_T=False
+    utilities: List[Stream], 
+    T_vals: np.ndarray, 
+    H_vals: np.ndarray, 
+    hot_pinch_row: int, 
+    cold_pinch_row: int, 
+    is_real_temperatures: bool = False,
 ) -> List[Stream]:
     """Targets multiple utility use considering a fixed target temperature."""
     if len(utilities) == 0:
         return utilities
 
-    pt = pt.copy
-    # pt.round(6)
-    hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(col_H)
+    if H_vals.min() < -tol:
+        H_vals = H_vals * -1
 
-    if pt.col[col_H].min() < -tol:
-        pt.col[col_H] = pt.col[col_H] * -1
-
-    if utilities[0].type == StreamType.Hot.value and abs(pt.loc[0, col_H]) > tol:
+    if utilities[0].type == StreamType.Hot.value and abs(H_vals[0]) > tol:
         utilities = _assign_utility(
-            pt, col_T, col_H, utilities, hot_pinch_row, is_hot_ut=True, real_T=real_T
+            T_vals, H_vals, utilities, hot_pinch_row, is_hot_ut=True, is_real_temperatures=is_real_temperatures
         )
 
-    elif utilities[0].type == StreamType.Cold.value and abs(pt.loc[-1, col_H]) > tol:
+    elif utilities[0].type == StreamType.Cold.value and abs(H_vals[-1]) > tol:
         utilities = _assign_utility(
-            pt, col_T, col_H, utilities, cold_pinch_row, is_hot_ut=False, real_T=real_T
+            T_vals, H_vals, utilities, cold_pinch_row, is_hot_ut=False, is_real_temperatures=is_real_temperatures
         )
 
     return utilities
 
 
 def _assign_utility(
-    pt: ProblemTable,
-    col_T: Enum,
-    col_H: Enum,
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
     u_ls: List[Stream],
     pinch_row: int,
     is_hot_ut: bool,
-    real_T: bool,
+    is_real_temperatures: bool,
 ) -> List[Stream]:
     """Assigns utility heat duties based on vertical heat transfer across a pinch."""
-    col_T_values = pt.col[col_T]
-    col_H_values = pt.col[col_H]
     if is_hot_ut:
-        T_segment = col_T_values[: pinch_row + 1]
-        H_segment = col_H_values[: pinch_row + 1]
+        T_segment = T_vals[: pinch_row + 1]
+        H_segment = H_vals[: pinch_row + 1]
         segment_limit = H_segment[0]
     else:
-        T_segment = col_T_values[pinch_row - 1:]
-        H_segment = col_H_values[pinch_row - 1:]
+        T_segment = T_vals[pinch_row - 1:]
+        H_segment = H_vals[pinch_row - 1:]
         segment_limit = H_segment[-1]
 
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
         Ts, Tt = (
-            ((u.t_max, u.t_min) if real_T else (u.t_max_star, u.t_min_star))
+            ((u.t_max, u.t_min) if is_real_temperatures else (u.t_max_star, u.t_min_star))
             if is_hot_ut
-            else ((u.t_min, u.t_max) if real_T else (u.t_min_star, u.t_max_star))
+            else ((u.t_min, u.t_max) if is_real_temperatures else (u.t_min_star, u.t_max_star))
         )
 
         Q_ut_max = _maximise_utility_duty(

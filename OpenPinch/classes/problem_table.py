@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import numbers
 from copy import deepcopy
-from typing import List, Tuple, Union
+from typing import List, Mapping, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
-from ..utils.interpolator import linear_interpolation
 
 PT = ProblemTableLabel
 INTERVAL_CORE_KEYS = (
@@ -705,6 +704,22 @@ class ProblemTable:
         for key, value in row_dict.items():
             if key in self.col_index:
                 self.data[index, self.col_index[key]] = value
+
+    def update(
+        self,
+        updates: Mapping[Union[str, ProblemTableLabel], Sequence[float]],
+    ) -> "ProblemTable":
+        """Assign column values in-place using a mapping of ``column -> iterable``."""
+        if not updates:
+            return self
+        if self.data is None:
+            raise ValueError("Cannot update columns on an uninitialised ProblemTable.")
+
+        for key, values in updates.items():
+            col_name = key.value if isinstance(key, ProblemTableLabel) else key
+            self.col[col_name] = values
+
+        return self
 
     def delete_row(self, index: int):
         """Remove a row at ``index`` from the buffer."""
