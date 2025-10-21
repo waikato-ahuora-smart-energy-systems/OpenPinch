@@ -34,6 +34,7 @@ class HeatPumpCycle:
         self._w_net: Optional[float] = None
         self._q_evap: Optional[float] = None
         self._Q_total: Optional[float] = Q_total
+        self._m_dot : Optional[float] = None
         self._solved = False
 
     @property
@@ -327,10 +328,11 @@ class HeatPumpCycle:
         self.fill_states()
 
         condenser_profile = self._build_condenser_profile()
-        condenser_sc = self._build_stream_collection(condenser_profile)
+        condenser_sc = self._build_stream_collection(condenser_profile,is_hot=True)
         evaporator_profile = self._build_evaporator_profile()
+        evaporator_sc = self._build_stream_collection(evaporator_profile,is_hot=False)
 
-        return condenser_sc, evaporator_profile
+        return condenser_sc, evaporator_sc
 
     def _build_condenser_profile(self) -> np.ndarray:
         """Construct a four-point condenser T-h polyline."""
@@ -360,8 +362,9 @@ class HeatPumpCycle:
 
         return condenser_profile
 
-    def _build_stream_collection(self,array):
-        m_dot = self._Q_total / (array[0,0] - array[-1,0])
+    def _build_stream_collection(self,array,is_hot):
+        if is_hot:
+            self._m_dot = self._Q_total / abs(array[0,0] - array[-1,0])
         sc = StreamCollection()
         for i in range(len(array) - 1):
             h1, T1 = array[i]
@@ -370,11 +373,19 @@ class HeatPumpCycle:
             # Do we need a name?
             name = f"Segment_{i + 1}"
 
+            if T1 == T2: # Catch phase change
+                if is_hot:
+                    t_target = T2 - .1
+                else:
+                    t_target = T2 + .1
+            else:
+                t_target = T2
+
             s = Stream(
                 name=name,
                 t_supply=T1,
-                t_target=T2,
-                heat_flow=m_dot*(h1 - h2),  # or m_dot * (h1 - h2), depending on your model
+                t_target=t_target,
+                heat_flow=self._m_dot*abs(h1 - h2),  # or m_dot * (h1 - h2), depending on your model
             )
 
             sc.add(s)
