@@ -48,15 +48,34 @@ def get_utility_targets(
     
     # Calculate various GCC profiles
     if is_process_zone:
-        pt = get_GCC_without_pockets(pt)
+        get_GCC_without_pockets(pt)
+        
     if config.DO_VERT_GCC:
-        pt = get_GCC_with_vertical_heat_transfer(pt)
+        pt.update(
+            get_GCC_with_vertical_heat_transfer(
+                pt.col[PT.H_COLD.value],
+                pt.col[PT.H_HOT.value],
+                pt.col[PT.H_NET.value],
+            )
+        )
+
     if config.DO_ASSITED_HT:
-        pt = get_GGC_pockets(pt)
-    pt = get_GCC_needing_utility(pt, config.GCC_FOR_TARGETING)
-    
-    # Add assisted integration targeting here...
-    pt = get_seperated_gcc_heat_load_profiles(pt, col_H_net=PT.H_NET_A.value)
+        # Add assisted integration targeting here...
+        pt.update(
+            get_GGC_pockets(pt)
+        )
+
+    pt.update(
+        get_GCC_needing_utility(
+            pt.col[PT.H_NET_NP.value]
+        )
+    )    
+    pt.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt, 
+            col_H_net=PT.H_NET_A.value
+        )
+    )
 
     # Target multiple utility use
     if is_process_zone:
@@ -67,42 +86,43 @@ def get_utility_targets(
             cold_utilities, pt, PT.T.value, PT.H_HOT_NET.value
         )
 
-    pt_ut_cols = get_utility_heat_cascade(
-        pt.col[PT.T.value],
-        hot_utilities,
-        cold_utilities,
-        is_shifted=True,
+    pt.update(
+        get_utility_heat_cascade(
+            pt.col[PT.T.value],
+            hot_utilities,
+            cold_utilities,
+            is_shifted=True,
+        )
     )
-    pt.update(pt_ut_cols)
-
-    pt = get_seperated_gcc_heat_load_profiles(
-        pt,
-        col_H_net=PT.H_UT_NET.value,
-        col_H_cold_net=PT.H_COLD_UT.value,
-        col_H_hot_net=PT.H_HOT_UT.value,
-        is_process_stream=False,
+    pt.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt,
+            col_H_net=PT.H_UT_NET.value,
+            col_H_cold_net=PT.H_COLD_UT.value,
+            col_H_hot_net=PT.H_HOT_UT.value,
+            is_process_stream=False,
+        )
     )
-
-    pt_real_ut_cols = get_utility_heat_cascade(
-        pt_real.col[PT.T.value], 
-        hot_utilities, 
-        cold_utilities, 
-        is_shifted=False
+    pt_real.update(
+        get_utility_heat_cascade(
+            pt_real.col[PT.T.value], 
+            hot_utilities, 
+            cold_utilities, 
+            is_shifted=False
+        )
     )
-    pt_real.update(pt_real_ut_cols)
-
-    pt_real = get_seperated_gcc_heat_load_profiles(
-        pt_real,
-        col_H_net=PT.H_UT_NET.value,
-        col_H_cold_net=PT.H_COLD_UT.value,
-        col_H_hot_net=PT.H_HOT_UT.value,
-        is_process_stream=False,
+    pt_real.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt_real,
+            col_H_net=PT.H_UT_NET.value,
+            col_H_cold_net=PT.H_COLD_UT.value,
+            col_H_hot_net=PT.H_HOT_UT.value,
+            is_process_stream=False,
+        )
     )
-
     pt_real = get_balanced_CC(
         pt_real
     )
-
     return pt, pt_real, hot_utilities, cold_utilities
 
 
@@ -110,7 +130,7 @@ def get_utility_targets(
 # Helper functions: get_utility_targets
 #######################################################################################################
 
-
+# TODO: refactor to pass in columns of the ProblemTable instead of pt and the coloumn names
 def _target_utility(
     utilities: List[Stream], pt: ProblemTable, col_T: str, col_H: str, real_T=False
 ) -> List[Stream]:
