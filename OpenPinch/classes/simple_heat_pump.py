@@ -218,20 +218,21 @@ class HeatPumpCycle:
 
         p0, p2 = self._convert_to_SI((Pe, Pc), SI)
         p_crit = self._state.keyed_output(CoolProp.iP_critical)
+        t_crit = self._state.keyed_output(CoolProp.iT_critical)
 
-        if p0 > p_crit:
+        if p0 < p_crit:
             self._state.update(CoolProp.PQ_INPUTS, p0, 1.0)
             Te_sat = self._state.T()
             T0 = Te_sat + dT_sh
         else:
-            T0 = p_crit + dT_sh
+            T0 = t_crit + dT_sh
 
-        if p2 > p_crit:
+        if p2 < p_crit:
             self._state.update(CoolProp.PQ_INPUTS, p2, 0.0)
             Tc_sat = self._state.T()
             T2 = Tc_sat - dT_sc
         else:
-            T2 = p_crit - dT_sc
+            T2 = t_crit - dT_sc
 
         self.solve(T0, p0, T2, p2, eta_com, fluid=None, SI=True)
 
@@ -275,6 +276,22 @@ class HeatPumpCycle:
                     state_point[CoolProp.iP],
                     state_point[CoolProp.iSmass],
                 )
+            elif (
+                state_point[CoolProp.iP] is not None
+                and state_point[CoolProp.iT] is not None
+            ):
+                try:
+                    self._state.update(
+                        CoolProp.PT_INPUTS,
+                        state_point[CoolProp.iP],
+                        state_point[CoolProp.iT],
+                    )
+                except:
+                    self._state.update(
+                        CoolProp.PQ_INPUTS,
+                        state_point[CoolProp.iP],
+                        1,
+                    )                    
             else:
                 warnings.warn(f'Insufficient data to fill state[{i}].', UserWarning)
                 continue
