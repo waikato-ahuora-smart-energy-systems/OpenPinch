@@ -1,5 +1,7 @@
 """Determine various forms of the grand composite curve."""
 
+from typing import Dict
+
 import numpy as np
 
 from ..classes import *
@@ -45,7 +47,6 @@ def get_GCC_without_pockets(
     pt, hot_pinch_loc, cold_pinch_loc = _remove_pockets_on_one_side_of_the_pinch(
         pt, col_H_NP, col_H, hot_pinch_loc, cold_pinch_loc, False
     )
-
     return pt
 
 
@@ -76,34 +77,42 @@ def get_GCC_with_partial_pockets(
     # pt.col[PT.H_NET_AI.value] = pt.col[PT.H_NET.value] - pt.col[PT.H_NET_PK.value]
     return pt
 
+def get_GCC_with_vertical_heat_transfer(
+    h_cold: np.ndarray,
+    h_hot: np.ndarray,
+    h_net: np.ndarray,
+) -> Dict[str, np.ndarray]:
+    """Return the extreme GCC where heat transfer on the composite curves is vertical."""
+    h_cold = np.asarray(h_cold)
+    h_hot = np.asarray(h_hot)
+    h_net = np.asarray(h_net)
 
-def get_GCC_with_vertical_heat_transfer(pt: ProblemTable) -> ProblemTable:
-    """Returns the extreme GCC where heat transfer on the composite curves is vertical (not horizontal)."""
-    # Top section of the vGCC
-    hcc_max = pt.loc[0, PT.H_HOT.value]
-    pt.col[PT.H_NET_V.value] = np.where(
-        pt.col[PT.H_COLD.value] > hcc_max, pt.col[PT.H_COLD.value] - hcc_max, 0.0
+    hcc_max = h_hot[0]
+    base = np.where(h_cold > hcc_max, h_cold - hcc_max, 0.0)
+
+    cu_tar = h_net[-1]
+    h_net_v = np.where(
+        h_hot < cu_tar,
+        cu_tar - h_hot,
+        base,
     )
-    # Bottom section of the vGCC
-    cu_tar = pt.loc[-1, PT.H_NET.value]
-    pt.col[PT.H_NET_V.value] = np.where(
-        pt.col[PT.H_HOT.value] < cu_tar,
-        cu_tar - pt.col[PT.H_HOT.value],
-        pt.col[PT.H_NET_V.value],
-    )
-    return pt
+    return {PT.H_NET_V.value: h_net_v}
 
 
-def get_GCC_needing_utility(pt: ProblemTable, selected_gcc: str = PT.H_NET_NP.value) -> ProblemTable:
-    """Return the actual GCC based on utility usage and heat transfer direction settings."""
-    pt.col[PT.H_NET_A.value] = pt.col[selected_gcc]
-    return pt
+def get_GCC_needing_utility(
+    h_net: np.ndarray,
+) -> Dict[str, np.ndarray]:
+    """Return the actual GCC."""
+    return {PT.H_NET_A.value: h_net}
 
 
-def get_GGC_pockets(pt: ProblemTable) -> ProblemTable:
+def get_GGC_pockets(pt: ProblemTable) -> Dict[str, np.ndarray]:
     """Store GCC pocket contribution (difference between real and pocket-free profiles)."""
-    pt.col[PT.H_NET_PK.value] = pt.col[PT.H_NET.value] - pt.col[PT.H_NET_NP.value]
-    return pt
+    h_net_pk = np.subtract(pt.col[PT.H_NET.value], pt.col[PT.H_NET_NP.value])
+    pt.col[PT.H_NET_PK.value] = h_net_pk
+    return {
+        PT.H_NET_PK.value: h_net_pk
+    }
 
 
 def get_seperated_gcc_heat_load_profiles(
@@ -115,11 +124,12 @@ def get_seperated_gcc_heat_load_profiles(
     col_RCP_hot_net: str = PT.RCP_HOT_UT.value,
     col_RCP_cold_net: str = PT.RCP_COLD_UT.value,
     is_process_stream: bool = True,
-) -> ProblemTable:
+    ) -> Dict[str, np.ndarray]:
     """Determines the gross required heating or cooling profile of a system from the GCC."""
 
     # Calculate ΔH differences
-    dh_diff = pt.delta_col(col_H_net, 1)
+    dh_diff = pt.delta_col(col_H_net)
+    rcp_net = pt.col[col_RCP_net]
 
     # Determine whether each row corresponds to a hot-side or cold-side enthalpy change
     if is_process_stream:
@@ -130,24 +140,29 @@ def get_seperated_gcc_heat_load_profiles(
         is_hot = ~is_cold
 
     # Compute cumulative enthalpy change
-    pt.col[col_H_hot_net] = np.cumsum(-dh_diff * is_hot)
-    pt.col[col_H_cold_net] = np.cumsum(-dh_diff * is_cold)
+    hot_profile = np.cumsum(-dh_diff * is_hot)
+    cold_profile = np.cumsum(-dh_diff * is_cold)
 
     # Handle RCP (HTR x CP)
-    pt.col[col_RCP_hot_net] = pt.col[col_RCP_net] * is_hot
-    pt.col[col_RCP_cold_net] = pt.col[col_RCP_net] * is_cold
+    rcp_hot = rcp_net * is_hot
+    rcp_cold = rcp_net * is_cold
 
     # Normalize hot profile to start at x=0 and cold profile to end at x=0
     if is_process_stream:
-        pt.col[col_H_hot_net] *= -1
-        HUt_max = -pt.loc[-1, col_H_cold_net]
-        pt.col[col_H_cold_net] += HUt_max
+        hot_profile *= -1
+        hut_max = -cold_profile[-1]
+        cold_profile = cold_profile + hut_max
     else:
-        pt.col[col_H_cold_net] *= -1
-        HUt_max = -pt.loc[-1, col_H_hot_net]
-        pt.col[col_H_hot_net] += HUt_max      
+        cold_profile *= -1
+        hut_max = -hot_profile[-1]
+        hot_profile = hot_profile + hut_max
 
-    return pt
+    return {
+        col_H_hot_net: hot_profile,
+        col_H_cold_net: cold_profile,
+        col_RCP_hot_net: rcp_hot,
+        col_RCP_cold_net: rcp_cold,
+    }
 
 
 #######################################################################################################
@@ -231,5 +246,3 @@ def _pocket_exit_index(H_vals: np.ndarray, i_0: int, pinch_loc: int, sgn: int) -
             if H_vals[i_0] >= H_vals[i] + tol:
                 return i + 1
         return pinch_loc
-
-

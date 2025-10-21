@@ -713,10 +713,11 @@ class ProblemTable:
         if not updates:
             return self
         if self.data is None:
-                raise ValueError("Cannot update columns on an uninitialised ProblemTable.")
-        
+            raise ValueError("Cannot update columns on an uninitialised ProblemTable.")
+
         for key, values in updates.items():
-            self.col[key] = values
+            col_name = key.value if isinstance(key, ProblemTableLabel) else key
+            self.col[col_name] = values
 
         return self
 

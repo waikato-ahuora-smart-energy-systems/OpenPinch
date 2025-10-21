@@ -1,6 +1,6 @@
 import os
 
-import pandas as pd
+import pandas as pd, numpy as np
 import pytest
 
 from OpenPinch.utils.miscellaneous import *
@@ -50,21 +50,21 @@ def test_get_gcc_without_pockets(
     t_vals, h_net_vals, expected_middle, expect_flat_pocket
 ):
     pt = make_df(t_vals, h_net_vals)
-    pt_updated = get_GCC_without_pockets(pt)
+    result = get_GCC_without_pockets(pt)
 
     # Structure
-    assert isinstance(pt_updated, ProblemTable)
-    assert PT.H_NET_NP.value in pt_updated.columns
-    assert PT.T.value in pt_updated.columns
-    assert len(pt_updated) >= len(t_vals)
+    assert isinstance(result, ProblemTable)
+    assert PT.H_NET_NP.value in result.columns
+    assert PT.T.value in result.columns
+    assert len(pt) >= len(t_vals)
 
     # Pocket flattening check
     if expect_flat_pocket:
         # Get pinch points
-        h_idx, c_idx, valid = pt_updated.pinch_idx()
+        h_idx, c_idx, valid = pt.pinch_idx()
 
         if valid and h_idx + 1 < c_idx:
-            values = pt_updated.loc[h_idx + 1 : c_idx - 1, PT.H_NET_NP.value]
+            values = pt.loc[h_idx + 1 : c_idx - 1, PT.H_NET_NP.value]
             first_val = values.iloc[0]
             assert all(
                 abs(val - first_val) < 1e-6 for val in values
@@ -81,22 +81,27 @@ def test_get_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
         }
     )
 
-    result = get_GCC_with_vertical_heat_transfer(pt.copy)
+    pt_copy = pt.copy
+    result = get_GCC_with_vertical_heat_transfer(
+        pt_copy.col[PT.H_COLD.value],
+        pt_copy.col[PT.H_HOT.value],
+        pt_copy.col[PT.H_NET.value],
+    )
 
-    assert PT.H_NET_V.value in result.columns
-    assert result.loc[0, PT.H_NET_V.value] == 250  # Top value nonzero
-    assert result.loc[-1, PT.H_NET_V.value] == 50  # Bottom-out should zero
+    assert PT.H_NET_V.value in result
+    assert result[PT.H_NET_V.value][0] == 250  # Top value nonzero
+    assert result[PT.H_NET_V.value][-1] == 50  # Bottom-out should zero
 
 
 def test_get_GCC_needing_utility_combines_columns():
     pt = ProblemTable(
-        {PT.H_NET_NP.value: [100, 200, 300], PT.H_NET_V.value: [300, 200, 100]}
+        {PT.H_NET_NP.value: [100, 200, 300]}
     )
 
-    result = get_GCC_needing_utility(pt.copy)
+    result = get_GCC_needing_utility(pt.col[PT.H_NET_NP.value])
 
-    expected = [100, 200, 300]  # Because f_horizontal = 1.0
-    assert result[PT.H_NET_A.value].to_list() == expected
+    expected = [100, 200, 300] 
+    assert (result[PT.H_NET_A.value] == expected).all()
 
 
 def test_get_separated_heat_profiles_categorises_correctly():
@@ -108,9 +113,9 @@ def test_get_separated_heat_profiles_categorises_correctly():
         }
     )
 
-    result = get_seperated_gcc_heat_load_profiles(pt.copy)
+    result_cols = get_seperated_gcc_heat_load_profiles(pt.copy)
 
-    assert PT.H_HOT_NET.value in result.columns
-    assert PT.H_COLD_NET.value in result.columns
-    assert result.loc[-1, PT.H_HOT_NET.value] == -100
-    assert result.loc[0, PT.H_COLD_NET.value] == 300
+    assert PT.H_HOT_NET.value in result_cols
+    assert PT.H_COLD_NET.value in result_cols
+    assert result_cols[PT.H_HOT_NET.value][-1] == -100
+    assert result_cols[PT.H_COLD_NET.value][0] == 300

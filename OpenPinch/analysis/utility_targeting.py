@@ -79,11 +79,23 @@ def get_utility_targets(
 
     # Target multiple utility use
     if is_process_zone:
+        hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(PT.H_NET_A)
+        is_real_temperatures = False
         hot_utilities = _target_utility(
-            hot_utilities, pt, PT.T.value, PT.H_COLD_NET.value
+            hot_utilities, 
+            pt.col[PT.T.value], 
+            pt.col[PT.H_COLD_NET.value],
+            hot_pinch_row, 
+            cold_pinch_row,
+            is_real_temperatures,
         )
         cold_utilities = _target_utility(
-            cold_utilities, pt, PT.T.value, PT.H_HOT_NET.value
+            cold_utilities, 
+            pt.col[PT.T.value], 
+            pt.col[PT.H_HOT_NET.value],
+            hot_pinch_row, 
+            cold_pinch_row,
+            is_real_temperatures,
         )
 
     pt.update(
@@ -130,61 +142,59 @@ def get_utility_targets(
 # Helper functions: get_utility_targets
 #######################################################################################################
 
-# TODO: refactor to pass in columns of the ProblemTable instead of pt and the coloumn names
+
 def _target_utility(
-    utilities: List[Stream], pt: ProblemTable, col_T: str, col_H: str, real_T=False
+    utilities: List[Stream], 
+    T_vals: np.ndarray, 
+    H_vals: np.ndarray, 
+    hot_pinch_row: int, 
+    cold_pinch_row: int, 
+    is_real_temperatures: bool = False,
 ) -> List[Stream]:
     """Targets multiple utility use considering a fixed target temperature."""
     if len(utilities) == 0:
         return utilities
 
-    pt = pt.copy
-    # pt.round(6)
-    hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(col_H)
+    if H_vals.min() < -tol:
+        H_vals = H_vals * -1
 
-    if pt.col[col_H].min() < -tol:
-        pt.col[col_H] = pt.col[col_H] * -1
-
-    if utilities[0].type == StreamType.Hot.value and abs(pt.loc[0, col_H]) > tol:
+    if utilities[0].type == StreamType.Hot.value and abs(H_vals[0]) > tol:
         utilities = _assign_utility(
-            pt, col_T, col_H, utilities, hot_pinch_row, is_hot_ut=True, real_T=real_T
+            T_vals, H_vals, utilities, hot_pinch_row, is_hot_ut=True, is_real_temperatures=is_real_temperatures
         )
 
-    elif utilities[0].type == StreamType.Cold.value and abs(pt.loc[-1, col_H]) > tol:
+    elif utilities[0].type == StreamType.Cold.value and abs(H_vals[-1]) > tol:
         utilities = _assign_utility(
-            pt, col_T, col_H, utilities, cold_pinch_row, is_hot_ut=False, real_T=real_T
+            T_vals, H_vals, utilities, cold_pinch_row, is_hot_ut=False, is_real_temperatures=is_real_temperatures
         )
 
     return utilities
 
 
 def _assign_utility(
-    pt: ProblemTable,
-    col_T: Enum,
-    col_H: Enum,
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
     u_ls: List[Stream],
     pinch_row: int,
     is_hot_ut: bool,
-    real_T: bool,
+    is_real_temperatures: bool,
 ) -> List[Stream]:
     """Assigns utility heat duties based on vertical heat transfer across a pinch."""
-    col_T_values = pt.col[col_T]
-    col_H_values = pt.col[col_H]
     if is_hot_ut:
-        T_segment = col_T_values[: pinch_row + 1]
-        H_segment = col_H_values[: pinch_row + 1]
+        T_segment = T_vals[: pinch_row + 1]
+        H_segment = H_vals[: pinch_row + 1]
         segment_limit = H_segment[0]
     else:
-        T_segment = col_T_values[pinch_row - 1:]
-        H_segment = col_H_values[pinch_row - 1:]
+        T_segment = T_vals[pinch_row - 1:]
+        H_segment = H_vals[pinch_row - 1:]
         segment_limit = H_segment[-1]
 
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
         Ts, Tt = (
-            ((u.t_max, u.t_min) if real_T else (u.t_max_star, u.t_min_star))
+            ((u.t_max, u.t_min) if is_real_temperatures else (u.t_max_star, u.t_min_star))
             if is_hot_ut
-            else ((u.t_min, u.t_max) if real_T else (u.t_min_star, u.t_max_star))
+            else ((u.t_min, u.t_max) if is_real_temperatures else (u.t_min_star, u.t_max_star))
         )
 
         Q_ut_max = _maximise_utility_duty(
