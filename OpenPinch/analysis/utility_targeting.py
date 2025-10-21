@@ -67,12 +67,13 @@ def get_utility_targets(
             cold_utilities, pt, PT.T.value, PT.H_HOT_NET.value
         )
 
-    pt = get_utility_heat_cascade(
-        pt, 
-        hot_utilities, 
-        cold_utilities, 
-        is_shifted=True
+    pt_ut_cols = get_utility_heat_cascade(
+        pt.col[PT.T.value],
+        hot_utilities,
+        cold_utilities,
+        is_shifted=True,
     )
+    pt.update(pt_ut_cols)
 
     pt = get_seperated_gcc_heat_load_profiles(
         pt,
@@ -82,9 +83,13 @@ def get_utility_targets(
         is_process_stream=False,
     )
 
-    pt_real = get_utility_heat_cascade(
-        pt_real, hot_utilities, cold_utilities, is_shifted=False
+    pt_real_ut_cols = get_utility_heat_cascade(
+        pt_real.col[PT.T.value], 
+        hot_utilities, 
+        cold_utilities, 
+        is_shifted=False
     )
+    pt_real.update(pt_real_ut_cols)
 
     pt_real = get_seperated_gcc_heat_load_profiles(
         pt_real,

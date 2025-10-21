@@ -5,7 +5,7 @@ interval problem table, cascade shifting logic, and helper routines used when
 deriving zonal targets and plotting data for composite curves.
 """
 
-from typing import Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 
@@ -14,14 +14,14 @@ from ..lib import *
 from ..utils import *
 
 
-__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade"]
+__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_problem_tables_with_temperature_int"]
 
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
-@timing_decorator
+
 def get_process_heat_cascade(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
@@ -30,7 +30,10 @@ def get_process_heat_cascade(
 ) -> Tuple[ProblemTable, ProblemTable, dict]:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
-    pt, pt_real = _get_temperature_intervals(all_streams, config)
+    pt, pt_real = create_problem_tables_with_temperature_int(
+        all_streams, 
+        config
+    )
 
     # Perform the heat cascade of the problem table
     _problem_table_algorithm(pt, hot_streams, cold_streams)
@@ -50,23 +53,51 @@ def get_process_heat_cascade(
 
     return pt, pt_real, target_values
 
-@timing_decorator
+
 def get_utility_heat_cascade(
-    pt: ProblemTable,
+    T_int_vals: np.ndarray,
     hot_utilities: List[Stream],
     cold_utilities: List[Stream],
     is_shifted: bool = True,
-) -> ProblemTable:
+) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
-    pt_ut = ProblemTable({PT.T.value: pt.col[PT.T.value]})
+    pt_ut = ProblemTable({PT.T.value: T_int_vals})
     _problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
 
-    # TODO: refactor to return these cols as a dict instead of pt
-    pt.col[PT.H_UT_NET.value] = pt_ut.col[PT.H_NET.value].max() - pt_ut.col[PT.H_NET.value]
-    pt.col[PT.RCP_HOT_UT.value] = pt_ut.col[PT.RCP_HOT.value]
-    pt.col[PT.RCP_COLD_UT.value] = pt_ut.col[PT.RCP_COLD.value]
-    pt.col[PT.RCP_UT_NET.value] = pt_ut.col[PT.RCP_HOT.value] + pt_ut.col[PT.RCP_COLD.value]
-    return pt
+    h_net_values = pt_ut.col[PT.H_NET.value]
+    h_ut_net = h_net_values.max() - h_net_values
+
+    return {
+        PT.H_UT_NET.value: h_ut_net,
+        PT.RCP_HOT_UT.value: pt_ut.col[PT.RCP_HOT.value],
+        PT.RCP_COLD_UT.value: pt_ut.col[PT.RCP_COLD.value],
+        PT.RCP_UT_NET.value: pt_ut.col[PT.RCP_HOT.value] + pt_ut.col[PT.RCP_COLD.value],
+    }
+
+
+def create_problem_tables_with_temperature_int(
+    streams: List[Stream] = [], config: Configuration = None
+) -> Tuple[ProblemTable, ProblemTable]:
+    """Returns ordered T and T* intervals for given streams and utilities."""
+
+    T_star = [t for s in streams for t in (s.t_min_star, s.t_max_star)]
+    T_real = [t for s in streams for t in (s.t_min, s.t_max)]
+
+    if isinstance(config, Configuration):
+        if config.DO_TURBINE_WORK:
+            T_val = config.T_TURBINE_BOX
+            Tsat_val = Tsat_p(config.P_TURBINE_BOX)
+            T_star.extend([T_val, Tsat_val])
+            T_real.extend([T_val, Tsat_val])
+
+        if config.DO_EXERGY_TARGETING:
+            T_star.append(config.T_ENV)
+            T_real.append(config.T_ENV)
+
+    pt = ProblemTable({PT.T.value: sorted(set(T_star), reverse=True)})
+    pt_real = ProblemTable({PT.T.value: sorted(set(T_real), reverse=True)})
+
+    return pt, pt_real
 
 
 #######################################################################################################
@@ -131,31 +162,6 @@ def _problem_table_algorithm(
     pt.col[PT.H_NET.value] = pt.col[PT.H_NET.value] - min_H
 
     return pt
-
-
-def _get_temperature_intervals(
-    streams: List[Stream] = [], config: Configuration = None
-) -> Tuple[ProblemTable, ProblemTable]:
-    """Returns ordered T and T* intervals for given streams and utilities."""
-
-    T_star = [t for s in streams for t in (s.t_min_star, s.t_max_star)]
-    T_real = [t for s in streams for t in (s.t_min, s.t_max)]
-
-    if isinstance(config, Configuration):
-        if config.DO_TURBINE_WORK:
-            T_val = config.T_TURBINE_BOX
-            Tsat_val = Tsat_p(config.P_TURBINE_BOX)
-            T_star.extend([T_val, Tsat_val])
-            T_real.extend([T_val, Tsat_val])
-
-        if config.DO_EXERGY_TARGETING:
-            T_star.append(config.T_ENV)
-            T_real.append(config.T_ENV)
-
-    pt = ProblemTable({PT.T.value: sorted(set(T_star), reverse=True)})
-    pt_real = ProblemTable({PT.T.value: sorted(set(T_real), reverse=True)})
-
-    return pt, pt_real
 
 
 def _sum_mcp_between_temperature_boundaries(

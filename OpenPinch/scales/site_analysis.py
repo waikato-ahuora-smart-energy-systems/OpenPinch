@@ -175,16 +175,28 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     cold_utilities = deepcopy(s_tzt.cold_utilities)
 
     # Apply the problem table algorithm to the simple sum of subzone utility use 
-    pt = get_utility_heat_cascade(
-        pt, hot_utilities, cold_utilities, is_shifted=True
+    pt_ut_cols = get_utility_heat_cascade(
+        pt.col[PT.T.value], 
+        hot_utilities, 
+        cold_utilities, 
+        is_shifted=True,
     )
-    pt_real = get_utility_heat_cascade(
-        pt_real, hot_utilities, cold_utilities, is_shifted=False
+    pt.update(pt_ut_cols)
+
+    pt_real_ut_cols = get_utility_heat_cascade(
+        pt_real.col[PT.T.value], 
+        hot_utilities, 
+        cold_utilities, 
+        is_shifted=False,
     )
+    pt_real.update(pt_real_ut_cols)
 
     # Apply the utility targeting method to determine the net utility use and generation 
     pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(
-        pt, pt_real, hot_utilities, cold_utilities
+        pt, 
+        pt_real, 
+        hot_utilities, 
+        cold_utilities
     )
 
     # Extract overall heat integration targets
