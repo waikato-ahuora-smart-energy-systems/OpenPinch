@@ -1,5 +1,7 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
+from scipy.optimize import minimize
+
 from ..classes import *
 from ..lib import *
 from ..utils import *
@@ -59,6 +61,14 @@ def get_optimal_heat_pump_placement(
 #######################################################################################################
 
 
+def _optimize():
+    minimize(
+        fun=None,
+        x0=None,
+        
+    )
+
+
 def _get_heat_pump_heating_and_cooling_streams() -> StreamCollection:
 
     hp_hot_streams, hp_cold_streams = StreamCollection(), StreamCollection()
@@ -73,7 +83,7 @@ def _get_heat_pump_cascade(
     pt: ProblemTable
     pt = create_problem_table_with_t_int(
         hp_hot_streams + hp_cold_streams,
-        True
+        True,
     )
     pt.update(
         get_utility_heat_cascade(
@@ -99,7 +109,11 @@ def _get_heat_pump_cascade(
     }
 
 
-def _get_min_temperature_approach(hp_profile) -> Tuple[float, float]:
+def _get_min_temperature_approach(
+    hp_profile: dict, 
+    snk_profile: dict, 
+    src_profile: dict
+) -> Tuple[float, float]:
     
     hot_side_tdf = get_temperature_driving_forces(
         T_hot=hp_profile[PT.T.value],
