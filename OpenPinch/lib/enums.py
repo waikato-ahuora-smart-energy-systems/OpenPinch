@@ -114,6 +114,10 @@ class ProblemTableLabel(Enum):
     RCP_UT_NET = "rcp_ut_net"
     RCP_HOT_UT = "rcp_hot_ut"
     RCP_COLD_UT = "rcp_cold_ut"
+    RCP_HOT_BAL = "rCP_hot_balanced"
+    RCP_COLD_BAL = "rCP_cold_balanced"
+    R_HOT_BAL = "HTC_hot_balanced"
+    R_COLD_BAL = "HTC_cold_balanced"
 
 
 PT = ProblemTableLabel

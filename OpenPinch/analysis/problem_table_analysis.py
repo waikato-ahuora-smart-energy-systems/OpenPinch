@@ -130,19 +130,19 @@ def _problem_table_algorithm(
 
     # Sum m_dot*Cp contributions from hot streams per interval (sets CP_HOT and rCP_HOT)
     if hot_streams is not None:
-        cp_hot, rcp_hot = _sum_mcp_between_temperature_boundaries(
+        sum_cp_hot, sum_rcp_hot = _sum_mcp_between_temperature_boundaries(
             pt.col[PT.T.value], hot_streams, is_shifted
         )
-        pt.col[PT.CP_HOT.value] = cp_hot
-        pt.col[PT.RCP_HOT.value] = rcp_hot
+        pt.col[PT.CP_HOT.value] = sum_cp_hot
+        pt.col[PT.RCP_HOT.value] = sum_rcp_hot
 
     # Sum m_dot*Cp contributions from cold streams per interval (sets CP_COLD and rCP_COLD)
     if cold_streams is not None:
-        cp_cold, rcp_cold = _sum_mcp_between_temperature_boundaries(
+        sum_cp_cold, sum_rcp_cold = _sum_mcp_between_temperature_boundaries(
             pt.col[PT.T.value], cold_streams, is_shifted
         )    
-        pt.col[PT.CP_COLD.value] = cp_cold
-        pt.col[PT.RCP_COLD.value] = rcp_cold
+        pt.col[PT.CP_COLD.value] = sum_cp_cold
+        pt.col[PT.RCP_COLD.value] = sum_rcp_cold
 
     # ΔT_i = T_{i-1} - T_i
     pt.col[PT.DELTA_T.value] = pt.delta_col(PT.T.value)

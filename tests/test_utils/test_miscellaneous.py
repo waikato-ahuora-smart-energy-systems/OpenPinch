@@ -6,6 +6,7 @@ from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.utils import *
+from OpenPinch.analysis.exergy_targeting import *
 
 """Test cases for the get_value function."""
 
@@ -86,3 +87,5 @@ def test_crf_negative_interest():
     """Negative interest should compute (though rarely used)."""
     result = compute_capital_recovery_factor(-0.01, 10)
     assert isinstance(result, float)
+
+

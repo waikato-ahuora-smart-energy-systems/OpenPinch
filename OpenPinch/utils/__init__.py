@@ -11,6 +11,6 @@ from .decorators import timing_decorator
 from .export import *
 from .heat_exchanger import *
 from .heat_pump import *
-from .interpolator import *
+from .miscellaneous import *
 from .water_properties import *
 from .wkbook_to_json import *
