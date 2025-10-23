@@ -1,6 +1,7 @@
 """Shared numerical helpers."""
 
 from typing import Union
+import numpy as np
 
 from ..lib import *
 
@@ -33,3 +34,21 @@ def linear_interpolation(xi: float, x1: float, x2: float, y1: float, y2: float) 
     c = y1 - m * x1
     yi = m * xi + c
     return yi
+
+
+def delta_with_zero_at_start(x: np.ndarray) -> np.ndarray:
+    """Compute difference between successive entries in a column and include a zero in the first entry."""  
+    return np.insert(
+        delta_vals(x),
+        0,
+        0.0
+    ) 
+
+
+def delta_vals(x: np.ndarray, descending_vals: bool = True) -> np.ndarray:
+    """Compute difference between successive entries in a column."""        
+    return (
+        x[:-1] - x[1:] 
+        if descending_vals else
+        x[1:] - x[:-1]
+    )

@@ -145,7 +145,7 @@ def _problem_table_algorithm(
         pt.col[PT.RCP_COLD.value] = sum_rcp_cold
 
     # ΔT_i = T_{i-1} - T_i
-    pt.col[PT.DELTA_T.value] = pt.delta_col(PT.T.value)
+    pt.col[PT.DELTA_T.value] = delta_with_zero_at_start(pt.col[PT.T.value])
     
     # ΔH_hot = ΔT * CP_hot
     pt.col[PT.DELTA_H_HOT.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_HOT.value]

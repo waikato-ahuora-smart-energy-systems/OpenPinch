@@ -7,7 +7,7 @@ respective modules (e.g. ``support_methods`` and ``additional_analysis``).
 """
 
 from .additional_analysis import *
-from .area_targeting import get_area_targets
+from .area_targeting import get_area_targets, get_balanced_CC
 from .data_preparation import prepare_problem
 from .exchanger_unit_targeting import get_min_number_hx
 from .graph_data import visualise_graphs

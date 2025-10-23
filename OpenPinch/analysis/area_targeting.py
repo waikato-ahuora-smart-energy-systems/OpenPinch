@@ -27,22 +27,30 @@ def get_balanced_CC(
     }
 
 
-def get_area_targets() -> float: # pt: ProblemTable
+def get_area_targets(
+    T_vals: np.ndarray,
+    H_hot_bal: np.ndarray,
+    H_cold_bal: np.ndarray,
+    RCP_hot: np.ndarray,
+    RCP_cold: np.ndarray,
+    RCP_hot_ut: np.ndarray,
+    RCP_cold_ut: np.ndarray,    
+) -> dict:
     """Estimates a heat transfer area target based on counter-current heat transfer using vectorized numpy operations."""
-    if pt.col[PT.H_HOT_BAL.value] - pt.col[PT.H_COLD_BAL.value] > tol:
+    if H_hot_bal - H_cold_bal > tol:
         raise ValueError("Balanced Composite Curves are imbalanced.")
     
     # Find HTC value for each temperature interval
-    pt.col[PT.RCP_HOT_BAL.value] = pt.col[PT.RCP_HOT.value] + pt.col[PT.RCP_HOT_UT.value]
-    pt.col[PT.RCP_COLD_BAL.value] = pt.col[PT.RCP_COLD.value] + pt.col[PT.RCP_COLD_UT.value]
+    RCP_hot_bal = RCP_hot + RCP_hot_ut
+    RCP_cold_bal = RCP_cold + RCP_cold_ut
 
-    dH_bal_pt = pt.col[PT.H_HOT_BAL.value][1:] - pt.col[PT.H_COLD_BAL.value][:-1]
+    dH_bal_pt = H_hot_bal[1:] - H_cold_bal[:-1]
 
-    pt.col[PT.R_HOT_BAL.value] = pt.col[PT.RCP_HOT_BAL.value] / dH_bal_pt if dH_bal_pt > 0 else 0
-    pt.col[PT.R_COLD_BAL.value] = pt.col[PT.RCP_COLD_BAL.value] / dH_bal_pt if dH_bal_pt > 0 else 0
+    R_hot_bal = RCP_hot_bal / dH_bal_pt if dH_bal_pt > 0 else 0
+    R_cold_bal = RCP_cold_bal / dH_bal_pt if dH_bal_pt > 0 else 0
 
     tdf = get_temperature_driving_forces(
-        pt.col[PT.T.value], pt.col[PT.H_HOT_BAL.value], pt.col[PT.T.value], pt.col[PT.H_COLD_BAL.value], 
+        T_vals, H_hot_bal, T_vals, H_cold_bal, 
     )
     dt_lm_i = compute_LMTD_from_dts(
         tdf["delta_T1"],
@@ -53,23 +61,9 @@ def get_area_targets() -> float: # pt: ProblemTable
     area_i = Q_i / (U_i * dt_lm_i)
 
     return {
+        PT.RCP_HOT_BAL.value: RCP_hot_bal,
+        PT.RCP_COLD_BAL.value: RCP_cold_bal,
+        PT.R_HOT_BAL.value: R_hot_bal,
+        PT.R_COLD_BAL.value: R_cold_bal,
         "area": area_i.sum(),
-        "area_i": area_i,
-        "Q_i": Q_i,
-        "U_i": U_i,
-        "dt_lm_i": dt_lm_i,
     }
-
-    # dh_vals = tdf["dh_vals"]
-
-    
-
-    # r_hot = np.interp(h_end, pt['HCC'], pt['RH'])
-    # r_cold = np.interp(h_end, pt['CCC'], pt['RC'])
-    # u_o = 1 / (r_hot + r_cold)
-
-    # area_segments = ntu * cp_min / u_o
-    # total_area = np.sum(area_segments)
-
-    # return float(total_area)
-    return 0

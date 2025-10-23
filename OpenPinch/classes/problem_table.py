@@ -11,6 +11,7 @@ import pandas as pd
 
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
+from ..utils import *
 
 PT = ProblemTableLabel
 INTERVAL_CORE_KEYS = (
@@ -302,27 +303,6 @@ class ProblemTable:
         elif col == None:
             ls = self.data.T.tolist()
         return ls[0] if len(ls) == 1 else ls
-
-    def delta_col(self, key, shift: int = 1) -> np.ndarray:
-        """Compute difference between successive entries in a column."""
-        idx = self.col_index[key]
-        col_values = self.data[:, idx]
-        delta = np.roll(col_values, shift) - col_values
-        delta[0] = 0.0          
-        return delta
-
-    def shift(self, key, shift: int = 1, filler_value: float = 0.0) -> np.ndarray:
-        """Return a shifted copy of a column filling vacated positions with ``filler_value``."""
-        idx = self.col_index[key]
-        col_values = self.data[:, idx]
-        values = np.roll(col_values, shift)
-        if shift > 0:
-            for i in range(shift):
-                values[i] = filler_value
-        elif shift < 0:
-            for i in range(shift, 0):
-                values[i] = filler_value
-        return values
 
     def round(self, decimals):
         """Round the underlying NumPy buffer in-place."""

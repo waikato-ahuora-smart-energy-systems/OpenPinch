@@ -71,8 +71,7 @@ def get_utility_targets(
     )    
     pt.update(
         get_seperated_gcc_heat_load_profiles(
-            pt, 
-            col_H_net=PT.H_NET_A.value
+            pt.col[PT.H_NET_A.value]
         )
     )
 
@@ -80,7 +79,7 @@ def get_utility_targets(
     if is_process_zone:
         hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(PT.H_NET_A)
         is_real_temperatures = False
-        hot_utilities = _target_utility(
+        _target_utility(
             hot_utilities, 
             pt.col[PT.T.value], 
             pt.col[PT.H_COLD_NET.value],
@@ -88,7 +87,7 @@ def get_utility_targets(
             cold_pinch_row,
             is_real_temperatures,
         )
-        cold_utilities = _target_utility(
+        _target_utility(
             cold_utilities, 
             pt.col[PT.T.value], 
             pt.col[PT.H_HOT_NET.value],
@@ -107,10 +106,8 @@ def get_utility_targets(
     )
     pt.update(
         get_seperated_gcc_heat_load_profiles(
-            pt,
-            col_H_net=PT.H_UT_NET.value,
-            col_H_cold_net=PT.H_COLD_UT.value,
-            col_H_hot_net=PT.H_HOT_UT.value,
+            pt.col[PT.H_UT_NET.value],
+            pt.col[PT.RCP_UT_NET.value],
             is_process_stream=False,
         )
     )
@@ -124,16 +121,10 @@ def get_utility_targets(
     )
     pt_real.update(
         get_seperated_gcc_heat_load_profiles(
-            pt_real,
-            col_H_net=PT.H_UT_NET.value,
-            col_H_cold_net=PT.H_COLD_UT.value,
-            col_H_hot_net=PT.H_HOT_UT.value,
+            pt_real.col[PT.H_UT_NET.value],
+            pt_real.col[PT.RCP_UT_NET.value],
             is_process_stream=False,
         )
-    )
-    
-    pt_real = get_balanced_CC(
-        pt_real
     )
     return pt, pt_real, hot_utilities, cold_utilities
 

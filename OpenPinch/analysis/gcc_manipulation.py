@@ -114,22 +114,16 @@ def get_GGC_pockets(pt: ProblemTable) -> Dict[str, np.ndarray]:
         PT.H_NET_PK.value: h_net_pk
     }
 
-# TODO: pass in columns of data instead of the full pt (ProblemTable).
+
 def get_seperated_gcc_heat_load_profiles(
-    pt: ProblemTable,
-    col_H_net: str = PT.H_NET_A.value,
-    col_H_hot_net: str = PT.H_HOT_NET.value,
-    col_H_cold_net: str = PT.H_COLD_NET.value,
-    col_RCP_net: str = PT.RCP_UT_NET.value,
-    col_RCP_hot_net: str = PT.RCP_HOT_UT.value,
-    col_RCP_cold_net: str = PT.RCP_COLD_UT.value,
+    H_net,
+    rcp_net: np.ndarray = None,
     is_process_stream: bool = True,
-    ) -> Dict[str, np.ndarray]:
-    """Determines the gross required heating or cooling profile of a system from the GCC."""
+) -> Dict[str, np.ndarray]:
+    """Determines the net required heating or cooling profile of a system from the GCC."""
 
     # Calculate ΔH differences
-    dh_diff = pt.delta_col(col_H_net)
-    rcp_net = pt.col[col_RCP_net]
+    dh_diff = delta_with_zero_at_start(H_net)
 
     # Determine whether each row corresponds to a hot-side or cold-side enthalpy change
     if is_process_stream:
@@ -144,8 +138,9 @@ def get_seperated_gcc_heat_load_profiles(
     cold_profile = np.cumsum(-dh_diff * is_cold)
 
     # Handle RCP (HTR x CP)
-    rcp_hot = rcp_net * is_hot
-    rcp_cold = rcp_net * is_cold
+    if not is_process_stream:
+        rcp_hot = rcp_net * is_hot
+        rcp_cold = rcp_net * is_cold
 
     # Normalize hot profile to start at x=0 and cold profile to end at x=0
     if is_process_stream:
@@ -158,10 +153,13 @@ def get_seperated_gcc_heat_load_profiles(
         hot_profile = hot_profile + hut_max
 
     return {
-        col_H_hot_net: hot_profile,
-        col_H_cold_net: cold_profile,
-        col_RCP_hot_net: rcp_hot,
-        col_RCP_cold_net: rcp_cold,
+        PT.H_HOT_NET.value: hot_profile,
+        PT.H_COLD_NET.value: cold_profile,
+    } if is_process_stream else {
+        PT.H_HOT_UT.value: hot_profile,
+        PT.H_COLD_UT.value: cold_profile,
+        PT.RCP_HOT_UT.value: rcp_hot,
+        PT.RCP_COLD_UT.value: rcp_cold,        
     }
 
 

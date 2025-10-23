@@ -95,10 +95,8 @@ def _get_heat_pump_cascade(
     )
     pt.update(
         get_seperated_gcc_heat_load_profiles(
-            pt,
-            col_H_net=PT.H_UT_NET.value,
-            col_H_cold_net=PT.H_COLD_UT.value,
-            col_H_hot_net=PT.H_HOT_UT.value,
+            pt.col[PT.H_UT_NET.value],
+            pt.col[PT.RCP_UT_NET.value],
             is_process_stream=False,
         )
     )

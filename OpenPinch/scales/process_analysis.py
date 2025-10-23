@@ -5,10 +5,11 @@ from ..analysis import (
     get_process_heat_cascade,
     get_utility_targets,
     get_area_targets,
+    get_balanced_CC,
 )
 from ..classes import *
 from ..lib import *
-from ..utils import timing_decorator
+from ..utils import *
 
 __all__ = ["get_process_targets"]
 
@@ -48,20 +49,43 @@ def get_process_targets(zone: Zone):
     pt, pt_real, target_values = get_process_heat_cascade(
         hot_streams, cold_streams, all_streams, config
     )
-    pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(
+    get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities
     )
     net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
         zone_identifier, pt, hot_utilities, cold_utilities
     )
-    _get_balanced_cc(pt)
-    _get_balanced_cc(pt_real)
+    pt.update(
+        get_balanced_CC(
+            pt.col[PT.H_HOT.value],
+            pt.col[PT.H_COLD.value],
+            pt.col[PT.H_HOT_UT.value],
+            pt.col[PT.H_COLD_UT.value],
+        )
+    )  
+    pt_real.update(
+        get_balanced_CC(
+            pt_real.col[PT.H_HOT.value],
+            pt_real.col[PT.H_COLD.value],
+            pt_real.col[PT.H_HOT_UT.value],
+            pt_real.col[PT.H_COLD_UT.value],
+        )
+    )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
     config: Configuration
-    if config.DO_AREA_TARGETING or 1:
-        res = get_area_targets(pt_real, config)
+    if config.DO_AREA_TARGETING and 0:
+        res = get_area_targets(
+            
+            # T_vals: np.ndarray,
+            # H_hot_bal: np.ndarray,
+            # H_cold_bal: np.ndarray,
+            # RCP_hot: np.ndarray,
+            # RCP_cold: np.ndarray,
+            # RCP_hot_ut: np.ndarray,
+            # RCP_cold_ut: np.ndarray,                
+        )
         # num_units = get_min_number_hx(pt)
         # capital_cost = compute_capital_cost(area, num_units, config)
         # annual_capital_cost = compute_annual_capital_cost(area, num_units, config)
@@ -114,7 +138,7 @@ def _get_net_hot_and_cold_segments(
     )
     if zone_identifier == ZoneType.P.value and total_utility_demand > tol:
         net_hot_streams, net_cold_streams = _save_data_for_site_analysis(
-            pt, PT.T.value, PT.H_NET_A.value, hot_utilities, cold_utilities
+            pt.col[PT.T.value], pt.col[PT.H_NET_A.value], hot_utilities, cold_utilities
         )
     else:
         net_hot_streams, net_cold_streams = StreamCollection(), StreamCollection()
@@ -122,21 +146,20 @@ def _get_net_hot_and_cold_segments(
 
 
 def _save_data_for_site_analysis(
-    pt: ProblemTable,
-    col_T: str,
-    col_H: str,
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Constructs net stream segments that require utility input across temperature intervals."""
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
-
-    if pt.delta_col(col_T)[1:].min() < tol:
+    
+    if delta_vals(T_vals).min() < tol:
         raise ValueError("Infeasible temperature interval detected in _store_TSP_data")
 
-    T_vals = pt.col[col_T]
-    dh_vals = pt.delta_col(col_H)[1:]
+    T_vals = T_vals
+    dh_vals = delta_vals(H_vals)
 
     hot_utilities_seq = list(hot_utilities)
     cold_utilities_seq = list(cold_utilities)
@@ -286,10 +309,3 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_UT_NET.value]],
         GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
     }
-
-
-def _get_balanced_cc(pt: ProblemTable) -> ProblemTable:
-    """Returns the balanced composite curves of both process and utility streams"""
-    pt.col[PT.H_HOT_BAL.value] = pt.col[PT.H_HOT.value] + pt.col[PT.H_HOT_UT.value] 
-    pt.col[PT.H_COLD_BAL.value] = pt.col[PT.H_COLD.value] + pt.col[PT.H_COLD_UT.value]
-    return pt
