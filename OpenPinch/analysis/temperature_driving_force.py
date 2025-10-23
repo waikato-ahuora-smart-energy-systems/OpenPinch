@@ -28,10 +28,9 @@ def get_temperature_driving_forces(
         # Raise an error due to heat flow imbalance, which is a requirement for this analysis. 
         raise ValueError("The temperature driving force plot requires the inputted composite curves to be balanced.")
 
-    if abs(H_hot[0] - H_cold[0]) > tol:
-        # Shift the hot and cold cascades to start from zero at the lowest temperature. 
-        H_hot = H_hot - H_hot[-1]
-        H_cold = H_cold - H_cold[-1]
+    # Shift the hot and cold cascades to start from zero at the lowest temperature. 
+    H_hot = H_hot - H_hot[0]
+    H_cold = H_cold - H_cold[0]
 
     # Collect a unified heat-load grid across both curves
     h_vals = _build_h_grid(H_hot, H_cold)
