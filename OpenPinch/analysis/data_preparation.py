@@ -20,7 +20,7 @@ __all__ = ["prepare_problem"]
 # Public API
 #######################################################################################################
 
-@timing_decorator
+
 def prepare_problem(
     streams: Optional[List[StreamSchema]] = None,
     utilities: Optional[List[UtilitySchema]] = None,

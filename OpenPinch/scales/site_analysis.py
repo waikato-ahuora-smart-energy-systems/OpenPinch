@@ -19,7 +19,7 @@ __all__ = ["get_site_targets"]
 # Public API
 #######################################################################################################
 
-@timing_decorator
+
 def get_site_targets(site: Zone):
     """Targets indirect heat integration, such as for Total Site,
     by systematically analysing individual zones and then performing

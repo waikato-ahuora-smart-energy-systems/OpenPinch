@@ -39,7 +39,7 @@ __all__ = ["get_output_graph_data", "visualise_graphs"]
 # Public API
 #######################################################################################################
 
-@timing_decorator
+
 def get_output_graph_data(zone: Zone, graph_sets: dict = {}) -> dict:
     """Returns Json data points for each process."""
     for key, t in zone.targets.items():

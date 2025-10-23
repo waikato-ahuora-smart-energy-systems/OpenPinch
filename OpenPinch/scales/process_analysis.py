@@ -125,7 +125,7 @@ def get_process_targets(zone: Zone):
 # Helper functions
 #######################################################################################################
 
-@timing_decorator
+
 def _get_net_hot_and_cold_segments(
     zone_identifier: str,
     pt: ProblemTable,
@@ -296,7 +296,6 @@ def _find_next_available_utility(
     return len(utilities) - 1
 
 
-@timing_decorator
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
     """Assemble the problem-table slices required for composite/comparison plots."""
     pt.round(decimals=4)

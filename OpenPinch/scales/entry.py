@@ -28,7 +28,6 @@ _TARGET_HANDLERS = {
 }
 
 
-@timing_decorator
 def get_targets(master_zone: Zone) -> dict:
     """Conduct core Pinch Analysis and total site targeting.
 
@@ -45,7 +44,6 @@ def get_targets(master_zone: Zone) -> dict:
 
 
 ########### TODO: This function is untested and not updated since the overhaul of OpenPinch. Broken, most likely.#####
-@timing_decorator
 def get_visualise(data) -> dict:
     """Build graph payloads directly from legacy problem-table structures.
 
