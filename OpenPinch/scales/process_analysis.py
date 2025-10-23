@@ -4,6 +4,7 @@ from typing import List, Tuple
 from ..analysis import (
     get_process_heat_cascade,
     get_utility_targets,
+    get_area_targets,
 )
 from ..classes import *
 from ..lib import *
@@ -59,8 +60,8 @@ def get_process_targets(zone: Zone):
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
     config: Configuration
-    if config.DO_AREA_TARGETING and 0:
-        # area = get_area_targets(pt_real, config)
+    if config.DO_AREA_TARGETING or 1:
+        res = get_area_targets(pt_real, config)
         # num_units = get_min_number_hx(pt)
         # capital_cost = compute_capital_cost(area, num_units, config)
         # annual_capital_cost = compute_annual_capital_cost(area, num_units, config)

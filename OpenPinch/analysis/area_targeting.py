@@ -14,14 +14,20 @@ __all__ = ["get_balanced_CC", "get_area_targets"]
 #######################################################################################################
 
 
-def get_balanced_CC(pt: ProblemTable) -> ProblemTable:
+def get_balanced_CC(
+    H_hot: np.ndarray,
+    H_cold: np.ndarray,
+    H_hot_ut: np.ndarray,
+    H_cold_ut: np.ndarray,
+) -> ProblemTable:
     """Creates the balanced Composite Curve (CC) using both process and utility streams."""
-    pt.col[PT.H_HOT_BAL.value] = pt.col[PT.H_HOT.value] + pt.col[PT.H_HOT_UT.value]
-    pt.col[PT.H_COLD_BAL.value] = pt.col[PT.H_COLD.value] + pt.col[PT.H_COLD_UT.value]
-    return pt
+    return {
+        PT.H_HOT_BAL.value: H_hot + H_hot_ut,
+        PT.H_COLD_BAL.value: H_cold + H_cold_ut,
+    }
 
 
-def get_area_targets(pt: ProblemTable) -> float:
+def get_area_targets() -> float: # pt: ProblemTable
     """Estimates a heat transfer area target based on counter-current heat transfer using vectorized numpy operations."""
     if pt.col[PT.H_HOT_BAL.value] - pt.col[PT.H_COLD_BAL.value] > tol:
         raise ValueError("Balanced Composite Curves are imbalanced.")
@@ -38,13 +44,21 @@ def get_area_targets(pt: ProblemTable) -> float:
     tdf = get_temperature_driving_forces(
         pt.col[PT.T.value], pt.col[PT.H_HOT_BAL.value], pt.col[PT.T.value], pt.col[PT.H_COLD_BAL.value], 
     )
-    t_lmtd = compute_LMTD_from_dts(
+    dt_lm_i = compute_LMTD_from_dts(
         tdf["delta_T1"],
         tdf["delta_T2"],
     )
-    h_vals = tdf["h_vals"]
+    Q_i = tdf["dh_vals"]
+    U_i = 1
+    area_i = Q_i / (U_i * dt_lm_i)
 
-
+    return {
+        "area": area_i.sum(),
+        "area_i": area_i,
+        "Q_i": Q_i,
+        "U_i": U_i,
+        "dt_lm_i": dt_lm_i,
+    }
 
     # dh_vals = tdf["dh_vals"]
 
