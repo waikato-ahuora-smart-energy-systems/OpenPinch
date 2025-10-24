@@ -381,43 +381,43 @@ class ProblemTable:
         """Insert any missing temperature intervals and return count inserted."""
         if self.data is None or self.data.shape[0] < 2:
             return 0
-        temps = np.atleast_1d(np.asarray(T_ls, dtype=float))
-        temps = self._temps_needing_insertion(temps)
-        top_temps, interval_map, bottom_temps = self._categorise_insertion_targets(temps)
+        T_vals = np.atleast_1d(np.asarray(T_ls, dtype=float))
+        T_vals = self._temps_needing_insertion(T_vals)        
+        top_temps, interval_map, bottom_temps = self._categorise_insertion_targets(T_vals)
         if top_temps.size == 0 and bottom_temps.size == 0 and not interval_map:
             return 0
         new_data, inserted = self._apply_interval_map(interval_map, top_temps, bottom_temps)
         self.data = new_data
         return inserted
 
-    def _temps_needing_insertion(self, temps: np.ndarray) -> np.ndarray:
+    def _temps_needing_insertion(self, T_vals: np.ndarray) -> np.ndarray:
         """Filter temperatures that are not within tolerance of existing rows."""
-        if temps.size == 0:
-            return temps
+        if T_vals.size == 0:
+            return T_vals
         T_col = self.data[:, self.col_index[PT.T.value]]
-        gaps = np.abs(T_col[:, None] - temps[None, :])
+        gaps = np.abs(T_col[:, None] - T_vals[None, :])
         mask = np.nanmin(gaps, axis=0) > tol
-        return temps[mask]
+        return T_vals[mask]
 
     def _categorise_insertion_targets(
-        self, temps: np.ndarray
+        self, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, dict[int, List[float]], np.ndarray]:
         """Split candidate temperatures into top, middle, and bottom insertions."""
-        if temps.size == 0:
+        if T_vals.size == 0:
             return np.array([], dtype=float), {}, np.array([], dtype=float)
         data = self.data
         T_col = data[:, self.col_index[PT.T.value]]
-        idx = np.searchsorted(-T_col, -temps, side="left")
+        idx = np.searchsorted(-T_col, -T_vals, side="left")
         n = len(T_col)
 
         top_mask = idx == 0
         bottom_mask = idx == n
         middle_mask = ~(top_mask | bottom_mask)
 
-        top_temps = self._dedupe_monotonic(np.sort(temps[top_mask])[::-1])
-        bottom_temps = self._dedupe_monotonic(np.sort(temps[bottom_mask])[::-1])
+        top_temps = self._dedupe_monotonic(np.sort(T_vals[top_mask])[::-1])
+        bottom_temps = self._dedupe_monotonic(np.sort(T_vals[bottom_mask])[::-1])
 
-        mid_temps = temps[middle_mask]
+        mid_temps = T_vals[middle_mask]
         mid_idx = idx[middle_mask]
         if mid_temps.size:
             upper = T_col[mid_idx - 1]
@@ -439,19 +439,19 @@ class ProblemTable:
         return np.asarray(kept, dtype=float)
 
     def _group_middle_inserts(
-        self, idx: np.ndarray, temps: np.ndarray
+        self, idx: np.ndarray, T_vals: np.ndarray
     ) -> dict[int, List[float]]:
         """Group candidate temperatures between existing rows."""
-        if temps.size == 0:
+        if T_vals.size == 0:
             return {}
-        order = np.lexsort((-temps, idx))
+        order = np.lexsort((-T_vals, idx))
         grouped: dict[int, List[float]] = {}
         for i in order:
             key = int(idx[i])
             bucket = grouped.setdefault(key, [])
-            if bucket and abs(bucket[-1] - temps[i]) <= tol:
+            if bucket and abs(bucket[-1] - T_vals[i]) <= tol:
                 continue
-            bucket.append(float(temps[i]))
+            bucket.append(float(T_vals[i]))
         return grouped
 
     def _apply_interval_map(
@@ -519,20 +519,20 @@ class ProblemTable:
         return new_data, inserted_total
 
     def _build_insert_block(
-        self, row_top: np.ndarray, row_bot: np.ndarray, temps: np.ndarray
+        self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Construct interpolated rows between existing bounds."""
-        rows, indices = self._initialise_insert_rows(row_top, row_bot, temps)
-        self._interpolate_heat_columns(rows, row_top, row_bot, temps, indices[0])
-        bottom = self._adjust_bottom_row(row_bot, temps, indices)
+        rows, indices = self._initialise_insert_rows(row_top, row_bot, T_vals)
+        self._interpolate_heat_columns(rows, row_top, row_bot, T_vals, indices[0])
+        bottom = self._adjust_bottom_row(row_bot, T_vals, indices)
         return rows, bottom
 
     def _build_top_block(
-        self, row_first: np.ndarray, temps: np.ndarray
+        self, row_first: np.ndarray, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Build rows to prepend above the current hottest interval."""
         n_cols = self.data.shape[1]
-        if temps.size == 0:
+        if T_vals.size == 0:
             return np.empty((0, n_cols), dtype=self.data.dtype), row_first.copy()
 
         col = self.col_index
@@ -545,7 +545,7 @@ class ProblemTable:
         mcp_idx = col[PT.MCP_NET.value]
         delta_h_net_idx = col[PT.DELTA_H_NET.value]
 
-        temps_sorted = np.sort(temps)
+        temps_sorted = np.sort(T_vals)
         block = np.full((temps_sorted.size, n_cols), np.nan, dtype=self.data.dtype)
         neighbor = row_first.copy()
 
@@ -575,11 +575,11 @@ class ProblemTable:
         return block, adjusted_first
 
     def _build_bottom_block(
-        self, row_last: np.ndarray, temps: np.ndarray
+        self, row_last: np.ndarray, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Build rows to append below the coldest interval."""
         n_cols = self.data.shape[1]
-        if temps.size == 0:
+        if T_vals.size == 0:
             return np.empty((0, n_cols), dtype=self.data.dtype), row_last.copy()
 
         col = self.col_index
@@ -592,7 +592,7 @@ class ProblemTable:
         mcp_idx = col[PT.MCP_NET.value]
         delta_h_net_idx = col[PT.DELTA_H_NET.value]
 
-        temps_sorted = np.sort(temps)[::-1]
+        temps_sorted = np.sort(T_vals)[::-1]
         block = np.full((temps_sorted.size, n_cols), np.nan, dtype=self.data.dtype)
         prev = row_last.copy()
 
@@ -620,15 +620,15 @@ class ProblemTable:
         return block, adjusted_last
 
     def _initialise_insert_rows(
-        self, row_top: np.ndarray, row_bot: np.ndarray, temps: np.ndarray
+        self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, Tuple[int, ...]]:
         """Initialise new rows with temperature and delta values."""
         idx = self.col_index
         indices = [idx[key] for key in INTERVAL_CORE_KEYS]
         t_i = indices[0]
-        deltas = row_top[t_i] - temps
-        rows = np.full((temps.size, self.data.shape[1]), np.nan, dtype=self.data.dtype)
-        rows[:, t_i] = temps
+        deltas = row_top[t_i] - T_vals
+        rows = np.full((T_vals.size, self.data.shape[1]), np.nan, dtype=self.data.dtype)
+        rows[:, t_i] = T_vals
         rows[:, indices[1]] = deltas
         for cp_idx, dh_idx in (
             (indices[2], indices[3]),
@@ -643,14 +643,14 @@ class ProblemTable:
         rows: np.ndarray,
         row_top: np.ndarray,
         row_bot: np.ndarray,
-        temps: np.ndarray,
+        T_vals: np.ndarray,
         t_idx: int,
     ):
         """Fill heat-related columns using linear interpolation."""
         denom = row_top[t_idx] - row_bot[t_idx]
         if abs(denom) <= tol:
             return
-        ratio = (temps - row_bot[t_idx]) / denom
+        ratio = (T_vals - row_bot[t_idx]) / denom
         for key in INTERPOLATION_KEYS:
             col_idx = self.col_index[key]
             if np.isnan(row_bot[col_idx]):
@@ -660,13 +660,13 @@ class ProblemTable:
     def _adjust_bottom_row(
         self,
         row_bot: np.ndarray,
-        temps: np.ndarray,
+        T_vals: np.ndarray,
         indices: Tuple[int, ...],
     ) -> np.ndarray:
         """Update the existing lower row to account for inserted intervals."""
         t_i, dt_i, cph_i, dhh_i, cpc_i, dhc_i, mcp_i, dhn_i, _, _ = indices
         adjusted = row_bot.copy()
-        delta = temps[-1] - row_bot[t_i]
+        delta = T_vals[-1] - row_bot[t_i]
         adjusted[dt_i] = delta
         for cp_idx, dh_idx in (
             (cph_i, dhh_i),
