@@ -14,18 +14,6 @@ from ..lib.enums import ProblemTableLabel
 from ..utils import *
 
 PT = ProblemTableLabel
-INTERVAL_CORE_KEYS = (
-    PT.T.value,
-    PT.DELTA_T.value,
-    PT.CP_HOT.value,
-    PT.DELTA_H_HOT.value,
-    PT.CP_COLD.value,
-    PT.DELTA_H_COLD.value,
-    PT.MCP_NET.value,
-    PT.DELTA_H_NET.value,
-    PT.RCP_HOT.value,    
-    PT.RCP_COLD.value,
-)
 INTERPOLATION_KEYS = (
     PT.H_HOT.value,
     PT.H_COLD.value,
@@ -492,7 +480,8 @@ class ProblemTable:
             row_bot_orig = self.data[next_idx]
             row_bot_adjusted = row_adjustments.get(next_idx, row_bot_orig).copy()
 
-            block, row_bot_adjusted = self._build_insert_block(row_current, row_bot_orig, temps_mid)
+            block, row_top_adjusted, row_bot_adjusted = self._build_insert_block(row_current, row_bot_orig, temps_mid)
+            new_data[out_idx - 1] = row_top_adjusted
             count_mid = block.shape[0]
             if count_mid:
                 new_data[out_idx : out_idx + count_mid] = block
@@ -518,12 +507,45 @@ class ProblemTable:
 
     def _build_insert_block(
         self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Construct interpolated rows between existing bounds."""
-        rows, indices = self._initialise_insert_rows(row_top, row_bot, T_vals)
-        self._interpolate_heat_columns(rows, row_top, row_bot, T_vals, indices[0])
-        bottom = self._adjust_bottom_row(row_bot, T_vals, indices)
-        return rows, bottom
+        rows, (t_idx, delta_idx) = self._initialise_insert_rows(row_top, row_bot, T_vals)
+        top_adjusted = row_top.copy()
+        bottom_adjusted = row_bot.copy()
+
+        if rows.size == 0:
+            return rows, top_adjusted, bottom_adjusted
+
+        self._interpolate_heat_columns(rows, row_top, row_bot, t_idx)
+        temps_chain = np.concatenate(
+            ([row_top[t_idx]], rows[:, t_idx], [row_bot[t_idx]])
+        )
+        for i in range(rows.shape[0]):
+            rows[i, delta_idx] = temps_chain[i + 1] - temps_chain[i + 2]
+        top_adjusted[delta_idx] = temps_chain[0] - temps_chain[1]
+        bottom_adjusted = self._adjust_bottom_row(row_bot, rows, t_idx, delta_idx)
+
+        return rows, top_adjusted, bottom_adjusted
+
+    def _populate_from_neighbor(
+        self,
+        target_row: np.ndarray,
+        neighbor_row: np.ndarray,
+        *,
+        copy_interpolation: bool,
+    ) -> None:
+        """Populate non-interpolated columns based on a neighbouring row."""
+        for key in self.columns:
+            if key in (PT.T.value, PT.DELTA_T.value):
+                continue
+            col_idx = self.col_index[key]
+            if key in INTERPOLATION_KEYS and not copy_interpolation:
+                continue
+            value = neighbor_row[col_idx]
+            if key in INTERPOLATION_KEYS or np.isnan(value):
+                target_row[col_idx] = value
+            else:
+                target_row[col_idx] = 0.0
 
     def _build_top_or_bottom_block(
         self, row_neighbor: np.ndarray, T_vals: np.ndarray, is_top_block: bool = True
@@ -531,7 +553,7 @@ class ProblemTable:
         """Build rows to prepend above the current hottest interval."""
         n_cols = self.data.shape[1]
         if T_vals.size == 0:
-            return np.empty((0, n_cols), dtype=self.data.dtype)
+            return np.empty((0, n_cols), dtype=self.data.dtype), row_neighbor.copy()
 
         col = self.col_index
         T_idx = col[PT.T.value]
@@ -545,19 +567,11 @@ class ProblemTable:
             row = block[i]
             row[T_idx] = temp
             row[delta_T_idx] = temp - neighbor[T_idx] if is_top_block else neighbor[T_idx] - temp
-            for num in PT:
-                key = num.value
-                row_idx = col[key]
-                if key in [PT.T.value, PT.DELTA_T.value]:
-                    continue
-                elif key in INTERPOLATION_KEYS or np.isnan(neighbor[row_idx]):
-                    row[row_idx] = neighbor[row_idx]
-                else:
-                    row[row_idx] = 0.0
+            self._populate_from_neighbor(row, neighbor, copy_interpolation=True)
             neighbor = row
 
         if is_top_block:
-            for i, temp in enumerate(block[:,delta_T_idx]):
+            for i, temp in enumerate(block[:, delta_T_idx]):
                 if i == 0:
                     row_neighbor[delta_T_idx] = temp
                 elif i + 1 == block[:,0].size:
@@ -570,59 +584,73 @@ class ProblemTable:
 
     def _initialise_insert_rows(
         self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
-    ) -> Tuple[np.ndarray, Tuple[int, ...]]:
+    ) -> Tuple[np.ndarray, Tuple[int, int]]:
         """Initialise new rows with temperature and delta values."""
-        idx = self.col_index
-        indices = [idx[key] for key in INTERVAL_CORE_KEYS]
-        t_i = indices[0]
-        deltas = row_top[t_i] - T_vals
-        rows = np.full((T_vals.size, self.data.shape[1]), np.nan, dtype=self.data.dtype)
-        rows[:, t_i] = T_vals
-        rows[:, indices[1]] = deltas
-        for cp_idx, dh_idx in (
-            (indices[2], indices[3]),
-            (indices[4], indices[5]),
-            (indices[6], indices[7]),
-        ):
-            rows[:, cp_idx] = row_bot[cp_idx]; rows[:, dh_idx] = deltas * row_bot[cp_idx]
-        return rows, tuple(indices)
+        n_rows = T_vals.size
+        n_cols = self.data.shape[1]
+        rows = np.full((n_rows, n_cols), np.nan, dtype=self.data.dtype)
+        if n_rows == 0:
+            t_idx = self.col_index[PT.T.value]
+            delta_idx = self.col_index[PT.DELTA_T.value]
+            return rows, (t_idx, delta_idx)
+
+        temps_sorted = np.sort(T_vals)[::-1]
+        t_idx = self.col_index[PT.T.value]
+        delta_idx = self.col_index[PT.DELTA_T.value]
+
+        neighbor = row_top.copy()
+        for i, temp in enumerate(temps_sorted):
+            row = rows[i]
+            row[t_idx] = temp
+            self._populate_from_neighbor(row, neighbor, copy_interpolation=False)
+            neighbor = row
+
+        return rows, (t_idx, delta_idx)
 
     def _interpolate_heat_columns(
         self,
         rows: np.ndarray,
         row_top: np.ndarray,
         row_bot: np.ndarray,
-        T_vals: np.ndarray,
         t_idx: int,
     ):
         """Fill heat-related columns using linear interpolation."""
+        if rows.size == 0:
+            return
+
+        temps = rows[:, t_idx]
         denom = row_top[t_idx] - row_bot[t_idx]
         if abs(denom) <= tol:
+            for key in INTERPOLATION_KEYS:
+                col_idx = self.col_index[key]
+                rows[:, col_idx] = row_bot[col_idx]
             return
-        ratio = (T_vals - row_bot[t_idx]) / denom
+
+        ratio = (temps - row_bot[t_idx]) / denom
         for key in INTERPOLATION_KEYS:
             col_idx = self.col_index[key]
-            if np.isnan(row_bot[col_idx]):
+            bot_val = row_bot[col_idx]
+            top_val = row_top[col_idx]
+            if np.isnan(bot_val):
                 continue
-            rows[:, col_idx] = row_bot[col_idx] + ratio * (row_top[col_idx] - row_bot[col_idx])
+            if np.isnan(top_val):
+                rows[:, col_idx] = bot_val
+                continue
+            rows[:, col_idx] = bot_val + ratio * (top_val - bot_val)
 
     def _adjust_bottom_row(
         self,
         row_bot: np.ndarray,
-        T_vals: np.ndarray,
-        indices: Tuple[int, ...],
+        rows: np.ndarray,
+        t_idx: int,
+        delta_idx: int,
     ) -> np.ndarray:
         """Update the existing lower row to account for inserted intervals."""
-        t_i, dt_i, cph_i, dhh_i, cpc_i, dhc_i, mcp_i, dhn_i, _, _ = indices
         adjusted = row_bot.copy()
-        delta = T_vals[-1] - row_bot[t_i]
-        adjusted[dt_i] = delta
-        for cp_idx, dh_idx in (
-            (cph_i, dhh_i),
-            (cpc_i, dhc_i),
-            (mcp_i, dhn_i),
-        ):
-            adjusted[dh_idx] = delta * row_bot[cp_idx]
+        if rows.size == 0:
+            return adjusted
+        last_temp = rows[-1, t_idx]
+        adjusted[delta_idx] = last_temp - adjusted[t_idx]
         return adjusted
 
     def insert(self, row_dict: dict, index: int):

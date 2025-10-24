@@ -19,22 +19,21 @@ def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
 
 
 def _make_problem_table_for_interval_tests():
-    nan = float("nan")
     data = {
         PT.T.value: [300.0, 200.0, 100.0],
         PT.DELTA_T.value: [0.0, 100.0, 100.0],
-        PT.CP_HOT.value: [1.0, 1.0, 0.5],
+        PT.CP_HOT.value: [0.0, 1.0, 0.5],
         PT.DELTA_H_HOT.value: [0.0, 100.0, 50.0],
-        PT.CP_COLD.value: [0.5, 0.5, 0.2],
-        PT.DELTA_H_COLD.value: [0.0, 50.0, 20.0],
-        PT.MCP_NET.value: [-0.5, -0.5, -0.3],
-        PT.DELTA_H_NET.value: [0.0, -50.0, -30.0],
+        PT.CP_COLD.value: [0.0, 0.5, 1.0],
+        PT.DELTA_H_COLD.value: [0.0, 50.0, 100.0],
+        PT.MCP_NET.value: [0.0, -0.5, 0.5],
+        PT.DELTA_H_NET.value: [0.0, -50.0, 50.0],
         PT.H_HOT.value: [200.0, 100.0, 50.0],
         PT.H_COLD.value: [20.0, 10.0, 5.0],
-        PT.H_NET.value: [180.0, 90.0, 45.0],
-        PT.H_NET_NP.value: [175.0, 85.0, 40.0],
-        PT.H_NET_A.value: [170.0, 80.0, 35.0],
-        PT.H_NET_V.value: [165.0, 75.0, 30.0],
+        PT.H_NET.value: [50.0, 0.0, 50.0],
+        PT.H_NET_NP.value: [50.0, 0.0, 50.0],
+        PT.H_NET_A.value: [50.0, 0.0, 50.0],
+        PT.H_NET_V.value: [50.0, 0.0, 50.0],
     }
     return ProblemTable(data)
 
@@ -186,29 +185,29 @@ def test_shifting_behavior():
 def test_insert_temperature_interval_basic():
     pt_ls = [
         [250, 200, 100],
-        [None, 50, 100],
-        [None, 2.0, 1.0],
-        [None, 2.0, 1.0],
+        [0, 50, 100],
+        [0, 2.0, 1.0],
+        [0, 2.0, 1.0],
         [200.0, 100.0, 0.0],
-        [None, 3.0, 2.0],
-        [None, 3.0, 2.0],
+        [0, 3.0, 2.0],
+        [0, 3.0, 2.0],
         [350.0, 200.0, 0],
-        [None, -1.0, -1.0],
-        [None, -50.0, -100.0],
+        [0, -1.0, -1.0],
+        [0, -50.0, -100.0],
         [150.0, 100.0, 0.0],
     ]
 
     expected_ls = [
         [250, 225.0, 200, 100],
-        [None, 25.0, 25.0, 100],
-        [None, 2.0, 2.0, 1.0],
-        [None, 2.0, 2.0, 1.0],
+        [0, 25.0, 25.0, 100],
+        [0, 2.0, 2.0, 1.0],
+        [0, 2.0, 2.0, 1.0],
         [200.0, 150.0, 100.0, 0.0],
-        [None, 3.0, 3.0, 2.0],
-        [None, 3.0, 3.0, 2.0],
+        [0, 3.0, 3.0, 2.0],
+        [0, 3.0, 3.0, 2.0],
         [350.0, 275.0, 200.0, 0],
-        [None, -1.0, -1.0, -1.0],
-        [None, -25.0, -25.0, -100.0],
+        [0, -1.0, -1.0, -1.0],
+        [0, -25.0, -25.0, -100.0],
         [150.0, 125.0, 100.0, 0.0],
     ]
 
