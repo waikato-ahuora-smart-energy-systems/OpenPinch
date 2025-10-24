@@ -29,8 +29,10 @@ def get_temperature_driving_forces(
         raise ValueError("The temperature driving force plot requires the inputted composite curves to be balanced.")
 
     # Shift the hot and cold cascades to start from zero at the lowest temperature. 
-    H_hot = H_hot - H_hot[0]
-    H_cold = H_cold - H_cold[0]
+    if abs(H_hot[-1]) > tol:
+        H_hot = H_hot - H_hot[-1]
+    if abs(H_cold[-1]) > tol:
+        H_cold = H_cold - H_cold[-1]
 
     # Collect a unified heat-load grid across both curves
     h_vals = _build_h_grid(H_hot, H_cold)

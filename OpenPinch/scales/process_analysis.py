@@ -55,36 +55,39 @@ def get_process_targets(zone: Zone):
     net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
         zone_identifier, pt, hot_utilities, cold_utilities
     )
-    pt.update(
-        get_balanced_CC(
-            pt.col[PT.H_HOT.value],
-            pt.col[PT.H_COLD.value],
-            pt.col[PT.H_HOT_UT.value],
-            pt.col[PT.H_COLD_UT.value],
+    if config.DO_BALANCED_CC or config.DO_AREA_TARGETING or 1:
+        pt.update(
+            get_balanced_CC(
+                pt.col[PT.H_HOT.value],
+                pt.col[PT.H_COLD.value],
+                pt.col[PT.H_HOT_UT.value],
+                pt.col[PT.H_COLD_UT.value],
+            )
+        )  
+        pt_real.update(
+            get_balanced_CC(
+                pt_real.col[PT.H_HOT.value],
+                pt_real.col[PT.H_COLD.value],
+                pt_real.col[PT.H_HOT_UT.value],
+                pt_real.col[PT.H_COLD_UT.value],
+                pt_real.col[PT.DELTA_T.value],
+                pt_real.col[PT.RCP_HOT.value],
+                pt_real.col[PT.RCP_COLD.value],
+                pt_real.col[PT.RCP_HOT_UT.value],
+                pt_real.col[PT.RCP_COLD_UT.value],
+            )
         )
-    )  
-    pt_real.update(
-        get_balanced_CC(
-            pt_real.col[PT.H_HOT.value],
-            pt_real.col[PT.H_COLD.value],
-            pt_real.col[PT.H_HOT_UT.value],
-            pt_real.col[PT.H_COLD_UT.value],
-        )
-    )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
 
     # Target heat transfer area and number of exchanger units based on Balanced CC
     config: Configuration
-    if config.DO_AREA_TARGETING and 0:
+    if config.DO_AREA_TARGETING or 0:
         res = get_area_targets(
-            
-            # T_vals: np.ndarray,
-            # H_hot_bal: np.ndarray,
-            # H_cold_bal: np.ndarray,
-            # RCP_hot: np.ndarray,
-            # RCP_cold: np.ndarray,
-            # RCP_hot_ut: np.ndarray,
-            # RCP_cold_ut: np.ndarray,                
+            pt.col[PT.T.value],
+            pt.col[PT.H_HOT_BAL.value],
+            pt.col[PT.H_COLD_BAL.value],
+            pt.col[PT.R_HOT_BAL.value],
+            pt.col[PT.R_COLD_BAL.value],               
         )
         # num_units = get_min_number_hx(pt)
         # capital_cost = compute_capital_cost(area, num_units, config)

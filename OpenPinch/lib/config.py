@@ -25,6 +25,7 @@ class Configuration:
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
 
+    DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
     DO_HP_TARGETING: bool = False
     DO_TURBINE_TARGETING: bool = False

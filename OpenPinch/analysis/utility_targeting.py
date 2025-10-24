@@ -7,7 +7,6 @@ from ..lib import *
 from ..utils import *
 from .problem_table_analysis import get_utility_heat_cascade
 from .gcc_manipulation import *
-from .area_targeting import get_balanced_CC
 
 
 __all__ = ["get_utility_targets"]
