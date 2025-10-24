@@ -22,13 +22,13 @@ def _make_problem_table_for_interval_tests():
     nan = float("nan")
     data = {
         PT.T.value: [300.0, 200.0, 100.0],
-        PT.DELTA_T.value: [nan, 100.0, 100.0],
+        PT.DELTA_T.value: [0.0, 100.0, 100.0],
         PT.CP_HOT.value: [1.0, 1.0, 0.5],
-        PT.DELTA_H_HOT.value: [nan, 100.0, 50.0],
+        PT.DELTA_H_HOT.value: [0.0, 100.0, 50.0],
         PT.CP_COLD.value: [0.5, 0.5, 0.2],
-        PT.DELTA_H_COLD.value: [nan, 50.0, 20.0],
+        PT.DELTA_H_COLD.value: [0.0, 50.0, 20.0],
         PT.MCP_NET.value: [-0.5, -0.5, -0.3],
-        PT.DELTA_H_NET.value: [nan, -50.0, -30.0],
+        PT.DELTA_H_NET.value: [0.0, -50.0, -30.0],
         PT.H_HOT.value: [200.0, 100.0, 50.0],
         PT.H_COLD.value: [20.0, 10.0, 5.0],
         PT.H_NET.value: [180.0, 90.0, 45.0],
@@ -321,7 +321,7 @@ def test_insert_temperature_interval_appends_bottom_interval_with_zero_heat():
     assert pt.loc[last_idx, PT.DELTA_T.value] == pytest.approx(
         pt.loc[last_idx - 1, PT.T.value] - pt.loc[last_idx, PT.T.value]
     )
-    assert pt.loc[last_idx - 1, PT.DELTA_T.value] == pytest.approx(
+    assert pt.loc[last_idx, PT.DELTA_T.value] == pytest.approx(
         last_temperature - pt.loc[last_idx, PT.T.value]
     )
 

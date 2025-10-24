@@ -9,16 +9,16 @@ from OpenPinch.analysis.temperature_driving_force import (
 
 def _base_curves():
     T_hot = np.array([400.0, 350.0, 300.0, 300.0])
-    H_hot = np.array([0.0,   100.0, 100.0, 200.0])
-    T_cold = np.array([300.0, 250.0, 100.0])
-    H_cold = np.array([0.0,    50.0, 200.0])
+    H_hot = np.array([200.0,   100.0, 100.0, 0.0])
+    T_cold = np.array([325.0, 250.0, 100.0])
+    H_cold = np.array([200.0,    50.0, 0.0])
     return T_hot, H_hot, T_cold, H_cold
 
 
 def _get_expected_base_results():
     expected_h = np.array([0.0, 50.0, 100.0, 200.0])
-    expected_delta_T1 = np.array([100.0, 125.0, 100.0])
-    expected_delta_T2 = np.array([125.0, 200.0, 200.0])
+    expected_delta_T1 = np.array([200.0, 50.0, 75.0])
+    expected_delta_T2 = np.array([50.0, 25.0, 75.0])
     expected_dh = np.array([50.0, 50.0, 100.0])
     return expected_h, expected_delta_T1, expected_delta_T2, expected_dh
 

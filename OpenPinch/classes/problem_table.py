@@ -282,14 +282,14 @@ class ProblemTable:
     @property
     def to_dataframe(self) -> pd.DataFrame:
         """Convert the buffer into a pandas DataFrame."""
-        return pd.DataFrame(self.data.copy, columns=self.columns)
+        return pd.DataFrame(self.data.copy(), columns=self.columns)
 
     @property
     def copy(self):
         """Return a deep copy of the table."""
         return deepcopy(self)
     
-    # TODO: create a automated series of properties and setters from the PT enum list
+    # TODO: create a automated series of properties and setters from the PT enum key list
 
 
     def _pad_data_input(self, data_input, n_cols):
@@ -407,24 +407,22 @@ class ProblemTable:
             return np.array([], dtype=float), {}, np.array([], dtype=float)
         data = self.data
         T_col = data[:, self.col_index[PT.T.value]]
-        idx = np.searchsorted(-T_col, -T_vals, side="left")
-        n = len(T_col)
-
-        top_mask = idx == 0
-        bottom_mask = idx == n
+        top_mask = T_vals > T_col[0]
+        bottom_mask = T_vals < T_col[-1]
         middle_mask = ~(top_mask | bottom_mask)
 
         top_temps = self._dedupe_monotonic(np.sort(T_vals[top_mask])[::-1])
         bottom_temps = self._dedupe_monotonic(np.sort(T_vals[bottom_mask])[::-1])
 
         mid_temps = T_vals[middle_mask]
-        mid_idx = idx[middle_mask]
+        mid_idx = np.empty(0, dtype=int)
         if mid_temps.size:
-            upper = T_col[mid_idx - 1]
-            lower = T_col[mid_idx]
+            idx = np.searchsorted(-T_col, -mid_temps, side="left")
+            upper = T_col[idx - 1]
+            lower = T_col[idx]
             inside = (upper - tol > mid_temps) & (mid_temps > lower + tol)
             mid_temps = mid_temps[inside]
-            mid_idx = mid_idx[inside]
+            mid_idx = idx[inside].astype(int)
         interval_map = self._group_middle_inserts(mid_idx, mid_temps)
         return top_temps, interval_map, bottom_temps
 
@@ -467,19 +465,19 @@ class ProblemTable:
             + bottom_temps.size
             + sum(len(vals) for vals in interval_map.values())
         )
-        new_data = np.empty((n_rows + total_new, n_cols), dtype=self.data.dtype)
+        new_data = np.zeros((n_rows + total_new, n_cols), dtype=self.data.dtype)
 
         row_adjustments: dict[int, np.ndarray] = {}
         out_idx = 0
         inserted_total = 0
 
         if top_temps.size:
-            top_block, first_adjusted = self._build_top_block(self.data[0], top_temps)
+            top_block, neighbor_adjusted = self._build_top_or_bottom_block(self.data[0], top_temps)
             count_top = top_block.shape[0]
             new_data[out_idx : out_idx + count_top] = top_block
             out_idx += count_top
             inserted_total += count_top
-            row_adjustments[0] = first_adjusted
+            row_adjustments[0] = neighbor_adjusted
 
         for row_idx in range(n_rows):
             row_current = row_adjustments.pop(row_idx, self.data[row_idx]).copy()
@@ -508,7 +506,7 @@ class ProblemTable:
 
         if bottom_temps.size:
             last_row = new_data[out_idx - 1].copy()
-            bottom_block, last_adjusted = self._build_bottom_block(last_row, bottom_temps)
+            bottom_block, last_adjusted = self._build_top_or_bottom_block(last_row, bottom_temps, False)
             new_data[out_idx - 1] = last_adjusted
             count_bottom = bottom_block.shape[0]
             if count_bottom:
@@ -527,97 +525,48 @@ class ProblemTable:
         bottom = self._adjust_bottom_row(row_bot, T_vals, indices)
         return rows, bottom
 
-    def _build_top_block(
-        self, row_first: np.ndarray, T_vals: np.ndarray
+    def _build_top_or_bottom_block(
+        self, row_neighbor: np.ndarray, T_vals: np.ndarray, is_top_block: bool = True
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Build rows to prepend above the current hottest interval."""
         n_cols = self.data.shape[1]
         if T_vals.size == 0:
-            return np.empty((0, n_cols), dtype=self.data.dtype), row_first.copy()
+            return np.empty((0, n_cols), dtype=self.data.dtype)
 
         col = self.col_index
         T_idx = col[PT.T.value]
         delta_T_idx = col[PT.DELTA_T.value]
-        cp_hot_idx = col[PT.CP_HOT.value]
-        delta_h_hot_idx = col[PT.DELTA_H_HOT.value]
-        cp_cold_idx = col[PT.CP_COLD.value]
-        delta_h_cold_idx = col[PT.DELTA_H_COLD.value]
-        mcp_idx = col[PT.MCP_NET.value]
-        delta_h_net_idx = col[PT.DELTA_H_NET.value]
 
         temps_sorted = np.sort(T_vals)
         block = np.full((temps_sorted.size, n_cols), np.nan, dtype=self.data.dtype)
-        neighbor = row_first.copy()
+        neighbor = row_neighbor.copy()
 
         for i, temp in enumerate(temps_sorted):
             row = block[i]
             row[T_idx] = temp
-            row[delta_T_idx] = temp - neighbor[T_idx]
-            row[cp_hot_idx] = 0.0
-            row[delta_h_hot_idx] = 0.0
-            row[cp_cold_idx] = 0.0
-            row[delta_h_cold_idx] = 0.0
-            row[mcp_idx] = 0.0
-            row[delta_h_net_idx] = 0.0
-            for key in INTERPOLATION_KEYS:
+            row[delta_T_idx] = temp - neighbor[T_idx] if is_top_block else neighbor[T_idx] - temp
+            for num in PT:
+                key = num.value
                 row_idx = col[key]
-                row[row_idx] = neighbor[row_idx]
+                if key in [PT.T.value, PT.DELTA_T.value]:
+                    continue
+                elif key in INTERPOLATION_KEYS or np.isnan(neighbor[row_idx]):
+                    row[row_idx] = neighbor[row_idx]
+                else:
+                    row[row_idx] = 0.0
             neighbor = row
 
-        block = block[::-1]
-        adjusted_first = row_first.copy()
-        neighbor_temp = block[-1][T_idx]
-        delta = neighbor_temp - adjusted_first[T_idx]
-        adjusted_first[delta_T_idx] = delta
-        adjusted_first[delta_h_hot_idx] = delta * adjusted_first[cp_hot_idx]
-        adjusted_first[delta_h_cold_idx] = delta * adjusted_first[cp_cold_idx]
-        adjusted_first[delta_h_net_idx] = delta * adjusted_first[mcp_idx]
-        return block, adjusted_first
+        if is_top_block:
+            for i, temp in enumerate(block[:,delta_T_idx]):
+                if i == 0:
+                    row_neighbor[delta_T_idx] = temp
+                elif i + 1 == block[:,0].size:
+                    block[i-1][delta_T_idx] = block[i][delta_T_idx]
+                    block[i][delta_T_idx] = 0.0
+                else:
+                    block[i-1][delta_T_idx] = block[i][delta_T_idx]
 
-    def _build_bottom_block(
-        self, row_last: np.ndarray, T_vals: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """Build rows to append below the coldest interval."""
-        n_cols = self.data.shape[1]
-        if T_vals.size == 0:
-            return np.empty((0, n_cols), dtype=self.data.dtype), row_last.copy()
-
-        col = self.col_index
-        T_idx = col[PT.T.value]
-        delta_T_idx = col[PT.DELTA_T.value]
-        cp_hot_idx = col[PT.CP_HOT.value]
-        delta_h_hot_idx = col[PT.DELTA_H_HOT.value]
-        cp_cold_idx = col[PT.CP_COLD.value]
-        delta_h_cold_idx = col[PT.DELTA_H_COLD.value]
-        mcp_idx = col[PT.MCP_NET.value]
-        delta_h_net_idx = col[PT.DELTA_H_NET.value]
-
-        temps_sorted = np.sort(T_vals)[::-1]
-        block = np.full((temps_sorted.size, n_cols), np.nan, dtype=self.data.dtype)
-        prev = row_last.copy()
-
-        for i, temp in enumerate(temps_sorted):
-            row = block[i]
-            row[T_idx] = temp
-            row[delta_T_idx] = prev[T_idx] - temp
-            row[cp_hot_idx] = 0.0
-            row[delta_h_hot_idx] = 0.0
-            row[cp_cold_idx] = 0.0
-            row[delta_h_cold_idx] = 0.0
-            row[mcp_idx] = 0.0
-            row[delta_h_net_idx] = 0.0
-            for key in INTERPOLATION_KEYS:
-                row_idx = col[key]
-                row[row_idx] = prev[row_idx]
-            prev = row
-
-        adjusted_last = row_last.copy()
-        delta = adjusted_last[T_idx] - block[0][T_idx]
-        adjusted_last[delta_T_idx] = delta
-        adjusted_last[delta_h_hot_idx] = delta * adjusted_last[cp_hot_idx]
-        adjusted_last[delta_h_cold_idx] = delta * adjusted_last[cp_cold_idx]
-        adjusted_last[delta_h_net_idx] = delta * adjusted_last[mcp_idx]
-        return block, adjusted_last
+        return block[::-1], row_neighbor
 
     def _initialise_insert_rows(
         self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray

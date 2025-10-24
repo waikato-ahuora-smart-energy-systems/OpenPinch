@@ -113,7 +113,9 @@ def test_get_separated_heat_profiles_categorises_correctly():
         }
     )
 
-    result_cols = get_seperated_gcc_heat_load_profiles(pt.copy)
+    result_cols = get_seperated_gcc_heat_load_profiles(
+        pt.col[PT.H_NET_A.value]
+    )
 
     assert PT.H_HOT_NET.value in result_cols
     assert PT.H_COLD_NET.value in result_cols
