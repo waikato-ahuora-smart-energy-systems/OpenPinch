@@ -159,11 +159,11 @@ def _problem_table_algorithm(
     # H_cold = Σ ΔH_cold
     pt.col[PT.H_COLD.value] = np.cumsum(pt.col[PT.DELTA_H_COLD.value])
 
-    # MCP_net = CP_cold - CP_hot
-    pt.col[PT.MCP_NET.value] = pt.col[PT.CP_COLD.value] - pt.col[PT.CP_HOT.value]
+    # CP_NET = CP_cold - CP_hot
+    pt.col[PT.CP_NET.value] = pt.col[PT.CP_COLD.value] - pt.col[PT.CP_HOT.value]
 
-    # ΔH_net = ΔT * MCP_net
-    pt.col[PT.DELTA_H_NET.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.MCP_NET.value]
+    # ΔH_net = ΔT * CP_NET
+    pt.col[PT.DELTA_H_NET.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_NET.value]
 
     # H_net = -Σ ΔH_net
     pt.col[PT.H_NET.value] = -np.cumsum(pt.col[PT.DELTA_H_NET.value])

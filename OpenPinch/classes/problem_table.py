@@ -22,6 +22,11 @@ INTERPOLATION_KEYS = (
     PT.H_NET_A.value,
     PT.H_NET_V.value,
 )
+HEAT_CAPACITY_PAIRS = (
+    (PT.CP_HOT.value, PT.DELTA_H_HOT.value),
+    (PT.CP_COLD.value, PT.DELTA_H_COLD.value),
+    (PT.CP_NET.value, PT.DELTA_H_NET.value),
+)
 
 
 class ProblemTable:
@@ -524,6 +529,7 @@ class ProblemTable:
             rows[i, delta_idx] = temps_chain[i + 1] - temps_chain[i + 2]
         top_adjusted[delta_idx] = temps_chain[0] - temps_chain[1]
         bottom_adjusted = self._adjust_bottom_row(row_bot, rows, t_idx, delta_idx)
+        self._update_heat_capacity_pairs(rows, top_adjusted, bottom_adjusted, delta_idx)
 
         return rows, top_adjusted, bottom_adjusted
 
@@ -533,6 +539,7 @@ class ProblemTable:
         neighbor_row: np.ndarray,
         *,
         copy_interpolation: bool,
+        zero_non_interpolation: bool,
     ) -> None:
         """Populate non-interpolated columns based on a neighbouring row."""
         for key in self.columns:
@@ -542,10 +549,14 @@ class ProblemTable:
             if key in INTERPOLATION_KEYS and not copy_interpolation:
                 continue
             value = neighbor_row[col_idx]
-            if key in INTERPOLATION_KEYS or np.isnan(value):
-                target_row[col_idx] = value
+            if key in INTERPOLATION_KEYS:
+                if copy_interpolation:
+                    target_row[col_idx] = value
+                continue
+            if zero_non_interpolation:
+                target_row[col_idx] = 0.0 if not np.isnan(value) else np.nan
             else:
-                target_row[col_idx] = 0.0
+                target_row[col_idx] = value
 
     def _build_top_or_bottom_block(
         self, row_neighbor: np.ndarray, T_vals: np.ndarray, is_top_block: bool = True
@@ -567,7 +578,12 @@ class ProblemTable:
             row = block[i]
             row[T_idx] = temp
             row[delta_T_idx] = temp - neighbor[T_idx] if is_top_block else neighbor[T_idx] - temp
-            self._populate_from_neighbor(row, neighbor, copy_interpolation=True)
+            self._populate_from_neighbor(
+                row,
+                neighbor,
+                copy_interpolation=True,
+                zero_non_interpolation=True,
+            )
             neighbor = row
 
         if is_top_block:
@@ -598,12 +614,15 @@ class ProblemTable:
         t_idx = self.col_index[PT.T.value]
         delta_idx = self.col_index[PT.DELTA_T.value]
 
-        neighbor = row_top.copy()
         for i, temp in enumerate(temps_sorted):
             row = rows[i]
             row[t_idx] = temp
-            self._populate_from_neighbor(row, neighbor, copy_interpolation=False)
-            neighbor = row
+            self._populate_from_neighbor(
+                row,
+                row_bot,
+                copy_interpolation=False,
+                zero_non_interpolation=False,
+            )
 
         return rows, (t_idx, delta_idx)
 
@@ -651,7 +670,27 @@ class ProblemTable:
             return adjusted
         last_temp = rows[-1, t_idx]
         adjusted[delta_idx] = last_temp - adjusted[t_idx]
+        for cp_key, dh_key in HEAT_CAPACITY_PAIRS:
+            cp_idx = self.col_index[cp_key]
+            dh_idx = self.col_index[dh_key]
+            adjusted[dh_idx] = adjusted[delta_idx] * adjusted[cp_idx]
         return adjusted
+
+    def _update_heat_capacity_pairs(
+        self,
+        rows: np.ndarray,
+        top_adjusted: np.ndarray,
+        bottom_adjusted: np.ndarray,
+        delta_idx: int,
+    ) -> None:
+        """Recalculate delta-H columns using heat capacities and delta-T."""
+        for cp_key, dh_key in HEAT_CAPACITY_PAIRS:
+            cp_idx = self.col_index[cp_key]
+            dh_idx = self.col_index[dh_key]
+            if rows.size:
+                rows[:, dh_idx] = rows[:, delta_idx] * rows[:, cp_idx]
+            top_adjusted[dh_idx] = top_adjusted[delta_idx] * top_adjusted[cp_idx]
+            bottom_adjusted[dh_idx] = bottom_adjusted[delta_idx] * bottom_adjusted[cp_idx]
 
     def insert(self, row_dict: dict, index: int):
         """Insert a single row (dict of column: value) at the specified index."""

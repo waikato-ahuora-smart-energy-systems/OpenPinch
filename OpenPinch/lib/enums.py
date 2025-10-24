@@ -89,7 +89,7 @@ class ProblemTableLabel(Enum):
     CP_COLD = "mcp_cold_tot"
     DELTA_H_COLD = "\N{GREEK CAPITAL LETTER DELTA}H_cold"
     H_COLD = "H_cold"
-    MCP_NET = "mcp_net"
+    CP_NET = "CP_NET"
     DELTA_H_NET = "\N{GREEK CAPITAL LETTER DELTA}H_net"
     H_NET = "H_net"
 
