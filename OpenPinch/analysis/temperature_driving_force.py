@@ -24,15 +24,19 @@ def get_temperature_driving_forces(
     T_cold = np.asarray(T_cold, dtype=float)
     H_cold = np.asarray(H_cold, dtype=float)
 
-    if abs((H_hot[0] - H_hot[-1]) - (H_cold[0] - H_cold[-1])) > tol:
+    if T_hot.size != H_hot.size or T_cold.size != H_cold.size:
+        raise ValueError("Composite curve temperature and heat arrays must be the same length.")
+    if T_hot.size == 0 or T_cold.size == 0:
+        raise ValueError("Composite curve arrays cannot be empty.")
+
+    span_hot = np.max(H_hot) - np.min(H_hot)
+    span_cold = np.max(H_cold) - np.min(H_cold)
+    if abs(span_hot - span_cold) > tol:
         # Raise an error due to heat flow imbalance, which is a requirement for this analysis. 
         raise ValueError("The temperature driving force plot requires the inputted composite curves to be balanced.")
 
-    # Shift the hot and cold cascades to start from zero at the lowest temperature. 
-    if abs(H_hot[-1]) > tol:
-        H_hot = H_hot - H_hot[-1]
-    if abs(H_cold[-1]) > tol:
-        H_cold = H_cold - H_cold[-1]
+    H_hot, T_hot = _normalise_curve(H_hot, T_hot)
+    H_cold, T_cold = _normalise_curve(H_cold, T_cold)
 
     # Collect a unified heat-load grid across both curves
     h_vals = _build_h_grid(H_hot, H_cold)
@@ -53,7 +57,7 @@ def get_temperature_driving_forces(
     if discontinuities:
         for idx in range(len(delta_T2_raw) - 2, -1, -1):
             if _is_discontinuity(h_end[idx], discontinuities):
-                delta_T2_raw[idx] = max(delta_T2_raw[idx], delta_T2_raw[idx + 1])
+                delta_T2_raw[idx] = min(delta_T2_raw[idx], delta_T2_raw[idx + 1])
 
     delta_T1 = delta_T1_raw - min_dT
     delta_T2 = delta_T2_raw - min_dT
@@ -125,6 +129,24 @@ def _make_monotonic(h_vals: np.ndarray, side: str) -> np.ndarray:
         idx = j
 
     return adjusted
+
+
+def _normalise_curve(h_vals: np.ndarray, t_vals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Ensure a composite curve has ascending heat flow and starts at zero."""
+    if h_vals.size != t_vals.size:
+        raise ValueError("Composite curve temperature and heat arrays must be the same length.")
+
+    # Orient so heat flow increases from lower to higher values
+    if h_vals[0] > h_vals[-1]:
+        h_vals = h_vals[::-1]
+        t_vals = t_vals[::-1]
+
+    # Shift the curve so it begins at zero heat load
+    offset = h_vals[0]
+    if abs(offset) > tol:
+        h_vals = h_vals - offset
+
+    return h_vals, t_vals
 
 
 def _collect_discontinuities(h_hot: np.ndarray, h_cold: np.ndarray) -> set[float]:
