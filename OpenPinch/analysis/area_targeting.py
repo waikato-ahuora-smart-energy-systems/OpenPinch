@@ -49,15 +49,21 @@ def get_balanced_CC(
             0,
             0,
         )
-        R_hot_bal = np.where(
-            dH_hot_bal > 0,
-            (RCP_hot + RCP_hot_ut) * dT_vals / dH_hot_bal,
-            0.0,
+        R_hot_bal = np.zeros_like(dH_hot_bal, dtype=float)
+        mask_hot = dH_hot_bal > tol
+        np.divide(
+            (RCP_hot + RCP_hot_ut) * dT_vals,
+            dH_hot_bal,
+            out=R_hot_bal,
+            where=mask_hot,
         )
-        R_cold_bal = np.where(
-            dH_cold_bal > 0,
-            (RCP_cold + RCP_cold_ut) * dT_vals / dH_cold_bal,
-            0.0,
+        R_cold_bal = np.zeros_like(dH_cold_bal, dtype=float)
+        mask_cold = dH_cold_bal > tol
+        np.divide(
+            (RCP_cold + RCP_cold_ut) * dT_vals,
+            dH_cold_bal,
+            out=R_cold_bal,
+            where=mask_cold,
         )
         res.update(
             {
@@ -103,6 +109,5 @@ def get_area_targets(
     area_i = Q_i / (U_i * dt_lm_i)
 
     return area_i.sum()
-
 
 

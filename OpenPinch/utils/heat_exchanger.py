@@ -16,11 +16,17 @@ def compute_LMTD_from_dts(
         raise ValueError(
             f"Invalid temperature differences: ΔT1={delta_T1}, ΔT2={delta_T2}"
         )
-    return np.where(
-        abs(delta_T1 - delta_T2) < 1e-6,
-        (delta_T1 + delta_T2) / 2,
-        (delta_T1 - delta_T2) / np.log(delta_T1 / delta_T2)
+    mask_equal = np.isclose(delta_T1, delta_T2, atol=1e-6)
+    lmtd = np.empty_like(delta_T1, dtype=float)
+    arithmetic = (delta_T1 + delta_T2) / 2
+    np.copyto(lmtd, arithmetic, where=mask_equal)
+    np.divide(
+        delta_T1 - delta_T2,
+        np.log(delta_T1 / delta_T2),
+        out=lmtd,
+        where=~mask_equal,
     )
+    return lmtd
 
 
 def compute_LMTD_from_ts(
