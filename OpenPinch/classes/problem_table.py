@@ -475,21 +475,16 @@ class ProblemTable:
         # 3) Append placeholder rows for every new temperature (only T populated).
         T_idx = self.col_index[PT.T.value]
         next_row = n_rows
-        for temp in np.asarray(top_temps, dtype=float):
-            new_data[next_row, T_idx] = temp
-            row_meta[next_row] = {"type": "top"}
-            next_row += 1
-
+        next_row = self._append_placeholders(
+            new_data, row_meta, next_row, top_temps, label="top"
+        )
         for lower_idx, temps in interval_map.items():
-            for temp in np.asarray(temps, dtype=float):
-                new_data[next_row, T_idx] = temp
-                row_meta[next_row] = {"type": "mid", "lower_idx": lower_idx}
-                next_row += 1
-
-        for temp in np.asarray(bottom_temps, dtype=float):
-            new_data[next_row, T_idx] = temp
-            row_meta[next_row] = {"type": "bottom"}
-            next_row += 1
+            next_row = self._append_placeholders(
+                new_data, row_meta, next_row, temps, label="mid", lower_idx=lower_idx,
+            )
+        self._append_placeholders(
+            new_data, row_meta, next_row, bottom_temps, label="bottom"
+        )
 
         # 4) Sort rows by descending temperature so indices align with the final ordering.
         order = np.argsort(new_data[:, T_idx])[::-1]
@@ -610,6 +605,31 @@ class ProblemTable:
         for idx_pos, row_vals in zip(positions, block):
             new_data[idx_pos] = row_vals
         new_data[lower_pos] = bottom_adjusted
+
+    def _append_placeholders(
+        self,
+        new_data: np.ndarray,
+        row_meta: List[dict],
+        start_idx: int,
+        temps: Sequence[float],
+        *,
+        label: str,
+        lower_idx: int | None = None,
+    ) -> int:
+        """Append placeholder rows for a given temperature sequence."""
+        temps_arr = np.asarray(temps, dtype=float)
+        if temps_arr.size == 0:
+            return start_idx
+        T_idx = self.col_index[PT.T.value]
+        next_row = start_idx
+        for temp in temps_arr:
+            new_data[next_row, T_idx] = float(temp)
+            meta = {"type": label}
+            if lower_idx is not None:
+                meta["lower_idx"] = lower_idx
+            row_meta[next_row] = meta
+            next_row += 1
+        return next_row
 
     def _populate_from_neighbor(
         self,
