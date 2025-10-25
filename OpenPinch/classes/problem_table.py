@@ -517,25 +517,9 @@ class ProblemTable:
                 mid_positions[meta["lower_idx"]].append(idx)
 
         for lower_idx, positions in sorted(mid_positions.items()):
-            if lower_idx <= 0:
-                continue
-            if lower_idx not in orig_positions or (lower_idx - 1) not in orig_positions:
-                continue
-
-            positions = sorted(positions)
-            temps_mid = new_data[positions, T_idx]
-
-            upper_pos = orig_positions[lower_idx - 1]
-            lower_pos = orig_positions[lower_idx]
-
-            block, top_adjusted, bottom_adjusted = self._build_mid_block(
-                new_data[upper_pos].copy(), new_data[lower_pos].copy(), temps_mid
-            )
-
-            new_data[upper_pos] = top_adjusted
-            for idx_pos, row_vals in zip(positions, block):
-                new_data[idx_pos] = row_vals
-            new_data[lower_pos] = bottom_adjusted
+            upper_pos = orig_positions.get(lower_idx - 1)
+            lower_pos = orig_positions.get(lower_idx)
+            self._insert_mid_block(new_data, positions, upper_pos, lower_pos)
 
         return new_data, inserted_total
 
@@ -560,6 +544,72 @@ class ProblemTable:
         bottom_adjusted = self._adjust_bottom_row(row_bot, rows, t_idx, delta_idx)
         self._update_heat_capacity_pairs(rows, top_adjusted, bottom_adjusted, delta_idx)
         return rows, top_adjusted, bottom_adjusted
+
+    def _rebuild_edge_block(
+        self,
+        new_data: np.ndarray,
+        row_meta: List[dict],
+        positions: List[int],
+        *,
+        is_top: bool,
+    ) -> None:
+        """Regenerate top or bottom placeholder rows after temperature reordering."""
+        if not positions:
+            return
+
+        edge_type = "top" if is_top else "bottom"
+        T_idx = self.col_index[PT.T.value]
+
+        if is_top:
+            neighbor_idx = next(
+                (idx for idx, meta in enumerate(row_meta) if meta.get("type") != edge_type),
+                None,
+            )
+        else:
+            neighbor_idx = next(
+                (idx for idx in range(len(row_meta) - 1, -1, -1) if row_meta[idx].get("type") != edge_type),
+                None,
+            )
+
+        if neighbor_idx is None:
+            return
+
+        neighbor_row = new_data[neighbor_idx].copy()
+        sorted_positions = sorted(positions)
+        temps = new_data[np.asarray(sorted_positions), T_idx]
+
+        block, neighbor_adjusted = self._build_top_or_bottom_block(
+            neighbor_row, temps, is_top_block=is_top
+        )
+        for idx_pos, row_vals in zip(sorted_positions, block):
+            new_data[idx_pos] = row_vals
+        new_data[neighbor_idx] = neighbor_adjusted
+
+    def _insert_mid_block(
+        self,
+        new_data: np.ndarray,
+        positions: List[int],
+        upper_pos: int | None,
+        lower_pos: int | None,
+    ) -> None:
+        """Populate middle placeholder rows between existing neighbours."""
+        if not positions or upper_pos is None or lower_pos is None:
+            return
+
+        positions = sorted(positions)
+        if upper_pos < 0 or lower_pos < 0:
+            return
+        T_idx = self.col_index[PT.T.value]
+        temps_mid = new_data[np.asarray(positions), T_idx]
+
+        block, top_adjusted, bottom_adjusted = self._build_mid_block(
+            new_data[upper_pos].copy(), new_data[lower_pos].copy(), temps_mid
+        )
+
+        new_data[upper_pos] = top_adjusted
+        for idx_pos, row_vals in zip(positions, block):
+            new_data[idx_pos] = row_vals
+        new_data[lower_pos] = bottom_adjusted
 
     def _populate_from_neighbor(
         self,
