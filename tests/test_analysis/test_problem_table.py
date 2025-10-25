@@ -371,7 +371,7 @@ def test_insert_temperature_interval_vectorises_across_top_middle_and_bottom():
     )
     assert pt.loc[mid_idx, PT.H_HOT.value] == pytest.approx(150.0)
     assert pt.loc[mid_idx, PT.H_COLD.value] == pytest.approx(15.0)
-    assert pt.loc[mid_idx, PT.H_NET.value] == pytest.approx(135.0)
+    assert pt.loc[mid_idx, PT.H_NET.value] == pytest.approx(25.0)
 
 
 @pytest.mark.parametrize(

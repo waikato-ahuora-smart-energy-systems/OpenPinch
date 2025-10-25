@@ -355,7 +355,6 @@ class ProblemTable:
             return self.loc[hot_idx, col_T], self.loc[cold_idx, col_T]
         return None, None
 
-
     def shift_heat_cascade(
         self, dh: float, col: Union[int, str, ProblemTableLabel]
     ) -> "ProblemTable":
