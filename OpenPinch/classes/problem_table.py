@@ -530,7 +530,6 @@ class ProblemTable:
         top_adjusted[delta_idx] = temps_chain[0] - temps_chain[1]
         bottom_adjusted = self._adjust_bottom_row(row_bot, rows, t_idx, delta_idx)
         self._update_heat_capacity_pairs(rows, top_adjusted, bottom_adjusted, delta_idx)
-
         return rows, top_adjusted, bottom_adjusted
 
     def _populate_from_neighbor(
@@ -540,6 +539,7 @@ class ProblemTable:
         *,
         copy_interpolation: bool,
         zero_non_interpolation: bool,
+        relevant_cp_source: np.ndarray | None = None,
     ) -> None:
         """Populate non-interpolated columns based on a neighbouring row."""
         for key in self.columns:
@@ -553,6 +553,12 @@ class ProblemTable:
                 if copy_interpolation:
                     target_row[col_idx] = value
                 continue
+            if relevant_cp_source is not None:
+                for cp_key, dh_key in HEAT_CAPACITY_PAIRS:
+                    if key == cp_key:
+                        cp_idx = self.col_index[cp_key]
+                        target_row[cp_idx] = relevant_cp_source[cp_idx]
+                        break
             if zero_non_interpolation:
                 target_row[col_idx] = 0.0 if not np.isnan(value) else np.nan
             else:
@@ -622,6 +628,7 @@ class ProblemTable:
                 row_bot,
                 copy_interpolation=False,
                 zero_non_interpolation=False,
+                relevant_cp_source=row_bot,
             )
 
         return rows, (t_idx, delta_idx)
@@ -675,6 +682,7 @@ class ProblemTable:
             dh_idx = self.col_index[dh_key]
             adjusted[dh_idx] = adjusted[delta_idx] * adjusted[cp_idx]
         return adjusted
+
 
     def _update_heat_capacity_pairs(
         self,
