@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numbers
+from collections import defaultdict
 from copy import deepcopy
 from typing import List, Mapping, Sequence, Tuple, Union
 
@@ -458,62 +459,90 @@ class ProblemTable:
             + bottom_temps.size
             + sum(len(vals) for vals in interval_map.values())
         )
+
+        if total_new == 0:
+            return self.data, 0
+
+        # 1) Create the expanded buffer sized for original + inserted rows.
         new_data = np.zeros((n_rows + total_new, n_cols), dtype=self.data.dtype)
+        row_meta: List[dict] = [{} for _ in range(new_data.shape[0])]
 
-        row_adjustments: dict[int, np.ndarray] = {}
-        out_idx = 0
-        inserted_total = 0
+        # 2) Copy existing rows into the new buffer (top to bottom).
+        new_data[:n_rows] = self.data
+        for idx in range(n_rows):
+            row_meta[idx] = {"type": "orig", "orig_idx": idx}
 
-        if top_temps.size:
-            top_block, neighbor_adjusted = self._build_top_or_bottom_block(self.data[0], top_temps)
-            count_top = top_block.shape[0]
-            new_data[out_idx : out_idx + count_top] = top_block
-            out_idx += count_top
-            inserted_total += count_top
-            row_adjustments[0] = neighbor_adjusted
+        # 3) Append placeholder rows for every new temperature (only T populated).
+        T_idx = self.col_index[PT.T.value]
+        next_row = n_rows
+        for temp in np.asarray(top_temps, dtype=float):
+            new_data[next_row, T_idx] = temp
+            row_meta[next_row] = {"type": "top"}
+            next_row += 1
 
-        for row_idx in range(n_rows):
-            row_current = row_adjustments.pop(row_idx, self.data[row_idx]).copy()
-            new_data[out_idx] = row_current
-            out_idx += 1
+        for lower_idx, temps in interval_map.items():
+            for temp in np.asarray(temps, dtype=float):
+                new_data[next_row, T_idx] = temp
+                row_meta[next_row] = {"type": "mid", "lower_idx": lower_idx}
+                next_row += 1
 
-            next_idx = row_idx + 1
-            if next_idx not in interval_map:
+        for temp in np.asarray(bottom_temps, dtype=float):
+            new_data[next_row, T_idx] = temp
+            row_meta[next_row] = {"type": "bottom"}
+            next_row += 1
+
+        # 4) Sort rows by descending temperature so indices align with the final ordering.
+        order = np.argsort(new_data[:, T_idx])[::-1]
+        new_data = new_data[order]
+        row_meta = [row_meta[idx] for idx in order]
+
+        # 5) Rebuild top and bottom placeholder rows using existing helper.
+        inserted_total = total_new
+
+        top_positions = [idx for idx, meta in enumerate(row_meta) if meta.get("type") == "top"]
+        self._rebuild_edge_block(new_data, row_meta, top_positions, is_top=True)
+
+        bottom_positions = [idx for idx, meta in enumerate(row_meta) if meta.get("type") == "bottom"]
+        self._rebuild_edge_block(new_data, row_meta, bottom_positions, is_top=False)
+
+        # 6) Build and insert middle blocks, adjusting adjacent rows along the way.
+        orig_positions = {
+            meta["orig_idx"]: idx
+            for idx, meta in enumerate(row_meta)
+            if meta.get("type") == "orig"
+        }
+        mid_positions: dict[int, List[int]] = defaultdict(list)
+        for idx, meta in enumerate(row_meta):
+            if meta.get("type") == "mid":
+                mid_positions[meta["lower_idx"]].append(idx)
+
+        for lower_idx, positions in sorted(mid_positions.items()):
+            if lower_idx <= 0:
+                continue
+            if lower_idx not in orig_positions or (lower_idx - 1) not in orig_positions:
                 continue
 
-            temps_mid = np.asarray(interval_map[next_idx], dtype=float)
-            row_bot_orig = self.data[next_idx]
-            row_bot_adjusted = row_adjustments.get(next_idx, row_bot_orig).copy()
+            positions = sorted(positions)
+            temps_mid = new_data[positions, T_idx]
 
-            block, row_top_adjusted, row_bot_adjusted = self._build_insert_block(row_current, row_bot_orig, temps_mid)
-            new_data[out_idx - 1] = row_top_adjusted
-            count_mid = block.shape[0]
-            if count_mid:
-                new_data[out_idx : out_idx + count_mid] = block
-                out_idx += count_mid
-                inserted_total += count_mid
-            row_adjustments[next_idx] = row_bot_adjusted
+            upper_pos = orig_positions[lower_idx - 1]
+            lower_pos = orig_positions[lower_idx]
 
-        for idx_adj, adjusted_row in sorted(row_adjustments.items()):
-            new_data[out_idx] = adjusted_row.copy()
-            out_idx += 1
+            block, top_adjusted, bottom_adjusted = self._build_mid_block(
+                new_data[upper_pos].copy(), new_data[lower_pos].copy(), temps_mid
+            )
 
-        if bottom_temps.size:
-            last_row = new_data[out_idx - 1].copy()
-            bottom_block, last_adjusted = self._build_top_or_bottom_block(last_row, bottom_temps, False)
-            new_data[out_idx - 1] = last_adjusted
-            count_bottom = bottom_block.shape[0]
-            if count_bottom:
-                new_data[out_idx : out_idx + count_bottom] = bottom_block
-                out_idx += count_bottom
-                inserted_total += count_bottom
+            new_data[upper_pos] = top_adjusted
+            for idx_pos, row_vals in zip(positions, block):
+                new_data[idx_pos] = row_vals
+            new_data[lower_pos] = bottom_adjusted
 
         return new_data, inserted_total
 
-    def _build_insert_block(
+    def _build_mid_block(
         self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Construct interpolated rows between existing bounds."""
+        """Construct interpolated rows between existing bounds and return updated neighbours."""
         rows, (t_idx, delta_idx) = self._initialise_insert_rows(row_top, row_bot, T_vals)
         top_adjusted = row_top.copy()
         bottom_adjusted = row_bot.copy()
@@ -682,7 +711,6 @@ class ProblemTable:
             dh_idx = self.col_index[dh_key]
             adjusted[dh_idx] = adjusted[delta_idx] * adjusted[cp_idx]
         return adjusted
-
 
     def _update_heat_capacity_pairs(
         self,
