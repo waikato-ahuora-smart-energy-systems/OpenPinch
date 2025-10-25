@@ -28,19 +28,18 @@ def get_site_targets(site: Zone):
 
     if site.config.TIT_BUTTON_SELECTED or 1:
         # Totally integrated analysis for a site
-        site = get_process_targets(site)
+        get_process_targets(site)
 
     # Targets process level energy requirements
     z: Zone
     for z in site.subzones.values():
-        z = get_process_targets(z)
+        get_process_targets(z)
 
     # Targets the indirect heat recovery potential within the utility network
-    site = _sum_subzone_targets(site)
+    _sum_subzone_targets(site)
 
     # Calculates TS targets based on different approaches
-    
-    site = _get_indirect_heat_integration_targets(site)
+    _get_indirect_heat_integration_targets(site)
 
     return site
 
@@ -63,7 +62,8 @@ def _sum_subzone_targets(site: Zone) -> Zone:
 
     for z in site.subzones.values():
         z: Zone
-        t: EnergyTarget = z.targets[f"{z.name}/{TargetType.DI.value}"]
+        t: EnergyTarget
+        t = z.targets[f"{z.name}/{TargetType.DI.value}"]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target
         heat_recovery_target += t.heat_recovery_target
@@ -138,9 +138,10 @@ def _set_sites_targets(
     }
 
 
-def _match_utility_gen_and_use_at_same_level(s_tzt: EnergyTarget):
-    hot_utilities = deepcopy(s_tzt.hot_utilities)
-    cold_utilities = deepcopy(s_tzt.cold_utilities)
+def _match_utility_gen_and_use_at_same_level(
+    hot_utilities: StreamCollection, 
+    cold_utilities: StreamCollection
+) -> Tuple[StreamCollection, StreamCollection]:
     for u_h in hot_utilities:
         for u_c in cold_utilities:
             if (
@@ -160,6 +161,13 @@ def _compute_utility_cost(hot_utilities: StreamCollection, cold_utilities: Strea
     return utility_cost
 
 
+def _shift_composite_curves(H_hot: np.ndarray, H_cold: np.ndarray) -> dict:
+    return {
+        PT.H_HOT.value: H_hot - H_hot[0],
+        PT.H_COLD.value: H_cold - H_cold[-1],
+    }
+
+
 def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     """Recalculate site-wide utility targets accounting for inter-utility balancing."""
 
@@ -168,31 +176,41 @@ def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
     pt, pt_real, _ = get_process_heat_cascade(
         site.net_hot_streams, site.net_cold_streams, site.all_net_streams, site.config
     )
+    pt.update(
+        _shift_composite_curves(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
+    )
+    pt_real.update(
+        _shift_composite_curves(pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value])
+    )    
 
     # Get utility duties based on the summation of subzones
     s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
     hot_utilities = deepcopy(s_tzt.hot_utilities)
     cold_utilities = deepcopy(s_tzt.cold_utilities)
-
+    
     # Apply the problem table algorithm to the simple sum of subzone utility use 
-    pt_ut_cols = get_utility_heat_cascade(
-        pt.col[PT.T.value], 
-        hot_utilities, 
-        cold_utilities, 
-        is_shifted=True,
+    pt.update(
+        get_utility_heat_cascade(
+            pt.col[PT.T.value], 
+            hot_utilities, 
+            cold_utilities, 
+            is_shifted=True,
+        )
     )
-    pt.update(pt_ut_cols)
-
-    pt_real_ut_cols = get_utility_heat_cascade(
-        pt_real.col[PT.T.value], 
-        hot_utilities, 
-        cold_utilities, 
-        is_shifted=False,
+    pt_real.update(
+        get_utility_heat_cascade(
+            pt_real.col[PT.T.value], 
+            hot_utilities, 
+            cold_utilities, 
+            is_shifted=False,
+        )
     )
-    pt_real.update(pt_real_ut_cols)
 
     # Apply the utility targeting method to determine the net utility use and generation 
-    pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(
+    _match_utility_gen_and_use_at_same_level(
+        hot_utilities, cold_utilities
+    )    
+    get_utility_targets(
         pt, 
         pt_real, 
         hot_utilities, 
