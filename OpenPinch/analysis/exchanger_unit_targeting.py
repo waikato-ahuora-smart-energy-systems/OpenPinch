@@ -10,7 +10,7 @@ from ..utils.miscellaneous import *
 __all__ = ["get_min_number_hx"]
 
 #######################################################################################################
-# Public API --- TODO: check implementation
+# Public API --- TODO: improve implementation
 #######################################################################################################
 
 
