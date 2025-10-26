@@ -11,4 +11,4 @@ __all__ = ["get_unit_operation_targets"]
 
 
 def get_unit_operation_targets(zone: Zone):
-    pass
+    return zone

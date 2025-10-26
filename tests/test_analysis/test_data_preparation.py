@@ -398,6 +398,8 @@ def test_streams_split_across_multiple_zones():
     site = prepare_problem(streams=streams)
     assert "Z1" in site.subzones
     assert "Z2" in site.subzones
+    assert "O1" in site.subzones["Z1"].subzones
+    assert "O1" in site.subzones["Z2"].subzones
     assert any(s.name == "Hot1" for s in site.subzones["Z1"].hot_streams)
     assert any(s.name == "Cold2" for s in site.subzones["Z2"].cold_streams)
 
@@ -801,16 +803,86 @@ def test_flat_single_zone():
     tree = _validate_zone_tree_structure(None, streams)
     assert tree.name == "Site"
     assert len(tree.children) == 1
-    assert tree.children[0].name == "Boiler"
-    assert tree.children[0].type == "Process Zone"
-    assert tree.children[0].children is None
+    process_zone = tree.children[0]
+    assert process_zone.name == "Boiler"
+    assert process_zone.type == ZoneType.P.value
+    assert process_zone.children is not None
+    assert len(process_zone.children) == 1
+    operation_zone = process_zone.children[0]
+    assert operation_zone.name == "O1"
+    assert operation_zone.type == ZoneType.O.value
+    assert operation_zone.children is None
 
 
 def test_nested_zone_with_slash():
     streams = [make_stream(zone="Plant/Line1")]
     tree = _validate_zone_tree_structure(None, streams)
-    assert tree.children[0].name == "Plant"
-    assert tree.children[0].children[0].name == "Line1"
+    plant = tree.children[0]
+    assert plant.name == "Plant"
+    line1 = plant.children[0]
+    assert line1.name == "Line1"
+    assert line1.type == ZoneType.P.value
+    assert len(line1.children) == 1
+    assert line1.children[0].name == "O1"
+    assert line1.children[0].type == ZoneType.O.value
+
+
+def test_generic_zone_tree_defaults_by_depth():
+    zone_tree = ZoneTreeSchema(
+        name="Layer0",
+        type="Zone",
+        children=[
+            ZoneTreeSchema(
+                name="Layer1",
+                type="Zone",
+                children=[ZoneTreeSchema(name="Layer2", type="Zone")],
+            )
+        ],
+    )
+    normalised = _validate_zone_tree_structure(zone_tree, [])
+    assert normalised.type == ZoneType.S.value
+    assert normalised.children[0].type == ZoneType.P.value
+    assert normalised.children[0].children[0].type == ZoneType.O.value
+
+
+def test_site_level_streams_get_individual_process_zones():
+    zone_tree = ZoneTreeSchema(name="SiteRoot", type="Zone", children=[])
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotStream",
+                "zone": "SiteRoot",
+                "t_supply": 200.0,
+                "t_target": 100.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "ColdStream",
+                "zone": "SiteRoot",
+                "t_supply": 50.0,
+                "t_target": 150.0,
+                "heat_flow": -400.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+    ]
+
+    normalised = _validate_zone_tree_structure(zone_tree, streams)
+    child_names = {child.name for child in normalised.children}
+    assert {"HotStream", "ColdStream"} <= child_names
+
+    for child in normalised.children:
+        if child.name in {"HotStream", "ColdStream"}:
+            assert child.type == ZoneType.P.value
+            assert child.children is None
+
+    assert streams[0].zone == "SiteRoot/HotStream"
+    assert streams[1].zone == "SiteRoot/ColdStream"
 
 
 def test_multiple_streams_shared_prefix():
@@ -825,6 +897,32 @@ def test_multiple_streams_shared_prefix():
     assert {c.name for c in site_node.children} == {"Area1", "Area2"}
     area1 = next(c for c in site_node.children if c.name == "Area1")
     assert {c.name for c in area1.children} == {"Line1", "Line2"}
+    line1 = next(c for c in area1.children if c.name == "Line1")
+    assert {c.name for c in line1.children} == {"O1"}
+    area2 = next(c for c in site_node.children if c.name == "Area2")
+    assert {c.name for c in area2.children} == {"O1"}
+
+
+def test_operation_zone_counter_and_zone_rewrite():
+    stream_a1 = make_stream(zone="Area1")
+    stream_a1.name = "StreamA1"
+    stream_a1b = make_stream(zone="Area1")
+    stream_a1b.name = "StreamA1B"
+    stream_a2 = make_stream(zone="Area2")
+    stream_a2.name = "StreamA2"
+    streams = [stream_a1, stream_a1b, stream_a2]
+
+    tree = _validate_zone_tree_structure(None, streams)
+
+    area1 = next(c for c in tree.children if c.name == "Area1")
+    assert {c.name for c in area1.children} == {"O1", "O2"}
+
+    area2 = next(c for c in tree.children if c.name == "Area2")
+    assert {c.name for c in area2.children} == {"O1"}
+
+    assert stream_a1.zone == "Site/Area1/O1"
+    assert stream_a1b.zone == "Site/Area1/O2"
+    assert stream_a2.zone == "Site/Area2/O1"
 
 
 def test_returns_existing_tree_if_valid():
@@ -848,8 +946,11 @@ def test_raises_on_utility_zone_input():
 def test_nested_path_with_whitespace_trimming():
     streams = [make_stream(zone="Plant / Line A ")]
     tree = _validate_zone_tree_structure(None, streams)
-    assert tree.children[0].name == "Plant"
-    assert tree.children[0].children[0].name == "Line A"
+    plant = tree.children[0]
+    assert plant.name == "Plant"
+    line_a = plant.children[0]
+    assert line_a.name == "Line A"
+    assert {c.name for c in line_a.children} == {"O1"}
 
 
 from OpenPinch.analysis.data_preparation import (
@@ -869,7 +970,7 @@ from OpenPinch.analysis.data_preparation import _get_validated_zone_info
 @pytest.mark.parametrize(
     "zone_type_str, expected_zone_type",
     [
-        ("Zone", ZoneType.P.value),
+        ("Zone", ZoneType.S.value),
         ("Sub-Zone", ZoneType.P.value),
         ("Process Zone", ZoneType.P.value),
         ("Site", ZoneType.S.value),
@@ -884,6 +985,16 @@ def test_valid_zone_types(zone_type_str, expected_zone_type):
     )
     _, actual_zone_type = _get_validated_zone_info(zone_tree)
     assert actual_zone_type == expected_zone_type
+
+
+def test_zone_type_defaults_with_depth():
+    root = ZoneTreeSchema(name="Root", type="Zone", children=[ZoneTreeSchema(name="Child", type="Zone")])
+    _, child_type = _get_validated_zone_info(root.children[0], depth=1)
+    _, grandchild_type = _get_validated_zone_info(
+        ZoneTreeSchema(name="Grandchild", type="Zone"), depth=2
+    )
+    assert child_type == ZoneType.P.value
+    assert grandchild_type == ZoneType.O.value
 
 
 def test_unexpected_zone_type_raises():

@@ -25,6 +25,9 @@ class Configuration:
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
 
+    DO_DIRECT_OPERATION_TARGETING: bool = False
+    DO_DIRECT_SITE_TARGETING: bool = True
+    DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
     DO_HP_TARGETING: bool = False
@@ -36,16 +39,13 @@ class Configuration:
 
     GCC_FOR_TARGETING: str = PT.H_NET_NP.value
 
-
     ANNUAL_OP_TIME: float = 8300
-
     DTCONT: float = 5
     DTGLIDE: float = 0.01
     HTC: float = 1.0
     UTILITY_PRICE: float = 40
     T_ENV: float = 15
     P_ENV: float = 101
-
     DECIMAL_PLACES: int = 2
 
     ### OLD CONFIG -- Review ###

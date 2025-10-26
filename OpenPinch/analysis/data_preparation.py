@@ -7,6 +7,7 @@ and propagate utility definitions across nested zones.
 """
 
 import copy
+from collections import defaultdict
 from typing import List, Optional, Tuple
 
 from ..classes import Stream, StreamCollection, Zone
@@ -89,7 +90,7 @@ def prepare_problem(
 
 
 def _get_validated_zone_info(
-    zone_tree: ZoneTreeSchema, project_name: str = None
+    zone_tree: ZoneTreeSchema, project_name: str = None, depth: int = 0
 ) -> Tuple[str, str]:
     """Get from input data (zone_tree) the identifier/type for the top level zone."""
     if isinstance(zone_tree, ZoneTreeSchema):
@@ -103,10 +104,22 @@ def _get_validated_zone_info(
             "Region": ZoneType.R.value,
             "Utility Zone": ZoneType.U.value,
         }
-        try:
-            zone_type = type_map[normalized_type]
-        except KeyError as exc:
-            raise ValueError("Zone name and type could not be identified correctly.") from exc
+        if normalized_type:
+            try:
+                zone_type = type_map[normalized_type]
+            except KeyError as exc:
+                raise ValueError("Zone name and type could not be identified correctly.") from exc
+        else:
+            zone_type = None
+
+        if not normalized_type or normalized_type == "Zone":
+            if depth == 0:
+                zone_type = ZoneType.S.value
+            elif depth == 1:
+                zone_type = ZoneType.P.value
+            else:
+                zone_type = ZoneType.O.value
+
         zone_name = zone_tree.name
     else:
         zone_type = ZoneType.S.value
@@ -159,14 +172,64 @@ def _get_process_streams_in_each_subzone(
 ) -> Zone:
     """Extracts all stream data into class instances, creates the required subzones and adds these to the parent zone."""
 
+    streams_by_full_path = defaultdict(list)
+    streams_by_relative_path = defaultdict(list)
+    for stream in streams:
+        zone_path = getattr(stream, "zone", None)
+        if not zone_path:
+            continue
+        streams_by_full_path[zone_path].append(stream)
+        path_components = zone_path.split("/")
+        for idx in range(1, len(path_components)):
+            relative_key = "/".join(path_components[idx:])
+            streams_by_relative_path[relative_key].append(stream)
+        streams_by_relative_path[zone_path].append(stream)
+
     def _iter_zones(parent_zone: Zone):
         """Depth-first traversal yielding each zone once."""
         yield parent_zone
         for subzone in parent_zone.subzones.values():
             yield from _iter_zones(subzone)
 
-    for z in _iter_zones(master_zone):
-        _add_process_streams_under_zones(z, streams)
+    def _get_zone_path_from_child(child_zone: Zone, delimiter="/") -> str:
+        """Constructs the zone path from a child Zone back to the master zone using parent_zone links."""
+        path_parts = []
+        current = child_zone
+        while current is not None:
+            path_parts.append(current.name)
+            current = current.parent_zone
+        return delimiter.join(reversed(path_parts))
+
+    for zone in _iter_zones(master_zone):
+        zone_path = _get_zone_path_from_child(zone)
+        relative_zone_path = zone_path.split("/", 1)[1] if "/" in zone_path else zone_path
+
+        matched_streams: List[StreamSchema] = []
+        seen = set()
+
+        for candidate in streams_by_full_path.get(zone_path, ()):
+            candidate_id = id(candidate)
+            if candidate_id not in seen:
+                matched_streams.append(candidate)
+                seen.add(candidate_id)
+
+        for candidate in streams_by_relative_path.get(relative_zone_path, ()):
+            candidate_id = id(candidate)
+            if candidate_id not in seen:
+                matched_streams.append(candidate)
+                seen.add(candidate_id)
+
+        if not matched_streams:
+            continue
+
+        for stream_schema in matched_streams:
+            stream_obj = _create_process_stream(stream_schema)
+            if stream_obj.type == StreamType.Hot.value:
+                key = ".".join([stream_schema.zone, StreamLoc.HotS.value, stream_schema.name])
+                zone.hot_streams.add(stream_obj, key)
+            else:
+                key = ".".join([stream_schema.zone, StreamLoc.ColdS.value, stream_schema.name])
+                zone.cold_streams.add(stream_obj)
     return master_zone
 
 
@@ -182,46 +245,6 @@ def _create_process_stream(stream: StreamSchema) -> Stream:
         htc=get_value(stream.htc),
         is_process_stream=True,
     )
-
-
-def _add_process_streams_under_zones(z: Zone, streams: List[StreamSchema]) -> Zone:
-    """Adds hot and cold streams to the given zone."""
-    stream_j: Stream
-
-    def _get_zone_path_from_child(child_zone: Zone, delimiter="/") -> str:
-        """Constructs the zone path from a child Zone back to the master zone using parent_zone links."""
-        path_parts = []
-        current = child_zone
-        while current is not None:
-            path_parts.append(current.name)
-            current = current.parent_zone
-        return delimiter.join(reversed(path_parts))
-
-    zone_path = _get_zone_path_from_child(z)
-
-    candidate_paths = {z.name, zone_path}
-    if "/" in z.name:
-        candidate_paths.add(z.name.split("/")[-1])
-    candidate_paths.add(zone_path.split("/")[-1])
-
-    for s in streams:
-        if not s.zone:
-            continue
-
-        stream_zone_name = s.zone.split("/")[-1]
-        if (
-            s.zone in candidate_paths
-            or stream_zone_name in candidate_paths
-        ):  # or z.name == TargetType.DI.value
-            # Create Stream from Data
-            stream_j = _create_process_stream(s)
-            if stream_j.type == StreamType.Hot.value:
-                key = ".".join([s.zone, StreamLoc.HotS.value, s.name])
-                z.hot_streams.add(stream_j, key)
-            else:
-                key = ".".join([s.zone, StreamLoc.ColdS.value, s.name])
-                z.cold_streams.add(stream_j)
-    return z
 
 
 def _get_hot_and_cold_utilities(
@@ -416,6 +439,87 @@ def _set_utilities_for_zone_and_subzones(
     return zone
 
 
+def _rewrite_stream_zones_from_tree(
+    zone_tree: ZoneTreeSchema, streams: Optional[List[StreamSchema]]
+) -> None:
+    """Rewrite stream.zone values to the fully-qualified path defined by the zone tree."""
+    if not streams:
+        return
+
+    all_paths: List[List[str]] = []
+    path_to_node: dict[Tuple[str, ...], ZoneTreeSchema] = {}
+
+    def _collect_paths(node: ZoneTreeSchema, prefix: List[str]) -> None:
+        current_path = prefix + [node.name]
+        all_paths.append(current_path)
+        path_to_node[tuple(current_path)] = node
+        for child in node.children or []:
+            _collect_paths(child, current_path)
+
+    _collect_paths(zone_tree, [])
+
+    if not all_paths:
+        return
+
+    canonical_paths = {"/".join(path) for path in all_paths}
+    root_name = zone_tree.name
+    if zone_tree.children is None:
+        zone_tree.children = []
+    root_child_names = {child.name for child in zone_tree.children}
+
+    for stream in streams:
+        zone_label = getattr(stream, "zone", None)
+        if not zone_label:
+            continue
+        components = [part.strip() for part in zone_label.split("/") if part.strip()]
+        if not components:
+            continue
+
+        label_joined = "/".join(components)
+        components_tuple = tuple(components)
+
+        if len(components_tuple) == 1 and components_tuple[0] == root_name:
+            base_name = stream.name or f"{root_name}_Process"
+            process_name = base_name
+            counter = 1
+            while (
+                process_name in root_child_names
+                or process_name == root_name
+            ):
+                counter += 1
+                process_name = f"{base_name}_{counter}"
+
+            new_node = ZoneTreeSchema(
+                name=process_name, type=ZoneType.P.value, children=None
+            )
+            zone_tree.children.append(new_node)
+            root_child_names.add(process_name)
+
+            new_path = (root_name, process_name)
+            path_to_node[new_path] = new_node
+            all_paths.append(list(new_path))
+            canonical_paths.add("/".join(new_path))
+
+            stream.zone = "/".join(new_path)
+            continue
+
+        if label_joined in canonical_paths:
+            stream.zone = label_joined
+            continue
+
+        if components_tuple in path_to_node:
+            stream.zone = "/".join(components_tuple)
+            continue
+
+        candidate_paths: List[Tuple[str, ...]] = []
+        for path_tuple in path_to_node.keys():
+            if len(path_tuple) >= len(components_tuple) and list(path_tuple)[-len(components_tuple):] == list(components_tuple):
+                candidate_paths.append(path_tuple)
+
+        if len(candidate_paths) == 1:
+            stream.zone = "/".join(candidate_paths[0])
+
+
 def _validate_zone_tree_structure(
     zone_tree: ZoneTreeSchema = None,
     streams: Optional[List[StreamSchema]] = None,
@@ -426,9 +530,13 @@ def _validate_zone_tree_structure(
         if zone_tree.type == ZoneType.U.value:
             raise ValueError("Pinch analysis does not apply to Utility Zones.")
 
-        def _check_zone_tree(parent_schema: ZoneTreeSchema) -> ZoneTreeSchema:
+        def _check_zone_tree(
+            parent_schema: ZoneTreeSchema, depth: int = 0
+        ) -> ZoneTreeSchema:
             """Recursively construct a Zone hierarchy from a ZoneTreeSchema."""
-            zone_name, zone_type = _get_validated_zone_info(parent_schema)
+            zone_name, zone_type = _get_validated_zone_info(
+                parent_schema, depth=depth
+            )
             parent_schema.name = zone_name
             parent_schema.type = zone_type
 
@@ -436,11 +544,12 @@ def _validate_zone_tree_structure(
                 return parent_schema
 
             for child_schema in parent_schema.children:
-                child_schema = _check_zone_tree(child_schema)
+                child_schema = _check_zone_tree(child_schema, depth + 1)
 
             return parent_schema
 
-        zone_tree = _check_zone_tree(zone_tree)
+        zone_tree = _check_zone_tree(zone_tree, depth=0)
+        _rewrite_stream_zones_from_tree(zone_tree, streams)
         return zone_tree
 
     # Build zone tree from stream zone names
@@ -448,10 +557,7 @@ def _validate_zone_tree_structure(
         top_zone_name = ZoneType.S.value
 
     root = {"name": top_zone_name, "type": ZoneType.S.value, "children": {}}
-    stream_iter = streams or []
-    zone_names = sorted(
-        {stream.zone for stream in stream_iter if stream.zone}
-    )  # Filter empty/null zones
+    stream_iter = [stream for stream in (streams or []) if stream.zone]
 
     def _split_zone_name(name: str):
         """Split hierarchical zone strings ("Site/Area/Unit") into clean path components."""
@@ -459,10 +565,21 @@ def _validate_zone_tree_structure(
             return [z.strip() for z in name.split("/") if z.strip()]
         return [name]
 
-    for zone_name in zone_names:
-        z_path = _split_zone_name(zone_name)
+    zone_counters = defaultdict(int)
+
+    def _build_full_path(path_components: List[str], o_zone_name: str) -> str:
+        """Compose the fully-qualified zone path including the top-level zone."""
+        if path_components:
+            return "/".join([root["name"], *path_components, o_zone_name])
+        return "/".join([root["name"], o_zone_name])
+
+    # Sort for deterministic naming (stability aids testing/debugging)
+    for stream in sorted(stream_iter, key=lambda s: (s.zone, s.name)):
+        original_zone = stream.zone
+        z_path = _split_zone_name(original_zone)
         current = root
-        for i, z_name in enumerate(z_path):
+        path_components: List[str] = []
+        for z_name in z_path:
             if z_name not in current["children"]:
                 current["children"][z_name] = {
                     "name": z_name,
@@ -470,6 +587,22 @@ def _validate_zone_tree_structure(
                     "children": {},
                 }
             current = current["children"][z_name]
+            path_components.append(z_name)
+
+        zone_key = tuple(path_components)
+        zone_counters[zone_key] += 1
+
+        subzone_name = f"O{zone_counters[zone_key]}"
+        while subzone_name in current["children"]:
+            zone_counters[zone_key] += 1
+            subzone_name = f"O{zone_counters[zone_key]}"
+
+        current["children"][subzone_name] = {
+            "name": subzone_name,
+            "type": ZoneType.O.value,
+            "children": {},
+        }
+        stream.zone = _build_full_path(path_components, subzone_name)
 
     def _build_tree(node_dict):
         """Recursively convert the intermediate dict representation into Pydantic models."""

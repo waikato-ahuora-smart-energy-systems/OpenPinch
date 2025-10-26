@@ -1,7 +1,7 @@
 from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.scales.process_analysis import (
+from OpenPinch.analysis.direct_integration_entry import (
     _add_net_segment_stateful,
     _initialise_utility_index,
 )

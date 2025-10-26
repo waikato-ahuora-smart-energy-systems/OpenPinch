@@ -6,11 +6,13 @@ assembling response payloads.  More specialised helpers remain in their
 respective modules (e.g. ``support_methods`` and ``additional_analysis``).
 """
 
-from .additional_analysis import *
-from .area_targeting import get_area_targets, get_balanced_CC
-from .data_preparation import prepare_problem
-from .exchanger_unit_targeting import get_min_number_hx
-from .graph_data import visualise_graphs
-from .power_cogeneration_analysis import get_power_cogeneration_above_pinch
-from .problem_table_analysis import get_process_heat_cascade
-from .utility_targeting import get_utility_targets
+from .area_targeting import *
+from .data_preparation import *
+from .exchanger_unit_targeting import *
+from .graph_data import *
+from .power_cogeneration_analysis import *
+from .problem_table_analysis import *
+from .utility_targeting import *
+
+from .direct_integration_entry import *
+from .indirect_integration_entry import *

@@ -247,34 +247,29 @@ class Zone:
             and zone1._cold_utilities == zone2._cold_utilities
         )
 
-    def import_hot_and_cold_streams_from_sub_zones(self):
+    def import_hot_and_cold_streams_from_sub_zones(self, get_net_streams: bool = False):
         """Get hot and cold streams from multiple subzones into two separate lists, maintaining references."""
         z: Zone
         s: Stream
         for z in self.subzones.values():
             if len(z.subzones) > 0:
-                z.import_hot_and_cold_streams_from_sub_zones()
+                z.import_hot_and_cold_streams_from_sub_zones(get_net_streams)
 
-            for s in z.hot_streams:
+            if not get_net_streams:
+                hs_src = z.hot_streams
+                hs_dst = self._hot_streams
+                cs_src = z.cold_streams
+                cs_dst = self._cold_streams
+            else:
+                hs_src = z.net_hot_streams
+                hs_dst = self._net_hot_streams
+                cs_src = z.net_cold_streams
+                cs_dst = self._net_cold_streams
+
+            for s in hs_src:
                 key = f"{z.name}.{s.name}"
-                self._hot_streams.add(s, key)
+                hs_dst.add(s, key)
 
-            for s in z.cold_streams:
+            for s in cs_src:
                 key = f"{z.name}.{s.name}"
-                self._cold_streams.add(s, key)
-
-    def import_net_hot_and_cold_streams_from_sub_zones(self):
-        """Get net hot and cold streams from multiple subzones into two separate lists, maintaining references."""
-        z: Zone
-        s: Stream
-        for z in self.subzones.values():
-            if len(z.subzones) > 0:
-                z.import_hot_and_cold_streams_from_sub_zones()
-
-            for s in z.net_hot_streams:
-                key = f"{z.name}.{s.name}"
-                self._net_hot_streams.add(s, key)
-
-            for s in z.net_cold_streams:
-                key = f"{z.name}.{s.name}"
-                self._net_cold_streams.add(s, key)
+                cs_dst.add(s, key)
