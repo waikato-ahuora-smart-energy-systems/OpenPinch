@@ -282,9 +282,6 @@ class ProblemTable:
     def copy(self):
         """Return a deep copy of the table."""
         return deepcopy(self)
-    
-    # TODO: create a automated series of properties and setters from the PT enum key list
-
 
     def _pad_data_input(self, data_input, n_cols):
         """Pad a list-of-columns input so it matches ``n_cols`` length."""

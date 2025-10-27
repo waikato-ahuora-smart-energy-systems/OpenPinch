@@ -5,6 +5,7 @@ import numpy as np
 from ..classes import *
 from ..lib import *
 from ..utils import *
+
 from .problem_table_analysis import get_utility_heat_cascade
 from .gcc_manipulation import *
 

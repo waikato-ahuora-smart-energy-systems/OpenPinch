@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Tuple
 
 from ..lib import *
-# from ..classes import *
+from ..classes import *
 from ..utils import *
 
 if TYPE_CHECKING:
@@ -13,8 +13,11 @@ if TYPE_CHECKING:
 
 __all__ = ["get_power_cogeneration_above_pinch"]
 
+# TODO: check implementation, refactor.
+
+
 #######################################################################################################
-# Public API --- TODO: check implementation, refactor.
+# Public API
 #######################################################################################################
 
 

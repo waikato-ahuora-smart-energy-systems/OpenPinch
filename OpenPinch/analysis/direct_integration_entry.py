@@ -8,7 +8,7 @@ from .problem_table_analysis import get_process_heat_cascade
 from . import (
     get_process_heat_cascade,
     get_utility_targets,
-    get_area_targets,
+    get_capital_cost_and_area_targets,
     get_balanced_CC,
 )
 
@@ -24,31 +24,15 @@ def compute_direct_integration_targets(zone: Zone):
 
     The function aggregates problem-table calculations, multi-utility targeting,
     pinch temperature detection, and graph preparation.  Results are cached on
-    the provided ``zone`` via :meth:`Zone.add_target_from_results` and used later
-    by site and regional aggregation routines.
+    the provided ``zone`` and used later by site and regional aggregation routines.
     """
-    zone_config: Configuration
-    hot_streams: StreamCollection
-    cold_streams: StreamCollection
-    all_streams: StreamCollection
-    hot_utilities: StreamCollection
-    cold_utilities: StreamCollection
-    
-    (
-        zone_config,
-        hot_streams,
-        cold_streams,
-        all_streams,
-        hot_utilities,
-        cold_utilities,
-    ) = attrgetter(
-        "config",
-        "hot_streams",
-        "cold_streams",
-        "all_streams",
-        "hot_utilities",
-        "cold_utilities",
-    )(zone)
+    zone_config: Configuration = zone.config
+    hot_streams: StreamCollection = zone.hot_streams
+    cold_streams: StreamCollection = zone.cold_streams
+    all_streams: StreamCollection = zone.all_streams
+    hot_utilities: StreamCollection = zone.hot_utilities
+    cold_utilities: StreamCollection = zone.cold_utilities
+    res: dict = {}
 
     pt, pt_real, target_values = get_process_heat_cascade(
         hot_streams, cold_streams, all_streams, zone_config
@@ -56,7 +40,7 @@ def compute_direct_integration_targets(zone: Zone):
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities
     )
-    net_hot_streams, net_cold_streams = _save_data_for_indirect_integration( # _get_net_hot_and_cold_segments
+    net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
         pt.col[PT.T.value], pt.col[PT.H_NET_A.value], hot_utilities, cold_utilities
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
@@ -83,44 +67,33 @@ def compute_direct_integration_targets(zone: Zone):
                 pt_real.col[PT.RCP_COLD_UT.value],
             )
         )
-
-        # Target heat transfer area and number of exchanger units based on Balanced CC
+        # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC
         if zone_config.DO_AREA_TARGETING or 0:
-            res = get_area_targets(
-                pt.col[PT.T.value],
-                pt.col[PT.H_HOT_BAL.value],
-                pt.col[PT.H_COLD_BAL.value],
-                pt.col[PT.R_HOT_BAL.value],
-                pt.col[PT.R_COLD_BAL.value],               
+            res.update(
+                get_capital_cost_and_area_targets(
+                    pt.col[PT.T.value],
+                    pt.col[PT.H_HOT_BAL.value],
+                    pt.col[PT.H_COLD_BAL.value],
+                    pt.col[PT.R_HOT_BAL.value],
+                    pt.col[PT.R_COLD_BAL.value],               
+                )
             )
-            # num_units = get_min_number_hx(pt)
-            # capital_cost = compute_capital_cost(area, num_units, zone_config)
-            # annual_capital_cost = compute_annual_capital_cost(area, num_units, zone_config)
-            # zone.add_target_from_results(TargetType.DI.value, {
-            #     "capital_cost": capital_cost,
-            #     "annual_capital_cost": annual_capital_cost,
-            #     "num_units": num_units,
-            #     "area": area,
-            # })
-            pass
 
-    graph_data = _save_graph_data(pt, pt_real)
-    zone.add_target_from_results(
-        TargetType.DI.value,
+    res.update(
         {
             "pt": pt,
             "pt_real": pt_real,
             "target_values": target_values,
-            "graphs": graph_data,
+            "graphs": _save_graph_data(pt, pt_real),
             "hot_utilities": hot_utilities,
             "cold_utilities": cold_utilities,
             "net_hot_streams": net_hot_streams,
             "net_cold_streams": net_cold_streams,
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
-        },
+        }
     )
-
+    zone.add_target_from_results(TargetType.DI.value, res)
     return zone
 
 
@@ -129,7 +102,7 @@ def compute_direct_integration_targets(zone: Zone):
 #######################################################################################################
 
 
-def _save_data_for_indirect_integration(
+def _get_net_hot_and_cold_segments(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     hot_utilities: StreamCollection,
