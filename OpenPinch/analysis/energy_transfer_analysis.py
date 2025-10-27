@@ -9,7 +9,7 @@
 
 # # TODO: Refactor this entire file.
 
-# __all__ = ["get_unit_operation_targets"]
+# __all__ = ["_get_unit_operation_targets"]
 
 # #######################################################################################################
 # # Public API --- TODO: Need to restore energy transfer diagram analysis

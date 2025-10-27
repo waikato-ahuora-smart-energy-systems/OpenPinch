@@ -34,7 +34,7 @@ Analysis Building Blocks
    :show-inheritance:
 
 .. automodule:: OpenPinch.analysis.process_analysis
-   :members: get_process_targets
+   :members: _get_process_targets
    :show-inheritance:
 
 .. automodule:: OpenPinch.analysis.utility_targeting
