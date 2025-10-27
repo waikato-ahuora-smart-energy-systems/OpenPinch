@@ -68,14 +68,14 @@ def compute_direct_integration_targets(zone: Zone):
             )
         )
         # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC
-        if zone_config.DO_AREA_TARGETING or 0:
+        if zone_config.DO_AREA_TARGETING or 1:
             res.update(
                 get_capital_cost_and_area_targets(
-                    pt.col[PT.T.value],
-                    pt.col[PT.H_HOT_BAL.value],
-                    pt.col[PT.H_COLD_BAL.value],
-                    pt.col[PT.R_HOT_BAL.value],
-                    pt.col[PT.R_COLD_BAL.value],               
+                    pt_real.col[PT.T.value],
+                    pt_real.col[PT.H_HOT_BAL.value],
+                    pt_real.col[PT.H_COLD_BAL.value],
+                    pt_real.col[PT.R_HOT_BAL.value],
+                    pt_real.col[PT.R_COLD_BAL.value],               
                 )
             )
 

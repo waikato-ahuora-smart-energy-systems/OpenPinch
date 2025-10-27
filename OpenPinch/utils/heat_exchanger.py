@@ -7,12 +7,14 @@ from ..lib import HeatExchangerTypes as HX
 def compute_LMTD_from_dts(
     delta_T1: float | list | np.ndarray, 
     delta_T2: float | list | np.ndarray,
+    
 ) ->  np.ndarray:
     """Returns the log mean temperature difference (LMTD) for a counterflow heat exchanger."""
     # Check temperature directions for counter-current assumption
     delta_T1 = np.array(delta_T1)
     delta_T2 = np.array(delta_T2)
-    if delta_T1.min() <= 0 or delta_T2.min() <= 0:
+    
+    if delta_T1.round(6).min() <= 0 or delta_T2.round(6).min() <= 0:
         raise ValueError(
             f"Invalid temperature differences: ΔT1={delta_T1}, ΔT2={delta_T2}"
         )

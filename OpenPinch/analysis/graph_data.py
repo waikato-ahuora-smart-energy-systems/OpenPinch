@@ -250,7 +250,7 @@ def _build_gcc_segments(
     is_utility_profile: bool,
     decolour: bool,
 ) -> List[dict]:
-    y_vals, x_vals = _clean_composite(list(y_vals), list(x_vals))
+    y_vals, x_vals = clean_composite_curve(list(y_vals), list(x_vals))
     counts: dict[StreamLoc, int] = defaultdict(int)
     segments: List[dict] = []
     for stream_loc, is_vertical, x_seg, y_seg in _iter_gcc_segment_slices(
@@ -391,7 +391,7 @@ def _graph_cc(
     """Plots a (shifted) hot or cold composite curve."""
 
     # Clean composite
-    y_vals, x_vals = _clean_composite(y_vals, x_vals)
+    y_vals, x_vals = clean_composite_curve(y_vals, x_vals)
 
     if not isinstance(stream_loc, StreamLoc):
         candidate = getattr(stream_loc, "value", stream_loc)
@@ -509,51 +509,6 @@ def _streamloc_colour(stream_loc: StreamLoc) -> int:
     if stream_loc == StreamLoc.ColdU:
         return LineColour.ColdU.value
     return LineColour.Other.value
-
-
-def _clean_composite(
-    y_vals: List[float], x_vals: List[float]
-) -> Tuple[List[float], List[float]]:
-    """Remove redundant points in composite curves."""
-
-    # Round to avoid tiny numerical errors
-    x_vals = [round(x, 5) for x in x_vals]
-    y_vals = [round(y, 5) for y in y_vals]
-
-    if len(x_vals) <= 2:
-        return y_vals, x_vals
-
-    x_clean, y_clean = [x_vals[0]], [y_vals[0]]
-
-    for i in range(1, len(x_vals) - 1):
-        x1, x2, x3 = x_vals[i - 1], x_vals[i], x_vals[i + 1]
-        y1, y2, y3 = y_vals[i - 1], y_vals[i], y_vals[i + 1]
-
-        if x1 == x3:
-            # All three x are the same; keep x2 only if y2 is different
-            if x1 != x2:
-                x_clean.append(x2)
-                y_clean.append(y2)
-        else:
-            # Linear interpolation check
-            y_interp = y1 + (y3 - y1) * (x2 - x1) / (x3 - x1)
-            if abs(y2 - y_interp) > tol:
-                x_clean.append(x2)
-                y_clean.append(y2)
-
-    x_clean.append(x_vals[-1])
-    y_clean.append(y_vals[-1])
-
-    if abs(x_clean[0] - x_clean[1]) < tol:
-        x_clean.pop(0)
-        y_clean.pop(0)
-
-    i = len(x_clean) - 1
-    if abs(x_clean[i] - x_clean[i - 1]) < tol:
-        x_clean.pop(i)
-        y_clean.pop(i)
-
-    return y_clean, x_clean
 
 
 def _create_curve(

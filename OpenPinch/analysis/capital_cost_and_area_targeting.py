@@ -31,11 +31,11 @@ def get_capital_cost_and_area_targets(
     # annual_capital_cost = compute_annual_capital_cost(area, num_units, zone_config)    
 
     return get_area_targets(
-    T_vals,
-    H_hot_bal,
-    H_cold_bal,
-    R_HOT_BAL,
-    R_COLD_BAL,  
+        T_vals,
+        H_hot_bal,
+        H_cold_bal,
+        R_HOT_BAL,
+        R_COLD_BAL,  
     )
 
 
@@ -116,24 +116,29 @@ def get_area_targets(
         raise ValueError("The temperature driving force plot requires the inputted composite curves to be balanced.")
 
     # Shift the hot and cold cascades to start from zero at the lowest temperature. 
-    if abs(H_hot_bal[0]) > tol: #if not np.isclose(H_cold[0], 0, tol):
+    if abs(H_hot_bal[0]) > tol:
         H_hot_bal = H_hot_bal - H_hot_bal[-1]
     if abs(H_cold_bal[0]) > tol:
         H_cold_bal = H_cold_bal - H_cold_bal[-1]    
 
-    # Find HTC value for each temperature interval
-    tdf = get_temperature_driving_forces(
-        T_vals, H_hot_bal, T_vals, H_cold_bal, 
-    )
+    Th, Hh = clean_composite_curve_ends(T_vals, H_hot_bal)
+    Tc, Hc = clean_composite_curve_ends(T_vals, H_cold_bal)
+
+    tdf = get_temperature_driving_forces(Th, Hh, Tc, Hc)
     dt_lm_i = compute_LMTD_from_dts(
         tdf["delta_T1"],
         tdf["delta_T2"],
     )
     Q_i = tdf["dh_vals"]
+
+    # Find HTC value for each temperature interval
     U_i = 1
+    
     area_i = Q_i / (U_i * dt_lm_i)
 
-    return area_i.sum()
+    return {
+        "Total heat exchanger area target": area_i.sum()
+    }
 
 
 def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
@@ -206,4 +211,3 @@ def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
         i += 1
 
     return int(num_hx)
-
