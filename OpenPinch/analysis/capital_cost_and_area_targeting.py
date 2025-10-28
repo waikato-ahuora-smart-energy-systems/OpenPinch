@@ -7,36 +7,32 @@ from ..lib import *
 from ..utils import *
 from .temperature_driving_force import get_temperature_driving_forces
 
-__all__ = ["get_balanced_CC", "get_capital_cost_and_area_targets", "get_area_targets", "get_min_number_hx"]
+__all__ = ["get_balanced_CC", "get_capital_cost_targets", "get_area_targets", "get_min_number_hx"]
 
-# TODO: Need to review get_min_number_hx which sets the target for the bumber of heat exchangers. 
-#.      Need to compute captial cost estimates with a new method. 
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
 
-def get_capital_cost_and_area_targets(
-    T_vals: np.ndarray,
-    H_hot_bal: np.ndarray,
-    H_cold_bal: np.ndarray,
-    R_HOT_BAL: np.ndarray,
-    R_COLD_BAL: np.ndarray,   
+def get_capital_cost_targets(
+    area: float,
+    num_units: int,
+    zone_config: Configuration,
 ) -> dict:
-    
-    # get area
-    # num_units = get_min_number_hx(pt)
-    # capital_cost = compute_capital_cost(area, num_units, zone_config)
-    # annual_capital_cost = compute_annual_capital_cost(area, num_units, zone_config)    
-
-    return get_area_targets(
-        T_vals,
-        H_hot_bal,
-        H_cold_bal,
-        R_HOT_BAL,
-        R_COLD_BAL,  
+    capital_cost = compute_capital_cost(
+        area, 
+        num_units, 
+        zone_config.FIXED_COST, 
+        zone_config.VARIABLE_COST,
+        zone_config.COST_EXP,
     )
+    annual_capital_cost = compute_annual_capital_cost(
+        capital_cost,
+        zone_config.DISCOUNT_RATE,
+        zone_config.SERV_LIFE,
+    )    
+    return capital_cost, annual_capital_cost
 
 
 def get_balanced_CC(
@@ -129,85 +125,114 @@ def get_area_targets(
         tdf["delta_T1"],
         tdf["delta_T2"],
     )
-    Q_i = tdf["dh_vals"]
-
-    # Find HTC value for each temperature interval
-    U_i = 1
-    
+    Q_i: np.ndarray = tdf["dh_vals"]
+    R_i = _map_interval_resistances_to_tdf(
+        T_vals,
+        R_hot_bal,
+        R_cold_bal,
+        tdf["t_h1"],
+        tdf["t_h2"],
+        tdf["t_c1"],
+        tdf["t_c2"],
+    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        U_i = np.where(R_i > tol, 1.0 / R_i, 1.0)
+    if not(Q_i.shape == U_i.shape == dt_lm_i.shape):
+        raise ValueError("Shape of heat exchanger area calculation arrays are unequal.")
     area_i = Q_i / (U_i * dt_lm_i)
-
-    return {
-        "Total heat exchanger area target": area_i.sum()
-    }
+    return area_i.sum()
 
 
-def get_min_number_hx(z, pt_df: ProblemTable, bcc_star_df: ProblemTable) -> int:
+def get_min_number_hx(
+    T_vals: np.ndarray,
+    H_hot_bal: np.ndarray,
+    H_cold_bal: np.ndarray,
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+) -> int:
+    """Estimates the minimum number of heat exchangers required for the pinch problem using vectorized interval logic.
     """
-    Estimates the minimum number of heat exchangers required for the pinch problem using vectorized interval logic.
+    num_hx: int = 0
+    H_net_bal = H_cold_bal - H_hot_bal
+    mask = np.isclose(H_net_bal, 0.0, atol=tol)
+    mask_true_positions = np.flatnonzero(mask).tolist()
+    idx_pairs = []
+    for i in range(len(mask_true_positions) - 1):
+        if mask_true_positions[i] + 1 < mask_true_positions[i+1]:
+            idx_pairs.append(
+                (mask_true_positions[i], mask_true_positions[i+1])
+            )
 
-    Args:
-        z: Zone with hot/cold streams and utilities.
-        pt_df (ProblemTable): Problem table DataFrame with temperature column.
-        bcc_star_df (ProblemTable): Balanced Composite Curve data with 'CCC' and 'HCC'.
+    for i0, i1 in idx_pairs:
+        T_high, T_low = T_vals[i0], T_vals[i1]
+        num_hx += _count_crossing(T_low, T_high, hot_streams)
+        num_hx += _count_crossing(T_low, T_high, cold_streams)        
+        num_hx += _count_utility_range_container(T_low, T_high, hot_utilities)
+        num_hx += _count_utility_range_container(T_low, T_high, cold_utilities)
+
+    return int(num_hx- len(idx_pairs))
+
+
+#######################################################################################################
+# Helper functions
+#######################################################################################################
+
+
+def _map_interval_resistances_to_tdf(
+    T_vals: np.ndarray,
+    R_hot_bal: np.ndarray,
+    R_cold_bal: np.ndarray,
+    t_h1: np.ndarray,
+    t_h2: np.ndarray,
+    t_c1: np.ndarray,
+    t_c2: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Align total hot/cold resistances with temperature-driving-force intervals using a vectorised mask.
 
     Returns:
-        int: Minimum number of exchangers.
+        tuple[np.ndarray, np.ndarray]: (total_resistance, mask) where total_resistance has the same
+        length as the temperature driving force intervals and mask is a boolean matrix that maps
+        each interval to the corresponding temperature band in ``T_vals``.
     """
-    T_vals = pt_df.iloc[:, 0].values
-    CCC = bcc_star_df["CCC"].values
-    HCC = bcc_star_df["HCC"].values
+    interval_lower = T_vals[1:]
+    interval_upper = T_vals[:-1]
 
-    num_hx = 0
-    i = 0
-    while i < len(T_vals) - 1:
-        if abs(CCC[i + 1] - HCC[i + 1]) > tol:
-            break
-        i += 1
+    active_hot = (
+        (t_h1[np.newaxis, :] >= interval_lower[:, np.newaxis] - tol)
+        & 
+        (t_h2[np.newaxis, :] <= interval_upper[:, np.newaxis] + tol)
+    )
+    active_cold = (
+        (t_c1[np.newaxis, :] >= interval_lower[:, np.newaxis] - tol)
+        & 
+        (t_c2[np.newaxis, :] <= interval_upper[:, np.newaxis] + tol)
+    )
+    R_hot_mat = np.ones(shape=active_hot.shape) * R_hot_bal[1:, np.newaxis]
+    R_cold_mat = np.ones(shape=active_hot.shape) * R_cold_bal[1:, np.newaxis]
+    Rh = (active_hot * R_hot_mat).sum(axis=0)
+    Rc = (active_cold * R_cold_mat).sum(axis=0)
+    return Rh + Rc
 
-    i_1 = i
-    i += 1
 
-    while i < len(T_vals):
-        i_0 = i_1
-        if abs(CCC[i] - HCC[i]) < tol or i == len(T_vals) - 1:
-            i_1 = i
-            T_high, T_low = T_vals[i_0], T_vals[i_1]
+def _count_crossing(T_low: float, T_high: float, streams: StreamCollection):
+    """Count process streams whose adjusted temperatures intersect interval [T_low, T_high]."""
+    t_max = np.array([s.t_max_star for s in streams])
+    t_min = np.array([s.t_min_star for s in streams])
+    return np.sum(
+        ((t_max > T_low + tol) & (t_max <= T_high + tol))
+        | ((t_min >= T_low - tol) & (t_min < T_high - tol))
+        | ((t_min < T_low - tol) & (t_max > T_high + tol))
+    )
 
-            def count_crossing(streams):
-                """Count process streams whose adjusted temperatures intersect interval [T_low, T_high]."""
-                t_max = np.array([s.t_max_star for s in streams])
-                t_min = np.array([s.t_min_star for s in streams])
-                return np.sum(
-                    ((t_max > T_low + tol) & (t_max <= T_high + tol))
-                    | ((t_min >= T_low - tol) & (t_min < T_high - tol))
-                    | ((t_min < T_low - tol) & (t_max > T_high + tol))
-                )
 
-            num_hx += count_crossing(z.hot_streams)
-            num_hx += count_crossing(z.cold_streams)
-
-            def count_utility_crossing(utilities):
-                """Count utility streams whose adjusted temperatures intersect interval [T_low, T_high]."""
-                t_max = np.array([u.t_max_star for u in utilities])
-                t_min = np.array([u.t_min_star for u in utilities])
-                return np.sum(
-                    (t_max > T_low + tol) & (t_max <= T_high + tol)
-                    | (t_min >= T_low - tol) & (t_min < T_high - tol)
-                )
-
-            num_hx += count_utility_crossing(z.hot_utilities)
-            num_hx += count_utility_crossing(z.cold_utilities)
-            num_hx -= 1
-
-            j = i_1
-            while j < len(T_vals) - 1:
-                if abs(CCC[j + 1] - HCC[j + 1]) > tol:
-                    break
-                j += 1
-
-            i = j
-            i_1 = j
-
-        i += 1
-
-    return int(num_hx)
+def _count_utility_range_container(T_low: float, T_high: float, utilities: StreamCollection):
+    """Count utility streams whose adjusted temperatures intersect interval [T_low, T_high]."""
+    t_max = np.array([u.t_max_star for u in utilities])
+    t_min = np.array([u.t_min_star for u in utilities])
+    active = np.array([1 if u.heat_flow > tol else 0 for u in utilities])
+    return np.sum(
+        (t_min >= T_low - tol) & (t_max <= T_high + tol) & (active)
+    )

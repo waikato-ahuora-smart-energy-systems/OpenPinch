@@ -22,22 +22,12 @@ def compute_capital_cost(
 
 
 def compute_annual_capital_cost(
-    area: float, 
-    num_units: int,
-    fixed_cost_factor: float, 
-    variable_cost_factor: float, 
-    n_exp_factor: float,     
+    capital_cost: float,   
     discount_rate: float, 
     service_life: float,
 ) -> float:
     """Determine the annualised capital cost of heat exchanger."""
-    return compute_capital_cost(
-        area, 
-        num_units, 
-        fixed_cost_factor, 
-        variable_cost_factor, 
-        n_exp_factor,
-    ) * compute_capital_recovery_factor(
+    return capital_cost * compute_capital_recovery_factor(
         discount_rate, 
         service_life
     )

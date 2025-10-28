@@ -8,7 +8,9 @@ from .problem_table_analysis import get_process_heat_cascade
 from . import (
     get_process_heat_cascade,
     get_utility_targets,
-    get_capital_cost_and_area_targets,
+    get_area_targets,
+    get_min_number_hx,
+    get_capital_cost_targets,
     get_balanced_CC,
 )
 
@@ -69,14 +71,34 @@ def compute_direct_integration_targets(zone: Zone):
         )
         # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC
         if zone_config.DO_AREA_TARGETING or 1:
+            num_units = get_min_number_hx(
+                pt.col[PT.T.value],
+                pt.col[PT.H_HOT_BAL.value],
+                pt.col[PT.H_COLD_BAL.value],
+                hot_streams,
+                cold_streams,
+                hot_utilities,
+                cold_utilities,               
+            )
+            area = get_area_targets(
+                pt_real.col[PT.T.value],
+                pt_real.col[PT.H_HOT_BAL.value],
+                pt_real.col[PT.H_COLD_BAL.value],
+                pt_real.col[PT.R_HOT_BAL.value],
+                pt_real.col[PT.R_COLD_BAL.value], 
+            )
+            capital_cost, annual_capital_cost = get_capital_cost_targets(
+                area,
+                num_units,
+                zone_config,
+            )
             res.update(
-                get_capital_cost_and_area_targets(
-                    pt_real.col[PT.T.value],
-                    pt_real.col[PT.H_HOT_BAL.value],
-                    pt_real.col[PT.H_COLD_BAL.value],
-                    pt_real.col[PT.R_HOT_BAL.value],
-                    pt_real.col[PT.R_COLD_BAL.value],               
-                )
+                {
+                    "Area target": area,
+                    "Units target": num_units,
+                    "Capital cost target": capital_cost,
+                    "Annualised capital cost target": annual_capital_cost,
+                }
             )
 
     res.update(

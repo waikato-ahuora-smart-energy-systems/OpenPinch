@@ -19,20 +19,17 @@ def get_temperature_driving_forces(
         min_dT: float = 0,
 ) -> float:
     """Determines the temeprature driving force plot using vectorized numpy operations."""
-    T_hot = np.asarray(T_hot, dtype=float)
-    H_hot = np.asarray(H_hot, dtype=float)
-    T_cold = np.asarray(T_cold, dtype=float)
-    H_cold = np.asarray(H_cold, dtype=float)
+    dp = int(-math.log10(tol))
+    T_hot = np.asarray(T_hot, dtype=float).round(dp)
+    H_hot = np.asarray(H_hot, dtype=float).round(dp)
+    T_cold = np.asarray(T_cold, dtype=float).round(dp)
+    H_cold = np.asarray(H_cold, dtype=float).round(dp)
 
     if T_hot.size != H_hot.size or T_cold.size != H_cold.size:
         raise ValueError("Composite curve temperature and heat arrays must be the same length.")
     if T_hot.size == 0 or T_cold.size == 0:
         raise ValueError("Composite curve arrays cannot be empty.")
-
-    span_hot = np.max(H_hot) - np.min(H_hot)
-    span_cold = np.max(H_cold) - np.min(H_cold)
-    if abs(span_hot - span_cold) > tol:
-        # Raise an error due to heat flow imbalance, which is a requirement for this analysis. 
+    if abs((np.max(H_hot) - np.min(H_hot)) - (np.max(H_cold) - np.min(H_cold))) > tol:
         raise ValueError("The temperature driving force plot requires the inputted composite curves to be balanced.")
 
     H_hot, T_hot = _normalise_curve(H_hot, T_hot)

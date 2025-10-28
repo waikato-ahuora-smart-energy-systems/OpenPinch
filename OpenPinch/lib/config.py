@@ -110,11 +110,11 @@ class Configuration:
     # ACCELERATION: bool = True
     # HEURISTICS: bool = True
 
-    # FC: float = 0
-    # VC: float = 10000
-    # EXP: float = 0.7
-    # DISCOUNT_RATE: float = 0.07
-    # SERV_LIFE: float = 10
+    FIXED_COST: float = 0
+    VARIABLE_COST: float = 10000
+    COST_EXP: float = 0.7
+    DISCOUNT_RATE: float = 0.07
+    SERV_LIFE: float = 10
 
     # AHT_BUTTON_SELECTED: bool = False
     # OVERRIDEDT_BUTTON_SELECTED: bool = False
