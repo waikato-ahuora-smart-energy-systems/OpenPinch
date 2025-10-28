@@ -76,9 +76,14 @@ def get_utility_heat_cascade(
 
     h_net_values = pt_ut.col[PT.H_NET.value]
     h_ut_net = h_net_values.max() - h_net_values
+    
+    h_ut_cc =  pt_ut.col[PT.H_HOT.value]
+    c_ut_cc =  pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max()
 
     return {
         PT.H_UT_NET.value: h_ut_net,
+        PT.H_HOT_UT.value: h_ut_cc,
+        PT.H_COLD_UT.value: c_ut_cc,
         PT.RCP_HOT_UT.value: pt_ut.col[PT.RCP_HOT.value],
         PT.RCP_COLD_UT.value: pt_ut.col[PT.RCP_COLD.value],
         PT.RCP_UT_NET.value: pt_ut.col[PT.RCP_HOT.value] + pt_ut.col[PT.RCP_COLD.value],

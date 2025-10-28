@@ -391,6 +391,7 @@ class HeatPumpCycle:
                 t_supply=T1,
                 t_target=t_target,
                 heat_flow=self._m_dot*abs(h1 - h2),  # or m_dot * (h1 - h2), depending on your model
+                is_process_stream=False,
             )
 
             sc.add(s)
