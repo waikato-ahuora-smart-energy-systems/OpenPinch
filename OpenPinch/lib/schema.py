@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import MainOptionsPropKeys, StreamType, TurbineOptionsPropKeys
@@ -34,6 +35,23 @@ class TempPinch(BaseModel):
 
     cold_temp: MaybeVU = None
     hot_temp: MaybeVU = None
+
+
+class HeatPumpPlacementArgs(BaseModel):
+    """Parameter bundle for heat pump optimisation routines."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    T_cond_hi: float
+    T_evap_lo: float
+    T_vals: np.ndarray
+    H_hot: np.ndarray
+    H_cold: np.ndarray
+    n_cond: int
+    n_evap: int
+    eff_isen: float
+    dtmin_hp: float
+    is_T_vals_shifted: bool
 
 
 # ---- Targeting results -------------------------------------------------------

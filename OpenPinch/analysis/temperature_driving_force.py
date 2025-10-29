@@ -42,10 +42,10 @@ def get_temperature_driving_forces(
     dh_vals = h_end - h_start
 
     # Interpolate temperatures for each H at both ends
-    t_h1 = _interp_with_plateaus(H_hot, T_hot, h_start, side="right")
-    t_h2 = _interp_with_plateaus(H_hot, T_hot, h_end, side="left")
-    t_c1 = _interp_with_plateaus(H_cold, T_cold, h_start, side="right")
-    t_c2 = _interp_with_plateaus(H_cold, T_cold, h_end, side="left")
+    t_h1 = interp_with_plateaus(H_hot, T_hot, h_start, side="right")
+    t_h2 = interp_with_plateaus(H_hot, T_hot, h_end, side="left")
+    t_c1 = interp_with_plateaus(H_cold, T_cold, h_start, side="right")
+    t_c2 = interp_with_plateaus(H_cold, T_cold, h_end, side="left")
 
     delta_T1_raw = t_h1 - t_c1
     delta_T2_raw = t_h2 - t_c2
@@ -78,54 +78,6 @@ def get_temperature_driving_forces(
 def _build_h_grid(h_hot: np.ndarray, h_cold: np.ndarray) -> np.ndarray:
     """Create a unified, sorted heat-flow grid across both curves."""
     return np.union1d(h_hot, h_cold).astype(float, copy=False)
-
-
-def _interp_with_plateaus(
-    h_vals: np.ndarray,
-    t_vals: np.ndarray,
-    targets: np.ndarray,
-    side: str,
-) -> np.ndarray:
-    """Interpolate temperatures while respecting vertical segments in the composite curves."""
-    if side not in {"left", "right"}:
-        raise ValueError("side must be 'left' or 'right'")
-
-    h_vals = np.asarray(h_vals, dtype=float)
-    t_vals = np.asarray(t_vals, dtype=float)
-    targets = np.asarray(targets, dtype=float)
-
-    if h_vals.size == 1:
-        return np.full_like(targets, t_vals[0], dtype=float)
-
-    h_monotonic = _make_monotonic(h_vals, side)
-    return np.interp(targets, h_monotonic, t_vals)
-
-
-def _make_monotonic(h_vals: np.ndarray, side: str) -> np.ndarray:
-    """Adjust an array so repeated values become strictly increasing for interpolation."""
-    adjusted = np.array(h_vals, dtype=float, copy=True)
-    if adjusted.size <= 1:
-        return adjusted
-
-    eps = tol * 0.5 if tol > 0 else 1e-9
-
-    idx = 0
-    n = adjusted.size
-    while idx < n - 1:
-        j = idx + 1
-        while j < n and abs(adjusted[j] - adjusted[idx]) <= tol:
-            j += 1
-        if j - idx > 1:
-            length = j - idx
-            if side == "right":
-                offsets = np.arange(length - 1, -1, -1, dtype=float) * eps
-                adjusted[idx:j] = adjusted[idx] - offsets
-            else:  # side == "left"
-                offsets = np.arange(length, dtype=float) * eps
-                adjusted[idx:j] = adjusted[idx] + offsets
-        idx = j
-
-    return adjusted
 
 
 def _normalise_curve(h_vals: np.ndarray, t_vals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
