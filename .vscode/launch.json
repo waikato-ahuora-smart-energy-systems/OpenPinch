@@ -18,7 +18,7 @@
             "module": "pytest",
             "cwd": "${workspaceFolder}/tests/", 
             "args": [
-              "test_analysis/test_temperature_driving_force.py",
+              "test_analysis/test_heat_pump_targeting.py"
             ],
             "console": "integratedTerminal",
             "justMyCode": false

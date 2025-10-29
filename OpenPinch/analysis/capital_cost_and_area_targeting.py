@@ -5,7 +5,7 @@ import numpy as np
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from .temperature_driving_force import get_temperature_driving_forces
+from .temperature_driving_force import *
 
 __all__ = ["get_balanced_CC", "get_capital_cost_targets", "get_area_targets", "get_min_number_hx"]
 
