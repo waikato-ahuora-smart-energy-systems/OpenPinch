@@ -181,23 +181,23 @@ def _get_min_temperature_approach(
     
     hot_side_tdf = get_temperature_driving_forces(
         T_hot=hp_profile[PT.T.value],
-        H_hot=hp_profile[PT.H_HOT_NET.value],
-        T_cold=None,
-        H_cold=None,
+        H_hot=hp_profile[PT.H_HOT_UT.value],
+        T_cold=snk_profile[PT.T.value],
+        H_cold=snk_profile[PT.H_HOT_UT.value],
     )
     min_hot_side_tdf = min(
-        hot_side_tdf["delta_T1"], 
-        hot_side_tdf["delta_T2"],
+        hot_side_tdf["delta_T1"].min(), 
+        hot_side_tdf["delta_T2"].min(),
     )
 
     cold_side_tdf = get_temperature_driving_forces(
-        T_hot=None,
-        H_hot=None,
+        T_hot=src_profile[PT.T.value],
+        H_hot=src_profile[PT.H_COLD_UT.value],
         T_cold=hp_profile[PT.T.value],
-        H_cold=hp_profile[PT.H_HOT_NET.value],
+        H_cold=hp_profile[PT.H_COLD_UT.value],
     )
     min_cold_side_tdf = min(
-        cold_side_tdf["delta_T1"], 
-        cold_side_tdf["delta_T2"],
+        cold_side_tdf["delta_T1"].min(), 
+        cold_side_tdf["delta_T2"].min(),
     )
     return min_hot_side_tdf, min_cold_side_tdf
