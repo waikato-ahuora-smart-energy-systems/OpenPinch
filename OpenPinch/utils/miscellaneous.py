@@ -113,6 +113,7 @@ def clean_composite_curve(
 
     return y_clean, x_clean
 
+
 def graph_simple_cc_plot(Tc, Hc, Th, Hh):
     fig, ax = plt.subplots()
     ax.plot(Hc, Tc, label="Cold composite")
@@ -124,3 +125,52 @@ def graph_simple_cc_plot(Tc, Hc, Th, Hh):
     ax.grid(alpha=0.3)
     fig.tight_layout()
     plt.show()
+
+
+def interp_with_plateaus(
+    h_vals: np.ndarray,
+    t_vals: np.ndarray,
+    targets: np.ndarray,
+    side: str,
+) -> np.ndarray:
+    """Interpolate temperatures while respecting vertical segments in the composite curves."""
+    if side not in {"left", "right"}:
+        raise ValueError("side must be 'left' or 'right'")
+
+    h_vals = np.asarray(h_vals, dtype=float)
+    t_vals = np.asarray(t_vals, dtype=float)
+    targets = np.asarray(targets, dtype=float)
+
+    if h_vals.size == 1:
+        return np.full_like(targets, t_vals[0], dtype=float)
+
+    h_monotonic = _make_monotonic(h_vals, side)
+    return np.interp(targets, h_monotonic, t_vals)
+
+
+def _make_monotonic(h_vals: np.ndarray, side: str) -> np.ndarray:
+    """Adjust an array so repeated values become strictly increasing for interpolation."""
+    adjusted = np.array(h_vals, dtype=float, copy=True)
+    if adjusted.size <= 1:
+        return adjusted
+
+    eps = tol * 0.5 if tol > 0 else 1e-9
+
+    idx = 0
+    n = adjusted.size
+    while idx < n - 1:
+        j = idx + 1
+        while j < n and abs(adjusted[j] - adjusted[idx]) <= tol:
+            j += 1
+        if j - idx > 1:
+            length = j - idx
+            if side == "right":
+                offsets = np.arange(length - 1, -1, -1, dtype=float) * eps
+                adjusted[idx:j] = adjusted[idx] - offsets
+            else:  # side == "left"
+                offsets = np.arange(length, dtype=float) * eps
+                adjusted[idx:j] = adjusted[idx] + offsets
+        idx = j
+
+    return adjusted
+
