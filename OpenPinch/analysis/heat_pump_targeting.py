@@ -1,6 +1,6 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
-from scipy.optimize import minimize
+from scipy.optimize import minimize, brentq
 from pydantic import BaseModel
 
 from ..classes import *
@@ -61,6 +61,8 @@ def _initialise_heat_pump_temperatures(
         H_cold=H_cold,
         n_cond=int(n_cond),
         n_evap=int(n_evap),
+        bnds_cond=T_bnds["HU"],
+        bnds_evap=T_bnds["CU"],
         eff_isen=float(eff_isen),
         dtmin_hp=float(dtmin_hp),
         is_T_vals_shifted=bool(is_T_vals_shifted),
@@ -84,9 +86,19 @@ def _get_entropic_average_temperature(
     T: np.ndarray,
     H: np.ndarray,        
 ):
-    S = H / (T + 273.15)
-    return H.sum() / S.sum()
+    if T.var() < tol:
+        return T[0]
+    
+    temp = np.roll(H, -1)
+    temp[-1] = 0
+    Q = H - temp
+    S = Q / (T + 273.15)
 
+    if Q.sum() > tol:
+        return Q.sum() / S.sum()
+    else: 
+        return T.mean()
+    
 
 def _get_carnot_COP(
     T_cond: np.ndarray,
@@ -96,8 +108,11 @@ def _get_carnot_COP(
     eff: float = 0.6,           
 ):  
     T_hi = _get_entropic_average_temperature(T_cond, H_cond)
-    T_lo = _get_entropic_average_temperature(T_evap, H_evap)
-    return T_hi / (T_hi - T_lo) * eff
+    T_lo = _get_entropic_average_temperature(T_evap, H_evap * -1)
+    if T_hi > T_lo:
+        return T_hi / (T_hi - T_lo) * eff
+    else:
+        return 1000
 
 
 def _get_heat_pump_placement_performance(x, args: HeatPumpPlacementArgs) -> float:
@@ -106,21 +121,41 @@ def _get_heat_pump_placement_performance(x, args: HeatPumpPlacementArgs) -> floa
     n_evap_vars = max(int(args.n_evap) - 1, 0)
 
     T_cond = np.concatenate((np.array([args.T_cond_hi]), x[:n_cond_vars]))
-    H_cond = np.interp(T_cond, args.T_vals[::-1], args.H_cold[::-1])
     T_evap = np.concatenate((np.array([args.T_evap_lo]), x[n_cond_vars:n_cond_vars + n_evap_vars]))
-    H_evap = np.interp(T_evap, args.T_vals[::-1], args.H_hot[::-1])
-    
-    cop = _get_carnot_COP(T_cond, H_cond, T_evap, H_evap)
-    Q_evap = H_cond[0] * (1 - 1 / cop) if cop > 0 else 0
-    T_evap_min = interp_with_plateaus(args.H_hot[::-1], args.T_vals[::-1], -Q_evap, "right")
-    
-    a = interp_with_plateaus(args.H_hot[::-1], args.T_vals[::-1], -400, "right")
-    b = interp_with_plateaus(args.H_hot[::-1], args.T_vals[::-1], -400, "left")
+    T_evap0 = T_evap.copy()
 
+    H_cond = np.interp(T_cond, args.T_vals[::-1], args.H_cold[::-1])
 
-    return x.sum()
+    def _get_optimal_min_evap_T(T_lo):
+        for i in range(len(T_evap)):
+            if (T_lo > T_evap[i]) or (abs(T_lo - T_evap[i]) > tol and i == 0):
+                T_evap[i] = T_lo
+            else:
+                T_evap[i] = T_evap0[i]  
+        H_evap = np.interp(T_evap, args.T_vals[::-1], args.H_hot[::-1])
+        cop = _get_carnot_COP(T_cond, H_cond, T_evap, H_evap)
+        Q_evap_tot = H_cond[0] * (1 - 1 / cop) if cop > 0 else 0
+        work = H_cond[0] - Q_evap_tot
+        T_lo_calc = interp_with_plateaus(args.H_hot[::-1], args.T_vals[::-1], -Q_evap_tot, "right")
+        return {
+            "work": work, 
+            "T_evap": T_evap, 
+            "H_evap": H_evap, 
+            "cop": cop, 
+            "Q_evap_tot": Q_evap_tot, 
+            "T_lo_calc": T_lo_calc,
+            "error": T_lo - T_lo_calc,
+        }     
 
+    res = brentq(
+        f=lambda T: _get_optimal_min_evap_T(T)["error"],
+        a=args.bnds_evap[0],
+        b=args.bnds_evap[1],
+        # full_output=True,
+    )
 
+    total_work = _get_optimal_min_evap_T(res)["work"]
+    return total_work
 
 
 def _prepare_data_for_minimizer(
