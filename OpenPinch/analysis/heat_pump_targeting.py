@@ -229,7 +229,104 @@ def _optimize():
         
     )
 
+def cut_profile(src_profile, H_cut, side="right", profile_type="source"):
+    """
+    Cut a source or sink profile dict at a given enthalpy H_cut, using plateau-aware interpolation.
 
+    side : {'left', 'right'}
+        'right' means after the cut (colder outlet for sources, hotter outlet for sinks)
+        'left'  means before the cut (hotter inlet for sources, colder inlet for sinks)
+    """
+    H_key = [k for k in src_profile.keys() if k != 'T'][0]
+    H = np.array(src_profile[H_key], dtype=float)
+    T = np.array(src_profile['T'], dtype=float)
+
+    flipped = False
+    if H[0] > H[-1]:
+        H = H[::-1]
+        T = T[::-1]
+        flipped = True
+
+    T_cut = interp_with_plateaus(H, T, np.array([H_cut]), side=side)[0]
+    idx = np.searchsorted(H, H_cut)
+
+    # Adjust logic based on type
+    if profile_type == "source":
+        keep_after = side == "right"
+    else:  # sink
+        keep_after = side == "right"  # 'right' still means after, but physically it's the opposite end
+
+    if keep_after:
+        new_H = np.concatenate([[H_cut], H[idx:]])
+        new_T = np.concatenate([[T_cut], T[idx:]])
+    else:
+        new_H = np.concatenate([H[:idx], [H_cut]])
+        new_T = np.concatenate([T[:idx], [T_cut]])
+
+    if flipped:
+        new_H = new_H[::-1]
+        new_T = new_T[::-1]
+
+    return {H_key: new_H, 'T': new_T}
+
+def add_ambient_source(
+    src_profile: dict,
+    heat_flow: float,
+    t_ambient_supply: float = None,
+    t_ambient_target: float = None,
+) -> dict:
+    """
+    Add an ambient heat source contribution to an existing source (cold utility) profile.
+
+    This function no longer modifies any StreamCollection. It simply extends the
+    given source profile by including an ambient stream defined by the specified
+    heat flow and ambient temperatures.
+
+    Parameters
+    ----------
+    src_profile : dict
+        Existing source (cold utility) profile, containing at least:
+        - PT.T.value
+        - PT.H_COLD_UT.value
+    heat_flow : float
+        Heat flow of the ambient stream [same units as src_profile].
+    t_ambient_supply : float, optional
+        Supply temperature of the ambient stream (default: Configuration.T_ENV).
+    t_ambient_target : float, optional
+        Target temperature of the ambient stream (default: Configuration.T_ENV - 1°C).
+
+    Returns
+    -------
+    dict
+        Updated cold utility profile (same structure as input) that includes
+        the ambient source contribution.
+    """
+    # Default temperatures from configuration
+    if t_ambient_supply is None:
+        t_ambient_supply = Configuration.T_ENV
+    if t_ambient_target is None:
+        t_ambient_target = Configuration.T_ENV - 1.0  # small delta
+
+    # Extract current arrays
+    T_vals = np.array(src_profile[PT.T.value])
+    H_vals = np.array(src_profile[PT.H_COLD_UT.value])
+
+    # Append ambient source at the lower end of temperature and enthalpy
+    # Assume the ambient source adds heat_flow starting from t_ambient_target
+    # up to t_ambient_supply
+    new_T_vals = np.append(T_vals, [t_ambient_target, t_ambient_supply])
+    new_H_vals = np.append(H_vals, [H_vals.min()- heat_flow, H_vals.min() ])
+
+    # Sort by temperature to maintain consistent profile order
+    sort_idx = np.argsort(new_T_vals)
+    new_T_vals = new_T_vals[sort_idx]
+    new_H_vals = new_H_vals[sort_idx]
+
+    # Return updated profile
+    return {
+        PT.T.value: new_T_vals,
+        PT.H_COLD_UT.value: new_H_vals,
+    }
 
 
 
