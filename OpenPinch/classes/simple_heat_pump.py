@@ -340,31 +340,50 @@ class HeatPumpCycle:
         )
 
     def _build_condenser_profile(self) -> np.ndarray:
-        """Construct a four-point condenser T-h polyline."""
-        p_high = self._cycle_states[1, CoolProp.iP]
-        h_outlet = self._cycle_states[2, 'H']
-        T_superheated = self._cycle_states[1, CoolProp.iT]
-        h_superheated = self._cycle_states[1, 'H']
-        T_subcooled = self._cycle_states[2, CoolProp.iT]
-
+        """
+        Construct a four-point condenser T-h polyline in the HeatPumpCycle's unit system.
+    
+        Returns
+        -------
+        np.ndarray
+            Array of shape (4,2): [enthalpy, temperature].
+            Enthalpy always in J/kg. Temperature in K (SI) or °C (EUR).
+        """
+        # Ensure the cycle has been solved
+        self._require_solution()
+    
+        # Read temperatures and enthalpies from the solved cycle
+        H = self.Hs  # [H0, H1, H2, H3] in J/kg
+        T = self.Ts  # [T0, T1, T2, T3] in K
+    
+        # Determine if the unit system is SI (K) or not
+        si_units = getattr(self._system[CoolProp.iT], 'to_SI', None) is None
+    
+        # Use saturation points from the state if needed
+        p_high = self.Ps[1]
+    
+        # Saturated vapor at condenser pressure
         self._state.update(CoolProp.PQ_INPUTS, p_high, 1.0)
         h_sat_vapor = self._state.hmass()
         T_sat_vapor = self._state.T()
-
+    
+        # Saturated liquid at condenser pressure
         self._state.update(CoolProp.PQ_INPUTS, p_high, 0.0)
         h_sat_liquid = self._state.hmass()
         T_sat_liquid = self._state.T()
-
-        condenser_profile = np.array(
-            [
-                [h_superheated, T_superheated],
-                [h_sat_vapor, T_sat_vapor],
-                [h_sat_liquid, T_sat_liquid],
-                [h_outlet, T_subcooled],
-            ],
-            dtype=float,
-        )
-
+    
+        # Assemble the 4-point polyline: [H, T]
+        condenser_profile = np.array([
+            [H[1], T[1]],            # superheated
+            [h_sat_vapor, T_sat_vapor],
+            [h_sat_liquid, T_sat_liquid],
+            [H[2], T[2]],            # subcooled outlet
+        ], dtype=float)
+    
+        # Convert temperature to °C if not SI
+        if not si_units:
+            condenser_profile[:, 1] -= 273.15
+    
         return condenser_profile
 
     def _build_stream_collection(self,array,is_hot):
@@ -398,26 +417,43 @@ class HeatPumpCycle:
         return sc
 
     def _build_evaporator_profile(self) -> np.ndarray:
-        """Construct a four-point evaporator T-h polyline."""
-        p_low = self._cycle_states[0, CoolProp.iP]
-        h_inlet = self._cycle_states[3, 'H']
-        T_inlet = self._cycle_states[3, CoolProp.iT]
-
-        h_superheated = self._cycle_states[0, 'H']
-        T_superheated = self._cycle_states[0, CoolProp.iT]
-
+        """
+        Construct a three-point evaporator T-h polyline in the HeatPumpCycle's unit system.
+    
+        Returns
+        -------
+        np.ndarray
+            Array of shape (3,2): [enthalpy, temperature].
+            Enthalpy always in J/kg. Temperature in K (SI) or °C (EUR).
+        """
+        # Ensure the cycle has been solved
+        self._require_solution()
+    
+        # Read temperatures and enthalpies from the solved cycle
+        H = self.Hs  # [H0, H1, H2, H3] in J/kg
+        T = self.Ts  # [T0, T1, T2, T3] in K
+    
+        # Determine if the unit system is SI (K) or not
+        si_units = getattr(self._system[CoolProp.iT], 'to_SI', None) is None
+    
+        # Evaporator pressure
+        p_low = self.Ps[0]
+    
+        # Saturated vapor at evaporator pressure
         self._state.update(CoolProp.PQ_INPUTS, p_low, 1.0)
         h_sat_vapor = self._state.hmass()
         T_sat_vapor = self._state.T()
-
-        evaporator_profile = np.array(
-            [
-                [h_inlet, T_inlet],
-                [h_sat_vapor, T_sat_vapor],
-                [h_superheated, T_superheated],
-            ],
-            dtype=float,
-        )
+    
+        # Assemble the 3-point polyline: [H, T]
+        evaporator_profile = np.array([
+            [H[3], T[3]],            # inlet
+            [h_sat_vapor, T_sat_vapor],
+            [H[0], T[0]],            # superheated outlet
+        ], dtype=float)
+    
+        # Convert temperature to °C if not SI
+        if not si_units:
+            evaporator_profile[:, 1] -= 273.15
 
         return evaporator_profile
 

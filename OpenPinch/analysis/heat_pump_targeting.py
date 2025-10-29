@@ -195,6 +195,9 @@ def _optimize():
     )
 
 
+
+
+
 def _get_heat_pump_heating_and_cooling_streams() -> StreamCollection:
 
     hp_hot_streams, hp_cold_streams = StreamCollection(), StreamCollection()
@@ -255,3 +258,5 @@ def _get_min_temperature_approach(
         cold_side_tdf["delta_T2"].min(),
     )
     return min_hot_side_tdf, min_cold_side_tdf
+
+
