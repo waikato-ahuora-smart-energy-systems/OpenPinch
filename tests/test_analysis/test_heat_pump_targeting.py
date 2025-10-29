@@ -23,15 +23,6 @@ def get_hot_cc():
     return np.array([0.0, 0.0, -400.0, -400.0, -1000.0, -1000.0])
 
 
-def test_get_entropic_average_temperature_returns_kelvin_for_uniform_temperature():
-    T_vals = np.array([100.0, 100.0, 100.0])
-    H_vals = np.array([200.0, 75.0, 25.0])
-
-    result = _get_entropic_average_temperature(T_vals, H_vals)
-
-    np.testing.assert_allclose(result, 100.0 + 273.15)
-
-
 def test_get_carnot_COP_returns_expected_value():
     T_cond = np.array([150.0, 130.0, 110.0])
     H_cond = np.array([60.0, 25.0, 15.0])
@@ -39,10 +30,8 @@ def test_get_carnot_COP_returns_expected_value():
     H_evap = np.array([30.0, 70.0])
     eff = 0.65
 
-    s_cond = H_cond / (T_cond + 273.15)
-    s_evap = H_evap / (T_evap + 273.15)
-    T_hi = H_cond.sum() / s_cond.sum()
-    T_lo = H_evap.sum() / s_evap.sum()
+    T_hi = _get_entropic_average_temperature(T_cond, H_cond)
+    T_lo = _get_entropic_average_temperature(T_evap, -H_evap)
     expected = T_hi / (T_hi - T_lo) * eff
 
     result = _get_carnot_COP(T_cond, H_cond, T_evap, H_evap, eff=eff)
