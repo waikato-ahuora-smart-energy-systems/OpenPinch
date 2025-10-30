@@ -19,24 +19,29 @@ __all__ = ["get_optimal_heat_pump_placement"]
 
 
 def get_optimal_heat_pump_placement(
-    T_vals: np.ndarray,
+    T_hot: np.ndarray,
     H_hot: np.ndarray,
+    T_cold: np.ndarray,
     H_cold: np.ndarray,
     n_cond: int,
     n_evap: int,
     eff_isen: float = 0.7,
     dtmin_hp: float = 5.0,
     is_T_vals_shifted: bool = True,
+    zone_config: Configuration = None,
+    
 ):
     init_res = _initialise_heat_pump_temperatures(
-        T_vals,
+        T_hot,
         H_hot,
+        T_cold,
         H_cold,
         n_cond,
         n_evap,
         eff_isen,
         dtmin_hp,
-        is_T_vals_shifted,        
+        is_T_vals_shifted,  
+        zone_config,      
     )
 
     return None
@@ -47,24 +52,29 @@ def get_optimal_heat_pump_placement(
 #######################################################################################################
 
 def _initialise_heat_pump_temperatures(
-    T_vals: np.ndarray,
+    T_hot: np.ndarray,
     H_hot: np.ndarray,
+    T_cold: np.ndarray,    
     H_cold: np.ndarray,
     n_cond: int,
     n_evap: int,
     eff_isen: float = 0.7,
     dtmin_hp: float = 5.0,
     is_T_vals_shifted: bool = True,
+    zone_config: Configuration = None,
 ):
+    H_hot, H_cold = _balance_hot_and_cold_heat_loads_with_ambient_air(T_hot, H_hot, T_cold, H_cold, zone_config)
+    T_hot, T_cold = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_hot, T_cold, dtmin_hp, is_T_vals_shifted)
     idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
-    T_bnds = _convert_idx_to_temperatures(idx_dict, T_vals)
+    T_bnds = _convert_idx_to_temperatures(idx_dict, T_hot, T_cold)
     T_cond_init, T_evap_init = _set_initial_values_for_condenser_and_evaporator(n_cond, n_evap, T_bnds)
     x0, bnds = _prepare_data_for_minimizer(T_cond_init, T_evap_init, T_bnds)
     args = HeatPumpPlacementArgs(
         T_cond_hi=T_cond_init[0],
         T_evap_lo=T_evap_init[0],
-        T_vals=T_vals,
+        T_hot=T_hot,
         H_hot=H_hot,
+        T_cold=T_cold,
         H_cold=H_cold,
         n_cond=int(n_cond),
         n_evap=int(n_evap),
@@ -76,7 +86,7 @@ def _initialise_heat_pump_temperatures(
     )
 
     if x0.shape == (0,):
-        res = _get_heat_pump_placement_performance(None, args)
+        var_x = None
     else:
         res = minimize(
             fun=lambda x: _get_heat_pump_placement_performance(x, args),
@@ -85,10 +95,12 @@ def _initialise_heat_pump_temperatures(
             bounds=bnds,
             # constraints=None,
         )
-    total_work = res.x
-    T_cond, T_evap = _get_all_cond_and_evap_temperature_levels(res.x, args)
-    H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_vals, args.H_cold)
-    H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_vals, args.H_hot)
+        var_x = res.x
+        
+    total_work = _get_heat_pump_placement_performance(var_x, args)
+    T_cond, T_evap = _get_all_cond_and_evap_temperature_levels(var_x, args)
+    H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold)
+    H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot)
 
     return {
         "T_cond": T_cond, 
@@ -99,16 +111,20 @@ def _initialise_heat_pump_temperatures(
     }
 
 
+def _get_Q_from_H(H: np.ndarray):
+    H0 = H * -1 if H.min() < -tol else H
+    temp = np.roll(H0, -1)
+    temp[-1] = 0
+    return H0 - temp    
+
 def _get_entropic_average_temperature(
     T: np.ndarray,
     H: np.ndarray,        
 ):
     if T.var() < tol:
         return T[0]
-    
-    temp = np.roll(H, -1)
-    temp[-1] = 0
-    Q = H - temp
+
+    Q = _get_Q_from_H(H)
     S = Q / (T + 273.15)
 
     if Q.sum() > tol:
@@ -125,7 +141,7 @@ def _get_carnot_COP(
     eff: float = 0.6,           
 ):  
     T_hi = _get_entropic_average_temperature(T_cond, H_cond)
-    T_lo = _get_entropic_average_temperature(T_evap, H_evap * -1)
+    T_lo = _get_entropic_average_temperature(T_evap, H_evap)
     if T_hi > T_lo:
         return T_hi / (T_hi - T_lo) * eff
     else:
@@ -152,19 +168,20 @@ def _get_H_vals_from_T_hp_vals(
 def _get_heat_pump_placement_performance(x, args: HeatPumpPlacementArgs) -> float:
     T_cond, T_evap = _get_all_cond_and_evap_temperature_levels(x, args)
     T_evap0 = T_evap.copy()
-    H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_vals, args.H_cold)
-    
+    H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold)
+    H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot)
+
     def _get_optimal_min_evap_T(T_lo):
         for i in range(len(T_evap)):
             if (T_lo > T_evap[i]) or (abs(T_lo - T_evap[i]) > tol and i == 0):
                 T_evap[i] = T_lo
             else:
                 T_evap[i] = T_evap0[i]  
-        H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_vals, args.H_hot)
+        H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot)
         cop = _get_carnot_COP(T_cond, H_cond, T_evap, H_evap)
         Q_evap_tot = H_cond[0] * (1 - 1 / cop) if cop > 0 else 0
         work = H_cond[0] - Q_evap_tot
-        T_lo_calc = interp_with_plateaus(args.H_hot[::-1], args.T_vals[::-1], -Q_evap_tot, "right")
+        T_lo_calc = interp_with_plateaus(args.H_hot[::-1], args.T_hot[::-1], -Q_evap_tot, "right")
         return {
             "work": work, 
             "T_evap": T_evap, 
@@ -174,13 +191,20 @@ def _get_heat_pump_placement_performance(x, args: HeatPumpPlacementArgs) -> floa
             "T_lo_calc": T_lo_calc,
             "error": T_lo - T_lo_calc,
         }     
-
-    res = brentq(
-        f=lambda T: _get_optimal_min_evap_T(T)["error"],
-        a=args.bnds_evap[0],
-        b=args.bnds_evap[1],
-        # full_output=True,
-    )
+    try:
+        res = brentq(
+            f=lambda T: _get_optimal_min_evap_T(T)["error"],
+            a=args.bnds_evap[0],
+            b=args.bnds_evap[1],
+            # full_output=True,
+        )
+        pass
+    except: 
+        if abs(args.bnds_evap[0] - args.bnds_evap[1]) < 0.1:
+            res = args.bnds_evap[0]
+        else:
+            res = args.bnds_evap[0]
+    
     total_work = _get_optimal_min_evap_T(res)["work"]
     return total_work
 
@@ -221,10 +245,10 @@ def _set_initial_values_for_condenser_and_evaporator(
     return T_cond_init, T_evap_init
 
 
-def _convert_idx_to_temperatures(idx_dict: dict, T_vals: np.ndarray) -> dict:
+def _convert_idx_to_temperatures(idx_dict: dict, T_hot: np.ndarray, T_cold: np.ndarray) -> dict:
     return {
-        "HU": (T_vals[idx_dict["HU"][0]], T_vals[idx_dict["HU"][1]]),
-        "CU": (T_vals[idx_dict["CU"][0]], T_vals[idx_dict["CU"][1]]),
+        "HU": (T_cold[idx_dict["HU"][0]], T_cold[idx_dict["HU"][1]]),
+        "CU": (T_hot[idx_dict["CU"][0]], T_hot[idx_dict["CU"][1]]),
     }
 
 
@@ -247,6 +271,52 @@ def _get_first_or_last_zero_value_idx(x: np.ndarray, find_first_zero: bool = Tru
     zero_hits = np.flatnonzero(mask)
     i = 0 if find_first_zero else -1
     return int(zero_hits[i])
+
+
+def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
+    T_hot: np.ndarray,    
+    T_cold: np.ndarray, 
+    dtmin_hp: float,
+    is_T_vals_shifted: bool,
+):
+    T_hot  -= dtmin_hp / 2 if is_T_vals_shifted else dtmin_hp
+    T_cold += dtmin_hp / 2 if is_T_vals_shifted else dtmin_hp
+
+    return T_hot, T_cold
+
+def _balance_hot_and_cold_heat_loads_with_ambient_air(
+    T_hot: np.ndarray,
+    H_hot: np.ndarray,
+    T_cold: np.ndarray,    
+    H_cold: np.ndarray, 
+    zone_config: Configuration,       
+):
+    if zone_config == None:
+        return H_hot, H_cold
+    
+    if H_hot.max() > tol:
+        H_hot *= -1
+
+    delta_H = np.abs(H_cold).max() - np.abs(H_hot).max()
+    if delta_H > 0.0:
+        mask = np.where(
+            T_hot <= (zone_config.T_ENV - zone_config.DT_ENV_CONT - zone_config.DT_PHASE_CHANGE),
+            delta_H, 0.0
+        )
+        H_hot -= mask
+
+    elif delta_H < 0.0:
+        # Case of refrigeration --> not currently a focus.
+        pass
+
+    else:
+        pass
+
+    return H_hot, H_cold   
+
+
+
+
 
 
 def _optimize():
