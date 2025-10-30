@@ -397,7 +397,7 @@ class HeatPumpCycle:
             # Do we need a name?
             name = f"Segment_{i + 1}"
 
-            if T1 == T2: # Catch phase change
+            if abs(T1 - T2) < 0.001: # Catch phase change
                 if is_hot:
                     t_target = T2 - .1
                 else:

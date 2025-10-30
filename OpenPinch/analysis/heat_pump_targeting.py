@@ -419,3 +419,245 @@ def _get_min_temperature_approach(
     return min_hot_side_tdf, min_cold_side_tdf
 
 
+# ============================================================
+# ─── SUPPORT FUNCTIONS ──────────────────────────────────────
+# ============================================================
+
+def get_fluid_T_limits(fluid, unit_system='EUR'):
+    """Return min and critical temperatures of a fluid."""
+    T_min, T_crit = PropsSI('Tmin', fluid), PropsSI('Tcrit', fluid)
+    if unit_system == 'EUR':  # Convert to °C if needed
+        T_min -= 273.15
+        T_crit -= 273.15
+    return T_min, T_crit
+
+
+
+def parse_hp_variables(x, n_cond, n_evap, Q_total):
+    """
+    Extract HP variables from optimization vector x.
+
+    - Te, dT_sh: length n_evap
+    - Tc, dT_sc: length n_cond
+    - Q_cond: length N_hp = max(n_cond, n_evap), last one fills remaining Q_total
+    """
+    N_hp = max(n_cond, n_evap)
+    
+    Te = x[:n_evap]
+    dT_sh = x[n_evap:2*n_evap]
+    Tc = x[2*n_evap:2*n_evap+n_cond]
+    dT_sc = x[2*n_evap+n_cond:2*n_evap+2*n_cond]
+    Q_vars = x[2*n_evap+2*n_cond:]  # length = N_hp-1
+    if len(Q_vars) != N_hp - 1:
+        raise ValueError(f"Q_vars length {len(Q_vars)} does not match N_hp-1 = {N_hp-1}")
+    
+    Q_cond = np.append(Q_vars, Q_total - np.sum(Q_vars))  # last HP fills remaining heat duty
+    return Te, dT_sh, Tc, dT_sc, Q_cond
+
+
+def create_heat_pump_list(Te, dT_sh, Tc, dT_sc, Q_cond, n_cond, n_evap, fluid, unit_system):
+    hp_list = []
+    N_hp = max(n_cond, n_evap)
+    for i in range(N_hp):
+        evap_idx = int(i * n_evap / N_hp)
+        cond_idx = int(i * n_cond / N_hp)
+        hp = HeatPumpCycle(fluid_ref=fluid, unit_system=unit_system, Q_total=Q_cond[i])
+        hp.solve_t_dt(
+            Te=Te[evap_idx],
+            Tc=Tc[cond_idx],
+            dT_sh=dT_sh[evap_idx],
+            dT_sc=dT_sc[cond_idx],
+            eta_com=0.7,
+            SI=False
+        )
+        hp_list.append(hp)
+    return hp_list
+
+
+# ============================================================
+# ─── OBJECTIVE AND CONSTRAINTS ───────────────────────────────
+# ============================================================
+
+def objective_multi_hp_work(x, n_cond, n_evap, T_vals, H_hot, H_cold, dtmin_hp,
+                            fluid='Ammonia', unit_system='EUR'):
+    """Objective: minimize total compressor work for multi-HP configuration."""
+    Q_total = max(H_hot)
+    Te, dT_sh, Tc, dT_sc, Q_cond = parse_hp_variables(x, n_cond, n_evap, Q_total)
+
+    # Create HP objects with correct temperature mapping
+    hp_list = create_heat_pump_list(Te, dT_sh, Tc, dT_sc, Q_cond, n_cond, n_evap, fluid, unit_system)
+
+    total_work = 0.0
+    for i, hp in enumerate(hp_list):
+        try:
+            total_work += Q_cond[i] / hp.COP_heating()  # use Q_cond directly
+        except ValueError:
+            return 1e6  # Penalize infeasible points
+
+    print(Q_cond, Te, Tc, total_work)
+    return total_work
+
+def mta_constraint_multi(x, n_cond, n_evap, T_vals, H_hot, H_cold, dtmin_hp,
+                         fluid='Ammonia', unit_system='EUR'):
+    """Ensure minimum temperature approach ≥ dtmin_hp."""
+    Q_total = max(H_hot)
+    Te, dT_sh, Tc, dT_sc, Q_cond = parse_hp_variables(x, n_cond, n_evap, Q_total)
+    hp_list = create_heat_pump_list(Te, dT_sh, Tc, dT_sc, Q_cond, n_cond, n_evap, fluid, unit_system)
+
+    try:
+        min_mta = profiles_crossing_check_multi(T_vals, H_hot, H_cold, hp_list)
+    except ValueError:
+        min_mta = -1e6  # Infeasible solution
+
+    return min_mta - dtmin_hp
+
+
+def condenser_vs_evaporator_constraint(x, n_cond, n_evap):
+    """Ensure Tc[i] > Te[i % n_evap] + margin."""
+    Te = x[:n_evap]
+    Tc = x[2 * n_evap:2 * n_evap + n_cond]
+    margin = 3.0
+    return Tc - np.array([Te[i % n_evap] for i in range(n_cond)]) - margin
+
+def min_Q_cond_constraint(x, n_cond, n_evap, Q_total):
+    _, _, _, _, Q_cond = parse_hp_variables(x, n_cond, n_evap, Q_total)
+    return Q_cond - 0.05*Q_total  # elementwise, must be >= 0
+
+def profiles_crossing_check_multi(T_vals, H_hot, H_cold, hp_list):
+    """
+    Check minimum temperature approach (MTA) between source/sink profiles
+    and a multi-heat-pump cascade.
+    """
+    # --- Define source and sink profiles with correct PT keys
+    snk_profile = {PT.T.value: T_vals, PT.H_HOT_UT.value: H_hot}
+    src_profile = {PT.T.value: T_vals, PT.H_COLD_UT.value: H_cold}
+
+    # --- Build condenser and evaporator profiles for all HPs
+    condenser_streams_all, evaporator_streams_all = [], []
+
+    for hp in hp_list:
+        condenser_streams_all.extend(
+            hp._build_stream_collection(hp._build_condenser_profile(), is_hot=True)
+        )
+        evaporator_streams_all.extend(
+            hp._build_stream_collection(hp._build_evaporator_profile(), is_hot=False)
+        )
+
+    # --- Merge streams into single HP cascade
+    cascade = _get_heat_pump_cascade(
+        hp_hot_streams=condenser_streams_all,
+        hp_cold_streams=evaporator_streams_all,
+    )
+
+    # --- Align source profile to cascade
+    try:
+        if min(src_profile[PT.H_COLD_UT.value]) < min(cascade[PT.H_COLD_UT.value]):
+            src_profile_cut = cut_profile(
+                src_profile, min(cascade[PT.H_COLD_UT.value]), "right", "source"
+            )
+        else:
+            ambient_heat_flow = (
+                min(src_profile[PT.H_COLD_UT.value]) - min(cascade[PT.H_COLD_UT.value])
+            )
+            src_profile_cut = add_ambient_source(src_profile, ambient_heat_flow)
+    except Exception:
+        return -1e6  # Unbalanced composite curves or data mismatch
+
+    # --- Compute minimum temperature approach
+    try:
+        deltaTs = _get_min_temperature_approach(cascade, snk_profile, src_profile_cut)
+        return min(deltaTs)
+    except ValueError:
+        return -1e6  # Infeasible temperature overlap
+
+
+# ============================================================
+# ─── OPTIMIZATION ROUTINE ───────────────────────────────────
+# ============================================================
+
+def optimize_multi_hp(T_vals, H_hot, H_cold, n_cond, n_evap,
+                      dtmin_hp=5.0, fluid='Ammonia', unit_system='EUR'):
+
+    Q_total = max(H_hot)
+    T_min, T_crit = get_fluid_T_limits(fluid, unit_system)
+
+    # --- Initial Guess
+    x0 = np.array(
+        [min(T_vals)] * n_evap +  # Te: all evaporators start at min temp
+        [1.0] * n_evap +          # dT_sh: small initial superheat
+        [max(T_vals)] * n_cond +  # Tc: all condensers start at max temp
+        [1.0] * n_cond +         # dT_sc: initial subcooling guess
+        [Q_total / n_cond] * (max(n_cond,n_evap) - 1)  # Q_cond: first N-1 set equally
+    )
+
+    # --- Bounds
+    bounds = (
+        [(T_min + 5, T_crit - 10)] * n_evap +  # Te
+        [(0.1, 5)] * n_evap +                # dT_sh
+        [(T_min + 10, T_crit - 5)] * n_cond + # Tc
+        [(0.1, 100)] * n_cond +               # dT_sc
+        [(0.05, Q_total)] * (max(n_cond,n_evap) - 1)         # Q_cond
+    )
+
+    # --- Constraints
+    constraints = [
+        {'type': 'ineq', 'fun': lambda x: mta_constraint_multi(x, n_cond, n_evap, T_vals, H_hot, H_cold, dtmin_hp, fluid, unit_system)},
+        {'type': 'ineq', 'fun': lambda x: min_Q_cond_constraint(x, n_cond, n_evap, Q_total)},
+        {'type': 'ineq', 'fun': lambda x: condenser_vs_evaporator_constraint(x, n_cond, n_evap)},
+    ]
+
+    # --- Optimization
+    result = minimize(
+        objective_multi_hp_work, x0,
+        args=(n_cond, n_evap, T_vals, H_hot, H_cold, dtmin_hp, fluid, unit_system),
+        bounds=bounds,
+        constraints=constraints,
+        method='COBYQA',  
+        options={'disp': False, 'maxiter': 1000}
+    )
+
+    if result.success:
+        Te, dT_sh, Tc, dT_sc, Q_cond = parse_hp_variables(result.x, n_cond, n_evap, Q_total)
+        print(f"\n--- Optimization Results ---")
+        print(f"Te       = {Te}")
+        print(f"dT_sh    = {dT_sh}")
+        print(f"Tc       = {Tc}")
+        print(f"dT_sc    = {dT_sc}")
+        print(f"Q_cond   = {Q_cond}")
+        print(f"Total W  = {result.fun:.3f}")
+    else:
+        print("Optimization failed:", result.message)
+
+    return result
+
+
+# ============================================================
+# ─── VISUALIZATION ──────────────────────────────────────────
+# ============================================================
+
+def plot_multi_hp_profiles(T_vals, H_hot, H_cold, x, n_cond, n_evap, 
+                           fluid='Ammonia', unit_system='EUR'):
+    """Plot HP cascade and source/sink profiles."""
+    Te, dT_sh, Tc, dT_sc, Q_cond = parse_hp_variables(x, n_cond, n_evap, Q_total=max(H_hot))
+    hp_list = create_heat_pump_list(Te, dT_sh, Tc, dT_sc, Q_cond, n_cond, n_evap, fluid, unit_system)
+
+    condenser_streams, evaporator_streams = [], []
+    for hp in hp_list:
+        condenser_streams += hp._build_stream_collection(hp._build_condenser_profile(), is_hot=True)
+        evaporator_streams += hp._build_stream_collection(hp._build_evaporator_profile(), is_hot=False)
+
+    cascade = _get_heat_pump_cascade(hp_hot_streams=condenser_streams, hp_cold_streams=evaporator_streams)
+
+    plt.figure(figsize=(7, 5))
+    plt.plot(cascade["H_hot_utility"], cascade["T"], "--", color="darkred", linewidth=1.8, label="Condenser")
+    plt.plot(cascade["H_cold_utility"], cascade["T"], "--", color="darkblue", linewidth=1.8, label="Evaporator")
+    plt.plot(H_hot, T_vals, label="Sink", linewidth=2, color="red")
+    plt.plot(H_cold, T_vals, label="Source", linewidth=2, color="blue")
+    plt.xlabel("Enthalpy")
+    plt.ylabel("Temperature [°C or K]")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.axvline(0.0, color='black', linewidth=2)
+    plt.tight_layout()
+    plt.show()
+
