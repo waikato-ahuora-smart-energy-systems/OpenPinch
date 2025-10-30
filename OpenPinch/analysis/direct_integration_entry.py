@@ -101,7 +101,7 @@ def compute_direct_integration_targets(zone: Zone):
                 }
             )
 
-    if zone_config.DO_HP_TARGETING:
+    if zone_config.DO_HP_TARGETING and pt.col[PT.H_COLD_NET.value].max() > tol:
         init_res = get_optimal_heat_pump_placement(
             T_hot=pt.col[PT.T.value],
             H_hot=pt.col[PT.H_HOT_NET.value],

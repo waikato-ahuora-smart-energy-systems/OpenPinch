@@ -29,8 +29,9 @@ def get_optimal_heat_pump_placement(
     dtmin_hp: float = 5.0,
     is_T_vals_shifted: bool = True,
     zone_config: Configuration = None,
-    
 ):
+    H_hot, H_cold = _balance_hot_and_cold_heat_loads_with_ambient_air(T_hot, H_hot, T_cold, H_cold, zone_config)
+    T_hot, T_cold = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_hot, T_cold, dtmin_hp, is_T_vals_shifted)    
     init_res = _initialise_heat_pump_temperatures(
         T_hot,
         H_hot,
@@ -40,8 +41,7 @@ def get_optimal_heat_pump_placement(
         n_evap,
         eff_isen,
         dtmin_hp,
-        is_T_vals_shifted,  
-        zone_config,      
+        is_T_vals_shifted,   
     )
 
     return None
@@ -61,10 +61,8 @@ def _initialise_heat_pump_temperatures(
     eff_isen: float = 0.7,
     dtmin_hp: float = 5.0,
     is_T_vals_shifted: bool = True,
-    zone_config: Configuration = None,
 ):
-    H_hot, H_cold = _balance_hot_and_cold_heat_loads_with_ambient_air(T_hot, H_hot, T_cold, H_cold, zone_config)
-    T_hot, T_cold = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_hot, T_cold, dtmin_hp, is_T_vals_shifted)
+
     idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
     T_bnds = _convert_idx_to_temperatures(idx_dict, T_hot, T_cold)
     T_cond_init, T_evap_init = _set_initial_values_for_condenser_and_evaporator(n_cond, n_evap, T_bnds)
