@@ -30,7 +30,7 @@ class Configuration:
     DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
-    DO_HP_TARGETING: bool = False
+    DO_HP_TARGETING: bool = True
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
     DO_VERT_GCC: bool = False
@@ -40,11 +40,12 @@ class Configuration:
     GCC_FOR_TARGETING: str = PT.H_NET_NP.value
 
     ANNUAL_OP_TIME: float = 8300
-    DTCONT: float = 5
-    DTGLIDE: float = 0.01
+    DT_CONT: float = 5
+    DT_PHASE_CHANGE: float = 0.01
     HTC: float = 1.0
     UTILITY_PRICE: float = 40
     T_ENV: float = 15
+    DT_ENV_CONT: float = 10 
     P_ENV: float = 101
     DECIMAL_PLACES: int = 2
 

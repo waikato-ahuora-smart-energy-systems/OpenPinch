@@ -49,16 +49,16 @@ def get_power_cogeneration_above_pinch(z: Zone):
 #######################################################################################################
 
 
-def _prepare_turbine_parameters(config: Configuration):
-    """Load and sanitize turbine parameters from config."""
+def _prepare_turbine_parameters(zone_config: Configuration):
+    """Load and sanitize turbine parameters from zone_config."""
 
-    P_in = float(config.P_TURBINE_BOX)  # bar
-    T_in = float(config.T_TURBINE_BOX)  # °C
-    min_eff = float(config.MIN_EFF)  # minimum isentropic efficiency (decimal)
-    model = config.COMBOBOX
+    P_in = float(zone_config.P_TURBINE_BOX)  # bar
+    T_in = float(zone_config.T_TURBINE_BOX)  # °C
+    min_eff = float(zone_config.MIN_EFF)  # minimum isentropic efficiency (decimal)
+    model = zone_config.COMBOBOX
 
-    load_frac = min(max(config.LOAD, 0), 1)  # clamp between 0 and 1
-    mech_eff = min(max(config.MECH_EFF, 0), 1)  # clamp between 0 and 1
+    load_frac = min(max(zone_config.LOAD, 0), 1)  # clamp between 0 and 1
+    mech_eff = min(max(zone_config.MECH_EFF, 0), 1)  # clamp between 0 and 1
 
     return {
         "P_in": P_in,
@@ -68,7 +68,7 @@ def _prepare_turbine_parameters(config: Configuration):
         "load_frac": load_frac,
         "mech_eff": mech_eff,
         "CONDESATE_FLASH_CORRECTION": getattr(
-            config, "CONDESATE_FLASH_CORRECTION", False
+            zone_config, "CONDESATE_FLASH_CORRECTION", False
         ),  # optional
     }
 
@@ -312,14 +312,14 @@ _TurbineState._max_mass_flow = _TurbineState__max_mass_flow
 
 
 # def get_power_cogeneration_above_pinch(z: Zone): # type: ignore
-#     config: Configuration = z.config
-#     P_in = float(config.P_TURBINE_BOX) # bar
-#     T_in = float(config.T_TURBINE_BOX) # C
-#     MinEff = float(config.MIN_EFF)     # %
-#     SelectedModel = config.COMBOBOX
+#     zone_config: Configuration = z.zone_config
+#     P_in = float(zone_config.P_TURBINE_BOX) # bar
+#     T_in = float(zone_config.T_TURBINE_BOX) # C
+#     MinEff = float(zone_config.MIN_EFF)     # %
+#     SelectedModel = zone_config.COMBOBOX
 
-#     load_frac = config.LOAD
-#     n_mech = config.MECH_EFF
+#     load_frac = zone_config.LOAD
+#     n_mech = zone_config.MECH_EFF
 
 #     if load_frac > 1:
 #         load_frac = 1
@@ -424,7 +424,7 @@ _TurbineState._max_mass_flow = _TurbineState__max_mass_flow
 
 #             # Correct for high pressure condensate flash, if selected
 #             if m_in_k > 0:
-#                 if config.CONDESATE_FLASH_CORRECTION:
+#                 if zone_config.CONDESATE_FLASH_CORRECTION:
 #                     Q_flash = m_k[j - 1] * (h_tar[j - 1] - h_tar[j])
 #                     m_k[j] = (Q_users[j] - Q_flash) / (h_out[j] - h_tar[j])
 #                 else:

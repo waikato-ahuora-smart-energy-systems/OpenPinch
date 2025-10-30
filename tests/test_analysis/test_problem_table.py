@@ -1086,17 +1086,17 @@ def test_includes_utilities():
 
 
 def test_includes_turbine_config():
-    config = Configuration()
-    config.DO_TURBINE_WORK = True
-    config.T_TURBINE_BOX = 200
-    config.P_TURBINE_BOX = 5  # pressure in bar
-    config.DO_EXERGY_TARGETING = True
+    zone_config = Configuration()
+    zone_config.DO_TURBINE_WORK = True
+    zone_config.T_TURBINE_BOX = 200
+    zone_config.P_TURBINE_BOX = 5  # pressure in bar
+    zone_config.DO_EXERGY_TARGETING = True
 
     T_star: ProblemTable
-    T_star = create_problem_table_with_t_int(config=config)
+    T_star = create_problem_table_with_t_int(zone_config=zone_config)
 
-    assert config.T_TURBINE_BOX in T_star[PT.T.value].to_list()
-    assert config.T_ENV in T_star[PT.T.value].to_list()
+    assert zone_config.T_TURBINE_BOX in T_star[PT.T.value].to_list()
+    assert zone_config.T_ENV in T_star[PT.T.value].to_list()
 
 
 def test_empty_inputs():

@@ -44,8 +44,9 @@ class HeatPumpPlacementArgs(BaseModel):
 
     T_cond_hi: float
     T_evap_lo: float
-    T_vals: np.ndarray
+    T_hot: np.ndarray
     H_hot: np.ndarray
+    T_cold: np.ndarray
     H_cold: np.ndarray
     n_cond: int
     n_evap: int

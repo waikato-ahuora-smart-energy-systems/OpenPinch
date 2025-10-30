@@ -26,19 +26,19 @@ def get_process_heat_cascade(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
     all_streams: StreamCollection,
-    config: Configuration,
+    zone_config: Configuration,
 ) -> Tuple[ProblemTable, ProblemTable, dict]:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
     pt = create_problem_table_with_t_int(
         all_streams,
         True,
-        config,
+        zone_config,
     )
     pt_real = create_problem_table_with_t_int(
         all_streams, 
         False,
-        config,
+        zone_config,
     )    
 
     # Perform the heat cascade of the problem table
@@ -93,7 +93,7 @@ def get_utility_heat_cascade(
 def create_problem_table_with_t_int(
     streams: List[Stream] = [], 
     is_shifted: bool = True,
-    config: Configuration = None,
+    zone_config: Configuration = None,
 ) -> Tuple[ProblemTable, ProblemTable]:
     """Returns ordered T and T* intervals for given streams and utilities."""
 
@@ -103,16 +103,24 @@ def create_problem_table_with_t_int(
         for t in ((s.t_min_star, s.t_max_star) if is_shifted else (s.t_min, s.t_max))
     ]
 
-    if isinstance(config, Configuration):
-        if config.DO_TURBINE_WORK:
+    if isinstance(zone_config, Configuration):
+        if zone_config.DO_TURBINE_WORK:
             T_vals.extend([
-                config.T_TURBINE_BOX, 
-                Tsat_p(config.P_TURBINE_BOX),
+                zone_config.T_TURBINE_BOX, 
+                Tsat_p(zone_config.P_TURBINE_BOX),
             ])
 
-        if config.DO_EXERGY_TARGETING:
-            T_vals.append(config.T_ENV)\
+        if zone_config.DO_EXERGY_TARGETING:
+            T_vals.append(zone_config.T_ENV)
 
+        if zone_config.DO_HP_TARGETING:
+            T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT)
+            T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT - zone_config.DT_PHASE_CHANGE)
+            T_vals.append(zone_config.T_ENV + zone_config.DT_ENV_CONT)
+            T_vals.append(zone_config.T_ENV + zone_config.DT_ENV_CONT + zone_config.DT_PHASE_CHANGE)
+
+    dp = int(-math.log10(tol))
+    T_vals = np.array(T_vals).round(dp)
     return ProblemTable(
         {
             PT.T.value: sorted(set(T_vals), reverse=True)

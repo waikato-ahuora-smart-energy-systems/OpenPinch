@@ -21,13 +21,13 @@ class Zone:
         self,
         name: str = "Zone",
         identifier: str = ZoneType.P.value,
-        config: Optional[Configuration] = None,
+        zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
     ):
         # === Metadata ===
         self._name = name
         self._identifier = identifier
-        self._config = config or Configuration()
+        self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
         self._active = True
         self._subzones = {}
@@ -219,7 +219,7 @@ class Zone:
 
     def add_target_from_results(self, target_id: str = None, results: dict = None):
         target_name = f"{self.name}/{target_id}" if target_id is not None else self.name
-        res = EnergyTarget(target_name, target_id, self.parent_zone, config=self.config)
+        res = EnergyTarget(target_name, target_id, self.parent_zone, zone_config=self.config)
         for key, value in results.items():
             setattr(res, key, value)
         self.add_target(res)

@@ -60,16 +60,16 @@ def prepare_problem(
     top_zone_name, top_zone_identifier = _get_validated_zone_info(
         zone_tree, project_name
     )
-    config = Configuration(
+    zone_config = Configuration(
         options=options,
         top_zone_name=top_zone_name,
         top_zone_identifier=top_zone_identifier,
     )
-    zone_tree, streams, utilities, config = _validate_input_data(
-        zone_tree, streams, utilities, config
+    zone_tree, streams, utilities, zone_config = _validate_input_data(
+        zone_tree, streams, utilities, zone_config
     )
     master_zone = Zone(
-        name=config.TOP_ZONE_NAME, identifier=config.TOP_ZONE_IDENTIFIER, config=config
+        name=zone_config.TOP_ZONE_NAME, identifier=zone_config.TOP_ZONE_IDENTIFIER, zone_config=zone_config
     )
     master_zone = _create_nested_zones(master_zone, zone_tree, master_zone.config)
     master_zone = _get_process_streams_in_each_subzone(
@@ -132,12 +132,12 @@ def _validate_input_data(
     zone_tree: ZoneTreeSchema = None,
     streams: Optional[List[StreamSchema]] = None,
     utilities: Optional[List[UtilitySchema]] = None,
-    config: Optional[Configuration] = None,
+    zone_config: Optional[Configuration] = None,
 ):
     """Checks for logic and completeness of the input data. Where possible, fills in the gaps with general assumptions."""
     streams_list = [] if streams is None else list(streams)
     utilities_list = [] if utilities is None else list(utilities)
-    cfg = config or Configuration()
+    cfg = zone_config or Configuration()
 
     streams_list = _validate_streams_passed_in(streams_list)
     utilities_list = _validate_utilities_passed_in(utilities_list)
@@ -149,7 +149,7 @@ def _validate_input_data(
 
 
 def _create_nested_zones(
-    parent_zone: Zone, zone_tree: ZoneTreeSchema, config: Configuration
+    parent_zone: Zone, zone_tree: ZoneTreeSchema, zone_config: Configuration
 ) -> Zone:
     """Recursively construct a Zone hierarchy from a ZoneTreeSchema."""
     if not zone_tree.children:
@@ -159,11 +159,11 @@ def _create_nested_zones(
         child_zone = Zone(
             name=child_schema.name,
             identifier=child_schema.type,
-            config=config,
+            zone_config=zone_config,
             parent_zone=parent_zone,
         )
         parent_zone.add_zone(child_zone, sub=True)
-        _create_nested_zones(child_zone, child_schema, config)
+        _create_nested_zones(child_zone, child_schema, zone_config)
 
     return parent_zone
 
@@ -252,15 +252,15 @@ def _get_hot_and_cold_utilities(
     utilities: List[UtilitySchema],
     hot_streams: List[Stream],
     cold_streams: List[Stream],
-    config: Configuration,
+    zone_config: Configuration,
 ) -> Tuple[List[Stream], List[Stream]]:
     """Extracts all utility data into class instances."""
     HU_T_min, CU_T_max = _find_extreme_process_temperatures(hot_streams, cold_streams)
     utilities, addDefaultHU, addDefaultCU = _complete_utility_data(
-        utilities, config, HU_T_min, CU_T_max
+        utilities, zone_config, HU_T_min, CU_T_max
     )
     utilities = _add_default_utilities(
-        utilities, config, addDefaultHU, addDefaultCU, HU_T_min, CU_T_max
+        utilities, zone_config, addDefaultHU, addDefaultCU, HU_T_min, CU_T_max
     )
     hot_utilities, utilities = _create_utilities_list(
         utilities, utility_type=StreamType.Hot.value
@@ -289,7 +289,7 @@ def _find_extreme_process_temperatures(
 
 def _complete_utility_data(
     utilities: List[UtilitySchema],
-    config: Configuration,
+    zone_config: Configuration,
     HU_T_min: float,
     CU_T_max: float,
 ) -> Tuple[List[UtilitySchema], bool, bool]:
@@ -306,23 +306,23 @@ def _complete_utility_data(
 
         t_target = get_value(utility.t_target)
         if t_target is None or t_target == utility.t_supply:
-            delta = -config.DTGLIDE if utility.type == "Hot" else config.DTGLIDE
+            delta = -zone_config.DT_PHASE_CHANGE if utility.type == "Hot" else zone_config.DT_PHASE_CHANGE
             utility.t_target = utility.t_supply + delta
         else:
             utility.t_target = t_target
 
         dt_cont = get_value(utility.dt_cont)
-        utility.dt_cont = config.DTCONT if dt_cont is None else dt_cont
+        utility.dt_cont = zone_config.DT_CONT if dt_cont is None else dt_cont
 
         price = get_value(utility.price)
         utility.price = (
-            config.UTILITY_PRICE * config.ANNUAL_OP_TIME
+            zone_config.UTILITY_PRICE * zone_config.ANNUAL_OP_TIME
             if price is None
             else price
         )
 
         htc = get_value(utility.htc)
-        utility.htc = config.HTC if not htc else htc
+        utility.htc = zone_config.HTC if not htc else htc
 
         if (
             utility.type in ["Hot", "Both"]
@@ -341,7 +341,7 @@ def _complete_utility_data(
 
 def _add_default_utilities(
     utilities: List[UtilitySchema],
-    config: Configuration,
+    zone_config: Configuration,
     addDefaultHU: bool,
     addDefaultCU: bool,
     HU_T_min: float,
@@ -350,14 +350,14 @@ def _add_default_utilities(
     """Adds default hot and cold utilities to the list of utilities."""
     # Add default hot and cold utilities
     if addDefaultHU:
-        utilities.append(_create_default_utility("HU", "Hot", HU_T_min, config))
+        utilities.append(_create_default_utility("HU", "Hot", HU_T_min, zone_config))
     if addDefaultCU:
-        utilities.append(_create_default_utility("CU", "Cold", CU_T_max, config))
+        utilities.append(_create_default_utility("CU", "Cold", CU_T_max, zone_config))
     return utilities
 
 
 def _create_default_utility(
-    name: str, ut_type: str, T: float, config: Configuration
+    name: str, ut_type: str, T: float, zone_config: Configuration
 ) -> UtilitySchema:
     """Construct a default utility entry anchored to the extreme process temperature."""
     a = 1 if ut_type == "Hot" else -1
@@ -365,12 +365,12 @@ def _create_default_utility(
         {
             "name": name,
             "type": ut_type,
-            "t_supply": T + (config.DTCONT) * a,
-            "t_target": T + (config.DTCONT - config.DTGLIDE) * a,
+            "t_supply": T + (zone_config.DT_CONT) * a,
+            "t_target": T + (zone_config.DT_CONT - zone_config.DT_PHASE_CHANGE) * a,
             "heat_flow": 0,
-            "dt_cont": config.DTCONT,
-            "price": config.UTILITY_PRICE,
-            "htc": config.HTC,
+            "dt_cont": zone_config.DT_CONT,
+            "price": zone_config.UTILITY_PRICE,
+            "htc": zone_config.HTC,
         }
     )
 
@@ -629,17 +629,17 @@ def _validate_utilities_passed_in(utilities: List[UtilitySchema]) -> list:
     return [] if utilities is None else utilities
 
 
-def _validate_config_data_completed(config: Configuration) -> Configuration:
+def _validate_config_data_completed(zone_config: Configuration) -> Configuration:
     """Validates that the configuration settings make logical sense."""
     # Check if annual operation time is set
-    if not isinstance(config.ANNUAL_OP_TIME, (int, float)) or config.ANNUAL_OP_TIME == 0:
-        config.ANNUAL_OP_TIME = 365 * 24  # h/y
+    if not isinstance(zone_config.ANNUAL_OP_TIME, (int, float)) or zone_config.ANNUAL_OP_TIME == 0:
+        zone_config.ANNUAL_OP_TIME = 365 * 24  # h/y
     # Ensures the inlet pressure to the turbine is below the critical pressure
     # TODO: Add units to the turbine pressure
-    if config.DO_TURBINE_WORK and config.P_TURBINE_BOX > 220:
-        config.P_TURBINE_BOX = 200
-    if config.DTGLIDE <= 0:
-        config.DTGLIDE = 0.01
-    if config.DTCONT < 0:
-        config.DTCONT = 0.0
-    return config
+    if zone_config.DO_TURBINE_WORK and zone_config.P_TURBINE_BOX > 220:
+        zone_config.P_TURBINE_BOX = 200
+    if zone_config.DT_PHASE_CHANGE <= 0:
+        zone_config.DT_PHASE_CHANGE = 0.01
+    if zone_config.DT_CONT < 0:
+        zone_config.DT_CONT = 0.0
+    return zone_config

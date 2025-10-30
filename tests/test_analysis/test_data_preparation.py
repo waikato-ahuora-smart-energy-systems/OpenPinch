@@ -62,7 +62,7 @@ def dummy_config():
 
 @pytest.fixture
 def dummy_site(dummy_config):
-    return Zone(name="test_site", config=dummy_config)
+    return Zone(name="test_site", zone_config=dummy_config)
 
 
 @pytest.fixture
@@ -1040,15 +1040,16 @@ def make_zone_tree_schema():
     )
 
 
-def test_creates_nested_zones_correctly(config: Configuration):
+def test_creates_nested_zones_correctly():
+    zone_config = Configuration()
     zone_tree = make_zone_tree_schema()
     master_zone = Zone(
-        name=config.TOP_ZONE_NAME, identifier=config.TOP_ZONE_IDENTIFIER, config=config
+        name=zone_config.TOP_ZONE_NAME, identifier=zone_config.TOP_ZONE_IDENTIFIER, zone_config=zone_config
     )
 
-    result = _create_nested_zones(master_zone, zone_tree, config)
+    result = _create_nested_zones(master_zone, zone_tree, zone_config)
 
-    assert result.name == "MySite"
+    assert result.name == "Site"
     assert len(result.subzones) == 1
 
     area1 = result.subzones["Area1"]
@@ -1062,11 +1063,12 @@ def test_creates_nested_zones_correctly(config: Configuration):
     assert line1.subzones == {}
 
 
-def test_empty_zone_tree_returns_parent(config):
+def test_empty_zone_tree_returns_parent():
+    zone_config = Configuration()
     zone_tree = ZoneTreeSchema(name="MySite", type=ZoneType.S.value, children=None)
-    parent_zone = Zone(name="MySite", identifier=ZoneType.S.value, config=config)
+    parent_zone = Zone(name="MySite", identifier=ZoneType.S.value, zone_config=zone_config)
 
-    result = _create_nested_zones(parent_zone, zone_tree, config)
+    result = _create_nested_zones(parent_zone, zone_tree, zone_config)
 
     assert result == parent_zone
     assert result.subzones == {}

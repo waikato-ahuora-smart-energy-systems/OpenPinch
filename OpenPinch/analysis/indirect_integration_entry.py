@@ -81,12 +81,12 @@ def compute_indirect_integration_targets(site: Zone) -> Zone:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_UT_NET.value)
 
-    # if config.DO_TURBINE_WORK:
+    # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
-    #     if config.ABOVE_PINCH_CHECKBOX:
+    #     if zone_config.ABOVE_PINCH_CHECKBOX:
     #         pass
     #         # s_tsi = get_power_cogeneration_above_pinch(s_tsi)
-    #     utility_cost = utility_cost - work_target / 1000 * config.ELECTRICITY_PRICE * config.ANNUAL_OP_TIME
+    #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
 
     graphs = _save_graph_data(pt, pt_real)
 
@@ -158,9 +158,9 @@ def _sum_subzone_targets(site: Zone) -> Zone:
     ].heat_recovery_limit
 
     # Target co-generation of heat and power
-    # if config.DO_TURBINE_WORK:
+    # if zone_config.DO_TURBINE_WORK:
     #     st = get_power_cogeneration_above_pinch(st)
-    #     utility_cost = utility_cost - work_target / 1000 * config.ELECTRICITY_PRICE * config.ANNUAL_OP_TIME
+    #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
 
     target_values = _set_sites_targets(
         hot_utility_target,

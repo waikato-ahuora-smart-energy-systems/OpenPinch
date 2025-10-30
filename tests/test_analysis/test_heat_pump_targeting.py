@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import numpy as np
 
 from OpenPinch.analysis.heat_pump_targeting import (
@@ -8,6 +10,8 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _get_entropic_average_temperature,
     _set_initial_values_for_condenser_and_evaporator,
     _get_carnot_COP,
+    _convert_idx_to_temperatures,
+    _get_H_vals_from_T_hp_vals,
 )
 from OpenPinch.lib import *
 
@@ -120,14 +124,27 @@ def test_prepare_data_for_minimize_single_segment():
     assert bnds == []
 
 
-def test_initialise_heat_pump_temperatures_constructs_minimizer_inputs():
+def test_initialise_heat_pump_temperatures_constructs_minimizer_inputs(monkeypatch):
     T_vals = get_temperatures()
     H_cold = get_cold_cc()
     H_hot = get_hot_cc()
 
-    x0, args, bnds = _initialise_heat_pump_temperatures(
+    minimize_calls = {}
+
+    def fake_minimize(fun, x0, method=None, bounds=None, **kwargs):
+        minimize_calls["fun"] = fun
+        minimize_calls["x0"] = np.array(x0, copy=True)
+        minimize_calls["method"] = method
+        minimize_calls["bounds"] = bounds
+        minimize_calls["kwargs"] = kwargs
+        return SimpleNamespace(x=np.array(x0, copy=True))
+
+    monkeypatch.setattr("OpenPinch.analysis.heat_pump_targeting.minimize", fake_minimize)
+
+    result = _initialise_heat_pump_temperatures(
         T_vals,
         H_hot,
+        T_vals,
         H_cold,
         n_cond=2,
         n_evap=3,
@@ -136,16 +153,19 @@ def test_initialise_heat_pump_temperatures_constructs_minimizer_inputs():
         is_T_vals_shifted=False,
     )
 
-    assert isinstance(args, HeatPumpPlacementArgs)
-    np.testing.assert_allclose(x0, np.array([175.0, 150.0, 200.0]))
-    assert bnds == [(100.0, 250.0), (100.0, 250.0), (100.0, 250.0)]
-    assert args.T_cond_hi == 250.0
-    assert args.T_evap_lo == 100.0
-    np.testing.assert_array_equal(args.T_vals, T_vals)
-    np.testing.assert_array_equal(args.H_hot, H_hot)
-    np.testing.assert_array_equal(args.H_cold, H_cold)
-    assert args.n_cond == 2
-    assert args.n_evap == 3
-    assert args.eff_isen == 0.75
-    assert args.dtmin_hp == 10.0
-    assert args.is_T_vals_shifted is False
+    idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
+    T_bnds = _convert_idx_to_temperatures(idx_dict, T_vals, T_vals)
+    expected_cond, expected_evap = _set_initial_values_for_condenser_and_evaporator(2, 3, T_bnds)
+    expected_x0, expected_bnds = _prepare_data_for_minimizer(expected_cond, expected_evap, T_bnds)
+    expected_H_cond = _get_H_vals_from_T_hp_vals(expected_cond, T_vals, H_cold)
+    expected_H_evap = _get_H_vals_from_T_hp_vals(expected_evap, T_vals, H_hot)
+
+    assert set(result.keys()) == {"T_cond", "H_cond", "T_evap", "H_evap", "total_work"}
+    np.testing.assert_allclose(result["T_cond"], expected_cond)
+    np.testing.assert_allclose(result["T_evap"], expected_evap)
+    np.testing.assert_allclose(result["H_cond"], expected_H_cond)
+    np.testing.assert_allclose(result["H_evap"], expected_H_evap)
+
+    assert minimize_calls["method"] == "COBYQA"
+    np.testing.assert_allclose(minimize_calls["x0"], expected_x0)
+    assert minimize_calls["bounds"] == expected_bnds

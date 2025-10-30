@@ -23,7 +23,7 @@ def get_utility_targets(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
     is_process_zone: bool = True,
-    config: Configuration = Configuration(),
+    zone_config: Configuration = Configuration(),
 ) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection]:
     """Target utility usage and compute GCC variants for a zone.
 
@@ -50,7 +50,7 @@ def get_utility_targets(
     if is_process_zone:
         get_GCC_without_pockets(pt)
         
-    if config.DO_VERT_GCC:
+    if zone_config.DO_VERT_GCC:
         pt.update(
             get_GCC_with_vertical_heat_transfer(
                 pt.col[PT.H_COLD.value],
@@ -59,7 +59,7 @@ def get_utility_targets(
             )
         )
 
-    if config.DO_ASSITED_HT:
+    if zone_config.DO_ASSITED_HT:
         pt.update(
             get_GGC_pockets(pt)
         )

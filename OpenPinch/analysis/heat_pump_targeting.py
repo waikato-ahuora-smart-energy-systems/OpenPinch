@@ -117,6 +117,7 @@ def _get_Q_from_H(H: np.ndarray):
     temp[-1] = 0
     return H0 - temp    
 
+
 def _get_entropic_average_temperature(
     T: np.ndarray,
     H: np.ndarray,        

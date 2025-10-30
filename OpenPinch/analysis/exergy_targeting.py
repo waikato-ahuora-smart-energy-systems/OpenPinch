@@ -86,7 +86,7 @@ def compute_exergetic_temperature(
 #     GCC_X = copy.deepcopy(GCC_A)
 #     Min_X = 0
 #     AbovePT = True
-#     GCC_X[0][0] = compute_exergetic_temperature(GCC_A[0][0] + z.config.DTCONT / 2, T_ref=z.config.T_ENV)
+#     GCC_X[0][0] = compute_exergetic_temperature(GCC_A[0][0] + z.config.DT_CONT / 2, T_ref=z.config.T_ENV)
 #     GCC_X[1][0] = 0
 #     i_upper = len(GCC_X[0]) + 1
 
@@ -95,7 +95,7 @@ def compute_exergetic_temperature(
 #     GCC_A_i = 1
 #     while i <= i_upper and GCC_A_i < len(GCC_A[0]):
 #         if AbovePT:
-#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i] + z.config.DTCONT / 2, T_ref=z.config.T_ENV)
+#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i] + z.config.DT_CONT / 2, T_ref=z.config.T_ENV)
 #             GCC_X[1][i] = (GCC_A[1][GCC_A_i - 1] - GCC_A[1][GCC_A_i]) / (GCC_A[0][GCC_A_i - 1] - GCC_A[0][GCC_A_i])
 #             GCC_X[1][i] = GCC_X[1][i - 1] - GCC_X[1][i] * (GCC_X[0][i - 1] - GCC_X[0][i])
 #             if GCC_A[1][GCC_A_i] < tol:
@@ -104,11 +104,11 @@ def compute_exergetic_temperature(
 #                     row += [0, 0]
 #                 i += 2
 #                 GCC_A_i += 1
-#                 GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.T_ENV)
+#                 GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DT_CONT / 2, T_ref=z.config.T_ENV)
 #                 GCC_X[1][i] = GCC_X[1][i - 1]
 #                 AbovePT = False
 #         else:
-#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DTCONT / 2, T_ref=z.config.T_ENV)
+#             GCC_X[0][i] = compute_exergetic_temperature(GCC_A[0][GCC_A_i - 1] - z.config.DT_CONT / 2, T_ref=z.config.T_ENV)
 #             GCC_X[1][i] = (GCC_A[1][GCC_A_i - 2] - GCC_A[1][GCC_A_i - 1]) / (GCC_A[0][GCC_A_i - 2] - GCC_A[0][GCC_A_i - 1])
 #             GCC_X[1][i] = GCC_X[1][i - 1] - GCC_X[1][i] * (GCC_X[0][i - 1] - GCC_X[0][i])
 #         i += 1

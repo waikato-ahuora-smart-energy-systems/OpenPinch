@@ -4,7 +4,6 @@ from typing import List, Tuple
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from .problem_table_analysis import get_process_heat_cascade
 from . import (
     get_process_heat_cascade,
     get_utility_targets,
@@ -12,6 +11,7 @@ from . import (
     get_min_number_hx,
     get_capital_cost_targets,
     get_balanced_CC,
+    get_optimal_heat_pump_placement,
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -47,7 +47,7 @@ def compute_direct_integration_targets(zone: Zone):
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
 
-    if zone_config.DO_BALANCED_CC or zone_config.DO_AREA_TARGETING or 1:
+    if zone_config.DO_BALANCED_CC or zone_config.DO_AREA_TARGETING:
         pt.update(
             get_balanced_CC(
                 pt.col[PT.H_HOT.value],
@@ -70,7 +70,7 @@ def compute_direct_integration_targets(zone: Zone):
             )
         )
         # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC
-        if zone_config.DO_AREA_TARGETING or 1:
+        if zone_config.DO_AREA_TARGETING:
             num_units = get_min_number_hx(
                 pt.col[PT.T.value],
                 pt.col[PT.H_HOT_BAL.value],
@@ -100,6 +100,21 @@ def compute_direct_integration_targets(zone: Zone):
                     "Annualised capital cost target": annual_capital_cost,
                 }
             )
+
+    if zone_config.DO_HP_TARGETING:
+        init_res = get_optimal_heat_pump_placement(
+            T_hot=pt.col[PT.T.value],
+            H_hot=pt.col[PT.H_HOT_NET.value],
+            T_cold=pt.col[PT.T.value],
+            H_cold=pt.col[PT.H_COLD_NET.value],
+            n_cond=2,
+            n_evap=2,
+            eff_isen=0.7,
+            dtmin_hp=0,
+            is_T_vals_shifted=True,  
+            zone_config=zone_config,      
+        )
+        pass
 
     res.update(
         {

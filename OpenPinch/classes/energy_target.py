@@ -25,10 +25,10 @@ class EnergyTarget:
         name: str = "untitled",
         identifier: str = TargetType.DI.value,
         parent_zone: "Zone" = None,
-        config: Optional[Configuration] = None,
+        zone_config: Optional[Configuration] = None,
     ):
         # === Metadata ===
-        self._config = config or Configuration()
+        self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
         self._identifier = identifier
         self._name = name
