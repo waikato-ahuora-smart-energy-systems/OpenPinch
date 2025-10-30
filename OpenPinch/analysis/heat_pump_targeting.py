@@ -1,7 +1,6 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
 from scipy.optimize import minimize, brentq
-from pydantic import BaseModel
 
 from ..classes import *
 from ..lib import *
@@ -21,16 +20,24 @@ __all__ = ["get_optimal_heat_pump_placement"]
 
 def get_optimal_heat_pump_placement(
     T_vals: np.ndarray,
-    T_hot_net: np.ndarray,
-    T_cold_net: np.ndarray,
+    H_hot: np.ndarray,
+    H_cold: np.ndarray,
     n_cond: int,
     n_evap: int,
-    hot_pinch: float,
-    cold_pinch: float,
     eff_isen: float = 0.7,
     dtmin_hp: float = 5.0,
+    is_T_vals_shifted: bool = True,
 ):
-
+    init_res = _initialise_heat_pump_temperatures(
+        T_vals,
+        H_hot,
+        H_cold,
+        n_cond,
+        n_evap,
+        eff_isen,
+        dtmin_hp,
+        is_T_vals_shifted,        
+    )
 
     return None
 
@@ -69,7 +76,7 @@ def _initialise_heat_pump_temperatures(
     )
 
     if x0.shape == (0,):
-        pass # nothing to optimise
+        res = _get_heat_pump_placement_performance(None, args)
     else:
         res = minimize(
             fun=lambda x: _get_heat_pump_placement_performance(x, args),
@@ -78,8 +85,18 @@ def _initialise_heat_pump_temperatures(
             bounds=bnds,
             # constraints=None,
         )
+    total_work = res.x
+    T_cond, T_evap = _get_all_cond_and_evap_temperature_levels(res.x, args)
+    H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_vals, args.H_cold)
+    H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_vals, args.H_hot)
 
-    return x0, args, bnds
+    return {
+        "T_cond": T_cond, 
+        "H_cond": H_cond, 
+        "T_evap": T_evap, 
+        "H_evap": H_evap, 
+        "total_work": total_work,
+    }
 
 
 def _get_entropic_average_temperature(
@@ -115,24 +132,35 @@ def _get_carnot_COP(
         return 1000
 
 
-def _get_heat_pump_placement_performance(x, args: HeatPumpPlacementArgs) -> float:
+def _get_all_cond_and_evap_temperature_levels(x, args: HeatPumpPlacementArgs) -> Tuple[np.ndarray, np.ndarray]:
     x = np.asarray(x, dtype=float).reshape(-1)
     n_cond_vars = max(int(args.n_cond) - 1, 0)
     n_evap_vars = max(int(args.n_evap) - 1, 0)
-
     T_cond = np.concatenate((np.array([args.T_cond_hi]), x[:n_cond_vars]))
     T_evap = np.concatenate((np.array([args.T_evap_lo]), x[n_cond_vars:n_cond_vars + n_evap_vars]))
+    return T_cond, T_evap
+
+
+def _get_H_vals_from_T_hp_vals(
+    T_hp: np.ndarray,
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+) -> np.ndarray:
+    return np.interp(T_hp, T_vals[::-1], H_vals[::-1])
+
+
+def _get_heat_pump_placement_performance(x, args: HeatPumpPlacementArgs) -> float:
+    T_cond, T_evap = _get_all_cond_and_evap_temperature_levels(x, args)
     T_evap0 = T_evap.copy()
-
-    H_cond = np.interp(T_cond, args.T_vals[::-1], args.H_cold[::-1])
-
+    H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_vals, args.H_cold)
+    
     def _get_optimal_min_evap_T(T_lo):
         for i in range(len(T_evap)):
             if (T_lo > T_evap[i]) or (abs(T_lo - T_evap[i]) > tol and i == 0):
                 T_evap[i] = T_lo
             else:
                 T_evap[i] = T_evap0[i]  
-        H_evap = np.interp(T_evap, args.T_vals[::-1], args.H_hot[::-1])
+        H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_vals, args.H_hot)
         cop = _get_carnot_COP(T_cond, H_cond, T_evap, H_evap)
         Q_evap_tot = H_cond[0] * (1 - 1 / cop) if cop > 0 else 0
         work = H_cond[0] - Q_evap_tot
@@ -153,7 +181,6 @@ def _get_heat_pump_placement_performance(x, args: HeatPumpPlacementArgs) -> floa
         b=args.bnds_evap[1],
         # full_output=True,
     )
-
     total_work = _get_optimal_min_evap_T(res)["work"]
     return total_work
 
