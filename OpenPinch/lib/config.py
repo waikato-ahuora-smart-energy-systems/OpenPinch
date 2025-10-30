@@ -24,84 +24,76 @@ class Configuration:
 
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
-    # TIT_BUTTON_SELECTED: bool = False
-    # TS_BUTTON_SELECTED: bool = False
-    TURBINE_WORK_BUTTON: bool = False
-    AREA_BUTTON: bool = False
-    ENERGY_RETROFIT_BUTTON: bool = False
-    EXERGY_BUTTON: bool = False
-    # PRINT_PTS: bool = False
-    PLOT_GRAPHS: bool = True
+
+    DO_DIRECT_OPERATION_TARGETING: bool = False
+    # DO_DIRECT_SITE_TARGETING: bool = True
+    DO_INDIRECT_PROCESS_TARGETING: bool = False
+    DO_BALANCED_CC: bool = True
+    DO_AREA_TARGETING: bool = False
+    DO_HP_TARGETING: bool = False
+    DO_TURBINE_TARGETING: bool = False
+    DO_EXERGY_TARGETING: bool = False
+    DO_VERTICAL_GCC: bool = False
+    DO_ASSITED_HT: bool = False
+    DO_TURBINE_WORK: bool = False
+
+    GCC_FOR_TARGETING: str = PT.H_NET_NP.value
+
+    DT_CONT: float = 5
+    DT_PHASE_CHANGE: float = 0.01
+    HTC: float = 1.0
+    T_ENV: float = 15
+    DT_ENV_CONT: float = 10 
+    P_ENV: float = 101
     DECIMAL_PLACES: int = 2
 
-    CC_CHECKBOX: bool = True
-    SCC_CHECKBOX: bool = True
-    BCC_CHECKBOX: bool = False
-    GCC_CHECKBOX: bool = True
-    GCC_N_CHECKBOX: bool = True
-    GCCU_CHECKBOX: bool = False
-    GCC_Lim_CHECKBOX: bool = False
-    TSC_CHECKBOX: bool = False
-    ERC_CHECKBOX: bool = False
-    NLC_CHECKBOX: bool = False
-    MAX_GRAPHS: int = 128
-
-    T_TURBINE_BOX: float = 450
-    P_TURBINE_BOX: float = 90
-    MIN_EFF: float = 0.1
-    ELECTRICITY_PRICE: float = 100
-    LOAD: float = 1
-    MECH_EFF: float = 1
-    COMBOBOX: str = "Medina-Flores et al. (2010)"
-    ABOVE_PINCH_CHECKBOX: bool = False
-    BELOW_PINCH_CHECKBOX: bool = False
-    CONDESATE_FLASH_CORRECTION: bool = False
-
-    # CF_SELECTED: bool = True
-    # PF_SELECTED: bool = False
-    # SHELL_AND_TUBE: bool = False
-
-    HHT_OPTION: bool = True
-    VHT_OPTION: bool = False
-    AUTOREORDER: bool = False
-    AUTOREORDER_1: bool = False
-    AUTOREORDER_2: bool = False
-    AUTOREORDER_3: bool = False
-    AUTOREORDER_4: bool = False
-    GCC_REG_FULL_POCKET: bool = True
-    GCC_VERT_CUT_KINK_OPTION: bool = False
-    SET_MIN_DH_THRES: bool = False
-    SET_MIN_TH_AREA: bool = False
-    AUTOMATED_RETROFIT_TARGETING_BUTTON: bool = False
-    THRESHOLD: float = 0
-    AREA_THRESHOLD: float = 0
-
-    Q_MIN: float = 400
-    NUM_HX: float = 6
-    AREA_RATIO: float = 0
-    PRICE_UTILITIES: float = 220
-    MAX_RBBRIDGE: float = 100000
-    RECORD: bool = True
-    PARETO: bool = False
-    QUANTIFY_AREA: bool = False
-    ACCELERATION: bool = True
-    HEURISTICS: bool = True
-
-    FC: float = 0
-    VC: float = 10000
-    EXP: float = 0.7
+    UTILITY_PRICE: float = 40
+    ANNUAL_OP_TIME: float = 8300
+    FIXED_COST: float = 0
+    VARIABLE_COST: float = 10000
+    COST_EXP: float = 0.7
     DISCOUNT_RATE: float = 0.07
     SERV_LIFE: float = 10
-    ANNUAL_OP_TIME: float = 8300
 
-    DTCONT: float = 5
-    DTGLIDE: float = 0.01
-    HTC: float = 1.0
-    UTILITY_PRICE: float = 40
-    TEMP_REF: float = 15
-    PRESSURE_REF: float = 101
-    AHT_BUTTON_SELECTED: bool = False
-    OVERRIDEDT_BUTTON_SELECTED: bool = False
+    ### OLD CONFIG -- Review ###
+
+    # T_TURBINE_BOX: float = 450
+    # P_TURBINE_BOX: float = 90
+    # MIN_EFF: float = 0.1
+    # ELECTRICITY_PRICE: float = 100
+    # LOAD: float = 1
+    # MOTOR_MECH_EFF: float = 1
+    # COMBOBOX: str = "Medina-Flores et al. (2010)"
+    # ABOVE_PINCH_CHECKBOX: bool = False
+    # BELOW_PINCH_CHECKBOX: bool = False
+    # CONDESATE_FLASH_CORRECTION: bool = False
+
+    # HHT_OPTION: bool = True
+    # VHT_OPTION: bool = False
+    # AUTOREORDER: bool = False
+    # AUTOREORDER_1: bool = False
+    # AUTOREORDER_2: bool = False
+    # AUTOREORDER_3: bool = False
+    # AUTOREORDER_4: bool = False
+
+    # GCC_REG_FULL_POCKET: bool = True
+    # GCC_VERT_CUT_KINK_OPTION: bool = False
+    # SET_MIN_DH_THRES: bool = False
+    # SET_MIN_TH_AREA: bool = False
+    # AUTOMATED_RETROFIT_TARGETING_BUTTON: bool = False
+    # THRESHOLD: float = 0
+    # AREA_THRESHOLD: float = 0
+
+    # Q_MIN: float = 400
+    # NUM_HX: float = 6
+    # AREA_RATIO: float = 0
+    # PRICE_UTILITIES: float = 220
+    # MAX_RBBRIDGE: float = 100000
+    # RECORD: bool = True
+    # PARETO: bool = False
+    # QUANTIFY_AREA: bool = False
+    # ACCELERATION: bool = True
+    # HEURISTICS: bool = True
 
     def __init__(
         self,
@@ -121,10 +113,10 @@ class Configuration:
         main_props = set(options.main)
         self.TIT_BUTTON_SELECTED = "PROP_MOP_0" in main_props
         self.TS_BUTTON_SELECTED = "PROP_MOP_1" in main_props
-        self.TURBINE_WORK_BUTTON = "PROP_MOP_2" in main_props
-        self.AREA_BUTTON = "PROP_MOP_3" in main_props
+        self.DO_TURBINE_WORK = "PROP_MOP_2" in main_props
+        self.DO_AREA_TARGETING = "PROP_MOP_3" in main_props
         self.ENERGY_RETROFIT_BUTTON = "PROP_MOP_4" in main_props
-        self.EXERGY_BUTTON = "PROP_MOP_5" in main_props
+        self.DO_EXERGY_TARGETING = "PROP_MOP_5" in main_props
         self.PRINT_PTS = "PROP_MOP_6" in main_props
         self.PLOT_GRAPHS = True
 
@@ -157,7 +149,7 @@ class Configuration:
             value = option_map.get(key, default)
             return default if value is None else value
 
-        if self.TURBINE_WORK_BUTTON:
+        if self.DO_TURBINE_WORK:
             self.T_TURBINE_BOX = get_turbine_value("PROP_TOP_0", self.T_TURBINE_BOX)
             self.P_TURBINE_BOX = get_turbine_value("PROP_TOP_1", self.P_TURBINE_BOX)
             self.MIN_EFF = get_turbine_value("PROP_TOP_2", self.MIN_EFF)

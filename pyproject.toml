@@ -16,8 +16,9 @@ dependencies=[
   "scipy",
   "streamlit",
   "plotly",
+  "matplotlib",
 ]
-version = "0.0.21"
+version = "0.0.22"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]

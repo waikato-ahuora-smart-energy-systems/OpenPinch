@@ -20,7 +20,7 @@ import openpyxl as xl_writer
 
 from ..classes import EnergyTarget, ProblemTable, Zone, Stream
 from ..lib.enums import ArrowHead, LineColour
-from .graph_data import get_output_graph_data
+from ..analysis.graph_data import get_output_graph_data
 
 __all__ = [
     "StreamlitGraphSet",

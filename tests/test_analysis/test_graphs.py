@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from OpenPinch.analysis.graph_data import (
-    _clean_composite,
     _classify_segment,
     _create_curve,
     _create_graph_set,
@@ -18,14 +17,6 @@ from OpenPinch.lib import *
 # ----------------------------------------------------------------------------------------------------
 # Unit Tests for Helper Functions
 # ----------------------------------------------------------------------------------------------------
-
-
-def test_clean_composite_removes_redundant_points():
-    x_vals = [0, 10, 20, 30, 20]
-    y_vals = [0, 5, 10, 15, 10]
-    y_clean, x_clean = _clean_composite(y_vals, x_vals)
-    assert x_clean == [0, 30, 20]
-    assert y_clean == [0, 15, 10]
 
 
 def test_create_curve_formats_data_correctly():

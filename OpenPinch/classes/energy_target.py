@@ -25,10 +25,10 @@ class EnergyTarget:
         name: str = "untitled",
         identifier: str = TargetType.DI.value,
         parent_zone: "Zone" = None,
-        config: Optional[Configuration] = None,
+        zone_config: Optional[Configuration] = None,
     ):
         # === Metadata ===
-        self._config = config or Configuration()
+        self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
         self._identifier = identifier
         self._name = name
@@ -387,17 +387,17 @@ class EnergyTarget:
             temp_pinch = {"hot_temp": self.hot_pinch}
             data["temp_pinch"] = temp_pinch
 
-        if self.config.TURBINE_WORK_BUTTON:
+        if self.config.DO_TURBINE_WORK:
             data["work_target"] = self.work_target
             data["turbine_efficiency_target"] = self.turbine_efficiency_target * 100
 
-        if self.config.AREA_BUTTON:
+        if self.config.DO_AREA_TARGETING:
             data["area"] = self.area
             data["num_units"] = self.num_units
             data["capital_cost"] = self.capital_cost
             data["total_cost"] = self.total_cost
 
-        if self.config.EXERGY_BUTTON:
+        if self.config.DO_EXERGY_TARGETING:
             data["exergy_sources"] = self.exergy_sources
             data["exergy_sinks"] = self.exergy_sinks
             data["ETE"] = self.ETE * 100

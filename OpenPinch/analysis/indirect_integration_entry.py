@@ -1,47 +1,115 @@
 from copy import deepcopy
 from typing import Tuple
 
-from ..analysis.problem_table_analysis import (
-    get_process_heat_cascade,
-    get_utility_heat_cascade,
-)
-from ..analysis.support_methods import get_pinch_temperatures, key_name
-from ..analysis.utility_targeting import get_utility_targets
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from .process_analysis import get_process_targets
+from ..analysis import (
+    get_process_heat_cascade,
+    get_utility_heat_cascade,
+    get_utility_targets
+)
+from ..analysis.utility_targeting import get_utility_targets
 
-__all__ = ["get_site_targets"]
+__all__ = ["compute_indirect_integration_targets"]
 
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
-@timing_decorator
-def get_site_targets(site: Zone):
-    """Targets indirect heat integration, such as for Total Site,
-    by systematically analysing individual zones and then performing
-    TS-level analysis.
+
+def compute_indirect_integration_targets(site: Zone) -> Zone:
+    """Targets indirect heat integration, such as for Total Site, 
+    after computing direct heat integration in subzones.
     """
 
-    if site.config.TIT_BUTTON_SELECTED or 1:
-        # Totally integrated analysis for a site
-        site = get_process_targets(site)
+    # Sum targets from subzones 
+    _sum_subzone_targets(site)
 
-    # Targets process level energy requirements
-    z: Zone
-    for z in site.subzones.values():
-        z = get_process_targets(z)
+    # Total site profiles - process side
+    site.import_hot_and_cold_streams_from_sub_zones(get_net_streams=True)
+    pt, pt_real, _ = get_process_heat_cascade(
+        site.net_hot_streams, site.net_cold_streams, site.all_net_streams, site.config
+    )
+    pt.update(
+        _shift_composite_curves(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
+    )
+    pt_real.update(
+        _shift_composite_curves(pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value])
+    )    
 
-    # Targets the indirect heat recovery potential within the utility network
-    site = _sum_subzone_targets(site)
-
-    # Calculates TS targets based on different approaches
+    # Get utility duties based on the summation of subzones
+    s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
+    hot_utilities = deepcopy(s_tzt.hot_utilities)
+    cold_utilities = deepcopy(s_tzt.cold_utilities)
     
-    site = _get_indirect_heat_integration_targets(site)
+    # Apply the problem table algorithm to the simple sum of subzone utility use 
+    pt.update(
+        get_utility_heat_cascade(
+            pt.col[PT.T.value], 
+            hot_utilities, 
+            cold_utilities, 
+            is_shifted=True,
+        )
+    )
+    pt_real.update(
+        get_utility_heat_cascade(
+            pt_real.col[PT.T.value], 
+            hot_utilities, 
+            cold_utilities, 
+            is_shifted=False,
+        )
+    )
 
+    # Apply the utility targeting method to determine the net utility use and generation 
+    _match_utility_gen_and_use_at_same_level(
+        hot_utilities, cold_utilities
+    )    
+    get_utility_targets(
+        pt, 
+        pt_real, 
+        hot_utilities, 
+        cold_utilities
+    )
+
+    # Extract overall heat integration targets
+    hot_utility_target = pt.loc[0, PT.H_UT_NET.value]
+    cold_utility_target = pt.loc[-1, PT.H_UT_NET.value]
+    heat_recovery_target = s_tzt.heat_recovery_target + (
+        s_tzt.hot_utility_target - hot_utility_target
+    )
+    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_UT_NET.value)
+
+    # if zone_config.DO_TURBINE_WORK:
+    #     work_target = 0.0
+    #     if zone_config.ABOVE_PINCH_CHECKBOX:
+    #         pass
+    #         # s_tsi = get_power_cogeneration_above_pinch(s_tsi)
+    #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
+
+    graphs = _save_graph_data(pt, pt_real)
+
+    target_values = _set_sites_targets(
+        hot_utility_target,
+        cold_utility_target,
+        heat_recovery_target,
+        s_tzt.heat_recovery_limit,
+    )
+    site.add_target_from_results(
+        TargetType.TS.value,
+        {
+            "pt": pt,
+            "pt_real": pt_real,
+            "target_values": target_values,
+            "graphs": graphs,
+            "hot_utilities": hot_utilities,
+            "cold_utilities": cold_utilities,
+            "hot_pinch": hot_pinch,
+            "cold_pinch": cold_pinch,
+            "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
+        },
+    )
     return site
 
 
@@ -63,7 +131,8 @@ def _sum_subzone_targets(site: Zone) -> Zone:
 
     for z in site.subzones.values():
         z: Zone
-        t: EnergyTarget = z.targets[f"{z.name}/{TargetType.DI.value}"]
+        t: EnergyTarget
+        t = z.targets[f"{z.name}/{TargetType.DI.value}"]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target
         heat_recovery_target += t.heat_recovery_target
@@ -89,9 +158,9 @@ def _sum_subzone_targets(site: Zone) -> Zone:
     ].heat_recovery_limit
 
     # Target co-generation of heat and power
-    # if config.TURBINE_WORK_BUTTON:
+    # if zone_config.DO_TURBINE_WORK:
     #     st = get_power_cogeneration_above_pinch(st)
-    #     utility_cost = utility_cost - work_target / 1000 * config.ELECTRICITY_PRICE * config.ANNUAL_OP_TIME
+    #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
 
     target_values = _set_sites_targets(
         hot_utility_target,
@@ -111,11 +180,14 @@ def _sum_subzone_targets(site: Zone) -> Zone:
 
 
 def _reset_utility_heat_flows(
-    hot_utilities: StreamCollection, cold_utilities: StreamCollection
+    hot_utilities: StreamCollection, 
+    cold_utilities: StreamCollection
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Zero out utility heat flows prior to accumulating site-level demands."""
+    hu: Stream
     for hu in hot_utilities:
         hu.heat_flow = 0.0
+    cu: Stream
     for cu in cold_utilities:
         cu.heat_flow = 0.0
     return hot_utilities, cold_utilities
@@ -138,9 +210,10 @@ def _set_sites_targets(
     }
 
 
-def _match_utility_gen_and_use_at_same_level(s_tzt: EnergyTarget):
-    hot_utilities = deepcopy(s_tzt.hot_utilities)
-    cold_utilities = deepcopy(s_tzt.cold_utilities)
+def _match_utility_gen_and_use_at_same_level(
+    hot_utilities: StreamCollection, 
+    cold_utilities: StreamCollection
+) -> Tuple[StreamCollection, StreamCollection]:
     for u_h in hot_utilities:
         for u_c in cold_utilities:
             if (
@@ -160,71 +233,11 @@ def _compute_utility_cost(hot_utilities: StreamCollection, cold_utilities: Strea
     return utility_cost
 
 
-def _get_indirect_heat_integration_targets(site: Zone) -> Zone:
-    """Recalculate site-wide utility targets accounting for inter-utility balancing."""
-
-    # Total site profiles - process side
-    site.import_net_hot_and_cold_streams_from_sub_zones()
-    pt, pt_real, _ = get_process_heat_cascade(
-        site.net_hot_streams, site.net_cold_streams, site.all_net_streams, site.config
-    )
-
-    # Get utility duties based on the summation of subzones
-    s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
-    hot_utilities = deepcopy(s_tzt.hot_utilities)
-    cold_utilities = deepcopy(s_tzt.cold_utilities)
-
-    # Apply the problem table algorithm to the simple sum of subzone utility use 
-    pt = get_utility_heat_cascade(
-        pt, hot_utilities, cold_utilities, shifted=True
-    )
-    pt_real = get_utility_heat_cascade(
-        pt_real, hot_utilities, cold_utilities, shifted=False
-    )
-
-    # Apply the utility targeting method to determine the net utility use and generation 
-    pt, pt_real, hot_utilities, cold_utilities = get_utility_targets(
-        pt, pt_real, hot_utilities, cold_utilities
-    )
-
-    # Extract overall heat integration targets
-    hot_utility_target = pt.loc[0, PT.H_UT_NET.value]
-    cold_utility_target = pt.loc[-1, PT.H_UT_NET.value]
-    heat_recovery_target = s_tzt.heat_recovery_target + (
-        s_tzt.hot_utility_target - hot_utility_target
-    )
-    hot_pinch, cold_pinch = get_pinch_temperatures(pt, col_H=PT.H_UT_NET.value)
-
-    # if config.TURBINE_WORK_BUTTON:
-    #     work_target = 0.0
-    #     if config.ABOVE_PINCH_CHECKBOX:
-    #         pass
-    #         # s_tsi = get_power_cogeneration_above_pinch(s_tsi)
-    #     utility_cost = utility_cost - work_target / 1000 * config.ELECTRICITY_PRICE * config.ANNUAL_OP_TIME
-
-    graphs = _save_graph_data(pt, pt_real)
-
-    target_values = _set_sites_targets(
-        hot_utility_target,
-        cold_utility_target,
-        heat_recovery_target,
-        s_tzt.heat_recovery_limit,
-    )
-    site.add_target_from_results(
-        TargetType.TS.value,
-        {
-            "pt": pt,
-            "pt_real": pt_real,
-            "target_values": target_values,
-            "graphs": graphs,
-            "hot_utilities": hot_utilities,
-            "cold_utilities": cold_utilities,
-            "hot_pinch": hot_pinch,
-            "cold_pinch": cold_pinch,
-            "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
-        },
-    )
-    return site
+def _shift_composite_curves(H_hot: np.ndarray, H_cold: np.ndarray) -> dict:
+    return {
+        PT.H_HOT.value: H_hot - H_hot[0],
+        PT.H_COLD.value: H_cold - H_cold[-1],
+    }
 
 
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:

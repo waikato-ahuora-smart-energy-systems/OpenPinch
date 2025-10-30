@@ -2,41 +2,8 @@ import math
 
 import pytest
 
-from OpenPinch.utils.miscellaneous import *
-from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.utils import *
-
-"""Test cases for the get_value function."""
-
-
-def test_get_value_with_float():
-    assert get_value(3.14) == 3.14
-
-
-def test_get_value_with_dict():
-    assert get_value({"value": 42}) == 42
-
-
-def test_get_value_with_missing_dict_key():
-    with pytest.raises(KeyError):
-        get_value({"not_value": 10})
-
-
-def test_get_value_with_valuewithunit():
-    vwu = ValueWithUnit(value=99.9, units="kW")
-    assert get_value(vwu) == 99.9
-
-
-def test_get_value_with_int_raises():
-    with pytest.raises(TypeError):
-        get_value(5)  # Int is not accepted
-
-
-def test_get_value_with_string_raises():
-    with pytest.raises(TypeError):
-        get_value("100")
-
 
 
 """Test cases for the compute_capital_recovery_factor function."""

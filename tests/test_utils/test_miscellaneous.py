@@ -6,6 +6,7 @@ from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.utils import *
+from OpenPinch.analysis.exergy_targeting import *
 
 """Test cases for the get_value function."""
 
@@ -86,3 +87,11 @@ def test_crf_negative_interest():
     """Negative interest should compute (though rarely used)."""
     result = compute_capital_recovery_factor(-0.01, 10)
     assert isinstance(result, float)
+
+
+def test_clean_composite_removes_redundant_points():
+    x_vals = [0, 10, 20, 30, 30]
+    y_vals = [0, 5, 10, 15, 30]
+    y_clean, x_clean = clean_composite_curve(y_vals, x_vals)
+    assert x_clean == [0, 30]
+    assert y_clean == [0, 15]

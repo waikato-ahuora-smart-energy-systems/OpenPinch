@@ -2,8 +2,8 @@ import logging
 import re
 import time
 
-import OpenPinch.lib.config as config
-from OpenPinch.utils.decorators import timing_decorator
+from OpenPinch.lib import *
+from OpenPinch.utils import *
 
 
 def get_dummy_function():

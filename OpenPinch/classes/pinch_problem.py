@@ -8,7 +8,7 @@ from ..utils import (
     get_problem_from_csv,
     get_problem_from_excel,
 )
-from ..analysis.graphing import (
+from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
 )
 from ..main import pinch_analysis_service

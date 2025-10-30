@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
+            "name": "Main Debugger",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/__main__.py",
             "console": "integratedTerminal"
         },
         {
@@ -18,7 +18,7 @@
             "module": "pytest",
             "cwd": "${workspaceFolder}/tests/", 
             "args": [
-              "test_analysis/test_utility_targeting.py",
+              "test_analysis/test_heat_pump_targeting.py"
             ],
             "console": "integratedTerminal",
             "justMyCode": false

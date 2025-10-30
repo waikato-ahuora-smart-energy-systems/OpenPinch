@@ -1,0 +1,103 @@
+{
+    "streams": [
+        {
+            "zone": "Flowsheet",
+            "name": "S3",
+            "t_supply": 10.000000000005457,
+            "t_target": 69.99999999999778,
+            "heat_flow": 45.21560457962873,
+            "dt_cont": 5.0,
+            "htc": 1.0
+        },
+        {
+            "zone": "Flowsheet",
+            "name": "S1 (1)",
+            "t_supply": 150.00000000001722,
+            "t_target": 99.65351429439147,
+            "heat_flow": 24.340539867420333,
+            "dt_cont": 5.0,
+            "htc": 1.0
+        },
+        {
+            "zone": "Flowsheet",
+            "name": "S1 (2)",
+            "t_supply": 99.65351429439147,
+            "t_target": 99.61456943060358,
+            "heat_flow": 389.4486378787258,
+            "dt_cont": 5.0,
+            "htc": 1.0
+        },
+        {
+            "zone": "Flowsheet",
+            "name": "S1 (3)",
+            "t_supply": 99.61456943060358,
+            "t_target": 82.25938450561551,
+            "heat_flow": 24.340539867420375,
+            "dt_cont": 5.0,
+            "htc": 1.0
+        },
+        {
+            "zone": "Flowsheet",
+            "name": "S1 (4)",
+            "t_supply": 82.25938450561551,
+            "t_target": 49.99999999999801,
+            "heat_flow": 24.340539867420382,
+            "dt_cont": 5.0,
+            "htc": 1.0
+        }
+    ],
+    "utilities": [],
+    "options": {
+        "main": [
+            "PROP_MOP_0",
+            "PROP_MOP_1"
+        ],
+        "turbine": [
+            {
+                "key": "PROP_TOP_0",
+                "value": 450
+            },
+            {
+                "key": "PROP_TOP_1",
+                "value": 90
+            },
+            {
+                "key": "PROP_TOP_2",
+                "value": 0.1
+            },
+            {
+                "key": "PROP_TOP_3",
+                "value": 100
+            },
+            {
+                "key": "PROP_TOP_4",
+                "value": 1.0
+            },
+            {
+                "key": "PROP_TOP_5",
+                "value": 1.0
+            },
+            {
+                "key": "PROP_TOP_6",
+                "value": "Medina-Flores et al. (2010)"
+            },
+            {
+                "key": "PROP_TOP_7",
+                "value": true
+            },
+            {
+                "key": "PROP_TOP_8",
+                "value": false
+            },
+            {
+                "key": "PROP_TOP_9",
+                "value": false
+            }
+        ]
+    },
+    "zone_tree": {
+        "name": "Flowsheet",
+        "type": "Process Zone",
+        "children": []
+    }
+}
