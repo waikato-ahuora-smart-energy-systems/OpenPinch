@@ -26,64 +26,47 @@ class Configuration:
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
 
     DO_DIRECT_OPERATION_TARGETING: bool = False
-    DO_DIRECT_SITE_TARGETING: bool = True
+    DO_DIRECT_SITE_TARGETING: bool = False
     DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
-    DO_HP_TARGETING: bool = True
+    DO_HP_TARGETING: bool = False
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
-    DO_VERT_GCC: bool = False
-    DO_ASSITED_HT: bool = False
+    DO_VERTICAL_GCC: bool = False
+    # DO_ASSITED_HT: bool = False
     DO_TURBINE_WORK: bool = False
 
     GCC_FOR_TARGETING: str = PT.H_NET_NP.value
 
-    ANNUAL_OP_TIME: float = 8300
     DT_CONT: float = 5
     DT_PHASE_CHANGE: float = 0.01
     HTC: float = 1.0
-    UTILITY_PRICE: float = 40
     T_ENV: float = 15
     DT_ENV_CONT: float = 10 
     P_ENV: float = 101
     DECIMAL_PLACES: int = 2
 
+    UTILITY_PRICE: float = 40
+    ANNUAL_OP_TIME: float = 8300
+    FIXED_COST: float = 0
+    VARIABLE_COST: float = 10000
+    COST_EXP: float = 0.7
+    DISCOUNT_RATE: float = 0.07
+    SERV_LIFE: float = 10
+
     ### OLD CONFIG -- Review ###
-
-    # TIT_BUTTON_SELECTED: bool = False
-    # TS_BUTTON_SELECTED: bool = False
-    
-    # ENERGY_RETROFIT_BUTTON: bool = False
-
-    # PRINT_PTS: bool = False
-    # PLOT_GRAPHS: bool = True
-    # CC_CHECKBOX: bool = True
-    # SCC_CHECKBOX: bool = True
-    # BCC_CHECKBOX: bool = False
-    # GCC_CHECKBOX: bool = True
-    # GCC_N_CHECKBOX: bool = True
-    # GCCU_CHECKBOX: bool = False
-    # GCC_Lim_CHECKBOX: bool = False
-    # TSC_CHECKBOX: bool = False
-    # ERC_CHECKBOX: bool = False
-    # NLC_CHECKBOX: bool = False
-    # MAX_GRAPHS: int = 128
 
     # T_TURBINE_BOX: float = 450
     # P_TURBINE_BOX: float = 90
     # MIN_EFF: float = 0.1
     # ELECTRICITY_PRICE: float = 100
     # LOAD: float = 1
-    # MECH_EFF: float = 1
+    # MOTOR_MECH_EFF: float = 1
     # COMBOBOX: str = "Medina-Flores et al. (2010)"
     # ABOVE_PINCH_CHECKBOX: bool = False
     # BELOW_PINCH_CHECKBOX: bool = False
     # CONDESATE_FLASH_CORRECTION: bool = False
-
-    # CF_SELECTED: bool = True
-    # PF_SELECTED: bool = False
-    # SHELL_AND_TUBE: bool = False
 
     # HHT_OPTION: bool = True
     # VHT_OPTION: bool = False
@@ -92,6 +75,7 @@ class Configuration:
     # AUTOREORDER_2: bool = False
     # AUTOREORDER_3: bool = False
     # AUTOREORDER_4: bool = False
+
     # GCC_REG_FULL_POCKET: bool = True
     # GCC_VERT_CUT_KINK_OPTION: bool = False
     # SET_MIN_DH_THRES: bool = False
@@ -110,15 +94,6 @@ class Configuration:
     # QUANTIFY_AREA: bool = False
     # ACCELERATION: bool = True
     # HEURISTICS: bool = True
-
-    FIXED_COST: float = 0
-    VARIABLE_COST: float = 10000
-    COST_EXP: float = 0.7
-    DISCOUNT_RATE: float = 0.07
-    SERV_LIFE: float = 10
-
-    # AHT_BUTTON_SELECTED: bool = False
-    # OVERRIDEDT_BUTTON_SELECTED: bool = False
 
     def __init__(
         self,

@@ -50,7 +50,7 @@ def get_utility_targets(
     if is_process_zone:
         get_GCC_without_pockets(pt)
         
-    if zone_config.DO_VERT_GCC:
+    if zone_config.DO_VERTICAL_GCC:
         pt.update(
             get_GCC_with_vertical_heat_transfer(
                 pt.col[PT.H_COLD.value],
