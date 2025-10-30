@@ -162,9 +162,9 @@ def _get_site_targets(zone: Zone):
     site-level indirect integration through the utility system.
     """
 
-    if zone.config.DO_DIRECT_SITE_TARGETING:
-        # Totally integrated analysis for a site zone
-        compute_direct_integration_targets(zone)
+    # if zone.config.DO_DIRECT_SITE_TARGETING:
+    # Totally integrated analysis for a site zone
+    compute_direct_integration_targets(zone)
 
     if len(zone.subzones) > 0:
         # Targets process level energy requirements
