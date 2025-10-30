@@ -16,6 +16,7 @@ dependencies=[
   "scipy",
   "streamlit",
   "plotly",
+  "matplotlib",
 ]
 version = "0.0.21"
 authors = [
