@@ -3,11 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
-from ..utils import (
-    export_target_summary_to_excel_with_units,
-    get_problem_from_csv,
-    get_problem_from_excel,
-)
+from ..utils import *
+from ..lib import *
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
 )
@@ -89,7 +86,7 @@ class PinchProblem:
     # Public API
     # ----------------------------------------------------------------------------
 
-    def load(self, source: Union[PathLike, Tuple[PathLike, PathLike]]) -> JsonDict:
+    def load(self, source: Union[TargetInput, PathLike, Tuple[PathLike, PathLike]]) -> JsonDict:
         """Load input data from one of:
 
         - JSON file path (``*.json``)
@@ -102,6 +99,10 @@ class PinchProblem:
         dict
             The loaded input structure.
         """
+        if isinstance(source, TargetInput):
+            self._problem_data = source
+            return self._problem_data
+
         if isinstance(source, tuple) and len(source) == 2:
             # CSV tuple form
             streams_csv, utilities_csv = map(Path, source)

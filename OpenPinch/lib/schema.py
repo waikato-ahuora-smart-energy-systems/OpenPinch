@@ -211,7 +211,7 @@ class TargetInput(BaseModel):
     """Validated top-level input payload for :func:`OpenPinch.pinch_analysis_service`."""
 
     streams: List[StreamSchema]
-    utilities: List[UtilitySchema] = Field(default_factory=list)
+    utilities: List[UtilitySchema] = []
     options: Optional[Options] = None
     zone_tree: Optional[ZoneTreeSchema] = None
 
