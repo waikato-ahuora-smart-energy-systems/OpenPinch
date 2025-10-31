@@ -30,7 +30,7 @@ class Configuration:
     DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
-    DO_HP_TARGETING: bool = False
+    DO_HP_TARGETING: bool = True
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
     DO_VERTICAL_GCC: bool = False

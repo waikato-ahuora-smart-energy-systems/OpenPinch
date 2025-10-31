@@ -102,19 +102,20 @@ def compute_direct_integration_targets(zone: Zone):
             )
 
     if zone_config.DO_HP_TARGETING and pt.col[PT.H_COLD_NET.value].max() > tol:
-        init_res = get_optimal_heat_pump_placement(
-            T_hot=pt.col[PT.T.value],
-            H_hot=pt.col[PT.H_HOT_NET.value],
-            T_cold=pt.col[PT.T.value],
-            H_cold=pt.col[PT.H_COLD_NET.value],
-            n_cond=2,
-            n_evap=2,
-            eff_isen=0.7,
-            dtmin_hp=0,
-            is_T_vals_shifted=True,  
-            zone_config=zone_config,      
+        res.update(
+            get_optimal_heat_pump_placement(
+                T_hot=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_HOT_NET.value],
+                T_cold=pt.col[PT.T.value],
+                H_cold=pt.col[PT.H_COLD_NET.value],
+                n_cond=2,
+                n_evap=2,
+                eff_isen=0.7,
+                dtmin_hp=0,
+                is_T_vals_shifted=True,  
+                zone_config=zone_config,      
+            )
         )
-        pass
 
     res.update(
         {
