@@ -7,10 +7,10 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _get_first_or_last_zero_value_idx,
     _get_extreme_temperatures_idx,
     _prepare_data_for_minimizer,
-    _get_entropic_average_temperature_in_K,
+    _compute_entropic_average_temperature_in_K,
     _get_Q_from_H,
     _set_initial_values_for_condenser_and_evaporator,
-    _get_COP_estimate_from_carnot_limit,
+    _compute_COP_estimate_from_carnot_limit,
     _convert_idx_to_temperatures,
     _get_H_vals_from_T_hp_vals,
 )
@@ -37,7 +37,7 @@ def test_get_carnot_COP_returns_expected_value():
 
     expected = (150 + 273.15) / (150 - 30) * eff
 
-    result = _get_COP_estimate_from_carnot_limit(T_cond, H_cond, T_evap, H_evap, eff=eff)
+    result = _compute_COP_estimate_from_carnot_limit(T_cond, H_cond, T_evap, H_evap, eff=eff)
 
     np.testing.assert_allclose(result, expected)
 

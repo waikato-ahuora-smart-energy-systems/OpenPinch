@@ -42,19 +42,21 @@ class HeatPumpPlacementArgs(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    T_cond_hi: float
-    T_evap_lo: float
     T_hot: np.ndarray
     H_hot: np.ndarray
     T_cold: np.ndarray
     H_cold: np.ndarray
     n_cond: int
     n_evap: int
-    bnds_cond: tuple
-    bnds_evap: tuple
-    eff_isen: float
-    dtmin_hp: float
+    bnds_cond: Optional[tuple] = None
+    bnds_evap: Optional[tuple] = None
+    eff_isen: Optional[float] = 0.7
+    dtmin_hp: Optional[float] = 5.0
     is_T_vals_shifted: bool
+    T_cond_hi: Optional[float] = None
+    T_evap_lo: Optional[float] = None
+    refrigerant: Optional[str] = None
+    unit_system: Optional[str] = None
 
 
 # ---- Targeting results -------------------------------------------------------
