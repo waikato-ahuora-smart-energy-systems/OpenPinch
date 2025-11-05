@@ -48,12 +48,12 @@ class HeatPumpPlacementArgs(BaseModel):
     H_hot: np.ndarray
     T_cold: np.ndarray
     H_cold: np.ndarray
-    n_cond: Optional[int] = 1
-    n_evap: Optional[int] = 1
-    T_bnds_cond: Optional[tuple] = None
-    T_bnds_evap: Optional[tuple] = None
-    eta_comp: Optional[float] = 0.7
-    dtmin_hp: Optional[float] = 5.0
+    n_cond: int
+    n_evap: int
+    T_bnds_cond: tuple
+    T_bnds_evap: tuple
+    eta_comp: float
+    dtmin_hp: float
     is_T_vals_shifted: Optional[bool] = True
     T_cond_hi: Optional[float] = None
     T_evap_lo: Optional[float] = None

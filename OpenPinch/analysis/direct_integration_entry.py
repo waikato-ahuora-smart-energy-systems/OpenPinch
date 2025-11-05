@@ -101,13 +101,12 @@ def compute_direct_integration_targets(zone: Zone):
                 }
             )
 
-    if zone_config.DO_HP_TARGETING and pt.col[PT.H_COLD_NET.value].max() > tol:
+    if zone_config.DO_HP_TARGETING and pt.col[PT.H_NET_COLD.value].max() > tol:
         res.update(
             get_optimal_heat_pump_placement(
-                T_hot=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_HOT_NET.value],
-                T_cold=pt.col[PT.T.value],
-                H_cold=pt.col[PT.H_COLD_NET.value],
+                T_vals=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_NET_HOT.value],
+                H_cold=pt.col[PT.H_NET_COLD.value],
                 n_cond=2,
                 n_evap=2,
                 eta_comp=0.7,
@@ -305,7 +304,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.CC.value: pt_real[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.BCC.value: pt_real[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
-        GT.GCC.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
-        GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_UT_NET.value]],
-        GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
+        GT.GCC.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_NET_UT.value]],
+        GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_NET_UT.value]],
+        GT.NLC.value: pt[[PT.T.value, PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
     }

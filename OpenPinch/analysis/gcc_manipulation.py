@@ -155,8 +155,8 @@ def get_seperated_gcc_heat_load_profiles(
         hot_profile = hot_profile + hut_max
 
     return {
-        PT.H_HOT_NET.value: hot_profile,
-        PT.H_COLD_NET.value: cold_profile,
+        PT.H_NET_HOT.value: hot_profile,
+        PT.H_NET_COLD.value: cold_profile,
     } if is_process_stream else {
         PT.H_HOT_UT.value: hot_profile,
         PT.H_COLD_UT.value: cold_profile,

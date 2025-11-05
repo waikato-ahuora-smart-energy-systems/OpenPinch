@@ -132,6 +132,7 @@ def interp_with_plateaus(
     t_vals: np.ndarray,
     targets: np.ndarray,
     side: str,
+    tol: float = 1e-6,
 ) -> np.ndarray:
     """Interpolate temperatures while respecting vertical segments in the composite curves."""
     if side not in {"left", "right"}:
@@ -144,17 +145,21 @@ def interp_with_plateaus(
     if h_vals.size == 1:
         return np.full_like(targets, t_vals[0], dtype=float)
 
-    h_monotonic = _make_monotonic(h_vals, side)
+    h_monotonic = _make_monotonic(h_vals, side, tol)
     return np.interp(targets, h_monotonic, t_vals)
 
 
-def _make_monotonic(h_vals: np.ndarray, side: str) -> np.ndarray:
+def _make_monotonic(
+    h_vals: np.ndarray, 
+    side: str, 
+    tol: float = 1e-6
+) -> np.ndarray:
     """Adjust an array so repeated values become strictly increasing for interpolation."""
     adjusted = np.array(h_vals, dtype=float, copy=True)
     if adjusted.size <= 1:
         return adjusted
 
-    eps = tol * 0.5 if tol > 0 else 1e-9
+    eps = tol * 0.5
 
     idx = 0
     n = adjusted.size

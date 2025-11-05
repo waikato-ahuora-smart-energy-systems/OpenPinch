@@ -13,6 +13,7 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _convert_idx_to_temperatures,
     _get_H_vals_from_T_hp_vals,
     _parse_carnot_hp_state_temperatures,
+    _get_H_cold_within_target_Q_hp,
 )
 
 
@@ -192,3 +193,40 @@ def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
     np.testing.assert_allclose(T_cond, np.array([160.0, 150.0, 140.0]))
     np.testing.assert_allclose(T_evap, np.array([90.0, 40.0]))
 
+
+def test_get_H_cold_within_target_Q_hp_returns_full_profile_when_target_matches_peak():
+    T_cold = np.array([160.0, 150.0, 140.0, 130.0])
+    H_cold = np.array([600.0, 450.0, 200.0, 0.0])
+    Q_hp_target = np.abs(H_cold).max()
+
+    T_out, H_out = _get_H_cold_within_target_Q_hp(Q_hp_target, T_cold.copy(), H_cold.copy())
+
+    np.testing.assert_allclose(T_out, T_cold)
+    np.testing.assert_allclose(H_out, H_cold)
+
+
+def test_get_H_cold_within_target_Q_hp_interpolates_to_target():
+    T_cold = np.array([160.0, 150.0, 140.0, 130.0])
+    H_cold = np.array([600.0, 400.0, 150.0, 0.0])
+    Q_hp_target = 250.0
+
+    T_out, H_out = _get_H_cold_within_target_Q_hp(Q_hp_target, T_cold.copy(), H_cold.copy())
+
+    np.testing.assert_allclose(T_out[0], 144.0)
+    np.testing.assert_allclose(H_out[0], Q_hp_target)
+    np.testing.assert_allclose(T_out[1:], np.array([140.0, 130.0]))
+    np.testing.assert_allclose(H_out[1:], np.array([150.0, 0.0]))
+
+
+def test_get_H_cold_within_target_Q_hp_interpolates_to_target_at_exisiting_temperature():
+    T_cold = np.array([160.0, 150.0, 140.0, 130.0])
+    H_cold = np.array([600.0, 400.0, 150.0, 0.0])
+    Q_hp_target = 150.0
+
+    T_out, H_out = _get_H_cold_within_target_Q_hp(Q_hp_target, T_cold.copy(), H_cold.copy())
+
+    np.testing.assert_allclose(T_out[0], 140.0)
+    np.testing.assert_allclose(H_out[0], Q_hp_target)
+    np.testing.assert_allclose(T_out[:], np.array([140.0, 130.0]))
+    np.testing.assert_allclose(H_out[:], np.array([150.0, 0.0]))
+    

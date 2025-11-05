@@ -74,12 +74,12 @@ def compute_indirect_integration_targets(site: Zone) -> Zone:
     )
 
     # Extract overall heat integration targets
-    hot_utility_target = pt.loc[0, PT.H_UT_NET.value]
-    cold_utility_target = pt.loc[-1, PT.H_UT_NET.value]
+    hot_utility_target = pt.loc[0, PT.H_NET_UT.value]
+    cold_utility_target = pt.loc[-1, PT.H_NET_UT.value]
     heat_recovery_target = s_tzt.heat_recovery_target + (
         s_tzt.hot_utility_target - hot_utility_target
     )
-    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_UT_NET.value)
+    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
@@ -248,11 +248,11 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.TSP.value: pt[
             [
                 PT.T.value,
-                PT.H_HOT_NET.value,
-                PT.H_COLD_NET.value,
+                PT.H_NET_HOT.value,
+                PT.H_NET_COLD.value,
                 PT.H_HOT_UT.value,
                 PT.H_COLD_UT.value,
             ]
         ],
-        GT.SUGCC.value: pt[[PT.T.value, PT.H_UT_NET.value]],
+        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value]],
     }

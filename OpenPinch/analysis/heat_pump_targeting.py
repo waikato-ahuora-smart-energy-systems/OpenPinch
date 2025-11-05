@@ -7,6 +7,7 @@ from ..utils import *
 from .problem_table_analysis import get_utility_heat_cascade, create_problem_table_with_t_int
 from .gcc_manipulation import *
 from .temperature_driving_force import get_temperature_driving_forces
+from ..classes.stream import Stream
 from ..classes.stream_collection import StreamCollection
 from ..classes.problem_table import ProblemTable
 from ..classes.simple_heat_pump import HeatPumpCycle
@@ -20,9 +21,8 @@ __all__ = ["get_optimal_heat_pump_placement"]
 
 
 def get_optimal_heat_pump_placement(
-    T_hot: np.ndarray,
+    T_vals: np.ndarray,
     H_hot: np.ndarray,
-    T_cold: np.ndarray,
     H_cold: np.ndarray,
     n_cond: int = 1,
     n_evap: int = 1,
@@ -54,8 +54,14 @@ def get_optimal_heat_pump_placement(
         None: The routine is currently a placeholder that normalises inputs and
         delegates to the basic placement helper.
     """
+    zone_config.HP_HEATING_FRACTION = 0.6
+    ####
     Q_hp_target = zone_config.HP_HEATING_FRACTION * np.abs(H_cold).max()
-    T_hot, T_cold, dT_shift = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_hot, T_cold, dtmin_hp, is_T_vals_shifted)   
+    if zone_config.HP_HEATING_FRACTION < tol:
+        return {}
+    T_hot, T_cold, dT_shift = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, dtmin_hp, is_T_vals_shifted)   
+    if zone_config.HP_HEATING_FRACTION < 1.0:
+        T_cold, H_cold = _get_H_cold_within_target_Q_hp(Q_hp_target, T_cold, H_cold)
     H_hot, H_cold, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(T_hot, H_hot, T_cold, H_cold, dT_shift, zone_config)
     idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
     T_bnds = _convert_idx_to_temperatures(idx_dict, T_hot, T_cold)
@@ -82,7 +88,6 @@ def get_optimal_heat_pump_placement(
         is_heat_pump=bool(is_heat_pump),
         refrigerant=zone_config.REFRIGERANTS[0]
     )
-
         
     _optimise_multi_temperature_carnot_heat_pump_placement(args)
     if 0:
@@ -91,14 +96,18 @@ def get_optimal_heat_pump_placement(
         _optimise_multi_simulated_heat_pump_placement(args)
         if 1:
             _plot_multi_hp_profiles(args, True)        
+    else:
+        hp_streams = _build_latent_streams(args.T_cond, args.Q_cond, args.dtmin_hp, is_hot=True) + _build_latent_streams(args.T_evap, args.Q_evap, args.dtmin_hp, is_hot=False)
+
 
     return {
+        "hp_streams": hp_streams,
         "T_cond": args.T_cond,
         "Q_cond": args.Q_cond,
         "T_evap": args.T_evap,
         "Q_evap": args.Q_evap,
         "total_work": args.total_work,
-        "COP": args.Q_hp_target / args.total_work,
+        "COP_ave": args.Q_hp_target / args.total_work,
     }
 
 
@@ -191,18 +200,11 @@ def _optimise_multi_simulated_heat_pump_placement(args: HeatPumpPlacementArgs):
     )
 
     if res.success:
-        T_evap, dT_sh, T_cond, dT_sc, Q_cond_hi = _parse_simulated_hp_state_temperatures(res.x, args)
-        print(f"\n--- Optimization Results ---")
-        print(f"T_evap       = {T_evap}")
-        print(f"dT_sh    = {dT_sh}")
-        print(f"T_cond       = {T_cond}")
-        print(f"dT_sc    = {dT_sc}")
-        print(f"Q_cond   = {Q_cond_hi}")
-        print(f"Total W  = {res.fun:.3f}")
+        args.T_evap, args.dT_sh, args.T_cond, args.dT_sc, args.Q_cond = _parse_simulated_hp_state_temperatures(res.x, args)
     else:
         print("Optimization failed:", res.message)
 
-    return res
+    return args
 
 
 #######################################################################################################
@@ -303,8 +305,7 @@ def _compute_carnot_heat_pump_system_performance(
         cop = _compute_COP_estimate_from_carnot_limit(T_cond, H_cond, T_evap, H_evap)
         work = H_cond[0] / cop if cop > 0 else 0
         Q_evap_tot = H_cond[0] - work
-        # T_lo_calc = interp_with_plateaus(args.H_hot[::-1], args.T_hot[::-1], -Q_evap_tot, "right")
-        q_error = Q_evap_tot - (-H_evap.min())
+        q_error = Q_evap_tot - (-H_evap[-1])
         return {
             "work": work, 
             "T_evap": T_evap, 
@@ -442,17 +443,37 @@ def _get_first_or_last_zero_value_idx(
 
 
 def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
-    T_hot: np.ndarray,    
-    T_cold: np.ndarray, 
+    T_vals: np.ndarray, 
     dtmin_hp: float,
     is_T_vals_shifted: bool,
 ):
     """Apply ΔTmin adjustments to cascade temperatures for heat pump calculations.
     """
     dT_shift = dtmin_hp / 2 if is_T_vals_shifted else dtmin_hp
-    T_hot  -= dT_shift
-    T_cold += dT_shift
+    T_hot  = T_vals - dT_shift
+    T_cold = T_vals + dT_shift
     return T_hot, T_cold, dT_shift
+
+
+def _get_H_cold_within_target_Q_hp(
+    Q_hp_target: float,        
+    T_cold: np.ndarray,    
+    H_cold: np.ndarray,        
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Trim the cold composite to the target heat duty, interpolating the boundary point."""
+    
+    if np.abs(H_cold).max() == Q_hp_target:
+        return T_cold, H_cold
+    mask = np.where(
+        H_cold >= Q_hp_target,
+        1.0, 0.0
+    )
+    i = np.flatnonzero(mask)[-1]
+    T_cold[i] = linear_interpolation(
+        Q_hp_target, H_cold[i], H_cold[i + 1], T_cold[i], T_cold[i + 1]
+    )
+    H_cold[i] = Q_hp_target
+    return T_cold[i:], H_cold[i:]
 
 
 def _balance_hot_and_cold_heat_loads_with_ambient_air(
@@ -688,8 +709,8 @@ def _parse_simulated_hp_state_temperatures(
     if len(Q_vars) != n_hp - 1:
         raise ValueError(f"Q_vars length {len(Q_vars)} does not match the number of condnesers and evaporators, {nc}")
     
-    Q_cond_hi = np.append(args.Q_hp_target - np.sum(Q_vars), Q_vars)  # last HP fills remaining heat duty
-    return T_evap, dT_sh, T_cond, dT_sc, Q_cond_hi
+    Q_cond = np.append(args.Q_hp_target - np.sum(Q_vars), Q_vars)  # highest temperature HP fills remaining heat duty
+    return T_evap, dT_sh, T_cond, dT_sc, Q_cond
 
 
 def _create_heat_pump_list(args: HeatPumpPlacementArgs):
@@ -828,6 +849,27 @@ def _profiles_crossing_check_multi(
         return min(deltaTs)
     except ValueError:
         return -1e6  # Infeasible temperature overlap
+
+
+def _build_latent_streams(
+    T_hp: np.ndarray, 
+    Q_hp: np.ndarray,
+    dt_min: float,
+    is_hot: bool
+) -> StreamCollection: 
+    sc = StreamCollection()
+    for i in range(len(Q_hp)):
+        sc.add(
+            Stream(
+                name=f"HP_H{i + 1}" if is_hot else f"HP_C{i + 1}",
+                t_supply=T_hp[i],
+                t_target=T_hp[i] - 0.01 if is_hot else T_hp[i] + 0.01,
+                heat_flow=Q_hp[i],
+                dt_cont=dt_min * 1.5, # Shift to intermediate process temperature scale
+                is_process_stream=False,
+            )            
+        )
+    return sc
 
 
 # ============================================================
