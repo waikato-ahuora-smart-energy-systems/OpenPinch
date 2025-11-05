@@ -42,21 +42,34 @@ class HeatPumpPlacementArgs(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    Q_hp_target: float
+    Q_amb_max: float
     T_hot: np.ndarray
     H_hot: np.ndarray
     T_cold: np.ndarray
     H_cold: np.ndarray
-    n_cond: int
-    n_evap: int
-    bnds_cond: Optional[tuple] = None
-    bnds_evap: Optional[tuple] = None
-    eff_isen: Optional[float] = 0.7
+    n_cond: Optional[int] = 1
+    n_evap: Optional[int] = 1
+    T_bnds_cond: Optional[tuple] = None
+    T_bnds_evap: Optional[tuple] = None
+    eta_comp: Optional[float] = 0.7
     dtmin_hp: Optional[float] = 5.0
-    is_T_vals_shifted: bool
+    is_T_vals_shifted: Optional[bool] = True
     T_cond_hi: Optional[float] = None
     T_evap_lo: Optional[float] = None
+    T_cond: Optional[np.ndarray] = None
+    T_evap: Optional[np.ndarray] = None
+    dT_sc: Optional[np.ndarray] = None
+    dT_sh: Optional[np.ndarray] = None
+    Q_cond: Optional[np.ndarray] = None
+    Q_evap: Optional[np.ndarray] = None
+    H_cond: Optional[np.ndarray] = None
+    H_evap: Optional[np.ndarray] = None    
     refrigerant: Optional[str] = None
-    unit_system: Optional[str] = None
+    unit_system: Optional[str] = "EUR"
+    is_heat_pump: Optional[bool] = True
+    is_multi_temperature_hp: Optional[bool] = True
+    total_work: Optional[float] = None
 
 
 # ---- Targeting results -------------------------------------------------------

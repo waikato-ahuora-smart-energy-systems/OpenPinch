@@ -39,7 +39,7 @@ def cycle_inputs():
 
 
 def test_solve_t_dt_establishes_cycle_states(cycle_inputs):
-    cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     cycle.solve_t_dt(
         cycle_inputs["Te"],
         cycle_inputs["Tc"],
@@ -60,7 +60,7 @@ def test_solve_t_dt_establishes_cycle_states(cycle_inputs):
 
 
 def test_direct_solve_matches_temperature_based_solution(cycle_inputs):
-    ref_cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    ref_cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     ref_cycle.solve_t_dt(
         cycle_inputs["Te"],
         cycle_inputs["Tc"],
@@ -71,7 +71,7 @@ def test_direct_solve_matches_temperature_based_solution(cycle_inputs):
         SI=True,
     )
 
-    direct_cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    direct_cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     direct_cycle.solve(
         cycle_inputs["T0"],
         cycle_inputs["p0"],
@@ -90,7 +90,7 @@ def test_direct_solve_matches_temperature_based_solution(cycle_inputs):
 
 
 def test_pressure_based_solution_matches_reference(cycle_inputs):
-    ref_cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    ref_cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     ref_cycle.solve(
         cycle_inputs["T0"],
         cycle_inputs["p0"],
@@ -101,7 +101,7 @@ def test_pressure_based_solution_matches_reference(cycle_inputs):
         SI=True,
     )
 
-    pressure_cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    pressure_cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     pressure_cycle.solve_p_dt(
         cycle_inputs["p0"],
         cycle_inputs["p2"],
@@ -117,7 +117,7 @@ def test_pressure_based_solution_matches_reference(cycle_inputs):
 
 
 def test_fill_states_populates_missing_properties(cycle_inputs):
-    cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     cycle.solve_t_dt(
         cycle_inputs["Te"],
         cycle_inputs["Tc"],
@@ -140,7 +140,7 @@ def test_fill_states_populates_missing_properties(cycle_inputs):
 
 
 def test_get_hp_th_profiles_returns_expected_shapes(cycle_inputs):
-    cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     cycle.solve_t_dt(
         cycle_inputs["Te"],
         cycle_inputs["Tc"],
@@ -160,7 +160,7 @@ def test_get_hp_th_profiles_returns_expected_shapes(cycle_inputs):
 
 
 def test_solve_p_dt_rejects_inverted_pressures(cycle_inputs):
-    cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"], unit_system="SI")
+    cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"], unit_system="SI")
     with pytest.raises(ValueError, match="Evaporator pressure must be below condenser pressure"):
         cycle.solve_p_dt(
             cycle_inputs["p2"],
@@ -174,7 +174,7 @@ def test_solve_p_dt_rejects_inverted_pressures(cycle_inputs):
 
 
 def test_system_property_updates_unit_container(cycle_inputs):
-    cycle = HeatPumpCycle(fluid_ref=cycle_inputs["fluid"])
+    cycle = HeatPumpCycle(refrigerant=cycle_inputs["fluid"])
     cycle.system = "SI"
     assert cycle.system is HeatPumpCycle.UNIT_SYSTEMS["SI"]
     assert cycle.cycle_states.units is cycle.system

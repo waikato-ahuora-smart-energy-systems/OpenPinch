@@ -47,6 +47,9 @@ class Configuration:
     P_ENV: float = 101
     DECIMAL_PLACES: int = 2
 
+    HP_HEATING_FRACTION: float = 1.0
+    REFRIGERANTS: List[str] = ["Ammonia"]
+
     UTILITY_PRICE: float = 40
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0

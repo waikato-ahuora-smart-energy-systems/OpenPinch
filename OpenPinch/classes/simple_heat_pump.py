@@ -27,9 +27,14 @@ class HeatPumpCycle:
         'EUR': EURunits(),
     }
 
-    def __init__(self, fluid_ref: str = 'Ammonia', unit_system: str | PropertyDict = 'EUR', Q_total: float = 1e6):
+    def __init__(
+        self, 
+        refrigerant: str = 'Ammonia', 
+        unit_system: str | PropertyDict = 'EUR', 
+        Q_total: float = 0.0,
+    ):
         self._system = self._parse_unit_system(unit_system)
-        self._state = process_fluid_state(fluid_ref)
+        self._state = process_fluid_state(refrigerant)
         self._cycle_states = StateContainer(unit_system=self._system)
         self._w_net: Optional[float] = None
         self._q_evap: Optional[float] = None
@@ -110,7 +115,7 @@ class HeatPumpCycle:
         p0: float,
         T2: float,
         p2: float,
-        eta_com: float,
+        eta_comp: float,
         *,
         fluid=None,
         SI: bool = True,
@@ -127,7 +132,10 @@ class HeatPumpCycle:
         working_state = self._state
 
         # Evaporator outlet / compressor inlet
-        working_state.update(CoolProp.PT_INPUTS, p0, T0)
+        try:
+            working_state.update(CoolProp.PT_INPUTS, p0, T0)
+        except:
+            working_state.update(CoolProp.PQ_INPUTS, p0, 1.0) # Close to saturated vapour
         h0 = working_state.hmass()
         s0 = working_state.smass()
         cycle_states[0, 'H'] = h0
@@ -139,7 +147,7 @@ class HeatPumpCycle:
         p1 = p2
         working_state.update(CoolProp.PSmass_INPUTS, p1, s0)
         h1_isentropic = working_state.hmass()
-        h1 = h0 + (h1_isentropic - h0) / eta_com
+        h1 = h0 + (h1_isentropic - h0) / eta_comp
         working_state.update(CoolProp.HmassP_INPUTS, h1, p1)
         s1 = working_state.smass()
         T1 = working_state.T()
@@ -149,7 +157,10 @@ class HeatPumpCycle:
         cycle_states[1, CoolProp.iT] = T1
 
         # Condenser outlet
-        working_state.update(CoolProp.PT_INPUTS, p2, T2)
+        try:
+            working_state.update(CoolProp.PT_INPUTS, p2, T2)
+        except:
+            working_state.update(CoolProp.PQ_INPUTS, p2, 0.0) # Close to saturated liquid
         h2 = working_state.hmass()
         s2 = working_state.smass()
         cycle_states[2, 'H'] = h2
@@ -180,7 +191,7 @@ class HeatPumpCycle:
         Tc: float,
         dT_sh: float,
         dT_sc: float,
-        eta_com: float,
+        eta_comp: float,
         *,
         fluid=None,
         SI: bool = True,
@@ -201,7 +212,7 @@ class HeatPumpCycle:
         T0 = Te + dT_sh
         T2 = Tc - dT_sc
 
-        self.solve(T0, p0, T2, p2, eta_com, fluid=None, SI=True)
+        self.solve(T0, p0, T2, p2, eta_comp, fluid=None, SI=True)
 
     def solve_p_dt(
         self,
@@ -209,7 +220,7 @@ class HeatPumpCycle:
         Pc: float,
         dT_sh: float,
         dT_sc: float,
-        eta_com: float,
+        eta_comp: float,
         *,
         fluid=None,
         SI: bool = True,
@@ -240,7 +251,7 @@ class HeatPumpCycle:
         else:
             T2 = t_crit - dT_sc
 
-        self.solve(T0, p0, T2, p2, eta_com, fluid=None, SI=True)
+        self.solve(T0, p0, T2, p2, eta_comp, fluid=None, SI=True)
 
     def fill_states(self, container: Optional[StateContainer] = None) -> StateContainer:
         """Populate missing properties for each state point where possible."""
@@ -386,35 +397,45 @@ class HeatPumpCycle:
     
         return condenser_profile
 
-    def _build_stream_collection(self,array,is_hot):
-        if is_hot:
-            self._m_dot = self._Q_total / abs(array[0,0] - array[-1,0])
-        sc = StreamCollection()
-        for i in range(len(array) - 1):
-            h1, T1 = array[i]
-            h2, T2 = array[i + 1]
+    def build_stream_collection(self, include_cond: bool = False, include_evap: bool = False):
 
-            # Do we need a name?
-            name = f"Segment_{i + 1}"
+        def _build_streams(profile: np.ndarray, is_hot: bool): 
 
-            if abs(T1 - T2) < 0.001: # Catch phase change
-                if is_hot:
-                    t_target = T2 - .1
+            if is_hot:
+                self._m_dot = self._Q_total / abs(profile[0,0] - profile[-1,0])
+            sc = StreamCollection()
+            for i in range(len(profile) - 1):
+                h1, T1 = profile[i]
+                h2, T2 = profile[i + 1]
+
+                # Do we need a name?
+                name = f"Segment_{i + 1}"
+
+                if abs(T1 - T2) < 0.001: # Catch phase change
+                    if is_hot:
+                        t_target = T2 - .1
+                    else:
+                        t_target = T2 + .1
                 else:
-                    t_target = T2 + .1
-            else:
-                t_target = T2
+                    t_target = T2
 
-            s = Stream(
-                name=name,
-                t_supply=T1,
-                t_target=t_target,
-                heat_flow=self._m_dot*abs(h1 - h2),  # or m_dot * (h1 - h2), depending on your model
-                is_process_stream=False,
-            )
+                s = Stream(
+                    name=name,
+                    t_supply=T1,
+                    t_target=t_target,
+                    heat_flow=self._m_dot*abs(h1 - h2),  # or m_dot * (h1 - h2), depending on your model
+                    is_process_stream=False,
+                )
 
-            sc.add(s)
-        return sc
+                sc.add(s)
+            return sc
+        
+        streams = StreamCollection()
+        if include_cond:
+            streams += _build_streams(self._build_condenser_profile, True)
+        if include_evap:
+            streams += _build_streams(self._build_evaporator_profile, False)            
+        return streams
 
     def _build_evaporator_profile(self) -> np.ndarray:
         """

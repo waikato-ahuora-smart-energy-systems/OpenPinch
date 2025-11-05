@@ -110,10 +110,11 @@ def compute_direct_integration_targets(zone: Zone):
                 H_cold=pt.col[PT.H_COLD_NET.value],
                 n_cond=2,
                 n_evap=2,
-                eff_isen=0.7,
+                eta_comp=0.7,
                 dtmin_hp=0,
-                is_T_vals_shifted=True,  
-                zone_config=zone_config,      
+                is_T_vals_shifted=True,
+                zone_config=zone_config,
+                is_cycle_simulation=True
             )
         )
 

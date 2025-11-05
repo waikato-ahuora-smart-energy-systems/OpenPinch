@@ -42,6 +42,16 @@ class HeatExchangerTypes(Enum):
     CondEvap = "Condensing or Evaporating"
 
 
+class HeatPump(Enum):
+    """Heat pump components"""
+
+    Cond = "Condenser"
+    Evap = "Evaporator"
+    Comp = "Compressor"
+    Expd = "Expansion"
+    IHX = "Internal Heat Exchanger"
+
+
 class HeatFlowUnits(Enum):
     """Heat flow units"""
 
