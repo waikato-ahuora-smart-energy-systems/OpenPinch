@@ -291,8 +291,9 @@ def _write_targets_to_dict_and_list(
 
         for col, value in record.items():
             unit = units_map.get(col)
-            if col == "temp_pinch" and value not in (None, ""):
-                parts = str(value).split("; ")
+            if col == "temp_pinch":
+                if value not in (None, ""):
+                    parts = str(value).split("; ")
                 is_process_target = record["name"] == f"{project_name}/Total Process Target"
                 if is_process_target:
                     parts[0] = None

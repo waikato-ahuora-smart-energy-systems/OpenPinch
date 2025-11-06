@@ -145,37 +145,72 @@ def interp_with_plateaus(
     if h_vals.size == 1:
         return np.full_like(targets, t_vals[0], dtype=float)
 
-    h_monotonic = _make_monotonic(h_vals, side, tol)
+    h_monotonic = make_monotonic(h_vals, side, tol)
     return np.interp(targets, h_monotonic, t_vals)
 
 
-def _make_monotonic(
+# def _make_monotonic(
+#     h_vals: np.ndarray, 
+#     side: str, 
+#     tol: float = 1e-6
+# ) -> np.ndarray:
+#     """Adjust an array so repeated values become strictly increasing for interpolation."""
+#     adjusted = np.array(h_vals, dtype=float, copy=True)
+#     if adjusted.size <= 1:
+#         return adjusted
+
+#     eps = tol * 0.5
+
+#     idx = 0
+#     n = adjusted.size
+#     while idx < n - 1:
+#         j = idx + 1
+#         while j < n and abs(adjusted[j] - adjusted[idx]) <= tol:
+#             j += 1
+#         if j - idx > 1:
+#             length = j - idx
+#             if side == "right":
+#                 offsets = np.arange(length - 1, -1, -1, dtype=float) * eps
+#                 adjusted[idx:j] = adjusted[idx] - offsets
+#             else:  # side == "left"
+#                 offsets = np.arange(length, dtype=float) * eps
+#                 adjusted[idx:j] = adjusted[idx] + offsets
+#         idx = j
+
+#     return adjusted
+
+
+def make_monotonic(
     h_vals: np.ndarray, 
     side: str, 
     tol: float = 1e-6
 ) -> np.ndarray:
     """Adjust an array so repeated values become strictly increasing for interpolation."""
-    adjusted = np.array(h_vals, dtype=float, copy=True)
+    adjusted = np.asarray(h_vals, dtype=float).copy()
     if adjusted.size <= 1:
         return adjusted
 
     eps = tol * 0.5
-
-    idx = 0
+    # Identify the start of each strictly increasing block
+    diff = np.abs(np.diff(adjusted)) > tol
+    starts = np.flatnonzero(np.concatenate(([True], diff)))
     n = adjusted.size
-    while idx < n - 1:
-        j = idx + 1
-        while j < n and abs(adjusted[j] - adjusted[idx]) <= tol:
-            j += 1
-        if j - idx > 1:
-            length = j - idx
-            if side == "right":
-                offsets = np.arange(length - 1, -1, -1, dtype=float) * eps
-                adjusted[idx:j] = adjusted[idx] - offsets
-            else:  # side == "left"
-                offsets = np.arange(length, dtype=float) * eps
-                adjusted[idx:j] = adjusted[idx] + offsets
-        idx = j
+    lengths = np.diff(np.append(starts, n))
+
+    if np.all(lengths == 1):
+        return adjusted
+
+    # Compute position within each block using vectorised repetition
+    within_block = np.arange(n) - np.repeat(starts, lengths)
+    block_lengths = np.repeat(lengths, lengths)
+    mask = block_lengths > 1
+
+    offsets = np.zeros_like(adjusted)
+    if side == "right":
+        offsets[mask] = (block_lengths[mask] - 1 - within_block[mask]) * eps
+        adjusted[mask] -= offsets[mask]
+    else:  # side == "left"
+        offsets[mask] = within_block[mask] * eps
+        adjusted[mask] += offsets[mask]
 
     return adjusted
-
