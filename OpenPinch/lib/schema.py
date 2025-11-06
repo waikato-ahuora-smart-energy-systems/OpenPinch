@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import MainOptionsPropKeys, StreamType, TurbineOptionsPropKeys
 
+from ..classes.stream_collection import StreamCollection
+
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
 MaybeVU = Union[float, "ValueWithUnit", None]
@@ -70,6 +72,9 @@ class HeatPumpPlacementArgs(BaseModel):
     is_heat_pump: Optional[bool] = True
     is_multi_temperature_hp: Optional[bool] = True
     total_work: Optional[float] = None
+    hp_list: Optional[list] = []
+    cond_streams: Optional[StreamCollection] = None
+    evap_streams: Optional[StreamCollection] = None
 
 
 # ---- Targeting results -------------------------------------------------------

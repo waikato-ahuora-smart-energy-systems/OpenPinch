@@ -116,6 +116,29 @@ def compute_direct_integration_targets(zone: Zone):
                 is_cycle_simulation=True
             )
         )
+        # convert to column in pt
+        # 
+        # hp_hot_streams: StreamCollection, 
+        # hp_cold_streams: StreamCollection,
+        #
+        # pt: ProblemTable
+        # pt = create_problem_table_with_t_int(
+        #     hp_hot_streams + hp_cold_streams,
+        #     True,
+        # )
+        # pt.update(
+        #     get_utility_heat_cascade(
+        #         pt.col[PT.T.value],
+        #         hp_hot_streams,
+        #         hp_cold_streams,
+        #         is_shifted=True,
+        #     )
+        # )
+        # return {
+        #     PT.T.value: pt.col[PT.T.value],
+        #     PT.H_HOT_UT.value: pt.col[PT.H_HOT_UT.value],
+        #     PT.H_COLD_UT.value: pt.col[PT.H_COLD_UT.value],
+        # }     
 
     res.update(
         {
