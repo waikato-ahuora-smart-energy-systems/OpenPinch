@@ -12,7 +12,7 @@
                 "units": "degC"
             },
             "heat_flow": {
-                "value": 3880.0,
+                "value": 2880.0,
                 "units": "kW"
             },
             "dt_cont": {
@@ -110,11 +110,11 @@
             "name": "HU",
             "type": "Hot",
             "t_supply": {
-                "value": 281.0,
+                "value": 60.0,
                 "units": "degC"
             },
             "t_target": {
-                "value": 280.0,
+                "value": 50.0,
                 "units": "degC"
             },
             "dt_cont": {
@@ -135,11 +135,11 @@
             "name": "CU",
             "type": "Cold",
             "t_supply": {
-                "value": 30.0,
+                "value": 25.0,
                 "units": "degC"
             },
             "t_target": {
-                "value": 31.0,
+                "value": 35.0,
                 "units": "degC"
             },
             "dt_cont": {

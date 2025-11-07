@@ -181,6 +181,7 @@ class GraphType(Enum):
     GCC = "Grand Composite Curve"
     GCC_R = "Grand Composite Curve (Real)"
     GCC_X = "Exergetic Grand Composite Curve"
+    GCC_HP = "Grand Composite Curve with Heat Pump"
     # GCC_N = "Grand Composite Curve (No Pockets)"
     # GCC_V = "Vertical Grand Composite Curve"
     # GCC_A = "Actual Grand Composite Curve"    
