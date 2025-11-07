@@ -94,4 +94,36 @@ def test_clean_composite_removes_redundant_points():
     y_vals = [0, 5, 10, 15, 30]
     y_clean, x_clean = clean_composite_curve(y_vals, x_vals)
     assert x_clean == [0, 30]
-    assert y_clean == [0, 15]
+    assert y_clean == [0, 15] 
+
+
+def test_clean_composite_curve_ends_0():
+    x_vals = [30, 50, 0, 30, 30, 30, 30]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert x_clean == [30, 50, 0, 30]
+    assert y_clean == [100, 80, 50, 40]
+
+
+def test_clean_composite_curve_ends_1():
+    x_vals = [10, 10, 60, 10, 0, 10, 10]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert x_clean == [10, 60, 10, 0, 10]
+    assert y_clean == [80, 50, 40, 10, 5]
+
+
+def test_clean_composite_curve_ends_2():
+    x_vals = [10, 0, 0, 0, 0, 0, 0]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert x_clean == [10, 0]
+    assert y_clean == [100, 80]
+
+
+def test_clean_composite_curve_ends_3():
+    x_vals = [0, 0, 0, 0, 0, 0, 50]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert x_clean == [0, 50]
+    assert y_clean == [5, 0]

@@ -262,6 +262,7 @@ def _build_gcc_segments(
     is_utility_profile: bool,
     decolour: bool,
 ) -> List[dict]:
+    
     y_vals, x_vals = clean_composite_curve(list(y_vals), list(x_vals))
     counts: dict[StreamLoc, int] = defaultdict(int)
     segments: List[dict] = []
