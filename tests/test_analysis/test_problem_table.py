@@ -975,7 +975,7 @@ from OpenPinch.analysis.problem_table_analysis import get_process_heat_cascade
 
 
 def test_problem_table_algorithm_executes():
-    z = Zone(name="Z")
+    z = Zone(name="P")
     z.config = Configuration()
     z.hot_streams.add(Stream("stream A", t_supply=400, t_target=200, heat_flow=1.0))
     z.cold_streams.add(Stream("stream B", t_supply=200, t_target=300, heat_flow=2.0))

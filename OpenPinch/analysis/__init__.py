@@ -7,6 +7,7 @@ respective modules (e.g. ``support_methods`` and ``additional_analysis``).
 """
 
 from .capital_cost_and_area_targeting import *
+from .gcc_manipulation import *
 from .data_preparation import *
 from .graph_data import *
 from .heat_pump_targeting import *

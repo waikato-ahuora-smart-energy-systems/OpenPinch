@@ -11,9 +11,8 @@ from . import (
     get_min_number_hx,
     get_capital_cost_targets,
     get_balanced_CC,
-    get_optimal_heat_pump_placement,
-    create_problem_table_with_t_int,
-    get_utility_heat_cascade,
+    get_additional_GCCs,
+    get_heat_pump_targets
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -41,14 +40,30 @@ def compute_direct_integration_targets(zone: Zone):
     pt, pt_real, target_values = get_process_heat_cascade(
         hot_streams, cold_streams, all_streams, zone_config
     )
+    hot_pinch, cold_pinch = pt.pinch_temperatures()
+    pt = get_additional_GCCs(
+        pt, 
+        is_direct_integration=True, 
+        do_vert_cc_calc=zone_config.DO_VERTICAL_GCC,
+        do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
+    )
+    
+    # if zone.identifier == Z.P.value:
+    #     res.update(
+    #         get_heat_pump_targets(
+    #             pt, zone_config, 
+    #             is_process_integrated=True,
+    #             is_heat_pumping=True,
+    #             is_T_vals_shifted=True,
+    #         )
+    #     )
+    
     get_utility_targets(
-        pt, pt_real, hot_utilities, cold_utilities
+        pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True
     )
     net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
         pt.col[PT.T.value], pt.col[PT.H_NET_A.value], hot_utilities, cold_utilities
     )
-    hot_pinch, cold_pinch = pt.pinch_temperatures()
-
     if zone_config.DO_BALANCED_CC or zone_config.DO_AREA_TARGETING:
         pt.update(
             get_balanced_CC(
@@ -102,37 +117,6 @@ def compute_direct_integration_targets(zone: Zone):
                     "Annualised capital cost target": annual_capital_cost,
                 }
             )
-
-    if zone_config.DO_HP_TARGETING and pt.col[PT.H_NET_COLD.value].max() > tol:
-        res.update(
-            get_optimal_heat_pump_placement(
-                T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_NET_HOT.value],
-                H_cold=pt.col[PT.H_NET_COLD.value],
-                n_cond=2,
-                n_evap=2,
-                eta_comp=0.7,
-                dtmin_hp=0,
-                is_T_vals_shifted=True,
-                zone_config=zone_config,
-                is_cycle_simulation=True
-            )
-        )
-        t_hp = create_problem_table_with_t_int(res["cond_streams"] + res["evap_streams"], True)
-        pt.insert_temperature_interval(t_hp[PT.T.value].to_list())
-        cascade = get_utility_heat_cascade(
-            pt.col[PT.T.value],
-            res["cond_streams"],
-            res["evap_streams"],
-            is_shifted=True,
-        )
-        pt.update(
-            {
-                PT.H_NET_HP_PRO.value: cascade[PT.H_NET_UT.value],
-                PT.H_HOT_HP.value: cascade[PT.H_HOT_UT.value],
-                PT.H_COLD_HP.value: cascade[PT.H_COLD_UT.value],
-            }
-        )
 
     res.update(
         {
@@ -326,41 +310,3 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.NLC.value: pt[[PT.T.value, PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
         GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_HP_PRO.value]],
     }
-
-# def _target_heat_pump_integration(
-#     T_vals: np.ndarray, 
-#     H_hot: np.ndarray, 
-#     H_cold: np.ndarray,   
-#     zone_config: Configuration
-# ):
-#     res = get_optimal_heat_pump_placement(
-#         T_vals=T_vals,
-#         H_hot=H_hot,
-#         H_cold=H_cold,
-#         n_cond=2,
-#         n_evap=2,
-#         eta_comp=0.7,
-#         dtmin_hp=0,
-#         is_T_vals_shifted=True,
-#         zone_config=zone_config,
-#         is_cycle_simulation=True,
-#     )
-#     pt_hp = create_problem_table_with_t_int(
-#         res["cond_streams"] + res["evap_streams"],
-#         True,
-#     )
-#     pt.insert_temperature_interval(pt_hp[PT.T.value])
-#     cascade = get_utility_heat_cascade(
-#         pt.col[PT.T.value],
-#         res["cond_streams"],
-#         res["evap_streams"],
-#         is_shifted=True,
-#     )
-
-#     pt.update(
-#         {
-#             PT.H_NET_HP_PRO.value: cascade[PT.H_NET_UT.value],
-#             PT.H_HOT_HP.value: cascade[PT.H_HOT_UT.value],
-#             PT.H_COLD_HP.value: cascade[PT.H_COLD_UT.value],
-#         }
-#     )    

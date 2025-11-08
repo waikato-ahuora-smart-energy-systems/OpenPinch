@@ -59,18 +59,25 @@ def clean_composite_curve_ends(
     y_vals: np.ndarray | list, x_vals: np.ndarray | list
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Remove redundant points in composite curves."""
+    y_vals = np.array(y_vals)
+    x_vals = np.array(x_vals)
+    
+    if np.abs(x_vals.sum()) < tol or np.abs(x_vals.var()) < tol:
+        return np.array([]), np.array([])
+    
     mask_0 = ~np.isclose(x_vals, x_vals[0] * np.ones(len(x_vals)), atol=tol)
     start = np.flatnonzero(mask_0)[0] - 1
     mask_1 = ~np.isclose(x_vals, x_vals[-1] * np.ones(len(x_vals)), atol=tol)
     end = np.flatnonzero(mask_1)[-1] + 1
+
     x_clean = x_vals[start:end+1]
     y_clean = y_vals[start:end+1]      
     return y_clean, x_clean
 
 
 def clean_composite_curve(
-    y_array: np.ndarray, x_array: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+    y_array: np.ndarray | list, x_array: np.ndarray | list
+) -> Tuple[np.ndarray | list]:
     """Remove redundant points in composite curves."""
 
     # Round to avoid tiny numerical errors

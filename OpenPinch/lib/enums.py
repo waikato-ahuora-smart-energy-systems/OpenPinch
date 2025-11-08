@@ -14,6 +14,7 @@ class ZoneType(Enum):
     def __str__(self):
         return self.value
 
+Z = ZoneType
 
 class TargetType(Enum):
     """Different target calculation categories."""

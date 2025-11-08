@@ -12,7 +12,7 @@ from ..classes.stream_collection import StreamCollection
 from ..classes.problem_table import ProblemTable
 from ..classes.simple_heat_pump import HeatPumpCycle
 
-__all__ = ["get_optimal_heat_pump_placement"]
+__all__ = ["get_heat_pump_targets"]
 
 
 #######################################################################################################
@@ -20,18 +20,98 @@ __all__ = ["get_optimal_heat_pump_placement"]
 #######################################################################################################
 
 
-def get_optimal_heat_pump_placement(
+def get_heat_pump_targets(
+    pt: ProblemTable, 
+    zone_config: Configuration,
+    is_T_vals_shifted: bool,
+    is_process_integrated: bool,
+    is_heat_pumping: bool,
+    n_cond: int = 2,
+    n_evap: int = 2,
+    eta_comp: float = 0.7,
+    dtmin_hp: float = 5.0,    
+):
+    ######### TEMP VARS ######### 
+    zone_config.HP_LOAD_FRACTION = 1
+    zone_config.DO_HP_SIM = False
+    #############################
+    res = {}
+    if (
+        (zone_config.DO_PROCESS_HP_TARGETING == False)
+        or 
+        (np.abs(pt.col[PT.H_NET_COLD.value]).max() < tol and is_heat_pumping == True)
+        or
+        (np.abs(pt.col[PT.H_NET_HOT.value]).max() < tol and is_heat_pumping == False)
+    ):
+        return res
+    
+    if is_process_integrated:
+        col_H_hot = PT.H_NET_HOT.value
+        col_H_cold = PT.H_NET_COLD.value
+        col_H_net = PT.H_NET_HP_PRO.value
+    else:
+        col_H_hot = PT.H_HOT_UT.value
+        col_H_cold = PT.H_COLD_UT.value 
+        col_H_net = PT.H_NET_HP_UT.value
+
+    res.update(
+        _get_optimal_heat_pump_placement(
+            T_vals=pt.col[PT.T.value],
+            H_hot=pt.col[col_H_hot],
+            H_cold=pt.col[col_H_cold],
+            n_cond=n_cond,
+            n_evap=n_evap,
+            eta_comp=eta_comp,
+            dtmin_hp=dtmin_hp,
+            is_process_integrated=is_process_integrated,
+            load_fraction=zone_config.HP_LOAD_FRACTION,
+            is_cycle_simulation=zone_config.DO_HP_SIM,
+            T_env=zone_config.T_ENV,
+            dT_env_cont=zone_config.DT_ENV_CONT ,
+            dt_phase_change=zone_config.DT_PHASE_CHANGE,
+            is_heat_pumping=is_heat_pumping,
+            refrigerant=zone_config.REFRIGERANTS
+        )
+    )
+    t_hp = create_problem_table_with_t_int(res["cond_streams"] + res["evap_streams"], is_T_vals_shifted)
+    pt.insert_temperature_interval(t_hp[PT.T.value].to_list())
+    temp = get_utility_heat_cascade(
+        pt.col[PT.T.value],
+        res["cond_streams"],
+        res["evap_streams"],
+        is_shifted=is_T_vals_shifted,
+    )
+    pt.update(  
+        {
+            col_H_net: temp[PT.H_NET_UT.value],
+            PT.H_HOT_HP.value: temp[PT.H_HOT_UT.value],
+            PT.H_COLD_HP.value: temp[PT.H_COLD_UT.value],
+        }
+    )
+    return res
+
+
+#######################################################################################################
+# Helper functions - primary
+#######################################################################################################
+
+
+def _get_optimal_heat_pump_placement(
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
     n_cond: int = 1,
     n_evap: int = 1,
     eta_comp: float = 0.7,
-    dtmin_hp: float = 5.0,
-    is_T_vals_shifted: bool = True,
-    zone_config: Configuration = None,
+    dtmin_hp: float = 0.0,
+    is_process_integrated: bool = True,
+    load_fraction: float = 1,
     is_cycle_simulation: bool = False,
-    is_heat_pump: bool = True,
+    refrigerant: list = [],
+    T_env: float = 15,
+    dT_env_cont: float = 5,
+    dt_phase_change: float = 0.01,
+    is_heat_pumping: bool = True,  
 ):
     """
     Determine an optimal multi-stage heat-pump placement for the supplied heat
@@ -54,24 +134,17 @@ def get_optimal_heat_pump_placement(
         None: The routine is currently a placeholder that normalises inputs and
         delegates to the basic placement helper.
     """
-    ### TEMP VARS ### 
-    # zone_config.HP_HEATING_FRACTION = 0.6
-    is_cycle_simulation = False
-    include_plots = False
-    #################
-    Q_hp_target = zone_config.HP_HEATING_FRACTION * np.abs(H_cold).max()
-    if zone_config.HP_HEATING_FRACTION < tol:
+    Q_hp_target = load_fraction * np.abs(H_cold).max()
+    if load_fraction < tol:
         return {}
-    T_hot, T_cold, dT_shift = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, dtmin_hp, is_T_vals_shifted)   
-    if zone_config.HP_HEATING_FRACTION < 1.0:
+    T_hot, T_cold, dT_shift = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, dtmin_hp, is_process_integrated)   
+    if load_fraction < 1.0:
         T_cold, H_cold = _get_H_col_till_target_Q(Q_hp_target, T_cold, H_cold)   
-    T_hot, H_hot, T_cold, H_cold, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(T_hot, H_hot, T_cold, H_cold, dT_shift, zone_config)
+    T_hot, H_hot, T_cold, H_cold, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(T_hot, H_hot, T_cold, H_cold, dT_shift, T_env, dT_env_cont, dt_phase_change, is_heat_pumping)
+         
     T_hot, H_hot = clean_composite_curve_ends(T_hot, H_hot)
-    T_cold, H_cold = clean_composite_curve_ends(T_cold, H_cold) 
     T_cold, H_cold = clean_composite_curve_ends(T_cold, H_cold)
-    # H_hot = make_monotonic(H_hot, side="left")
-    # H_cold = make_monotonic(H_cold, side="right")    
-
+    
     idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
     T_bnds = _convert_idx_to_temperatures(idx_dict, T_hot, T_cold)
     T_cond_init, T_evap_init = _set_initial_values_for_condenser_and_evaporator(n_cond, n_evap, T_bnds)
@@ -93,9 +166,9 @@ def get_optimal_heat_pump_placement(
         T_bnds_evap=T_bnds["CU"],
         eta_comp=float(eta_comp),
         dtmin_hp=float(dtmin_hp),
-        is_T_vals_shifted=bool(is_T_vals_shifted),
-        is_heat_pump=bool(is_heat_pump),
-        refrigerant=zone_config.REFRIGERANTS[0]
+        is_process_integrated=bool(is_process_integrated),
+        is_heat_pump=bool(is_heat_pumping),
+        refrigerant=refrigerant[0]
     )
         
     _optimise_multi_temperature_carnot_heat_pump_placement(args)
@@ -106,7 +179,7 @@ def get_optimal_heat_pump_placement(
         args.cond_streams = _build_latent_streams(args.T_cond, args.Q_cond, args.dtmin_hp, is_hot=True)
         args.evap_streams = _build_latent_streams(args.T_evap, args.Q_evap, args.dtmin_hp, is_hot=False)
     
-    if include_plots:
+    if 0:
         _plot_multi_hp_profiles(args, False)
         
     return {
@@ -119,11 +192,6 @@ def get_optimal_heat_pump_placement(
         "total_work": args.total_work,
         "COP_ave": args.Q_hp_target / args.total_work,
     }
-
-
-#######################################################################################################
-# Helper functions - primary
-#######################################################################################################
 
 
 def _optimise_multi_temperature_carnot_heat_pump_placement(args: HeatPumpPlacementArgs) -> Tuple[dict, HeatPumpPlacementArgs]:
@@ -471,11 +539,11 @@ def _get_first_or_last_zero_value_idx(
 def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
     T_vals: np.ndarray, 
     dtmin_hp: float,
-    is_T_vals_shifted: bool,
+    is_process_integrated: bool,
 ):
     """Apply ΔTmin adjustments to cascade temperatures for heat pump calculations.
     """
-    dT_shift = dtmin_hp / 2 if is_T_vals_shifted else dtmin_hp
+    dT_shift = dtmin_hp * 0.5 if is_process_integrated else dtmin_hp * 1.5
     T_hot  = T_vals - dT_shift
     T_cold = T_vals + dT_shift
     return T_hot, T_cold, dT_shift
@@ -517,13 +585,15 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
     T_cold: np.ndarray,    
     H_cold: np.ndarray,
     dT_shift: float,
-    zone_config: Configuration,   
-    is_heat_pump: bool = True,    
+    T_env: float = 15,
+    dT_env_cont: float = 5,
+    dt_phase_change: float = 0.01,
+    is_heat_pumping: bool = True,    
 ):
     """Balance net hot and cold duties using an ambient sink/source if required.
     """
     delta_H = np.abs(H_cold).max() - np.abs(H_hot).max()
-    if zone_config == None or np.abs(delta_H) < tol:
+    if np.abs(delta_H) < tol:
         return H_hot, H_cold
     
     if H_hot.max() > tol:
@@ -532,23 +602,23 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
     if H_cold.min() < -tol:
         H_cold *= -1
     
-    if delta_H > tol and is_heat_pump:
+    if delta_H > tol and is_heat_pumping:
         # Heat pump with potentially limited sources
         mask = np.where(
-            T_hot <= (zone_config.T_ENV - zone_config.DT_ENV_CONT - zone_config.DT_PHASE_CHANGE - dT_shift),
+            T_hot <= (T_env - dT_env_cont - dt_phase_change - dT_shift),
             delta_H, 0.0
         )
         H_hot -= mask
 
-    elif delta_H < -tol and not is_heat_pump:
+    elif delta_H < -tol and not is_heat_pumping:
         # Refrigeration with potentially limited sinks
         mask = np.where(
-            T_cold >= (zone_config.T_ENV + zone_config.DT_ENV_CONT + zone_config.DT_PHASE_CHANGE + dT_shift),
+            T_cold >= (T_env + dT_env_cont + dt_phase_change + dT_shift),
             delta_H, 0.0
         )
         H_cold += mask
 
-    if delta_H < -tol and is_heat_pump:
+    if delta_H < -tol and is_heat_pumping:
         # Heat pump with excess sources -> remove excess
         T_hot, H_hot = _get_H_col_till_target_Q(
             np.abs(H_cold).max(),
@@ -557,7 +627,7 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
             False,
         )
 
-    elif delta_H > tol and not is_heat_pump:
+    elif delta_H > tol and not is_heat_pumping:
         # Refrigeration with excess sinks -> remove excess
         T_cold, H_cold = _get_H_col_till_target_Q(
             np.abs(H_hot).max(),

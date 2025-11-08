@@ -30,14 +30,13 @@ class Configuration:
     DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
-    DO_HP_TARGETING: bool = False
+    DO_PROCESS_HP_TARGETING: bool = False
+    DO_UTILITY_HP_TARGETING: bool = False
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
     DO_VERTICAL_GCC: bool = False
     DO_ASSITED_HT: bool = False
     DO_TURBINE_WORK: bool = False
-
-    GCC_FOR_TARGETING: str = PT.H_NET_NP.value
 
     DT_CONT: float = 5
     DT_PHASE_CHANGE: float = 0.01
@@ -47,7 +46,8 @@ class Configuration:
     P_ENV: float = 101
     DECIMAL_PLACES: int = 2
 
-    HP_HEATING_FRACTION: float = 1.0
+    HP_LOAD_FRACTION: float = 1.0
+    DO_HP_SIM: bool = False
     REFRIGERANTS: List[str] = ["Ammonia"]
 
     UTILITY_PRICE: float = 40

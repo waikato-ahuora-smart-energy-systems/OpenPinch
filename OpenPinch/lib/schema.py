@@ -56,7 +56,7 @@ class HeatPumpPlacementArgs(BaseModel):
     T_bnds_evap: tuple
     eta_comp: float
     dtmin_hp: float
-    is_T_vals_shifted: Optional[bool] = True
+    is_process_integrated: Optional[bool] = True
     T_cond_hi: Optional[float] = None
     T_evap_lo: Optional[float] = None
     T_cond: Optional[np.ndarray] = None

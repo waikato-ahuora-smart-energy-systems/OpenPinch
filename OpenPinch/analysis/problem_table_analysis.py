@@ -91,7 +91,7 @@ def get_utility_heat_cascade(
 
 
 def create_problem_table_with_t_int(
-    streams: List[Stream] = [], 
+    streams: List[Stream] | StreamCollection = [], 
     is_shifted: bool = True,
     zone_config: Configuration = None,
 ) -> Tuple[ProblemTable, ProblemTable]:
@@ -113,7 +113,7 @@ def create_problem_table_with_t_int(
         if zone_config.DO_EXERGY_TARGETING:
             T_vals.append(zone_config.T_ENV)
 
-        if zone_config.DO_HP_TARGETING:
+        if zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_UTILITY_HP_TARGETING:
             T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT)
             T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT - zone_config.DT_PHASE_CHANGE)
             T_vals.append(zone_config.T_ENV + zone_config.DT_ENV_CONT)

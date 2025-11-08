@@ -44,8 +44,8 @@ def get_results_filepath(problem_filepath: Path) -> Path:
 
 @pytest.mark.parametrize("p_filepath", get_example_problem_filepaths())
 def test_pinch_analysis_pipeline(p_filepath: Path):
-    if p_filepath.name != "p_potatoe-simple.json":
-        return True
+    # if p_filepath.name != "p_only_hot.json":
+    #     return True
 
     # Set the file path to the directory of this script
     with open(p_filepath) as json_data:
