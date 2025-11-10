@@ -52,8 +52,8 @@ class HeatPumpPlacementArgs(BaseModel):
     H_cold: np.ndarray | list
     n_cond: int
     n_evap: int
-    T_bnds_cond: tuple
-    T_bnds_evap: tuple
+    T_bnds_cond: np.ndarray | tuple
+    T_bnds_evap: np.ndarray | tuple
     eta_comp: float
     dtcont_hp: float
     is_process_integrated: Optional[bool] = True
