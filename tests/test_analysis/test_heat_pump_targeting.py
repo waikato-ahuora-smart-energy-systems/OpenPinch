@@ -14,6 +14,7 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _get_H_vals_from_T_hp_vals,
     _parse_carnot_hp_state_temperatures,
     _get_H_col_till_target_Q,
+    _prepare_latent_hp_profile,
 )
 
 
@@ -113,8 +114,8 @@ def test_prepare_data_for_minimize_multiple_segments():
         T_bnds["CU"],
     )
 
-    np.testing.assert_allclose(x0, np.array([210.0, 205.0, 40.0, 35.0]))
-    assert bnds == [T_bnds["HU"], T_bnds["HU"], T_bnds["CU"], T_bnds["CU"]]
+    np.testing.assert_allclose(x0, np.array([210.0, 205.0, 40.0, 35.0, 30.0]))
+    assert bnds == [T_bnds["HU"], T_bnds["HU"], T_bnds["CU"], T_bnds["CU"], T_bnds["CU"]]
 
 
 def test_prepare_data_for_minimize_single_segment():
@@ -129,9 +130,9 @@ def test_prepare_data_for_minimize_single_segment():
         T_bnds["CU"],
     )
 
-    assert isinstance(x0, np.ndarray)
-    assert x0.shape == (0,)
-    assert bnds == []
+    np.testing.assert_allclose(x0, np.array([25.0]))
+    assert x0.shape == (1,)
+    assert bnds == [T_bnds["CU"]]
 
 
 def test_get_Q_from_H_computes_interval_duties():
@@ -186,7 +187,7 @@ def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
         T_cond_hi=160.0,
         T_evap_lo=40.0,
     )
-    x = np.array([150.0, 140.0, 90.0])
+    x = np.array([150.0, 140.0, 90.0, 40.0])
 
     T_cond, T_evap = _parse_carnot_hp_state_temperatures(x, args)
 
@@ -229,4 +230,63 @@ def test_get_H_col_till_target_Q_interpolates_to_target_at_exisiting_temperature
     np.testing.assert_allclose(H_out[0], Q_hp_target)
     np.testing.assert_allclose(T_out[:], np.array([140.0, 130.0]))
     np.testing.assert_allclose(H_out[:], np.array([150.0, 0.0]))
-    
+
+
+def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty():
+    T_hp = [150.0, 149.7, 130.0]
+    Q_hp = [10.0, 5.0, 20.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+
+    np.testing.assert_allclose(T_out, np.array([150.0, 130.0]))
+    np.testing.assert_allclose(Q_out, np.array([15.0, 20.0]))
+
+
+def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty_consecutivily():
+    T_hp = [150.0, 149.7, 149.01, 130.0]
+    Q_hp = [10.0, 2.0, 3.0, 20.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+
+    np.testing.assert_allclose(T_out, np.array([150.0, 130.0]))
+    np.testing.assert_allclose(Q_out, np.array([15.0, 20.0]))
+
+
+def test_prepare_latent_hp_profile_merges_cold_segments_with_lower_temperature():
+    T_hp = [60.0, 45.0, 30.4, 30.0]
+    Q_hp = [12.5, 10.0, 7.5, 5.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=False)
+
+    np.testing.assert_allclose(T_out, np.array([60.0, 45.0, 30.0]))
+    np.testing.assert_allclose(Q_out, np.array([12.5, 10.0, 12.5]))
+
+
+def test_prepare_latent_hp_profile_merges_cold_segments_with_complex_temperature():
+    T_hp = [31.5, 30.8, 30.4, 30.0]
+    Q_hp = [12.5, 10.0, 7.5, 5.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=False)
+
+    np.testing.assert_allclose(T_out, np.array([31.5, 30.0]))
+    np.testing.assert_allclose(Q_out, np.array([12.5, 22.5]))    
+
+
+def test_prepare_latent_hp_profile_keeps_unique_sequences_unchanged():
+    T_hp = [180.0, 160.0, 140.0]
+    Q_hp = [8.0, 6.0, 4.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=0.5, is_hot=True)
+
+    np.testing.assert_allclose(T_out, T_hp)
+    np.testing.assert_allclose(Q_out, Q_hp)
+
+
+def test_prepare_latent_hp_profile_handles_empty_input():
+    T_hp = []
+    Q_hp = []
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+
+    assert len(T_out) == 0
+    assert len(Q_out) == 0

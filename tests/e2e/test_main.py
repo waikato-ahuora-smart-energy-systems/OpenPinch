@@ -44,7 +44,7 @@ def get_results_filepath(problem_filepath: Path) -> Path:
 
 @pytest.mark.parametrize("p_filepath", get_example_problem_filepaths())
 def test_pinch_analysis_pipeline(p_filepath: Path):
-    # if p_filepath.name != "p_only_hot.json":
+    # if p_filepath.name != "p_illustrative.json":
     #     return True
 
     # Set the file path to the directory of this script
@@ -64,33 +64,7 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
         wkb_res = TargetOutput.model_validate(wkb_res)
 
     # Compare targets from Python and Excel implementations of Open Pinch
-    if 1 and r_filepath is not None:
-        for z in res.targets:
-            for z0 in wkb_res.targets:
-                if z.name in z0.name:
-                    assert abs(get_value(z.Qh) - get_value(z0.Qh)) < 1e-3
-                    assert abs(get_value(z.Qc) - get_value(z0.Qc)) < 1e-3
-                    assert abs(get_value(z.Qr) - get_value(z0.Qr)) < 1e-3
-
-                    for i in range(len(z.hot_utilities)):
-                        assert (
-                            abs(
-                                get_value(z.hot_utilities[i].heat_flow)
-                                - get_value(z0.hot_utilities[i].heat_flow)
-                            )
-                            < 1e-3
-                        )
-
-                    for i in range(len(z.cold_utilities)):
-                        assert (
-                            abs(
-                                get_value(z.cold_utilities[i].heat_flow)
-                                - get_value(z0.cold_utilities[i].heat_flow)
-                            )
-                            < 1e-3
-                        )
-
-    elif 0 and r_filepath is not None:
+    if 0 and r_filepath is not None:
         print(f"Name: {res.name}")
         for z in res.targets:
             for z0 in wkb_res.targets:
@@ -146,7 +120,7 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
                         for i in range(len(z.cold_utilities))
                     ]
                     print("")
-    else:
+    elif 0:
         print(f"Name: {res.name}")
         for z in res.targets:
                     print("")
@@ -183,3 +157,28 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
                         for i in range(len(z.cold_utilities))
                     ]
                     print("")
+
+    for z in res.targets:
+        for z0 in wkb_res.targets:
+            if z.name in z0.name:
+                assert abs(get_value(z.Qh) - get_value(z0.Qh)) < 1e-3
+                assert abs(get_value(z.Qc) - get_value(z0.Qc)) < 1e-3
+                assert abs(get_value(z.Qr) - get_value(z0.Qr)) < 1e-3
+
+                for i in range(len(z.hot_utilities)):
+                    assert (
+                        abs(
+                            get_value(z.hot_utilities[i].heat_flow)
+                            - get_value(z0.hot_utilities[i].heat_flow)
+                        )
+                        < 1e-3
+                    )
+
+                for i in range(len(z.cold_utilities)):
+                    assert (
+                        abs(
+                            get_value(z.cold_utilities[i].heat_flow)
+                            - get_value(z0.cold_utilities[i].heat_flow)
+                        )
+                        < 1e-3
+                    )

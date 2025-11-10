@@ -46,16 +46,16 @@ class HeatPumpPlacementArgs(BaseModel):
 
     Q_hp_target: float
     Q_amb_max: float
-    T_hot: np.ndarray
-    H_hot: np.ndarray
-    T_cold: np.ndarray
-    H_cold: np.ndarray
+    T_hot: np.ndarray | list
+    H_hot: np.ndarray | list
+    T_cold: np.ndarray | list
+    H_cold: np.ndarray | list
     n_cond: int
     n_evap: int
     T_bnds_cond: tuple
     T_bnds_evap: tuple
     eta_comp: float
-    dtmin_hp: float
+    dtcont_hp: float
     is_process_integrated: Optional[bool] = True
     T_cond_hi: Optional[float] = None
     T_evap_lo: Optional[float] = None

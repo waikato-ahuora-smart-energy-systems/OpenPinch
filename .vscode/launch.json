@@ -18,8 +18,8 @@
             "module": "pytest",
             "cwd": "${workspaceFolder}/tests/", 
             "args": [
-            //   "test_analysis/test_heat_pump_targeting.py"
-              "test_utils/test_miscellaneous.py"
+              "test_analysis/test_heat_pump_targeting.py",
+            //   "test_utils/test_miscellaneous.py",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

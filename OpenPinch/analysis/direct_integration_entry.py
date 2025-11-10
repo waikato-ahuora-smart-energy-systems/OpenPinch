@@ -48,15 +48,15 @@ def compute_direct_integration_targets(zone: Zone):
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
     
-    # if zone.identifier == Z.P.value:
-    #     res.update(
-    #         get_heat_pump_targets(
-    #             pt, zone_config, 
-    #             is_process_integrated=True,
-    #             is_heat_pumping=True,
-    #             is_T_vals_shifted=True,
-    #         )
-    #     )
+    if zone.identifier in [Z.P.value]:
+        res.update(
+            get_heat_pump_targets(
+                pt, zone_config, 
+                is_process_integrated=True,
+                is_heat_pumping=True,
+                is_T_vals_shifted=True,
+            )
+        )
     
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True

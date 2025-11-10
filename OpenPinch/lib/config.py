@@ -30,7 +30,7 @@ class Configuration:
     DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
-    DO_PROCESS_HP_TARGETING: bool = False
+    DO_PROCESS_HP_TARGETING: bool = True
     DO_UTILITY_HP_TARGETING: bool = False
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
@@ -39,7 +39,7 @@ class Configuration:
     DO_TURBINE_WORK: bool = False
 
     DT_CONT: float = 5
-    DT_PHASE_CHANGE: float = 0.01
+    DT_PHASE_CHANGE: float = 0.1
     HTC: float = 1.0
     T_ENV: float = 15
     DT_ENV_CONT: float = 10 
