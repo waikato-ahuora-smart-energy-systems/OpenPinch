@@ -331,8 +331,8 @@ def _compute_entropic_average_temperature_in_K(
     """
     if T.var() < tol:
         return T[0] + 273.15
-    S = Q / (T + 273.15)
-    return Q.sum() / S.sum()
+    S_tot = (Q / (T + 273.15)).sum()
+    return Q.sum() / S_tot if S_tot > 0 else (T.mean() + 273.15)
     
 
 def _compute_COP_estimate_from_carnot_limit(
@@ -461,9 +461,10 @@ def _scale_x_evap(
     T_max: float,
 ) -> np.ndarray:
     temp = []
+    T_rev = T[::-1]
     for i in range(T.size):
-        temp.append((T[::-1][i] - T_min) / (T_max - T_min))
-        T_min = T[i]
+        temp.append((T_rev[i] - T_min) / (T_max - T_min))
+        T_min = T_rev[i]
     return np.array(temp)[::-1].flatten()
 
 
@@ -542,20 +543,22 @@ def _set_initial_values_for_condenser_and_evaporator(
     n_cond = max(1, int(n_cond))
     n_evap = max(1, int(n_evap))
 
-    hot_lo, hot_hi = T_bnds["HU"]
-    cold_lo, cold_hi = T_bnds["CU"]
+    _, hot_hi = T_bnds["HU"]
+    cold_lo, _ = T_bnds["CU"]
 
     # Find key points where temperature might be minimised
     cond_areas = np.column_stack(((hot_hi - T_cold) * H_cold, T_cold))
     cond_areas[:] = cond_areas[cond_areas[:, 0].argsort()[::-1]]
+    sorted_T_cond = np.sort(cond_areas[:n_cond-1, 1])[::-1]
     evap_areas = np.column_stack(((T_hot - cold_lo) * H_hot, T_hot))
     evap_areas[:] = evap_areas[evap_areas[:, 0].argsort()[::-1]]
+    sorted_T_evap = np.sort(evap_areas[:n_evap-1, 1])[::-1]
     
     # Distribute condenser nodes from hottest to coldest limits.
-    T_cond_init = np.concatenate([[hot_hi], cond_areas[:n_cond-1, 1]])
+    T_cond_init = np.concatenate([[hot_hi], sorted_T_cond])
 
     # Distribute evaporator nodes from coldest to hottest limits.
-    T_evap_init = np.concatenate((evap_areas[:n_evap-1, 1], [cold_lo]))
+    T_evap_init = np.concatenate((sorted_T_evap, [cold_lo]))
 
     return T_cond_init, T_evap_init
 
