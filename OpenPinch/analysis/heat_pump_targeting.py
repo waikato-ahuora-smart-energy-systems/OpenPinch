@@ -177,7 +177,7 @@ def _get_optimal_heat_pump_placement(
     idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
     T_bnds = _convert_idx_to_temperatures(idx_dict, T_hot, T_cold)
     T_cond_init, T_evap_init = _set_initial_values_for_condenser_and_evaporator(
-        n_cond, n_evap, T_bnds,
+        n_cond, n_evap, T_bnds, T_hot, H_hot, T_cold, H_cold,
     )
 
     args = HeatPumpPlacementArgs(
@@ -213,7 +213,6 @@ def _get_optimal_heat_pump_placement(
     if 0:
         _plot_multi_hp_profiles_from_args(args)
 
-
     return {
         "cond_streams": args.cond_streams,
         "evap_streams": args.evap_streams,
@@ -231,24 +230,20 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
 ) -> Tuple[dict, HeatPumpPlacementArgs]:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
     """
-    x_cond = _scale_vars(args.T_cond, args.T_evap_lo, args.T_cond_hi)
-    x_evap = _scale_vars(args.T_evap, args.T_evap_lo, args.T_cond_hi)
-    x_bnds_cond = _scale_vars(args.T_bnds_cond, args.T_evap_lo, args.T_cond_hi)
-    x_bnds_evap = _scale_vars(args.T_bnds_evap, args.T_evap_lo, args.T_cond_hi)
-    # _, bnds, constraints = _prepare_data_for_minimizer(args.T_cond, args.T_evap, args.T_bnds_cond, args.T_bnds_evap)
-    _, bnds, constraints = _prepare_data_for_minimizer(x_cond, x_evap, x_bnds_cond, x_bnds_evap)
+    x_cond = _scale_x_cond(args.T_cond, args.T_bnds_cond[0], args.T_bnds_cond[1])
+    x_evap = _scale_x_evap(args.T_evap, args.T_bnds_evap[0], args.T_bnds_evap[1])
+    x0, bnds = _prepare_data_for_minimizer(x_cond, x_evap)
 
-    res = glob_minimize(
-        func=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["work"], 
-        bounds=bnds,
-        maxiter=100
-    )    
+    # res = glob_minimize(
+    #     func=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"], 
+    #     bounds=bnds,
+    #     # maxiter=50
+    # )
     res = minimize(
-        fun=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["work"],
-        x0=res.x,
-        method="SLSQP",
+        fun=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"],
+        x0=x0,
+        method="COBYQA", #"SLSQP"
         bounds=bnds,
-        constraints=constraints, 
     )
     opt = _compute_carnot_heat_pump_system_performance(res.x, args)
     args.T_cond, args.T_evap = opt["T_cond"], opt["T_evap"]
@@ -334,7 +329,7 @@ def _compute_entropic_average_temperature_in_K(
 ):
     """Compute the entropic average temperature.
     """
-    if T.var() < tol or Q.sum() < tol:
+    if T.var() < tol:
         return T[0] + 273.15
     S = Q / (T + 273.15)
     return Q.sum() / S.sum()
@@ -345,19 +340,21 @@ def _compute_COP_estimate_from_carnot_limit(
     Q_cond: np.ndarray, 
     T_evap: np.ndarray,
     Q_evap: np.ndarray,  
-    eff: float = 0.6,           
+    eff: float = 0.6, 
+    min_dt_lift: float = 3.0,          
 ):  
     """Estimate COP by scaling the Carnot limit using entropic mean temperatures.
     """
     T_hi = _compute_entropic_average_temperature_in_K(T_cond, Q_cond)
     T_lo = _compute_entropic_average_temperature_in_K(T_evap, Q_evap)
-    if T_hi > T_lo + 5:
-        return T_lo / (T_hi - T_lo) * eff + 1
-    else:
-        return 50
+    return (
+        T_lo / (T_hi - T_lo) * eff + 1 
+        if T_hi >= T_lo + min_dt_lift 
+        else T_lo / min_dt_lift * eff + 1
+    )
 
 
-def _parse_carnot_hp_state_temperatures(
+def _parse_carnot_hp_state_variables(
     x: np.ndarray, 
     args: HeatPumpPlacementArgs
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -365,9 +362,9 @@ def _parse_carnot_hp_state_temperatures(
     """
     x = np.asarray(x, dtype=float).reshape(-1)
     n_cond_vars = max(int(args.n_cond) - 1, 0)
-    T_cond = np.concatenate((np.array([args.T_cond_hi]), x[:n_cond_vars]))
-    T_evap = x[n_cond_vars:]
-    return T_cond, T_evap
+    x_cond = np.concatenate((np.array([0.0]), x[:n_cond_vars]))
+    x_evap = np.concatenate((x[n_cond_vars:], np.array([0.0])))
+    return x_cond, x_evap
 
 
 def _get_H_vals_from_T_hp_vals(
@@ -389,55 +386,115 @@ def _compute_carnot_heat_pump_system_performance(
 ) -> float:
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """
-    x_trans = _unscale_vars(x, args.T_evap_lo, args.T_cond_hi)
-    T_cond, T_evap = _parse_carnot_hp_state_temperatures(x_trans, args)
+    x_cond, x_evap = _parse_carnot_hp_state_variables(x, args)
+    T_cond = _unscale_x_cond(x_cond, args.T_bnds_cond[0], args.T_bnds_cond[1])
     H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold, True)
-    H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
     Q_cond = _get_Q_from_H(H_cond)
-    Q_evap = _get_Q_from_H(H_evap)
-    cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
-    work_hp = H_cond[0] / cop if cop > 0 else H_cond[0]
-    Q_evap_tot = H_cond[0] - work_hp
-    work_el = max(Q_evap_tot - Q_evap.sum(), 0.0) # Effective penalty
-    if 1:
+
+    def _get_optimal_min_evap_T(T_lo):
+        """Adjust evaporator ladder to honour minimum temperature limits."""
+        T_evap = _unscale_x_evap(x_evap, T_lo, args.T_bnds_evap[1])
+        H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
+        Q_evap = _get_Q_from_H(H_evap)
+        cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
+
+        if np.abs(H_evap[-1]) / (cop - 1) > np.abs(H_cond[0] / cop):
+            work_hp = np.abs(H_cond[0] / cop)
+            Q_evap_tot = np.abs(H_cond[0]) - work_hp
+            work_el = 0.0
+            H_evap = H_evap / H_evap[-1] * Q_evap_tot * -1
+        else: # Evaporator is limits the heat pump
+            work_hp = np.abs(H_evap[-1]) / (cop - 1)
+            Q_evap_tot = np.abs(H_evap[-1])
+            work_el = H_cond[0] - Q_evap_tot - work_hp # Direct electric heating
+
+        return {
+            "obj": (work_hp + work_el) / args.Q_hp_target, 
+            "work": work_hp + work_el, 
+            "work_hp": work_hp,  
+            "work_el": work_el,
+            "T_evap": T_evap, 
+            "H_evap": H_evap, 
+            "cop": cop, 
+            "Q_evap_tot": Q_evap_tot,
+        }    
+
+    result = minimize(
+        fun=lambda T: _get_optimal_min_evap_T(T)["obj"],
+        method="SLSQP",
+        x0=args.T_bnds_evap[0],
+        bounds=[args.T_bnds_evap],
+    )
+    res = _get_optimal_min_evap_T(result.x)
+
+    if abs(H_cond[0] - 22894.889999999796) < tol:
+        T_evap = _unscale_x_evap(x_evap, result.x, args.T_bnds_evap[1])
+        Q_evap = _get_Q_from_H(res["H_evap"])
         args.cond_streams = _build_latent_streams(T_cond, 0.01, Q_cond, args.dtcont_hp, is_hot=True)
         args.evap_streams = _build_latent_streams(T_evap, 0.01, Q_evap, args.dtcont_hp, is_hot=False)        
-        _plot_multi_hp_profiles_from_args(args, str(f"Total work: {work_hp + work_el}"))
+        _plot_multi_hp_profiles_from_args(args, str(f"Work ({x}): {res["work"]} = {res["work_hp"]} + {res["work_el"]}"))
 
-    return {
-        "work": work_hp + work_el, 
-        "T_cond": T_cond,
-        "H_cond": H_cond,        
-        "T_evap": T_evap, 
-        "H_evap": H_evap, 
-        "cop": cop, 
-        "Q_evap_tot": Q_evap_tot,
-    }
+    res.update(
+        {
+            "T_cond": T_cond,
+            "H_cond": H_cond,
+        }
+    )
+    return res
 
 
-def _scale_vars(T, T_min, T_max, is_abs_T=True):
-    if is_abs_T:
-        return (T - T_min) / (T_max - T_min)
-    else:
-        return T / (T_max - T_min)
+def _scale_x_cond(
+    T: np.ndarray, 
+    T_min: float, 
+    T_max: float,
+) -> np.ndarray:
+    temp = []
+    for i in range(T.size):
+        temp.append((T_max - T[i]) / (T_max - T_min))
+        T_max = T[i]
+    return np.array(temp).flatten()
 
 
-def _unscale_vars(x, T_min, T_max, is_abs_T=True):
-    if is_abs_T:
-        return x * (T_max - T_min) + T_min
-    else:
-        return x * (T_max - T_min)
+def _scale_x_evap(
+    T: np.ndarray, 
+    T_min: float, 
+    T_max: float,
+) -> np.ndarray:
+    temp = []
+    for i in range(T.size):
+        temp.append((T[::-1][i] - T_min) / (T_max - T_min))
+        T_min = T[i]
+    return np.array(temp)[::-1].flatten()
+
+
+def _unscale_x_cond(
+    x: np.ndarray, 
+    T_min: float, 
+    T_max: float,
+) -> np.ndarray:
+    temp = []
+    for i in range(x.size):
+        temp.append(T_max - x[i] * (T_max - T_min))
+        T_max = temp[-1]
+    return np.array(temp).flatten()
+
+
+def _unscale_x_evap(
+    x: np.ndarray, 
+    T_min: float, 
+    T_max: float,
+) -> np.ndarray:
+    temp = []
+    for i in range(x.size):
+        temp.append(x[::-1][i] * (T_max - T_min) + T_min)
+        T_min = temp[-1]
+    return np.array(temp)[::-1].flatten()
 
 
 def _prepare_data_for_minimizer(
-    T_cond: np.ndarray = None, 
-    T_evap: np.ndarray = None,
-    T_bnds_cond: Tuple = None,
-    T_bnds_evap: Tuple = None,
-    Q_cond: np.ndarray = None,
-    Q_evap: np.ndarray = None,
-    Q_max: float = None,
-    is_first_level_included: bool = False,
+    x_cond: np.ndarray = None, 
+    x_evap: np.ndarray = None,
+    is_first_and_last_levels_vars: bool = False,
     is_multi_temperature_hp: bool = True,
     is_carnot_cycle: bool = True,
 ) -> Tuple[list, dict, Tuple]:
@@ -445,12 +502,11 @@ def _prepare_data_for_minimizer(
     """
     x_ls = []
     bnds = []
-    A = []
-    j0 = None if is_first_level_included else 1
 
-    dT_sc = T_cond - T_bnds_cond[0] if not is_carnot_cycle else None
-    dT_sh = T_bnds_evap[1] - T_evap if not is_carnot_cycle else None
-    Qe = Q_evap if is_multi_temperature_hp else None
+    j = (None, None) if is_first_and_last_levels_vars else (1, -1)   
+    # dT_sc = T_cond - T_bnds_cond[0] if not is_carnot_cycle else None
+    # dT_sh = T_bnds_evap[1] - T_evap if not is_carnot_cycle else None
+    # Qe = Q_evap if is_multi_temperature_hp else None
 
     def _build_lists(candidate, limits, k0, k1):
         if candidate is not None:
@@ -459,40 +515,27 @@ def _prepare_data_for_minimizer(
                 bnds.append(limits)
 
     pairs = [
-        (T_cond, T_bnds_cond,  j0,    None),
-        (dT_sc,  (0.0, None),  None,  None),
-        (T_evap, T_bnds_evap,  None,  None),
-        (dT_sh,  (0.0, None),  None,  None),
-        (Q_cond, (0.0, Q_max), 1,     None),
-        (Qe,     (0.0, Q_max), 1,     None),
+        (x_cond, (0.0, 1.0),  j[0], None),
+        (x_evap, (0.0, 1.0),  None, j[1]),
+        # (dT_sc,  (0.0, None), None, None),
+        # (dT_sh,  (0.0, None), None, None),
+        # (Q_cond, (0.0, 1.0),  1,    None),
+        # (Qe,     (0.0, 1.0),  1,    None),
     ]
-
     for candidate, limits, k0, k1 in pairs:
         _build_lists(candidate, limits, k0, k1)
-
-    x0 = np.concatenate(x_ls)
-
-    for i in range(len(bnds) - 1):
-        row = np.zeros(len(bnds))
-        if np.all(bnds[i] == T_bnds_cond) and np.all(bnds[i+1] == T_bnds_cond):
-            row[i] = 1
-            row[i+1] = -1
-        elif np.all(bnds[i] == T_bnds_evap) and np.all(bnds[i+1] == T_bnds_evap):
-            row[i] = 1
-            row[i+1] = -1
-        A.append(row)
-
-    lb = np.zeros(len(A))
-    ub = np.ones(len(A)) * np.inf
-    constraints = LinearConstraint(np.array(A), lb, ub)
- 
-    return x0, bnds, constraints
+    x0 = np.concatenate(x_ls) 
+    return x0, bnds
 
 
 def _set_initial_values_for_condenser_and_evaporator(
     n_cond: int,
     n_evap: int,
     T_bnds: dict,   
+    T_hot: np.ndarray,
+    H_hot: np.ndarray,
+    T_cold: np.ndarray,    
+    H_cold: np.ndarray,    
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Generate evenly spaced starting points for condenser and evaporator levels.
     """
@@ -502,10 +545,17 @@ def _set_initial_values_for_condenser_and_evaporator(
     hot_lo, hot_hi = T_bnds["HU"]
     cold_lo, cold_hi = T_bnds["CU"]
 
+    # Find key points where temperature might be minimised
+    cond_areas = np.column_stack(((hot_hi - T_cold) * H_cold, T_cold))
+    cond_areas[:] = cond_areas[cond_areas[:, 0].argsort()[::-1]]
+    evap_areas = np.column_stack(((T_hot - cold_lo) * H_hot, T_hot))
+    evap_areas[:] = evap_areas[evap_areas[:, 0].argsort()[::-1]]
+    
     # Distribute condenser nodes from hottest to coldest limits.
-    T_cond_init = np.linspace(hot_hi, hot_lo, n_cond + 1)[:-1]
+    T_cond_init = np.concatenate([[hot_hi], cond_areas[:n_cond-1, 1]])
+
     # Distribute evaporator nodes from coldest to hottest limits.
-    T_evap_init = np.linspace(cold_hi, cold_lo, n_evap + 1)[1:]
+    T_evap_init = np.concatenate((evap_areas[:n_evap-1, 1], [cold_lo]))
 
     return T_cond_init, T_evap_init
 
@@ -1108,4 +1158,3 @@ def _plot_multi_hp_profiles_from_args(args: HeatPumpPlacementArgs, title: str = 
         H_hp_cold,
         title,
     )
-
