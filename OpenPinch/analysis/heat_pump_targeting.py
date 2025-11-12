@@ -220,7 +220,7 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     res = CarnotHeatPumpResults.model_validate(res)
     res.cond_streams = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
     res.evap_streams = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
-    if 0:
+    if 1:
         _plot_multi_hp_profiles_from_results(args, res)    
     return res
 
@@ -484,6 +484,9 @@ def _prepare_data_for_minimizer(
     return x0, bnds
 
 
+# def
+
+
 def _set_initial_values_for_condenser_and_evaporator(
     n_cond: int,
     n_evap: int, 
@@ -500,17 +503,33 @@ def _set_initial_values_for_condenser_and_evaporator(
     # Find key points where temperature might be minimised
     cond_areas = np.column_stack((np.abs((T_cold[0] - T_cold) * H_cold), T_cold))
     cond_areas[:] = cond_areas[cond_areas[:, 0].argsort()[::-1]]
+    j = np.flatnonzero(cond_areas[:,0] == 0)[0]
+    cond_areas = cond_areas[:j]
     sorted_T_cond = np.sort(cond_areas[:n_cond-1, 1])[::-1]
+    if sorted_T_cond.size > 0:
+        i = np.flatnonzero(np.abs(T_cold[0] - sorted_T_cond) > tol)[0]
+        sorted_T_cond = sorted_T_cond[i:]
+    if n_cond > sorted_T_cond.size:
+        # Distribute default initial values from hottest to coldest limits with even spacing.
+        default_T_cond = np.linspace(T_cold[0], T_cold[-1], n_cond - sorted_T_cond.size + 1)[:-1]
+        T_cond_init = np.sort(np.concatenate([default_T_cond, sorted_T_cond]))[::-1]
+    else: 
+        T_cond_init = np.concatenate([[T_cold[0]], sorted_T_cond])
 
     evap_areas = np.column_stack((np.abs((T_hot[-1] - T_hot) * H_hot), T_hot))
     evap_areas[:] = evap_areas[evap_areas[:, 0].argsort()[::-1]]
+    j = np.flatnonzero(evap_areas[:,0] == 0)[0]
+    evap_areas = evap_areas[:j]
     sorted_T_evap = np.sort(evap_areas[:n_evap-1, 1])[::-1]
-    
-    # Distribute condenser nodes from hottest to coldest limits.
-    T_cond_init = np.concatenate([[T_cold[0]], sorted_T_cond])
-
-    # Distribute evaporator nodes from coldest to hottest limits.
-    T_evap_init = np.concatenate((sorted_T_evap, [T_hot[-1]]))
+    if sorted_T_evap.size > 0:
+        # Distribute default initial values from hottest to coldest limits with even spacing.
+        i = np.flatnonzero(np.abs(T_hot[-1] - sorted_T_evap) > tol)[-1]
+        sorted_T_evap = sorted_T_evap[:i]
+    if n_evap > sorted_T_evap.size:
+        default_T_evap = np.linspace(T_hot[0], T_hot[-1], n_evap - sorted_T_evap.size + 1)[1:]
+        T_evap_init = np.sort(np.concatenate([default_T_evap, sorted_T_evap]))[::-1]
+    else: 
+        T_evap_init = np.concatenate((sorted_T_evap, [T_hot[-1]]))
 
     return T_cond_init, T_evap_init
 

@@ -62,6 +62,18 @@ def test_set_initial_values_for_condenser_and_evaporator_even_spacing():
     np.testing.assert_allclose(T_evap, expected_evap)
 
 
+def test_set_initial_values_for_condenser_and_evaporator_even_spacing():    
+    T_hot, H_hot = clean_composite_curve(get_temperatures(), get_hot_cc())
+    T_cold, H_cold = clean_composite_curve(get_temperatures(), get_cold_cc())
+
+    T_cond, T_evap = _set_initial_values_for_condenser_and_evaporator(
+        5, 10, T_hot, H_hot, T_cold, H_cold
+    )
+
+    assert len(T_cond) == 5
+    assert len(T_evap) == 10
+
+
 def test_set_initial_values_for_condenser_and_evaporator_min_segments():
     T_hot, H_hot = clean_composite_curve(get_temperatures(), get_hot_cc())
     T_cold, H_cold = clean_composite_curve(get_temperatures(), get_cold_cc())
