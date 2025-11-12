@@ -52,27 +52,32 @@ class HeatPumpPlacementArgs(BaseModel):
     H_cold: np.ndarray | list
     n_cond: int
     n_evap: int
-    T_bnds_cond: np.ndarray | tuple
-    T_bnds_evap: np.ndarray | tuple
     eta_comp: float
     dtcont_hp: float
+    dt_phase_change: float
     is_process_integrated: Optional[bool] = True
-    T_cond_hi: Optional[float] = None
-    T_evap_lo: Optional[float] = None
-    T_cond: Optional[np.ndarray] = None
-    T_evap: Optional[np.ndarray] = None
+    T_cond_init: Optional[np.ndarray] = None
+    T_evap_init: Optional[np.ndarray] = None
     dT_sc: Optional[np.ndarray] = None
-    dT_sh: Optional[np.ndarray] = None
-    Q_cond: Optional[np.ndarray] = None
-    Q_evap: Optional[np.ndarray] = None
-    H_cond: Optional[np.ndarray] = None
-    H_evap: Optional[np.ndarray] = None    
+    dT_sh: Optional[np.ndarray] = None 
     refrigerant: Optional[str] = None
     unit_system: Optional[str] = "EUR"
     is_heat_pump: Optional[bool] = True
     is_multi_temperature_hp: Optional[bool] = True
-    total_work: Optional[float] = None
-    hp_list: Optional[list] = []
+
+
+class CarnotHeatPumpResults(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    T_cond: np.ndarray
+    T_evap: np.ndarray
+    Q_cond: np.ndarray
+    Q_evap: np.ndarray
+    work: float
+    work_hp: float
+    work_el: float
+    cop: float
+    obj: float
     cond_streams: Optional[StreamCollection] = None
     evap_streams: Optional[StreamCollection] = None
 

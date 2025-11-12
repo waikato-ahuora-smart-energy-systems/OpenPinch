@@ -1,6 +1,6 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
-from scipy.optimize import minimize, direct as glob_minimize, NonlinearConstraint, LinearConstraint
+from scipy.optimize import minimize, NonlinearConstraint
 
 from ..lib import *
 from ..utils import *
@@ -93,7 +93,7 @@ def get_heat_pump_targets(
             PT.H_COLD_HP.value: temp[PT.H_COLD_UT.value],
         }
     )
-    if 1:
+    if 0:
         _plot_multi_hp_profiles(
             T_hot=pt.col[PT.T.value],
             H_hot=pt.col[PT.H_NET_HOT.value],
@@ -150,16 +150,14 @@ def _get_optimal_heat_pump_placement(
         None: The routine is currently a placeholder that normalises inputs and
         delegates to the basic placement helper.
     """
-    T_vals = T_vals.copy()
-    H_hot = H_hot.copy()
-    H_cold = H_cold.copy()
-
-    Q_hp_target = load_fraction * np.abs(H_cold).max()
     if load_fraction < tol:
         return {}
+        
+    T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
+
     T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, dtmin_hp, is_process_integrated)   
-    if load_fraction < 1.0:
-        T_cold, H_cold = _get_H_col_till_target_Q(Q_hp_target, T_cold, H_cold)   
+    Q_hp_target = min(load_fraction, 1.0) * np.abs(H_cold).max()
+    T_cold, H_cold = _get_H_col_till_target_Q(Q_hp_target, T_cold, H_cold)
     T_hot, H_hot, T_cold, H_cold, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(
         T_hot=T_hot, 
         H_hot=H_hot, 
@@ -173,85 +171,58 @@ def _get_optimal_heat_pump_placement(
     )
     T_hot, H_hot = clean_composite_curve(T_hot, H_hot)
     T_cold, H_cold = clean_composite_curve(T_cold, H_cold)
-    
-    idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
-    T_bnds = _convert_idx_to_temperatures(idx_dict, T_hot, T_cold)
     T_cond_init, T_evap_init = _set_initial_values_for_condenser_and_evaporator(
-        n_cond, n_evap, T_bnds, T_hot, H_hot, T_cold, H_cold,
+        n_cond, n_evap, T_hot, H_hot, T_cold, H_cold,
     )
 
     args = HeatPumpPlacementArgs(
         Q_hp_target=Q_hp_target,
         Q_amb_max=Q_amb_max,
-        T_cond_hi=T_cond_init[0],
-        T_evap_lo=T_evap_init[-1],
-        T_cond=T_cond_init,
-        T_evap=T_evap_init,
+        T_cond_init=T_cond_init,
+        T_evap_init=T_evap_init,
         T_hot=T_hot,
         H_hot=H_hot,
         T_cold=T_cold,
         H_cold=H_cold,
         n_cond=int(n_cond),
         n_evap=int(n_evap),
-        T_bnds_cond=T_bnds["HU"],
-        T_bnds_evap=T_bnds["CU"],
         eta_comp=float(eta_comp),
         dtcont_hp=dtcont_hp,
+        dt_phase_change=dt_phase_change,
         is_process_integrated=bool(is_process_integrated),
         is_heat_pump=bool(is_heat_pumping),
-        refrigerant=refrigerant[0]
+        refrigerant=refrigerant[0],
     )
         
-    _optimise_multi_temperature_carnot_heat_pump_placement(args)
+    res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
     if is_cycle_simulation:
-        _optimise_multi_simulated_heat_pump_placement(args)
-        args.cond_streams, args.evap_streams = _build_simulated_hps_streams(args.hp_list)
-    else:
-        args.cond_streams = _build_latent_streams(args.T_cond, dt_phase_change, args.Q_cond, dtcont_hp, is_hot=True)
-        args.evap_streams = _build_latent_streams(args.T_evap, dt_phase_change, args.Q_evap, dtcont_hp, is_hot=False)
-    
-    if 0:
-        _plot_multi_hp_profiles_from_args(args)
+        res = _optimise_multi_simulated_heat_pump_placement(args)
+        res.cond_streams, res.evap_streams = _build_simulated_hps_streams(res.hp_list)
 
-    return {
-        "cond_streams": args.cond_streams,
-        "evap_streams": args.evap_streams,
-        "T_cond": args.T_cond,
-        "Q_cond": args.Q_cond,
-        "T_evap": args.T_evap,
-        "Q_evap": args.Q_evap,
-        "total_work": args.total_work,
-        "COP_ave": args.Q_hp_target / args.total_work,
-    }
+    return dict(res)
 
 
 def _optimise_multi_temperature_carnot_heat_pump_placement(
     args: HeatPumpPlacementArgs
-) -> Tuple[dict, HeatPumpPlacementArgs]:
+) -> CarnotHeatPumpResults:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
     """
-    x_cond = _scale_x_cond(args.T_cond, args.T_bnds_cond[0], args.T_bnds_cond[1])
-    x_evap = _scale_x_evap(args.T_evap, args.T_bnds_evap[0], args.T_bnds_evap[1])
+    x_cond = _scale_x_cond(args.T_cond_init, args.T_cold[-1], args.T_cold[0])
+    x_evap = _scale_x_evap(args.T_evap_init, args.T_hot[-1], args.T_hot[0])
     x0, bnds = _prepare_data_for_minimizer(x_cond, x_evap)
-
-    # res = glob_minimize(
-    #     func=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"], 
-    #     bounds=bnds,
-    #     # maxiter=50
-    # )
-    res = minimize(
+    opt = minimize(
         fun=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"],
         x0=x0,
-        method="COBYQA", #"SLSQP"
+        method="SLSQP",
         bounds=bnds,
     )
-    opt = _compute_carnot_heat_pump_system_performance(res.x, args)
-    args.T_cond, args.T_evap = opt["T_cond"], opt["T_evap"]
-    args.H_cond, args.H_evap = opt["H_cond"], opt["H_evap"]
-    args.total_work = opt["work"]
-    args.Q_cond = _get_Q_from_H(args.H_cond)
-    args.Q_evap = _get_Q_from_H(args.H_evap)
-    return args
+    res = _compute_carnot_heat_pump_system_performance(opt.x, args)
+    res = CarnotHeatPumpResults.model_validate(res)
+    res.cond_streams = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
+    res.evap_streams = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
+    if 0:
+        _plot_multi_hp_profiles_from_results(args, res)    
+    return res
 
 
 def _optimise_multi_simulated_heat_pump_placement(args: HeatPumpPlacementArgs):
@@ -311,18 +282,6 @@ def _optimise_multi_simulated_heat_pump_placement(args: HeatPumpPlacementArgs):
 #######################################################################################################
 
 
-def _get_Q_from_H(
-    H: np.ndarray,
-):
-    """Convert enthalpy cascade into interval duties.
-    """
-    temp = np.roll(H, -1)
-    temp[-1] = 0
-    Q = H - temp
-    Q_hx = Q[:-1]
-    return np.where(Q_hx > 0.0, Q_hx, 0.0)
-
-
 def _compute_entropic_average_temperature_in_K(
     T: np.ndarray,
     Q: np.ndarray,        
@@ -367,17 +326,21 @@ def _parse_carnot_hp_state_variables(
     return x_cond, x_evap
 
 
-def _get_H_vals_from_T_hp_vals(
+def _get_Q_vals_from_T_hp_vals(
     T_hp: np.ndarray,
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     is_cond: bool = True,
 ) -> np.ndarray:
-    """Interpolate the cascade at a specified temperature to find the corresponding heat flow.
+    """Interpolate the cascade at a specified temperature to find the corresponding duty for each temperature level.
     """
     H_less_origin = np.interp(T_hp, T_vals[::-1], H_vals[::-1])
     H = np.concatenate((H_less_origin, np.array([0.0]))) if is_cond else np.concatenate((np.array([0.0]), H_less_origin))
-    return H
+    temp = np.roll(H, -1)
+    temp[-1] = 0
+    Q = H - temp
+    Q_hx = Q[:-1]
+    return np.where(Q_hx > 0.0, Q_hx, 0.0)    
 
 
 def _compute_carnot_heat_pump_system_performance(
@@ -387,59 +350,51 @@ def _compute_carnot_heat_pump_system_performance(
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """
     x_cond, x_evap = _parse_carnot_hp_state_variables(x, args)
-    T_cond = _unscale_x_cond(x_cond, args.T_bnds_cond[0], args.T_bnds_cond[1])
-    H_cond = _get_H_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold, True)
-    Q_cond = _get_Q_from_H(H_cond)
+    T_cond = _unscale_x_cond(x_cond, args.T_cold[-1], args.T_cold[0])
+    Q_cond = _get_Q_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold, True)
+    Qh_tar = args.Q_hp_target
 
     def _get_optimal_min_evap_T(T_lo):
         """Adjust evaporator ladder to honour minimum temperature limits."""
-        T_evap = _unscale_x_evap(x_evap, T_lo, args.T_bnds_evap[1])
-        H_evap = _get_H_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
-        Q_evap = _get_Q_from_H(H_evap)
+        T_evap = _unscale_x_evap(x_evap, T_lo, args.T_hot[0])
+        Q_evap = _get_Q_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
+        Q_evap_max = np.abs(Q_evap.sum())
         cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
 
-        if np.abs(H_evap[-1]) / (cop - 1) > np.abs(H_cond[0] / cop):
-            work_hp = np.abs(H_cond[0] / cop)
-            Q_evap_tot = np.abs(H_cond[0]) - work_hp
+        if Q_evap_max / (cop - 1) > Qh_tar / cop:
+            work_hp = Qh_tar / cop
+            Q_evap_tot = Qh_tar - work_hp
             work_el = 0.0
-            H_evap = H_evap / H_evap[-1] * Q_evap_tot * -1
+            Q_evap = Q_evap * (Q_evap_tot / Q_evap_max)
         else: # Evaporator is limits the heat pump
-            work_hp = np.abs(H_evap[-1]) / (cop - 1)
-            Q_evap_tot = np.abs(H_evap[-1])
-            work_el = H_cond[0] - Q_evap_tot - work_hp # Direct electric heating
+            work_hp = Q_evap_max / (cop - 1)
+            Q_evap_tot = Q_evap_max
+            work_el = Qh_tar - Q_evap_tot - work_hp # Direct electric heating
 
         return {
             "obj": (work_hp + work_el) / args.Q_hp_target, 
             "work": work_hp + work_el, 
             "work_hp": work_hp,  
             "work_el": work_el,
+            "T_cond": T_cond,
+            "Q_cond": Q_cond,            
             "T_evap": T_evap, 
-            "H_evap": H_evap, 
-            "cop": cop, 
-            "Q_evap_tot": Q_evap_tot,
+            "Q_evap": Q_evap, 
+            "cop": cop,
         }    
 
-    result = minimize(
+    opt = minimize(
         fun=lambda T: _get_optimal_min_evap_T(T)["obj"],
         method="SLSQP",
-        x0=args.T_bnds_evap[0],
-        bounds=[args.T_bnds_evap],
+        x0=args.T_hot[-1],
+        bounds=[(args.T_hot[-1], args.T_hot[0])],
     )
-    res = _get_optimal_min_evap_T(result.x)
-
-    if abs(H_cond[0] - 22894.889999999796) < tol:
-        T_evap = _unscale_x_evap(x_evap, result.x, args.T_bnds_evap[1])
-        Q_evap = _get_Q_from_H(res["H_evap"])
-        args.cond_streams = _build_latent_streams(T_cond, 0.01, Q_cond, args.dtcont_hp, is_hot=True)
-        args.evap_streams = _build_latent_streams(T_evap, 0.01, Q_evap, args.dtcont_hp, is_hot=False)        
-        _plot_multi_hp_profiles_from_args(args, str(f"Work ({x}): {res["work"]} = {res["work_hp"]} + {res["work_el"]}"))
-
-    res.update(
-        {
-            "T_cond": T_cond,
-            "H_cond": H_cond,
-        }
-    )
+    res = _get_optimal_min_evap_T(opt.x)
+    if 0:
+        res0 = CarnotHeatPumpResults.model_validate(res)
+        res0.cond_streams = _build_latent_streams(res0.T_cond, 0.1, res0.Q_cond, args.dtcont_hp, is_hot=True)
+        res0.evap_streams = _build_latent_streams(res0.T_evap, 0.1, res0.Q_evap, args.dtcont_hp, is_hot=False)         
+        _plot_multi_hp_profiles_from_results(args, res0, str(f"Work ({x}): {res0.work} = {res0.work_hp} + {res0.work_el}"))
     return res
 
 
@@ -531,8 +486,7 @@ def _prepare_data_for_minimizer(
 
 def _set_initial_values_for_condenser_and_evaporator(
     n_cond: int,
-    n_evap: int,
-    T_bnds: dict,   
+    n_evap: int, 
     T_hot: np.ndarray,
     H_hot: np.ndarray,
     T_cold: np.ndarray,    
@@ -543,66 +497,22 @@ def _set_initial_values_for_condenser_and_evaporator(
     n_cond = max(1, int(n_cond))
     n_evap = max(1, int(n_evap))
 
-    _, hot_hi = T_bnds["HU"]
-    cold_lo, _ = T_bnds["CU"]
-
     # Find key points where temperature might be minimised
-    cond_areas = np.column_stack(((hot_hi - T_cold) * H_cold, T_cold))
+    cond_areas = np.column_stack((np.abs((T_cold[0] - T_cold) * H_cold), T_cold))
     cond_areas[:] = cond_areas[cond_areas[:, 0].argsort()[::-1]]
     sorted_T_cond = np.sort(cond_areas[:n_cond-1, 1])[::-1]
-    evap_areas = np.column_stack(((T_hot - cold_lo) * H_hot, T_hot))
+
+    evap_areas = np.column_stack((np.abs((T_hot[-1] - T_hot) * H_hot), T_hot))
     evap_areas[:] = evap_areas[evap_areas[:, 0].argsort()[::-1]]
     sorted_T_evap = np.sort(evap_areas[:n_evap-1, 1])[::-1]
     
     # Distribute condenser nodes from hottest to coldest limits.
-    T_cond_init = np.concatenate([[hot_hi], sorted_T_cond])
+    T_cond_init = np.concatenate([[T_cold[0]], sorted_T_cond])
 
     # Distribute evaporator nodes from coldest to hottest limits.
-    T_evap_init = np.concatenate((sorted_T_evap, [cold_lo]))
+    T_evap_init = np.concatenate((sorted_T_evap, [T_hot[-1]]))
 
     return T_cond_init, T_evap_init
-
-
-def _convert_idx_to_temperatures(
-    idx_dict: dict, 
-    T_hot: np.ndarray, 
-    T_cold: np.ndarray,
-) -> dict:
-    """Translate extreme enthalpy indices into temperature values.
-    """
-    return {
-        "HU": np.array((T_cold[idx_dict["HU"][0]], T_cold[idx_dict["HU"][1]])),
-        "CU": np.array((T_hot[idx_dict["CU"][0]], T_hot[idx_dict["CU"][1]])),
-    }
-
-
-def _get_extreme_temperatures_idx(
-    H_hot: np.ndarray,
-    H_cold: np.ndarray,        
-) -> dict:
-    """Locate index pairs describing the active composite curve start and end points.
-    """
-    # TODO: Is there a better way to call one function multiple times?
-    i0 = _get_first_or_last_zero_value_idx(H_cold, True)
-    i1 = _get_first_or_last_zero_value_idx(H_cold - H_cold[0], False)
-    j0 = _get_first_or_last_zero_value_idx(H_hot - H_hot[-1], True)
-    j1 = _get_first_or_last_zero_value_idx(H_hot, False)
-    return {
-        "HU": (i0, i1),
-        "CU": (j0, j1),
-    }
-
-
-def _get_first_or_last_zero_value_idx(
-    H: np.ndarray, 
-    find_first_zero: bool = True
-) -> int:
-    """Return the cascade index of the first or last element within tolerance of zero.
-    """
-    mask = np.abs(H) < tol
-    zero_hits = np.flatnonzero(mask)
-    i = 0 if find_first_zero else -1
-    return int(zero_hits[i])
 
 
 def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
@@ -625,7 +535,7 @@ def _get_H_col_till_target_Q(
     is_cold: bool = True,      
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Trim the cold composite to the target heat duty, interpolating the boundary point."""
-    if np.abs(H_vals).max() == Q_max:
+    if abs(np.abs(H_vals).max() - Q_max) < tol:
         return T_vals, H_vals
     mask = np.where(
         np.abs(H_vals) >= Q_max,
@@ -1138,13 +1048,17 @@ def _plot_multi_hp_profiles(
     plt.show()
 
 
-def _plot_multi_hp_profiles_from_args(args: HeatPumpPlacementArgs, title: str = None):
+def _plot_multi_hp_profiles_from_results(
+    args: HeatPumpPlacementArgs, 
+    res: CarnotHeatPumpResults, 
+    title: str = None
+):
     """Plot HP cascade and source/sink profiles.
-    """
+    """        
     T_hot, H_hot = clean_composite_curve_ends(args.T_hot, args.H_hot)
     T_cold, H_cold = clean_composite_curve_ends(args.T_cold, args.H_cold)
 
-    cascade = _get_heat_pump_cascade(hp_hot_streams=args.cond_streams, hp_cold_streams=args.evap_streams)
+    cascade = _get_heat_pump_cascade(hp_hot_streams=res.cond_streams, hp_cold_streams=res.evap_streams)
     T_hp_hot = cascade[PT.T.value]
     T_hp_cold = cascade[PT.T.value]
     H_hp_hot = cascade[PT.H_HOT_UT.value]
