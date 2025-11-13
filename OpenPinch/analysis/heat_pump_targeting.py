@@ -1,6 +1,6 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
-from scipy.optimize import minimize, NonlinearConstraint
+from scipy.optimize import minimize, NonlinearConstraint, differential_evolution
 
 from ..lib import *
 from ..utils import *
@@ -189,7 +189,7 @@ def _get_optimal_heat_pump_placement(
         eta_comp=float(eta_comp),
         dtcont_hp=dtcont_hp,
         dt_phase_change=dt_phase_change,
-        dt_range_max=T_cold[0] - T_cold[-1],
+        dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
         is_process_integrated=bool(is_process_integrated),
         is_heat_pump=bool(is_heat_pumping),
         refrigerant=refrigerant[0],
@@ -212,12 +212,18 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     x_cond = _map_T_to_x_cond(args.T_cond_init, args.T_cold[0], args.dt_range_max)
     x_evap = _map_T_to_x_evap(args.T_evap_init, args.T_hot[-1], args.dt_range_max)
     x0, bnds = _prepare_data_for_minimizer(x_cond, x_evap)
-    opt = minimize(
-        fun=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"],
+    opt = differential_evolution(
+        func=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"],
         x0=x0,
-        method="SLSQP",
-        bounds=bnds,
+        bounds=bnds,  
+        init='sobol'  
     )
+    # opt = minimize(
+    #     fun=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"],
+    #     x0=x0,
+    #     method="SLSQP",
+    #     bounds=bnds,
+    # )
     res = _compute_carnot_heat_pump_system_performance(opt.x, args)
     res["cond_streams"] = _build_latent_streams(res["T_cond"], 0.01, res["Q_cond"], args.dtcont_hp, is_hot=True)
     res["evap_streams"] = _build_latent_streams(res["T_evap"], 0.01, res["Q_evap"], args.dtcont_hp, is_hot=False)
