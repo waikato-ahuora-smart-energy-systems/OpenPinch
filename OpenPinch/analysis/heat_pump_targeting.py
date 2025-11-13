@@ -1,6 +1,9 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
 from scipy.optimize import minimize, NonlinearConstraint
+import parameterspace as ps
+import blackboxopt as bbo
+from blackboxopt.optimizers.random_search import RandomSearch
 
 from ..lib import *
 from ..utils import *
@@ -207,6 +210,7 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
 ) -> CarnotHeatPumpResults:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
     """
+
     x_cond = _scale_x_cond(args.T_cond_init, args.T_cold[-1], args.T_cold[0])
     x_evap = _scale_x_evap(args.T_evap_init, args.T_hot[-1], args.T_hot[0])
     x0, bnds = _prepare_data_for_minimizer(x_cond, x_evap)
@@ -217,12 +221,13 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
         bounds=bnds,
     )
     res = _compute_carnot_heat_pump_system_performance(opt.x, args)
-    res = CarnotHeatPumpResults.model_validate(res)
-    res.cond_streams = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
-    res.evap_streams = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
+    res["cond_streams"] = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
+    res["evap_streams"] = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
     if 1:
-        _plot_multi_hp_profiles_from_results(args, res)    
-    return res
+        _plot_multi_hp_profiles_from_results(
+            args, CarnotHeatPumpResults.model_validate(res)
+        )    
+    return CarnotHeatPumpResults.model_validate(res)
 
 
 def _optimise_multi_simulated_heat_pump_placement(args: HeatPumpPlacementArgs):
@@ -484,7 +489,55 @@ def _prepare_data_for_minimizer(
     return x0, bnds
 
 
-# def
+def _build_hp_section_initial_values(
+    n_levels: int,
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+    is_condenser: bool,
+) -> np.ndarray:
+    """Return candidate HP temperature levels for a condenser/evaporator section."""
+    n_levels = max(1, int(n_levels))
+    boundary_idx = 0 if is_condenser else -1
+    boundary_temperature = T_vals[boundary_idx]
+
+    areas = np.column_stack(
+        (np.abs((boundary_temperature - T_vals) * H_vals), T_vals)
+    )
+    areas = areas[areas[:, 0].argsort()[::-1]]
+
+    zero_idx = np.flatnonzero(areas[:, 0] == 0)
+    if zero_idx.size:
+        areas = areas[:zero_idx[0]]
+
+    candidate_count = max(n_levels - 1, 0)
+    sorted_candidates = np.sort(areas[:candidate_count, 1])[::-1]
+    if sorted_candidates.size > 0:
+        idx = np.flatnonzero(np.abs(boundary_temperature - sorted_candidates) > tol)
+        if idx.size:
+            if is_condenser:
+                sorted_candidates = sorted_candidates[idx[0]:]
+            else:
+                sorted_candidates = sorted_candidates[:idx[-1]]
+
+    if n_levels > sorted_candidates.size:
+        default_span = np.linspace(
+            T_vals[0], T_vals[-1], n_levels - sorted_candidates.size + 1
+        )
+        if is_condenser:
+            default_span = default_span[:-1]
+        else:
+            default_span = default_span[1:]
+        section_T_vals = np.sort(
+            np.concatenate([default_span, sorted_candidates])
+        )[::-1]
+    else:
+        boundary = np.array([boundary_temperature])
+        section_T_vals = (
+            np.concatenate([boundary, sorted_candidates])
+            if is_condenser
+            else np.concatenate([sorted_candidates, boundary])
+        )
+    return section_T_vals
 
 
 def _set_initial_values_for_condenser_and_evaporator(
@@ -497,40 +550,18 @@ def _set_initial_values_for_condenser_and_evaporator(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Generate evenly spaced starting points for condenser and evaporator levels.
     """
-    n_cond = max(1, int(n_cond))
-    n_evap = max(1, int(n_evap))
-
-    # Find key points where temperature might be minimised
-    cond_areas = np.column_stack((np.abs((T_cold[0] - T_cold) * H_cold), T_cold))
-    cond_areas[:] = cond_areas[cond_areas[:, 0].argsort()[::-1]]
-    j = np.flatnonzero(cond_areas[:,0] == 0)[0]
-    cond_areas = cond_areas[:j]
-    sorted_T_cond = np.sort(cond_areas[:n_cond-1, 1])[::-1]
-    if sorted_T_cond.size > 0:
-        i = np.flatnonzero(np.abs(T_cold[0] - sorted_T_cond) > tol)[0]
-        sorted_T_cond = sorted_T_cond[i:]
-    if n_cond > sorted_T_cond.size:
-        # Distribute default initial values from hottest to coldest limits with even spacing.
-        default_T_cond = np.linspace(T_cold[0], T_cold[-1], n_cond - sorted_T_cond.size + 1)[:-1]
-        T_cond_init = np.sort(np.concatenate([default_T_cond, sorted_T_cond]))[::-1]
-    else: 
-        T_cond_init = np.concatenate([[T_cold[0]], sorted_T_cond])
-
-    evap_areas = np.column_stack((np.abs((T_hot[-1] - T_hot) * H_hot), T_hot))
-    evap_areas[:] = evap_areas[evap_areas[:, 0].argsort()[::-1]]
-    j = np.flatnonzero(evap_areas[:,0] == 0)[0]
-    evap_areas = evap_areas[:j]
-    sorted_T_evap = np.sort(evap_areas[:n_evap-1, 1])[::-1]
-    if sorted_T_evap.size > 0:
-        # Distribute default initial values from hottest to coldest limits with even spacing.
-        i = np.flatnonzero(np.abs(T_hot[-1] - sorted_T_evap) > tol)[-1]
-        sorted_T_evap = sorted_T_evap[:i]
-    if n_evap > sorted_T_evap.size:
-        default_T_evap = np.linspace(T_hot[0], T_hot[-1], n_evap - sorted_T_evap.size + 1)[1:]
-        T_evap_init = np.sort(np.concatenate([default_T_evap, sorted_T_evap]))[::-1]
-    else: 
-        T_evap_init = np.concatenate((sorted_T_evap, [T_hot[-1]]))
-
+    T_cond_init = _build_hp_section_initial_values(
+        n_levels=n_cond,
+        T_vals=T_cold,
+        H_vals=H_cold,
+        is_condenser=True,
+    )
+    T_evap_init = _build_hp_section_initial_values(
+        n_levels=n_evap,
+        T_vals=T_hot,
+        H_vals=H_hot,
+        is_condenser=False,
+    )
     return T_cond_init, T_evap_init
 
 
@@ -635,6 +666,83 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
     #         )
 
     return T_hot, H_hot, T_cold, H_cold, delta_H
+
+
+def minimize_with_blackboxopt(
+    f,
+    x0,
+    bounds,
+    n_steps=30,
+    seed=None,
+):
+    """Minimize a black-box function using blackboxopt.RandomSearch.
+
+    Args:
+        f: Callable f(x) -> float, where x is a 1D numpy array.
+        x0: Initial point (list/tuple/np.ndarray of floats).
+        bounds: Sequence of (lower, upper) for each dimension.
+        n_steps: Total number of blackboxopt proposals (budget).
+        seed: Optional RNG seed.
+
+    Returns:
+        best_x: 1D numpy array of best found point.
+        best_y: Float, f(best_x).
+        evaluations: List of blackboxopt.Evaluation objects.
+    """
+    x0 = np.asarray(x0, dtype=float)
+    if len(bounds) != x0.size:
+        raise ValueError("len(bounds) must match dimension of x0")
+
+    # ---- 1. Define search space from bounds (continuous box) ----
+    space = ps.ParameterSpace()
+    param_names = []
+    for i, (low, high) in enumerate(bounds):
+        name = f"x{i}"
+        param_names.append(name)
+        space.add(ps.ContinuousParameter(name, bounds=(float(low), float(high))))
+
+    # ---- 2. Set up optimizer (single objective: minimize 'loss') ----
+    optimizer = RandomSearch(
+        search_space=space,
+        objectives=[bbo.Objective("loss", greater_is_better=False)],
+        max_steps=n_steps,
+        seed=seed,
+    )
+
+    evaluations = []
+
+    # ---- 3. Evaluate the user-provided initial point x0 first ----
+    # Grab a specification from the optimizer and overwrite its configuration with x0
+    spec0 = optimizer.get_evaluation_specification()
+    for name, val in zip(param_names, x0):
+        spec0.configuration[name] = float(val)
+
+    y0 = float(f(x0))
+    eval0 = spec0.create_evaluation({"loss": y0})
+    optimizer.report_evaluation(eval0)
+    evaluations.append(eval0)
+
+    # ---- 4. Main optimization loop (RandomSearch over the box) ----
+    while True:
+        try:
+            spec = optimizer.get_evaluation_specification()
+        except bbo.OptimizationComplete:
+            break
+
+        # Convert configuration dict -> numpy vector
+        x_vec = np.array([spec.configuration[name] for name in param_names], dtype=float)
+        y = float(f(x_vec))
+
+        evaluation = spec.create_evaluation({"loss": y})
+        optimizer.report_evaluation(evaluation)
+        evaluations.append(evaluation)
+
+    # ---- 5. Extract best solution according to the objective ----
+    best_eval = min(evaluations, key=lambda ev: ev.objectives["loss"])
+    best_x = np.array([best_eval.configuration[name] for name in param_names], dtype=float)
+    best_y = float(best_eval.objectives["loss"])
+
+    return best_x, best_y, evaluations
 
 
 #######################################################################################################
