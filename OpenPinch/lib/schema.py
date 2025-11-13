@@ -39,7 +39,7 @@ class TempPinch(BaseModel):
     hot_temp: MaybeVU = None
 
 
-class HeatPumpPlacementArgs(BaseModel):
+class HeatPumpTargetInputs(BaseModel):
     """Parameter bundle for heat pump optimisation routines."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -67,7 +67,7 @@ class HeatPumpPlacementArgs(BaseModel):
     is_multi_temperature_hp: Optional[bool] = True
 
 
-class CarnotHeatPumpResults(BaseModel):
+class HeatPumpTargetOutputs(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     T_cond: np.ndarray

@@ -186,15 +186,10 @@ def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator_w
 
 
 def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
-    args = SimpleNamespace(
-        n_cond=3,
-        n_evap=2,
-        T_cond_hi=160.0,
-        T_evap_lo=40.0,
-    )
     x = np.array([0.5, 0.5, 0.5])
+    n_cond = 3
 
-    T_cond, T_evap = _parse_carnot_hp_state_variables(x, args)
+    T_cond, T_evap = _parse_carnot_hp_state_variables(x, n_cond)
 
     np.testing.assert_allclose(T_cond, np.array([0.0, 0.5, 0.5]))
     np.testing.assert_allclose(T_evap, np.array([0.5, 0.0]))
