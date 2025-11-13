@@ -19,7 +19,6 @@ __all__ = ["get_heat_pump_targets"]
 # Public API
 #######################################################################################################
 
-
 def get_heat_pump_targets(
     pt: ProblemTable, 
     zone_config: Configuration,
@@ -31,26 +30,25 @@ def get_heat_pump_targets(
     eta_comp: float = 0.7,
     dtmin_hp: float = 0.0,    
 ):
-    """
-    Determine an optimal multi-stage heat-pump placement for the supplied heat
-    cascade envelopes.
+    """Optimise multi-stage heat-pump placement for the supplied problem table.
 
     Args:
-        T_hot: Shifted hot composite-curve temperatures (descending °C).
-        H_hot: Matching hot composite enthalpy values.
-        T_cold: Shifted cold composite-curve temperatures (descending °C).
-        H_cold: Matching cold composite enthalpy values.
-        n_cond: Number of condenser segments to consider.
-        n_evap: Number of evaporator segments to consider.
-        eta_comp: Isentropic efficiency estimate for the optimiser.
-        dtmin_hp: Minimum allowable approach temperature for the HP.
-        is_T_vals_shifted: True when composite curves already include ΔTmin/2
-            shifting; False for real temperatures.
-        zone_config: Optional zone configuration providing ambient parameters.
+        pt: ProblemTable that already contains the composite-cascade columns.
+        zone_config: Scenario configuration holding HP parameters, ambient data,
+            and targeting flags.
+        is_T_vals_shifted: Indicates whether ``pt`` temperatures already include
+            ΔTmin/2 shifting.
+        is_process_integrated: True when targeting is performed against the
+            process cascade; False for utility-only cascades.
+        is_heat_pumping: Selects heating mode (True) versus refrigeration (False).
+        n_cond: Number of condenser temperature levels to optimise.
+        n_evap: Number of evaporator temperature levels to optimise.
+        eta_comp: Assumed compressor isentropic efficiency for optimisation.
+        dtmin_hp: Minimum approach temperature enforced on the heat pump.
 
     Returns:
-        None: The routine is currently a placeholder that normalises inputs and
-        delegates to the basic placement helper.
+        HeatPumpTargetOutputs with the optimal placement, or an empty dict when
+        targeting is skipped by the configuration screens.
     """    
     ######### TEMP VARS ######### 
     zone_config.HP_LOAD_FRACTION = 1
@@ -111,7 +109,6 @@ def get_heat_pump_targets(
 #######################################################################################################
 
 
-# TODO: write simple docstring
 def _prepare_heat_pump_target_inputs(
     T_vals: np.ndarray,
     H_hot: np.ndarray,
@@ -128,6 +125,8 @@ def _prepare_heat_pump_target_inputs(
     dt_phase_change: float = 0.01,
     is_heat_pumping: bool = True,  
 ):
+    """Format temperature/enthalpy inputs and options for heat pump targeting.
+    """
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
     T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, dtmin_hp, is_process_integrated)   
     Q_hp_target = min(load_fraction, 1.0) * np.abs(H_cold).max()
@@ -193,7 +192,8 @@ def _get_H_col_till_target_Q(
     H_vals: np.ndarray,  
     is_cold: bool = True,      
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Trim the cold composite to the target heat duty, interpolating the boundary point."""
+    """Trim the cold composite to the target heat duty, interpolating the boundary point.
+    """
     if abs(np.abs(H_vals).max() - Q_max) < tol:
         return T_vals, H_vals
     mask = np.where(
@@ -283,7 +283,8 @@ def _build_hp_section_initial_values(
     H_vals: np.ndarray,
     is_condenser: bool,
 ) -> np.ndarray:
-    """Return candidate HP temperature levels for a condenser/evaporator section."""
+    """Return candidate HP temperature levels for a condenser/evaporator section.
+    """
     n_levels = max(1, int(n_levels))
     boundary_idx = 0 if is_condenser else -1
     boundary_temperature = T_vals[boundary_idx]
@@ -820,7 +821,9 @@ def _parse_simulated_hp_state_temperatures(
     return T_evap, dT_sh, T_cond, dT_sc, Q_cond
 
 
-def _create_heat_pump_list(args: HeatPumpTargetInputs):
+def _create_heat_pump_list(
+    args: HeatPumpTargetInputs
+):
     """Instantiate HeatPumpCycle objects that span the condenser/evaporator ladders.
     """
     hp_list = []
@@ -849,7 +852,8 @@ def _compute_simulated_heat_pump_system_performance(
     x: np.ndarray, 
     args: HeatPumpTargetInputs
 ) -> float:
-    """Objective: minimize total compressor work for multi-HP configuration."""
+    """Objective: minimize total compressor work for multi-HP configuration.
+    """
     T_evap, dT_sh, T_cond, dT_sc, Q_cond = _parse_simulated_hp_state_temperatures(x, args.n_cond, args.n_evap, args.Q_hp_target)
 
     # Create HP objects with correct temperature mapping
@@ -886,7 +890,8 @@ def _condenser_vs_evaporator_constraint(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
 ):
-    """Ensure T_cond[i] > T_evap[i % n_evap] + margin."""
+    """Ensure T_cond[i] > T_evap[i % n_evap] + margin.
+    """
     T_evap, _, T_cond, dT_sc, _ = _parse_simulated_hp_state_temperatures(x, args)
     return T_cond - dT_sc - np.array([T_evap[i % args.n_evap] for i in range(args.n_cond)]) - args.dtmin_hp
 
@@ -960,7 +965,8 @@ def _prepare_latent_hp_profile(
     is_hot: bool,
     i: int = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Clamp near-equal HP levels and merge their heat duties."""
+    """Clamp near-equal HP levels and merge their heat duties.
+    """
     inc = 1 if is_hot else -1
     if i == None:
         i = 0 if is_hot else len(T_hp)
@@ -990,7 +996,8 @@ def _build_latent_streams(
     dt_cont: float,
     is_hot: bool
 ) -> StreamCollection:
-
+    """Convert latent HP levels into a StreamCollection for condenser/evaporator levels.
+    """
     if len(T_hp) > 1:
         T_hp, Q_hp = _prepare_latent_hp_profile(T_hp.tolist(), Q_hp.tolist(), dT_phase_change, is_hot)
 
@@ -1012,6 +1019,7 @@ def _build_latent_streams(
 def _build_simulated_hps_streams(
     hp_list: list,
 ) -> Tuple[StreamCollection, StreamCollection]:
+    """Aggregate condenser and evaporator streams for each simulated HP cycle."""
     cond_streams, evap_streams = StreamCollection(), StreamCollection()
     hp: HeatPumpCycle
     for hp in hp_list:
@@ -1031,6 +1039,7 @@ def _calc_pt_heat_pump_cascade(
     is_T_vals_shifted: bool,
     is_process_integrated: bool,
 ) -> ProblemTable:
+    """Augment the base problem table with HP condenser/evaporator cascades."""
     t_hp = create_problem_table_with_t_int(
         streams=res.cond_streams + res.evap_streams, 
         is_shifted=is_T_vals_shifted
@@ -1055,23 +1064,25 @@ def _calc_pt_heat_pump_cascade(
     return pt    
 
 
-def _plot_multi_hp_profiles(
-    T_hot: np.ndarray,
-    H_hot: np.ndarray,
-    T_cold: np.ndarray,
-    H_cold: np.ndarray,
-    T_hp_hot: np.ndarray,
-    H_hp_hot: np.ndarray,
-    T_hp_cold: np.ndarray,
-    H_hp_cold: np.ndarray,
+def _plot_multi_hp_profiles_from_results(
+    args: HeatPumpTargetInputs, 
+    res: HeatPumpTargetOutputs, 
     title: str = None,
+    is_carnot_hp: bool = True,    
 ):
     """Plot HP cascade and source/sink profiles.
     """
-    T_hot, H_hot = clean_composite_curve_ends(T_hot, H_hot)
-    T_cold, H_cold = clean_composite_curve_ends(T_cold, H_cold)
-    T_hp_hot, H_hp_hot = clean_composite_curve_ends(T_hp_hot, H_hp_hot)
-    T_hp_cold, H_hp_cold = clean_composite_curve_ends(T_hp_cold, H_hp_cold)
+    args = HeatPumpTargetInputs.model_validate(args)
+    res = HeatPumpTargetOutputs.model_validate(res)
+    if is_carnot_hp:
+        cascade = _get_heat_pump_cascade(hp_hot_streams=res.cond_streams, hp_cold_streams=res.evap_streams)
+    else:
+        return False
+    
+    T_hot, H_hot = clean_composite_curve_ends(args.T_hot, args.H_hot)
+    T_cold, H_cold = clean_composite_curve_ends(args.T_cold, args.H_cold)
+    T_hp_hot, H_hp_hot = clean_composite_curve_ends(cascade[PT.T.value], cascade[PT.H_HOT_UT.value])
+    T_hp_cold, H_hp_cold = clean_composite_curve_ends(cascade[PT.T.value], cascade[PT.H_COLD_UT.value])
 
     plt.figure(figsize=(7, 5))
     plt.plot(H_hot, T_hot, label="Sink", linewidth=2, color="red")
@@ -1088,29 +1099,6 @@ def _plot_multi_hp_profiles(
     plt.show()
 
 
-def _plot_multi_hp_profiles_from_results(
-    args: HeatPumpTargetInputs, 
-    res: HeatPumpTargetOutputs, 
-    title: str = None
-):
-    """Plot HP cascade and source/sink profiles.
-    """
-    args = HeatPumpTargetInputs.model_validate(args)
-    res = HeatPumpTargetOutputs.model_validate(res)
-    cascade = _get_heat_pump_cascade(hp_hot_streams=res.cond_streams, hp_cold_streams=res.evap_streams)
-    _plot_multi_hp_profiles(
-        T_hot=args.T_hot,
-        H_hot=args.H_hot,
-        T_cold=args.T_cold,
-        H_cold=args.H_cold,
-        T_hp_hot=cascade[PT.T.value],
-        H_hp_hot=cascade[PT.H_HOT_UT.value],
-        T_hp_cold=cascade[PT.T.value],
-        H_hp_cold=cascade[PT.H_COLD_UT.value],
-        title=title,
-    )
-
-
 #######################################################################################################
 # Helper functions: variable scaling and unscaling methods
 #######################################################################################################
@@ -1121,6 +1109,7 @@ def _map_T_to_x_cond(
     T_hi: float, 
     deltaT_range: float,
 ) -> np.ndarray:
+    """Map monotonically decreasing condenser temperatures to x values."""
     x = []
     for i in range(T.size):
         x.append((T_hi - T[i]) / deltaT_range)
@@ -1133,6 +1122,7 @@ def _map_T_to_x_evap(
     T_lo: float, 
     deltaT_range: float,
 ) -> np.ndarray:
+    """Map monotonically increasing evaporator temperatures to x values."""
     T = T[::-1]
     x = []
     for i in range(T.size):
@@ -1146,6 +1136,7 @@ def _map_x_to_T_cond(
     T_hi: float, 
     deltaT_range: float,
 ) -> np.ndarray:
+    """Recover condenser temperatures from normalized x values."""
     temp = []
     for i in range(x.size):
         temp.append(T_hi - x[i] * deltaT_range)
@@ -1158,9 +1149,9 @@ def _map_x_to_T_evap(
     T_lo: float, 
     deltaT_range: float,
 ) -> np.ndarray:
+    """Recover evaporator temperatures from normalized x values."""
     temp = []
     for i in range(x.size):
         temp.append(x[::-1][i] * deltaT_range + T_lo)
         T_lo = temp[-1]
     return np.array(temp).flatten()[::-1]
-
