@@ -55,6 +55,7 @@ class HeatPumpPlacementArgs(BaseModel):
     eta_comp: float
     dtcont_hp: float
     dt_phase_change: float
+    dt_range_max: Optional[float] = None
     is_process_integrated: Optional[bool] = True
     T_cond_init: Optional[np.ndarray] = None
     T_evap_init: Optional[np.ndarray] = None

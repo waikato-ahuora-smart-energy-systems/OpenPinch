@@ -1,9 +1,6 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
 from scipy.optimize import minimize, NonlinearConstraint
-import parameterspace as ps
-import blackboxopt as bbo
-from blackboxopt.optimizers.random_search import RandomSearch
 
 from ..lib import *
 from ..utils import *
@@ -192,6 +189,7 @@ def _get_optimal_heat_pump_placement(
         eta_comp=float(eta_comp),
         dtcont_hp=dtcont_hp,
         dt_phase_change=dt_phase_change,
+        dt_range_max=T_cold[0] - T_cold[-1],
         is_process_integrated=bool(is_process_integrated),
         is_heat_pump=bool(is_heat_pumping),
         refrigerant=refrigerant[0],
@@ -211,8 +209,8 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
     """
 
-    x_cond = _scale_x_cond(args.T_cond_init, args.T_cold[-1], args.T_cold[0])
-    x_evap = _scale_x_evap(args.T_evap_init, args.T_hot[-1], args.T_hot[0])
+    x_cond = _map_T_to_x_cond(args.T_cond_init, args.T_cold[0], args.dt_range_max)
+    x_evap = _map_T_to_x_evap(args.T_evap_init, args.T_hot[-1], args.dt_range_max)
     x0, bnds = _prepare_data_for_minimizer(x_cond, x_evap)
     opt = minimize(
         fun=lambda x: _compute_carnot_heat_pump_system_performance(x, args)["obj"],
@@ -221,8 +219,8 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
         bounds=bnds,
     )
     res = _compute_carnot_heat_pump_system_performance(opt.x, args)
-    res["cond_streams"] = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
-    res["evap_streams"] = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
+    res["cond_streams"] = _build_latent_streams(res["T_cond"], 0.01, res["Q_cond"], args.dtcont_hp, is_hot=True)
+    res["evap_streams"] = _build_latent_streams(res["T_evap"], 0.01, res["Q_evap"], args.dtcont_hp, is_hot=False)
     if 1:
         _plot_multi_hp_profiles_from_results(
             args, CarnotHeatPumpResults.model_validate(res)
@@ -355,13 +353,13 @@ def _compute_carnot_heat_pump_system_performance(
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """
     x_cond, x_evap = _parse_carnot_hp_state_variables(x, args)
-    T_cond = _unscale_x_cond(x_cond, args.T_cold[-1], args.T_cold[0])
+    T_cond = _map_x_to_T_cond(x_cond, args.T_cold[0], args.dt_range_max)
     Q_cond = _get_Q_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold, True)
     Qh_tar = args.Q_hp_target
 
     def _get_optimal_min_evap_T(T_lo):
         """Adjust evaporator ladder to honour minimum temperature limits."""
-        T_evap = _unscale_x_evap(x_evap, T_lo, args.T_hot[0])
+        T_evap = _map_x_to_T_evap(x_evap, T_lo, args.dt_range_max)
         Q_evap = _get_Q_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
         Q_evap_max = np.abs(Q_evap.sum())
         cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
@@ -403,53 +401,53 @@ def _compute_carnot_heat_pump_system_performance(
     return res
 
 
-def _scale_x_cond(
+def _map_T_to_x_cond(
     T: np.ndarray, 
-    T_min: float, 
-    T_max: float,
+    T_hi: float, 
+    deltaT_range: float,
 ) -> np.ndarray:
-    temp = []
+    x = []
     for i in range(T.size):
-        temp.append((T_max - T[i]) / (T_max - T_min))
-        T_max = T[i]
-    return np.array(temp).flatten()
+        x.append((T_hi - T[i]) / deltaT_range)
+        T_hi = T[i]
+    return np.array(x).flatten()
 
 
-def _scale_x_evap(
+def _map_T_to_x_evap(
     T: np.ndarray, 
-    T_min: float, 
-    T_max: float,
+    T_lo: float, 
+    deltaT_range: float,
 ) -> np.ndarray:
-    temp = []
-    T_rev = T[::-1]
+    T = T[::-1]
+    x = []
     for i in range(T.size):
-        temp.append((T_rev[i] - T_min) / (T_max - T_min))
-        T_min = T_rev[i]
-    return np.array(temp)[::-1].flatten()
+        x.append((T[i] - T_lo) / deltaT_range)
+        T_lo = T[i]
+    return np.array(x).flatten()[::-1]
 
 
-def _unscale_x_cond(
+def _map_x_to_T_cond(
     x: np.ndarray, 
-    T_min: float, 
-    T_max: float,
+    T_hi: float, 
+    deltaT_range: float,
 ) -> np.ndarray:
     temp = []
     for i in range(x.size):
-        temp.append(T_max - x[i] * (T_max - T_min))
-        T_max = temp[-1]
+        temp.append(T_hi - x[i] * deltaT_range)
+        T_hi = temp[-1]
     return np.array(temp).flatten()
 
 
-def _unscale_x_evap(
-    x: np.ndarray, 
-    T_min: float, 
-    T_max: float,
+def _map_x_to_T_evap(
+    x: np.ndarray,
+    T_lo: float, 
+    deltaT_range: float,
 ) -> np.ndarray:
     temp = []
     for i in range(x.size):
-        temp.append(x[::-1][i] * (T_max - T_min) + T_min)
-        T_min = temp[-1]
-    return np.array(temp)[::-1].flatten()
+        temp.append(x[::-1][i] * deltaT_range + T_lo)
+        T_lo = temp[-1]
+    return np.array(temp).flatten()[::-1]
 
 
 def _prepare_data_for_minimizer(
@@ -666,83 +664,6 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
     #         )
 
     return T_hot, H_hot, T_cold, H_cold, delta_H
-
-
-def minimize_with_blackboxopt(
-    f,
-    x0,
-    bounds,
-    n_steps=30,
-    seed=None,
-):
-    """Minimize a black-box function using blackboxopt.RandomSearch.
-
-    Args:
-        f: Callable f(x) -> float, where x is a 1D numpy array.
-        x0: Initial point (list/tuple/np.ndarray of floats).
-        bounds: Sequence of (lower, upper) for each dimension.
-        n_steps: Total number of blackboxopt proposals (budget).
-        seed: Optional RNG seed.
-
-    Returns:
-        best_x: 1D numpy array of best found point.
-        best_y: Float, f(best_x).
-        evaluations: List of blackboxopt.Evaluation objects.
-    """
-    x0 = np.asarray(x0, dtype=float)
-    if len(bounds) != x0.size:
-        raise ValueError("len(bounds) must match dimension of x0")
-
-    # ---- 1. Define search space from bounds (continuous box) ----
-    space = ps.ParameterSpace()
-    param_names = []
-    for i, (low, high) in enumerate(bounds):
-        name = f"x{i}"
-        param_names.append(name)
-        space.add(ps.ContinuousParameter(name, bounds=(float(low), float(high))))
-
-    # ---- 2. Set up optimizer (single objective: minimize 'loss') ----
-    optimizer = RandomSearch(
-        search_space=space,
-        objectives=[bbo.Objective("loss", greater_is_better=False)],
-        max_steps=n_steps,
-        seed=seed,
-    )
-
-    evaluations = []
-
-    # ---- 3. Evaluate the user-provided initial point x0 first ----
-    # Grab a specification from the optimizer and overwrite its configuration with x0
-    spec0 = optimizer.get_evaluation_specification()
-    for name, val in zip(param_names, x0):
-        spec0.configuration[name] = float(val)
-
-    y0 = float(f(x0))
-    eval0 = spec0.create_evaluation({"loss": y0})
-    optimizer.report_evaluation(eval0)
-    evaluations.append(eval0)
-
-    # ---- 4. Main optimization loop (RandomSearch over the box) ----
-    while True:
-        try:
-            spec = optimizer.get_evaluation_specification()
-        except bbo.OptimizationComplete:
-            break
-
-        # Convert configuration dict -> numpy vector
-        x_vec = np.array([spec.configuration[name] for name in param_names], dtype=float)
-        y = float(f(x_vec))
-
-        evaluation = spec.create_evaluation({"loss": y})
-        optimizer.report_evaluation(evaluation)
-        evaluations.append(evaluation)
-
-    # ---- 5. Extract best solution according to the objective ----
-    best_eval = min(evaluations, key=lambda ev: ev.objectives["loss"])
-    best_x = np.array([best_eval.configuration[name] for name in param_names], dtype=float)
-    best_y = float(best_eval.objectives["loss"])
-
-    return best_x, best_y, evaluations
 
 
 #######################################################################################################

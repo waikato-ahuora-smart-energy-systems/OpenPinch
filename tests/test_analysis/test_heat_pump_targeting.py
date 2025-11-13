@@ -12,10 +12,10 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _parse_carnot_hp_state_variables,
     _get_H_col_till_target_Q,
     _prepare_latent_hp_profile,
-    _scale_x_cond,
-    _scale_x_evap,
-    _unscale_x_cond,
-    _unscale_x_evap,
+    _map_T_to_x_cond,
+    _map_T_to_x_evap,
+    _map_x_to_T_cond,
+    _map_x_to_T_evap,
 )
 
 
@@ -92,14 +92,14 @@ def test_prepare_data_for_minimize_multiple_segments():
     T_cond_init = np.array([220.0, 210.0, 205.0])
     T_evap_init = np.array([40.0, 35.0, 30.0])
     T_bnds = {"HU": (200.0, 230.0), "CU": (25.0, 55.0)}
-    x_cond = _scale_x_cond(T_cond_init, T_bnds["HU"][0], T_bnds["HU"][1])
-    x_evap = _scale_x_evap(T_evap_init, T_bnds["CU"][0], T_bnds["CU"][1])
+    x_cond = _map_T_to_x_cond(T_cond_init, T_bnds["HU"][1], T_bnds["HU"][1] - T_bnds["HU"][0])
+    x_evap = _map_T_to_x_evap(T_evap_init, T_bnds["CU"][0], T_bnds["CU"][1] - T_bnds["CU"][0])
     x0, bnds = _prepare_data_for_minimizer(
         x_cond,
         x_evap,
     )
 
-    np.testing.assert_allclose(x0, [0.5, 0.5, 0.25, 0.2])
+    np.testing.assert_allclose(x0, [0.33333333, 0.16666667, 0.16666667, 0.16666667])
     assert bnds == [(0,1), (0,1), (0,1), (0,1)]
 
 
@@ -107,8 +107,8 @@ def test_prepare_data_for_minimize_single_segment():
     T_cond_init = np.array([215.0])
     T_evap_init = np.array([25.0])
     T_bnds = {"HU": (210.0, 240.0), "CU": (20.0, 40.0)}
-    x_cond = _scale_x_cond(T_cond_init, T_bnds["HU"][0], T_bnds["HU"][1])
-    x_evap = _scale_x_evap(T_evap_init, T_bnds["CU"][0], T_bnds["CU"][1])
+    x_cond = _map_T_to_x_cond(T_cond_init, T_bnds["HU"][0], T_bnds["HU"][1])
+    x_evap = _map_T_to_x_evap(T_evap_init, T_bnds["CU"][0], T_bnds["CU"][1])
 
     x0, bnds = _prepare_data_for_minimizer(
         x_cond,
@@ -138,13 +138,13 @@ def test_scale_and_unscale_cond_roundtrip_and_bounds():
     T_cond = np.array([210.0, 190.0, 175.0, 160.0])
     T_bounds = (150.0, 230.0)
 
-    scaled = _scale_x_cond(T_cond, T_bounds[0], T_bounds[1])
+    scaled = _map_T_to_x_cond(T_cond, T_bounds[1], T_bounds[1] - T_bounds[0])
 
     assert scaled.size == T_cond.size
     assert np.all(scaled >= -1e-12)
     assert np.all(scaled <= 1 + 1e-12)
 
-    restored = _unscale_x_cond(scaled, T_bounds[0], T_bounds[1])
+    restored = _map_x_to_T_cond(scaled, T_bounds[1], T_bounds[1] - T_bounds[0])
     np.testing.assert_allclose(restored, T_cond)
 
 
@@ -152,12 +152,12 @@ def test_scale_and_unscale_evap_roundtrip_and_bounds():
     T_evap = np.array([65.0, 55.0, 45.0, 35.0])
     T_bounds = (20.0, 80.0)
 
-    scaled = _scale_x_evap(T_evap, T_bounds[0], T_bounds[1])
+    scaled = _map_T_to_x_evap(T_evap, T_bounds[0], T_bounds[1] - T_bounds[0])
 
     assert scaled.size == T_evap.size
-    np.testing.assert_allclose(scaled, [10/25, 10/35, 10/45, 15/60])
+    np.testing.assert_allclose(scaled, [0.16666667, 0.16666667, 0.16666667, 0.25])
 
-    restored = _unscale_x_evap(scaled, T_bounds[0], T_bounds[1])
+    restored = _map_x_to_T_evap(scaled, T_bounds[0], T_bounds[1] - T_bounds[0])
     np.testing.assert_allclose(restored, T_evap)
 
 
@@ -171,6 +171,18 @@ def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator()
 
     np.testing.assert_allclose(Q_cond, np.array([400.0, 200.0]))
     np.testing.assert_allclose(Q_evap, np.array([100.0, 400.0]))
+
+
+def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator_with_out_of_range():
+    T_vals = np.array([160.0, 140.0, 120.0, 90.0])
+    H_vals = np.array([700.0, 500.0, 300.0, 0.0])
+    T_hp = np.array([150.0, 70.0])
+
+    Q_cond = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals, is_cond=True)
+    Q_evap = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals - H_vals[0], is_cond=False)
+
+    np.testing.assert_allclose(Q_cond, np.array([600.0, 0.0]))
+    np.testing.assert_allclose(Q_evap, np.array([100.0, 600.0]))    
 
 
 def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
