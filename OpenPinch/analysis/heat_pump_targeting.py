@@ -1,6 +1,6 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
-from scipy.optimize import minimize, NonlinearConstraint, differential_evolution
+from scipy.optimize import minimize, NonlinearConstraint, differential_evolution, minimize_scalar
 
 from ..lib import *
 from ..utils import *
@@ -240,16 +240,17 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
                 delta_H, 0.0
             )
             H_hot -= mask
-        # elif delta_H < -tol:
-        #     # Heat pump with excess sources -> remove excess
-        #     T_hot, H_hot = _get_H_col_till_target_Q(
-        #         np.abs(H_cold).max(),
-        #         T_hot,
-        #         H_hot,
-        #         False,
-        #     )
+        elif delta_H < -tol:
+            # Heat pump with excess sources -> remove excess
+            T_hot, H_hot = _get_H_col_till_target_Q(
+                np.abs(H_cold).max(),
+                T_hot,
+                H_hot,
+                False,
+            )
+            pass
             
-    # if is_heat_pumping == False:
+    # else: # Refrigeration
     #     if delta_H < -tol:
     #         # Refrigeration with potentially limited sinks
     #         mask = np.where(
@@ -280,20 +281,12 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
     """
     x0, bnds = _get_x0_and_bnds_for_carnot_hp_opt(args)
-    if 1:
-        opt = minimize(
-            fun=lambda x: _compute_carnot_hp_opt_obj(x, args)["obj"],
-            x0=x0,
-            bounds=bnds,
-            method="SLSQP",            
-        )
-    else:
-        opt = differential_evolution(
-            func=lambda x: _compute_carnot_hp_opt_obj(x, args)["obj"],
-            x0=x0,
-            bounds=bnds, 
-            init='sobol'  
-        )
+    opt = minimize(
+        fun=lambda x: _compute_carnot_hp_opt_obj(x, args)["obj"],
+        x0=x0,
+        bounds=bnds,
+        method="SLSQP",            
+    )
     res = _compute_carnot_hp_opt_obj(opt.x, args)
     res["cond_streams"] = _build_latent_streams(res["T_cond"], 0.01, res["Q_cond"], args.dtcont_hp, is_hot=True)
     res["evap_streams"] = _build_latent_streams(res["T_evap"], 0.01, res["Q_evap"], args.dtcont_hp, is_hot=False)  
@@ -303,6 +296,8 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
 def _get_x0_and_bnds_for_carnot_hp_opt(
     args: HeatPumpTargetInputs
 ) -> Tuple[np.ndarray, list]:
+    """Return the initial x vector and bounds for the Carnot HP optimizer.
+    """
     x0_cond = _initialise_carnot_hp_optimisation(
         n=args.n_cond,
         is_condenser=True,
@@ -312,7 +307,7 @@ def _get_x0_and_bnds_for_carnot_hp_opt(
         H_vals=args.H_cold,
         dt_range_max=args.dt_range_max,
     )
-    x0 = x0_cond + np.zeros(args.n_evap-1).tolist()
+    x0 = np.array(x0_cond + np.zeros(args.n_evap-1).tolist())
     res = _compute_carnot_hp_opt_obj(x0, args)
     T0 = res["T_evap"][-1]
     x0_evap = _initialise_carnot_hp_optimisation(
@@ -338,7 +333,7 @@ def _initialise_carnot_hp_optimisation(
     H_vals: np.ndarray,
     dt_range_max: float,
 ) -> list:
-    """Build initial guesses and bounds for the optimisation proceedure.
+    """Build initial guesses based on a simple area maximisation problem, i.e., sum(Q x delta T).
     """
     args = {
         "is_condenser": is_condenser,
@@ -349,7 +344,7 @@ def _initialise_carnot_hp_optimisation(
         "dt_range_max": dt_range_max
     }
     opt = differential_evolution(
-        func=lambda x: _compute_th_negative_area_obj(x, args),
+        func=lambda x: _compute_entropy_generation_reduction_at_constant_T(x, args),
         x0=np.zeros(n-1),
         bounds=[(0.0, 1.0) for _ in range(n-1)],  
         init='sobol'
@@ -357,13 +352,19 @@ def _initialise_carnot_hp_optimisation(
     return opt.x.tolist()
 
 
-def _compute_th_negative_area_obj(
+def _compute_entropy_generation_reduction_at_constant_T(
     x: int,
     args: dict,
 ) -> np.ndarray:    
+    """Compute the reduction in entropy generation as a result of selection of x; used for seeding the Carnot HP optimisation.
+    """
     T = args["map_fun"](x, args["T0"], args["dt_range_max"])
     Q = _get_Q_vals_from_T_hp_vals(T, args["T_vals"], args["H_vals"], args["is_condenser"])
-    return (Q * (T - args["T0"])).sum() if args["is_condenser"] else (Q * (args["T0"] - T)).sum()
+    if args["is_condenser"]:
+        S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() 
+    else: 
+        S_red = (Q * (args["T0"] - T) / ((T + 273.15) * (args["T0"] + 273.15))).sum()
+    return S_red # where the negative sign with the variable indicates a reduction in entropy generation
 
 
 def _compute_carnot_hp_opt_obj(
@@ -376,11 +377,10 @@ def _compute_carnot_hp_opt_obj(
     T_cond = _map_x_to_T_cond(x_cond, args.T_cold[0], args.dt_range_max)
     Q_cond = _get_Q_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold, True)
 
-    opt = minimize(
+    opt = minimize_scalar(
         fun=lambda T: _get_optimal_min_evap_T(T, [args, T_cond, Q_cond, x_evap])["obj"],
-        method="SLSQP",
-        x0=args.T_hot[-1],
-        bounds=[(args.T_hot[-1], args.T_hot[0])],
+        bracket=(args.T_hot[-1], args.T_hot[0]),
+        method="brent",
     )
     res = _get_optimal_min_evap_T(opt.x, [args, T_cond, Q_cond, x_evap])
     if 0:
