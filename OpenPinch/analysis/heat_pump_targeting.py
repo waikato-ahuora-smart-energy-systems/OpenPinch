@@ -12,7 +12,7 @@ from ..classes.stream_collection import StreamCollection
 from ..classes.problem_table import ProblemTable
 from ..classes.simple_heat_pump import HeatPumpCycle
 
-__all__ = ["get_heat_pump_targets"]
+__all__ = ["get_heat_pump_targets", "calc_heat_pump_cascade", "plot_multi_hp_profiles_from_results"]
 
 
 #######################################################################################################
@@ -21,7 +21,9 @@ __all__ = ["get_heat_pump_targets"]
 
 
 def get_heat_pump_targets(
-    pt: ProblemTable, 
+    T_vals: np.ndarray,
+    H_hot: np.ndarray,
+    H_cold: np.ndarray,
     zone_config: Configuration,
     is_T_vals_shifted: bool,
     is_process_integrated: bool,
@@ -55,24 +57,6 @@ def get_heat_pump_targets(
     zone_config.HP_LOAD_FRACTION = 1
     zone_config.DO_HP_SIM = False
     #############################
-    if (
-        (zone_config.DO_PROCESS_HP_TARGETING == False)
-        or 
-        (np.abs(pt.col[PT.H_NET_COLD.value]).max() < tol and is_heat_pumping == True)
-        or
-        (np.abs(pt.col[PT.H_NET_HOT.value]).max() < tol and is_heat_pumping == False)
-        or 
-        (zone_config.HP_LOAD_FRACTION < tol)
-    ):
-        return {}
-    
-    T_vals=pt.col[PT.T.value]
-    if is_process_integrated:
-        H_hot=pt.col[PT.H_NET_HOT.value]
-        H_cold=pt.col[PT.H_NET_COLD.value]                
-    else:
-        H_hot=pt.col[PT.H_HOT_UT.value]
-        H_cold=pt.col[PT.H_COLD_UT.value]
 
     args = _prepare_heat_pump_target_inputs(
         T_vals=T_vals,
@@ -94,15 +78,75 @@ def get_heat_pump_targets(
     if zone_config.DO_HP_SIM:
         res = _optimise_multi_simulated_heat_pump_placement(args)
         res.cond_streams, res.evap_streams = _build_simulated_hps_streams(res.hp_list)
-    _calc_pt_heat_pump_cascade(
-        pt=pt,
-        res=res,
-        is_T_vals_shifted=is_T_vals_shifted,
-        is_process_integrated=is_process_integrated,
-    )
-    if 0:
-        _plot_multi_hp_profiles_from_results(args, res)  
     return res
+
+
+def calc_heat_pump_cascade(
+    pt: ProblemTable,
+    res: HeatPumpTargetOutputs,
+    is_T_vals_shifted: bool,
+    is_process_integrated: bool,
+) -> ProblemTable:
+    """Augment the base problem table with HP condenser/evaporator cascades."""
+    t_hp = create_problem_table_with_t_int(
+        streams=res.cond_streams + res.evap_streams, 
+        is_shifted=is_T_vals_shifted
+    )
+    pt.insert_temperature_interval(
+        t_hp[PT.T.value].to_list()
+    )
+    temp = get_utility_heat_cascade(
+        T_int_vals=pt.col[PT.T.value],
+        hot_utilities=res.cond_streams,
+        cold_utilities=res.evap_streams,
+        is_shifted=is_T_vals_shifted,
+    )
+    col_H_net = PT.H_NET_HP_PRO.value if is_process_integrated else PT.H_NET_HP_UT.value  
+    pt.update(  
+        {
+            col_H_net: temp[PT.H_NET_UT.value],
+            PT.H_HOT_HP.value: temp[PT.H_HOT_UT.value],
+            PT.H_COLD_HP.value: temp[PT.H_COLD_UT.value],
+        }
+    )
+    return pt    
+
+
+def plot_multi_hp_profiles_from_results(
+    T_hot: np.ndarray,
+    H_hot: np.ndarray,
+    T_cold: np.ndarray,
+    H_cold: np.ndarray,
+    res: HeatPumpTargetOutputs, 
+    title: str = None,
+    is_carnot_hp: bool = True,    
+):
+    """Plot HP cascade and source/sink profiles.
+    """
+    res = HeatPumpTargetOutputs.model_validate(res)
+    if is_carnot_hp:
+        cascade = _get_heat_pump_cascade(hp_hot_streams=res.cond_streams, hp_cold_streams=res.evap_streams)
+    else:
+        return False
+    
+    T_hot, H_hot = clean_composite_curve_ends(T_hot, H_hot)
+    T_cold, H_cold = clean_composite_curve_ends(T_cold, H_cold)
+    T_hp_hot, H_hp_hot = clean_composite_curve_ends(cascade[PT.T.value], cascade[PT.H_HOT_UT.value])
+    T_hp_cold, H_hp_cold = clean_composite_curve_ends(cascade[PT.T.value], cascade[PT.H_COLD_UT.value])
+
+    plt.figure(figsize=(7, 5))
+    plt.plot(H_hot, T_hot, label="Sink", linewidth=2, color="red")
+    plt.plot(H_cold, T_cold, label="Source", linewidth=2, color="blue")
+    plt.plot(H_hp_hot, T_hp_hot, "--", color="darkred", linewidth=1.8, label="Condenser")
+    plt.plot(H_hp_cold, T_hp_cold, "--", color="darkblue", linewidth=1.8, label="Evaporator")
+    plt.title(title)
+    plt.xlabel("Heat Flow / kW")
+    plt.ylabel("Temperature / °C")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.axvline(0.0, color='black', linewidth=2)
+    plt.tight_layout()
+    plt.show()
 
 
 #######################################################################################################
@@ -387,11 +431,14 @@ def _compute_carnot_hp_opt_obj(
         res0 = HeatPumpTargetOutputs.model_validate(res)
         res0.cond_streams = _build_latent_streams(res0.T_cond, 0.1, res0.Q_cond, args.dtcont_hp, is_hot=True)
         res0.evap_streams = _build_latent_streams(res0.T_evap, 0.1, res0.Q_evap, args.dtcont_hp, is_hot=False)         
-        _plot_multi_hp_profiles_from_results(args, res0, str(f"Work ({x}): {res0.work} = {res0.work_hp} + {res0.work_el}"))
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res0, str(f"Work ({x}): {res0.work} = {res0.work_hp} + {res0.work_el}"))
     return res
 
 
-def _get_optimal_min_evap_T(T_lo: np.ndarray, input_args: list):
+def _get_optimal_min_evap_T(
+    T_lo: np.ndarray, 
+    input_args: list
+) -> dict:
     """Adjust evaporator ladder to honour minimum temperature limits."""
     args, T_cond, Q_cond, x_evap = input_args
     T_evap = _map_x_to_T_evap(x_evap, T_lo, args.dt_range_max)
@@ -490,7 +537,7 @@ def _compute_COP_estimate_from_carnot_limit(
 # Helper functions: Optimise simulated heat pump placement
 #######################################################################################################
 
-
+@timing_decorator
 def _optimise_multi_simulated_heat_pump_placement(
     args: HeatPumpTargetInputs
 ):
@@ -975,77 +1022,6 @@ def _build_simulated_hps_streams(
         cond_streams.add_many(hp.build_stream_collection(include_cond=True))
         evap_streams.add_many(hp.build_stream_collection(include_evap=True))
     return cond_streams, evap_streams
-
-
-#######################################################################################################
-# Helper functions: problem table summary and plotting
-#######################################################################################################
-
-
-def _calc_pt_heat_pump_cascade(
-    pt: ProblemTable,
-    res: HeatPumpTargetOutputs,
-    is_T_vals_shifted: bool,
-    is_process_integrated: bool,
-) -> ProblemTable:
-    """Augment the base problem table with HP condenser/evaporator cascades."""
-    t_hp = create_problem_table_with_t_int(
-        streams=res.cond_streams + res.evap_streams, 
-        is_shifted=is_T_vals_shifted
-    )
-    pt.insert_temperature_interval(
-        t_hp[PT.T.value].to_list()
-    )
-    temp = get_utility_heat_cascade(
-        T_int_vals=pt.col[PT.T.value],
-        hot_utilities=res.cond_streams,
-        cold_utilities=res.evap_streams,
-        is_shifted=is_T_vals_shifted,
-    )
-    col_H_net = PT.H_NET_HP_PRO.value if is_process_integrated else PT.H_NET_HP_UT.value  
-    pt.update(  
-        {
-            col_H_net: temp[PT.H_NET_UT.value],
-            PT.H_HOT_HP.value: temp[PT.H_HOT_UT.value],
-            PT.H_COLD_HP.value: temp[PT.H_COLD_UT.value],
-        }
-    )
-    return pt    
-
-
-def _plot_multi_hp_profiles_from_results(
-    args: HeatPumpTargetInputs, 
-    res: HeatPumpTargetOutputs, 
-    title: str = None,
-    is_carnot_hp: bool = True,    
-):
-    """Plot HP cascade and source/sink profiles.
-    """
-    args = HeatPumpTargetInputs.model_validate(args)
-    res = HeatPumpTargetOutputs.model_validate(res)
-    if is_carnot_hp:
-        cascade = _get_heat_pump_cascade(hp_hot_streams=res.cond_streams, hp_cold_streams=res.evap_streams)
-    else:
-        return False
-    
-    T_hot, H_hot = clean_composite_curve_ends(args.T_hot, args.H_hot)
-    T_cold, H_cold = clean_composite_curve_ends(args.T_cold, args.H_cold)
-    T_hp_hot, H_hp_hot = clean_composite_curve_ends(cascade[PT.T.value], cascade[PT.H_HOT_UT.value])
-    T_hp_cold, H_hp_cold = clean_composite_curve_ends(cascade[PT.T.value], cascade[PT.H_COLD_UT.value])
-
-    plt.figure(figsize=(7, 5))
-    plt.plot(H_hot, T_hot, label="Sink", linewidth=2, color="red")
-    plt.plot(H_cold, T_cold, label="Source", linewidth=2, color="blue")
-    plt.plot(H_hp_hot, T_hp_hot, "--", color="darkred", linewidth=1.8, label="Condenser")
-    plt.plot(H_hp_cold, T_hp_cold, "--", color="darkblue", linewidth=1.8, label="Evaporator")
-    plt.title(title)
-    plt.xlabel("Heat Flow / kW")
-    plt.ylabel("Temperature / °C")
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.legend()
-    plt.axvline(0.0, color='black', linewidth=2)
-    plt.tight_layout()
-    plt.show()
 
 
 #######################################################################################################
