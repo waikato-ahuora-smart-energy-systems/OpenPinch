@@ -57,8 +57,6 @@ class HeatPumpTargetInputs(BaseModel):
     dt_phase_change: float
     dt_range_max: Optional[float] = None
     is_process_integrated: Optional[bool] = True
-    T_cond_init: Optional[np.ndarray] = None
-    T_evap_init: Optional[np.ndarray] = None
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None 
     refrigerant: Optional[str] = None

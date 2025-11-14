@@ -92,6 +92,7 @@ def test_prepare_data_for_minimize_multiple_segments():
     T_cond_init = np.array([220.0, 210.0, 205.0])
     T_evap_init = np.array([40.0, 35.0, 30.0])
     T_bnds = {"HU": (200.0, 230.0), "CU": (25.0, 55.0)}
+    
     x_cond = _map_T_to_x_cond(T_cond_init, T_bnds["HU"][1], T_bnds["HU"][1] - T_bnds["HU"][0])
     x_evap = _map_T_to_x_evap(T_evap_init, T_bnds["CU"][0], T_bnds["CU"][1] - T_bnds["CU"][0])
     x0, bnds = _prepare_data_for_minimizer(
