@@ -1,6 +1,11 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
-from scipy.optimize import minimize, NonlinearConstraint, differential_evolution, minimize_scalar
+from scipy.optimize import (
+    minimize, 
+    NonlinearConstraint, 
+    differential_evolution, 
+    minimize_scalar
+)
 
 from ..lib import *
 from ..utils import *
@@ -284,6 +289,7 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
                 delta_H, 0.0
             )
             H_hot -= mask
+            Q_amb_max = delta_H
         elif delta_H < -tol:
             # Heat pump with excess sources -> remove excess
             T_hot, H_hot = _get_H_col_till_target_Q(
@@ -292,7 +298,7 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
                 H_hot,
                 False,
             )
-            pass
+            Q_amb_max = 0.0
             
     # else: # Refrigeration
     #     if delta_H < -tol:
@@ -311,7 +317,7 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
     #             True,
     #         )
 
-    return T_hot, H_hot, T_cold, H_cold, delta_H
+    return T_hot, H_hot, T_cold, H_cold, Q_amb_max
 
 
 #######################################################################################################
@@ -333,7 +339,8 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     )
     res = _compute_carnot_hp_opt_obj(opt.x, args)
     res["cond_streams"] = _build_latent_streams(res["T_cond"], 0.01, res["Q_cond"], args.dtcont_hp, is_hot=True)
-    res["evap_streams"] = _build_latent_streams(res["T_evap"], 0.01, res["Q_evap"], args.dtcont_hp, is_hot=False)  
+    res["evap_streams"] = _build_latent_streams(res["T_evap"], 0.01, res["Q_evap"], args.dtcont_hp, is_hot=False)
+    res["Q_amb"] = res["Q_evap"].sum() - (np.abs(args.H_hot).max() - args.Q_amb_max)
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -408,7 +415,7 @@ def _compute_entropy_generation_reduction_at_constant_T(
         S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() 
     else: 
         S_red = (Q * (args["T0"] - T) / ((T + 273.15) * (args["T0"] + 273.15))).sum()
-    return S_red # where the negative sign with the variable indicates a reduction in entropy generation
+    return S_red # is negative, meaning a reduction in entropy generation
 
 
 def _compute_carnot_hp_opt_obj(

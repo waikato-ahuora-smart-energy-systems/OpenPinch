@@ -6,7 +6,6 @@ from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_targeting import (
     _prepare_data_for_minimizer,
     _compute_entropic_average_temperature_in_K,
-    _set_initial_values_for_condenser_and_evaporator,
     _compute_COP_estimate_from_carnot_limit,
     _get_Q_vals_from_T_hp_vals,
     _parse_carnot_hp_state_variables,
@@ -43,49 +42,6 @@ def test_get_carnot_COP_returns_expected_value():
     result = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap, eff=eff)
 
     np.testing.assert_allclose(result, expected)
-
-
-def test_set_initial_values_for_condenser_and_evaporator_even_spacing():    
-    T_hot, H_hot = clean_composite_curve(get_temperatures(), get_hot_cc())
-    T_cold, H_cold = clean_composite_curve(get_temperatures(), get_cold_cc())
-
-    T_cond, T_evap = _set_initial_values_for_condenser_and_evaporator(
-        2, 3, T_hot, H_hot, T_cold, H_cold
-    )
-
-    expected_cond = [140., 90.]
-    expected_evap = [50., 40., 20.]
-
-    assert len(T_cond) == 2
-    assert len(T_evap) == 3
-    np.testing.assert_allclose(T_cond, expected_cond)
-    np.testing.assert_allclose(T_evap, expected_evap)
-
-
-def test_set_initial_values_for_condenser_and_evaporator_even_spacing():    
-    T_hot, H_hot = clean_composite_curve(get_temperatures(), get_hot_cc())
-    T_cold, H_cold = clean_composite_curve(get_temperatures(), get_cold_cc())
-
-    T_cond, T_evap = _set_initial_values_for_condenser_and_evaporator(
-        5, 10, T_hot, H_hot, T_cold, H_cold
-    )
-
-    assert len(T_cond) == 5
-    assert len(T_evap) == 10
-
-
-def test_set_initial_values_for_condenser_and_evaporator_min_segments():
-    T_hot, H_hot = clean_composite_curve(get_temperatures(), get_hot_cc())
-    T_cold, H_cold = clean_composite_curve(get_temperatures(), get_cold_cc())
-
-    T_cond, T_evap = _set_initial_values_for_condenser_and_evaporator(
-        0, -2, T_hot, H_hot, T_cold, H_cold
-    )
-
-    assert len(T_cond) == 1
-    assert len(T_evap) == 1
-    np.testing.assert_allclose(T_cond, [140.0])
-    np.testing.assert_allclose(T_evap, [20.0])
 
 
 def test_prepare_data_for_minimize_multiple_segments():

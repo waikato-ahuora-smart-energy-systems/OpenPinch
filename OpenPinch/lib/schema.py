@@ -79,6 +79,7 @@ class HeatPumpTargetOutputs(BaseModel):
     obj: float
     cond_streams: Optional[StreamCollection] = None
     evap_streams: Optional[StreamCollection] = None
+    Q_amb: Optional[float] = 0.0
 
 
 # ---- Targeting results -------------------------------------------------------
