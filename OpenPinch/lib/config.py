@@ -49,6 +49,9 @@ class Configuration:
     HP_LOAD_FRACTION: float = 1.0
     DO_HP_SIM: bool = False
     REFRIGERANTS: List[str] = ["Ammonia"]
+    Y_COND_MIN: float = 0.05 # Minimum load on a heat pump condenser, enforced for simulated heat pump
+    PRICE_RATIO_ELE_TO_FUEL: float = 1.0
+
 
     UTILITY_PRICE: float = 40
     ANNUAL_OP_TIME: float = 8300

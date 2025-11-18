@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Optional, Sequence, Tuple
 
 import CoolProp
 from CoolProp.Plots.Common import EURunits, KSIunits, PropertyDict, SIunits, process_fluid_state
@@ -38,8 +38,10 @@ class HeatPumpCycle:
         self._cycle_states = StateContainer(unit_system=self._system)
         self._w_net: Optional[float] = None
         self._q_evap: Optional[float] = None
-        self._Q_total: Optional[float] = Q_total
-        self._m_dot : Optional[float] = None
+        self._q_cond: Optional[float] = None
+        self._Q_cond: Optional[float] = Q_total
+        self._Q_evap: Optional[float] = 0
+        self._m_dot: Optional[float] = None
         self._solved = False
 
     @property
@@ -106,8 +108,16 @@ class HeatPumpCycle:
         return self._q_evap
 
     @property
+    def Q_evap(self) -> Optional[float]:
+        return self._Q_evap
+        
+    @property
     def w_net(self) -> Optional[float]:
         return self._w_net
+
+    @property
+    def work(self) -> Optional[float]:
+        return self._work
 
     def solve(
         self,
@@ -182,8 +192,13 @@ class HeatPumpCycle:
         self.cycle_states = cycle_states
         self.fill_states()
 
-        self._w_net = h0 - h1
-        self._q_evap = h0 - h3
+        self._w_net = (h1 - h0) / 1000
+        self._q_evap = (h0 - h3) / 1000
+        self._q_cond = (h1 - h3) / 1000
+        if isinstance(self._Q_cond, float):
+            self._m_dot = self._Q_cond / self._q_cond
+            self._work = self._m_dot * self._w_net
+            self._Q_evap = self._m_dot * self._q_evap
 
     def solve_t_dt(
         self,
@@ -335,10 +350,9 @@ class HeatPumpCycle:
 
     def get_hp_hot_and_cold_streams(self) -> tuple[np.ndarray, np.ndarray]:
         """Return hot and cold streams that define the external heating and cooling provided by a heat pump."""
-        condenser_profile, evaporator_profile = self.get_hp_th_profiles()
         return (
-            self._build_stream_collection(condenser_profile,is_hot=True),
-            self._build_stream_collection(evaporator_profile,is_hot=False),
+            self.build_stream_collection(include_cond=True),
+            self.build_stream_collection(include_evap=True),
         )
 
     def get_hp_th_profiles(self) -> tuple[np.ndarray, np.ndarray]:
@@ -397,12 +411,12 @@ class HeatPumpCycle:
     
         return condenser_profile
 
-    def build_stream_collection(self, include_cond: bool = False, include_evap: bool = False):
+    def build_stream_collection(self, include_cond: bool = False, include_evap: bool = False, is_process_stream: bool = False) -> Tuple[StreamCollection, StreamCollection]:
 
         def _build_streams(profile: np.ndarray, is_hot: bool): 
 
             if is_hot:
-                self._m_dot = self._Q_total / abs(profile[0,0] - profile[-1,0])
+                self._m_dot = self._Q_cond / abs(profile[0,0] - profile[-1,0])
             sc = StreamCollection()
             for i in range(len(profile) - 1):
                 h1, T1 = profile[i]
@@ -411,11 +425,11 @@ class HeatPumpCycle:
                 # Do we need a name?
                 name = f"Segment_{i + 1}"
 
-                if abs(T1 - T2) < 0.001: # Catch phase change
+                if abs(T1 - T2) < 0.0001: # Catch phase change
                     if is_hot:
-                        t_target = T2 - .1
+                        t_target = T2 - 0.001
                     else:
-                        t_target = T2 + .1
+                        t_target = T2 + 0.001
                 else:
                     t_target = T2
 
@@ -432,9 +446,11 @@ class HeatPumpCycle:
         
         streams = StreamCollection()
         if include_cond:
-            streams += _build_streams(self._build_condenser_profile, True)
+            temp = self._build_condenser_profile()
+            streams += _build_streams(temp, True)
         if include_evap:
-            streams += _build_streams(self._build_evaporator_profile, False)            
+            temp = self._build_evaporator_profile()
+            streams += _build_streams(temp, False)            
         return streams
 
     def _build_evaporator_profile(self) -> np.ndarray:

@@ -79,13 +79,14 @@ def compute_direct_integration_targets(zone: Zone):
                     H_hot=pt.col[PT.H_NET_HOT.value],
                     T_cold=pt.col[PT.T.value],                    
                     H_cold=pt.col[PT.H_NET_COLD.value],
-                    res=res
+                    hp_hot_streams=hp_res.cond_streams,
+                    hp_cold_streams=hp_res.evap_streams,
                 )
     
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True
     )
-    net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
+    net_hot_streams, net_cold_streams = _create_net_hot_and_cold_stream_collections_for_site_analysis(
         pt.col[PT.T.value], pt.col[PT.H_NET_A.value], hot_utilities, cold_utilities
     )
     if zone_config.DO_BALANCED_CC or zone_config.DO_AREA_TARGETING:
@@ -165,7 +166,7 @@ def compute_direct_integration_targets(zone: Zone):
 #######################################################################################################
 
 
-def _get_net_hot_and_cold_segments(
+def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     hot_utilities: StreamCollection,

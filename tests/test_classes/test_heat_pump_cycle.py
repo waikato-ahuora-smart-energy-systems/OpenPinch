@@ -53,7 +53,7 @@ def test_solve_t_dt_establishes_cycle_states(cycle_inputs):
     assert len(cycle.Hs) == HeatPumpCycle.STATECOUNT
     assert len(cycle.Ts) == HeatPumpCycle.STATECOUNT
     assert len(cycle.Ps) == HeatPumpCycle.STATECOUNT
-    assert cycle.w_net < 0.0
+    assert cycle.w_net > 0.0
     assert cycle.q_evap > 0.0
     assert cycle.COP_heating() > 1.0
     assert cycle.COP_cooling() > 1.0

@@ -55,14 +55,18 @@ class HeatPumpTargetInputs(BaseModel):
     eta_comp: float
     dtcont_hp: float
     dt_phase_change: float
-    dt_range_max: Optional[float] = None
-    is_process_integrated: Optional[bool] = True
+    y_cond_min: float
+    dt_range_max: float
+    is_process_integrated: bool
+    is_heat_pumping: bool
+    is_multi_temperature_hp: bool
+
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None 
     refrigerant: Optional[str] = None
     unit_system: Optional[str] = "EUR"
-    is_heat_pump: Optional[bool] = True
-    is_multi_temperature_hp: Optional[bool] = True
+    net_hot_streams: Optional[StreamCollection] = StreamCollection()
+    net_cold_streams: Optional[StreamCollection] = StreamCollection()
 
 
 class HeatPumpTargetOutputs(BaseModel):
@@ -80,6 +84,8 @@ class HeatPumpTargetOutputs(BaseModel):
     cond_streams: Optional[StreamCollection] = None
     evap_streams: Optional[StreamCollection] = None
     Q_amb: Optional[float] = 0.0
+    dT_sc: Optional[np.ndarray] = None
+    dT_sh: Optional[np.ndarray] = None
 
 
 # ---- Targeting results -------------------------------------------------------

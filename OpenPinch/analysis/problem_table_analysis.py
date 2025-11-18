@@ -26,7 +26,8 @@ def get_process_heat_cascade(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
     all_streams: StreamCollection,
-    zone_config: Configuration,
+    zone_config: Configuration = None,
+    include_real_pt: bool = True,
 ) -> Tuple[ProblemTable, ProblemTable, dict]:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
@@ -35,14 +36,18 @@ def get_process_heat_cascade(
         True,
         zone_config,
     )
+    # Perform the heat cascade of the problem table
+    _problem_table_algorithm(pt, hot_streams, cold_streams)
+
+    if not include_real_pt or zone_config == None:
+        return pt, None, None
+    
     pt_real = create_problem_table_with_t_int(
         all_streams, 
         False,
         zone_config,
-    )    
+    )
 
-    # Perform the heat cascade of the problem table
-    _problem_table_algorithm(pt, hot_streams, cold_streams)
     _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
     target_values = _set_zonal_targets(pt, pt_real)
 
