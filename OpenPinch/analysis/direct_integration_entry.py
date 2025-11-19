@@ -60,9 +60,8 @@ def compute_direct_integration_targets(zone: Zone):
                 H_hot=pt.col[PT.H_NET_HOT.value],
                 H_cold=pt.col[PT.H_NET_COLD.value],
                 zone_config=zone_config, 
-                is_process_integrated=True,
+                is_direct_integration=True,
                 is_heat_pumping=True,
-                is_T_vals_shifted=True,
             )
             res.update(
                 hp_res
@@ -71,9 +70,9 @@ def compute_direct_integration_targets(zone: Zone):
                 pt=pt,
                 res=hp_res,
                 is_T_vals_shifted=True,
-                is_process_integrated=True,
+                is_direct_integration=True,
             )
-            if 0:
+            if 1:
                 plot_multi_hp_profiles_from_results(
                     T_hot=pt.col[PT.T.value],
                     H_hot=pt.col[PT.H_NET_HOT.value],
@@ -82,7 +81,11 @@ def compute_direct_integration_targets(zone: Zone):
                     hp_hot_streams=hp_res.cond_streams,
                     hp_cold_streams=hp_res.evap_streams,
                 )
-            pass
+                plot_multi_hp_profiles_from_results(
+                    T_hot=pt.col[PT.T.value],
+                    H_hot=pt.col[PT.H_NET_W_AIR.value],
+                )
+                pass
     
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True
@@ -334,7 +337,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.GCC.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_NET_UT.value]],
         GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_NET_UT.value]],
         GT.NLC.value: pt[[PT.T.value, PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
-        GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_HP_PRO.value]],
+        GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP_PRO.value]],
     }
 
 

@@ -114,6 +114,7 @@ class ProblemTableLabel(Enum):
     H_NET_COLD = "H_cold_net"
     H_NET_HP_UT = "H_net_hp_ut"
     H_NET_HP_PRO = "H_net_hp_pro"
+    H_NET_W_AIR = "H_net_with_air"
 
     H_HOT_UT = "H_hot_utility"
     H_COLD_UT = "H_cold_utility"

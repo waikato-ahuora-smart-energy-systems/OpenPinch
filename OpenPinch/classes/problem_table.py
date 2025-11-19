@@ -27,6 +27,7 @@ INTERPOLATION_KEYS = (
     PT.H_NET_UT.value,
     PT.H_NET_HOT.value,
     PT.H_NET_COLD.value,
+    PT.H_NET_W_AIR.value,
     PT.H_NET_HP_UT.value,
     PT.H_NET_HP_PRO.value,
     PT.H_HOT_UT.value,

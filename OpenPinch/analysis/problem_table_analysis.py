@@ -23,9 +23,9 @@ __all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_probl
 
 
 def get_process_heat_cascade(
-    hot_streams: StreamCollection,
-    cold_streams: StreamCollection,
-    all_streams: StreamCollection,
+    hot_streams: StreamCollection = StreamCollection(),
+    cold_streams: StreamCollection = StreamCollection(),
+    all_streams: StreamCollection = StreamCollection(),
     zone_config: Configuration = None,
     include_real_pt: bool = True,
 ) -> Tuple[ProblemTable, ProblemTable, dict]:

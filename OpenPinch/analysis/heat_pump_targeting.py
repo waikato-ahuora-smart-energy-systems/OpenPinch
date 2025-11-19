@@ -31,8 +31,7 @@ def get_heat_pump_targets(
     H_hot: np.ndarray,
     H_cold: np.ndarray,
     zone_config: Configuration,
-    is_T_vals_shifted: bool,
-    is_process_integrated: bool,
+    is_direct_integration: bool,
     is_heat_pumping: bool,  
 ):
     """Optimise multi-stage heat-pump placement for the supplied problem table.
@@ -43,7 +42,7 @@ def get_heat_pump_targets(
             and targeting flags.
         is_T_vals_shifted: Indicates whether ``pt`` temperatures already include
             ΔTmin/2 shifting.
-        is_process_integrated: True when targeting is performed against the
+        is_direct_integration: True when targeting is performed against the
             process cascade; False for utility-only cascades.
         is_heat_pumping: Selects heating mode (True) versus refrigeration (False).
         n_cond: Number of condenser temperature levels to optimise.
@@ -64,13 +63,13 @@ def get_heat_pump_targets(
         T_vals=T_vals,
         H_hot=H_hot,
         H_cold=H_cold,
-        is_process_integrated=is_process_integrated,
+        is_direct_integration=is_direct_integration,
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
     )
     if zone_config.MULTI_TEMPERATURE_HP:
         carnot_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
-        if 1:
+        if 0:
             plot_multi_hp_profiles_from_results(
                 T_hot=args.T_hot,
                 H_hot=args.H_hot,
@@ -82,11 +81,21 @@ def get_heat_pump_targets(
     else:
         pass
 
-    if zone_config.DO_HP_SIM or 1:
+    if zone_config.DO_HP_SIM or 0:
         args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
         res = _optimise_multi_simulated_heat_pump_placement(args, carnot_res)
     else:
         res = carnot_res
+
+    res.amb_stream = _build_latent_streams(
+        T_ls=np.array([zone_config.T_ENV]),
+        dT_phase_change=zone_config.DT_PHASE_CHANGE,
+        Q_ls=np.array([res.Q_amb]),
+        dt_cont=zone_config.DT_ENV_CONT,
+        is_hot=True if res.Q_amb > 0 else False,
+        is_process_stream=True,
+        prefix="AIR",
+    )
 
     return HeatPumpTargetOutputs.model_validate(res)
 
@@ -95,12 +104,12 @@ def calc_heat_pump_cascade(
     pt: ProblemTable,
     res: HeatPumpTargetOutputs,
     is_T_vals_shifted: bool,
-    is_process_integrated: bool,
+    is_direct_integration: bool,
 ) -> ProblemTable:
     """Augment the base problem table with HP condenser/evaporator cascades."""
     t_hp = create_problem_table_with_t_int(
         streams=res.cond_streams + res.evap_streams, 
-        is_shifted=is_T_vals_shifted
+        is_shifted=is_T_vals_shifted,
     )
     pt.insert_temperature_interval(
         t_hp[PT.T.value].to_list()
@@ -111,7 +120,7 @@ def calc_heat_pump_cascade(
         cold_utilities=res.evap_streams,
         is_shifted=is_T_vals_shifted,
     )
-    col_H_net = PT.H_NET_HP_PRO.value if is_process_integrated else PT.H_NET_HP_UT.value  
+    col_H_net = PT.H_NET_HP_PRO.value if is_direct_integration else PT.H_NET_HP_UT.value  
     pt.update(  
         {
             col_H_net: temp[PT.H_NET_UT.value],
@@ -119,8 +128,30 @@ def calc_heat_pump_cascade(
             PT.H_COLD_HP.value: temp[PT.H_COLD_UT.value],
         }
     )
-    return pt    
 
+    # Calculate ambient air portion for the heat pump cascade
+    if res.Q_amb > tol:
+        hot_streams = res.amb_stream
+        cold_streams = StreamCollection()
+    elif res.Q_amb < tol:
+        hot_streams = StreamCollection()
+        cold_streams = res.amb_stream
+
+    pt_air, _, _ = get_process_heat_cascade(
+        hot_streams=hot_streams,
+        cold_streams=cold_streams,
+        all_streams=hot_streams+cold_streams,
+        include_real_pt=False,
+    )
+    pt_air.insert_temperature_interval(
+        pt[PT.T.value].to_list()
+    )
+    pt.col[PT.H_NET_W_AIR.value] = pt.col[PT.H_NET_A.value] + pt_air.col[PT.H_NET.value]
+    if res.Q_amb > tol:
+        pt.col[PT.H_NET_HOT.value] -= pt_air.col[PT.H_NET.value]
+    elif res.Q_amb < tol:
+        pt.col[PT.H_NET_COLD.value] += pt_air.col[PT.H_NET.value]
+    
 
 def plot_multi_hp_profiles_from_results(
     T_hot: np.ndarray = None,
@@ -169,7 +200,7 @@ def _prepare_heat_pump_target_inputs(
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
-    is_process_integrated: bool = True,
+    is_direct_integration: bool = True,
     load_fraction: float = 1,
     is_heat_pumping: bool = True,
     zone_config: Configuration = Configuration(),
@@ -177,7 +208,7 @@ def _prepare_heat_pump_target_inputs(
     """Format temperature/enthalpy inputs and options for heat pump targeting.
     """
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
-    T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, zone_config.DTMIN_HP, is_process_integrated)   
+    T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, zone_config.DTMIN_HP, is_direct_integration)   
     Q_hp_target = min(load_fraction, 1.0) * np.abs(H_cold).max()
     T_cold, H_cold = _get_H_col_till_target_Q(Q_hp_target, T_cold, H_cold)
     T_hot, H_hot, T_cold, H_cold, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(
@@ -202,9 +233,8 @@ def _prepare_heat_pump_target_inputs(
         T_cold=T_cold,
         H_cold=H_cold,
         dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
-        is_process_integrated=bool(is_process_integrated),
+        is_direct_integration=bool(is_direct_integration),
         is_heat_pumping=bool(is_heat_pumping),
-        # is_multi_temperature_hp=True,
         n_cond=zone_config.N_COND,
         n_evap=zone_config.N_EVAP,
         eta_comp=zone_config.ETA_COMP,
@@ -223,11 +253,11 @@ def _prepare_heat_pump_target_inputs(
 def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
     T_vals: np.ndarray, 
     dtmin_hp: float,
-    is_process_integrated: bool,
+    is_direct_integration: bool,
 ):
     """Apply ΔTmin adjustments to cascade temperatures for heat pump calculations.
     """
-    dT_shift = dtmin_hp * 0.5 if is_process_integrated else dtmin_hp * 1.5
+    dT_shift = dtmin_hp * 0.5 if is_direct_integration else dtmin_hp * 1.5
     T_hot  = T_vals - dT_shift
     T_cold = T_vals + dT_shift
     return T_hot, T_cold, dT_shift
@@ -270,10 +300,10 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
     T_cold: np.ndarray,    
     H_cold: np.ndarray,
     dtcont: float,
-    T_env: float = 15,
-    dT_env_cont: float = 5,
-    dt_phase_change: float = 0.01,
-    is_heat_pumping: bool = True,    
+    T_env: float,
+    dT_env_cont: float,
+    dt_phase_change: float,
+    is_heat_pumping: bool,    
 ):
     """Balance net hot and cold duties using an ambient sink/source if required.
     """
@@ -354,8 +384,8 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
             opt = m
 
     res = _compute_carnot_hp_opt_obj(opt.x, args)
-    res.cond_streams = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
-    res.evap_streams = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
+    res.cond_streams = _build_latent_streams(res.T_cond, args.dt_phase_change, res.Q_cond, args.dtcont_hp, is_hot=True)
+    res.evap_streams = _build_latent_streams(res.T_evap, args.dt_phase_change, res.Q_evap, args.dtcont_hp, is_hot=False)
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -629,7 +659,7 @@ def _optimise_multi_simulated_heat_pump_placement(
 
     if opt.success:
         res = _compute_simulated_heat_pump_system_performance(opt.x, args)
-        if 1:
+        if 0:
             res = HeatPumpTargetOutputs.model_validate(res)
             plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.cond_streams, res.evap_streams)
         
@@ -1012,27 +1042,29 @@ def _prepare_latent_hp_profile(
 
 
 def _build_latent_streams(
-    T_hp: np.ndarray, 
+    T_ls: np.ndarray, 
     dT_phase_change: float,
-    Q_hp: np.ndarray,
+    Q_ls: np.ndarray,
     dt_cont: float,
-    is_hot: bool
+    is_hot: bool,
+    is_process_stream: bool = False,
+    prefix: str = "HP",
 ) -> StreamCollection:
-    """Convert latent HP levels into a StreamCollection for condenser/evaporator levels.
+    """Convert a series of temperature levels into a StreamCollection, e.g. for condenser/evaporator levels or ambient air.
     """
-    if len(T_hp) > 1:
-        T_hp, Q_hp = _prepare_latent_hp_profile(T_hp.tolist(), Q_hp.tolist(), dT_phase_change, is_hot)
+    if len(T_ls) > 1:
+        T_ls, Q_ls = _prepare_latent_hp_profile(T_ls.tolist(), Q_ls.tolist(), dT_phase_change, is_hot)
 
     sc = StreamCollection()
-    for i in range(len(Q_hp)):
+    for i in range(len(Q_ls)):
         sc.add(
             Stream(
-                name=f"HP_H{i + 1}" if is_hot else f"HP_C{i + 1}",
-                t_supply=T_hp[i] if is_hot else T_hp[i] - dT_phase_change,
-                t_target=T_hp[i] - dT_phase_change if is_hot else T_hp[i],
-                heat_flow=Q_hp[i],
+                name=f"{prefix}_H{i + 1}" if is_hot else f"{prefix}_C{i + 1}",
+                t_supply=T_ls[i] if is_hot else T_ls[i] - dT_phase_change,
+                t_target=T_ls[i] - dT_phase_change if is_hot else T_ls[i],
+                heat_flow=Q_ls[i],
                 dt_cont=dt_cont, # Shift to intermediate process temperature scale
-                is_process_stream=False,
+                is_process_stream=is_process_stream,
             )            
         )
     return sc

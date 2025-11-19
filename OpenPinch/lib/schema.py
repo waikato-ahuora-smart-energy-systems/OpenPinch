@@ -58,7 +58,7 @@ class HeatPumpTargetInputs(BaseModel):
     y_cond_min: float
     dt_range_max: float
     price_ratio: float
-    is_process_integrated: bool
+    is_direct_integration: bool
     is_heat_pumping: bool
     max_multi_start: int
 
@@ -84,6 +84,7 @@ class HeatPumpTargetOutputs(BaseModel):
     obj: float
     cond_streams: Optional[StreamCollection] = None
     evap_streams: Optional[StreamCollection] = None
+    amb_stream: Optional[StreamCollection] = None
     Q_amb: Optional[float] = 0.0
     Q_ext: Optional[float] = 0.0
     dT_sc: Optional[np.ndarray] = None
