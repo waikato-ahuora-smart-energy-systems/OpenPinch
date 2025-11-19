@@ -48,6 +48,7 @@ class Configuration:
     DO_TURBINE_WORK: bool = False
 
     ### Heat pump targeting parameters ###
+    MULTI_TEMPERATURE_HP: bool = True
     HP_LOAD_FRACTION: float = 1.0
     DO_HP_SIM: bool = False
     REFRIGERANTS: List[str] = ["Ammonia"]

@@ -60,9 +60,8 @@ class HeatPumpTargetInputs(BaseModel):
     price_ratio: float
     is_process_integrated: bool
     is_heat_pumping: bool
-    is_multi_temperature_hp: bool
     max_multi_start: int
-    
+
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None 
     refrigerant: Optional[str] = None

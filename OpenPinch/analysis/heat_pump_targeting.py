@@ -68,14 +68,26 @@ def get_heat_pump_targets(
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
     )
-    carnot_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
+    if zone_config.MULTI_TEMPERATURE_HP:
+        carnot_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
+        if 1:
+            plot_multi_hp_profiles_from_results(
+                T_hot=args.T_hot,
+                H_hot=args.H_hot,
+                T_cold=args.T_cold,
+                H_cold=args.H_cold,
+                hp_hot_streams=carnot_res.cond_streams,
+                hp_cold_streams=carnot_res.evap_streams,
+            )        
+    else:
+        pass
+
     if zone_config.DO_HP_SIM or 1:
-        args.is_multi_temperature_hp = False
-        n_hp = max(args.n_cond, args.n_evap)
-        args.n_cond, args.n_evap = n_hp, n_hp
+        args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
         res = _optimise_multi_simulated_heat_pump_placement(args, carnot_res)
     else:
         res = carnot_res
+
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -192,7 +204,7 @@ def _prepare_heat_pump_target_inputs(
         dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
         is_process_integrated=bool(is_process_integrated),
         is_heat_pumping=bool(is_heat_pumping),
-        is_multi_temperature_hp=True,
+        # is_multi_temperature_hp=True,
         n_cond=zone_config.N_COND,
         n_evap=zone_config.N_EVAP,
         eta_comp=zone_config.ETA_COMP,
@@ -617,7 +629,7 @@ def _optimise_multi_simulated_heat_pump_placement(
 
     if opt.success:
         res = _compute_simulated_heat_pump_system_performance(opt.x, args)
-        if 0:
+        if 1:
             res = HeatPumpTargetOutputs.model_validate(res)
             plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.cond_streams, res.evap_streams)
         
@@ -785,9 +797,9 @@ def _compute_simulated_heat_pump_system_performance(
 
     return {
         "obj": (work_hp + work_el) / args.Q_hp_target, 
-        "work": work_hp + work_el, 
+        "utility_tot": work_hp + work_el, 
         "work_hp": work_hp,  
-        "work_el": work_el,
+        "Q_ext": work_el,
         "T_cond": T_cond,
         "dT_sc": dT_sc,
         "Q_cond": Q_cond,            
@@ -819,14 +831,16 @@ def _create_heat_pump_list(
             unit_system=args.unit_system, 
             Q_total=Q_cond[i],
         )
-        hp.solve_t_dt(
-            Te=T_evap[i],
-            Tc=T_cond[i],
-            dT_sh=dT_sh[i] if isinstance(dT_sh, np.ndarray) else 0.001,
-            dT_sc=dT_sc[i] if isinstance(dT_sh, np.ndarray) else 0.001,
-            eta_comp=args.eta_comp,
-            SI=False
-        )
+        if Q_cond[i] > 0.0:
+            Te = min(T_evap[i], T_cond[i] - dT_sc[i] - 3)
+            hp.solve_t_dt(
+                Te=Te,
+                Tc=T_cond[i],
+                dT_sh=dT_sh[i] if isinstance(dT_sh, np.ndarray) else 0.001,
+                dT_sc=dT_sc[i] if isinstance(dT_sh, np.ndarray) else 0.001,
+                eta_comp=args.eta_comp,
+                SI=False
+            )
         hp_list.append(hp)
     return hp_list
 
