@@ -84,6 +84,7 @@ class HeatPumpTargetOutputs(BaseModel):
     cond_streams: Optional[StreamCollection] = None
     evap_streams: Optional[StreamCollection] = None
     Q_amb: Optional[float] = 0.0
+    Q_ext: Optional[float] = 0.0
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None
 

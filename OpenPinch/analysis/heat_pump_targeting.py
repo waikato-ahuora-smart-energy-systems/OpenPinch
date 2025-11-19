@@ -2,9 +2,9 @@
 
 from scipy.optimize import (
     minimize, 
-    NonlinearConstraint, 
-    LinearConstraint,
-    differential_evolution, 
+    NonlinearConstraint,
+    differential_evolution,
+    shgo, 
     minimize_scalar
 )
 
@@ -342,14 +342,14 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     """
     x0, bnds = _get_x0_and_bnds_for_carnot_hp_opt(args)
     opt = minimize(
-        fun=lambda x: _compute_carnot_hp_opt_obj(x, args)["obj"],
+        fun=lambda x: _compute_carnot_hp_opt_obj(x, args).obj,
         x0=x0,
         bounds=bnds,
         method="SLSQP",            
     )
     res = _compute_carnot_hp_opt_obj(opt.x, args)
-    res["cond_streams"] = _build_latent_streams(res["T_cond"], 0.01, res["Q_cond"], args.dtcont_hp, is_hot=True)
-    res["evap_streams"] = _build_latent_streams(res["T_evap"], 0.01, res["Q_evap"], args.dtcont_hp, is_hot=False)
+    res.cond_streams = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
+    res.evap_streams = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -366,10 +366,11 @@ def _get_x0_and_bnds_for_carnot_hp_opt(
         T_vals=args.T_cold,
         H_vals=args.H_cold,
         dt_range_max=args.dt_range_max,
+        Q_hp_target=args.Q_hp_target,
     )
     x0 = np.array(x0_cond + np.zeros(args.n_evap-1).tolist())
     res = _compute_carnot_hp_opt_obj(x0, args)
-    T0 = res["T_evap"][-1]
+    T0 = res.T_evap[-1]
     x0_evap = _initialise_carnot_hp_optimisation(
         n=args.n_evap,
         is_condenser=False,
@@ -380,7 +381,7 @@ def _get_x0_and_bnds_for_carnot_hp_opt(
         dt_range_max=args.dt_range_max,
     )
     x0 = x0_cond + x0_evap
-    bnds = [(0.0, 1.0) for _ in range(args.n_cond+args.n_evap-2)]
+    bnds = [(0.0, 1.0) for _ in range(args.n_cond+args.n_evap-1)]
     return x0, bnds
 
 
@@ -392,23 +393,27 @@ def _initialise_carnot_hp_optimisation(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     dt_range_max: float,
+    Q_hp_target: float = None,
 ) -> list:
     """Build initial guesses based on a simple area maximisation problem, i.e., sum(Q x delta T).
     """
+    n_stages = n if is_condenser else n-1
     args = {
         "is_condenser": is_condenser,
         "map_fun": map_fun,
         "T0": T0,
         "T_vals": T_vals,
         "H_vals": H_vals,
-        "dt_range_max": dt_range_max
+        "dt_range_max": dt_range_max,
+        "Q_hp_target": Q_hp_target,
     }
     opt = differential_evolution(
         func=lambda x: _compute_entropy_generation_reduction_at_constant_T(x, args),
-        x0=np.zeros(n-1),
-        bounds=[(0.0, 1.0) for _ in range(n-1)],  
-        init='sobol'
-    )
+        x0=np.zeros(n_stages),
+        bounds=[(0.0, 1.0) for _ in range(n_stages)],  
+        init='sobol',
+        vectorized=False,
+    )    
     return opt.x.tolist()
 
 
@@ -421,7 +426,8 @@ def _compute_entropy_generation_reduction_at_constant_T(
     T = args["map_fun"](x, args["T0"], args["dt_range_max"])
     Q = _get_Q_vals_from_T_hp_vals(T, args["T_vals"], args["H_vals"], args["is_condenser"])
     if args["is_condenser"]:
-        S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() 
+        W = args["Q_hp_target"] - Q.sum()
+        S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() + W / (T.max() + 273.15)
     else: 
         S_red = (Q * (args["T0"] - T) / ((T + 273.15) * (args["T0"] + 273.15))).sum()
     return S_red # is negative, meaning a reduction in entropy generation
@@ -430,7 +436,7 @@ def _compute_entropy_generation_reduction_at_constant_T(
 def _compute_carnot_hp_opt_obj(
     x: np.ndarray, 
     args: HeatPumpTargetInputs
-) -> float:
+) -> HeatPumpTargetOutputs:
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """
     x_cond, x_evap = _parse_carnot_hp_state_variables(x, args.n_cond)
@@ -441,13 +447,28 @@ def _compute_carnot_hp_opt_obj(
         fun=lambda T: _get_optimal_min_evap_T(T, [args, T_cond, Q_cond, x_evap])["obj"],
         bracket=(args.T_hot[-1], args.T_hot[0]),
         method="brent",
+        tol=1e-6,
     )
-    res = _get_optimal_min_evap_T(opt.x, [args, T_cond, Q_cond, x_evap])
-    if 0:
-        res0 = HeatPumpTargetOutputs.model_validate(res)
-        res0.cond_streams = _build_latent_streams(res0.T_cond, 0.1, res0.Q_cond, args.dtcont_hp, is_hot=True)
-        res0.evap_streams = _build_latent_streams(res0.T_evap, 0.1, res0.Q_evap, args.dtcont_hp, is_hot=False)         
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.hp_hot_streams, res.hp_cold_streams, str(f"Work ({x}): {res0.work} = {res0.work_hp} + {res0.work_el}"))
+    res = HeatPumpTargetOutputs.model_validate(
+        _get_optimal_min_evap_T(opt.x, [args, T_cond, Q_cond, x_evap])
+    )
+    Q_cond_max = res.Q_cond.sum()    
+    Q_evap_max = res.Q_evap.sum()
+    if Q_evap_max > Q_cond_max * (1 - 1 / res.cop):
+        Q_cond_tot = Q_cond_max
+        work_hp = Q_cond_tot / res.cop
+        Q_evap_tot = Q_cond_tot - work_hp
+        res.Q_evap = res.Q_evap * (Q_evap_tot / Q_evap_max)
+    else: # Evaporator limits the heat pump
+        Q_evap_tot = Q_evap_max
+        work_hp = Q_evap_tot / (res.cop - 1)
+        Q_cond_tot = Q_evap_tot + work_hp
+        res.Q_cond = res.Q_cond * (Q_cond_tot / Q_cond_max)
+
+    if 1:
+        res.cond_streams = _build_latent_streams(res.T_cond, args.dt_phase_change, res.Q_cond, args.dtcont_hp, is_hot=True)
+        res.evap_streams = _build_latent_streams(res.T_evap, args.dt_phase_change, res.Q_evap, args.dtcont_hp, is_hot=False)         
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.cond_streams, res.evap_streams, str(f"Work: {res.work} = {res.work_hp} + {res.work_el}"))
     return res
 
 
@@ -459,18 +480,20 @@ def _get_optimal_min_evap_T(
     args, T_cond, Q_cond, x_evap = input_args
     T_evap = _map_x_to_T_evap(x_evap, T_lo, args.dt_range_max)
     Q_evap = _get_Q_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
-    Q_evap_max = np.abs(Q_evap.sum())
     cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
 
-    if Q_evap_max / (cop - 1) > args.Q_hp_target / cop:
-        work_hp = args.Q_hp_target / cop
-        Q_evap_tot = args.Q_hp_target - work_hp
-        work_el = 0.0
-        Q_evap = Q_evap * (Q_evap_tot / Q_evap_max)
+    Q_evap_max = Q_evap.sum()
+    Q_cond_max = Q_cond.sum()
+    if Q_evap_max > Q_cond_max * (1 - 1 / cop):
+        Q_cond_tot = Q_cond_max
+        work_hp = Q_cond_tot / cop
+        Q_evap_tot = Q_cond_tot - work_hp
     else: # Evaporator limits the heat pump
-        work_hp = Q_evap_max / (cop - 1)
         Q_evap_tot = Q_evap_max
-        work_el = args.Q_hp_target - Q_evap_tot - work_hp # Direct electric heating
+        work_hp = Q_evap_tot / (cop - 1)
+        Q_cond_tot = Q_evap_tot + work_hp
+    
+    work_el = max(args.Q_hp_target - Q_cond_tot, 0.0) # Direct electric heating
 
     return {
         "obj": (work_hp + work_el) / args.Q_hp_target, 
@@ -493,8 +516,8 @@ def _parse_carnot_hp_state_variables(
     """Compile the full list of condenser and evaporator temperature levels.
     """
     x = np.asarray(x, dtype=float).reshape(-1)
-    n_cond_vars = max(int(n_cond) - 1, 0)
-    x_cond = np.concatenate((np.array([0.0]), x[:n_cond_vars]))
+    n_cond_vars = int(n_cond)
+    x_cond = x[:n_cond_vars]
     x_evap = np.concatenate((x[n_cond_vars:], np.array([0.0])))
     return x_cond, x_evap
 
@@ -535,7 +558,7 @@ def _compute_COP_estimate_from_carnot_limit(
     Q_cond: np.ndarray, 
     T_evap: np.ndarray,
     Q_evap: np.ndarray,  
-    eff: float = 0.6, 
+    eff: float = 0.5, 
     min_dt_lift: float = 3.0,          
 ):  
     """Estimate COP by scaling the Carnot limit using entropic mean temperatures.
@@ -581,9 +604,10 @@ def _optimise_multi_simulated_heat_pump_placement(
         fun=lambda x: _compute_simulated_heat_pump_system_performance(x, args)["obj"],
         x0=x0,
         constraints=constraints,
-        method="SLSQP",
+        method="SLSQP", # SLSQP. COBYQA
         bounds=bnds,
-        options={'disp': False, 'maxiter': 1000}
+        options={'disp': False, 'maxiter': 1000},
+        tol=1e-6,
     )
 
     if opt.success:
@@ -891,7 +915,7 @@ def _map_x_to_T_cond(
 ) -> np.ndarray:
     """Recover condenser temperatures from normalized x values."""
     temp = []
-    for i in range(x.size):
+    for i in range(x.shape[0]):
         temp.append(T_hi - x[i] * deltaT_range)
         T_hi = temp[-1]
     return np.array(temp).flatten()
