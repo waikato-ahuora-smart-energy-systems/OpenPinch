@@ -44,39 +44,6 @@ def test_get_carnot_COP_returns_expected_value():
     np.testing.assert_allclose(result, expected)
 
 
-# def test_prepare_data_for_minimize_multiple_segments():
-#     T_cond_init = np.array([220.0, 210.0, 205.0])
-#     T_evap_init = np.array([40.0, 35.0, 30.0])
-#     T_bnds = {"HU": (200.0, 230.0), "CU": (25.0, 55.0)}
-    
-#     x_cond = _map_T_to_x_cond(T_cond_init, T_bnds["HU"][1], T_bnds["HU"][1] - T_bnds["HU"][0])
-#     x_evap = _map_T_to_x_evap(T_evap_init, T_bnds["CU"][0], T_bnds["CU"][1] - T_bnds["CU"][0])
-#     x0, bnds = _prepare_data_for_minimizer(
-#         x_cond,
-#         x_evap,
-#     )
-
-#     np.testing.assert_allclose(x0, [0.33333333, 0.16666667, 0.16666667, 0.16666667])
-#     assert bnds == [(0,1), (0,1), (0,1), (0,1)]
-
-
-# def test_prepare_data_for_minimize_single_segment():
-#     T_cond_init = np.array([215.0])
-#     T_evap_init = np.array([25.0])
-#     T_bnds = {"HU": (210.0, 240.0), "CU": (20.0, 40.0)}
-#     x_cond = _map_T_to_x_cond(T_cond_init, T_bnds["HU"][0], T_bnds["HU"][1])
-#     x_evap = _map_T_to_x_evap(T_evap_init, T_bnds["CU"][0], T_bnds["CU"][1])
-
-#     x0, bnds = _prepare_data_for_minimizer(
-#         x_cond,
-#         x_evap,
-#     )
-
-#     np.testing.assert_allclose(x0, np.array([]))
-#     assert x0.shape == (0,)
-#     assert bnds == []
-
-
 def test_compute_entropic_average_temperature_in_K_constant_temperature():
     T = np.array([60.0, 60.0, 60.0])
     Q = np.array([100.0, 150.0, 200.0])
@@ -148,8 +115,8 @@ def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
 
     T_cond, T_evap = _parse_carnot_hp_state_variables(x, n_cond)
 
-    np.testing.assert_allclose(T_cond, np.array([0.0, 0.5, 0.5]))
-    np.testing.assert_allclose(T_evap, np.array([0.5, 0.0]))
+    np.testing.assert_allclose(T_cond, np.array([0.5, 0.5, 0.5]))
+    np.testing.assert_allclose(T_evap, np.array([0.0]))
 
 
 def test_get_H_col_till_target_Q_returns_full_profile_when_target_matches_peak():

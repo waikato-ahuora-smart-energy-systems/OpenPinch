@@ -2,6 +2,7 @@
 
 import itertools
 from scipy.optimize import (
+    differential_evolution,
     minimize, 
     NonlinearConstraint,
     minimize_scalar
@@ -68,7 +69,7 @@ def get_heat_pump_targets(
         zone_config=zone_config,
     )
     carnot_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
-    if zone_config.DO_HP_SIM:
+    if zone_config.DO_HP_SIM or 1:
         args.is_multi_temperature_hp = False
         n_hp = max(args.n_cond, args.n_evap)
         args.n_cond, args.n_evap = n_hp, n_hp
@@ -410,7 +411,15 @@ def _initialise_carnot_hp_optimisation(
     for i, f in enumerate(local_minima_fun):
         if f > 0 and i != 0:
             break
-    return local_minima_x[:i]
+    local_minima_x = local_minima_x[:i]
+    if len(local_minima_x) == 0: 
+        res = differential_evolution(
+            func=lambda x: _compute_entropy_generation_reduction_at_constant_T(x, args),
+            bounds=[(0.0, 1.0) for _ in range(n_stages)], 
+        )
+        local_minima_x = [res.x]
+        
+    return local_minima_x
 
 
 def _compute_entropy_generation_reduction_at_constant_T(
