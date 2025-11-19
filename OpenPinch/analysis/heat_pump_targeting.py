@@ -92,7 +92,7 @@ def get_heat_pump_targets(
         dT_phase_change=zone_config.DT_PHASE_CHANGE,
         Q_ls=np.array([res.Q_amb]),
         dt_cont=zone_config.DT_ENV_CONT,
-        is_hot=True if res.Q_amb > 0 else False,
+        is_hot=True if res.Q_amb >= -tol else False,
         is_process_stream=True,
         prefix="AIR",
     )
@@ -552,7 +552,7 @@ def _get_optimal_min_evap_T(
         "T_evap": T_evap, 
         "Q_evap": Q_evap, 
         "cop": cop,
-        "Q_amb": Q_evap.sum() - (np.abs(args.H_hot).max() - args.Q_amb_max),
+        "Q_amb": max(Q_evap.sum() - (np.abs(args.H_hot).max() - args.Q_amb_max), args.Q_amb_max),
     }
 
 

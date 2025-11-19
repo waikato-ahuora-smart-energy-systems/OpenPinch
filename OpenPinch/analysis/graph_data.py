@@ -186,8 +186,8 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.GCC_HP.value,
                 data=t.graphs[GT.GCC_HP.value],
                 label="Grand Composite Curve with Heat Pump",
-                value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_HP_PRO.value],
-                is_utility_profile=[False, False, True],
+                value_field=[PT.H_NET_W_AIR.value, PT.H_NET_HP_PRO.value],
+                is_utility_profile=[False, True],
             )
         )
 

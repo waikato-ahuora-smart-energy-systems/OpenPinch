@@ -72,11 +72,7 @@ def get_utility_heat_cascade(
     is_shifted: bool = True,
 ) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
-    pt_ut = ProblemTable(
-        {
-            PT.T.value: T_int_vals
-        }
-    )
+    pt_ut = ProblemTable({PT.T.value: T_int_vals})
     _problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
 
     h_net_values = pt_ut.col[PT.H_NET.value]
