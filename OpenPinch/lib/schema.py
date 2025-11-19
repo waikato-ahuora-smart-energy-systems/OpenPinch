@@ -57,10 +57,12 @@ class HeatPumpTargetInputs(BaseModel):
     dt_phase_change: float
     y_cond_min: float
     dt_range_max: float
+    price_ratio: float
     is_process_integrated: bool
     is_heat_pumping: bool
     is_multi_temperature_hp: bool
-
+    max_multi_start: int
+    
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None 
     refrigerant: Optional[str] = None
@@ -76,9 +78,9 @@ class HeatPumpTargetOutputs(BaseModel):
     T_evap: np.ndarray
     Q_cond: np.ndarray
     Q_evap: np.ndarray
-    work: float
+    utility_tot: float
     work_hp: float
-    work_el: float
+    Q_ext: float
     cop: float
     obj: float
     cond_streams: Optional[StreamCollection] = None

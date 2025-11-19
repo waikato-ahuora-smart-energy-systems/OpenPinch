@@ -18,6 +18,7 @@
             "module": "pytest",
             "cwd": "${workspaceFolder}/tests/", 
             "args": [
+              "-s",
               "test_analysis/test_heat_pump_targeting.py",
             //   "test_utils/test_miscellaneous.py",
             ],

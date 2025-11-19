@@ -1,10 +1,9 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
+import itertools
 from scipy.optimize import (
     minimize, 
     NonlinearConstraint,
-    differential_evolution,
-    shgo, 
     minimize_scalar
 )
 
@@ -33,11 +32,7 @@ def get_heat_pump_targets(
     zone_config: Configuration,
     is_T_vals_shifted: bool,
     is_process_integrated: bool,
-    is_heat_pumping: bool,
-    n_cond: int = 2,
-    n_evap: int = 2,
-    eta_comp: float = 0.7,
-    dtmin_hp: float = 0.0,    
+    is_heat_pumping: bool,  
 ):
     """Optimise multi-stage heat-pump placement for the supplied problem table.
 
@@ -68,23 +63,14 @@ def get_heat_pump_targets(
         T_vals=T_vals,
         H_hot=H_hot,
         H_cold=H_cold,
-        n_cond=n_cond,
-        n_evap=n_evap,
-        eta_comp=eta_comp,
-        dtmin_hp=dtmin_hp,
-        y_cond_min= zone_config.Y_COND_MIN,
         is_process_integrated=is_process_integrated,
-        load_fraction=zone_config.HP_LOAD_FRACTION,
-        T_env=zone_config.T_ENV,
-        dT_env_cont=zone_config.DT_ENV_CONT ,
-        dt_phase_change=zone_config.DT_PHASE_CHANGE,
-        is_heat_pumping=is_heat_pumping,
-        refrigerant=zone_config.REFRIGERANTS,
+        is_heat_pumping=is_heat_pumping,        
+        zone_config=zone_config,
     )
     carnot_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
     if zone_config.DO_HP_SIM:
         args.is_multi_temperature_hp = False
-        n_hp = max(n_cond, n_evap)
+        n_hp = max(args.n_cond, args.n_evap)
         args.n_cond, args.n_evap = n_hp, n_hp
         res = _optimise_multi_simulated_heat_pump_placement(args, carnot_res)
     else:
@@ -170,23 +156,15 @@ def _prepare_heat_pump_target_inputs(
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
-    n_cond: int = 1,
-    n_evap: int = 1,
-    eta_comp: float = 0.7,
-    dtmin_hp: float = 0.0,
-    y_cond_min: float = 0.05,
     is_process_integrated: bool = True,
     load_fraction: float = 1,
-    refrigerant: list = [],
-    T_env: float = 15,
-    dT_env_cont: float = 5,
-    dt_phase_change: float = 0.01,
-    is_heat_pumping: bool = True,  
+    is_heat_pumping: bool = True,
+    zone_config: Configuration = Configuration(),
 ):
     """Format temperature/enthalpy inputs and options for heat pump targeting.
     """
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
-    T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, dtmin_hp, is_process_integrated)   
+    T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, zone_config.DTMIN_HP, is_process_integrated)   
     Q_hp_target = min(load_fraction, 1.0) * np.abs(H_cold).max()
     T_cold, H_cold = _get_H_col_till_target_Q(Q_hp_target, T_cold, H_cold)
     T_hot, H_hot, T_cold, H_cold, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(
@@ -195,9 +173,9 @@ def _prepare_heat_pump_target_inputs(
         T_cold=T_cold, 
         H_cold=H_cold, 
         dtcont=dtcont_hp, 
-        T_env=T_env, 
-        dT_env_cont=dT_env_cont, 
-        dt_phase_change=dt_phase_change, 
+        T_env=zone_config.T_ENV, 
+        dT_env_cont=zone_config.DT_ENV_CONT, 
+        dt_phase_change=zone_config.DT_PHASE_CHANGE, 
         is_heat_pumping=is_heat_pumping,
     )
     T_hot, H_hot = clean_composite_curve(T_hot, H_hot)
@@ -210,17 +188,22 @@ def _prepare_heat_pump_target_inputs(
         H_hot=H_hot,
         T_cold=T_cold,
         H_cold=H_cold,
-        n_cond=int(n_cond),
-        n_evap=int(n_evap),
-        eta_comp=float(eta_comp),
-        dtcont_hp=dtcont_hp,
-        dt_phase_change=dt_phase_change,
         dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
         is_process_integrated=bool(is_process_integrated),
         is_heat_pumping=bool(is_heat_pumping),
         is_multi_temperature_hp=True,
-        refrigerant=refrigerant[0],
-        y_cond_min=y_cond_min,
+        n_cond=zone_config.N_COND,
+        n_evap=zone_config.N_EVAP,
+        eta_comp=zone_config.ETA_COMP,
+        dtcont_hp=zone_config.DTMIN_HP,
+        y_cond_min= zone_config.Y_COND_MIN,
+        load_fraction=zone_config.HP_LOAD_FRACTION,
+        T_env=zone_config.T_ENV,
+        dT_env_cont=zone_config.DT_ENV_CONT ,
+        dt_phase_change=zone_config.DT_PHASE_CHANGE,
+        refrigerant=zone_config.REFRIGERANTS[0],
+        price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL,
+        max_multi_start=zone_config.MAX_HP_MULTISTART,
     )
 
 
@@ -340,13 +323,23 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
     """
-    x0, bnds = _get_x0_and_bnds_for_carnot_hp_opt(args)
-    opt = minimize(
-        fun=lambda x: _compute_carnot_hp_opt_obj(x, args).obj,
-        x0=x0,
-        bounds=bnds,
-        method="SLSQP",            
-    )
+    x0_ls, bnds = _get_x0_and_bnds_for_carnot_hp_opt(args)
+    def _mapped_fun(x0):
+        return minimize(
+            fun=lambda x: _compute_carnot_hp_opt_obj(x, args).obj,
+            x0=x0,
+            bounds=bnds,
+            method="SLSQP",            
+        )
+    minima = list(map(
+        _mapped_fun,
+        x0_ls
+    ))
+    opt = minima[0]
+    for m in minima:
+        if opt["fun"] > m["fun"]:
+            opt = m
+
     res = _compute_carnot_hp_opt_obj(opt.x, args)
     res.cond_streams = _build_latent_streams(res.T_cond, 0.01, res.Q_cond, args.dtcont_hp, is_hot=True)
     res.evap_streams = _build_latent_streams(res.T_evap, 0.01, res.Q_evap, args.dtcont_hp, is_hot=False)
@@ -358,7 +351,7 @@ def _get_x0_and_bnds_for_carnot_hp_opt(
 ) -> Tuple[np.ndarray, list]:
     """Return the initial x vector and bounds for the Carnot HP optimizer.
     """
-    x0_cond = _initialise_carnot_hp_optimisation(
+    x0_cond_ls = _initialise_carnot_hp_optimisation(
         n=args.n_cond,
         is_condenser=True,
         T0=args.T_cold[0],
@@ -368,21 +361,22 @@ def _get_x0_and_bnds_for_carnot_hp_opt(
         dt_range_max=args.dt_range_max,
         Q_hp_target=args.Q_hp_target,
     )
-    x0 = np.array(x0_cond + np.zeros(args.n_evap-1).tolist())
+    x0 = np.array(x0_cond_ls[0] + np.zeros(args.n_evap-1).tolist())
     res = _compute_carnot_hp_opt_obj(x0, args)
-    T0 = res.T_evap[-1]
-    x0_evap = _initialise_carnot_hp_optimisation(
+    x0_evap_ls = _initialise_carnot_hp_optimisation(
         n=args.n_evap,
         is_condenser=False,
-        T0=T0,
+        T0=res.T_evap[-1],
         map_fun=_map_x_to_T_evap,
         T_vals=args.T_hot,
         H_vals=args.H_hot,
         dt_range_max=args.dt_range_max,
+        price_ratio=args.price_ratio,
     )
-    x0 = x0_cond + x0_evap
+    x0_ls = list(itertools.product(x0_cond_ls, x0_evap_ls))
+    x0_ls = [np.concatenate(x0) for x0 in x0_ls]
     bnds = [(0.0, 1.0) for _ in range(args.n_cond+args.n_evap-1)]
-    return x0, bnds
+    return x0_ls, bnds
 
 
 def _initialise_carnot_hp_optimisation(
@@ -394,6 +388,7 @@ def _initialise_carnot_hp_optimisation(
     H_vals: np.ndarray,
     dt_range_max: float,
     Q_hp_target: float = None,
+    price_ratio: float = 1,
 ) -> list:
     """Build initial guesses based on a simple area maximisation problem, i.e., sum(Q x delta T).
     """
@@ -406,15 +401,16 @@ def _initialise_carnot_hp_optimisation(
         "H_vals": H_vals,
         "dt_range_max": dt_range_max,
         "Q_hp_target": Q_hp_target,
+        "price_ratio": price_ratio,
     }
-    opt = differential_evolution(
+    local_minima_fun, local_minima_x = dual_annealing_multiminima(
         func=lambda x: _compute_entropy_generation_reduction_at_constant_T(x, args),
-        x0=np.zeros(n_stages),
-        bounds=[(0.0, 1.0) for _ in range(n_stages)],  
-        init='sobol',
-        vectorized=False,
-    )    
-    return opt.x.tolist()
+        bounds=[(0.0, 1.0) for _ in range(n_stages)], 
+    )
+    for i, f in enumerate(local_minima_fun):
+        if f > 0 and i != 0:
+            break
+    return local_minima_x[:i]
 
 
 def _compute_entropy_generation_reduction_at_constant_T(
@@ -427,7 +423,7 @@ def _compute_entropy_generation_reduction_at_constant_T(
     Q = _get_Q_vals_from_T_hp_vals(T, args["T_vals"], args["H_vals"], args["is_condenser"])
     if args["is_condenser"]:
         W = args["Q_hp_target"] - Q.sum()
-        S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() + W / (T.max() + 273.15)
+        S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() + W / (T.max() + 273.15) / args["price_ratio"]
     else: 
         S_red = (Q * (args["T0"] - T) / ((T + 273.15) * (args["T0"] + 273.15))).sum()
     return S_red # is negative, meaning a reduction in entropy generation
@@ -465,10 +461,10 @@ def _compute_carnot_hp_opt_obj(
         Q_cond_tot = Q_evap_tot + work_hp
         res.Q_cond = res.Q_cond * (Q_cond_tot / Q_cond_max)
 
-    if 1:
+    if 0:
         res.cond_streams = _build_latent_streams(res.T_cond, args.dt_phase_change, res.Q_cond, args.dtcont_hp, is_hot=True)
         res.evap_streams = _build_latent_streams(res.T_evap, args.dt_phase_change, res.Q_evap, args.dtcont_hp, is_hot=False)         
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.cond_streams, res.evap_streams, str(f"Work: {res.work} = {res.work_hp} + {res.work_el}"))
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.cond_streams, res.evap_streams, str(f"Obj: {res.obj} = {res.work_hp} + {res.Q_ext}"))
     return res
 
 
@@ -493,13 +489,13 @@ def _get_optimal_min_evap_T(
         work_hp = Q_evap_tot / (cop - 1)
         Q_cond_tot = Q_evap_tot + work_hp
     
-    work_el = max(args.Q_hp_target - Q_cond_tot, 0.0) # Direct electric heating
+    Q_ext = max(args.Q_hp_target - Q_cond_tot, 0.0) # Direct electric heating
 
     return {
-        "obj": (work_hp + work_el) / args.Q_hp_target, 
-        "work": work_hp + work_el, 
+        "obj": (work_hp + Q_ext / args.price_ratio) / args.Q_hp_target, 
+        "utility_tot": work_hp + Q_ext, 
         "work_hp": work_hp,  
-        "work_el": work_el,
+        "Q_ext": Q_ext,
         "T_cond": T_cond,
         "Q_cond": Q_cond,            
         "T_evap": T_evap, 

@@ -20,13 +20,22 @@ LOG_TIMING = False
 
 
 class Configuration:
-    """Runtime configuration flags mirroring options from the legacy Excel workbook."""
-
+    """Runtime configuration."""
+    
+    ### General parameters ###
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
+    DT_CONT: float = 5
+    DT_PHASE_CHANGE: float = 0.1
+    HTC: float = 1.0
+    T_ENV: float = 15
+    DT_ENV_CONT: float = 10 
+    P_ENV: float = 101
+    DECIMAL_PLACES: int = 2
 
+    ### Targeting analysis flags ### 
     DO_DIRECT_OPERATION_TARGETING: bool = False
-    # DO_DIRECT_SITE_TARGETING: bool = True
+    DO_DIRECT_SITE_TARGETING: bool = True
     DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
@@ -38,21 +47,19 @@ class Configuration:
     DO_ASSITED_HT: bool = False
     DO_TURBINE_WORK: bool = False
 
-    DT_CONT: float = 5
-    DT_PHASE_CHANGE: float = 0.1
-    HTC: float = 1.0
-    T_ENV: float = 15
-    DT_ENV_CONT: float = 10 
-    P_ENV: float = 101
-    DECIMAL_PLACES: int = 2
-
+    ### Heat pump targeting parameters ###
     HP_LOAD_FRACTION: float = 1.0
     DO_HP_SIM: bool = False
     REFRIGERANTS: List[str] = ["Ammonia"]
     Y_COND_MIN: float = 0.05 # Minimum load on a heat pump condenser, enforced for simulated heat pump
     PRICE_RATIO_ELE_TO_FUEL: float = 1.0
+    MAX_HP_MULTISTART: int = 10
+    N_COND: int = 2
+    N_EVAP: int = 2
+    ETA_COMP: float = 0.7
+    DTMIN_HP: float = 0.0  
 
-
+    ### Cost targeting parameters ### 
     UTILITY_PRICE: float = 40
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0
