@@ -51,7 +51,7 @@ class Configuration:
     MULTI_TEMPERATURE_HP: bool = True
     HP_LOAD_FRACTION: float = 1.0
     DO_HP_SIM: bool = False
-    REFRIGERANTS: List[str] = ["Ammonia"]
+    REFRIGERANTS: List[str] = ["propane", "butane", "water"]
     Y_COND_MIN: float = 0.05 # Minimum load on a heat pump condenser, enforced for simulated heat pump
     PRICE_RATIO_ELE_TO_FUEL: float = 1.0
     MAX_HP_MULTISTART: int = 10

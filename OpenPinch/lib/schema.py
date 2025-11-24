@@ -64,7 +64,7 @@ class HeatPumpTargetInputs(BaseModel):
 
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None 
-    refrigerant: Optional[str] = None
+    refrigerant_ls: Optional[List[str]] = []
     unit_system: Optional[str] = "EUR"
     net_hot_streams: Optional[StreamCollection] = StreamCollection()
     net_cold_streams: Optional[StreamCollection] = StreamCollection()

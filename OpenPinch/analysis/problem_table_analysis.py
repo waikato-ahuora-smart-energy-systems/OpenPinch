@@ -25,12 +25,15 @@ __all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_probl
 def get_process_heat_cascade(
     hot_streams: StreamCollection = StreamCollection(),
     cold_streams: StreamCollection = StreamCollection(),
-    all_streams: StreamCollection = StreamCollection(),
+    all_streams: StreamCollection = None,
     zone_config: Configuration = None,
     include_real_pt: bool = True,
 ) -> Tuple[ProblemTable, ProblemTable, dict]:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
+    if all_streams is None:
+        all_streams = hot_streams + cold_streams
+    
     pt = create_problem_table_with_t_int(
         all_streams,
         True,

@@ -13,4 +13,4 @@ from .energy_target import EnergyTarget
 from .value import Value
 from .zone import Zone
 from .pinch_problem import PinchProblem
-from .simple_heat_pump import HeatPumpCycle
+from .simple_heat_pump import SimpleHeatPumpCycle
