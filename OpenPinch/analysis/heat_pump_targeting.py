@@ -1050,9 +1050,8 @@ def _create_multi_simple_hp_list(
     return hp_list
 
 
-
 #######################################################################################################
-# Helper functions: Optimise sinlge Brayton heat pump placement - TODO
+# Helper functions: Optimise single Brayton heat pump placement - TODO
 #######################################################################################################
 
 
@@ -1093,7 +1092,7 @@ def _prepare_brayton_hp_data_for_minimizer(
     """Build initial guesses and bounds for the condenser/evaporator temperature.
     """
     bnds = [
-        (-0.2, 1.0), # T_comp_out = T_cold_max - x[0] * dT_range_max
+        (-0.2, 1.0), # T_comp_out = T_cold_max + x[0] * dT_range_max
         (0.01, 1.5), # dT_comp = x[1] * dT_range_max
         (0.01, 1.5), # dT_gc = x[2] * dT_range_max
         (0.01, 1.0), # Q_h_total = x[3] * Q_hp_target
@@ -1113,7 +1112,7 @@ def _parse_brayton_hp_state_temperatures(
 ) -> Tuple[np.ndarray]:
     """Extract HP variables from optimization vector x.
     """
-    T_comp_out = args.T_cold[0] - x[0] * args.dt_range_max
+    T_comp_out = args.T_cold[0] + x[0] * args.dt_range_max
     dT_comp = x[1] * args.dt_range_max
     dT_gc = x[2] * args.dt_range_max
     Q_h_total = x[3] * args.Q_hp_target
