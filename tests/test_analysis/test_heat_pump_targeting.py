@@ -7,14 +7,14 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _compute_entropic_average_temperature_in_K,
     _compute_COP_estimate_from_carnot_limit,
     _get_Q_vals_from_T_hp_vals,
-    _parse_carnot_hp_state_variables,
+    _parse_multi_simple_carnot_hp_state_variables,
     _get_H_col_till_target_Q,
     _prepare_latent_hp_profile,
     _map_T_to_x_cond,
     _map_T_to_x_evap,
     _map_x_to_T_cond,
     _map_x_to_T_evap,
-    _validate_refrigerant_ls,
+    _validate_vapour_hp_refrigerant_ls,
 )
 
 
@@ -113,7 +113,7 @@ def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
     x = np.array([0.5, 0.5, 0.5])
     n_cond = 3
 
-    T_cond, T_evap = _parse_carnot_hp_state_variables(x, n_cond)
+    T_cond, T_evap = _parse_multi_simple_carnot_hp_state_variables(x, n_cond)
 
     np.testing.assert_allclose(T_cond, np.array([0.5, 0.5, 0.5]))
     np.testing.assert_allclose(T_evap, np.array([0.0]))
@@ -216,30 +216,30 @@ def test_prepare_latent_hp_profile_handles_empty_input():
     assert len(Q_out) == 0
 
 
-def test_validate_refrigerant_ls_defaults_to_water_and_matches_length():
+def test_validate_vapour_hp_refrigerant_ls_defaults_to_water_and_matches_length():
     args = SimpleNamespace(n_cond=3, refrigerant_ls=[])
 
-    refrigerants = _validate_refrigerant_ls(args)
+    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
 
     assert len(refrigerants) == args.n_cond
     assert refrigerants == ["water", "water", "water"]
     assert all(isinstance(ref, str) for ref in refrigerants)
 
 
-def test_validate_refrigerant_ls_preserves_length_when_provided():
+def test_validate_vapour_hp_refrigerant_ls_preserves_length_when_provided():
     args = SimpleNamespace(n_cond=2, refrigerant_ls=["Water", "Ammonia"])
 
-    refrigerants = _validate_refrigerant_ls(args)
+    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
 
     assert len(refrigerants) == args.n_cond
     assert refrigerants[0] == "Water"
     assert all(isinstance(ref, str) for ref in refrigerants)
 
 
-def test_validate_refrigerant_ls_extends_to_match_n_cond():
+def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
     args = SimpleNamespace(n_cond=4, refrigerant_ls=["Ammonia", "Water"])
 
-    refrigerants = _validate_refrigerant_ls(args)
+    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
 
     assert len(refrigerants) == args.n_cond
     assert refrigerants[:2] == ["Water", "Ammonia"]

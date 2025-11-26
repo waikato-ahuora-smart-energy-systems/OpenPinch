@@ -78,8 +78,8 @@ def compute_direct_integration_targets(zone: Zone):
                     H_hot=pt.col[PT.H_NET_HOT.value],
                     T_cold=pt.col[PT.T.value],                    
                     H_cold=pt.col[PT.H_NET_COLD.value],
-                    hp_hot_streams=hp_res.cond_streams,
-                    hp_cold_streams=hp_res.evap_streams,
+                    hp_hot_streams=hp_res.hp_hot_streams,
+                    hp_cold_streams=hp_res.hp_cold_streams,
                 )
                 plot_multi_hp_profiles_from_results(
                     T_hot=pt.col[PT.T.value],

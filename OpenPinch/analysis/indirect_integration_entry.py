@@ -4,11 +4,14 @@ from typing import Tuple
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from ..analysis import (
+from . import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
     get_utility_targets,
     get_additional_GCCs,
+    get_heat_pump_targets,
+    calc_heat_pump_cascade,
+    plot_multi_hp_profiles_from_results
 )
 
 __all__ = ["compute_indirect_integration_targets"]
@@ -23,6 +26,8 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     """Targets indirect heat integration, such as for Total Site, 
     after computing direct heat integration in subzones.
     """
+    zone_config: Configuration = zone.config
+    res: dict = {}
 
     # Sum targets from subzones 
     _sum_subzone_targets(zone)
@@ -84,6 +89,43 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
+    if zone.identifier in [Z.S.value]:
+        T_vals=pt.col[PT.T.value]
+        H_hot=pt.col[PT.H_HOT_UT.value]
+        H_cold=pt.col[PT.H_COLD_UT.value]
+        if _validate_heat_pump_targeting_required(pt, True, zone_config):
+            hp_res = get_heat_pump_targets(
+                T_vals=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_HOT_UT.value],
+                H_cold=pt.col[PT.H_COLD_UT.value],
+                zone_config=zone_config, 
+                is_direct_integration=False,
+                is_heat_pumping=True,
+            )
+            res.update(
+                hp_res
+            )
+            calc_heat_pump_cascade(
+                pt=pt,
+                res=hp_res,
+                is_T_vals_shifted=True,
+                is_direct_integration=True,
+            )
+            if 0:
+                plot_multi_hp_profiles_from_results(
+                    T_hot=pt.col[PT.T.value],
+                    H_hot=pt.col[PT.H_NET_HOT.value],
+                    T_cold=pt.col[PT.T.value],                    
+                    H_cold=pt.col[PT.H_NET_COLD.value],
+                    hp_hot_streams=hp_res.hp_hot_streams,
+                    hp_cold_streams=hp_res.hp_cold_streams,
+                )
+                plot_multi_hp_profiles_from_results(
+                    T_hot=pt.col[PT.T.value],
+                    H_hot=pt.col[PT.H_NET_W_AIR.value],
+                )
+                pass
+
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
     #     if zone_config.ABOVE_PINCH_CHECKBOX:
@@ -99,8 +141,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         heat_recovery_target,
         s_tzt.heat_recovery_limit,
     )
-    zone.add_target_from_results(
-        TargetType.TS.value,
+    res.update(
         {
             "pt": pt,
             "pt_real": pt_real,
@@ -111,8 +152,9 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
             "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
-        },
+        }            
     )
+    zone.add_target_from_results(TargetType.TS.value, res)
     return zone
 
 
@@ -259,3 +301,19 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         ],
         GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value]],
     }
+
+
+def _validate_heat_pump_targeting_required(
+    pt: ProblemTable,
+    is_heat_pumping: bool,
+    zone_config: Configuration,
+) -> bool:
+    return False if (
+        (zone_config.DO_UTILITY_HP_TARGETING == False)
+        or 
+        (pt.col[PT.H_NET_UT.value][0] < tol and is_heat_pumping == True)
+        or
+        (pt.col[PT.H_NET_UT.value][-1] < tol and is_heat_pumping == False)
+        or 
+        (zone_config.HP_LOAD_FRACTION < tol)
+    ) else True

@@ -53,6 +53,13 @@ class HeatPump(Enum):
     IHX = "Internal Heat Exchanger"
 
 
+class HeatPumpType(str, Enum):
+    MultiTempCarnot = "Multi-temperature Carnot"
+    Brayton = "Brayton"
+    CascadeVapourComp = "Cascade vapour compression"
+    MultiSimpleVapourComp = "Multiple simple vapour compression"
+
+
 class HeatFlowUnits(Enum):
     """Heat flow units"""
 

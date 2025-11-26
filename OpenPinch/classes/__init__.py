@@ -14,3 +14,4 @@ from .value import Value
 from .zone import Zone
 from .pinch_problem import PinchProblem
 from .simple_heat_pump import SimpleHeatPumpCycle
+from .brayton_heat_pump import SimpleBraytonHeatPumpCycle

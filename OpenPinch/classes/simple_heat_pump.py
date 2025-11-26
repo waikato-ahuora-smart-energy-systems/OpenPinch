@@ -114,7 +114,11 @@ class SimpleHeatPumpCycle:
     @property
     def Q_evap(self) -> Optional[float]:
         return self._Q_evap
-        
+
+    @property
+    def Q_cond(self) -> Optional[float]:
+        return self._Q_cond
+            
     @property
     def w_net(self) -> Optional[float]:
         return self._w_net
@@ -287,9 +291,6 @@ class SimpleHeatPumpCycle:
         if p0 > p2:
             raise ValueError('Evaporator pressure must be below condenser pressure.')   
 
-        # dT_sh = max(dT_sh, 0.00001)
-        # dT_sc = max(dT_sc, 0.00001)
-
         T0 = Te + dT_sh
         T2 = Tc - dT_sc
 
@@ -407,7 +408,7 @@ class SimpleHeatPumpCycle:
             # Assemble the 4-point polyline: [H, T]
             condenser_profile = np.array([
                 [H[1], T[1]],            # superheated
-                [h_sat_vapor, T_sat_vapor],
+                [h_sat_vapor, T_sat_vapor] if h_sat_vapor < H[1] else [H[1], T[1]],
                 [h_sat_liquid, T_sat_liquid],
                 [H[2], T[2]],            # subcooled outlet
             ], dtype=float)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,24 +44,33 @@ class HeatPumpTargetInputs(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    # Calculated based on the case
     Q_hp_target: float
     Q_amb_max: float
+    dt_range_max: float
+
+    # Background process net hot and cold load curves
     T_hot: np.ndarray | list
     H_hot: np.ndarray | list
     T_cold: np.ndarray | list
     H_cold: np.ndarray | list
+
+    # From overall analysis configuration
     n_cond: int
     n_evap: int
     eta_comp: float
     dtcont_hp: float
     dt_phase_change: float
-    y_cond_min: float
-    dt_range_max: float
     price_ratio: float
     is_direct_integration: bool
     is_heat_pumping: bool
     max_multi_start: int
+    T_env: float
+    dt_env_cont: float
+    # y_cond_min: float
 
+    # Optional arguments
+    eta_exp: Optional[float] = None
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None 
     refrigerant_ls: Optional[List[str]] = []
@@ -82,8 +91,9 @@ class HeatPumpTargetOutputs(BaseModel):
     Q_ext: float
     cop: float
     obj: float
-    cond_streams: Optional[StreamCollection] = None
-    evap_streams: Optional[StreamCollection] = None
+    opt_success: bool    
+    hp_hot_streams: Optional[StreamCollection] = None
+    hp_cold_streams: Optional[StreamCollection] = None
     amb_stream: Optional[StreamCollection] = None
     Q_amb: Optional[float] = 0.0
     Q_ext: Optional[float] = 0.0

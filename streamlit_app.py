@@ -14,7 +14,7 @@ import streamlit as st
 from OpenPinch import PinchProblem
 
 # Default case. Update this path if you want to switch datasets.
-DEFAULT_PROBLEM_FILE = Path("examples/OpenPinchWkbs/potatoe-simple.xlsb")
+DEFAULT_PROBLEM_FILE = Path("examples/OpenPinchWkbs/pulp_mill.xlsb")
 
 
 @st.cache_resource

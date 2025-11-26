@@ -34,7 +34,7 @@ class Stream:
         self._h_target: Optional[float] = h_target
         self._dt_cont: float = dt_cont
         self._heat_flow: float = heat_flow
-        self._htc: float = htc if htc != 0.0 else 1.0
+        self._htc: float = htc if htc != 0.0 and isinstance(htc, float | int) else 1.0
         self._htr: float = 1 / self._htc
         self._price: float = price
         self._is_process_stream: bool = is_process_stream
