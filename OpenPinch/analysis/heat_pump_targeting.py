@@ -234,8 +234,8 @@ def _prepare_heat_pump_target_inputs(
         n_cond=zone_config.N_COND,
         n_evap=zone_config.N_EVAP,
         eta_comp=zone_config.ETA_COMP,
+        eta_exp=zone_config.ETA_EXP,
         dtcont_hp=zone_config.DTMIN_HP,
-        y_cond_min= zone_config.Y_COND_MIN,
         load_fraction=zone_config.HP_LOAD_FRACTION,
         T_env=zone_config.T_ENV,
         dt_env_cont=zone_config.DT_ENV_CONT,
@@ -1076,7 +1076,8 @@ def _optimise_brayton_heat_pump_placement(
 
     if opt.success:
         res = _compute_brayton_hp_system_performance(opt.x, args)
-        if 1:
+        res["opt_success"] = opt.success
+        if 0:
             res = HeatPumpTargetOutputs.model_validate(res)
             plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.hp_hot_streams, res.hp_cold_streams)
         
@@ -1106,7 +1107,7 @@ def _prepare_brayton_hp_data_for_minimizer(
     return x0, bnds
 
 
-def _parse_brayton_hp_state_temperatures(
+def _parse_brayton_hp_state_variables(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray]:
@@ -1116,7 +1117,7 @@ def _parse_brayton_hp_state_temperatures(
     dT_comp = x[1] * args.dt_range_max
     dT_gc = x[2] * args.dt_range_max
     Q_h_total = x[3] * args.Q_hp_target
-    return T_comp_out, dT_comp, dT_gc, Q_h_total
+    return [T_comp_out], [dT_comp], [dT_gc], [Q_h_total]
 
 
 def _compute_brayton_hp_system_performance(
@@ -1125,19 +1126,19 @@ def _compute_brayton_hp_system_performance(
 ) -> float:
     """Objective: minimize total compressor work for multi-HP configuration.
     """
-    T_comp_out, dT_comp, dT_gc, Q_h_total = _parse_brayton_hp_state_temperatures(x, args)
+    T_comp_out, dT_comp, dT_gc, Q_h_total = _parse_brayton_hp_state_variables(x, args)
     
     hp_list = _create_brayton_hp_list(
         T_comp_out=T_comp_out, 
         dT_comp=dT_comp, 
         dT_gc=dT_gc, 
-        Q_h_total=Q_h_total,
+        Q_gc=Q_h_total,
         args=args,
     )
     
     hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list, args.dtcont_hp)
     
-    T_evap = hp_list[0].T_exp_out
+    T_exp_out = hp_list[0].cycle_states[3]['T']
 
     pt_gas_cooler, _, _ = get_process_heat_cascade(
         hp_hot_streams, args.net_cold_streams
@@ -1146,30 +1147,30 @@ def _compute_brayton_hp_system_performance(
         args.net_hot_streams, hp_cold_streams
     )
 
-    work_hp = sum([hp.work for hp in hp_list])
-    c = pt_gas_cooler.col[PT.H_NET.value][-1] * 2 # Penalty for supplying too much heat
-    Q_ext = pt_gas_cooler.col[PT.H_NET.value][0] + pt_gas_heater.col[PT.H_NET.value][0] # Extra heating required on either side of the gcc 
-    Q_evap = np.array([hp.Q_evap for hp in hp_list])
+    work_hp = sum([hp.work_net for hp in hp_list])
+    c = (pt_gas_cooler.col[PT.H_NET.value][-1] + pt_gas_heater.col[PT.H_NET.value][0]) * 10 # Penalty for supplying too much heat
+    Q_ext = pt_gas_cooler.col[PT.H_NET.value][0] # Extra heating required on either side of the gcc 
+    Q_cool = np.array([hp.Q_cool for hp in hp_list])
     COP = (args.Q_hp_target - Q_ext) / work_hp
-    Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0)
+    Q_amb = max(Q_cool.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0)
     obj = (work_hp + Q_ext + c) / args.Q_hp_target
 
     if 0:
         plot_multi_hp_profiles_from_results(pt_gas_cooler.col[PT.T.value], pt_gas_cooler.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(pt_gas_heater.col[PT.T.value], pt_gas_heater.col[PT.H_NET.value])
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, title=f"T_hi {float(T_comp_out)} -> {float(obj), float(c / args.Q_hp_target)}")
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, title=f"T_hi {T_comp_out} -> {float(obj), float(c / args.Q_hp_target)}")
 
     return {
         "obj": obj, 
         "utility_tot": work_hp + Q_ext, 
         "work_hp": work_hp,  
         "Q_ext": Q_ext,
-        "T_cond": [T_comp_out],
-        "dT_sc": [dT_gc],
-        "Q_cond": [Q_h_total],            
-        "T_evap": [T_evap], 
-        "dT_sh": [dT_comp],
-        "Q_evap": [Q_evap],
+        "T_comp_out": np.array(T_comp_out),
+        "dT_gc": np.array(dT_gc),
+        "Q_heat": np.array(Q_h_total),            
+        "T_evap": np.array(T_exp_out), 
+        "dT_comp": np.array(dT_comp),
+        "Q_cool": np.array(Q_cool),
         "cop": COP,
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
@@ -1198,6 +1199,7 @@ def _create_brayton_hp_list(
             eta_comp=args.eta_comp,
             eta_exp=args.eta_exp,
             is_recuperated=False,
+            refrigerant=args.refrigerant_ls[0],
         )
         hp_list.append(hp)
     return hp_list

@@ -67,7 +67,6 @@ class HeatPumpTargetInputs(BaseModel):
     max_multi_start: int
     T_env: float
     dt_env_cont: float
-    # y_cond_min: float
 
     # Optional arguments
     eta_exp: Optional[float] = None
@@ -80,25 +79,41 @@ class HeatPumpTargetInputs(BaseModel):
 
 
 class HeatPumpTargetOutputs(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        arbitrary_types_allowed=True,
+    )
 
-    T_cond: np.ndarray
-    T_evap: np.ndarray
-    Q_cond: np.ndarray
-    Q_evap: np.ndarray
+    # --- Common objective / result fields -------------------------
     utility_tot: float
     work_hp: float
     Q_ext: float
+    Q_amb: float    
     cop: float
     obj: float
-    opt_success: bool    
-    hp_hot_streams: Optional[StreamCollection] = None
-    hp_cold_streams: Optional[StreamCollection] = None
-    amb_stream: Optional[StreamCollection] = None
-    Q_amb: Optional[float] = 0.0
-    Q_ext: Optional[float] = 0.0
+    opt_success: bool
+
+    hp_hot_streams: Optional["StreamCollection"] = None
+    hp_cold_streams: Optional["StreamCollection"] = None
+    amb_stream: Optional["StreamCollection"] = None
+
+    # --- Flattened state fields (union of all children) -----------
+    # Carnot & Simple Vapour Compression
+    T_cond: Optional[np.ndarray] = None
+    T_evap: Optional[np.ndarray] = None
+    Q_cond: Optional[np.ndarray] = None
+    Q_evap: Optional[np.ndarray] = None
+
+    # Simple Vapour Compression only
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None
+
+    # Brayton only
+    T_comp_out: Optional[np.ndarray] = None
+    dT_gc: Optional[np.ndarray] = None
+    dT_comp: Optional[np.ndarray] = None
+    Q_heat: Optional[np.ndarray] = None
+    Q_cool: Optional[np.ndarray] = None
 
 
 # ---- Targeting results -------------------------------------------------------

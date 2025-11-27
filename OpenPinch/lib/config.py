@@ -51,12 +51,12 @@ class Configuration:
     HP_TYPE: str = HeatPumpType.Brayton.value
     HP_LOAD_FRACTION: float = 1.0
     REFRIGERANTS: List[str] = ["butane", "Pentane"]
-    Y_COND_MIN: float = 0.05 # Minimum load on a heat pump condenser, enforced for simulated heat pump
     PRICE_RATIO_ELE_TO_FUEL: float = 1.0
     MAX_HP_MULTISTART: int = 10
     N_COND: int = 2
     N_EVAP: int = 2
     ETA_COMP: float = 0.7
+    ETA_EXP: float = 0.7
     DTMIN_HP: float = 0.0  
 
     ### Cost targeting parameters ### 
