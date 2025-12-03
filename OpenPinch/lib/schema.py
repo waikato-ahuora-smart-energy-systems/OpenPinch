@@ -59,6 +59,7 @@ class HeatPumpTargetInputs(BaseModel):
     n_cond: int
     n_evap: int
     eta_comp: float
+    eta_exp: float
     dtcont_hp: float
     dt_phase_change: float
     price_ratio: float
@@ -67,13 +68,13 @@ class HeatPumpTargetInputs(BaseModel):
     max_multi_start: int
     T_env: float
     dt_env_cont: float
-    eta_carnot: float
+    eta_hp_carnot: float
+    eta_he_carnot: float
+    refrigerant_ls: List[str]
 
     # Optional arguments
-    eta_exp: Optional[float] = None
     dT_sc: Optional[np.ndarray] = None
     dT_sh: Optional[np.ndarray] = None 
-    refrigerant_ls: Optional[List[str]] = []
     unit_system: Optional[str] = "EUR"
     net_hot_streams: Optional[StreamCollection] = StreamCollection()
     net_cold_streams: Optional[StreamCollection] = StreamCollection()

@@ -48,7 +48,7 @@ class Configuration:
     DO_TURBINE_WORK: bool = False
 
     ### Heat pump targeting parameters ###
-    HP_TYPE: str = HeatPumpType.Brayton.value
+    HP_TYPE: str = HeatPumpType.MultiTempCarnot.value
     HP_LOAD_FRACTION: float = 1.0
     REFRIGERANTS: List[str] = ["butane", "ammonia"]
     PRICE_RATIO_ELE_TO_FUEL: float = 1.0
@@ -57,7 +57,8 @@ class Configuration:
     N_EVAP: int = 2
     ETA_COMP: float = 0.7
     ETA_EXP: float = 0.7
-    ETA_CARNOT: float = 0.5
+    ETA_HP_CARNOT: float = 0.5
+    ETA_HE_CARNOT: float = 0.5
     DTMIN_HP: float = 0.0  
 
     ### Cost targeting parameters ### 

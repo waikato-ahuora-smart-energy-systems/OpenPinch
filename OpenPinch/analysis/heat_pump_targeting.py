@@ -56,9 +56,9 @@ def get_heat_pump_targets(
         targeting is skipped by the configuration screens.
     """    
     ######### TEMP VARS ######### 
-    zone_config.HP_LOAD_FRACTION = 1
+    # zone_config.HP_LOAD_FRACTION = 1
     # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
-    zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
+    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     # zone_config.HP_TYPE = HeatPumpType.Brayton.value
     #############################
@@ -223,7 +223,8 @@ def _prepare_heat_pump_target_inputs(
         n_evap=zone_config.N_EVAP,
         eta_comp=zone_config.ETA_COMP,
         eta_exp=zone_config.ETA_EXP,
-        eta_carnot=zone_config.ETA_CARNOT,
+        eta_hp_carnot=zone_config.ETA_HP_CARNOT,
+        eta_he_carnot=zone_config.ETA_HE_CARNOT,
         dtcont_hp=zone_config.DTMIN_HP,
         load_fraction=zone_config.HP_LOAD_FRACTION,
         T_env=zone_config.T_ENV,
@@ -598,8 +599,8 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     delta_T_lift = T_cond - T_evap
     perf = np.where(
         delta_T_lift > 0.0,
-        (T_evap + 273.15) / delta_T_lift * args.eta_carnot + 1, # acting as a heat pump
-        1 / ((T_evap + 273.15) / (delta_T_lift * args.eta_carnot) + 1) # acting as a heat engine
+        (T_evap + 273.15) / delta_T_lift * args.eta_hp_carnot + 1, # acting as a heat pump
+        1 / ((T_evap + 273.15) / (delta_T_lift * args.eta_he_carnot) + 1) # acting as a heat engine
     )
     work_hp = np.where(
         np.isclose(perf, 0.0),
