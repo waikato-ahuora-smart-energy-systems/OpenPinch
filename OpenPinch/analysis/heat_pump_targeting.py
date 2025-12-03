@@ -59,7 +59,7 @@ def get_heat_pump_targets(
     # zone_config.HP_LOAD_FRACTION = 1
     # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
-    zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
+    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     # zone_config.HP_TYPE = HeatPumpType.Brayton.value
     #############################
     args = _prepare_heat_pump_target_inputs(
