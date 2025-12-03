@@ -67,6 +67,7 @@ class HeatPumpTargetInputs(BaseModel):
     max_multi_start: int
     T_env: float
     dt_env_cont: float
+    eta_carnot: float
 
     # Optional arguments
     eta_exp: Optional[float] = None
@@ -89,7 +90,7 @@ class HeatPumpTargetOutputs(BaseModel):
     work_hp: float
     Q_ext: float
     Q_amb: float    
-    cop: float
+    cop: float | list | np.ndarray
     obj: float
     opt_success: bool
 

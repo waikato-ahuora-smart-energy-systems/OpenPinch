@@ -51,9 +51,6 @@ def compute_direct_integration_targets(zone: Zone):
     )
     
     if zone.identifier in [Z.P.value]:
-        # T_vals=pt.col[PT.T.value]
-        # H_hot=pt.col[PT.H_HOT_UT.value]
-        # H_cold=pt.col[PT.H_COLD_UT.value]
         if _validate_heat_pump_targeting_required(pt, True, zone_config):
             hp_res = get_heat_pump_targets(
                 T_vals=pt.col[PT.T.value],

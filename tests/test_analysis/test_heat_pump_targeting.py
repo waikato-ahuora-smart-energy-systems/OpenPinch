@@ -7,7 +7,7 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _compute_entropic_average_temperature_in_K,
     _compute_COP_estimate_from_carnot_limit,
     _get_Q_vals_from_T_hp_vals,
-    _parse_multi_simple_carnot_hp_state_variables,
+    _parse_multi_temperature_carnot_hp_state_variables,
     _get_H_col_till_target_Q,
     _prepare_latent_hp_profile,
     _map_T_to_x_cond,
@@ -113,7 +113,7 @@ def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
     x = np.array([0.5, 0.5, 0.5])
     n_cond = 3
 
-    T_cond, T_evap = _parse_multi_simple_carnot_hp_state_variables(x, n_cond)
+    T_cond, T_evap = _parse_multi_temperature_carnot_hp_state_variables(x, n_cond)
 
     np.testing.assert_allclose(T_cond, np.array([0.5, 0.5, 0.5]))
     np.testing.assert_allclose(T_evap, np.array([0.0]))

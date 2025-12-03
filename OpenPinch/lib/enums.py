@@ -54,10 +54,11 @@ class HeatPump(Enum):
 
 
 class HeatPumpType(str, Enum):
-    MultiTempCarnot = "Multi-temperature Carnot"
-    Brayton = "Brayton"
-    CascadeVapourComp = "Cascade vapour compression"
-    MultiSimpleVapourComp = "Multiple simple vapour compression"
+    MultiTempCarnot = "Multi-temperature Carnot cycles"
+    MultiSimpleCarnot = "Multiple simple Carnot cycles"
+    Brayton = "Brayton cycle"
+    CascadeVapourComp = "Cascade vapour compression cycles"
+    MultiSimpleVapourComp = "Multiple simple vapour compression cycles"
 
 
 class HeatFlowUnits(Enum):

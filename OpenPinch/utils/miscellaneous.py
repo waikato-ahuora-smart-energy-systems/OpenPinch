@@ -225,6 +225,7 @@ def make_monotonic(
 def dual_annealing_multiminima(
     func,
     bounds,
+    x0=None,
     args=(),
     constraints=(),
     n_runs=6,
@@ -311,7 +312,8 @@ def dual_annealing_multiminima(
             return False
 
         res = dual_annealing(
-            func,
+            func=func,
+            x0=x0,
             bounds=bounds,
             args=args,
             maxiter=maxiter,

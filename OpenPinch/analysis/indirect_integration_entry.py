@@ -90,9 +90,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
     if zone.identifier in [Z.S.value]:
-        T_vals=pt.col[PT.T.value]
-        H_hot=pt.col[PT.H_HOT_UT.value]
-        H_cold=pt.col[PT.H_COLD_UT.value]
         if _validate_heat_pump_targeting_required(pt, True, zone_config):
             hp_res = get_heat_pump_targets(
                 T_vals=pt.col[PT.T.value],
