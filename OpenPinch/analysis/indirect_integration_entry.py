@@ -4,12 +4,15 @@ from typing import Tuple
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from ..analysis import (
+from . import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
-    get_utility_targets
+    get_utility_targets,
+    get_additional_GCCs,
+    get_heat_pump_targets,
+    calc_heat_pump_cascade,
+    plot_multi_hp_profiles_from_results
 )
-from ..analysis.utility_targeting import get_utility_targets
 
 __all__ = ["compute_indirect_integration_targets"]
 
@@ -19,18 +22,20 @@ __all__ = ["compute_indirect_integration_targets"]
 #######################################################################################################
 
 
-def compute_indirect_integration_targets(site: Zone) -> Zone:
+def compute_indirect_integration_targets(zone: Zone) -> Zone:
     """Targets indirect heat integration, such as for Total Site, 
     after computing direct heat integration in subzones.
     """
+    zone_config: Configuration = zone.config
+    res: dict = {}
 
     # Sum targets from subzones 
-    _sum_subzone_targets(site)
+    _sum_subzone_targets(zone)
 
     # Total site profiles - process side
-    site.import_hot_and_cold_streams_from_sub_zones(get_net_streams=True)
+    zone.import_hot_and_cold_streams_from_sub_zones(get_net_streams=True)
     pt, pt_real, _ = get_process_heat_cascade(
-        site.net_hot_streams, site.net_cold_streams, site.all_net_streams, site.config
+        zone.net_hot_streams, zone.net_cold_streams, zone.all_net_streams, zone.config
     )
     pt.update(
         _shift_composite_curves(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
@@ -40,7 +45,7 @@ def compute_indirect_integration_targets(site: Zone) -> Zone:
     )    
 
     # Get utility duties based on the summation of subzones
-    s_tzt: EnergyTarget = site.targets[key_name(site.name, TargetType.TZ.value)]
+    s_tzt: EnergyTarget = zone.targets[key_name(zone.name, TargetType.TZ.value)]
     hot_utilities = deepcopy(s_tzt.hot_utilities)
     cold_utilities = deepcopy(s_tzt.cold_utilities)
     
@@ -65,21 +70,58 @@ def compute_indirect_integration_targets(site: Zone) -> Zone:
     # Apply the utility targeting method to determine the net utility use and generation 
     _match_utility_gen_and_use_at_same_level(
         hot_utilities, cold_utilities
-    )    
-    get_utility_targets(
+    )
+    pt = get_additional_GCCs(
         pt, 
-        pt_real, 
-        hot_utilities, 
-        cold_utilities
+        is_direct_integration=False
+    )
+    get_utility_targets(
+        pt, pt_real, 
+        hot_utilities, cold_utilities,
+        is_direct_integration=False
     )
 
     # Extract overall heat integration targets
-    hot_utility_target = pt.loc[0, PT.H_UT_NET.value]
-    cold_utility_target = pt.loc[-1, PT.H_UT_NET.value]
+    hot_utility_target = pt.loc[0, PT.H_NET_UT.value]
+    cold_utility_target = pt.loc[-1, PT.H_NET_UT.value]
     heat_recovery_target = s_tzt.heat_recovery_target + (
         s_tzt.hot_utility_target - hot_utility_target
     )
-    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_UT_NET.value)
+    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
+
+    if zone.identifier in [Z.S.value]:
+        if _validate_heat_pump_targeting_required(pt, True, zone_config):
+            hp_res = get_heat_pump_targets(
+                T_vals=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_HOT_UT.value],
+                H_cold=pt.col[PT.H_COLD_UT.value],
+                zone_config=zone_config, 
+                is_direct_integration=False,
+                is_heat_pumping=True,
+            )
+            res.update(
+                hp_res
+            )
+            calc_heat_pump_cascade(
+                pt=pt,
+                res=hp_res,
+                is_T_vals_shifted=True,
+                is_direct_integration=True,
+            )
+            if 0:
+                plot_multi_hp_profiles_from_results(
+                    T_hot=pt.col[PT.T.value],
+                    H_hot=pt.col[PT.H_NET_HOT.value],
+                    T_cold=pt.col[PT.T.value],                    
+                    H_cold=pt.col[PT.H_NET_COLD.value],
+                    hp_hot_streams=hp_res.hp_hot_streams,
+                    hp_cold_streams=hp_res.hp_cold_streams,
+                )
+                plot_multi_hp_profiles_from_results(
+                    T_hot=pt.col[PT.T.value],
+                    H_hot=pt.col[PT.H_NET_W_AIR.value],
+                )
+                pass
 
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
@@ -96,8 +138,7 @@ def compute_indirect_integration_targets(site: Zone) -> Zone:
         heat_recovery_target,
         s_tzt.heat_recovery_limit,
     )
-    site.add_target_from_results(
-        TargetType.TS.value,
+    res.update(
         {
             "pt": pt,
             "pt_real": pt_real,
@@ -108,9 +149,10 @@ def compute_indirect_integration_targets(site: Zone) -> Zone:
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
             "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
-        },
+        }            
     )
-    return site
+    zone.add_target_from_results(TargetType.TS.value, res)
+    return zone
 
 
 #######################################################################################################
@@ -118,18 +160,18 @@ def compute_indirect_integration_targets(site: Zone) -> Zone:
 #######################################################################################################
 
 
-def _sum_subzone_targets(site: Zone) -> Zone:
+def _sum_subzone_targets(zone: Zone) -> Zone:
     """Sums and records zonal targets."""
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = num_units = area = capital_cost = total_cost = 0.0
 
-    hot_utilities = deepcopy(site.hot_utilities)
-    cold_utilities = deepcopy(site.cold_utilities)
+    hot_utilities = deepcopy(zone.hot_utilities)
+    cold_utilities = deepcopy(zone.cold_utilities)
     hot_utilities, cold_utilities = _reset_utility_heat_flows(
         hot_utilities, cold_utilities
     )
 
-    for z in site.subzones.values():
+    for z in zone.subzones.values():
         z: Zone
         t: EnergyTarget
         t = z.targets[f"{z.name}/{TargetType.DI.value}"]
@@ -153,8 +195,8 @@ def _sum_subzone_targets(site: Zone) -> Zone:
             area += t.area
             # capital_cost = t.capital_cost
 
-    heat_recovery_limit = site.targets[
-        f"{site.name}/{TargetType.DI.value}"
+    heat_recovery_limit = zone.targets[
+        f"{zone.name}/{TargetType.DI.value}"
     ].heat_recovery_limit
 
     # Target co-generation of heat and power
@@ -168,7 +210,7 @@ def _sum_subzone_targets(site: Zone) -> Zone:
         heat_recovery_target,
         heat_recovery_limit,
     )
-    site.add_target_from_results(
+    zone.add_target_from_results(
         TargetType.TZ.value,
         {
             "target_values": target_values,
@@ -176,7 +218,7 @@ def _sum_subzone_targets(site: Zone) -> Zone:
             "cold_utilities": cold_utilities,
         },
     )
-    return site
+    return zone
 
 
 def _reset_utility_heat_flows(
@@ -248,11 +290,27 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.TSP.value: pt[
             [
                 PT.T.value,
-                PT.H_HOT_NET.value,
-                PT.H_COLD_NET.value,
+                PT.H_NET_HOT.value,
+                PT.H_NET_COLD.value,
                 PT.H_HOT_UT.value,
                 PT.H_COLD_UT.value,
             ]
         ],
-        GT.SUGCC.value: pt[[PT.T.value, PT.H_UT_NET.value]],
+        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value]],
     }
+
+
+def _validate_heat_pump_targeting_required(
+    pt: ProblemTable,
+    is_heat_pumping: bool,
+    zone_config: Configuration,
+) -> bool:
+    return False if (
+        (zone_config.DO_UTILITY_HP_TARGETING == False)
+        or 
+        (pt.col[PT.H_NET_UT.value][0] < tol and is_heat_pumping == True)
+        or
+        (pt.col[PT.H_NET_UT.value][-1] < tol and is_heat_pumping == False)
+        or 
+        (zone_config.HP_LOAD_FRACTION < tol)
+    ) else True

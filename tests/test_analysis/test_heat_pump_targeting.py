@@ -2,170 +2,246 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_targeting import (
-    _initialise_heat_pump_temperatures,
-    _get_first_or_last_zero_value_idx,
-    _get_extreme_temperatures_idx,
-    _prepare_data_for_minimizer,
-    _get_entropic_average_temperature,
-    _set_initial_values_for_condenser_and_evaporator,
-    _get_carnot_COP,
-    _convert_idx_to_temperatures,
-    _get_H_vals_from_T_hp_vals,
+    _compute_entropic_average_temperature_in_K,
+    _compute_COP_estimate_from_carnot_limit,
+    _get_Q_vals_from_T_hp_vals,
+    _parse_multi_temperature_carnot_hp_state_variables,
+    _get_H_col_till_target_Q,
+    _prepare_latent_hp_profile,
+    _map_T_to_x_cond,
+    _map_T_to_x_evap,
+    _map_x_to_T_cond,
+    _map_x_to_T_evap,
+    _validate_vapour_hp_refrigerant_ls,
 )
-from OpenPinch.lib import *
+
 
 def get_temperatures():
-    return np.array([300.0, 250.0, 200.0, 150.0, 100.0, 50.0])
+    return np.array([140.0, 90.0, 75.0, 60.0, 50.0, 40.0, 20.0])
 
 
 def get_cold_cc():
-    return np.array([1000.0, 1000.0, 800.0, 300.0, 0.0, 0.0])
+    return np.array([1000.0, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 
 def get_hot_cc():
-    return np.array([0.0, 0.0, -400.0, -400.0, -1000.0, -1000.0])
+    return np.array([0.0, 0.0, 0.0, 0.0, -400.0, -400.0, -800.0])
 
 
 def test_get_carnot_COP_returns_expected_value():
-    T_cond = np.array([150.0, 130.0, 110.0])
-    H_cond = np.array([60.0, 25.0, 15.0])
-    T_evap = np.array([40.0, 30.0])
-    H_evap = np.array([30.0, 70.0])
+    T_cond = np.array([150.0, 150.0, 150.0])
+    Q_cond = np.array([60.0, 25.0, 15.0])
+    T_evap = np.array([30.0, 30.0])
+    Q_evap = np.array([70.0, 40.0])
     eff = 0.65
 
-    T_hi = _get_entropic_average_temperature(T_cond, H_cond)
-    T_lo = _get_entropic_average_temperature(T_evap, -H_evap)
-    expected = T_hi / (T_hi - T_lo) * eff
+    expected = ((150 + 273.15) / (150 - 30) - 1)* eff + 1
 
-    result = _get_carnot_COP(T_cond, H_cond, T_evap, H_evap, eff=eff)
+    result = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap, eff=eff)
 
     np.testing.assert_allclose(result, expected)
 
 
-def test_get_first_or_last_zero_value_idx_ccc_min_hot():
-    h_vals = get_cold_cc()
-    idx = _get_first_or_last_zero_value_idx(h_vals, True)
-    assert idx == 4
+def test_compute_entropic_average_temperature_in_K_constant_temperature():
+    T = np.array([60.0, 60.0, 60.0])
+    Q = np.array([100.0, 150.0, 200.0])
+    result = _compute_entropic_average_temperature_in_K(T, Q)
+    np.testing.assert_allclose(result, 60.0 + 273.15)
 
 
-def test_get_first_or_last_zero_value_idx_ccc_max_hot():
-    h_vals = get_cold_cc()
-    h_vals = h_vals - h_vals[0]
-    idx = _get_first_or_last_zero_value_idx(h_vals, False)
-    assert idx == 1
+def test_compute_entropic_average_temperature_in_K_zero_net_duty_uses_arithmetic_mean():
+    T = np.array([40.0, 60.0, 80.0])
+    Q = np.zeros_like(T)
+    result = _compute_entropic_average_temperature_in_K(T, Q)
+    np.testing.assert_allclose(result, T.mean() + 273.15)
 
 
-def test_get_first_or_last_zero_value_idx_hcc_min_cold():
-    h_vals = get_hot_cc()
-    h_vals = h_vals - h_vals[-1]
-    idx = _get_first_or_last_zero_value_idx(h_vals, True)
-    assert idx == 4
+def test_scale_and_unscale_cond_roundtrip_and_bounds():
+    T_cond = np.array([210.0, 190.0, 175.0, 160.0])
+    T_bounds = (150.0, 230.0)
+
+    scaled = _map_T_to_x_cond(T_cond, T_bounds[1], T_bounds[1] - T_bounds[0])
+
+    assert scaled.size == T_cond.size
+    assert np.all(scaled >= -1e-12)
+    assert np.all(scaled <= 1 + 1e-12)
+
+    restored = _map_x_to_T_cond(scaled, T_bounds[1], T_bounds[1] - T_bounds[0])
+    np.testing.assert_allclose(restored, T_cond)
 
 
-def test_get_first_or_last_zero_value_idx_hcc_max_cold():
-    h_vals = get_hot_cc()
-    idx = _get_first_or_last_zero_value_idx(h_vals, False)
-    assert idx == 1
+def test_scale_and_unscale_evap_roundtrip_and_bounds():
+    T_evap = np.array([65.0, 55.0, 45.0, 35.0])
+    T_bounds = (20.0, 80.0)
+
+    scaled = _map_T_to_x_evap(T_evap, T_bounds[0], T_bounds[1] - T_bounds[0])
+
+    assert scaled.size == T_evap.size
+    np.testing.assert_allclose(scaled, [0.16666667, 0.16666667, 0.16666667, 0.25])
+
+    restored = _map_x_to_T_evap(scaled, T_bounds[0], T_bounds[1] - T_bounds[0])
+    np.testing.assert_allclose(restored, T_evap)
 
 
-def test_get_extreme_temperatures_idx():
-    H_hot = get_hot_cc()
-    H_cold = get_cold_cc()
-    idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
-    assert idx_dict["HU"][0] == 4
-    assert idx_dict["HU"][1] == 1
-    assert idx_dict["CU"][0] == 4
-    assert idx_dict["CU"][1] == 1
+def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator():
+    T_vals = np.array([160.0, 140.0, 120.0, 90.0])
+    H_vals = np.array([700.0, 500.0, 300.0, 0.0])
+    T_hp = np.array([150.0, 110.0])
+
+    Q_cond = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals, is_cond=True)
+    Q_evap = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals - H_vals[0], is_cond=False)
+
+    np.testing.assert_allclose(Q_cond, np.array([400.0, 200.0]))
+    np.testing.assert_allclose(Q_evap, np.array([100.0, 400.0]))
 
 
-def test_set_initial_values_for_condenser_and_evaporator_even_spacing():
-    T_bnds = {"HU": (150.0, 200.0), "CU": (20.0, 70.0)}
-    T_cond, T_evap = _set_initial_values_for_condenser_and_evaporator(2, 3, T_bnds)
-    expected_cond = np.linspace(200.0, 150.0, 3)[:-1]
-    expected_evap = np.linspace(20.0, 70.0, 4)[:-1]
+def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator_with_out_of_range():
+    T_vals = np.array([160.0, 140.0, 120.0, 90.0])
+    H_vals = np.array([700.0, 500.0, 300.0, 0.0])
+    T_hp = np.array([150.0, 70.0])
 
-    assert len(T_cond) == 2
-    assert len(T_evap) == 3
-    np.testing.assert_allclose(T_cond, expected_cond)
-    np.testing.assert_allclose(T_evap, expected_evap)
+    Q_cond = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals, is_cond=True)
+    Q_evap = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals - H_vals[0], is_cond=False)
 
-
-def test_set_initial_values_for_condenser_and_evaporator_min_segments():
-    T_bnds = {"HU": (120.0, 180.0), "CU": (30.0, 90.0)}
-    T_cond, T_evap = _set_initial_values_for_condenser_and_evaporator(0, -2, T_bnds)
-
-    assert len(T_cond) == 1
-    assert len(T_evap) == 1
-    np.testing.assert_allclose(T_cond, [180.0])
-    np.testing.assert_allclose(T_evap, [30.0])
+    np.testing.assert_allclose(Q_cond, np.array([600.0, 0.0]))
+    np.testing.assert_allclose(Q_evap, np.array([100.0, 600.0]))    
 
 
-def test_prepare_data_for_minimize_multiple_segments():
-    T_cond_init = np.array([220.0, 210.0, 205.0])
-    T_evap_init = np.array([30.0, 35.0, 40.0])
-    T_bnds = {"HU": (200.0, 230.0), "CU": (25.0, 55.0)}
+def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
+    x = np.array([0.5, 0.5, 0.5])
+    n_cond = 3
 
-    x0, bnds = _prepare_data_for_minimizer(T_cond_init, T_evap_init, T_bnds)
+    T_cond, T_evap = _parse_multi_temperature_carnot_hp_state_variables(x, n_cond)
 
-    np.testing.assert_allclose(x0, np.array([210.0, 205.0, 35.0, 40.0]))
-    assert bnds == [T_bnds["HU"], T_bnds["HU"], T_bnds["CU"], T_bnds["CU"]]
-
-
-def test_prepare_data_for_minimize_single_segment():
-    T_cond_init = np.array([215.0])
-    T_evap_init = np.array([25.0])
-    T_bnds = {"HU": (210.0, 240.0), "CU": (20.0, 40.0)}
-
-    x0, bnds = _prepare_data_for_minimizer(T_cond_init, T_evap_init, T_bnds)
-
-    assert isinstance(x0, np.ndarray)
-    assert x0.shape == (0,)
-    assert bnds == []
+    np.testing.assert_allclose(T_cond, np.array([0.5, 0.5, 0.5]))
+    np.testing.assert_allclose(T_evap, np.array([0.0]))
 
 
-def test_initialise_heat_pump_temperatures_constructs_minimizer_inputs(monkeypatch):
-    T_vals = get_temperatures()
-    H_cold = get_cold_cc()
-    H_hot = get_hot_cc()
+def test_get_H_col_till_target_Q_returns_full_profile_when_target_matches_peak():
+    T_cold = np.array([160.0, 150.0, 140.0, 130.0])
+    H_cold = np.array([600.0, 450.0, 200.0, 0.0])
+    Q_hp_target = np.abs(H_cold).max()
 
-    minimize_calls = {}
+    T_out, H_out = _get_H_col_till_target_Q(Q_hp_target, T_cold.copy(), H_cold.copy())
 
-    def fake_minimize(fun, x0, method=None, bounds=None, **kwargs):
-        minimize_calls["fun"] = fun
-        minimize_calls["x0"] = np.array(x0, copy=True)
-        minimize_calls["method"] = method
-        minimize_calls["bounds"] = bounds
-        minimize_calls["kwargs"] = kwargs
-        return SimpleNamespace(x=np.array(x0, copy=True))
+    np.testing.assert_allclose(T_out, T_cold)
+    np.testing.assert_allclose(H_out, H_cold)
 
-    monkeypatch.setattr("OpenPinch.analysis.heat_pump_targeting.minimize", fake_minimize)
 
-    result = _initialise_heat_pump_temperatures(
-        T_vals,
-        H_hot,
-        T_vals,
-        H_cold,
-        n_cond=2,
-        n_evap=3,
-        eff_isen=0.75,
-        dtmin_hp=10.0,
-        is_T_vals_shifted=False,
-    )
+def test_get_H_col_till_target_Q_interpolates_to_target():
+    T_cold = np.array([160.0, 150.0, 140.0, 130.0])
+    H_cold = np.array([600.0, 400.0, 150.0, 0.0])
+    Q_hp_target = 250.0
 
-    idx_dict = _get_extreme_temperatures_idx(H_hot, H_cold)
-    T_bnds = _convert_idx_to_temperatures(idx_dict, T_vals, T_vals)
-    expected_cond, expected_evap = _set_initial_values_for_condenser_and_evaporator(2, 3, T_bnds)
-    expected_x0, expected_bnds = _prepare_data_for_minimizer(expected_cond, expected_evap, T_bnds)
-    expected_H_cond = _get_H_vals_from_T_hp_vals(expected_cond, T_vals, H_cold)
-    expected_H_evap = _get_H_vals_from_T_hp_vals(expected_evap, T_vals, H_hot)
+    T_out, H_out = _get_H_col_till_target_Q(Q_hp_target, T_cold.copy(), H_cold.copy())
 
-    assert set(result.keys()) == {"T_cond", "H_cond", "T_evap", "H_evap", "total_work"}
-    np.testing.assert_allclose(result["T_cond"], expected_cond)
-    np.testing.assert_allclose(result["T_evap"], expected_evap)
-    np.testing.assert_allclose(result["H_cond"], expected_H_cond)
-    np.testing.assert_allclose(result["H_evap"], expected_H_evap)
+    np.testing.assert_allclose(T_out[0], 144.0)
+    np.testing.assert_allclose(H_out[0], Q_hp_target)
+    np.testing.assert_allclose(T_out[1:], np.array([140.0, 130.0]))
+    np.testing.assert_allclose(H_out[1:], np.array([150.0, 0.0]))
 
-    assert minimize_calls["method"] == "COBYQA"
-    np.testing.assert_allclose(minimize_calls["x0"], expected_x0)
-    assert minimize_calls["bounds"] == expected_bnds
+
+def test_get_H_col_till_target_Q_interpolates_to_target_at_exisiting_temperature():
+    T_cold = np.array([160.0, 150.0, 140.0, 130.0])
+    H_cold = np.array([600.0, 400.0, 150.0, 0.0])
+    Q_hp_target = 150.0
+
+    T_out, H_out = _get_H_col_till_target_Q(Q_hp_target, T_cold.copy(), H_cold.copy())
+
+    np.testing.assert_allclose(T_out[0], 140.0)
+    np.testing.assert_allclose(H_out[0], Q_hp_target)
+    np.testing.assert_allclose(T_out[:], np.array([140.0, 130.0]))
+    np.testing.assert_allclose(H_out[:], np.array([150.0, 0.0]))
+
+
+def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty():
+    T_hp = [150.0, 149.7, 130.0]
+    Q_hp = [10.0, 5.0, 20.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+
+    np.testing.assert_allclose(T_out, np.array([150.0, 130.0]))
+    np.testing.assert_allclose(Q_out, np.array([15.0, 20.0]))
+
+
+def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty_consecutivily():
+    T_hp = [150.0, 149.7, 149.01, 130.0]
+    Q_hp = [10.0, 2.0, 3.0, 20.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+
+    np.testing.assert_allclose(T_out, np.array([150.0, 130.0]))
+    np.testing.assert_allclose(Q_out, np.array([15.0, 20.0]))
+
+
+def test_prepare_latent_hp_profile_merges_cold_segments_with_lower_temperature():
+    T_hp = [60.0, 45.0, 30.4, 30.0]
+    Q_hp = [12.5, 10.0, 7.5, 5.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=False)
+
+    np.testing.assert_allclose(T_out, np.array([60.0, 45.0, 30.0]))
+    np.testing.assert_allclose(Q_out, np.array([12.5, 10.0, 12.5]))
+
+
+def test_prepare_latent_hp_profile_merges_cold_segments_with_complex_temperature():
+    T_hp = [31.5, 30.8, 30.4, 30.0]
+    Q_hp = [12.5, 10.0, 7.5, 5.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=False)
+
+    np.testing.assert_allclose(T_out, np.array([31.5, 30.0]))
+    np.testing.assert_allclose(Q_out, np.array([12.5, 22.5]))    
+
+
+def test_prepare_latent_hp_profile_keeps_unique_sequences_unchanged():
+    T_hp = [180.0, 160.0, 140.0]
+    Q_hp = [8.0, 6.0, 4.0]
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=0.5, is_hot=True)
+
+    np.testing.assert_allclose(T_out, T_hp)
+    np.testing.assert_allclose(Q_out, Q_hp)
+
+
+def test_prepare_latent_hp_profile_handles_empty_input():
+    T_hp = []
+    Q_hp = []
+
+    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+
+    assert len(T_out) == 0
+    assert len(Q_out) == 0
+
+
+def test_validate_vapour_hp_refrigerant_ls_defaults_to_water_and_matches_length():
+    args = SimpleNamespace(n_cond=3, refrigerant_ls=[])
+
+    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
+
+    assert len(refrigerants) == args.n_cond
+    assert refrigerants == ["water", "water", "water"]
+    assert all(isinstance(ref, str) for ref in refrigerants)
+
+
+def test_validate_vapour_hp_refrigerant_ls_preserves_length_when_provided():
+    args = SimpleNamespace(n_cond=2, refrigerant_ls=["Water", "Ammonia"])
+
+    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
+
+    assert len(refrigerants) == args.n_cond
+    assert refrigerants[0] == "Water"
+    assert all(isinstance(ref, str) for ref in refrigerants)
+
+
+def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
+    args = SimpleNamespace(n_cond=4, refrigerant_ls=["Ammonia", "Water"])
+
+    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
+
+    assert len(refrigerants) == args.n_cond
+    assert refrigerants[:2] == ["Water", "Ammonia"]
+    assert refrigerants[2:] == ["Ammonia", "Ammonia"]
+    assert all(isinstance(ref, str) for ref in refrigerants)

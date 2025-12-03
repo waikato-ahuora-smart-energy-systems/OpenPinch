@@ -5,7 +5,7 @@ from scipy.optimize import NonlinearConstraint, minimize
 
 from ..lib import *
 
-__all__ = ["get_piecewise_linearisation_for_streams"]
+__all__ = ["get_piecewise_linearisation_for_streams", "get_piecewise_data_points"]
 
 
 #######################################################################################################
@@ -14,7 +14,9 @@ __all__ = ["get_piecewise_linearisation_for_streams"]
 
 
 def get_piecewise_linearisation_for_streams(
-    streams: List[NonLinearStream], t_h_data: list, dt_diff_max: float
+    streams: List[NonLinearStream], 
+    t_h_data: list, 
+    dt_diff_max: float = 0.1,
 ) -> np.array:
     """Generate piecewise-linear T-H profiles for each non-linear stream using a tolerance cap."""
     if len(streams) != len(t_h_data):
@@ -37,7 +39,9 @@ def get_piecewise_linearisation_for_streams(
 
 
 def get_piecewise_data_points(
-    curve: list, dt_diff_max: float, is_hot_stream: bool
+    curve: list, 
+    is_hot_stream: bool,
+    dt_diff_max: float = 0.1,
 ) -> np.array:
     """
     Performs piecewise linearisation on a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
@@ -49,7 +53,9 @@ def get_piecewise_data_points(
     curve = np.array(curve)
     try:
         return _get_piecewise_breakpoints(
-            curve=curve, epsilon=dt_diff_max, is_hot_stream=is_hot_stream
+            curve=curve, 
+            epsilon=dt_diff_max, 
+            is_hot_stream=is_hot_stream
         )
     except:
         try:
@@ -66,7 +72,10 @@ def get_piecewise_data_points(
 #######################################################################################################
 
 
-def _rdp(curve: np.array, epsilon: float) -> np.array:
+def _rdp(
+    curve: np.array, 
+    epsilon: float
+) -> np.array:
     """
     Linearize and simplify a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
 

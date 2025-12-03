@@ -170,7 +170,7 @@ def _get_site_targets(zone: Zone):
         # Targets process level energy requirements
         z: Zone
         for z in zone.subzones.values():
-            _get_process_targets(z)
+            # _get_process_targets(z)
             if z.identifier == ZoneType.O.value:
                 _get_unit_operation_targets(z)
             elif z.identifier == ZoneType.P.value:

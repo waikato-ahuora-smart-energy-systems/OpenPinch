@@ -1,0 +1,264 @@
+{
+    "targets": [
+        {
+            "name": "potatoe-simple/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 43.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 43.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2916.813186813187,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1476.813186813187,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3683.186813186813,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 73.91227644607139,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 5084973317.687531,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1342.6373626373627,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1574.1758241758241,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 974.3573817486861,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 502.45580506450136,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 43.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 43.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2916.813186813187,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1476.813186813187,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3683.186813186813,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 73.91227644607139,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 5084973317.687531,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1342.6373626373627,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1574.1758241758241,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 974.3573817486861,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 502.45580506450136,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "potatoe-simple/Total Process Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": null,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": null,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2916.813186813187,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1476.813186813187,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3683.186813186813,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 5084973317.687531,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1342.6373626373627,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1574.1758241758241,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 974.3573817486861,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 502.45580506450136,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "potatoe-simple/Total Site Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 35.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 50.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2916.813186813187,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1476.8131868131873,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3683.1868131868127,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 73.91227644607137,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 5084973317.687531,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1342.6373626373627,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1574.1758241758241,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 974.3573817486861,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 502.45580506450136,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

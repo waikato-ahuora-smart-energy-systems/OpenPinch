@@ -22,6 +22,22 @@ INTERPOLATION_KEYS = (
     PT.H_NET_NP.value,
     PT.H_NET_A.value,
     PT.H_NET_V.value,
+    PT.H_NET_PK.value,
+    PT.H_NET_AI.value,
+    PT.H_NET_UT.value,
+    PT.H_NET_HOT.value,
+    PT.H_NET_COLD.value,
+    PT.H_NET_W_AIR.value,
+    PT.H_NET_HP_UT.value,
+    PT.H_NET_HP_PRO.value,
+    PT.H_HOT_UT.value,
+    PT.H_COLD_UT.value,
+    PT.H_HOT_BAL.value,
+    PT.H_COLD_BAL.value,
+    PT.H_HOT_HP.value,
+    PT.H_COLD_HP.value,
+    PT.H_NET_HOT_2.value,
+    PT.H_NET_COLD_2.value,
 )
 HEAT_CAPACITY_PAIRS = (
     (PT.CP_HOT.value, PT.DELTA_H_HOT.value),
@@ -369,18 +385,21 @@ class ProblemTable:
         self, T_ls: List[float] | float
     ) -> int:
         """Insert any missing temperature intervals and return count inserted."""
-        if self.data is None or self.data.shape[0] < 2:
+        if self.data is None or self.data.shape[0] < 2 == 0:
             return 0
         T_vals = np.atleast_1d(np.asarray(T_ls, dtype=float))
-        T_vals = self._temps_needing_insertion(T_vals)        
-        top_temps, interval_map, bottom_temps = self._categorise_insertion_targets(T_vals)
+        # Get unique missing values
+        T_insert = self._Ts_needing_insertion(T_vals)  
+        # S    
+        top_temps, interval_map, bottom_temps = self._categorise_insertion_targets(T_insert)
         if top_temps.size == 0 and bottom_temps.size == 0 and not interval_map:
             return 0
+        
         new_data, inserted = self._apply_interval_map(interval_map, top_temps, bottom_temps)
         self.data = new_data
         return inserted
 
-    def _temps_needing_insertion(self, T_vals: np.ndarray) -> np.ndarray:
+    def _Ts_needing_insertion(self, T_vals: np.ndarray) -> np.ndarray:
         """Filter temperatures that are not within tolerance of existing rows."""
         if T_vals.size == 0:
             return T_vals

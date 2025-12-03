@@ -23,26 +23,34 @@ __all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_probl
 
 
 def get_process_heat_cascade(
-    hot_streams: StreamCollection,
-    cold_streams: StreamCollection,
-    all_streams: StreamCollection,
-    zone_config: Configuration,
+    hot_streams: StreamCollection = StreamCollection(),
+    cold_streams: StreamCollection = StreamCollection(),
+    all_streams: StreamCollection = None,
+    zone_config: Configuration = None,
+    include_real_pt: bool = True,
 ) -> Tuple[ProblemTable, ProblemTable, dict]:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
+    if all_streams is None:
+        all_streams = hot_streams + cold_streams
+    
     pt = create_problem_table_with_t_int(
         all_streams,
         True,
         zone_config,
     )
+    # Perform the heat cascade of the problem table
+    _problem_table_algorithm(pt, hot_streams, cold_streams)
+
+    if not include_real_pt or zone_config == None:
+        return pt, None, None
+    
     pt_real = create_problem_table_with_t_int(
         all_streams, 
         False,
         zone_config,
-    )    
+    )
 
-    # Perform the heat cascade of the problem table
-    _problem_table_algorithm(pt, hot_streams, cold_streams)
     _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
     target_values = _set_zonal_targets(pt, pt_real)
 
@@ -67,21 +75,17 @@ def get_utility_heat_cascade(
     is_shifted: bool = True,
 ) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
-    pt_ut = ProblemTable(
-        {
-            PT.T.value: T_int_vals
-        }
-    )
+    pt_ut = ProblemTable({PT.T.value: T_int_vals})
     _problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
 
     h_net_values = pt_ut.col[PT.H_NET.value]
-    h_ut_net = h_net_values.max() - h_net_values
+    H_NET_UT = h_net_values.max() - h_net_values
     
     h_ut_cc =  pt_ut.col[PT.H_HOT.value]
     c_ut_cc =  pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max()
 
     return {
-        PT.H_UT_NET.value: h_ut_net,
+        PT.H_NET_UT.value: H_NET_UT,
         PT.H_HOT_UT.value: h_ut_cc,
         PT.H_COLD_UT.value: c_ut_cc,
         PT.RCP_HOT_UT.value: pt_ut.col[PT.RCP_HOT.value],
@@ -91,7 +95,7 @@ def get_utility_heat_cascade(
 
 
 def create_problem_table_with_t_int(
-    streams: List[Stream] = [], 
+    streams: List[Stream] | StreamCollection = [], 
     is_shifted: bool = True,
     zone_config: Configuration = None,
 ) -> Tuple[ProblemTable, ProblemTable]:
@@ -113,7 +117,7 @@ def create_problem_table_with_t_int(
         if zone_config.DO_EXERGY_TARGETING:
             T_vals.append(zone_config.T_ENV)
 
-        if zone_config.DO_HP_TARGETING:
+        if zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_UTILITY_HP_TARGETING:
             T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT)
             T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT - zone_config.DT_PHASE_CHANGE)
             T_vals.append(zone_config.T_ENV + zone_config.DT_ENV_CONT)

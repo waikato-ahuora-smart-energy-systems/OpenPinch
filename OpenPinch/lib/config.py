@@ -20,33 +20,48 @@ LOG_TIMING = False
 
 
 class Configuration:
-    """Runtime configuration flags mirroring options from the legacy Excel workbook."""
-
+    """Runtime configuration."""
+    
+    ### General parameters ###
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER = ZoneType.S.value
-
-    DO_DIRECT_OPERATION_TARGETING: bool = False
-    # DO_DIRECT_SITE_TARGETING: bool = True
-    DO_INDIRECT_PROCESS_TARGETING: bool = False
-    DO_BALANCED_CC: bool = True
-    DO_AREA_TARGETING: bool = False
-    DO_HP_TARGETING: bool = False
-    DO_TURBINE_TARGETING: bool = False
-    DO_EXERGY_TARGETING: bool = False
-    DO_VERTICAL_GCC: bool = False
-    DO_ASSITED_HT: bool = False
-    DO_TURBINE_WORK: bool = False
-
-    GCC_FOR_TARGETING: str = PT.H_NET_NP.value
-
     DT_CONT: float = 5
-    DT_PHASE_CHANGE: float = 0.01
+    DT_PHASE_CHANGE: float = 0.1
     HTC: float = 1.0
     T_ENV: float = 15
     DT_ENV_CONT: float = 10 
     P_ENV: float = 101
     DECIMAL_PLACES: int = 2
 
+    ### Targeting analysis flags ### 
+    DO_DIRECT_OPERATION_TARGETING: bool = False
+    DO_DIRECT_SITE_TARGETING: bool = True
+    DO_INDIRECT_PROCESS_TARGETING: bool = False
+    DO_BALANCED_CC: bool = True
+    DO_AREA_TARGETING: bool = False
+    DO_PROCESS_HP_TARGETING: bool = True
+    DO_UTILITY_HP_TARGETING: bool = False
+    DO_TURBINE_TARGETING: bool = False
+    DO_EXERGY_TARGETING: bool = False
+    DO_VERTICAL_GCC: bool = False
+    DO_ASSITED_HT: bool = False
+    DO_TURBINE_WORK: bool = False
+
+    ### Heat pump targeting parameters ###
+    HP_TYPE: str = HeatPumpType.MultiTempCarnot.value
+    HP_LOAD_FRACTION: float = 1.0
+    REFRIGERANTS: List[str] = ["water", "ammonia"]
+    PRICE_RATIO_ELE_TO_FUEL: float = 1.0
+    MAX_HP_MULTISTART: int = 10
+    N_COND: int = 2
+    N_EVAP: int = 2
+    ETA_COMP: float = 0.7
+    ETA_EXP: float = 0.7
+    ETA_HP_CARNOT: float = 0.5
+    ETA_HE_CARNOT: float = 0.5
+    DTMIN_HP: float = 0.0  
+
+    ### Cost targeting parameters ### 
     UTILITY_PRICE: float = 40
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0

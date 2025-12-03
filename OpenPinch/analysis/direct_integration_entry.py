@@ -11,7 +11,10 @@ from . import (
     get_min_number_hx,
     get_capital_cost_targets,
     get_balanced_CC,
-    get_optimal_heat_pump_placement,
+    get_additional_GCCs,
+    get_heat_pump_targets,
+    calc_heat_pump_cascade,
+    plot_multi_hp_profiles_from_results,
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -39,14 +42,54 @@ def compute_direct_integration_targets(zone: Zone):
     pt, pt_real, target_values = get_process_heat_cascade(
         hot_streams, cold_streams, all_streams, zone_config
     )
-    get_utility_targets(
-        pt, pt_real, hot_utilities, cold_utilities
+    hot_pinch, cold_pinch = pt.pinch_temperatures()
+    pt = get_additional_GCCs(
+        pt, 
+        is_direct_integration=True, 
+        do_vert_cc_calc=zone_config.DO_VERTICAL_GCC,
+        do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
-    net_hot_streams, net_cold_streams = _get_net_hot_and_cold_segments(
+    
+    if zone.identifier in [Z.P.value]:
+        if _validate_heat_pump_targeting_required(pt, True, zone_config):
+            hp_res = get_heat_pump_targets(
+                T_vals=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_NET_HOT.value],
+                H_cold=pt.col[PT.H_NET_COLD.value],
+                zone_config=zone_config, 
+                is_direct_integration=True,
+                is_heat_pumping=True,
+            )
+            res.update(
+                hp_res
+            )
+            calc_heat_pump_cascade(
+                pt=pt,
+                res=hp_res,
+                is_T_vals_shifted=True,
+                is_direct_integration=True,
+            )
+            if 0:
+                plot_multi_hp_profiles_from_results(
+                    T_hot=pt.col[PT.T.value],
+                    H_hot=pt.col[PT.H_NET_HOT.value],
+                    T_cold=pt.col[PT.T.value],                    
+                    H_cold=pt.col[PT.H_NET_COLD.value],
+                    hp_hot_streams=hp_res.hp_hot_streams,
+                    hp_cold_streams=hp_res.hp_cold_streams,
+                )
+                plot_multi_hp_profiles_from_results(
+                    T_hot=pt.col[PT.T.value],
+                    H_hot=pt.col[PT.H_NET_W_AIR.value],
+                )
+                pass
+    
+    get_utility_targets(
+        pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True
+    )
+    net_hot_streams, net_cold_streams = _create_net_hot_and_cold_stream_collections_for_site_analysis(
         pt.col[PT.T.value], pt.col[PT.H_NET_A.value], hot_utilities, cold_utilities
     )
-    hot_pinch, cold_pinch = pt.pinch_temperatures()
-
     if zone_config.DO_BALANCED_CC or zone_config.DO_AREA_TARGETING:
         pt.update(
             get_balanced_CC(
@@ -101,21 +144,6 @@ def compute_direct_integration_targets(zone: Zone):
                 }
             )
 
-    if zone_config.DO_HP_TARGETING and pt.col[PT.H_COLD_NET.value].max() > tol:
-        init_res = get_optimal_heat_pump_placement(
-            T_hot=pt.col[PT.T.value],
-            H_hot=pt.col[PT.H_HOT_NET.value],
-            T_cold=pt.col[PT.T.value],
-            H_cold=pt.col[PT.H_COLD_NET.value],
-            n_cond=2,
-            n_evap=2,
-            eff_isen=0.7,
-            dtmin_hp=0,
-            is_T_vals_shifted=True,  
-            zone_config=zone_config,      
-        )
-        pass
-
     res.update(
         {
             "pt": pt,
@@ -139,7 +167,7 @@ def compute_direct_integration_targets(zone: Zone):
 #######################################################################################################
 
 
-def _get_net_hot_and_cold_segments(
+def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     hot_utilities: StreamCollection,
@@ -303,7 +331,24 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
         GT.CC.value: pt_real[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
         GT.BCC.value: pt_real[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
-        GT.GCC.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_UT_NET.value]],
-        GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_UT_NET.value]],
-        GT.NLC.value: pt[[PT.T.value, PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
+        GT.GCC.value: pt[[PT.T.value, PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_NET_UT.value]],
+        GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_NET_UT.value]],
+        GT.NLC.value: pt[[PT.T.value, PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
+        GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP_PRO.value]],
     }
+
+
+def _validate_heat_pump_targeting_required(
+    pt: ProblemTable,
+    is_heat_pumping: bool,
+    zone_config: Configuration,
+) -> bool:
+    return False if (
+        (zone_config.DO_PROCESS_HP_TARGETING == False)
+        or 
+        (np.abs(pt.col[PT.H_NET_COLD.value]).max() < tol and is_heat_pumping == True)
+        or
+        (np.abs(pt.col[PT.H_NET_HOT.value]).max() < tol and is_heat_pumping == False)
+        or 
+        (zone_config.HP_LOAD_FRACTION < tol)
+    ) else True

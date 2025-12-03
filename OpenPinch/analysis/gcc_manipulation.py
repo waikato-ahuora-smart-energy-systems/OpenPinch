@@ -10,6 +10,7 @@ from ..utils import *
 
 
 __all__ = [
+    "get_additional_GCCs",
     "get_GCC_without_pockets", 
     "get_GCC_with_partial_pockets", 
     "get_GCC_with_vertical_heat_transfer",
@@ -23,6 +24,43 @@ __all__ = [
 #######################################################################################################
 # Public API
 #######################################################################################################
+
+
+def get_additional_GCCs(
+    pt: ProblemTable,
+    is_direct_integration: bool = True,
+    do_vert_cc_calc: bool = False,
+    do_assisted_ht_calc: bool = False,
+) -> ProblemTable:        
+    # Calculate various GCC profiles
+    if is_direct_integration:
+        get_GCC_without_pockets(pt)
+        
+        if do_vert_cc_calc:
+            pt.update(
+                get_GCC_with_vertical_heat_transfer(
+                    pt.col[PT.H_COLD.value],
+                    pt.col[PT.H_HOT.value],
+                    pt.col[PT.H_NET.value],
+                )
+            )
+
+        if do_assisted_ht_calc:
+            pt.update(
+                get_GGC_pockets(pt)
+            )
+
+    pt.update(
+        get_GCC_needing_utility(
+            pt.col[PT.H_NET_NP.value]
+        )
+    )    
+    pt.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt.col[PT.H_NET_A.value]
+        )
+    )
+    return pt    
 
 
 def get_GCC_without_pockets(
@@ -155,8 +193,8 @@ def get_seperated_gcc_heat_load_profiles(
         hot_profile = hot_profile + hut_max
 
     return {
-        PT.H_HOT_NET.value: hot_profile,
-        PT.H_COLD_NET.value: cold_profile,
+        PT.H_NET_HOT.value: hot_profile,
+        PT.H_NET_COLD.value: cold_profile,
     } if is_process_stream else {
         PT.H_HOT_UT.value: hot_profile,
         PT.H_COLD_UT.value: cold_profile,

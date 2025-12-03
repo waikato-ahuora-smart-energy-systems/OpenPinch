@@ -117,7 +117,7 @@ def test_get_separated_heat_profiles_categorises_correctly():
         pt.col[PT.H_NET_A.value]
     )
 
-    assert PT.H_HOT_NET.value in result_cols
-    assert PT.H_COLD_NET.value in result_cols
-    assert result_cols[PT.H_HOT_NET.value][-1] == -100
-    assert result_cols[PT.H_COLD_NET.value][0] == 300
+    assert PT.H_NET_HOT.value in result_cols
+    assert PT.H_NET_COLD.value in result_cols
+    assert result_cols[PT.H_NET_HOT.value][-1] == -100
+    assert result_cols[PT.H_NET_COLD.value][0] == 300

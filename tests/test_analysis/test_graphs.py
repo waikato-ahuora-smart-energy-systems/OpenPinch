@@ -113,7 +113,7 @@ def test_visualise_graphs_gcc_utility():
         PT.H_NET_NP.value: MagicMock(to_list=lambda: [0, -100]),
         PT.H_NET_V.value: MagicMock(to_list=lambda: [0, -100]),
         PT.H_NET_PK.value: MagicMock(to_list=lambda: [0, -100]), 
-        PT.H_UT_NET.value: MagicMock(to_list=lambda: [0, -100]), 
+        PT.H_NET_UT.value: MagicMock(to_list=lambda: [0, -100]), 
     }
     visualise_graphs(graph_set, graph)
     assert len(graph_set["graphs"]) == 1

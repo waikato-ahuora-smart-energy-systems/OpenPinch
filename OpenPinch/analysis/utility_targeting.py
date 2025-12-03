@@ -7,7 +7,7 @@ from ..lib import *
 from ..utils import *
 
 from .problem_table_analysis import get_utility_heat_cascade
-from .gcc_manipulation import *
+from .gcc_manipulation import get_seperated_gcc_heat_load_profiles
 
 
 __all__ = ["get_utility_targets"]
@@ -19,11 +19,10 @@ __all__ = ["get_utility_targets"]
 
 def get_utility_targets(
     pt: ProblemTable,
-    pt_real: ProblemTable,
-    hot_utilities: StreamCollection,
-    cold_utilities: StreamCollection,
-    is_process_zone: bool = True,
-    zone_config: Configuration = Configuration(),
+    pt_real: ProblemTable = None,
+    hot_utilities: StreamCollection = None,
+    cold_utilities: StreamCollection = None,
+    is_direct_integration: bool = True,
 ) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection]:
     """Target utility usage and compute GCC variants for a zone.
 
@@ -34,7 +33,7 @@ def get_utility_targets(
     hot_utilities, cold_utilities:
         Candidate utility collections that will be targeted across temperature
         intervals.
-    is_process_zone:
+    is_direct_integration:
         When ``True`` (default) the function assumes the zone represents a
         process area and applies additional targeting logic appropriate for that
         context.
@@ -45,44 +44,15 @@ def get_utility_targets(
         Updated ``(pt, pt_real, hot_utilities, cold_utilities)`` collections with
         derived profiles embedded.
     """
-    
-    # Calculate various GCC profiles
-    if is_process_zone:
-        get_GCC_without_pockets(pt)
-        
-    if zone_config.DO_VERTICAL_GCC:
-        pt.update(
-            get_GCC_with_vertical_heat_transfer(
-                pt.col[PT.H_COLD.value],
-                pt.col[PT.H_HOT.value],
-                pt.col[PT.H_NET.value],
-            )
-        )
-
-    if zone_config.DO_ASSITED_HT:
-        pt.update(
-            get_GGC_pockets(pt)
-        )
-
-    pt.update(
-        get_GCC_needing_utility(
-            pt.col[PT.H_NET_NP.value]
-        )
-    )    
-    pt.update(
-        get_seperated_gcc_heat_load_profiles(
-            pt.col[PT.H_NET_A.value]
-        )
-    )
 
     # Target multiple utility use
-    if is_process_zone:
+    if is_direct_integration:
         hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(PT.H_NET_A)
         is_real_temperatures = False
         _target_utility(
             hot_utilities, 
             pt.col[PT.T.value], 
-            pt.col[PT.H_COLD_NET.value],
+            pt.col[PT.H_NET_COLD.value],
             hot_pinch_row, 
             cold_pinch_row,
             is_real_temperatures,
@@ -90,7 +60,7 @@ def get_utility_targets(
         _target_utility(
             cold_utilities, 
             pt.col[PT.T.value], 
-            pt.col[PT.H_HOT_NET.value],
+            pt.col[PT.H_NET_HOT.value],
             hot_pinch_row, 
             cold_pinch_row,
             is_real_temperatures,
@@ -106,26 +76,27 @@ def get_utility_targets(
     )
     pt.update(
         get_seperated_gcc_heat_load_profiles(
-            pt.col[PT.H_UT_NET.value],
+            pt.col[PT.H_NET_UT.value],
             pt.col[PT.RCP_UT_NET.value],
             is_process_stream=False,
         )
     )
-    pt_real.update(
-        get_utility_heat_cascade(
-            pt_real.col[PT.T.value], 
-            hot_utilities, 
-            cold_utilities, 
-            is_shifted=False
+    if isinstance(pt_real, ProblemTable):    
+        pt_real.update(
+            get_utility_heat_cascade(
+                pt_real.col[PT.T.value], 
+                hot_utilities, 
+                cold_utilities, 
+                is_shifted=False
+            )
         )
-    )
-    pt_real.update(
-        get_seperated_gcc_heat_load_profiles(
-            pt_real.col[PT.H_UT_NET.value],
-            pt_real.col[PT.RCP_UT_NET.value],
-            is_process_stream=False,
+        pt_real.update(
+            get_seperated_gcc_heat_load_profiles(
+                pt_real.col[PT.H_NET_UT.value],
+                pt_real.col[PT.RCP_UT_NET.value],
+                is_process_stream=False,
+            )
         )
-    )
     return pt, pt_real, hot_utilities, cold_utilities
 
 

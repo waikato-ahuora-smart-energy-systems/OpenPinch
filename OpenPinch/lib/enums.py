@@ -14,6 +14,7 @@ class ZoneType(Enum):
     def __str__(self):
         return self.value
 
+Z = ZoneType
 
 class TargetType(Enum):
     """Different target calculation categories."""
@@ -40,6 +41,24 @@ class HeatExchangerTypes(Enum):
     CrFMUmin = "Crossflow - Cmin Unmixed"
     ShellTube = "1-n Shell and Tube"
     CondEvap = "Condensing or Evaporating"
+
+
+class HeatPump(Enum):
+    """Heat pump components"""
+
+    Cond = "Condenser"
+    Evap = "Evaporator"
+    Comp = "Compressor"
+    Expd = "Expansion"
+    IHX = "Internal Heat Exchanger"
+
+
+class HeatPumpType(str, Enum):
+    MultiTempCarnot = "Multi-temperature Carnot cycles"
+    MultiSimpleCarnot = "Multiple simple Carnot cycles"
+    Brayton = "Brayton cycle"
+    CascadeVapourComp = "Cascade vapour compression cycles"
+    MultiSimpleVapourComp = "Multiple simple vapour compression cycles"
 
 
 class HeatFlowUnits(Enum):
@@ -98,14 +117,22 @@ class ProblemTableLabel(Enum):
     H_NET_PK = "H_net_pockets"
     H_NET_AI = "H_net_assisted"
     H_NET_A = "H_net_actual"
-    H_UT_NET = "H_net_ut"
-    H_HOT_NET = "H_hot_net"
-    H_COLD_NET = "H_cold_net"
+    H_NET_UT = "H_net_ut"
+    H_NET_HOT = "H_hot_net"
+    H_NET_COLD = "H_cold_net"
+    H_NET_HP_UT = "H_net_hp_ut"
+    H_NET_HP_PRO = "H_net_hp_pro"
+    H_NET_W_AIR = "H_net_with_air"
 
     H_HOT_UT = "H_hot_utility"
     H_COLD_UT = "H_cold_utility"
     H_HOT_BAL = "H_hot_balanced"
     H_COLD_BAL = "H_cold_balanced"
+
+    H_HOT_HP = "H_hot_hp_ut"
+    H_COLD_HP = "H_cold_hp_ut"
+    H_NET_HOT_2 = "H_hot_net_after_hp"
+    H_NET_COLD_2 = "H_cold_net_after_hp"      
 
     RCP_HOT = "rCP_hot"
     RCP_COLD = "rCP_cold"
@@ -164,6 +191,7 @@ class GraphType(Enum):
     GCC = "Grand Composite Curve"
     GCC_R = "Grand Composite Curve (Real)"
     GCC_X = "Exergetic Grand Composite Curve"
+    GCC_HP = "Grand Composite Curve with Heat Pump"
     # GCC_N = "Grand Composite Curve (No Pockets)"
     # GCC_V = "Vertical Grand Composite Curve"
     # GCC_A = "Actual Grand Composite Curve"    

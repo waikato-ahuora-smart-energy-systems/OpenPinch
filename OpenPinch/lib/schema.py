@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import MainOptionsPropKeys, StreamType, TurbineOptionsPropKeys
+
+from ..classes.stream_collection import StreamCollection
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
@@ -37,24 +39,83 @@ class TempPinch(BaseModel):
     hot_temp: MaybeVU = None
 
 
-class HeatPumpPlacementArgs(BaseModel):
+class HeatPumpTargetInputs(BaseModel):
     """Parameter bundle for heat pump optimisation routines."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    T_cond_hi: float
-    T_evap_lo: float
-    T_hot: np.ndarray
-    H_hot: np.ndarray
-    T_cold: np.ndarray
-    H_cold: np.ndarray
+    # Calculated based on the case
+    Q_hp_target: float
+    Q_amb_max: float
+    dt_range_max: float
+
+    # Background process net hot and cold load curves
+    T_hot: np.ndarray | list
+    H_hot: np.ndarray | list
+    T_cold: np.ndarray | list
+    H_cold: np.ndarray | list
+
+    # From overall analysis configuration
     n_cond: int
     n_evap: int
-    bnds_cond: tuple
-    bnds_evap: tuple
-    eff_isen: float
-    dtmin_hp: float
-    is_T_vals_shifted: bool
+    eta_comp: float
+    eta_exp: float
+    dtcont_hp: float
+    dt_phase_change: float
+    price_ratio: float
+    is_direct_integration: bool
+    is_heat_pumping: bool
+    max_multi_start: int
+    T_env: float
+    dt_env_cont: float
+    eta_hp_carnot: float
+    eta_he_carnot: float
+    refrigerant_ls: List[str]
+
+    # Optional arguments
+    dT_sc: Optional[np.ndarray] = None
+    dT_sh: Optional[np.ndarray] = None 
+    unit_system: Optional[str] = "EUR"
+    net_hot_streams: Optional[StreamCollection] = StreamCollection()
+    net_cold_streams: Optional[StreamCollection] = StreamCollection()
+
+
+class HeatPumpTargetOutputs(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        arbitrary_types_allowed=True,
+    )
+
+    # --- Common objective / result fields -------------------------
+    utility_tot: float
+    work_hp: float
+    Q_ext: float
+    Q_amb: float    
+    cop: float | list | np.ndarray
+    obj: float
+    opt_success: bool
+
+    hp_hot_streams: Optional["StreamCollection"] = None
+    hp_cold_streams: Optional["StreamCollection"] = None
+    amb_stream: Optional["StreamCollection"] = None
+
+    # --- Flattened state fields (union of all children) -----------
+    # Carnot & Simple Vapour Compression
+    T_cond: Optional[np.ndarray] = None
+    T_evap: Optional[np.ndarray] = None
+    Q_cond: Optional[np.ndarray] = None
+    Q_evap: Optional[np.ndarray] = None
+
+    # Simple Vapour Compression only
+    dT_sc: Optional[np.ndarray] = None
+    dT_sh: Optional[np.ndarray] = None
+
+    # Brayton only
+    T_comp_out: Optional[np.ndarray] = None
+    dT_gc: Optional[np.ndarray] = None
+    dT_comp: Optional[np.ndarray] = None
+    Q_heat: Optional[np.ndarray] = None
+    Q_cool: Optional[np.ndarray] = None
 
 
 # ---- Targeting results -------------------------------------------------------
@@ -211,7 +272,7 @@ class TargetInput(BaseModel):
     """Validated top-level input payload for :func:`OpenPinch.pinch_analysis_service`."""
 
     streams: List[StreamSchema]
-    utilities: List[UtilitySchema] = Field(default_factory=list)
+    utilities: List[UtilitySchema] = []
     options: Optional[Options] = None
     zone_tree: Optional[ZoneTreeSchema] = None
 

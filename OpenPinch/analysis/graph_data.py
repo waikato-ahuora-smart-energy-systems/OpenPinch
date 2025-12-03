@@ -25,7 +25,7 @@ GCC_SERIES_LEGEND: dict[str, GCCSeriesMeta] = {
     PT.H_NET_NP.value: GCCSeriesMeta(LegendSeries.GCC_N.name, LegendSeries.GCC_N.value),
     PT.H_NET_V.value: GCCSeriesMeta(LegendSeries.GCC_V.name, LegendSeries.GCC_V.value),
     PT.H_NET_A.value: GCCSeriesMeta(LegendSeries.GCC_A.name, LegendSeries.GCC_A.value),
-    PT.H_UT_NET.value: GCCSeriesMeta(
+    PT.H_NET_UT.value: GCCSeriesMeta(
         LegendSeries.GCC_U.name,
         LegendSeries.GCC_U.value,
         StreamLoc.HotU,
@@ -89,7 +89,7 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                     data=graph_data,
                     label=graph_type,
                     name=f"{graph_type} Graph",
-                    value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_UT_NET.value],
+                    value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_NET_UT.value],
                     is_utility_profile=[False, False, False, False, True],
                 )
             )
@@ -149,7 +149,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.GCC.value,
                 data=t.graphs[GT.GCC.value],
                 label="Grand Composite Curve",
-                value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_UT_NET.value],
+                value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_NET_UT.value],
                 is_utility_profile=[False, False, False, False, True],
             )
         )
@@ -160,7 +160,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 graph_title=graphTitle,
                 key=GT.TSP.value,
                 data=t.graphs[GT.TSP.value],
-                col_keys=[PT.H_HOT_NET.value, PT.H_COLD_NET.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
+                col_keys=[PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
                 stream_types=[StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU],
                 label="Total Site Profiles",
                 include_arrows=True,
@@ -174,8 +174,20 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.SUGCC.value,
                 data=t.graphs[GT.SUGCC.value],
                 label="Site Utility Grand Composite Curve",
-                value_field=[PT.H_UT_NET.value],
+                value_field=[PT.H_NET_UT.value],
                 is_utility_profile=[True],
+            )
+        )
+    
+    if GT.GCC_HP.value in t.graphs:
+        graphs.append(
+            _make_gcc_graph(
+                graph_title=graphTitle,
+                key=GT.GCC_HP.value,
+                data=t.graphs[GT.GCC_HP.value],
+                label="Grand Composite Curve with Heat Pump",
+                value_field=[PT.H_NET_W_AIR.value, PT.H_NET_HP_PRO.value],
+                is_utility_profile=[False, True],
             )
         )
 
@@ -250,7 +262,8 @@ def _build_gcc_segments(
     is_utility_profile: bool,
     decolour: bool,
 ) -> List[dict]:
-    y_vals, x_vals = clean_composite_curve(list(y_vals), list(x_vals))
+    
+    y_vals, x_vals = clean_composite_curve(y_vals, x_vals)
     counts: dict[StreamLoc, int] = defaultdict(int)
     segments: List[dict] = []
     for stream_loc, is_vertical, x_seg, y_seg in _iter_gcc_segment_slices(
