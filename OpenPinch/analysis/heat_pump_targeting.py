@@ -59,7 +59,7 @@ def get_heat_pump_targets(
     # zone_config.HP_LOAD_FRACTION = 1
     # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
-    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
+    zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     # zone_config.HP_TYPE = HeatPumpType.Brayton.value
     #############################
     args = _prepare_heat_pump_target_inputs(
@@ -358,7 +358,7 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     minima = list(
         map(
             lambda x0: minimize(
-                fun=lambda x: _compute_multi_temperature_carnot_hp_opt_obj(x, args).obj,
+                fun=lambda x: _compute_multi_temperature_carnot_hp_opt_obj(x, args)["obj"],
                 x0=x0,
                 bounds=bnds,
                 method="SLSQP",            
@@ -372,8 +372,11 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
             opt = m
 
     res = _compute_multi_temperature_carnot_hp_opt_obj(opt.x, args)
-    res.hp_hot_streams = _build_latent_streams(res.T_cond, args.dt_phase_change, res.Q_cond, args.dtcont_hp, is_hot=True)
-    res.hp_cold_streams = _build_latent_streams(res.T_evap, args.dt_phase_change, res.Q_evap, args.dtcont_hp, is_hot=False)
+    res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))   
+
+    if 0:        
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))
+
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -397,7 +400,7 @@ def _get_x0_and_bnds_for_multi_temperature_carnot_hp_opt(
     x0_evap_ls = _initialise_multi_temperature_carnot_hp_optimisation(
         n=args.n_evap,
         is_condenser=False,
-        T0=res.T_evap[-1],
+        T0=res["T_evap"][-1],
         map_fun=_map_x_to_T_evap,
         T_vals=args.T_hot,
         H_vals=args.H_hot,
@@ -455,7 +458,7 @@ def _initialise_multi_temperature_carnot_hp_optimisation(
 def _compute_multi_temperature_carnot_hp_opt_obj(
     x: np.ndarray, 
     args: HeatPumpTargetInputs
-) -> HeatPumpTargetOutputs:
+) -> dict:
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """
     x_cond, x_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args.n_cond)
@@ -468,26 +471,11 @@ def _compute_multi_temperature_carnot_hp_opt_obj(
         method="brent",
         tol=1e-6,
     )
-    res = HeatPumpTargetOutputs.model_validate(
-        _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(opt.x, [args, T_cond, Q_cond, x_evap, opt.success])
-    )
-    Q_cond_max = res.Q_cond.sum()    
-    Q_evap_max = res.Q_evap.sum()
-    if Q_evap_max > Q_cond_max * (1 - 1 / res.cop):
-        Q_cond_tot = Q_cond_max
-        work_hp = Q_cond_tot / res.cop
-        Q_evap_tot = Q_cond_tot - work_hp
-        res.Q_evap = res.Q_evap * (Q_evap_tot / Q_evap_max)
-    else: # Evaporator limits the heat pump
-        Q_evap_tot = Q_evap_max
-        work_hp = Q_evap_tot / (res.cop - 1)
-        Q_cond_tot = Q_evap_tot + work_hp
-        res.Q_cond = res.Q_cond * (Q_cond_tot / Q_cond_max)
+    res = _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(opt.x, [args, T_cond, Q_cond, x_evap, opt.success])
 
     if 0:
-        res.hp_hot_streams = _build_latent_streams(res.T_cond, args.dt_phase_change, res.Q_cond, args.dtcont_hp, is_hot=True)
-        res.hp_cold_streams = _build_latent_streams(res.T_evap, args.dt_phase_change, res.Q_evap, args.dtcont_hp, is_hot=False)         
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.hp_hot_streams, res.hp_cold_streams, str(f"Obj: {res.obj} = {res.work_hp} + {res.Q_ext}"))
+        res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))      
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))
     return res
 
 
@@ -496,7 +484,8 @@ def _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(
     input_args: list
 ) -> dict:
     """Adjust evaporator ladder to honour minimum temperature limits."""
-    args, T_cond, Q_cond, x_evap, success = input_args
+    args, T_cond, Q_cond_0, x_evap, success = input_args
+    Q_cond = Q_cond_0.copy()
     T_evap = _map_x_to_T_evap(x_evap, T_lo, args.dt_range_max)
     Q_evap = _get_Q_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
     cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
@@ -507,11 +496,13 @@ def _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(
         Q_cond_tot = Q_cond_max
         work_hp = Q_cond_tot / cop
         Q_evap_tot = Q_cond_tot - work_hp
+        Q_evap *= (Q_evap_tot / Q_evap_max)
     else: # Evaporator limits the heat pump
         Q_evap_tot = Q_evap_max
         work_hp = Q_evap_tot / (cop - 1)
         Q_cond_tot = Q_evap_tot + work_hp
-    
+        Q_cond *= (Q_cond_tot / Q_cond_max)
+
     Q_ext = max(args.Q_hp_target - Q_cond_tot, 0.0) # Direct electric heating
 
     return {
@@ -552,6 +543,25 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout.
     """
+    x0, bnds = _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(args)
+    _, local_minima_x = dual_annealing_multiminima(
+        func=lambda x_cond: _compute_multi_simple_carnot_hp_opt_obj(x_cond, args)["obj"],
+        x0=x0,
+        bounds=bnds,
+        constraints=None,
+    )
+    res = _compute_multi_simple_carnot_hp_opt_obj(np.array(local_minima_x[0]), args)
+    res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
+
+    if 0:        
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))
+
+    return HeatPumpTargetOutputs.model_validate(res)
+
+
+def _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(
+    args: HeatPumpTargetInputs
+) -> Tuple[np.ndarray, list]:
     ub_cond = (args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max
     ub_evap = (args.T_hot[0] - args.T_hot[-1]) / args.dt_range_max
     x0 = np.concatenate(
@@ -561,22 +571,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
         )
     )
     bnds = [(0.0, ub_cond) for _ in range(args.n_cond-1)] + [(0.0, ub_evap) for _ in range(args.n_evap)]
-    _, local_minima_x = dual_annealing_multiminima(
-        func=lambda x_cond: _compute_multi_simple_carnot_hp_opt_obj(x_cond, args)["obj"],
-        x0=x0,
-        bounds=bnds,
-        constraints=None,
-    )
-    res = _compute_multi_simple_carnot_hp_opt_obj(np.array(local_minima_x[0]), args)
-
-    res["hp_hot_streams"] = _build_latent_streams(res["T_cond"], args.dt_phase_change, res["Q_cond"], args.dtcont_hp, is_hot=True)
-    res["hp_cold_streams"] = _build_latent_streams(res["T_evap"], args.dt_phase_change, res["Q_evap"], args.dtcont_hp, is_hot=False)
-
-    if 0:
-        res = HeatPumpTargetOutputs.model_validate(res)
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.hp_hot_streams, res.hp_cold_streams, str(f"Q_evap: {res.Q_evap.sum()} = {res.work_hp} + {res.Q_ext}"))
-
-    return HeatPumpTargetOutputs.model_validate(res)
+    return x0, bnds    
 
 
 def _compute_multi_simple_carnot_hp_opt_obj(
@@ -626,9 +621,8 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
 
     if 0:
-        hp_hot_streams = _build_latent_streams(T_cond, args.dt_phase_change, Q_cond, args.dtcont_hp, is_hot=True)
-        hp_cold_streams = _build_latent_streams(T_evap, args.dt_phase_change, Q_evap, args.dtcont_hp, is_hot=False)
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, str(f"Q_evap: {Q_evap.sum()} = {work_hp.sum()} + {Q_ext}"))
+        res = _get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args)     
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))        
 
     return {
         "obj": (work_hp.sum() + Q_ext / args.price_ratio) / args.Q_hp_target, 
@@ -668,7 +662,7 @@ def _optimise_multi_simple_heat_pump_placement(
     opt = minimize(
         fun=lambda x: _compute_multi_simple_hp_system_performance(x, args)["obj"],
         x0=x0,
-        method="COBYQA", # SLSQP COBYQA
+        method="SLSQP",
         bounds=bnds,
         options={'disp': False, 'maxiter': 1000},
         tol=1e-7,
@@ -679,10 +673,9 @@ def _optimise_multi_simple_heat_pump_placement(
         res["amb_stream"] = _get_ambient_air_stream(res["Q_amb"], args)
         res["opt_success"] = opt.success
         if 1:
-            res = HeatPumpTargetOutputs.model_validate(res)
-            plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.hp_hot_streams, res.hp_cold_streams)        
+            plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))            
     else:
-        raise ValueError("Optimization failed:", opt.message)
+        raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)
 
     return res
 
@@ -972,9 +965,8 @@ def _optimise_brayton_heat_pump_placement(
     if opt.success:
         res = _compute_brayton_hp_system_performance(opt.x, args)
         res["opt_success"] = opt.success
-        if 0:
-            res = HeatPumpTargetOutputs.model_validate(res)
-            plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res.hp_hot_streams, res.hp_cold_streams)
+        if 0:   
+            plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"])
         
     else:
         print("Optimization failed:", opt.message)
@@ -1328,6 +1320,19 @@ def _prepare_latent_hp_profile(
     
     return T_hp, Q_hp
 
+
+def _get_carnot_hp_streams(
+    T_cond: np.ndarray,
+    Q_cond: np.ndarray,
+    T_evap: np.ndarray,
+    Q_evap: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> dict:
+    return {
+        "hp_hot_streams": _build_latent_streams(T_cond, args.dt_phase_change, Q_cond, args.dtcont_hp, is_hot=True),
+        "hp_cold_streams": _build_latent_streams(T_evap, args.dt_phase_change, Q_evap, args.dtcont_hp, is_hot=False),
+    }
+    
 
 def _build_latent_streams(
     T_ls: np.ndarray, 

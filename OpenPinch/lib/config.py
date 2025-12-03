@@ -50,7 +50,7 @@ class Configuration:
     ### Heat pump targeting parameters ###
     HP_TYPE: str = HeatPumpType.MultiTempCarnot.value
     HP_LOAD_FRACTION: float = 1.0
-    REFRIGERANTS: List[str] = ["butane", "ammonia"]
+    REFRIGERANTS: List[str] = ["water", "ammonia"]
     PRICE_RATIO_ELE_TO_FUEL: float = 1.0
     MAX_HP_MULTISTART: int = 10
     N_COND: int = 2

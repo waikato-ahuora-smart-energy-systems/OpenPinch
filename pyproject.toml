@@ -17,6 +17,7 @@ dependencies=[
   "streamlit",
   "plotly",
   "matplotlib",
+  "tespy",
 ]
 version = "0.0.22"
 authors = [
