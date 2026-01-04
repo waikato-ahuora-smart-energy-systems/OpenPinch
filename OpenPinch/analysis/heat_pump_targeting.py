@@ -671,7 +671,7 @@ def _optimise_multi_simple_heat_pump_placement(
         res = _compute_multi_simple_hp_system_performance(opt.x, args)
         res["amb_stream"] = _get_ambient_air_stream(res["Q_amb"], args)
         res["opt_success"] = opt.success
-        if 1:
+        if 0:
             plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))            
     else:
         raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)

@@ -108,12 +108,12 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 is_T_vals_shifted=True,
                 is_direct_integration=False,
             )
-            if 0:
+            if 1:
                 plot_multi_hp_profiles_from_results(
                     T_hot=pt.col[PT.T.value],
-                    H_hot=pt.col[PT.H_NET_HOT.value],
+                    H_hot=pt.col[PT.H_COLD_UT.value],
                     T_cold=pt.col[PT.T.value],                    
-                    H_cold=pt.col[PT.H_NET_COLD.value],
+                    H_cold=pt.col[PT.H_HOT_UT.value],
                     hp_hot_streams=hp_res.hp_hot_streams,
                     hp_cold_streams=hp_res.hp_cold_streams,
                 )

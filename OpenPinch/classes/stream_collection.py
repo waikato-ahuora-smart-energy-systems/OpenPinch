@@ -1,5 +1,7 @@
 """Utility container for managing ordered sets of stream objects."""
 
+import csv
+from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, List, Union
 
 if TYPE_CHECKING:
@@ -144,3 +146,29 @@ class StreamCollection:
         if not isinstance(other, StreamCollection):
             return NotImplemented
         return self._streams == other._streams
+
+    def export_to_csv(self, filename: str = "heat pump streams.csv") -> Path:
+        """Export stream data to ``results/<filename>`` and return the path written."""
+        base_dir = Path(__file__).resolve().parents[2] / "results"
+        base_dir.mkdir(parents=True, exist_ok=True)
+        output_path = base_dir / filename
+
+        self._ensure_sorted()
+        with output_path.open("w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(
+                ["name", "t_supply", "t_target", "heat_flow", "dt_cont", "htc"]
+            )
+            for stream in self._sorted_cache:
+                writer.writerow(
+                    [
+                        stream.name,
+                        stream.t_supply,
+                        stream.t_target,
+                        stream.heat_flow,
+                        stream.dt_cont,
+                        stream.htc,
+                    ]
+                )
+
+        return output_path
