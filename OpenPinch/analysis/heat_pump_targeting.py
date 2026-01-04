@@ -687,7 +687,7 @@ def _validate_vapour_hp_refrigerant_ls(
     if len(args.refrigerant_ls) > 0:
         refrigerants = [
             ref for ref, _ in sorted(
-                ((ref, PropsSI("Tcrit", ref)) for ref in args.refrigerant_ls),
+                ((ref, PropsSI("Tcrit", ref.upper())) for ref in args.refrigerant_ls),
                 key=lambda x: x[1],
                 reverse=True,
             )
@@ -713,7 +713,7 @@ def _prepare_multi_simple_hp_data_for_minimizer(
     x_cond_bnds = []
     x_evap_bnds = []
     for i, refrigerant in enumerate(args.refrigerant_ls):
-        T_min, T_max = PropsSI('Tmin', refrigerant) - 273.15, PropsSI('Tmax', refrigerant) - 273.15
+        T_min, T_max = PropsSI('Tmin', refrigerant.upper()) - 273.15, PropsSI('Tmax', refrigerant.upper()) - 273.15
         if i == T_cond.size:
             break
         T_cond_bnds = np.array((
