@@ -6,15 +6,13 @@ case and launch the interactive dashboard defined in
 """
 
 from __future__ import annotations
-
 from pathlib import Path
-
 import streamlit as st
-
 from OpenPinch import PinchProblem
 
-# Default case. Update this path if you want to switch datasets.
-DEFAULT_PROBLEM_FILE = Path("examples/OpenPinchWkbs/pulp_mill.xlsb")
+
+# Current case. Update this path if you want to switch datasets.
+PROBLEM_FILE = Path("OpenPinch/examples/OpenPinchWkbs/UnderReview/Chocolote Factory.xlsb")
 
 
 @st.cache_resource
@@ -23,21 +21,18 @@ def _load_problem(problem_path: str) -> PinchProblem:
     return PinchProblem(problem_path, run=True)
 
 
-def main() -> None:
-    problem_path = DEFAULT_PROBLEM_FILE
+def validate_problem_path(problem_path) -> None:
     if not problem_path.exists():
         st.error(
             f"Problem file not found at {problem_path}. "
-            "Update DEFAULT_PROBLEM_FILE to point to a valid case."
+            "Update PROBLEM_FILE to point to a valid case."
         )
-        st.stop()
-
-    problem = _load_problem(str(problem_path))
-    problem.render_streamlit_dashboard(
-        page_title="OpenPinch Dashboard",
-        value_rounding=2,
-    )
+        st.stop()    
 
 
 if __name__ == "__main__":
-    main()
+    problem_path = PROBLEM_FILE
+    validate_problem_path(problem_path)
+
+    problem = _load_problem(str(problem_path))
+    problem.render_streamlit_dashboard()

@@ -115,7 +115,7 @@ class PinchProblem:
         src_path = Path(source)
         self._project_name = src_path.name
 
-        # 1) JSON
+        # 1. JSON
         if src_path.suffix.lower() == ".json":
             try:
                 with src_path.open("r", encoding="utf-8") as f:
@@ -125,14 +125,14 @@ class PinchProblem:
             self._problem_filepath = src_path
             return self._problem_data
 
-        # 2) Excel
+        # 2. Excel
         elif src_path.suffix.lower() in {".xlsx", ".xls", ".xlsb", ".xlsm"}:
             # Reuse your existing Excel reader; writes options, streams, utilities
             self._problem_data = get_problem_from_excel(src_path, output_json=None)
             self._problem_filepath = src_path
             return self._problem_data
 
-        # 3) CSV bundle via directory lookup
+        # 3. CSV bundle via directory lookup
         elif src_path.is_dir():
             streams_csv = src_path / "streams.csv"
             utilities_csv = src_path / "utilities.csv"
@@ -241,7 +241,7 @@ class PinchProblem:
         *,
         zone: Optional["Zone"] = None,
         graph_payload: Optional[Dict[str, Any]] = None,
-        page_title: Optional[str] = None,
+        page_title: Optional[str] = "OpenPinch Dashboard",
         value_rounding: int = 2,
     ) -> None:
         """Launch the Streamlit dashboard for the analysed problem."""

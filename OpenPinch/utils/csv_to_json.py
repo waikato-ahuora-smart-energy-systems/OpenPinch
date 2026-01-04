@@ -5,7 +5,6 @@ import pandas as pd
 
 from .wkbook_to_json import (
     _get_column_names_and_units,
-    _set_options,
     _write_problem_to_dict_and_list,
     _write_targets_to_dict_and_list,
 )
@@ -68,7 +67,7 @@ def get_problem_from_csv(
         row_data=row_data,
         encoding=encoding,
     )
-    options_data = _set_options()
+    options_data = dict()
 
     output_dict = {
         "streams": streams_data,

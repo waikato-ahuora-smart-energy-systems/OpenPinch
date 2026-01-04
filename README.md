@@ -97,6 +97,20 @@ pp.target()
 pp.export_to_Excel(Path("results"))
 ```
 
+## Visualisation through Streamlit
+
+A Streamlit app provides a simple way to explore OpenPinch analysis results. In streamlit_app.py, a user can define the path to the stream and utility data for the problem. 
+
+Run with 
+
+``streamlit run streamlit_app.py`` 
+
+to load a case and launch the interactive dashboard defined in
+
+``OpenPinch/streamlit_webviewer/web_graphing.py``.
+
+"""
+
 ## Documentation
 
 Full documentation (getting started, guides, and API reference) is available:

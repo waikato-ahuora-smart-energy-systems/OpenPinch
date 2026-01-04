@@ -342,14 +342,13 @@ class SimpleHeatPumpCycle:
                 h1, T1 = profile[i]
                 h2, T2 = profile[i+1]
 
-                # Do we need a name?
                 name = f"Segment_{i+1}"
 
-                if abs(T1 - T2) < 0.0001: # Catch phase change
+                if abs(T1 - T2) < 0.001: # Catch phase change
                     if is_hot:
-                        t_target = T2 - 0.001
+                        t_target = T2 - 0.01
                     else:
-                        t_target = T2 + 0.001
+                        t_target = T2 + 0.01
                 else:
                     t_target = T2
 
