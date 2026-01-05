@@ -3,8 +3,7 @@
 import itertools
 from scipy.optimize import (
     differential_evolution,
-    minimize, 
-    NonlinearConstraint,
+    minimize,
     minimize_scalar
 )
 
@@ -225,6 +224,7 @@ def _prepare_heat_pump_target_inputs(
         eta_hp_carnot=zone_config.ETA_HP_CARNOT,
         eta_he_carnot=zone_config.ETA_HE_CARNOT,
         dtcont_hp=zone_config.DTMIN_HP,
+        dt_hp_ihx = zone_config.DT_HP_IHX,
         load_fraction=zone_config.HP_LOAD_FRACTION,
         T_env=zone_config.T_ENV,
         dt_env_cont=zone_config.DT_ENV_CONT,
@@ -244,7 +244,7 @@ def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
 ):
     """Apply ΔTmin adjustments to cascade temperatures for heat pump calculations.
     """
-    dT_shift = dtmin_hp * 0.5 if is_direct_integration else dtmin_hp * 1.5
+    dT_shift = dtmin_hp * 0.5 if is_direct_integration else dtmin_hp * 1.5 # utility streams are real temperatures??? 
     T_hot  = T_vals - dT_shift
     T_cold = T_vals + dT_shift
     return T_hot, T_cold, dT_shift
@@ -808,10 +808,10 @@ def _constrain_min_temperature_lift(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
 ):
-    """Ensure T_cond - dT_sc > T_evap + dtcont_hp
+    """Ensure T_cond - dT_sc > T_evap + dtcont_hp + dt_hp_ihx
     """
     T_cond, dT_sc, _, T_evap, _ = _parse_multi_simple_hp_state_temperatures(x, args)
-    T_diff = (T_cond - dT_sc) - T_evap - args.dtcont_hp
+    T_diff = T_cond - dT_sc - T_evap - args.dtcont_hp - args.dt_hp_ihx
     return T_diff.min()
 
 
@@ -823,13 +823,13 @@ def _parse_multi_simple_hp_state_temperatures(
     """
     n = args.n_cond 
 
-    T_cond = np.array(args.T_cold[0] - x[:n] * args.dt_range_max + args.dtcont_hp, dtype=np.float64)
+    T_cond = np.array(args.T_cold[0] - x[:n] * args.dt_range_max, dtype=np.float64)
     i = n
     dT_sc = np.array(x[i:i+n] * args.dt_range_max, dtype=np.float64)
     i += n
     Q_cond = np.array(x[i:i+n] * args.Q_hp_target, dtype=np.float64)
     i += n
-    T_evap = np.array(x[i:i+n] * args.dt_range_max + args.T_hot[-1] - args.dtcont_hp, dtype=np.float64)
+    T_evap = np.array(x[i:i+n] * args.dt_range_max + args.T_hot[-1], dtype=np.float64)
     i += n
     dT_sh = np.array(x[i:] * args.dt_range_max, dtype=np.float64)
 
@@ -857,7 +857,7 @@ def _compute_multi_simple_hp_system_performance(
     )
 
     # Build streams based on heat pump profiles and determine the heat cascade
-    hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list, args.dtcont_hp)
+    hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list)
     pt_cond, _, _ = get_process_heat_cascade(
         hp_hot_streams, args.net_cold_streams
     )    
@@ -1012,7 +1012,7 @@ def _compute_brayton_hp_system_performance(
         args=args,
     )
     
-    hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list, args.dtcont_hp)
+    hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list)
     
     T_exp_out = hp_list[0].cycle_states[3]['T']
 
@@ -1318,8 +1318,8 @@ def _get_carnot_hp_streams(
     args: HeatPumpTargetInputs,
 ) -> dict:
     return {
-        "hp_hot_streams": _build_latent_streams(T_cond, args.dt_phase_change, Q_cond, args.dtcont_hp, is_hot=True),
-        "hp_cold_streams": _build_latent_streams(T_evap, args.dt_phase_change, Q_evap, args.dtcont_hp, is_hot=False),
+        "hp_hot_streams": _build_latent_streams(T_cond, args.dt_phase_change, Q_cond, is_hot=True),
+        "hp_cold_streams": _build_latent_streams(T_evap, args.dt_phase_change, Q_evap, is_hot=False),
     }
     
 
@@ -1327,8 +1327,9 @@ def _build_latent_streams(
     T_ls: np.ndarray, 
     dT_phase_change: float,
     Q_ls: np.ndarray,
-    dt_cont: float,
-    is_hot: bool,
+    *,
+    dt_cont: float = 0.0,
+    is_hot: bool = True,
     is_process_stream: bool = False,
     prefix: str = "HP",
 ) -> StreamCollection:
@@ -1353,8 +1354,9 @@ def _build_latent_streams(
 
 
 def _build_simulated_hps_streams(
-    hp_list: list,
-    dtcont_hp: float,
+    hp_list: list, 
+    *,
+    dtcont_hp: float = 0.0,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Aggregate condenser/gas-cooler and evaporator/gas-heater streams for each simulated HP cycle."""
     hp_hot_streams, hp_cold_streams = StreamCollection(), StreamCollection()

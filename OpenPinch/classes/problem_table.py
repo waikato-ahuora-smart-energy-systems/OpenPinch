@@ -5,6 +5,7 @@ from __future__ import annotations
 import numbers
 from collections import defaultdict
 from copy import deepcopy
+from pathlib import Path
 from typing import List, Mapping, Sequence, Tuple, Union
 
 import numpy as np
@@ -856,3 +857,25 @@ class ProblemTable:
         if not ascending:
             order = order[::-1]
         self.data = self.data[order]
+
+    def export(
+        self,
+        filename: str = "problem_table",
+        sheet_name: str = "ProblemTable",
+        include_index: bool = False,
+    ) -> Path:
+        """Export the table to ``results/<filename>.xlsx`` and return the path."""
+        if self.data is None:
+            raise ValueError("Cannot export an uninitialised ProblemTable.")
+
+        results_dir = Path(__file__).resolve().parents[2] / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+
+        name = Path(filename).stem or "problem_table"
+        output_path = results_dir / f"{name}.xlsx"
+
+        df = self.to_dataframe
+        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=include_index)
+
+        return output_path

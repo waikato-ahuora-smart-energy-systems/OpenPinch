@@ -147,11 +147,11 @@ class StreamCollection:
             return NotImplemented
         return self._streams == other._streams
 
-    def export_to_csv(self, filename: str = "heat pump streams.csv") -> Path:
+    def export_to_csv(self, filename: str = "heat pump streams") -> Path:
         """Export stream data to ``results/<filename>`` and return the path written."""
         base_dir = Path(__file__).resolve().parents[2] / "results"
         base_dir.mkdir(parents=True, exist_ok=True)
-        output_path = base_dir / filename
+        output_path = base_dir / (filename + ".csv")
 
         self._ensure_sorted()
         with output_path.open("w", newline="", encoding="utf-8") as csvfile:

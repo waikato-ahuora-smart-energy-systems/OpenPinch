@@ -117,9 +117,13 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                     hp_hot_streams=hp_res.hp_hot_streams,
                     hp_cold_streams=hp_res.hp_cold_streams,
                 )
-                plot_multi_hp_profiles_from_results(
-                    T_hot=pt.col[PT.T.value],
-                    H_hot=pt.col[PT.H_NET_W_AIR.value],
+                # plot_multi_hp_profiles_from_results(
+                #     T_hot=pt.col[PT.T.value],
+                #     H_hot=pt.col[PT.H_NET_W_AIR.value],
+                # )
+                streams = hp_res.hp_hot_streams + hp_res.hp_cold_streams
+                streams.export_to_csv(
+                    filename=(zone_config.TOP_ZONE_NAME + "--" + " ".join(zone_config.REFRIGERANTS))
                 )
                 pass
 

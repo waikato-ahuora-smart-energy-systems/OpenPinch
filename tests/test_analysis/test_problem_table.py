@@ -1,6 +1,8 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
+from pathlib import Path
+import uuid
 
 from OpenPinch.classes import *
 from OpenPinch.lib import *
@@ -58,6 +60,20 @@ def test_no_overlap_streams_are_skipped():
 
     assert all(m == 0 for m in CP_hot)
     assert all(m == 0 for m in CP_cold)
+
+def test_export_writes_to_results_dir_and_uses_filename_stem():
+    table = ProblemTable({PT.T.value: [100], PT.H_NET.value: [50]})
+    unique_name = f"problem_table_test_{uuid.uuid4().hex}"
+    expected_dir = Path(__file__).resolve().parents[2] / "results"
+    output_path = table.export(unique_name)
+
+    try:
+        assert output_path.parent == expected_dir
+        assert output_path.name == f"{unique_name}.xlsx"
+        assert output_path.is_file()
+    finally:
+        if output_path.exists():
+            output_path.unlink()
 
 
 def test_stream_with_zero_cp_does_not_affect_result():

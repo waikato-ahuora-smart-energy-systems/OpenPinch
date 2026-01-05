@@ -61,6 +61,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_comp: float
     eta_exp: float
     dtcont_hp: float
+    dt_hp_ihx: float
     dt_phase_change: float
     price_ratio: float
     is_direct_integration: bool
