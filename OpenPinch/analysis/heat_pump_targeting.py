@@ -661,7 +661,7 @@ def _optimise_multi_simple_heat_pump_placement(
     opt = minimize(
         fun=lambda x: _compute_multi_simple_hp_system_performance(x, args)["obj"],
         x0=x0,
-        method="SLSQP",
+        method="COBYQA", #SLSQP
         bounds=bnds,
         options={'disp': False, 'maxiter': 1000},
         tol=1e-7,
