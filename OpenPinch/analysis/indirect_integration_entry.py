@@ -117,16 +117,10 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                     hp_hot_streams=hp_res.hp_hot_streams,
                     hp_cold_streams=hp_res.hp_cold_streams,
                 )
-                # plot_multi_hp_profiles_from_results(
-                #     T_hot=pt.col[PT.T.value],
-                #     H_hot=pt.col[PT.H_NET_W_AIR.value],
-                # )
-                streams = hp_res.hp_hot_streams + hp_res.hp_cold_streams
-                streams.export_to_csv(
-                    filename=(zone_config.TOP_ZONE_NAME + "--" + " ".join(zone_config.REFRIGERANTS))
-                )
-                pass
 
+            pt.export(
+                filename=("PT--" + zone_config.TOP_ZONE_NAME.split('.')[0] + "--" + "-".join([r.strip().upper() for r in zone_config.REFRIGERANTS]))
+            )
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
     #     if zone_config.ABOVE_PINCH_CHECKBOX:

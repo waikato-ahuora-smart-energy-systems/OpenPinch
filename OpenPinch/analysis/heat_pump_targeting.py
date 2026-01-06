@@ -229,7 +229,7 @@ def _prepare_heat_pump_target_inputs(
         T_env=zone_config.T_ENV,
         dt_env_cont=zone_config.DT_ENV_CONT,
         dt_phase_change=zone_config.DT_PHASE_CHANGE,
-        refrigerant_ls=zone_config.REFRIGERANTS,
+        refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
         price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL,
         max_multi_start=zone_config.MAX_HP_MULTISTART,
         net_hot_streams=net_hot_streams,
@@ -687,7 +687,7 @@ def _validate_vapour_hp_refrigerant_ls(
     if len(args.refrigerant_ls) > 0:
         refrigerants = [
             ref for ref, _ in sorted(
-                ((ref, PropsSI("Tcrit", ref.upper())) for ref in args.refrigerant_ls),
+                ((ref, PropsSI("Tcrit", ref)) for ref in args.refrigerant_ls),
                 key=lambda x: x[1],
                 reverse=True,
             )
@@ -713,7 +713,7 @@ def _prepare_multi_simple_hp_data_for_minimizer(
     x_cond_bnds = []
     x_evap_bnds = []
     for i, refrigerant in enumerate(args.refrigerant_ls):
-        T_min, T_max = PropsSI('Tmin', refrigerant.upper()) - 273.15, PropsSI('Tmax', refrigerant.upper()) - 273.15
+        T_min, T_max = PropsSI('Tmin', refrigerant) - 273.15, PropsSI('Tmax', refrigerant) - 273.15
         if i == T_cond.size:
             break
         T_cond_bnds = np.array((
@@ -756,7 +756,7 @@ def _prepare_multi_simple_hp_data_for_minimizer(
     y_cond_bnds = (0.0, 1.0)
 
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
-    x_sc_temp = (T_cond - args.T_cold[-1]) / args.dt_range_max
+    x_sc_temp = (T_cond - args.T_cold[-1]) / args.dt_range_max * 0 + args.dt_phase_change / args.dt_range_max
     x_sc = np.where(
         (x_sc_bnds[0] <= x_sc_temp) * (x_sc_temp <= x_sc_bnds[1]),
         x_sc_temp,
@@ -808,10 +808,10 @@ def _constrain_min_temperature_lift(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
 ):
-    """Ensure T_cond - dT_sc > T_evap + dtcont_hp + dt_hp_ihx
+    """Ensure T_cond - dT_sc > T_evap + dtcont_hp
     """
     T_cond, dT_sc, _, T_evap, _ = _parse_multi_simple_hp_state_temperatures(x, args)
-    T_diff = T_cond - dT_sc - T_evap - args.dtcont_hp - args.dt_hp_ihx
+    T_diff = T_cond - dT_sc - T_evap - args.dtcont_hp
     return T_diff.min()
 
 
@@ -919,6 +919,7 @@ def _create_multi_simple_hp_list(
             Tc=T_cond[i],
             dT_sh=dT_sh[i],
             dT_sc=dT_sc[i],
+            ihx_gas_dt=args.dt_hp_ihx,
             eta_comp=args.eta_comp,
             refrigerant=args.refrigerant_ls[i],
             Q_h_total=Q_cond[i],                

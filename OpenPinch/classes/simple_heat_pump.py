@@ -194,7 +194,7 @@ class SimpleHeatPumpCycle:
         refrigerant: str = None,             
     ) -> bool:
         if refrigerant is not None:
-            self.state = process_fluid_state(refrigerant.upper())
+            self.state = process_fluid_state(refrigerant)
         if self._state is None:
             raise ValueError('A fluid must be specified before solving the cycle.') 
         return True
