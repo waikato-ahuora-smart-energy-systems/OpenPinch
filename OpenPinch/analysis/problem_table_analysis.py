@@ -211,8 +211,8 @@ def _sum_mcp_between_temperature_boundaries(
         upper_bounds = np.array(temperatures[:-1])
 
         # Shape: (intervals, streams)
-        active = (t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + tol) & (
-            t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - tol
+        active = (t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + tol * 10) & (
+            t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - tol * 10
         )
 
         return active

@@ -44,6 +44,13 @@ class SimpleHeatPumpCycle:
         self._solved: bool = False
         self._dtcont: float = 0.0
         self._dt_diff_max: float = 0.5 # Default value, used in piecewise approximation of non linear T-h profiles
+        self._refrigerant: Optional[str] = None
+        self._T_evap: Optional[float] = None
+        self._T_cond: Optional[float] = None
+        self._dT_superheat: float = 0.0
+        self._dT_subcool: float = 0.0
+        self._eta_comp: float = 1.0
+        self._ihx_gas_dt: float = 0.0
 
     @property
     def system(self) -> PropertyDict:
@@ -153,6 +160,34 @@ class SimpleHeatPumpCycle:
     def dt_diff_max(self, value: float) -> None:
         self._dt_diff_max = value
 
+    @property
+    def refrigerant(self) -> Optional[str]:
+        return self._refrigerant
+
+    @property
+    def T_evap(self) -> Optional[float]:
+        return self._T_evap
+
+    @property
+    def T_cond(self) -> Optional[float]:
+        return self._T_cond
+
+    @property
+    def dT_superheat(self) -> float:
+        return self._dT_superheat
+
+    @property
+    def dT_subcool(self) -> float:
+        return self._dT_subcool
+
+    @property
+    def eta_comp(self) -> float:
+        return self._eta_comp
+
+    @property
+    def ihx_gas_dt(self) -> float:
+        return self._ihx_gas_dt
+
 
     def _validate_solve_inputs(
         self,
@@ -177,16 +212,26 @@ class SimpleHeatPumpCycle:
         return self._state.p()
 
 
+    def _compute_state_from_pressure_temperature(
+        self,
+        p: float,
+        T: float,
+        *,
+        phase: str = 1.0,
+    ) -> CoolProp.AbstractState:
+        try:
+            self._state.update(CoolProp.PT_INPUTS, p, T)          
+        except:
+            self._state.update(CoolProp.PQ_INPUTS, p, phase) # Close to saturated liquid/vapour  
+        return self._state
+    
+
     def _compute_evaporator_outlet_state(
         self,
         p: float, 
         T: float,        
     ) -> CoolProp.AbstractState:
-        try:
-            self._state.update(CoolProp.PT_INPUTS, p, T)          
-        except:
-            self._state.update(CoolProp.PQ_INPUTS, p, 1.0) # Close to saturated vapour  
-        return self._state
+        return self._compute_state_from_pressure_temperature(p, T, 1.0)
     
 
     def _compute_compressor_outlet_state(
@@ -220,7 +265,7 @@ class SimpleHeatPumpCycle:
         return self._state
     
 
-    def _compute_expansion_valve_outlet_state(
+    def _compute_state_from_pressure_enthalpy(
         self, 
         p: float, 
         h: float,
@@ -267,11 +312,12 @@ class SimpleHeatPumpCycle:
         self,
         Te: float,
         Tc: float,
-        dT_sh: float,
-        dT_sc: float,
-        eta_comp: float,
         *,
-        refrigerant: str = None, 
+        dT_sh: float = 0.0,
+        dT_sc: float = 0.0,
+        eta_comp: float = 0.7,
+        refrigerant: str = "water",
+        ihx_gas_dt: float = 40.0,
         Q_h_total: float = 1.0,
         t_unit: str = "C",
     ) -> float:
@@ -280,8 +326,14 @@ class SimpleHeatPumpCycle:
             refrigerant=refrigerant,
         )
 
+        self._refrigerant = refrigerant
+        self._T_evap = Te
+        self._T_cond = Tc
+        self._dT_superheat = dT_sh
+        self._dT_subcool = dT_sc   
         self._Q_cond = Q_h_total
         self._eta_comp = eta_comp
+        self._ihx_gas_dt = min(ihx_gas_dt, Tc - Te - dT_sc - dT_sh - 5)
 
         Te = self._convert_C_to_K(Te)
         Tc = self._convert_C_to_K(Tc)
@@ -295,22 +347,30 @@ class SimpleHeatPumpCycle:
         T2 = Tc - dT_sc
 
         """Solve a basic four-state cycle given inlet/outlet temperatures and pressures."""
-        # Evaporator outlet / compressor inlet
-        self._compute_evaporator_outlet_state(
+        # Evaporator outlet / IHX inlet
+        self._compute_state_from_pressure_temperature(
             p=p0, 
-            T=T0,
-        )      
+            T=T0,            
+        )
+        h_ihx_in = self._state.hmass()
         self._save_cycle_state(0)
+
+        # IHX outlet / compressor inlet
+        self._compute_state_from_pressure_temperature(
+            p=p0, 
+            T=T0 + self._ihx_gas_dt,
+        )      
+        dh_ihx = self._state.hmass() - h_ihx_in
 
         # Compressor discharge (real)
         self._compute_compressor_outlet_state(
-            h_in=self._cycle_states[0, 'H'],
-            s_in=self._cycle_states[0, 'S'],
+            h_in=self._state.hmass(),
+            s_in=self._state.smass(),
             p_out=p2
         )
         self._save_cycle_state(1)
 
-        # Condenser outlet
+        # Condenser outlet / IHX inlet (source)
         self._compute_condenser_outlet_state(
             p=p2,
             T=T2,
@@ -318,10 +378,16 @@ class SimpleHeatPumpCycle:
         )
         self._save_cycle_state(2)
 
+        # IHX outlet (source) / expansion valve outlet
+        # self._compute_state_from_pressure_enthalpy(
+        #     p=p2,
+        #     h=self._state.hmass() - dh_ihx,
+        # )
+
         # Expansion valve outlet / evaporator inlet
-        self._compute_expansion_valve_outlet_state(
+        self._compute_state_from_pressure_enthalpy(
             p=p0,
-            h=self._cycle_states[2, 'H'],
+            h=self._state.hmass() - dh_ihx,
         )
         self._save_cycle_state(3)
 
@@ -342,14 +408,13 @@ class SimpleHeatPumpCycle:
                 h1, T1 = profile[i]
                 h2, T2 = profile[i+1]
 
-                # Do we need a name?
-                name = f"Segment_{i+1}"
+                name = f"Condenser_{i+1}" if is_hot else f"Evaporator_{i+1}"
 
-                if abs(T1 - T2) < 0.0001: # Catch phase change
+                if abs(T1 - T2) < 0.001: # Catch phase change
                     if is_hot:
-                        t_target = T2 - 0.001
+                        t_target = T2 - 0.01
                     else:
-                        t_target = T2 + 0.001
+                        t_target = T2 + 0.01
                 else:
                     t_target = T2
 

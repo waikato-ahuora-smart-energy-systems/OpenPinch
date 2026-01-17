@@ -61,6 +61,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_comp: float
     eta_exp: float
     dtcont_hp: float
+    dt_hp_ihx: float
     dt_phase_change: float
     price_ratio: float
     is_direct_integration: bool
@@ -257,14 +258,14 @@ class TurbineOption(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
-class Options(BaseModel):
-    """Primary checkbox-style options plus turbine configuration."""
+# class Options(BaseModel):
+#     """Primary checkbox-style options plus turbine configuration."""
 
-    main: List[MainOptionsPropKeys] = Field(default_factory=list)
-    # graphs: List[GraphOptionsPropKeys]
-    turbine: List[TurbineOption] = Field(default_factory=list)
+#     main: List[MainOptionsPropKeys] = Field(default_factory=list)
+#     # graphs: List[GraphOptionsPropKeys]
+#     turbine: List[TurbineOption] = Field(default_factory=list)
 
-    model_config = ConfigDict(use_enum_values=True)
+#     model_config = ConfigDict(use_enum_values=True)
 
 
 # ---- Complete request --------------------------------------------------------
@@ -273,7 +274,7 @@ class TargetInput(BaseModel):
 
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = []
-    options: Optional[Options] = None
+    options: Optional[dict] = None
     zone_tree: Optional[ZoneTreeSchema] = None
 
 
@@ -296,7 +297,7 @@ class GetInputOutputData(BaseModel):
     plant_profile_data: List[ProblemTableDataSchema]
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
-    options: Optional[Options] = None
+    options: Optional[dict] = {}
 
 
 # ---- Linearisation schema ---------------------------------------------------

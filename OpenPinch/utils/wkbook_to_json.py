@@ -1,5 +1,4 @@
 import json
-
 import pandas as pd
 
 #######################################################################################################
@@ -17,13 +16,14 @@ def get_problem_from_excel(excel_file, output_json=None):
     Then writes a JSON file (similar to the provided example) containing:
       {
         "streams": [...],
-        "utilities": [...]
+        "utilities": [...],
+        "options": [...],
       }
     """
 
     streams_data = _parse_sheet_with_units(excel_file, sheet_name="Stream Data")
     utilities_data = _parse_sheet_with_units(excel_file, sheet_name="Utility Data")
-    options_data = _set_options()
+    options_data = _parse_options_sheet(excel_file, sheet_name="Options")
 
     # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
     output_dict = {
@@ -141,16 +141,7 @@ def _parse_sheet_with_units(
     excel_file, sheet_name, row_units=1, row_data=2, project_name=None
 ):
     """
-    Reads a sheet from `excel_file` in which:
-      - Row 1 = column names
-      - Row 2 = column units
-      - Row 3 onward = data
-
-    Returns:
-      A list of dictionaries, where each dictionary represents a row of data.
-      Numeric columns are stored as:
-         column_name: {"value": <number>, "units": <unit string>}
-      String columns (like 'name' or 'zone') remain as simple keys and values.
+    Read key/value options from `sheet_name` and return them as a dictionary.
     """
     # Read the entire sheet as-is (no header)
     df_full = pd.read_excel(excel_file, sheet_name=sheet_name, header=None)
@@ -176,6 +167,55 @@ def _parse_sheet_with_units(
         return _write_targets_to_dict_and_list(df_data, units_map, project_name)
     else:
         return _write_problem_to_dict_and_list(df_data, units_map)
+
+
+def _parse_options_sheet(
+    excel_file, 
+    sheet_name: str = "Options",
+):
+    """
+    Reads a sheet from `excel_file` in which:
+      - Row 1 = column names
+      - Row 2 = column units
+      - Row 3 onward = data
+
+    Returns:
+      A list of dictionaries, where each dictionary represents a row of data.
+      Numeric columns are stored as:
+         column_name: {"value": <number>, "units": <unit string>}
+      String columns (like 'name' or 'zone') remain as simple keys and values.
+    """
+    # Read the entire sheet as-is (no header)
+
+    with pd.ExcelFile(excel_file) as xls:
+        if sheet_name not in xls.sheet_names:
+            return {}
+        df_full = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+
+    col0 = df_full.iloc[:, 0]
+    col1 = df_full.iloc[:, 1]
+    df_full = df_full.loc[col1.notna() & ~col0.astype(str).str.startswith("###")]
+    if df_full.empty:
+        return {}
+
+    keys = df_full.iloc[:, 0].tolist()
+    values = df_full.iloc[:, 1].tolist()
+
+    def _to_python(val):
+        if pd.isna(val):
+            return None
+        if hasattr(val, "item"):
+            try:
+                return val.item()
+            except Exception:
+                pass
+        return val
+
+    options_dict = {
+        (k.strip() if isinstance(k, str) else k): _to_python(v)
+        for k, v in zip(keys, values)
+    }
+    return options_dict
 
 
 def _write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> list:
@@ -323,24 +363,3 @@ def _write_targets_to_dict_and_list(
         results.append(dict(items[2:] + items[:2]))
 
     return results
-
-
-def _set_options():
-    """
-    Create and set default options.
-    """
-    return {
-        "main": [],
-        "turbine": [
-            {"key": "PROP_TOP_0", "value": 450},
-            {"key": "PROP_TOP_1", "value": 90},
-            {"key": "PROP_TOP_2", "value": 0.1},
-            {"key": "PROP_TOP_3", "value": 100},
-            {"key": "PROP_TOP_4", "value": 1},
-            {"key": "PROP_TOP_5", "value": 1},
-            {"key": "PROP_TOP_6", "value": "Medina-Flores et al. (2010)"},
-            {"key": "PROP_TOP_7", "value": True},
-            {"key": "PROP_TOP_8", "value": False},
-            {"key": "PROP_TOP_9", "value": False},
-        ],
-    }

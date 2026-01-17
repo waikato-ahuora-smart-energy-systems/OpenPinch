@@ -93,8 +93,8 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         if _validate_heat_pump_targeting_required(pt, True, zone_config):
             hp_res = get_heat_pump_targets(
                 T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_HOT_UT.value],
-                H_cold=pt.col[PT.H_COLD_UT.value],
+                H_hot=pt.col[PT.H_COLD_UT.value],
+                H_cold=pt.col[PT.H_HOT_UT.value],
                 zone_config=zone_config, 
                 is_direct_integration=False,
                 is_heat_pumping=True,
@@ -106,22 +106,20 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 pt=pt,
                 res=hp_res,
                 is_T_vals_shifted=True,
-                is_direct_integration=True,
+                is_direct_integration=False,
             )
             if 0:
                 plot_multi_hp_profiles_from_results(
                     T_hot=pt.col[PT.T.value],
-                    H_hot=pt.col[PT.H_NET_HOT.value],
+                    H_hot=pt.col[PT.H_COLD_UT.value],
                     T_cold=pt.col[PT.T.value],                    
-                    H_cold=pt.col[PT.H_NET_COLD.value],
+                    H_cold=pt.col[PT.H_HOT_UT.value],
                     hp_hot_streams=hp_res.hp_hot_streams,
                     hp_cold_streams=hp_res.hp_cold_streams,
                 )
-                plot_multi_hp_profiles_from_results(
-                    T_hot=pt.col[PT.T.value],
-                    H_hot=pt.col[PT.H_NET_W_AIR.value],
+                pt.export(
+                    filename=("PT--" + zone_config.TOP_ZONE_NAME.split('.')[0] + "-" + zone.name + "--" + "-".join([r.strip().upper() for r in zone_config.REFRIGERANTS]))
                 )
-                pass
 
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0

@@ -5,6 +5,9 @@ from OpenPinch.lib import *
 
 """Tests for StreamCollection."""
 
+import csv
+from uuid import uuid4
+
 
 @pytest.fixture
 def sample_streams():
@@ -118,3 +121,30 @@ def test_dynamic_sort_after_adding(sample_streams):
 
     assert names_in_order == ["B", "D", "A"]
     assert temps_in_order == [180, 160, 150]
+
+
+def test_export_to_csv(sample_streams):
+    sc = StreamCollection()
+    for stream in sample_streams:
+        sc.add(stream)
+
+    filename = f"test_streams_{uuid4().hex}.csv"
+    output_path = sc.export_to_csv(filename)
+
+    try:
+        assert output_path.exists()
+        with output_path.open(newline="", encoding="utf-8") as csvfile:
+            rows = list(csv.DictReader(csvfile))
+
+        assert rows
+        assert rows[0].keys() == {
+            "name",
+            "t_supply",
+            "t_target",
+            "heat_flow",
+            "dt_cont",
+            "htc",
+        }
+        assert {row["name"] for row in rows} == {s.name for s in sample_streams}
+    finally:
+        output_path.unlink(missing_ok=True)

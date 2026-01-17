@@ -149,9 +149,13 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
     mod = sys.modules[PinchProblem.__module__]
     called = {}
 
-    def fake_writer(results, results_dir):
-        called["args"] = (results, results_dir)
-        output_path = Path(results_dir) / "targets.xlsx"
+    def fake_writer(*, target_response, master_zone, out_dir):
+        called["kwargs"] = {
+            "target_response": target_response,
+            "master_zone": master_zone,
+            "out_dir": out_dir,
+        }
+        output_path = Path(out_dir) / "targets.xlsx"
         # we don't actually write, just return a path
         return output_path
 
@@ -166,8 +170,9 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
     path = obj.export_to_Excel(dest)
 
     assert path == dest / "targets.xlsx"
-    assert called["args"][0] == {"foo": "bar"}
-    assert called["args"][1] == dest
+    assert called["kwargs"]["target_response"] == {"foo": "bar"}
+    assert called["kwargs"]["master_zone"] is None
+    assert called["kwargs"]["out_dir"] == dest
     # object state updated
     assert obj.results_dir == dest
 

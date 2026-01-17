@@ -24,7 +24,7 @@ class Configuration:
     
     ### General parameters ###
     TOP_ZONE_NAME: str = "Site"
-    TOP_ZONE_IDENTIFIER = ZoneType.S.value
+    TOP_ZONE_IDENTIFIER: str = ZoneType.S.value
     DT_CONT: float = 5
     DT_PHASE_CHANGE: float = 0.1
     HTC: float = 1.0
@@ -53,13 +53,14 @@ class Configuration:
     REFRIGERANTS: List[str] = ["water", "ammonia"]
     PRICE_RATIO_ELE_TO_FUEL: float = 1.0
     MAX_HP_MULTISTART: int = 10
-    N_COND: int = 2
+    N_COND: int = 3
     N_EVAP: int = 2
     ETA_COMP: float = 0.7
     ETA_EXP: float = 0.7
     ETA_HP_CARNOT: float = 0.5
     ETA_HE_CARNOT: float = 0.5
-    DTMIN_HP: float = 0.0  
+    DTMIN_HP: float = 0.0
+    DT_HP_IHX: float = 0.0
 
     ### Cost targeting parameters ### 
     UTILITY_PRICE: float = 40
@@ -107,15 +108,19 @@ class Configuration:
 
     def __init__(
         self,
-        options: Options = None,
+        options: dict = None,
         top_zone_name: str = "Site",
         top_zone_identifier: str = ZoneType.S.value,
     ):
         """Initialise defaults and optionally apply user-provided options."""
         self.TOP_ZONE_NAME = top_zone_name
         self.TOP_ZONE_IDENTIFIER = top_zone_identifier
-    #     if options:
-    #         self.set_parameters(options)
+        if isinstance(options, dict):
+            for key in options.keys():
+                if key != "REFRIGERANTS":
+                    setattr(self, key, options[key])
+                else:
+                    setattr(self, key, options[key].split(","))
 
     # def set_parameters(self, options: Options) -> None:
     #     """Apply checkbox- and turbine-related configuration from :class:`Options`."""
