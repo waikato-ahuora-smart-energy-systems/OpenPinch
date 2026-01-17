@@ -113,7 +113,7 @@ class PinchProblem:
             return self._problem_data
 
         src_path = Path(source)
-        self._project_name = src_path.name
+        self._project_name = src_path.stem
 
         # 1. JSON
         if src_path.suffix.lower() == ".json":
