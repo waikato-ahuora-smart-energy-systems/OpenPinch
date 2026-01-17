@@ -119,7 +119,9 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
         ],
     )
 
-    out = export_target_summary_to_excel_with_units(target_response, out_dir=tmp_path)
+    out = export_target_summary_to_excel_with_units(
+        target_response, master_zone=None, out_dir=tmp_path
+    )
     out_path = Path(out)
     assert out_path.exists()
 

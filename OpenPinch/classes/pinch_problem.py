@@ -151,7 +151,7 @@ class PinchProblem:
             f"a directory with 'streams.csv' and 'utilities.csv', or a (streams, utilities) tuple."
         )
 
-    def target(self) -> JsonDict:
+    def target(self) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the results."""
         if self._problem_data is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
@@ -177,7 +177,9 @@ class PinchProblem:
             self.target()
 
         output_path = export_target_summary_to_excel_with_units(
-            self._results, self.results_dir
+            target_response=self._results, 
+            master_zone=self._master_zone,
+            out_dir=self.results_dir,
         )
 
         return output_path

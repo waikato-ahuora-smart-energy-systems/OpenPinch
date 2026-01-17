@@ -1,9 +1,13 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
 
 import pandas as pd
+
+if TYPE_CHECKING:
+    from ..classes import Zone
+    from ..lib import TargetOutput
 
 #######################################################################################################
 # Public API
@@ -11,7 +15,9 @@ import pandas as pd
 
 
 def export_target_summary_to_excel_with_units(
-    target_response, out_dir: str = "."
+    target_response: "TargetOutput", 
+    master_zone: "Zone", 
+    out_dir: str = ".",
 ) -> str:
     """
     Export TargetOutput to an Excel workbook with values and units.
@@ -30,6 +36,8 @@ def export_target_summary_to_excel_with_units(
 
     with pd.ExcelWriter(out_path, engine="openpyxl") as xw:
         _write_summary_sheet(df_summary, xw)
+
+    # TODO: Write each of the problem tables stored in masterzone.targets (which is a dict of EnergyTargets) and in each subzone. Include headers. Mimic the tables produced by the SteamLit app interface. 
 
     return str(out_path)
 
@@ -170,3 +178,5 @@ def _compose_output_path(project_name: str, out_dir: str) -> Path:
 def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> None:
     df_summary.to_excel(writer, sheet_name="Summary", index=False)
     _autosize_columns(df_summary, writer.sheets["Summary"])
+
+
