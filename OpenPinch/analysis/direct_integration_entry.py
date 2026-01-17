@@ -82,7 +82,9 @@ def compute_direct_integration_targets(zone: Zone):
                     T_hot=pt.col[PT.T.value],
                     H_hot=pt.col[PT.H_NET_W_AIR.value],
                 )
-                pass
+                pt.export(
+                    filename=("PT--" + zone_config.TOP_ZONE_NAME.split('.')[0] + "--" + "-".join([r.strip().upper() for r in zone_config.REFRIGERANTS]))
+                )                
     
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True

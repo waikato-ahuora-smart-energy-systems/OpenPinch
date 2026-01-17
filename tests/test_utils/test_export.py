@@ -11,6 +11,8 @@ from OpenPinch.utils.export import (
     _split_vu,
     export_target_summary_to_excel_with_units,
 )
+from OpenPinch.classes import EnergyTarget, ProblemTable, Zone
+from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 # --------------------------------------------------------------------------------------
 # Fixtures & tiny helpers
@@ -75,6 +77,17 @@ def _make_target(
         capital_cost=capital_cost,
         total_cost=total_cost,
         ETE=ETE,
+    )
+
+
+def _make_problem_table(values):
+    """Small ProblemTable with a few populated numeric columns."""
+    return ProblemTable(
+        {
+            PT.T.value: values,
+            PT.H_HOT.value: [v * 1.1 for v in values],
+            PT.H_COLD.value: [v * 2.2 for v in values],
+        }
     )
 
 
@@ -196,6 +209,60 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert alt["MP Steam (unit)"] == "kW"
     assert pytest.approx(alt["Chilled Water (value)"]) == 30.0
     assert alt["Chilled Water (unit)"] == "kW"
+
+
+def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
+    master_zone = Zone("Plant")
+    master_target = EnergyTarget(name="Master")
+    master_target.pt = _make_problem_table([10.0, 20.0])
+    master_target.pt_real = _make_problem_table([30.0])
+    master_zone.targets["Master"] = master_target
+
+    sub_zone = Zone("Sub/Zone", parent_zone=master_zone)
+    master_zone.add_zone(sub_zone, sub=True)
+    sub_target = EnergyTarget(name="Alt:Target", parent_zone=sub_zone)
+    sub_target.pt = _make_problem_table([40.0])
+    sub_target.pt_real = _make_problem_table([50.0])
+    sub_zone.targets["Alt:Target"] = sub_target
+
+    target_response = SimpleNamespace(name="Project", targets=[])
+    out = export_target_summary_to_excel_with_units(
+        target_response, master_zone=master_zone, out_dir=tmp_path
+    )
+    xls = pd.ExcelFile(out)
+
+    master_shifted = "Plant - Master (Shifted)"
+    master_real = "Plant - Master (Real)"
+    sub_shifted = "Sub_Zone - Alt_Target (Shifted)"
+    sub_real = "Sub_Zone - Alt_Target (Real)"
+
+    assert master_shifted in xls.sheet_names
+    assert master_real in xls.sheet_names
+    assert sub_shifted in xls.sheet_names
+    assert sub_real in xls.sheet_names
+
+    import openpyxl
+
+    wb = openpyxl.load_workbook(out, data_only=True)
+    assert wb[master_shifted]["A1"].value == "Master"
+    assert wb[sub_shifted]["A1"].value == "Alt:Target"
+
+    master_df = pd.read_excel(
+        out,
+        sheet_name=master_shifted,
+        usecols=lambda c: not str(c).startswith("Unnamed"),
+        header=2,
+    )
+    assert pytest.approx(master_df.iloc[0][PT.T.value]) == 10.0
+    assert pytest.approx(master_df.iloc[0][PT.H_HOT.value]) == 11.0
+
+    sub_df = pd.read_excel(
+        out,
+        sheet_name=sub_shifted,
+        usecols=lambda c: not str(c).startswith("Unnamed"),
+        header=2,
+    )
+    assert pytest.approx(sub_df.iloc[0][PT.T.value]) == 40.0
 
 
 # --------------------------------------------------------------------------------------

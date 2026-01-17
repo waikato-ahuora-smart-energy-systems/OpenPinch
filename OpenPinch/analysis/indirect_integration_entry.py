@@ -108,7 +108,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 is_T_vals_shifted=True,
                 is_direct_integration=False,
             )
-            if 1:
+            if 0:
                 plot_multi_hp_profiles_from_results(
                     T_hot=pt.col[PT.T.value],
                     H_hot=pt.col[PT.H_COLD_UT.value],
@@ -117,10 +117,10 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                     hp_hot_streams=hp_res.hp_hot_streams,
                     hp_cold_streams=hp_res.hp_cold_streams,
                 )
+                pt.export(
+                    filename=("PT--" + zone_config.TOP_ZONE_NAME.split('.')[0] + "-" + zone.name + "--" + "-".join([r.strip().upper() for r in zone_config.REFRIGERANTS]))
+                )
 
-            pt.export(
-                filename=("PT--" + zone_config.TOP_ZONE_NAME.split('.')[0] + "--" + "-".join([r.strip().upper() for r in zone_config.REFRIGERANTS]))
-            )
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
     #     if zone_config.ABOVE_PINCH_CHECKBOX:

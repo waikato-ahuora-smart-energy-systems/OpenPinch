@@ -36,8 +36,7 @@ def export_target_summary_to_excel_with_units(
 
     with pd.ExcelWriter(out_path, engine="openpyxl") as xw:
         _write_summary_sheet(df_summary, xw)
-
-    # TODO: Write each of the problem tables stored in masterzone.targets (which is a dict of EnergyTargets) and in each subzone. Include headers. Mimic the tables produced by the SteamLit app interface. 
+        _write_problem_tables(master_zone, xw)
 
     return str(out_path)
 
@@ -61,13 +60,13 @@ def _split_vu(x: Any) -> Tuple[Optional[float], Optional[str]]:
         return None, None
 
 
-def _autosize_columns(df: pd.DataFrame, ws):
+def _autosize_columns(df: pd.DataFrame, ws, start_col: int = 1, header_row: int = 1):
     """Best-effort column width:  max(len(header), max len cell)."""
-    for i, col in enumerate(df.columns, start=1):
+    for i, col in enumerate(df.columns, start=start_col):
         max_len = len(str(col))
         for val in df[col].astype(str):
             max_len = max(max_len, len(val))
-        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = min(
+        ws.column_dimensions[ws.cell(row=header_row, column=i).column_letter].width = min(
             max_len + 2, 40
         )
 
@@ -180,3 +179,67 @@ def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> No
     _autosize_columns(df_summary, writer.sheets["Summary"])
 
 
+def _write_problem_tables(master_zone: Optional["Zone"], writer: pd.ExcelWriter) -> None:
+    """Emit shifted/real problem tables for master zone and all subzones."""
+    if master_zone is None:
+        return
+
+    from ..streamlit_webviewer.web_graphing import problem_table_to_dataframe
+
+    used_sheet_names: set[str] = set()
+
+    for zone in _iter_zones(master_zone):
+        for target_name, target in zone.targets.items():
+            table_specs = (
+                (f"{zone.name} - {target_name} (Shifted)", getattr(target, "pt", None)),
+                (f"{zone.name} - {target_name} (Real)", getattr(target, "pt_real", None)),
+            )
+            for sheet_label, table in table_specs:
+                df = problem_table_to_dataframe(table, round_decimals=2)
+                if df.empty:
+                    continue
+                sheet_name = _unique_sheet_name(sheet_label, used_sheet_names)
+                df.to_excel(
+                    writer,
+                    sheet_name=sheet_name,
+                    index=False,
+                    startcol=0,
+                    startrow=2,
+                )
+                ws = writer.sheets[sheet_name]
+                ws["A1"] = target.name
+                _autosize_columns(df, ws, start_col=1, header_row=3)
+
+
+def _iter_zones(zone: "Zone"):
+    """Yield ``zone`` and all nested subzones depth-first."""
+    stack = [zone]
+    while stack:
+        current = stack.pop()
+        yield current
+        stack.extend(current.subzones.values())
+
+
+def _unique_sheet_name(base: str, used: set[str]) -> str:
+    """Return an Excel-safe, unique sheet name capped at 31 chars."""
+    cleaned = _sanitize_sheet_name(base)
+    candidate = cleaned[:31] or "Sheet"
+    if candidate not in used:
+        used.add(candidate)
+        return candidate
+
+    for idx in range(2, 1000):
+        suffix = f" ({idx})"
+        trimmed = candidate[: 31 - len(suffix)] if len(candidate) + len(suffix) > 31 else candidate
+        alt = f"{trimmed}{suffix}"
+        if alt not in used:
+            used.add(alt)
+            return alt
+
+    raise ValueError("Unable to allocate unique sheet name.")
+
+
+def _sanitize_sheet_name(name: str) -> str:
+    """Replace characters Excel forbids in sheet names and strip trailing apostrophes."""
+    cleaned = re.sub(r"[:/?*\\\[\]]", "_", name).strip().rstrip("'")
+    return cleaned or "Sheet"
