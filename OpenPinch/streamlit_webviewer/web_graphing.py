@@ -106,9 +106,22 @@ def render_streamlit_dashboard(
     st.set_page_config(
         page_title=page_title or f"{zone.name} Pinch Dashboard",
         layout="wide",
+        initial_sidebar_state="expanded",
     )
 
-    st.title(page_title or f"{zone.name} Pinch Dashboard")
+    _apply_dashboard_theme(st)
+
+    st.markdown(
+        f"""
+        <div class="op-header">
+            <div>
+                <div class="op-title">{page_title or f"{zone.name} Pinch Dashboard"}</div>
+                <div class="op-subtitle">Energy targeting summary with composite curve visualisation</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     targets = collect_targets(zone)
     if not targets:
@@ -125,7 +138,7 @@ def render_streamlit_dashboard(
 
     target_names = sorted(targets.keys())
     selected_target_name = st.sidebar.selectbox(
-        "**Select zone**",
+        "Select zone",
         target_names,
         index=0 if target_names else None,
         key=f"target_select_{base_key}",
@@ -133,27 +146,68 @@ def render_streamlit_dashboard(
     target = targets[selected_target_name]
 
     st.sidebar.divider()
-    st.sidebar.write(f"**Targets**")
-    st.sidebar.write(f"Cold pinch: {target.cold_pinch:.1f} \N{DEGREE SIGN}C")
-    st.sidebar.write(f"Hot pinch: {target.hot_pinch:.1f} \N{DEGREE SIGN}C")
-    st.sidebar.write(f"Hot utility: {target.hot_utility_target:,.0f} kW")
-    st.sidebar.write(f"Cold Utility: {target.cold_utility_target:,.0f} kW")
-    st.sidebar.write(f"Heat Recovery: {target.heat_recovery_target:,.0f} kW")
-    st.sidebar.write(f"Degree of Integration: {target.degree_of_int:.0%}")
+    st.sidebar.write("Targets")
+    st.sidebar.markdown(
+        f"""
+        <div class="op-metric-grid">
+            <div class="op-metric">
+                <div class="op-metric-label">Cold pinch</div>
+                <div class="op-metric-value">{target.cold_pinch:.1f}&nbsp;\N{DEGREE SIGN}C</div>
+            </div>
+            <div class="op-metric">
+                <div class="op-metric-label">Hot pinch</div>
+                <div class="op-metric-value">{target.hot_pinch:.1f}&nbsp;\N{DEGREE SIGN}C</div>
+            </div>
+            <div class="op-metric">
+                <div class="op-metric-label">Hot utility</div>
+                <div class="op-metric-value">{target.hot_utility_target:,.0f}&nbsp;kW</div>
+            </div>
+            <div class="op-metric">
+                <div class="op-metric-label">Cold utility</div>
+                <div class="op-metric-value">{target.cold_utility_target:,.0f}&nbsp;kW</div>
+            </div>
+            <div class="op-metric">
+                <div class="op-metric-label">Heat recovery</div>
+                <div class="op-metric-value">{target.heat_recovery_target:,.0f}&nbsp;kW</div>
+            </div>
+            <div class="op-metric">
+                <div class="op-metric-label">Degree of integration</div>
+                <div class="op-metric-value">{target.degree_of_int:.0%}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    ut_dict ={
+    ut_dict = {
         "Hot utilities" : target.hot_utilities, 
         "Cold utilities" : target.cold_utilities,
     }
-    for entry in ut_dict.keys():
+    for entry, utilities in ut_dict.items():
         st.sidebar.divider()
-        st.sidebar.write(f"**{entry}**")
-        if len(ut_dict[entry]):
-            u: Stream
-            for u in ut_dict[entry]:
-                st.sidebar.write(f"{u.name}: {u.heat_flow:,.0f} kW")
+        st.sidebar.markdown(
+            f"<div class='op-utility-title'>{entry}</div>",
+            unsafe_allow_html=True,
+        )
+        if utilities:
+            cards = "".join(
+                f"<div class=\"op-utility-card\">"
+                f"<div class=\"op-utility-name\">{u.name}</div>"
+                f"<div class=\"op-utility-value\">{u.heat_flow:,.0f}&nbsp;kW</div>"
+                f"</div>"
+                for u in utilities
+            )
+            st.sidebar.markdown(
+                f"<div class='op-utility-grid'>{cards}</div>",
+                unsafe_allow_html=True,
+            )
         else:
-            st.sidebar.write(f"{entry} not required.")
+            st.sidebar.markdown(
+                "<div class=\"op-utility-grid\">"
+                "<div class=\"op-utility-card op-utility-empty\">Not required</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
 
 
     tabs = st.tabs(
@@ -177,7 +231,7 @@ def render_streamlit_dashboard(
             for idx, graph in enumerate(graph_set.graphs):
                 column = columns[idx % 2]
                 with column:
-                    st.markdown(f"**{graph_names[idx]}**")
+                    st.markdown(f"<div class='op-card-title'>{graph_names[idx]}</div>", unsafe_allow_html=True)
                     figure = _build_plotly_graph(graph)
                     st.plotly_chart(
                         figure,
@@ -265,8 +319,8 @@ def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
     fig = go.Figure()
     legend_seen: Dict[str, bool] = {}
     for segment in graph.get("segments", []):
-        trace = _segment_trace(segment, graph, legend_seen)
-        if trace is not None:
+        traces = _segment_trace(segment, graph, legend_seen)
+        for trace in traces:
             fig.add_trace(trace)
     _apply_default_layout(fig)
     return fig
@@ -276,25 +330,58 @@ def _segment_trace(
     segment: Mapping[str, object],
     graph: Mapping[str, object],
     legend_seen: Dict[str, bool],
-) -> Optional[go.Scatter]:
+) -> List[go.Scatter]:
     x_vals, y_vals = _extract_segment_xy(segment)
     if not x_vals or not y_vals:
-        return None
+        return []
     title = segment.get("title") or graph.get("type") or "Segment"
     colour = _segment_colour(segment)
     legend_label, series_id, show = _legend_details(segment, title, legend_seen)
-    mode, marker = _segment_mode_and_markers(segment, x_vals, y_vals, colour)
-    return go.Scatter(
+    arrow = segment.get("arrow")
+    line_trace = go.Scatter(
         x=x_vals,
         y=y_vals,
-        mode=mode,
+        mode="lines",
         name=legend_label,
         line=_line_style(segment, colour),
-        marker=marker,
         hovertemplate=_hover_template(segment, title, legend_label),
         legendgroup=series_id,
         showlegend=show,
     )
+    if arrow not in {ArrowHead.END.value, ArrowHead.START.value} or len(x_vals) < 2:
+        return [line_trace]
+
+    tip_idx, ref_idx = _arrow_indices(arrow, len(x_vals))
+    dx = x_vals[tip_idx] - x_vals[ref_idx]
+    dy = y_vals[tip_idx] - y_vals[ref_idx]
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return [line_trace]
+    backoff = min(length * 0.02, length * 0.25)
+    ux, uy = dx / length, dy / length
+    if arrow == ArrowHead.END.value:
+        mx = x_vals[tip_idx] - ux * backoff
+        my = y_vals[tip_idx] - uy * backoff
+    else:
+        mx = x_vals[tip_idx] + ux * backoff
+        my = y_vals[tip_idx] + uy * backoff
+    angle = math.degrees(math.atan2(dy, dx))
+    marker_trace = go.Scatter(
+        x=[mx],
+        y=[my],
+        mode="markers",
+        marker={
+            "symbol": "triangle-right",
+            "size": 12,
+            "angle": angle,
+            "color": colour,
+            "line": {"width": 1.5, "color": colour},
+        },
+        hoverinfo="skip",
+        legendgroup=series_id,
+        showlegend=False,
+    )
+    return [line_trace, marker_trace]
 
 
 def _segment_colour(segment: Mapping[str, object]) -> str:
@@ -313,29 +400,6 @@ def _legend_details(
     show = not legend_seen.get(series_id, False)
     legend_seen[series_id] = True
     return legend_label, series_id, show
-
-
-def _segment_mode_and_markers(
-    segment: Mapping[str, object],
-    x_vals: List[float],
-    y_vals: List[float],
-    colour: str,
-) -> Tuple[str, Optional[dict]]:
-    arrow = segment.get("arrow")
-    if arrow not in {ArrowHead.END.value, ArrowHead.START.value} or len(x_vals) < 2:
-        return "lines", None
-    tip_idx, ref_idx = _arrow_indices(arrow, len(x_vals))
-    dx = x_vals[tip_idx] - x_vals[ref_idx]
-    dy = y_vals[tip_idx] - y_vals[ref_idx]
-    angle = math.degrees(math.atan2(dy, dx))
-    marker = {
-        "symbol": ["triangle-right"] * len(x_vals),
-        "size": [12 if i == tip_idx else 0.0 for i in range(len(x_vals))],
-        "angle": [angle if i == tip_idx else 0.0 for i in range(len(x_vals))],
-        "color": colour,
-        "line": {"width": 0},
-    }
-    return "lines+markers", marker
 
 
 def _arrow_indices(arrow: str, length: int) -> Tuple[int, int]:
@@ -366,10 +430,46 @@ def _apply_default_layout(fig: go.Figure) -> None:
         yaxis_title="Temperature / \N{DEGREE SIGN}C",
         template="plotly_white",
         hovermode="closest",
-        legend={"title": "", "orientation": "h", "yanchor": "bottom", "y": 1.02},
-        margin={"l": 40, "r": 20, "t": 60, "b": 40},
+        legend={
+            "title": "Click to toggle",
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.06,
+            "title_font": {"color": "#000000", "size": 13},
+            "font": {"color": "#000000", "size": 12},
+        },
+        margin={"l": 50, "r": 28, "t": 64, "b": 48},
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        font={"family": "IBM Plex Sans, Inter, system-ui, sans-serif", "size": 13, "color": "#000000"},
+        hoverlabel={"bgcolor": "#ffffff", "font": {"color": "#000000"}},
     )
-    fig.update_yaxes(rangemode="tozero")
+    fig.update_xaxes(
+        rangemode="tozero",
+        showgrid=True,
+        gridcolor="rgba(148, 163, 184, 0.25)",
+        zerolinecolor="rgba(148, 163, 184, 0.25)",
+        zerolinewidth=1,
+        ticks="outside",
+        tickcolor="#000000",
+        showline=True,
+        linecolor="#000000",
+        tickfont={"color": "#000000"},
+        title_font={"color": "#000000"},
+    )
+    fig.update_yaxes(
+        rangemode="tozero",
+        showgrid=True,
+        gridcolor="rgba(148, 163, 184, 0.2)",
+        zerolinecolor="rgba(148, 163, 184, 0.2)",
+        zerolinewidth=1,
+        ticks="outside",
+        tickcolor="#000000",
+        showline=True,
+        linecolor="#000000",
+        tickfont={"color": "#000000"},
+        title_font={"color": "#000000"},
+    )
 
 
 def _extract_segment_xy(segment: Mapping[str, object]) -> tuple[List[float], List[float]]:
@@ -388,3 +488,193 @@ def _legend_group_name(title: str) -> str:
     if suffix.isdigit() and base:
         return base
     return title
+
+
+def _apply_dashboard_theme(st) -> None:
+    st.markdown(
+        """
+        <style>
+            :root {
+                --op-bg: #f5f7fb;
+                --op-card: #ffffff;
+                --op-ink: #0f172a;
+                --op-muted: #64748b;
+                --op-border: rgba(148, 163, 184, 0.35);
+                --op-accent: #0ea5a4;
+                --op-accent-soft: rgba(14, 165, 164, 0.12);
+                --op-select-text: #262730;
+            }
+
+            .stApp {
+                background: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 60%, #f8fafc 100%);
+                color: var(--op-ink);
+                font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+            }
+
+            section[data-testid="stSidebar"] {
+                background-color: #0f172a;
+                color: #f8fafc;
+                border-right: 1px solid rgba(148, 163, 184, 0.2);
+            }
+
+            section[data-testid="stSidebar"] * {
+                color: #e2e8f0;
+            }
+
+            section[data-testid="stSidebar"] label {
+                color: #94a3b8 !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-baseweb="select"] span {
+                color: var(--op-select-text) !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-baseweb="select"] input {
+                color: var(--op-select-text) !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-baseweb="select"] * {
+                color: var(--op-select-text) !important;
+            }
+
+            div[data-baseweb="menu"] span {
+                color: var(--op-select-text) !important;
+            }
+
+            .op-header {
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                padding: 0.5rem 0 1rem;
+            }
+
+            .op-title {
+                font-size: 2rem;
+                font-weight: 600;
+                letter-spacing: -0.02em;
+                color: var(--op-ink);
+            }
+
+            .op-subtitle {
+                color: var(--op-muted);
+                font-size: 0.95rem;
+                margin-top: 0.2rem;
+            }
+
+            .op-metric-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.75rem;
+                margin-top: 0.6rem;
+            }
+
+            .op-metric {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(148, 163, 184, 0.2);
+                border-radius: 12px;
+                padding: 0.65rem 0.75rem;
+            }
+
+            .op-metric-label {
+                font-size: 0.72rem;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: #94a3b8;
+                margin-bottom: 0.3rem;
+            }
+
+            .op-metric-value {
+                font-size: 1.1rem;
+                font-weight: 600;
+            }
+
+            .op-card-title {
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--op-ink);
+                margin-bottom: 0.3rem;
+                padding-left: 0.1rem;
+            }
+
+            .op-utility-title {
+                font-size: 0.72rem;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: #94a3b8;
+                margin-bottom: 0.45rem;
+            }
+
+            .op-utility-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.6rem;
+            }
+
+            .op-utility-card {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(148, 163, 184, 0.2);
+                border-radius: 12px;
+                padding: 0.55rem 0.75rem;
+            }
+
+            .op-utility-name {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: #e2e8f0;
+            }
+
+            .op-utility-value {
+                font-size: 0.92rem;
+                color: #cbd5f5;
+            }
+
+            .op-utility-empty {
+                color: #94a3b8;
+                text-align: center;
+                font-size: 0.88rem;
+            }
+
+            div[data-testid="stPlotlyChart"] {
+                background: var(--op-card);
+                border: 1px solid var(--op-border);
+                border-radius: 14px;
+                padding: 0.75rem;
+                box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+                overflow: hidden;
+            }
+
+            div[data-testid="stPlotlyChart"] > div {
+                width: 100% !important;
+            }
+
+            .stTabs [role="tab"] {
+                font-weight: 600;
+                letter-spacing: 0.01em;
+                color: var(--op-muted);
+            }
+
+            .stTabs [role="tab"][aria-selected="true"] {
+                color: var(--op-ink);
+                border-bottom: 2px solid var(--op-accent);
+            }
+
+            .stBadge {
+                background-color: var(--op-accent-soft) !important;
+                color: var(--op-ink) !important;
+                border: 1px solid rgba(14, 165, 164, 0.3);
+            }
+
+            div[data-testid="stDataFrame"] {
+                background: var(--op-card);
+                border: 1px solid var(--op-border);
+                border-radius: 12px;
+                padding: 0.4rem;
+            }
+
+            input, textarea {
+                border-radius: 10px !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
