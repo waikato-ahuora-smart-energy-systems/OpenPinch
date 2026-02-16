@@ -8,7 +8,6 @@ from . import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
     get_utility_targets,
-    get_additional_GCCs,
     get_heat_pump_targets,
     calc_heat_pump_cascade,
     plot_multi_hp_profiles_from_results
@@ -38,11 +37,11 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         zone.net_hot_streams, zone.net_cold_streams, zone.all_net_streams, zone.config
     )
     pt.update(
-        _shift_composite_curves(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
+        _get_site_process_heat_load_profiles(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
     )
     pt_real.update(
-        _shift_composite_curves(pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value])
-    )    
+        _get_site_process_heat_load_profiles(pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value])
+    )
 
     # Get utility duties based on the summation of subzones
     s_tzt: EnergyTarget = zone.targets[key_name(zone.name, TargetType.TZ.value)]
@@ -71,10 +70,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     _match_utility_gen_and_use_at_same_level(
         hot_utilities, cold_utilities
     )
-    pt = get_additional_GCCs(
-        pt, 
-        is_direct_integration=False
-    )
+    
     get_utility_targets(
         pt, pt_real, 
         hot_utilities, cold_utilities,
@@ -273,14 +269,20 @@ def _compute_utility_cost(hot_utilities: StreamCollection, cold_utilities: Strea
     return utility_cost
 
 
-def _shift_composite_curves(H_hot: np.ndarray, H_cold: np.ndarray) -> dict:
+def _get_site_process_heat_load_profiles(
+    H_hot: np.ndarray, 
+    H_cold: np.ndarray,
+) -> dict:
     return {
-        PT.H_HOT.value: H_hot - H_hot[0],
-        PT.H_COLD.value: H_cold - H_cold[-1],
+        PT.H_NET_HOT.value: H_hot - H_hot[0],
+        PT.H_NET_COLD.value: H_cold - H_cold[-1],
     }
 
 
-def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
+def _save_graph_data(
+    pt: ProblemTable, 
+    pt_real: ProblemTable,
+) -> Zone:
     """Prepare graph-ready tables capturing site-level utility composite curves."""
     pt.round(decimals=4)
     pt_real.round(decimals=4)

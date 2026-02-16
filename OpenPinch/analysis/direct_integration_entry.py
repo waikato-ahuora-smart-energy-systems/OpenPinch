@@ -44,8 +44,7 @@ def compute_direct_integration_targets(zone: Zone):
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     pt = get_additional_GCCs(
-        pt, 
-        is_direct_integration=True, 
+        pt,
         do_vert_cc_calc=zone_config.DO_VERTICAL_GCC,
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
@@ -89,7 +88,7 @@ def compute_direct_integration_targets(zone: Zone):
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True
     )
-    net_hot_streams, net_cold_streams = _create_net_hot_and_cold_stream_collections_for_site_analysis(
+    zone.net_hot_streams, zone.net_cold_streams = _create_net_hot_and_cold_stream_collections_for_site_analysis(
         pt.col[PT.T.value], pt.col[PT.H_NET_A.value], hot_utilities, cold_utilities
     )
     if zone_config.DO_BALANCED_CC or zone_config.DO_AREA_TARGETING:
@@ -154,8 +153,8 @@ def compute_direct_integration_targets(zone: Zone):
             "graphs": _save_graph_data(pt, pt_real),
             "hot_utilities": hot_utilities,
             "cold_utilities": cold_utilities,
-            "net_hot_streams": net_hot_streams,
-            "net_cold_streams": net_cold_streams,
+            "net_hot_streams": zone.net_hot_streams,
+            "net_cold_streams": zone.net_cold_streams,
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
         }

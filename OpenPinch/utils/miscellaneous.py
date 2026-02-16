@@ -48,12 +48,14 @@ def delta_with_zero_at_start(x: np.ndarray) -> np.ndarray:
 
 
 def delta_vals(x: np.ndarray, descending_vals: bool = True) -> np.ndarray:
-    """Compute difference between successive entries in a column."""        
-    return (
+    """Compute difference between successive entries in a column."""  
+    deltas = (
         x[:-1] - x[1:] 
         if descending_vals else
         x[1:] - x[:-1]
     )
+    deltas[np.abs(deltas) <= tol] = 0.0
+    return deltas
 
 
 def clean_composite_curve_ends(
@@ -63,7 +65,7 @@ def clean_composite_curve_ends(
     y_vals = np.array(y_vals)
     x_vals = np.array(x_vals)
     
-    if np.abs(x_vals.sum()) < tol or np.abs(x_vals.var()) < tol:
+    if np.all(np.isclose(x_vals, 0.0, atol=tol)) or np.abs(x_vals.var()) < tol:
         return np.array([]), np.array([])
     
     mask_0 = ~np.isclose(x_vals, x_vals[0] * np.ones(len(x_vals)), atol=tol)
