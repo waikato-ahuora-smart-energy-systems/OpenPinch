@@ -247,27 +247,36 @@ class Zone:
             and zone1._cold_utilities == zone2._cold_utilities
         )
 
-    def import_hot_and_cold_streams_from_sub_zones(self, get_net_streams: bool = False):
+    def import_hot_and_cold_streams_from_sub_zones(self, get_net_streams: bool = False, is_n_zone_depth: bool = True, is_new_stream_collection: bool = True):
         """Get hot and cold streams from multiple subzones into two separate lists, maintaining references."""
         z: Zone
         s: Stream
+        if not get_net_streams:
+            if is_new_stream_collection:
+                self._hot_streams = StreamCollection()
+                self._cold_streams = StreamCollection()
+            hs_dst = self._hot_streams 
+            cs_dst = self._cold_streams
+        else:
+            if is_new_stream_collection:
+                self._net_hot_streams = StreamCollection()
+                self._net_cold_streams = StreamCollection()
+            hs_dst = self._net_hot_streams 
+            cs_dst = self._net_cold_streams
+
         for z in self.subzones.values():
-            if len(z.subzones) > 0:
+            if len(z.subzones) > 0 and is_n_zone_depth:
                 z.import_hot_and_cold_streams_from_sub_zones(get_net_streams)
 
             if not get_net_streams:
                 hs_src = z.hot_streams
-                hs_dst = self._hot_streams
                 cs_src = z.cold_streams
-                cs_dst = self._cold_streams
             else:
                 hs_src = z.net_hot_streams
-                hs_dst = self._net_hot_streams
                 cs_src = z.net_cold_streams
-                cs_dst = self._net_cold_streams
 
             for s in hs_src:
-                key = f"{z.name}.{s.name}"
+                key = f"{z.name}.{s.name}"  
                 hs_dst.add(s, key)
 
             for s in cs_src:
