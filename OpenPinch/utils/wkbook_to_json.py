@@ -22,7 +22,11 @@ def get_problem_from_excel(excel_file, output_json=None):
     """
 
     streams_data = _parse_sheet_with_units(excel_file, sheet_name="Stream Data")
+    streams_data = _validate_stream_data(streams_data)
+    
     utilities_data = _parse_sheet_with_units(excel_file, sheet_name="Utility Data")
+    utilities_data = _validate_utilities_data(utilities_data) 
+
     options_data = _parse_options_sheet(excel_file, sheet_name="Options")
 
     # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
@@ -363,3 +367,101 @@ def _write_targets_to_dict_and_list(
         results.append(dict(items[2:] + items[:2]))
 
     return results
+
+
+def _validate_stream_data(
+    sd: pd.DataFrame,
+) -> pd.DataFrame:
+    default_zone = "Process Zone"
+    def _normalize_label(value, prefix: str):
+        if value is None or pd.isna(value):
+            return value
+        text = str(value).strip()
+        if "." in text:
+            text = text.replace(".", "-")
+        if text.isdigit():
+            text = f"{prefix}{text}"
+        return text
+
+    if sd is None:
+        return []
+
+    if isinstance(sd, pd.DataFrame):
+        if sd.empty:
+            return sd
+        if "zone" in sd.columns:
+            zone_series = sd["zone"]
+            zone_text = zone_series.astype(str).str.strip()
+            missing_zone = zone_series.isna() | (zone_text == "")
+            if missing_zone.any():
+                sd = sd.copy()
+                sd.loc[missing_zone, "zone"] = default_zone
+                zone_series = sd["zone"]
+                zone_text = zone_series.astype(str).str.strip()
+            normalized_zone = zone_text.str.replace(".", "-", regex=False)
+            numeric_zone = normalized_zone.str.fullmatch(r"\d+")
+            normalized_zone = normalized_zone.mask(numeric_zone, "Z" + normalized_zone)
+            sd["zone"] = normalized_zone
+        if "name" in sd.columns:
+            name_series = sd["name"]
+            valid = ~name_series.isna()
+            if valid.any():
+                valid &= name_series.astype(str).str.strip() != ""
+            sd = sd.loc[valid].reset_index(drop=True)
+            name_text = sd["name"].astype(str).str.strip()
+            normalized_name = name_text.str.replace(".", "-", regex=False)
+            numeric_name = normalized_name.str.fullmatch(r"\d+")
+            sd["name"] = normalized_name.mask(numeric_name, "S" + normalized_name)
+        return sd
+
+    cleaned = []
+    append = cleaned.append
+    for record in sd:
+        if not isinstance(record, dict):
+            continue
+        name = record.get("name")
+        if name is None or pd.isna(name):
+            continue
+        if isinstance(name, str) and not name.strip():
+            continue
+        zone = record.get("zone")
+        if zone is None or pd.isna(zone) or (
+            isinstance(zone, str) and not zone.strip()
+        ):
+            record["zone"] = default_zone
+        else:
+            record["zone"] = _normalize_label(zone, "Z")
+        record["name"] = _normalize_label(name, "S")
+        append(record)
+    return cleaned
+
+
+def _validate_utilities_data(
+    ud: pd.DataFrame,
+) -> pd.DataFrame:
+    if ud is None:
+        return []
+
+    if isinstance(ud, pd.DataFrame):
+        if ud.empty:
+            return ud
+        if "name" in ud.columns:
+            name_series = ud["name"]
+            valid = ~name_series.isna()
+            if valid.any():
+                valid &= name_series.astype(str).str.strip() != ""
+            ud = ud.loc[valid].reset_index(drop=True)
+        return ud
+
+    cleaned = []
+    append = cleaned.append
+    for record in ud:
+        if not isinstance(record, dict):
+            continue
+        name = record.get("name")
+        if name is None or pd.isna(name):
+            continue
+        if isinstance(name, str) and not name.strip():
+            continue
+        append(record)
+    return cleaned

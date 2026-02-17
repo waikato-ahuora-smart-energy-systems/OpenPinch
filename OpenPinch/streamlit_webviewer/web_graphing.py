@@ -148,6 +148,10 @@ def render_streamlit_dashboard(
     st.sidebar.divider()
     st.sidebar.write("Targets")
     st.sidebar.markdown(
+        f"<div class='op-utility-title'>Overview</div>",
+        unsafe_allow_html=True,
+    )    
+    st.sidebar.markdown(
         f"""
         <div class="op-metric-grid">
             <div class="op-metric">
@@ -319,9 +323,11 @@ def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
     fig = go.Figure()
     legend_seen: Dict[str, bool] = {}
     for segment in graph.get("segments", []):
-        traces = _segment_trace(segment, graph, legend_seen)
+        traces, arrow_annotation = _segment_trace(segment, graph, legend_seen)
         for trace in traces:
             fig.add_trace(trace)
+        if arrow_annotation is not None:
+            fig.add_annotation(**arrow_annotation)
     _apply_default_layout(fig)
     return fig
 
@@ -330,14 +336,25 @@ def _segment_trace(
     segment: Mapping[str, object],
     graph: Mapping[str, object],
     legend_seen: Dict[str, bool],
-) -> List[go.Scatter]:
+) -> Tuple[List[go.Scatter], Optional[dict]]:
     x_vals, y_vals = _extract_segment_xy(segment)
     if not x_vals or not y_vals:
-        return []
+        return [], None
     title = segment.get("title") or graph.get("type") or "Segment"
+    graph_type = graph.get("type")
     colour = _segment_colour(segment)
     legend_label, series_id, show = _legend_details(segment, title, legend_seen)
     arrow = segment.get("arrow")
+
+    if graph_type in {"Site Utility Grand Composite Curve"} and _is_vertical_segment(x_vals):
+        colour = _SEGMENT_COLOUR_MAP[LineColour.Other.value]
+
+    if graph_type in {"Total Site Profiles", "Site Utility Grand Composite Curve"}:
+        if arrow == ArrowHead.START.value:
+            arrow = ArrowHead.END.value
+        elif arrow == ArrowHead.END.value:
+            arrow = ArrowHead.START.value
+            
     line_trace = go.Scatter(
         x=x_vals,
         y=y_vals,
@@ -349,44 +366,47 @@ def _segment_trace(
         showlegend=show,
     )
     if arrow not in {ArrowHead.END.value, ArrowHead.START.value} or len(x_vals) < 2:
-        return [line_trace]
+        return [line_trace], None
 
-    tip_idx, ref_idx = _arrow_indices(arrow, len(x_vals))
+    tip_idx, ref_idx = _arrow_indices(x_vals, y_vals, arrow)
     dx = x_vals[tip_idx] - x_vals[ref_idx]
     dy = y_vals[tip_idx] - y_vals[ref_idx]
     length = math.hypot(dx, dy)
     if length == 0:
-        return [line_trace]
-    backoff = min(length * 0.02, length * 0.25)
+        return [line_trace], None
     ux, uy = dx / length, dy / length
-    if arrow == ArrowHead.END.value:
-        mx = x_vals[tip_idx] - ux * backoff
-        my = y_vals[tip_idx] - uy * backoff
-    else:
-        mx = x_vals[tip_idx] + ux * backoff
-        my = y_vals[tip_idx] + uy * backoff
-    angle = math.degrees(math.atan2(dy, dx))
-    marker_trace = go.Scatter(
-        x=[mx],
-        y=[my],
-        mode="markers",
-        marker={
-            "symbol": "triangle-right",
-            "size": 12,
-            "angle": angle,
-            "color": colour,
-            "line": {"width": 1.5, "color": colour},
-        },
-        hoverinfo="skip",
-        legendgroup=series_id,
-        showlegend=False,
-    )
-    return [line_trace, marker_trace]
+    tail_offset = 0.2 * length
+    arrow_annotation = {
+        "x": x_vals[tip_idx],
+        "y": y_vals[tip_idx],
+        "xref": "x",
+        "yref": "y",
+        "ax": x_vals[tip_idx] - ux * tail_offset,
+        "ay": y_vals[tip_idx] - uy * tail_offset,
+        "axref": "x",
+        "ayref": "y",
+        "text": "",
+        "showarrow": True,
+        "arrowhead": 2,
+        "arrowsize": 0.9,
+        "arrowwidth": 1.8,
+        "arrowcolor": colour,
+    }
+    return [line_trace], arrow_annotation
 
 
 def _segment_colour(segment: Mapping[str, object]) -> str:
+    if segment.get("is_vertical") and segment.get("is_utility_stream"):
+        return _SEGMENT_COLOUR_MAP[LineColour.Black.value]
     colour_idx = segment.get("colour")
     return _SEGMENT_COLOUR_MAP.get(colour_idx, "#333333")
+
+
+def _is_vertical_segment(x_vals: List[float], *, atol: float = 1e-9) -> bool:
+    if len(x_vals) < 2:
+        return False
+    x0 = x_vals[0]
+    return all(abs(x - x0) <= atol for x in x_vals[1:])
 
 
 def _legend_details(
@@ -402,10 +422,23 @@ def _legend_details(
     return legend_label, series_id, show
 
 
-def _arrow_indices(arrow: str, length: int) -> Tuple[int, int]:
+def _arrow_indices(x_vals: List[float], y_vals: List[float], arrow: str) -> Tuple[int, int]:
+    length = len(x_vals)
     if arrow == ArrowHead.START.value:
-        return 0, 1
-    return length - 1, length - 2
+        tip_idx = 0
+        candidates = range(1, length)
+    else:
+        tip_idx = length - 1
+        candidates = range(length - 2, -1, -1)
+
+    for idx in candidates:
+        if x_vals[idx] != x_vals[tip_idx] or y_vals[idx] != y_vals[tip_idx]:
+            return tip_idx, idx
+
+    # Fallback to adjacent point (caller handles zero-length vectors)
+    if arrow == ArrowHead.START.value:
+        return 0, min(1, length - 1)
+    return length - 1, max(length - 2, 0)
 
 
 def _line_style(segment: Mapping[str, object], colour: str) -> dict:
@@ -448,8 +481,9 @@ def _apply_default_layout(fig: go.Figure) -> None:
         rangemode="tozero",
         showgrid=True,
         gridcolor="rgba(148, 163, 184, 0.25)",
-        zerolinecolor="rgba(148, 163, 184, 0.25)",
-        zerolinewidth=1,
+        zeroline=True,
+        zerolinecolor="rgba(15, 23, 42, 0.8)",
+        zerolinewidth=1.25,
         ticks="outside",
         tickcolor="#000000",
         showline=True,
@@ -461,8 +495,9 @@ def _apply_default_layout(fig: go.Figure) -> None:
         rangemode="tozero",
         showgrid=True,
         gridcolor="rgba(148, 163, 184, 0.2)",
-        zerolinecolor="rgba(148, 163, 184, 0.2)",
-        zerolinewidth=1,
+        zeroline=True,
+        zerolinecolor="rgba(15, 23, 42, 0.8)",
+        zerolinewidth=1.25,
         ticks="outside",
         tickcolor="#000000",
         showline=True,
@@ -537,6 +572,10 @@ def _apply_dashboard_theme(st) -> None:
                 color: var(--op-select-text) !important;
             }
 
+            section[data-testid="stSidebar"] hr {
+                margin: 0.8rem 0;
+            }
+
             div[data-baseweb="menu"] span {
                 color: var(--op-select-text) !important;
             }
@@ -564,15 +603,15 @@ def _apply_dashboard_theme(st) -> None:
             .op-metric-grid {
                 display: grid;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 0.75rem;
-                margin-top: 0.6rem;
+                gap: 0.45rem;
+                margin-top: 0.35rem;
             }
 
             .op-metric {
                 background: rgba(255, 255, 255, 0.08);
                 border: 1px solid rgba(148, 163, 184, 0.2);
                 border-radius: 12px;
-                padding: 0.65rem 0.75rem;
+                padding: 0.45rem 0.6rem;
             }
 
             .op-metric-label {
