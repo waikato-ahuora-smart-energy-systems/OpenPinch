@@ -126,13 +126,15 @@ class ProblemTableLabel(Enum):
 
     H_HOT_UT = "H_hot_utility"
     H_COLD_UT = "H_cold_utility"
+    H_NET_HOT_UT = "H_hot_net_utility"
+    H_NET_COLD_UT = "H_cold_net_utility"      
     H_HOT_BAL = "H_hot_balanced"
     H_COLD_BAL = "H_cold_balanced"
 
     H_HOT_HP = "H_hot_hp_ut"
     H_COLD_HP = "H_cold_hp_ut"
-    H_NET_HOT_2 = "H_hot_net_after_hp"
-    H_NET_COLD_2 = "H_cold_net_after_hp"      
+    H_NET_HOT_2 = "H_hot_net_utility_after_hp"
+    H_NET_COLD_2 = "H_cold_net_utility_after_hp"      
 
     RCP_HOT = "rCP_hot"
     RCP_COLD = "rCP_cold"

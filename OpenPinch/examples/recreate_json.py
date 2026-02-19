@@ -7,7 +7,6 @@ def create_problem_and_results_json():
     filepath_save = os.path.dirname(__file__)
 
     for filename in os.listdir(filepath_load):
-        # filename = 'locally_integrated.xlsb'
         if (filename.endswith(".xlsb") or filename.endswith(".xlsx")) and not filename.startswith("~$"):
             excel_file = os.path.join(filepath_load, filename)
             project_name = os.path.splitext(filename)[0]

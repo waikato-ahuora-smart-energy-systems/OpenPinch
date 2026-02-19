@@ -14,7 +14,7 @@ from ..lib import *
 from ..utils import *
 
 
-__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_problem_table_with_t_int"]
+__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_problem_table_with_t_int", "problem_table_algorithm"]
 
 
 #######################################################################################################
@@ -40,7 +40,7 @@ def get_process_heat_cascade(
         zone_config,
     )
     # Perform the heat cascade of the problem table
-    _problem_table_algorithm(pt, hot_streams, cold_streams)
+    problem_table_algorithm(pt, hot_streams, cold_streams)
 
     if not include_real_pt or zone_config == None:
         return pt, None, None
@@ -51,7 +51,7 @@ def get_process_heat_cascade(
         zone_config,
     )
 
-    _problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
+    problem_table_algorithm(pt_real, hot_streams, cold_streams, False)
     target_values = _set_zonal_targets(pt, pt_real)
 
     # Correct the location of the cold composite curve and limiting GCC (real temperatures)
@@ -70,13 +70,13 @@ def get_process_heat_cascade(
 
 def get_utility_heat_cascade(
     T_int_vals: np.ndarray,
-    hot_utilities: List[Stream],
-    cold_utilities: List[Stream],
+    hot_utilities: List[Stream] = None,
+    cold_utilities: List[Stream] = None,
     is_shifted: bool = True,
 ) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
     pt_ut = ProblemTable({PT.T.value: T_int_vals})
-    _problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
+    problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
 
     h_net_values = pt_ut.col[PT.H_NET.value]
     H_NET_UT = h_net_values.max() - h_net_values
@@ -132,12 +132,7 @@ def create_problem_table_with_t_int(
     )
 
 
-#######################################################################################################
-# Helper functions
-#######################################################################################################
-
-
-def _problem_table_algorithm(
+def problem_table_algorithm(
     pt: ProblemTable,
     hot_streams: StreamCollection = None,
     cold_streams: StreamCollection = None,
@@ -152,6 +147,9 @@ def _problem_table_algorithm(
         )
         pt.col[PT.CP_HOT.value] = sum_cp_hot
         pt.col[PT.RCP_HOT.value] = sum_rcp_hot
+    else:
+        pt.col[PT.CP_HOT.value].fill(0.0)
+        pt.col[PT.RCP_HOT.value].fill(0.0)
 
     # Sum m_dot*Cp contributions from cold streams per interval (sets CP_COLD and rCP_COLD)
     if cold_streams is not None:
@@ -160,6 +158,9 @@ def _problem_table_algorithm(
         )    
         pt.col[PT.CP_COLD.value] = sum_cp_cold
         pt.col[PT.RCP_COLD.value] = sum_rcp_cold
+    else:
+        pt.col[PT.CP_COLD.value].fill(0.0)
+        pt.col[PT.RCP_COLD.value].fill(0.0)  
 
     # ΔT_i = T_{i-1} - T_i
     pt.col[PT.DELTA_T.value] = delta_with_zero_at_start(pt.col[PT.T.value])
@@ -194,6 +195,11 @@ def _problem_table_algorithm(
     pt.col[PT.H_NET.value] = pt.col[PT.H_NET.value] - min_H
 
     return pt
+
+
+#######################################################################################################
+# Helper functions
+#######################################################################################################
 
 
 def _sum_mcp_between_temperature_boundaries(

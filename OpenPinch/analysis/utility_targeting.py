@@ -87,7 +87,7 @@ def get_utility_targets(
                 pt_real.col[PT.T.value], 
                 hot_utilities, 
                 cold_utilities, 
-                is_shifted=False
+                is_shifted=False,
             )
         )
         pt_real.update(

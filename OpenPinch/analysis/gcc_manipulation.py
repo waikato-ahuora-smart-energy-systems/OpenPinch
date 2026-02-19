@@ -28,33 +28,31 @@ __all__ = [
 
 def get_additional_GCCs(
     pt: ProblemTable,
-    is_direct_integration: bool = True,
     do_vert_cc_calc: bool = False,
     do_assisted_ht_calc: bool = False,
 ) -> ProblemTable:        
     # Calculate various GCC profiles
-    if is_direct_integration:
-        get_GCC_without_pockets(pt)
-        
-        if do_vert_cc_calc:
-            pt.update(
-                get_GCC_with_vertical_heat_transfer(
-                    pt.col[PT.H_COLD.value],
-                    pt.col[PT.H_HOT.value],
-                    pt.col[PT.H_NET.value],
-                )
+    get_GCC_without_pockets(pt)
+    
+    if do_vert_cc_calc:
+        pt.update(
+            get_GCC_with_vertical_heat_transfer(
+                pt.col[PT.H_COLD.value],
+                pt.col[PT.H_HOT.value],
+                pt.col[PT.H_NET.value],
             )
+        )
 
-        if do_assisted_ht_calc:
-            pt.update(
-                get_GGC_pockets(pt)
-            )
+    if do_assisted_ht_calc:
+        pt.update(
+            get_GGC_pockets(pt)
+        )
 
     pt.update(
         get_GCC_needing_utility(
             pt.col[PT.H_NET_NP.value]
         )
-    )    
+    )
     pt.update(
         get_seperated_gcc_heat_load_profiles(
             pt.col[PT.H_NET_A.value]

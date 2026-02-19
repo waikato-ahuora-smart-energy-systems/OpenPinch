@@ -6,9 +6,8 @@ from ..lib import *
 from ..utils import *
 from . import (
     get_process_heat_cascade,
-    get_utility_heat_cascade,
+    problem_table_algorithm,
     get_utility_targets,
-    get_additional_GCCs,
     get_heat_pump_targets,
     calc_heat_pump_cascade,
     plot_multi_hp_profiles_from_results
@@ -33,16 +32,20 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     _sum_subzone_targets(zone)
 
     # Total site profiles - process side
-    zone.import_hot_and_cold_streams_from_sub_zones(get_net_streams=True)
+    zone.import_hot_and_cold_streams_from_sub_zones(
+        get_net_streams=True,
+        is_n_zone_depth=False,
+        is_new_stream_collection=True,
+    )
     pt, pt_real, _ = get_process_heat_cascade(
         zone.net_hot_streams, zone.net_cold_streams, zone.all_net_streams, zone.config
     )
     pt.update(
-        _shift_composite_curves(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
+        _get_site_process_heat_load_profiles(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
     )
     pt_real.update(
-        _shift_composite_curves(pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value])
-    )    
+        _get_site_process_heat_load_profiles(pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value])
+    )
 
     # Get utility duties based on the summation of subzones
     s_tzt: EnergyTarget = zone.targets[key_name(zone.name, TargetType.TZ.value)]
@@ -51,7 +54,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     
     # Apply the problem table algorithm to the simple sum of subzone utility use 
     pt.update(
-        get_utility_heat_cascade(
+        _get_site_utility_heat_cascade(
             pt.col[PT.T.value], 
             hot_utilities, 
             cold_utilities, 
@@ -59,7 +62,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         )
     )
     pt_real.update(
-        get_utility_heat_cascade(
+        _get_site_utility_heat_cascade(
             pt_real.col[PT.T.value], 
             hot_utilities, 
             cold_utilities, 
@@ -70,15 +73,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     # Apply the utility targeting method to determine the net utility use and generation 
     _match_utility_gen_and_use_at_same_level(
         hot_utilities, cold_utilities
-    )
-    pt = get_additional_GCCs(
-        pt, 
-        is_direct_integration=False
-    )
-    get_utility_targets(
-        pt, pt_real, 
-        hot_utilities, cold_utilities,
-        is_direct_integration=False
     )
 
     # Extract overall heat integration targets
@@ -273,14 +267,50 @@ def _compute_utility_cost(hot_utilities: StreamCollection, cold_utilities: Strea
     return utility_cost
 
 
-def _shift_composite_curves(H_hot: np.ndarray, H_cold: np.ndarray) -> dict:
+def _get_site_process_heat_load_profiles(
+    H_hot: np.ndarray, 
+    H_cold: np.ndarray,
+) -> dict:
     return {
-        PT.H_HOT.value: H_hot - H_hot[0],
-        PT.H_COLD.value: H_cold - H_cold[-1],
+        PT.H_NET_HOT.value: H_hot - H_hot[0],
+        PT.H_NET_COLD.value: H_cold - H_cold[-1],
     }
 
 
-def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
+def _get_site_utility_heat_cascade(
+    T_int_vals: np.ndarray,
+    hot_utilities: List[Stream] = None,
+    cold_utilities: List[Stream] = None,
+    is_shifted: bool = True,
+) -> Dict[str, np.ndarray]:
+    """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
+    pt_ut_hot = ProblemTable({PT.T.value: T_int_vals})
+    problem_table_algorithm(pt_ut_hot, hot_streams=hot_utilities, is_shifted=is_shifted)
+
+    pt_ut_cld = ProblemTable({PT.T.value: T_int_vals})
+    problem_table_algorithm(pt_ut_cld, cold_streams=cold_utilities, is_shifted=is_shifted)
+
+    pt_ut = ProblemTable({PT.T.value: T_int_vals})
+    problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted=is_shifted)    
+
+
+    h_net_values = pt_ut.col[PT.H_NET.value]
+    H_NET_UT = h_net_values.max() - h_net_values
+    
+    h_ut_cc =  pt_ut_hot.col[PT.H_HOT.value]
+    c_ut_cc =  pt_ut_cld.col[PT.H_COLD.value] - pt_ut_cld.col[PT.H_COLD.value].max()
+
+    return {
+        PT.H_NET_UT.value: H_NET_UT,
+        PT.H_HOT_UT.value: h_ut_cc,
+        PT.H_COLD_UT.value: c_ut_cc,
+    }
+
+
+def _save_graph_data(
+    pt: ProblemTable, 
+    pt_real: ProblemTable,
+) -> Zone:
     """Prepare graph-ready tables capturing site-level utility composite curves."""
     pt.round(decimals=4)
     pt_real.round(decimals=4)
@@ -294,7 +324,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
                 PT.H_COLD_UT.value,
             ]
         ],
-        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value]],
+        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value]],
     }
 
 

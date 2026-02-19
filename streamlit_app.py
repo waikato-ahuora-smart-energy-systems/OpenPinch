@@ -12,7 +12,7 @@ from OpenPinch import PinchProblem
 
 
 # Current case. Update this path if you want to switch datasets.
-PROBLEM_FILE = Path("OpenPinch/examples/OpenPinchWkbs/UnderReview/Chocolote Factory.xlsb")
+PROBLEM_FILE = Path("OpenPinch/examples/OpenPinchWkbs/pulp_mill.xlsb")
 
 
 @st.cache_resource

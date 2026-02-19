@@ -141,8 +141,8 @@ def test_empty_stream_lists_returns_zero():
     assert CP_cold == [0, 0, 0]
 
 
-"""Tests for _problem_table_algorithm function."""
-from OpenPinch.analysis.problem_table_analysis import _problem_table_algorithm
+"""Tests for problem_table_algorithm function."""
+from OpenPinch.analysis.problem_table_analysis import problem_table_algorithm
 
 
 def make_simple_problem_table():
@@ -164,7 +164,7 @@ def make_simple_problem_table():
 
 def test_calc_problem_table_cascade_correct():
     pt_real = make_simple_problem_table()
-    result = _problem_table_algorithm(pt_real.copy)
+    result = problem_table_algorithm(pt_real.copy)
 
     # Check composite curves calculated
     assert result.loc[0, PT.H_NET.value] == 0  # GCC starts at 0
@@ -173,22 +173,22 @@ def test_calc_problem_table_cascade_correct():
 
 def test_delta_t_computation():
     pt_real = make_simple_problem_table()
-    result = _problem_table_algorithm(pt_real.copy)
+    result = problem_table_algorithm(pt_real.copy)
     assert result.col[PT.DELTA_T.value].tolist() == [0, 100, 100]
 
 
 def test_net_mcp_and_delta_h():
     pt_real = make_simple_problem_table()
-    result = _problem_table_algorithm(pt_real.copy)
-    expected_CP_NET = [0, -1.0, 1.0]
-    expected_delta_h_net = [0, -100.0, 100.0]
+    result = problem_table_algorithm(pt_real.copy)
+    expected_CP_NET = [0, 0, 0]
+    expected_delta_h_net = [0, 0, 0]
     assert result.col[PT.CP_NET.value].tolist() == expected_CP_NET
     assert result.col[PT.DELTA_H_NET.value].tolist() == expected_delta_h_net
 
 
 def test_shifting_behavior():
     pt_real = make_simple_problem_table()
-    result = _problem_table_algorithm(pt_real.copy)
+    result = problem_table_algorithm(pt_real.copy)
     assert result.col[PT.H_NET.value].min() == 0
     assert (
         abs(result.loc[-1, PT.H_COLD.value] - result.loc[-1, PT.H_HOT.value]) < 1e-6
