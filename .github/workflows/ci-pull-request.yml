@@ -74,19 +74,39 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Resolve bump part from PR labels
+        id: bump-part
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const labels = (context.payload.pull_request.labels || []).map(l => l.name.toLowerCase());
+            let part = "patch";
+            if (labels.includes("major")) {
+              part = "major";
+            } else if (labels.includes("minor")) {
+              part = "minor";
+            } else if (labels.includes("patch")) {
+              part = "patch";
+            }
+            core.setOutput("part", part);
+
       # 2) Run the bump locally (no tag), capture versions
-      - name: Bump version (patch, no tag)
+      - name: Bump version (selected part, no tag)
         id: bump
         if: steps.guard.outputs.skip != 'true'
+        env:
+          BUMP_PART: ${{ steps.bump-part.outputs.part }}
         run: |
           set -euo pipefail
           prev="$(bump-my-version show current_version)"
           echo "previous-version=${prev}" >> "$GITHUB_OUTPUT"
 
-          bump-my-version bump patch --no-tag
+          bump-my-version bump "${BUMP_PART}" --no-tag
 
           curr="$(bump-my-version show current_version)"
           echo "current-version=${curr}" >> "$GITHUB_OUTPUT"
+          echo "bump-part=${BUMP_PART}" >> "$GITHUB_OUTPUT"
 
           if [ "$prev" != "$curr" ]; then
             echo "bumped=true" >> "$GITHUB_OUTPUT"
@@ -112,11 +132,12 @@ jobs:
         env:
           PREV: ${{ steps.bump.outputs.previous-version }}
           CURR: ${{ steps.bump.outputs.current-version }}
+          PART: ${{ steps.bump.outputs.bump-part }}
         with:
           script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
-              body: `✅ Version bumped from \`${process.env.PREV}\` to \`${process.env.CURR}\` on this PR branch.`
+              body: `✅ Version bumped (${process.env.PART}) from \`${process.env.PREV}\` to \`${process.env.CURR}\` on this PR branch.`
             });
