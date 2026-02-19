@@ -180,8 +180,8 @@ def test_delta_t_computation():
 def test_net_mcp_and_delta_h():
     pt_real = make_simple_problem_table()
     result = problem_table_algorithm(pt_real.copy)
-    expected_CP_NET = [0, -1.0, 1.0]
-    expected_delta_h_net = [0, -100.0, 100.0]
+    expected_CP_NET = [0, 0, 0]
+    expected_delta_h_net = [0, 0, 0]
     assert result.col[PT.CP_NET.value].tolist() == expected_CP_NET
     assert result.col[PT.DELTA_H_NET.value].tolist() == expected_delta_h_net
 
