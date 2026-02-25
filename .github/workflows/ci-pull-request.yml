@@ -74,13 +74,15 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Resolve bump part from PR labels
+      - name: Resolve bump part from PR labels/title
         id: bump-part
         if: steps.guard.outputs.skip != 'true'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
             const labels = (context.payload.pull_request.labels || []).map(l => l.name.toLowerCase());
+            const title = (context.payload.pull_request.title || "").toLowerCase();
+            const titleMatch = title.match(/\[(major|minor|patch)\]/);
             let part = "patch";
             if (labels.includes("major")) {
               part = "major";
@@ -88,6 +90,8 @@ jobs:
               part = "minor";
             } else if (labels.includes("patch")) {
               part = "patch";
+            } else if (titleMatch) {
+              part = titleMatch[1];
             }
             core.setOutput("part", part);
 
