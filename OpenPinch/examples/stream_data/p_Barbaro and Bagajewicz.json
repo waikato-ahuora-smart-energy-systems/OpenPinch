@@ -1,0 +1,239 @@
+{
+    "streams": [
+        {
+            "zone": "Barbaro",
+            "name": "H1",
+            "t_supply": {
+                "value": 100.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3616.6666666666665,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Barbaro",
+            "name": "H2",
+            "t_supply": {
+                "value": 75.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2100.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Barbaro",
+            "name": "H3",
+            "t_supply": {
+                "value": 50.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 133.33333333333334,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Barbaro",
+            "name": "C1",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4666.666666666667,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Barbaro",
+            "name": "C2",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1283.3333333333333,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Barbaro",
+            "name": "C3",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 466.66666666666663,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Barbaro",
+            "name": "C4",
+            "t_supply": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 67.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 483.3333333333333,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 180.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 179.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": null,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": null,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

@@ -1,0 +1,310 @@
+{
+    "targets": [
+        {
+            "name": "Total Integrated Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 21.5,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 21.5,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1627.6800000000005,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 2306.19,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 99.99999999999997,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4485235008.000077,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 1627.680000000028,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process A - bromine plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 115.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 115.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 266.55,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 320.05,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 684.1500000000001,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 99.20968677494199,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 1616434960.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 266.55,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 320.05,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process B - sodium bromide plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 73.5,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 73.5,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1328.4976258503402,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 485.3176258503404,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 816.6723741496594,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 93.6251607769859,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4998149307.586395,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 1328.4976258503402,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 485.3176258503404,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process C - residential/commercial area/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 838.0000000000001,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 2309192800.0000005,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 838.0000000000001,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Process Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2433.0476258503404,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 805.3676258503403,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 1500.8223741496595,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 8923777067.586395,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 2433.0476258503404,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 805.3676258503403,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Site Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 20.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 175.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2433.0476258503404,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 805.3676258503406,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 1500.8223741496595,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 65.07800199244899,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 8923777067.586397,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 2433.0476258503404,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 805.3676258503403,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

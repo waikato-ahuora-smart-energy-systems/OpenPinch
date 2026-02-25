@@ -872,8 +872,8 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             ), f"Mismatch at row {row_index}, col {col}: expected {expected_val}, got {result_val}"
 
 
-"""Tests for _set_zonal_targets function"""
-from OpenPinch.analysis.problem_table_analysis import _set_zonal_targets
+"""Tests for set_zonal_targets function"""
+from OpenPinch.analysis.problem_table_analysis import set_zonal_targets
 
 # --- Fixtures & Helpers ---
 
@@ -915,7 +915,7 @@ def dummy_problem_table_star():
 def test_zonal_targets_computed_correctly(
     dummy_zone, dummy_problem_table, dummy_problem_table_star
 ):
-    z = _set_zonal_targets(dummy_problem_table_star, dummy_problem_table)
+    z = set_zonal_targets(dummy_problem_table_star, dummy_problem_table)
 
     assert z["hot_utility_target"] == 150
     assert z["cold_utility_target"] == 450
@@ -938,7 +938,7 @@ def test_zero_heat_recovery_limit_sets_degree_to_one(dummy_zone):
     pt = ProblemTable(
         {PT.T.value: [400, 300], PT.H_HOT.value: [200, 100], PT.H_NET.value: [50, 100]}
     )
-    z = _set_zonal_targets(pt, pt_real)
+    z = set_zonal_targets(pt, pt_real)
 
     assert z["heat_recovery_limit"] == 0
     assert z["degree_of_int"] == 1.0
@@ -956,7 +956,7 @@ def test_negative_heat_recovery_target():
         }
     )
 
-    z = _set_zonal_targets(pt, pt_real)
+    z = set_zonal_targets(pt, pt_real)
 
     assert z["heat_recovery_target"] < 0
     assert isinstance(z["degree_of_int"], float)
@@ -978,7 +978,7 @@ def test_single_row_problem_table():
         }
     )
 
-    z = _set_zonal_targets(pt, pt_real)
+    z = set_zonal_targets(pt, pt_real)
 
     assert z["hot_utility_target"] == 40
     assert z["cold_utility_target"] == 40
@@ -987,7 +987,7 @@ def test_single_row_problem_table():
 
 
 """Test get_process_heat_cascade"""
-from OpenPinch.analysis.problem_table_analysis import get_process_heat_cascade
+from OpenPinch.analysis.problem_table_analysis import get_process_heat_cascade, get_heat_recovery_target_from_pt, set_zonal_targets
 
 
 def test_problem_table_algorithm_executes():
@@ -998,62 +998,38 @@ def test_problem_table_algorithm_executes():
     z.pt = ProblemTable()
     z.pt_real = ProblemTable()
 
-    _, _, target_values = get_process_heat_cascade(
-        z.hot_streams, z.cold_streams, z.all_streams, z.config
+    pt = get_process_heat_cascade(
+        hot_streams=z.hot_streams, 
+        cold_streams=z.cold_streams, 
+        all_streams=z.all_streams, 
+        zone_config=z.config,
+        is_shifted=True,
+    )
+    pt_real = get_process_heat_cascade(
+        hot_streams=z.hot_streams, 
+        cold_streams=z.cold_streams, 
+        all_streams=z.all_streams, 
+        zone_config=z.config,
+        is_shifted=False,
+        known_heat_recovery=get_heat_recovery_target_from_pt(pt)
+    )
+    target_values = set_zonal_targets(
+        pt=pt,
+        pt_real=pt_real,
     )
     assert target_values["hot_utility_target"] == 1.0
     assert target_values["cold_utility_target"] == 0.0
     assert target_values["heat_recovery_target"] == 1.0
 
 
-"""Test _add_temperature_intervals_at_constant_h"""
-from OpenPinch.analysis.problem_table_analysis import (
-    _add_temperature_intervals_at_constant_h,
-)
-
-
-def test_add_temperature_intervals_skips_when_target_zero(monkeypatch):
-    dummy_pt = ProblemTable(
-        {PT.T.value: [400, 300], PT.H_HOT.value: [0, 0], PT.H_COLD.value: [0, 0]}
-    )
-    monkeypatch.setattr(
-        "OpenPinch.analysis.problem_table_analysis._insert_temperature_interval_into_pt_at_constant_h",
-        lambda *args: args[1],
-    )
-    result_pt = dummy_pt.copy
-    _add_temperature_intervals_at_constant_h(result_pt, 0.0)
-    assert result_pt == dummy_pt
-
-
-def test_add_temperature_intervals_calls_insert(monkeypatch):
-    calls = []
-
-    def fake_insert(*args):
-        calls.append(args)
-        return args[0]  # Return the full DataFrame, not a column name
-
-    monkeypatch.setattr(
-        "OpenPinch.analysis.problem_table_analysis._insert_temperature_interval_into_pt_at_constant_h",
-        fake_insert,
-    )
-
-    dummy_pt = ProblemTable(
-        {PT.T.value: [400, 300], PT.H_HOT.value: [0, 0], PT.H_COLD.value: [0, 0]}
-    )
-    dummy_pt = dummy_pt.copy
-    _add_temperature_intervals_at_constant_h(dummy_pt, 50.0)
-
-    assert len(calls) == 1
-
-
-"""Test _shift_pt_real_composite_curves"""
-from OpenPinch.analysis.problem_table_analysis import _shift_pt_real_composite_curves
+"""Test _shift_pt_to_set_heat_recovery"""
+from OpenPinch.analysis.problem_table_analysis import _shift_pt_to_set_heat_recovery
 
 
 def test_correct_pt_composite_curves_shifts_columns():
     pt = ProblemTable({PT.H_COLD.value: [10, 20], PT.H_NET.value: [5, 15]})
-    corrected: ProblemTable = _shift_pt_real_composite_curves(
-        pt.copy, heat_recovery_target=30, heat_recovery_limit=50
+    corrected: ProblemTable = _shift_pt_to_set_heat_recovery(
+        pt.copy, heat_recovery_target=30, current_heat_recovery=50
     )
 
     assert (corrected.col[PT.H_COLD.value] == [30, 40]).all()

@@ -1,0 +1,187 @@
+{
+    "streams": [
+        {
+            "zone": "gundersen",
+            "name": "H1",
+            "t_supply": {
+                "value": 159.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 77.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 18737.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": -1.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.4,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "gundersen",
+            "name": "H2",
+            "t_supply": {
+                "value": 267.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 88.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3652.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.62,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.3,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "gundersen",
+            "name": "H3",
+            "t_supply": {
+                "value": 343.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13611.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.25,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "gundersen",
+            "name": "C1",
+            "t_supply": {
+                "value": 26.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 127.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9423.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.15,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "gundersen",
+            "name": "C2",
+            "t_supply": {
+                "value": 118.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 265.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 28827.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.62,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 376.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 6.2,
+                "units": "degC"
+            },
+            "price": {
+                "value": 12.59157509157509,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 15.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 6.2,
+                "units": "degC"
+            },
+            "price": {
+                "value": 1.1446886446886446,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.6,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

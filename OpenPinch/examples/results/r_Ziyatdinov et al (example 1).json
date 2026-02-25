@@ -1,0 +1,208 @@
+{
+    "targets": [
+        {
+            "name": "Total Integrated Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 139.35000000000002,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 139.35000000000002,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 700.0000000000005,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 800.0000000000008,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 4199.999999999999,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 95.45454545454545,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4133400000.000003,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 700.0000000000005,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 800.0000000000007,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Ziyatdinov et al/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 139.35000000000002,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 139.35000000000002,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 700.0000000000005,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 800.0000000000008,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 4199.999999999999,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 95.45454545454545,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4133400000.000003,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 700.0000000000005,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 800.0000000000007,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Process Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 139.35000000000002,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 139.35000000000002,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 700.0000000000005,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 800.0000000000008,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 4199.999999999999,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4133400000.000003,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 700.0000000000005,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 800.0000000000007,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Site Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 42.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 353.8,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 700.0000000000005,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 800.0000000000007,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 4199.999999999998,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 95.45454545454544,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 4133400000.000003,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 700.0000000000005,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 800.0000000000007,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}
