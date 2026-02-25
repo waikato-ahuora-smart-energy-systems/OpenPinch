@@ -1,0 +1,161 @@
+{
+    "streams": [
+        {
+            "zone": "Adjiman",
+            "name": "H1",
+            "t_supply": {
+                "value": 376.85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 96.85000000000002,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2800.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.33,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "Adjiman",
+            "name": "H2",
+            "t_supply": {
+                "value": 316.85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 96.85000000000002,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4400.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.33,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "Adjiman",
+            "name": "C1",
+            "t_supply": {
+                "value": 136.85000000000002,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 376.85,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3600.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.33,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "Adjiman",
+            "name": "C2",
+            "t_supply": {
+                "value": 76.85000000000002,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 226.85000000000002,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1950.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.33,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 406.85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 406.75,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.33,
+                "units": "degC"
+            },
+            "price": {
+                "value": 9.157509157509159,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 5.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 26.850000000000023,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 46.85000000000002,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.33,
+                "units": "degC"
+            },
+            "price": {
+                "value": 1.717032967032967,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

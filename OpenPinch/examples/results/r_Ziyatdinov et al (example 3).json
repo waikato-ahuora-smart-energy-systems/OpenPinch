@@ -1,0 +1,157 @@
+{
+    "targets": [
+        {
+            "name": "Total Integrated Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 64.4,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 79.4,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1068.7000000000003,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1899.9999999999998,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 6086.6,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 8180549720.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1068.7000000000003,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 1899.9999999999998,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Process Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 64.4,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 79.4,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1068.7000000000003,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1899.9999999999998,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 6086.6,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 8180549720.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1068.7000000000003,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 1899.9999999999998,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Site Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 41.9,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 353.8,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1068.7000000000003,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1899.9999999999998,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 6086.599999999953,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 99.99999999999922,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 8180549720.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1068.7000000000003,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 1899.9999999999998,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

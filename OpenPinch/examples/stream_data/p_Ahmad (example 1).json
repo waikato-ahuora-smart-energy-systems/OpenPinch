@@ -1,0 +1,187 @@
+{
+    "streams": [
+        {
+            "zone": "Ahmad",
+            "name": "H1",
+            "t_supply": {
+                "value": 159.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 77.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 187.37,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 2.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "H2",
+            "t_supply": {
+                "value": 267.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 38.15,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 13.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.04,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "H3",
+            "t_supply": {
+                "value": 343.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 136.11,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "C1",
+            "t_supply": {
+                "value": 26.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 127.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 94.23,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 58.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.01,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "C2",
+            "t_supply": {
+                "value": 118.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 265.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 288.27,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 19.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": null,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 300.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 300.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 41.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": 12.59157509157509,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.05,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": 1.1446886446886446,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.2,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

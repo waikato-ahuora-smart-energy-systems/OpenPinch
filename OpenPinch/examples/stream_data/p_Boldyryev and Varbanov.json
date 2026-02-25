@@ -1,0 +1,681 @@
+{
+    "streams": [
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Ferrous chloride",
+            "t_supply": {
+                "value": 90.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 416.3,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Bromine condensation",
+            "t_supply": {
+                "value": 64.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 63.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 183.4,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 5.3,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Extra vapour",
+            "t_supply": {
+                "value": 110.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 109.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 265.9,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 6.2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Condensate of heating steam",
+            "t_supply": {
+                "value": 120.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 104.5,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Condensate of extra vapour",
+            "t_supply": {
+                "value": 110.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 34.1,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Water for CaCO3",
+            "t_supply": {
+                "value": 18.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 646.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Heating of FeCl3",
+            "t_supply": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 43.6,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process A - bromine plant",
+            "name": "Evaporation of FeCl3",
+            "t_supply": {
+                "value": 120.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 121.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 261.1,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 5.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Bromine reactor cooling",
+            "t_supply": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 46.56,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Correction reactor cooling",
+            "t_supply": {
+                "value": 90.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 80.45,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Extra vapour of 1st evaporation",
+            "t_supply": {
+                "value": 61.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 396.4,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 6.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Extra vapour of 2nd evaporation",
+            "t_supply": {
+                "value": 75.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 74.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 725.5,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 6.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Condensate of heating steam",
+            "t_supply": {
+                "value": 95.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 53.08,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "1st evaporation",
+            "t_supply": {
+                "value": 108.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 109.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 381.11,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 6.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "2nd evaporation",
+            "t_supply": {
+                "value": 113.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 114.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 703.1,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 6.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Correction reactor heating",
+            "t_supply": {
+                "value": 55.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 93.86,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Preheating of feed",
+            "t_supply": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 109.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 133.3,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Water preheating",
+            "t_supply": {
+                "value": 50.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 44.8,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Fresh water to boiler house",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 36.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 298.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Condensate and treated water",
+            "t_supply": {
+                "value": 45.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 349.2,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.3,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process B - sodium bromide plant",
+            "name": "Water to deaerator",
+            "t_supply": {
+                "value": 75.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 102.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 141.8,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 1.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.4,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process C - residential/commercial area",
+            "name": "Heating of power substation",
+            "t_supply": {
+                "value": 50.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 139.6,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process C - residential/commercial area",
+            "name": "Hot water of residential area",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 488.9,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process C - residential/commercial area",
+            "name": "Hot water of commercial area",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 209.5,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "MPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 175.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": null,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": null,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

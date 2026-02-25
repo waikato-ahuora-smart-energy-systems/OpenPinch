@@ -10,8 +10,8 @@ def create_problem_and_results_json():
         if (filename.endswith(".xlsb") or filename.endswith(".xlsx")) and not filename.startswith("~$"):
             excel_file = os.path.join(filepath_load, filename)
             project_name = os.path.splitext(filename)[0]
-            p_json_file = filepath_save + "/p_" + project_name + ".json"
+            p_json_file = filepath_save + "/stream_data/p_" + project_name + ".json"
             get_problem_from_excel(excel_file, p_json_file)
 
-            r_json_file = filepath_save + "/r_" + project_name + ".json"
+            r_json_file = filepath_save + "/results/r_" + project_name + ".json"
             get_results_from_excel(excel_file, r_json_file, project_name)

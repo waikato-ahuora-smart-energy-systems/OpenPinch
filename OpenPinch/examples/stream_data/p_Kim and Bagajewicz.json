@@ -1,0 +1,395 @@
+{
+    "streams": [
+        {
+            "zone": "Process Zone",
+            "name": "TCR",
+            "t_supply": {
+                "value": 140.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 39.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 10724.55,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.26,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "LGO",
+            "t_supply": {
+                "value": 248.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 110.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4415.228,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.72,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "Kerosene",
+            "t_supply": {
+                "value": 170.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3735.6929999999998,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.45,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "HGO",
+            "t_supply": {
+                "value": 277.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 121.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3812.3579999999997,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.57,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "HVGO",
+            "t_supply": {
+                "value": 250.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 21231.319999999996,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.26,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "MCR",
+            "t_supply": {
+                "value": 210.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 163.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5440.72,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.33,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "LCR",
+            "t_supply": {
+                "value": 303.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 270.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7848.332000000008,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.41,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "VR1",
+            "t_supply": {
+                "value": 360.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 290.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2786.7000000000003,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.47,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "LVGO",
+            "t_supply": {
+                "value": 178.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 108.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3335.1449999999995,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.6,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "SR-Quench",
+            "t_supply": {
+                "value": 359.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 280.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1952.5880000000006,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.47,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "VR2",
+            "t_supply": {
+                "value": 290.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 115.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6966.75,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.47,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "Crude oil",
+            "t_supply": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 130.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 20248.0,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.26,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process Zone",
+            "name": "Crude oil",
+            "t_supply": {
+                "value": 130.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 350.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 63782.4,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 6.565,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.72,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 500.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 499.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": null,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.53,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5.0,
+                "units": "degC"
+            },
+            "price": {
+                "value": null,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.53,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}
