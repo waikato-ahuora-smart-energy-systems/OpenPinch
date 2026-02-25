@@ -6,6 +6,8 @@ from ..lib import *
 from ..utils import *
 from . import (
     get_process_heat_cascade,
+    get_heat_recovery_target_from_pt,
+    set_zonal_targets,
     get_utility_targets,
     get_area_targets,
     get_min_number_hx,
@@ -39,9 +41,26 @@ def compute_direct_integration_targets(zone: Zone):
     cold_utilities: StreamCollection = zone.cold_utilities
     res: dict = {}
 
-    pt, pt_real, target_values = get_process_heat_cascade(
-        hot_streams, cold_streams, all_streams, zone_config
+    pt = get_process_heat_cascade(
+        hot_streams=hot_streams, 
+        cold_streams=cold_streams, 
+        all_streams=all_streams, 
+        zone_config=config,
+        is_shifted=True,
     )
+    pt_real = get_process_heat_cascade(
+        hot_streams=hot_streams, 
+        cold_streams=cold_streams, 
+        all_streams=all_streams, 
+        zone_config=config,
+        is_shifted=False,
+        known_heat_recovery=get_heat_recovery_target_from_pt(pt)
+    )
+    target_values = set_zonal_targets(
+        pt=pt,
+        pt_real=pt_real,
+    )
+
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     pt = get_additional_GCCs(
         pt,

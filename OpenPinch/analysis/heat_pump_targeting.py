@@ -114,10 +114,10 @@ def calc_heat_pump_cascade(
         cold_streams = res.amb_stream
 
     if len(res.amb_stream) > 0:
-        pt_air, _, _ = get_process_heat_cascade(
+        pt_air = get_process_heat_cascade(
             hot_streams=hot_streams,
             cold_streams=cold_streams,
-            include_real_pt=False,
+            is_shifted=True,
         )
         pt_air.insert_temperature_interval(
             pt[PT.T.value].to_list()
@@ -858,12 +858,17 @@ def _compute_multi_simple_hp_system_performance(
 
     # Build streams based on heat pump profiles and determine the heat cascade
     hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list)
-    pt_cond, _, _ = get_process_heat_cascade(
-        hp_hot_streams, args.net_cold_streams
+    pt_cond = get_process_heat_cascade(
+        hot_streams=hp_hot_streams, 
+        cold_streams=args.net_cold_streams,
+        is_shifted=True,        
     )    
-    pt_evap, _, _ = get_process_heat_cascade(
-        args.net_hot_streams, hp_cold_streams
+    pt_evap = get_process_heat_cascade(
+        hot_streams=args.net_hot_streams, 
+        cold_streams=hp_cold_streams,
+        is_shifted=True,        
     )
+
     # Calculate key perfromance indicators
     work_hp = sum([hp.work for hp in hp_list])
     Q_ext = pt_cond.col[PT.H_NET.value][0] # Acts as a penalty
@@ -1017,11 +1022,15 @@ def _compute_brayton_hp_system_performance(
     
     T_exp_out = hp_list[0].cycle_states[3]['T']
 
-    pt_gas_cooler, _, _ = get_process_heat_cascade(
-        hp_hot_streams, args.net_cold_streams
+    pt_gas_cooler = get_process_heat_cascade(
+        hot_streams=hp_hot_streams, 
+        cold_streams=args.net_cold_streams,
+        is_shifted=True,
     )    
-    pt_gas_heater, _, _ = get_process_heat_cascade(
-        args.net_hot_streams, hp_cold_streams
+    pt_gas_heater = get_process_heat_cascade(
+        hot_streams=args.net_hot_streams, 
+        cold_streams=hp_cold_streams,
+        is_shifted=True,        
     )
 
     work_hp = sum([hp.work_net for hp in hp_list])

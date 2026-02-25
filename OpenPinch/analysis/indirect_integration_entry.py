@@ -7,10 +7,11 @@ from ..utils import *
 from . import (
     get_process_heat_cascade,
     problem_table_algorithm,
-    get_utility_targets,
     get_heat_pump_targets,
     calc_heat_pump_cascade,
-    plot_multi_hp_profiles_from_results
+    plot_multi_hp_profiles_from_results,
+    get_heat_recovery_target_from_pt,
+    set_zonal_targets,
 )
 
 __all__ = ["compute_indirect_integration_targets"]
@@ -37,9 +38,27 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         is_n_zone_depth=False,
         is_new_stream_collection=True,
     )
-    pt, pt_real, _ = get_process_heat_cascade(
-        zone.net_hot_streams, zone.net_cold_streams, zone.all_net_streams, zone.config
+    
+    pt = get_process_heat_cascade(
+        hot_streams=zone.net_hot_streams, 
+        cold_streams=zone.net_cold_streams, 
+        all_streams=zone.all_net_streams, 
+        zone_config=zone.config,
+        is_shifted=True,
     )
+    pt_real = get_process_heat_cascade(
+        hot_streams=zone.net_hot_streams, 
+        cold_streams=zone.net_cold_streams, 
+        all_streams=zone.all_net_streams, 
+        zone_config=zone.config,
+        is_shifted=False,
+        known_heat_recovery=get_heat_recovery_target_from_pt(pt)
+    )
+    target_values = set_zonal_targets(
+        pt=pt,
+        pt_real=pt_real,
+    )
+    
     pt.update(
         _get_site_process_heat_load_profiles(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
     )
