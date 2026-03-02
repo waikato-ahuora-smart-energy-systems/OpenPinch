@@ -12,7 +12,7 @@ from OpenPinch import PinchProblem
 
 
 # Current case. Update this path if you want to switch datasets.
-PROBLEM_FILE = Path("OpenPinch/examples/stream_data/p_Sun et al.json")
+PROBLEM_FILE = Path("OpenPinch/examples/OpenPinchWkbs/Ziyatdinov et al (example 2).xlsb")
 
 
 @st.cache_resource

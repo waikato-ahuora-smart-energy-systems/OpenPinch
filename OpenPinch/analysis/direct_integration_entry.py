@@ -60,14 +60,12 @@ def compute_direct_integration_targets(zone: Zone):
         pt=pt,
         pt_real=pt_real,
     )
-
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     pt = get_additional_GCCs(
         pt,
         do_vert_cc_calc=zone_config.DO_VERTICAL_GCC,
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
-    
     if zone.identifier in [Z.P.value]:
         if _validate_heat_pump_targeting_required(pt, True, zone_config):
             hp_res = get_heat_pump_targets(
