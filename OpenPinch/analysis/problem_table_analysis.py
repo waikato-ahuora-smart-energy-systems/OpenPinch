@@ -41,17 +41,22 @@ def get_process_heat_cascade(
         zone_config=zone_config,
     )
     # Perform the heat cascade of the problem table
-    problem_table_algorithm(pt, hot_streams, cold_streams)
+    problem_table_algorithm(
+        pt=pt, 
+        hot_streams=hot_streams, 
+        cold_streams=cold_streams,
+        is_shifted=is_shifted,
+    )
 
-    heat_recovery_target = get_heat_recovery_target_from_pt(pt)
     if isinstance(known_heat_recovery, float):
         # Correct the location of the cold composite curve and limiting GCC (real temperatures)
         _shift_pt_to_set_heat_recovery(
             pt,
             known_heat_recovery,
-            heat_recovery_target,
+            get_heat_recovery_target_from_pt(pt),
         )
 
+    heat_recovery_target = get_heat_recovery_target_from_pt(pt)
     if heat_recovery_target > tol:
         # Add additional temperature intervals for ease in targeting utility etc
         _insert_temperature_interval_into_pt_at_constant_h(pt)
