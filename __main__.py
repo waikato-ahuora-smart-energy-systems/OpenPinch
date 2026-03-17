@@ -6,6 +6,6 @@ if __name__ == "__main__":
     # create_problem_and_results_json()
 
     pp = PinchProblem()
-    pp.load(Path("OpenPinch/examples/OpenPinchWkbs/only_cold.xlsb"))
+    pp.load(Path("OpenPinch/examples/OpenPinchWkbs/UnderReview/Chocolote Factory.xlsb"))
     pp.target()
     pp.export_to_Excel(Path("results"))

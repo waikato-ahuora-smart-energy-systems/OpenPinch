@@ -73,6 +73,7 @@ def get_heat_pump_targets(
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
     res = handler(args)
+    res.amb_stream = _get_ambient_air_stream(res.Q_amb, args)
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -119,9 +120,14 @@ def calc_heat_pump_cascade(
             cold_streams=cold_streams,
             is_shifted=True,
         )
+        T_ls_pt = pt[PT.T.value].to_list()
+        T_ls_pt_air = pt_air[PT.T.value].to_list()
         pt_air.insert_temperature_interval(
-            pt[PT.T.value].to_list()
+            T_ls_pt
         )
+        pt.insert_temperature_interval(
+            T_ls_pt_air
+        )        
         pt.col[PT.H_NET_W_AIR.value] = pt.col[PT.H_NET_A.value] + pt_air.col[PT.H_NET.value]
 
         if res.Q_amb > tol:
@@ -406,8 +412,11 @@ def _get_x0_and_bnds_for_multi_temperature_carnot_hp_opt(
         dt_range_max=args.dt_range_max,
         price_ratio=args.price_ratio,
     )
-    x0_ls = list(itertools.product(x0_cond_ls, x0_evap_ls))
-    x0_ls = [np.concatenate(x0) for x0 in x0_ls]
+    if len(x0_evap_ls) > 0:
+        x0_ls = list(itertools.product(x0_cond_ls, x0_evap_ls))
+        x0_ls = [np.concatenate(x0) for x0 in x0_ls]
+    else:
+        x0_ls = list(list(x0_cond_ls))
     bnds = [(0.0, 1.0) for _ in range(args.n_cond+args.n_evap-1)]
     return x0_ls, bnds
 
@@ -426,6 +435,9 @@ def _initialise_multi_temperature_carnot_hp_optimisation(
     """Build initial guesses based on a simple area maximisation problem, i.e., sum(Q x delta T).
     """
     n_stages = n if is_condenser else n-1
+    if n_stages == 0:
+        return []
+    
     args = {
         "is_condenser": is_condenser,
         "map_fun": map_fun,
@@ -542,6 +554,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout.
     """
+    args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
     x0, bnds = _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(args)
     _, local_minima_x = dual_annealing_multiminima(
         func=lambda x_cond: _compute_multi_simple_carnot_hp_opt_obj(x_cond, args)["obj"],
@@ -648,12 +661,11 @@ def _optimise_multi_simple_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Optimise a multi-unit heat-pump cascade against composite curve constraints.
     """
-    # Validate specific inputs related to this approach
-    args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
-    args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(args)
-
     # Use as initialisation
     init_res = _optimise_multi_simple_carnot_heat_pump_placement(args)
+
+    # Validate specific inputs related to this approach
+    args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(args)
 
     # Prepare and run the optimisation
     x0, bnds = _prepare_multi_simple_hp_data_for_minimizer(init_res.T_cond, init_res.Q_cond, init_res.T_evap, args)
@@ -669,7 +681,6 @@ def _optimise_multi_simple_heat_pump_placement(
 
     if isinstance(opt.x, np.ndarray):
         res = _compute_multi_simple_hp_system_performance(opt.x, args)
-        res["amb_stream"] = _get_ambient_air_stream(res["Q_amb"], args)
         res["opt_success"] = opt.success
         if 0:
             plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))            
