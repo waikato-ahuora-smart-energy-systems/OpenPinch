@@ -9,7 +9,7 @@ from OpenPinch.lib import *
 
 
 def get_example_problem_filepaths():
-    test_data_dir = Path(__file__).resolve().parents[2] / "OpenPinch" / "examples" / "stream_data"
+    test_data_dir = Path(__file__).resolve().parents[2] / "examples" / "stream_data"
     return [
         filepath
         for filepath in test_data_dir.iterdir()
@@ -44,7 +44,7 @@ def get_results_filepath(problem_filepath: Path) -> Path:
 
 @pytest.mark.parametrize("p_filepath", get_example_problem_filepaths())
 def test_pinch_analysis_pipeline(p_filepath: Path):
-    # if p_filepath.name != "p_new_example_1.json":
+    # if p_filepath.name != "p_pulp_mill.json":
     #     return True
 
     # Set the file path to the directory of this script
