@@ -9,7 +9,7 @@ from OpenPinch.lib import *
 
 
 def get_example_problem_filepaths():
-    test_data_dir = Path(__file__).resolve().parents[2] / "examples" / "stream_data"
+    test_data_dir = Path(__file__).resolve().parents[2] / "OpenPinch" / "examples" / "stream_data"
     return [
         filepath
         for filepath in test_data_dir.iterdir()
