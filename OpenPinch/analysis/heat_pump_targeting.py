@@ -688,7 +688,7 @@ def _optimise_multi_simple_heat_pump_placement(
     else:
         raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)
 
-    return res
+    return HeatPumpTargetOutputs.model_validate(res)
 
 
 def _validate_vapour_hp_refrigerant_ls(
