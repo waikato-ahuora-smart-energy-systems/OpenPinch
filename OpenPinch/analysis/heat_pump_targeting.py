@@ -662,6 +662,7 @@ def _optimise_multi_simple_heat_pump_placement(
     """Optimise a multi-unit heat-pump cascade against composite curve constraints.
     """
     # Use as initialisation
+    args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
     init_res = _optimise_multi_simple_carnot_heat_pump_placement(args)
 
     # Validate specific inputs related to this approach
@@ -673,10 +674,10 @@ def _optimise_multi_simple_heat_pump_placement(
     opt = minimize(
         fun=lambda x: _compute_multi_simple_hp_system_performance(x, args)["obj"],
         x0=x0,
-        method="COBYQA", #SLSQP
+        method="SLSQP", #SLSQP, COBYQA
         bounds=bnds,
         options={'disp': False, 'maxiter': 1000},
-        tol=1e-7,
+        # tol=1e-7,
     )
 
     if isinstance(opt.x, np.ndarray):
@@ -887,7 +888,7 @@ def _compute_multi_simple_hp_system_performance(
     Q_evap = np.array([hp.Q_evap for hp in hp_list])
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = (args.Q_hp_target - Q_ext) / work_hp
-    obj = (work_hp + Q_ext + c) / args.Q_hp_target
+    obj = (work_hp + Q_ext) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
     if 0:
