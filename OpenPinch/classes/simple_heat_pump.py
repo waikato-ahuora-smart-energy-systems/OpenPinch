@@ -392,15 +392,12 @@ class SimpleHeatPumpCycle:
                 name = f"Condenser_{i+1}" if is_hot else f"Evaporator_{i+1}"
 
                 if abs(T1 - T2) < 0.01: # Catch phase change
-                    if is_hot:
-                        T2 = T1 - 0.01
-                    else:
-                        T2 = T1 + 0.01
+                    T2 = T1 - 0.01 if is_hot else T1 + 0.01
 
                 s = Stream(
                     name=name,
-                    t_supply=max(T1,T2) if is_hot else min(T1,T2),
-                    t_target=min(T1,T2) if is_hot else max(T1,T2),
+                    t_supply=T1,
+                    t_target=T2,
                     heat_flow=self._m_dot*abs(h1 - h2),  # or m_dot * (h1 - h2), depending on your model
                     is_process_stream=False,
                     dt_cont=self._dtcont,
@@ -526,7 +523,7 @@ class SimpleHeatPumpCycle:
                     if h != h_sat_liquid or H[3] > h_sat_liquid:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
                         t_h_curve_points.append([h, float(self._state.T())])            
-            if H[0] > h_sat_vapor:
+            if H[0] > h_sat_vapor or H[0] < H[3]:
                 for h in np.linspace(max(h_sat_vapor, H[3]), H[0], 21):
                     if h != h_sat_vapor or H[3] > h_sat_vapor:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
