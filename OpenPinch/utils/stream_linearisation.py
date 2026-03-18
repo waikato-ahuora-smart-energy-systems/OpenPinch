@@ -100,7 +100,11 @@ def _rdp(
         # Get point with max distance from line
         for i in range(start + 1, end):
             point_vector = curve[i] - curve[start]
-            distance = abs(np.cross(line_vector, point_vector)) / line_length
+            # 2D cross-product magnitude via determinant to avoid NumPy 2D cross deprecation.
+            cross_magnitude = (
+                line_vector[0] * point_vector[1] - line_vector[1] * point_vector[0]
+            )
+            distance = abs(cross_magnitude) / line_length
             if distance > dmax:
                 dmax = distance
                 index = i
