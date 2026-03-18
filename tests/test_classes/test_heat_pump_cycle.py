@@ -12,35 +12,25 @@ from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
 
 @pytest.fixture(scope="module")
 def cycle_inputs():
-    fluid = "R134a"
-    Te = -15  # degC, evaporator saturation temperature
-    Tc = 35  # degC, condenser saturation temperature
-    dT_sh = 5.0  # K superheat
-    dT_sc = 5.0  # K subcooling
-    eta = 0.75
-    T0 = Te + dT_sh
-    T2 = Tc - dT_sc
     return {
-        "fluid": fluid,
-        "Te": Te,
-        "Tc": Tc,
-        "dT_sh": dT_sh,
-        "dT_sc": dT_sc,
-        "eta": eta,
-        "T0": T0,
-        "T2": T2,
+        "refrigerant": "R134a",
+        "Te": -15,  # degC, evaporator saturation temperature
+        "Tc": 35, # degC, condenser saturation temperature
+        "dT_sh": 5.0,  # K superheat
+        "dT_sc": 5.0,  # K subcooling
+        "eta_comp": 0.75,
     }
 
 
 def test_solve_t_dt_establishes_cycle_states(cycle_inputs):
     cycle = SimpleHeatPumpCycle()
     cycle.solve(
+        refrigerant=cycle_inputs["refrigerant"],
         Te=cycle_inputs["Te"],
         Tc=cycle_inputs["Tc"],
         dT_sh=cycle_inputs["dT_sh"],
         dT_sc=cycle_inputs["dT_sc"],
-        eta_comp=cycle_inputs["eta"],
-        refrigerant=cycle_inputs["fluid"],
+        eta_comp=cycle_inputs["eta_comp"],
     )
 
     cond_streams = cycle.build_stream_collection(include_cond=True)
@@ -57,4 +47,7 @@ def test_solve_t_dt_establishes_cycle_states(cycle_inputs):
     assert cycle.COP_r > 0.0
     assert np.isclose(sum([s.heat_flow for s in cond_streams]) - cycle.Q_cond, 0)
     assert np.isclose(sum([s.heat_flow for s in evap_streams]) - cycle.Q_evap, 0)
+    assert np.isclose(min([s.t_supply for s in evap_streams]) - cycle_inputs["Te"], 0)
+    assert np.isclose(max([s.t_target for s in evap_streams]) - (cycle_inputs["Te"] + cycle_inputs["dT_sh"]), 0)
+    assert np.isclose(min([s.t_target for s in cond_streams]) - (cycle_inputs["Tc"] - cycle_inputs["dT_sc"]), 0)
 

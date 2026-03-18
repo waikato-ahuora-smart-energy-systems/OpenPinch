@@ -886,7 +886,7 @@ def _compute_multi_simple_hp_system_performance(
     obj = (work_hp + Q_ext + c) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
-    if debug:
+    if debug or 1:
         plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
