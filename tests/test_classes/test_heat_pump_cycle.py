@@ -49,17 +49,18 @@ def test_solve_t_dt_establishes_cycle_states(cycle_inputs):
         refrigerant=cycle_inputs["fluid"],
     )
 
+    cond_streams = cycle.build_stream_collection(include_cond=True)
+    evap_streams = cycle.build_stream_collection(include_evap=True)
+
     assert len(cycle.Hs) == SimpleHeatPumpCycle.STATECOUNT
     assert len(cycle.Ts) == SimpleHeatPumpCycle.STATECOUNT
     assert len(cycle.Ps) == SimpleHeatPumpCycle.STATECOUNT
+    assert np.isclose(cycle.q_cond - cycle.q_evap - cycle.w_net, 0)
+    assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0)
     assert cycle.w_net > 0.0
     assert cycle.q_evap > 0.0
     assert cycle.COP_h > 1.0
     assert cycle.COP_r > 0.0
+    assert np.isclose(sum([s.heat_flow for s in cond_streams]) - cycle.Q_cond, 0)
+    assert np.isclose(sum([s.heat_flow for s in evap_streams]) - cycle.Q_evap, 0)
 
-
-def test_system_property_updates_unit_container():
-    cycle = SimpleHeatPumpCycle()
-    cycle.system = "SI"
-    assert cycle.system is SimpleHeatPumpCycle.UNIT_SYSTEMS["SI"]
-    assert cycle.cycle_states.units is cycle.system

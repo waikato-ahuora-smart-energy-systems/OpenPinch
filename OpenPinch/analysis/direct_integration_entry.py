@@ -85,7 +85,7 @@ def compute_direct_integration_targets(zone: Zone):
                 is_T_vals_shifted=True,
                 is_direct_integration=True,
             )
-            if 0:
+            if 1:
                 plot_multi_hp_profiles_from_results(
                     T_hot=pt.col[PT.T.value],
                     H_hot=pt.col[PT.H_NET_HOT.value],

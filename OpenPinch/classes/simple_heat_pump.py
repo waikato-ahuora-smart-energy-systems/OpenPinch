@@ -22,17 +22,9 @@ class SimpleHeatPumpCycle:
     """
 
     STATECOUNT = 4
-    UNIT_SYSTEMS = {
-        'SI': SIunits(),
-        'KSI': KSIunits(),
-        'EUR': EURunits(),
-    }
 
-    def __init__(
-        self, 
-        plot_unit_system: str | PropertyDict = 'EUR',
-    ):
-        self._system = self._parse_unit_system(plot_unit_system)
+    def __init__(self):
+        self._system = SIunits()
         self._cycle_states = StateContainer(unit_system=self._system)
         self._state = None
         self._w_net: Optional[float] = None
@@ -55,11 +47,6 @@ class SimpleHeatPumpCycle:
     @property
     def system(self) -> PropertyDict:
         return self._system
-
-    @system.setter
-    def system(self, value: str | PropertyDict) -> None:
-        self._system = self._parse_unit_system(value)
-        self._cycle_states.units = self._system
 
     @property
     def state(self):
@@ -123,9 +110,13 @@ class SimpleHeatPumpCycle:
         return self._Q_evap
 
     @property
+    def q_cond(self) -> Optional[float]:
+        return self._q_cond
+
+    @property
     def Q_cond(self) -> Optional[float]:
         return self._Q_cond
-            
+                
     @property
     def w_net(self) -> Optional[float]:
         return self._w_net
@@ -205,7 +196,7 @@ class SimpleHeatPumpCycle:
         T: float,
         Q: float = 1.0,
     ):
-        if T > self._t_crit:
+        if T > self._t_crit - 1:
             self._state.update(CoolProp.DmassT_INPUTS, self._d_crit, T)
         else:
             self._state.update(CoolProp.QT_INPUTS, Q, T)
@@ -447,58 +438,59 @@ class SimpleHeatPumpCycle:
         Returns
         -------
         np.ndarray
-            Array of shape (4,2): [enthalpy, temperature].
-            Enthalpy always in J/kg. Temperature in K (SI) or °C (EUR).
+            Array of shape (n,2): [enthalpy, temperature].
+            Enthalpy always in J/kg, Temperature in K.
         """
         # Ensure the cycle has been solved
         self._require_solution()
     
         # Read temperatures and enthalpies from the solved cycle
         H = self.Hs  # [H0, H1, H2, H3] in J/kg
-        T = self.Ts  # [T0, T1, T2, T3] in K
     
         # Use saturation points from the state if needed
         p_high = self.Ps[1]
+        t_h_curve_points = []
+
         if p_high < self._p_crit:    
             # Saturated vapor at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_high, 1.0)
             h_sat_vapor = self._state.hmass()
-            T_sat_vapor = self._state.T()
         
             # Saturated liquid at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_high, 0.0)
             h_sat_liquid = self._state.hmass()
-            T_sat_liquid = self._state.T()
-        
-            # Assemble the 4-point polyline: [H, T]
-            condenser_profile = np.array([
-                [H[1], T[1]],            # superheated
-                [h_sat_vapor, T_sat_vapor] if h_sat_vapor < H[1] else [H[1], T[1]],
-                [h_sat_liquid, T_sat_liquid],
-                [H[2], T[2]],            # subcooled outlet
-            ], dtype=float)
 
-            # Convert temperature to °C if not SI
-            condenser_profile[:, 1] -= 273.15
-        else:
-            # Determine gas cooler profile
-            P = self.Ps
-            t_h_curve_points = []
-            for h in np.linspace(H[1], H[2], 51):
-                self._state.update(CoolProp.HmassP_INPUTS, h, P[1])
+            for h in np.linspace(H[1], h_sat_vapor, 21):
+                self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
                 t_h_curve_points.append([h, float(self._state.T())])
-            t_h_curve_points = np.array(t_h_curve_points)
+            
+            for h in np.linspace(h_sat_vapor, h_sat_liquid, 21):
+                if h != h_sat_vapor:
+                    self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
+                    t_h_curve_points.append([h, float(self._state.T())])            
+            
+            for h in np.linspace(h_sat_liquid, H[2], 21):
+                if h != h_sat_liquid:
+                    self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
+                    t_h_curve_points.append([h, float(self._state.T())])
 
-            # Convert temperature to °C if not SI
-            t_h_curve_points[:, 1] -= 273.15
+        else:
+            # Determine supercritical gas cooler profile
+            for h in np.linspace(H[1], H[2], 61):
+                self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
+                t_h_curve_points.append([h, float(self._state.T())])
+        
+        t_h_curve_points = np.array(t_h_curve_points)
 
-            # Calculate piece-wise linear approximation of the gas cooler profile
-            condenser_profile = get_piecewise_data_points(
-                curve=t_h_curve_points, 
-                is_hot_stream=True, 
-                dt_diff_max=self._dt_diff_max,
-            )
-            pass    
+        # Convert temperature to °C if not SI
+        t_h_curve_points[:, 1] -= 273.15
+
+        # Calculate a piece-wise linear approximation of the condenser or gas cooler profile
+        condenser_profile = get_piecewise_data_points(
+            curve=t_h_curve_points, 
+            is_hot_stream=True, 
+            dt_diff_max=self._dt_diff_max,
+        )
         return condenser_profile
 
 
@@ -517,38 +509,54 @@ class SimpleHeatPumpCycle:
     
         # Read temperatures and enthalpies from the solved cycle
         H = self.Hs  # [H0, H1, H2, H3] in J/kg
-        T = self.Ts  # [T0, T1, T2, T3] in K
     
         # Evaporator pressure
         p_low = self.Ps[0]
-    
-        # Saturated vapor at evaporator pressure
-        self._state.update(CoolProp.PQ_INPUTS, p_low, 1.0)
-        h_sat_vapor = self._state.hmass()
-        T_sat_vapor = self._state.T()
-    
-        # Assemble the 3-point polyline: [H, T]
-        evaporator_profile = np.array([
-            [H[3], T[3]],            # inlet
-            [h_sat_vapor, T_sat_vapor],
-            [H[0], T[0]],            # superheated outlet
-        ], dtype=float)
-    
+        t_h_curve_points = []
+
+        if p_low < self._p_crit:    
+            # Saturated vapor at condenser pressure
+            self._state.update(CoolProp.PQ_INPUTS, p_low, 1.0)
+            h_sat_vapor = self._state.hmass()
+        
+            # Saturated liquid at condenser pressure
+            self._state.update(CoolProp.PQ_INPUTS, p_low, 0.0)
+            h_sat_liquid = self._state.hmass()
+
+            if H[3] < h_sat_liquid:
+                for h in np.linspace(H[3], h_sat_liquid, 21):
+                    self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
+                    t_h_curve_points.append([h, float(self._state.T())])
+            
+            if H[3] < h_sat_vapor:
+                for h in np.linspace(max(h_sat_liquid, H[3]), h_sat_vapor, 21):
+                    if h != h_sat_liquid or H[3] > h_sat_liquid:
+                        self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
+                        t_h_curve_points.append([h, float(self._state.T())])            
+            if H[0] > h_sat_vapor:
+                for h in np.linspace(max(h_sat_vapor, H[3]), H[0], 21):
+                    if h != h_sat_vapor or H[3] > h_sat_vapor:
+                        self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
+                        t_h_curve_points.append([h, float(self._state.T())])
+
+        else:
+            # Determine supercritical gas heater profile
+            for h in np.linspace(H[3], H[0], 61):
+                self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
+                t_h_curve_points.append([h, float(self._state.T())])
+        
+        t_h_curve_points = np.array(t_h_curve_points)
+
         # Convert temperature to °C if not SI
-        evaporator_profile[:, 1] -= 273.15
+        t_h_curve_points[:, 1] -= 273.15
 
+        # Calculate a piece-wise linear approximation of the evaporator or gas heater profile
+        evaporator_profile = get_piecewise_data_points(
+            curve=t_h_curve_points, 
+            is_hot_stream=False, 
+            dt_diff_max=self._dt_diff_max,
+        )
         return evaporator_profile
-
-
-    def _parse_unit_system(self, value: str | PropertyDict) -> PropertyDict:
-        if isinstance(value, PropertyDict):
-            return value
-        if isinstance(value, str):
-            key = value.upper()
-            if key in self.UNIT_SYSTEMS:
-                return self.UNIT_SYSTEMS[key]
-        valid = ', '.join(sorted(self.UNIT_SYSTEMS.keys()))
-        raise ValueError(f'Invalid unit system: {value!r}. Expected one of {valid}.')
 
 
     def _require_solution(self) -> None:

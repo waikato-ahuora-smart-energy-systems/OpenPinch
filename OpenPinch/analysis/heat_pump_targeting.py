@@ -376,12 +376,8 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
         if opt["fun"] > m["fun"]:
             opt = m
 
-    res = _compute_multi_temperature_carnot_hp_opt_obj(opt.x, args)
-    res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))   
-
-    if 0:        
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))
-
+    res = _compute_multi_temperature_carnot_hp_opt_obj(opt.x, args, debug=False)
+    res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -468,7 +464,8 @@ def _initialise_multi_temperature_carnot_hp_optimisation(
 
 def _compute_multi_temperature_carnot_hp_opt_obj(
     x: np.ndarray, 
-    args: HeatPumpTargetInputs
+    args: HeatPumpTargetInputs,
+    debug: bool = False,
 ) -> dict:
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """
@@ -484,7 +481,7 @@ def _compute_multi_temperature_carnot_hp_opt_obj(
     )
     res = _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(opt.x, [args, T_cond, Q_cond, x_evap, opt.success])
 
-    if 0:
+    if debug:
         res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))      
         plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))
     return res
@@ -562,12 +559,8 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
         bounds=bnds,
         constraints=None,
     )
-    res = _compute_multi_simple_carnot_hp_opt_obj(np.array(local_minima_x[0]), args)
+    res = _compute_multi_simple_carnot_hp_opt_obj(np.array(local_minima_x[0]), args, debug=False)
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
-
-    if 0:        
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))
-
     return HeatPumpTargetOutputs.model_validate(res)
 
 
@@ -589,6 +582,7 @@ def _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(
 def _compute_multi_simple_carnot_hp_opt_obj(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
+    debug: bool = False,
 ) -> dict:
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """    
@@ -632,7 +626,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     Q_ext = args.Q_hp_target - Q_cond.sum()
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
 
-    if 0:
+    if debug:
         res = _get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args)     
         plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))        
 
@@ -681,10 +675,8 @@ def _optimise_multi_simple_heat_pump_placement(
     )
 
     if isinstance(opt.x, np.ndarray):
-        res = _compute_multi_simple_hp_system_performance(opt.x, args)
+        res = _compute_multi_simple_hp_system_performance(opt.x, args, debug=True)
         res["opt_success"] = opt.success
-        if 0:
-            plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))            
     else:
         raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)
 
@@ -768,21 +760,23 @@ def _prepare_multi_simple_hp_data_for_minimizer(
     y_cond_bnds = (0.0, 1.0)
 
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
-    x_sc_temp = (T_cond - args.T_cold[-1]) / args.dt_range_max * 0 + args.dt_phase_change / args.dt_range_max
-    x_sc = np.where(
-        (x_sc_bnds[0] <= x_sc_temp) * (x_sc_temp <= x_sc_bnds[1]),
-        x_sc_temp,
-        x_sc_bnds[0],
-    )
+    # x_sc_temp = (T_cond - args.T_cold[-1]) / args.dt_range_max * 0 + args.dt_phase_change / args.dt_range_max
+    # x_sc = np.where(
+    #     (x_sc_bnds[0] <= x_sc_temp) * (x_sc_temp <= x_sc_bnds[1]),
+    #     x_sc_temp,
+    #     x_sc_bnds[0],
+    # )
+    x_sc = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_cond))])
     y_cond = Q_cond / args.Q_hp_target
 
     x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
-    x_sh_temp = (args.T_hot[0] - T_evap) / args.dt_range_max
-    x_sh = np.where(
-        (x_sh_bnds[0] <= x_sh_temp) * (x_sh_temp <= x_sh_bnds[1]),
-        x_sh_temp,
-        x_sh_bnds[0],
-    )
+    # x_sh_temp = (args.T_hot[0] - T_evap) / args.dt_range_max
+    # x_sh = np.where(
+    #     (x_sh_bnds[0] <= x_sh_temp) * (x_sh_temp <= x_sh_bnds[1]),
+    #     x_sh_temp,
+    #     x_sh_bnds[0],
+    # )
+    x_sh = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_evap))])
 
     x_ls = []
     bnds = []
@@ -850,7 +844,8 @@ def _parse_multi_simple_hp_state_temperatures(
 
 def _compute_multi_simple_hp_system_performance(
     x: np.ndarray, 
-    args: HeatPumpTargetInputs
+    args: HeatPumpTargetInputs, 
+    debug: bool = False,
 ) -> float:
     """Objective: minimize total compressor work for multi-HP configuration.
     """
@@ -883,17 +878,17 @@ def _compute_multi_simple_hp_system_performance(
 
     # Calculate key perfromance indicators
     work_hp = sum([hp.work for hp in hp_list])
-    Q_ext = pt_cond.col[PT.H_NET.value][0] # Acts as a penalty
-    c = pt_cond.col[PT.H_NET.value][-1] / 10 + pt_evap.col[PT.H_NET.value][0] / 10
+    Q_ext = pt_cond.col[PT.H_NET.value][0] + pt_evap.col[PT.H_NET.value][0] # Acts as a penalty
+    c = pt_cond.col[PT.H_NET.value][-1] / 10
     Q_evap = np.array([hp.Q_evap for hp in hp_list])
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = (args.Q_hp_target - Q_ext) / work_hp
-    obj = (work_hp + Q_ext) / args.Q_hp_target
+    obj = (work_hp + Q_ext + c) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
-    if 0:
-        # plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
-        # plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
+    if debug:
+        plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
+        plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
             title=f"{dT_sc} -> {float(obj), float(c / args.Q_hp_target)}"
