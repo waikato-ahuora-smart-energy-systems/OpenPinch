@@ -13,17 +13,13 @@ from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
 @pytest.fixture(scope="module")
 def cycle_inputs():
     fluid = "R134a"
-    Te = 268.15  # K, evaporator saturation temperature (-5 °C)
-    Tc = 308.15  # K, condenser saturation temperature (35 °C)
+    Te = -15  # degC, evaporator saturation temperature
+    Tc = 35  # degC, condenser saturation temperature
     dT_sh = 5.0  # K superheat
     dT_sc = 5.0  # K subcooling
     eta = 0.75
-
-    p0 = PropsSI("P", "T", Te, "Q", 1.0, fluid)
-    p2 = PropsSI("P", "T", Tc, "Q", 0.0, fluid)
     T0 = Te + dT_sh
     T2 = Tc - dT_sc
-
     return {
         "fluid": fluid,
         "Te": Te,
@@ -32,9 +28,7 @@ def cycle_inputs():
         "dT_sc": dT_sc,
         "eta": eta,
         "T0": T0,
-        "p0": p0,
         "T2": T2,
-        "p2": p2,
     }
 
 

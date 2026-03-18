@@ -290,13 +290,13 @@ class SimpleHeatPumpCycle:
 
 
     def _get_metrics(self):
-        self._w_net = (self._cycle_states[1, 'H'] - self._cycle_states[0, 'H']) / 1000
-        self._q_evap = max(self._cycle_states[0, 'H'] - self._cycle_states[3, 'H'], 0.0) / 1000
-        self._q_cond = (self._cycle_states[1, 'H'] - self._cycle_states[3, 'H']) / 1000
+        self._q_evap = (self._cycle_states[0, 'H'] - self._cycle_states[3, 'H']) / 1000
+        self._q_cond = (self._cycle_states[1, 'H'] - self._cycle_states[2, 'H']) / 1000
+        self._w_net = self._q_cond - self._q_evap
 
         self._m_dot = self._Q_cond / self._q_cond
         self._Q_evap = self._m_dot * self._q_evap
-        self._work = self._Q_cond - self._Q_evap
+        self._work = self._m_dot * self._w_net
 
 
     def solve(
@@ -310,7 +310,6 @@ class SimpleHeatPumpCycle:
         refrigerant: str = "water",
         ihx_gas_dt: float = 40.0,
         Q_h_total: float = 1.0,
-        t_unit: str = "C",
     ) -> float:
         """Solve the cycle using saturation temperatures, superheat, and subcooling."""
         self._validate_solve_inputs(
@@ -334,26 +333,25 @@ class SimpleHeatPumpCycle:
         if p0 > p2:
             raise ValueError('Evaporator pressure must be below condenser pressure.')   
 
-        T0 = Te + dT_sh
-        T2 = Tc - dT_sc
-
         """Solve a basic four-state cycle given inlet/outlet temperatures and pressures."""
-        # Evaporator outlet / IHX inlet
+        # 0 - Evaporator outlet / IHX inlet
         self._compute_state_from_pressure_temperature(
             p=p0, 
-            T=T0,            
+            T=Te + dT_sh,
+            phase=1,
         )
-        h_ihx_in = self._state.hmass()
         self._save_cycle_state(0)
+        hc_ihx_in = self._state.hmass()
 
         # IHX outlet / compressor inlet
         self._compute_state_from_pressure_temperature(
             p=p0, 
-            T=T0 + self._ihx_gas_dt,
+            T=Te + dT_sh + self._ihx_gas_dt,
+            phase=1,
         )      
-        dh_ihx = self._state.hmass() - h_ihx_in
+        dh_ihx = self._state.hmass() - hc_ihx_in
 
-        # Compressor discharge (real)
+        # 1 - Compressor discharge (real)
         self._compute_compressor_outlet_state(
             h_in=self._state.hmass(),
             s_in=self._state.smass(),
@@ -362,18 +360,12 @@ class SimpleHeatPumpCycle:
         self._save_cycle_state(1)
 
         # Condenser outlet / IHX inlet (source)
-        self._compute_condenser_outlet_state(
+        self._compute_state_from_pressure_temperature(
             p=p2,
-            T=T2,
-            dT_sc=dT_sc,
+            T=Tc - dT_sc,
+            phase=0,
         )
         self._save_cycle_state(2)
-
-        # IHX outlet (source) / expansion valve outlet
-        # self._compute_state_from_pressure_enthalpy(
-        #     p=p2,
-        #     h=self._state.hmass() - dh_ihx,
-        # )
 
         # Expansion valve outlet / evaporator inlet
         self._compute_state_from_pressure_enthalpy(
