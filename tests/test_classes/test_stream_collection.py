@@ -123,6 +123,36 @@ def test_dynamic_sort_after_adding(sample_streams):
     assert temps_in_order == [180, 160, 150]
 
 
+def test_get_hot_streams_filters_and_preserves_sort_settings():
+    sc = StreamCollection()
+    sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1))
+    sc.add(Stream(name="C1", t_supply=90, t_target=160, heat_flow=1))
+    sc.add(Stream(name="H2", t_supply=180, t_target=100, heat_flow=1))
+    sc.set_sort_key("t_supply", reverse=False)
+
+    hot_streams = sc.get_hot_streams()
+
+    assert len(hot_streams) == 2
+    assert set(hot_streams._streams.keys()) == {"H1", "H2"}
+    assert [s.name for s in hot_streams] == ["H2", "H1"]
+    assert hot_streams._sort_reverse is False
+
+
+def test_get_cold_streams_filters_and_preserves_sort_settings():
+    sc = StreamCollection()
+    sc.add(Stream(name="C1", t_supply=80, t_target=140, heat_flow=1))
+    sc.add(Stream(name="H1", t_supply=220, t_target=160, heat_flow=1))
+    sc.add(Stream(name="C2", t_supply=70, t_target=160, heat_flow=1))
+    sc.set_sort_key("t_target", reverse=True)
+
+    cold_streams = sc.get_cold_streams()
+
+    assert len(cold_streams) == 2
+    assert set(cold_streams._streams.keys()) == {"C1", "C2"}
+    assert [s.name for s in cold_streams] == ["C2", "C1"]
+    assert cold_streams._sort_reverse is True
+
+
 def test_export_to_csv(sample_streams):
     sc = StreamCollection()
     for stream in sample_streams:

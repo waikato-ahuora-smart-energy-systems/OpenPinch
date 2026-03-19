@@ -54,8 +54,7 @@ def get_heat_pump_targets(
         HeatPumpTargetOutputs with the optimal placement, or an empty dict when
         targeting is skipped by the configuration screens.
     """    
-    ######### TEMP VARS ######### 
-    # zone_config.HP_LOAD_FRACTION = 1
+    ######### Analysis Options #########
     # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
@@ -668,14 +667,14 @@ def _optimise_multi_simple_heat_pump_placement(
     opt = minimize(
         fun=lambda x: _compute_multi_simple_hp_system_performance(x, args)["obj"],
         x0=x0,
-        method="SLSQP", #SLSQP, COBYQA
+        method="COBYQA",
         bounds=bnds,
         options={'disp': False, 'maxiter': 1000},
-        # tol=1e-7,
+        tol=1e-6,
     )
 
     if isinstance(opt.x, np.ndarray):
-        res = _compute_multi_simple_hp_system_performance(opt.x, args, debug=True)
+        res = _compute_multi_simple_hp_system_performance(opt.x, args, debug=False)
         res["opt_success"] = opt.success
     else:
         raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)
@@ -760,22 +759,10 @@ def _prepare_multi_simple_hp_data_for_minimizer(
     y_cond_bnds = (0.0, 1.0)
 
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
-    # x_sc_temp = (T_cond - args.T_cold[-1]) / args.dt_range_max * 0 + args.dt_phase_change / args.dt_range_max
-    # x_sc = np.where(
-    #     (x_sc_bnds[0] <= x_sc_temp) * (x_sc_temp <= x_sc_bnds[1]),
-    #     x_sc_temp,
-    #     x_sc_bnds[0],
-    # )
     x_sc = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_cond))])
     y_cond = Q_cond / args.Q_hp_target
 
     x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
-    # x_sh_temp = (args.T_hot[0] - T_evap) / args.dt_range_max
-    # x_sh = np.where(
-    #     (x_sh_bnds[0] <= x_sh_temp) * (x_sh_temp <= x_sh_bnds[1]),
-    #     x_sh_temp,
-    #     x_sh_bnds[0],
-    # )
     x_sh = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_evap))])
 
     x_ls = []
@@ -868,7 +855,7 @@ def _compute_multi_simple_hp_system_performance(
     pt_cond = get_process_heat_cascade(
         hot_streams=hp_hot_streams, 
         cold_streams=args.net_cold_streams,
-        is_shifted=True,        
+        is_shifted=True,
     )    
     pt_evap = get_process_heat_cascade(
         hot_streams=args.net_hot_streams, 
@@ -879,19 +866,19 @@ def _compute_multi_simple_hp_system_performance(
     # Calculate key perfromance indicators
     work_hp = sum([hp.work for hp in hp_list])
     Q_ext = pt_cond.col[PT.H_NET.value][0] + pt_evap.col[PT.H_NET.value][0] # Acts as a penalty
-    c = pt_cond.col[PT.H_NET.value][-1] / 10
+    c = pt_cond.col[PT.H_NET.value][-1]
     Q_evap = np.array([hp.Q_evap for hp in hp_list])
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = (args.Q_hp_target - Q_ext) / work_hp
     obj = (work_hp + Q_ext + c) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
-    if debug or 1:
+    if debug:
         plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"{dT_sc} -> {float(obj), float(c / args.Q_hp_target)}"
+            title=f"Obj {float(obj)} = {(work_hp / args.Q_hp_target)} + {(Q_ext / args.Q_hp_target)} + {(c / args.Q_hp_target)}"
         )
 
     return {
@@ -1376,12 +1363,12 @@ def _build_simulated_hps_streams(
     dtcont_hp: float = 0.0,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Aggregate condenser/gas-cooler and evaporator/gas-heater streams for each simulated HP cycle."""
-    hp_hot_streams, hp_cold_streams = StreamCollection(), StreamCollection()
+    hp_streams = StreamCollection()
     for hp in hp_list:
         hp.dtcont = dtcont_hp
-        hp_hot_streams.add_many(hp.build_stream_collection(include_cond=True, is_process_stream=True))
-        hp_cold_streams.add_many(hp.build_stream_collection(include_evap=True, is_process_stream=True))
-    return hp_hot_streams, hp_cold_streams
+        hp_streams.add_many(hp.build_stream_collection(include_cond=True, include_evap=True, is_process_stream=True))
+    
+    return hp_streams.get_hot_streams(), hp_streams.get_cold_streams()
 
 
 def _get_ambient_air_stream(
