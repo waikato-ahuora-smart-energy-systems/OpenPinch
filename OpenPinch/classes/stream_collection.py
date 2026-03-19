@@ -4,6 +4,8 @@ import csv
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, List, Union
 
+from ..lib.enums import *
+
 if TYPE_CHECKING:
     from ..classes import Stream
 
@@ -59,6 +61,33 @@ class StreamCollection:
                 raise ValueError("Length of streams and keys must match.")
             for stream, key in zip(streams, keys):
                 self.add(stream, key, prevent_overwrite)
+    
+    
+    def get_hot_streams(self):
+        hot_streams = StreamCollection()
+        hot_streams._sort_key = self._sort_key
+        hot_streams._sort_reverse = self._sort_reverse
+        hot_streams._streams = {
+            key: stream
+            for key, stream in self._streams.items()
+            if stream.type == StreamType.Hot.value
+        }
+        hot_streams._needs_sort = True
+        return hot_streams
+
+
+    def get_cold_streams(self):
+        cold_streams = StreamCollection()
+        cold_streams._sort_key = self._sort_key
+        cold_streams._sort_reverse = self._sort_reverse
+        cold_streams._streams = {
+            key: stream
+            for key, stream in self._streams.items()
+            if stream.type == StreamType.Cold.value
+        }
+        cold_streams._needs_sort = True
+        return cold_streams
+
 
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
         self._streams = {}
