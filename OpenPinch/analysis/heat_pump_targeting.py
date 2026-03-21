@@ -32,7 +32,7 @@ def get_heat_pump_targets(
     H_cold: np.ndarray,
     zone_config: Configuration,
     is_direct_integration: bool,
-    is_heat_pumping: bool,  
+    is_heat_pumping: bool,
 ):
     """Optimise multi-stage heat-pump placement for the supplied problem table.
 
@@ -55,7 +55,8 @@ def get_heat_pump_targets(
         targeting is skipped by the configuration screens.
     """    
     ######### Analysis Options #########
-    # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
+    zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
+    zone_config.N_EVAP = 3
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     # zone_config.HP_TYPE = HeatPumpType.Brayton.value
@@ -67,6 +68,7 @@ def get_heat_pump_targets(
         is_direct_integration=is_direct_integration,
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
+        debug=True,        
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:
@@ -189,6 +191,7 @@ def _prepare_heat_pump_target_inputs(
     is_direct_integration: bool = True,
     is_heat_pumping: bool = True,
     zone_config: Configuration = Configuration(),
+    debug: bool = False,    
 ):
     """Format temperature/enthalpy inputs and options for heat pump targeting.
     """
@@ -239,6 +242,7 @@ def _prepare_heat_pump_target_inputs(
         max_multi_start=zone_config.MAX_HP_MULTISTART,
         net_hot_streams=net_hot_streams,
         net_cold_streams=net_cold_streams,
+        debug=debug,
     )
 
 
@@ -375,7 +379,7 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
         if opt["fun"] > m["fun"]:
             opt = m
 
-    res = _compute_multi_temperature_carnot_hp_opt_obj(opt.x, args, debug=False)
+    res = _compute_multi_temperature_carnot_hp_opt_obj(opt.x, args, debug=args.debug)
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
 
@@ -558,7 +562,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
         bounds=bnds,
         constraints=None,
     )
-    res = _compute_multi_simple_carnot_hp_opt_obj(np.array(local_minima_x[0]), args, debug=False)
+    res = _compute_multi_simple_carnot_hp_opt_obj(np.array(local_minima_x[0]), args, debug=args.debug)
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
 
@@ -674,7 +678,7 @@ def _optimise_multi_simple_heat_pump_placement(
     )
 
     if isinstance(opt.x, np.ndarray):
-        res = _compute_multi_simple_hp_system_performance(opt.x, args, debug=False)
+        res = _compute_multi_simple_hp_system_performance(opt.x, args, debug=args.debug)
         res["opt_success"] = opt.success
     else:
         raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)
@@ -801,10 +805,10 @@ def _constrain_min_temperature_lift(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
 ):
-    """Ensure T_cond - dT_sc > T_evap + dtcont_hp
+    """Ensure T_cond - dT_subcool > T_evap + dtcont_hp
     """
-    T_cond, dT_sc, _, T_evap, _ = _parse_multi_simple_hp_state_temperatures(x, args)
-    T_diff = T_cond - dT_sc - T_evap - args.dtcont_hp
+    T_cond, dT_subcool, _, T_evap, _ = _parse_multi_simple_hp_state_temperatures(x, args)
+    T_diff = T_cond - dT_subcool - T_evap - args.dtcont_hp
     return T_diff.min()
 
 
@@ -818,15 +822,15 @@ def _parse_multi_simple_hp_state_temperatures(
 
     T_cond = np.array(args.T_cold[0] - x[:n] * args.dt_range_max, dtype=np.float64)
     i = n
-    dT_sc = np.array(x[i:i+n] * args.dt_range_max, dtype=np.float64)
+    dT_subcool = np.array(x[i:i+n] * args.dt_range_max, dtype=np.float64)
     i += n
     Q_cond = np.array(x[i:i+n] * args.Q_hp_target, dtype=np.float64)
     i += n
     T_evap = np.array(x[i:i+n] * args.dt_range_max + args.T_hot[-1], dtype=np.float64)
     i += n
-    dT_sh = np.array(x[i:] * args.dt_range_max, dtype=np.float64)
+    dT_superheat = np.array(x[i:] * args.dt_range_max, dtype=np.float64)
 
-    return T_cond, dT_sc, Q_cond, T_evap, dT_sh
+    return T_cond, dT_subcool, Q_cond, T_evap, dT_superheat
 
 
 def _compute_multi_simple_hp_system_performance(
@@ -836,17 +840,17 @@ def _compute_multi_simple_hp_system_performance(
 ) -> float:
     """Objective: minimize total compressor work for multi-HP configuration.
     """
-    T_cond, dT_sc, Q_cond, T_evap, dT_sh = _parse_multi_simple_hp_state_temperatures(x, args)
+    T_cond, dT_subcool, Q_cond, T_evap, dT_superheat = _parse_multi_simple_hp_state_temperatures(x, args)
 
     if _constrain_min_temperature_lift(x, args) < 0:
         return {"obj": np.inf}
     
     hp_list = _create_multi_simple_hp_list(
         T_cond=T_cond, 
-        dT_sc=dT_sc, 
+        dT_subcool=dT_subcool, 
         Q_cond=Q_cond, 
         T_evap=T_evap, 
-        dT_sh=dT_sh,
+        dT_superheat=dT_superheat,
         args=args,
     )
 
@@ -887,10 +891,10 @@ def _compute_multi_simple_hp_system_performance(
         "work_hp": work_hp,  
         "Q_ext": Q_ext,
         "T_cond": T_cond,
-        "dT_sc": dT_sc,
+        "dT_subcool": dT_subcool,
         "Q_cond": Q_cond,            
         "T_evap": T_evap, 
-        "dT_sh": dT_sh,
+        "dT_superheat": dT_superheat,
         "Q_evap": Q_evap,
         "cop": COP,
         "Q_amb": Q_amb,
@@ -901,10 +905,10 @@ def _compute_multi_simple_hp_system_performance(
 
 def _create_multi_simple_hp_list(
     T_cond: np.ndarray, 
-    dT_sc: np.ndarray, 
+    dT_subcool: np.ndarray, 
     Q_cond: np.ndarray, 
     T_evap: np.ndarray, 
-    dT_sh: np.ndarray,
+    dT_superheat: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> List[SimpleHeatPumpCycle]:
     """Instantiate SimpleHeatPumpCycle objects that span the condenser/evaporator states.
@@ -914,14 +918,14 @@ def _create_multi_simple_hp_list(
     for i in range(n_hp):
         hp = SimpleHeatPumpCycle()
         hp.solve(
-            Te=T_evap[i],
-            Tc=T_cond[i],
-            dT_sh=dT_sh[i],
-            dT_sc=dT_sc[i],
+            T_evap=T_evap[i],
+            T_cond=T_cond[i],
+            dT_superheat=dT_superheat[i],
+            dT_subcool=dT_subcool[i],
             ihx_gas_dt=args.dt_hp_ihx,
             eta_comp=args.eta_comp,
             refrigerant=args.refrigerant_ls[i],
-            Q_h_total=Q_cond[i],                
+            Q_heat=Q_cond[i],                
         )
         hp_list.append(hp)
     return hp_list
@@ -930,7 +934,6 @@ def _create_multi_simple_hp_list(
 #######################################################################################################
 # Helper functions: Optimise single Brayton heat pump placement - TODO
 #######################################################################################################
-
 
 @timing_decorator
 def _optimise_brayton_heat_pump_placement(
@@ -972,7 +975,7 @@ def _prepare_brayton_hp_data_for_minimizer(
         (-0.2, 1.0), # T_comp_out = T_cold_max + x[0] * dT_range_max
         (0.01, 1.5), # dT_comp = x[1] * dT_range_max
         (0.01, 1.5), # dT_gc = x[2] * dT_range_max
-        (0.01, 1.0), # Q_h_total = x[3] * Q_hp_target
+        (0.01, 1.0), # Q_heat = x[3] * Q_hp_target
     ]        
     x0 = [
         0.0,
@@ -992,8 +995,8 @@ def _parse_brayton_hp_state_variables(
     T_comp_out = np.array(args.T_cold[0] + x[0] * args.dt_range_max, dtype=np.float64)
     dT_comp = np.array(x[1] * args.dt_range_max, dtype=np.float64)
     dT_gc = np.array(x[2] * args.dt_range_max, dtype=np.float64)
-    Q_h_total = np.array(x[3] * args.Q_hp_target, dtype=np.float64)
-    return [T_comp_out], [dT_comp], [dT_gc], [Q_h_total]
+    Q_heat = np.array(x[3] * args.Q_hp_target, dtype=np.float64)
+    return [T_comp_out], [dT_comp], [dT_gc], [Q_heat]
 
 
 def _compute_brayton_hp_system_performance(
@@ -1002,13 +1005,13 @@ def _compute_brayton_hp_system_performance(
 ) -> float:
     """Objective: minimize total compressor work for multi-HP configuration.
     """
-    T_comp_out, dT_comp, dT_gc, Q_h_total = _parse_brayton_hp_state_variables(x, args)
+    T_comp_out, dT_comp, dT_gc, Q_heat = _parse_brayton_hp_state_variables(x, args)
     
     hp_list = _create_brayton_hp_list(
         T_comp_out=T_comp_out, 
         dT_comp=dT_comp, 
         dT_gc=dT_gc, 
-        Q_gc=Q_h_total,
+        Q_gc=Q_heat,
         args=args,
     )
     
@@ -1047,7 +1050,7 @@ def _compute_brayton_hp_system_performance(
         "Q_ext": Q_ext,
         "T_comp_out": np.array(T_comp_out),
         "dT_gc": np.array(dT_gc),
-        "Q_heat": np.array(Q_h_total),            
+        "Q_heat": np.array(Q_heat),            
         "T_evap": np.array(T_exp_out), 
         "dT_comp": np.array(dT_comp),
         "Q_cool": np.array(Q_cool),
@@ -1075,7 +1078,7 @@ def _create_brayton_hp_list(
             T_comp_out=T_comp_out[i],
             T_comp_in=T_comp_out[i] - dT_comp[i],
             dT_gc=dT_gc[i],
-            Q_h_total=Q_gc[i],
+            Q_heat=Q_gc[i],
             eta_comp=args.eta_comp,
             eta_exp=args.eta_exp,
             is_recuperated=False,
@@ -1366,8 +1369,13 @@ def _build_simulated_hps_streams(
     hp_streams = StreamCollection()
     for hp in hp_list:
         hp.dtcont = dtcont_hp
-        hp_streams.add_many(hp.build_stream_collection(include_cond=True, include_evap=True, is_process_stream=True))
-    
+        hp_streams.add_many(
+            hp.build_stream_collection(
+                include_cond=True, 
+                include_evap=True, 
+                is_process_stream=False
+            )
+        )
     return hp_streams.get_hot_streams(), hp_streams.get_cold_streams()
 
 

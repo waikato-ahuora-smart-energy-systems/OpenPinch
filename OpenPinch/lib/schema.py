@@ -74,12 +74,14 @@ class HeatPumpTargetInputs(BaseModel):
     refrigerant_ls: List[str]
 
     # Optional arguments
-    dT_sc: Optional[np.ndarray] = None
-    dT_sh: Optional[np.ndarray] = None 
+    dT_subcool: Optional[np.ndarray] = None
+    dT_superheat: Optional[np.ndarray] = None 
     unit_system: Optional[str] = "EUR"
     net_hot_streams: Optional[StreamCollection] = StreamCollection()
     net_cold_streams: Optional[StreamCollection] = StreamCollection()
 
+    # Debug mode toogle
+    debug: bool
 
 class HeatPumpTargetOutputs(BaseModel):
     model_config = ConfigDict(
@@ -108,8 +110,8 @@ class HeatPumpTargetOutputs(BaseModel):
     Q_evap: Optional[np.ndarray] = None
 
     # Simple Vapour Compression only
-    dT_sc: Optional[np.ndarray] = None
-    dT_sh: Optional[np.ndarray] = None
+    dT_subcool: Optional[np.ndarray] = None
+    dT_superheat: Optional[np.ndarray] = None
 
     # Brayton only
     T_comp_out: Optional[np.ndarray] = None
