@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import warnings
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import CoolProp
 from CoolProp.Plots.Common import PropertyDict, SIunits, process_fluid_state
@@ -41,8 +40,8 @@ class SimpleHeatPumpCycle:
         self._w_net: Optional[float] = None
         self._q_cond: Optional[float] = None
         self._Q_cond: Optional[float] = None
-        self._q_cas_hot: Optional[float] = None
-        self._Q_cas_hot: Optional[float] = None
+        self._q_cas_heat: Optional[float] = None
+        self._Q_cas_heat: Optional[float] = None
         self._q_heat: Optional[float] = None
         self._Q_heat: Optional[float] = None
         self._q_evap: Optional[float] = None
@@ -149,11 +148,11 @@ class SimpleHeatPumpCycle:
 
     @property
     def q_cas_hot(self) -> Optional[float]:
-        return self._q_cas_hot
+        return self._q_cas_heat
 
     @property
     def Q_cas_heat(self) -> Optional[float]:
-        return self._Q_cas_hot
+        return self._Q_cas_heat
  
     @property
     def q_heat(self) -> Optional[float]:
@@ -371,7 +370,7 @@ class SimpleHeatPumpCycle:
         self._dT_subcool = dT_subcool
         self._Q_cond = Q_heat + Q_cas_heat
         self._Q_heat = Q_heat
-        self._Q_cas_hot = Q_cas_heat
+        self._Q_cas_heat = Q_cas_heat
         self._Q_cool = Q_cool
         self._eta_comp = eta_comp
         self._ihx_gas_dt = max(min(ihx_gas_dt, T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2), 0.0)
@@ -442,13 +441,13 @@ class SimpleHeatPumpCycle:
         # 4 - Hot side of cascade heat exchanger outlet (if it exists, Q_cas_heat > 0)
         h_4 = self._cycle_states[1, 'H']
         if self._Q_cond > 0:
-            h_4 -= (self._cycle_states[1, 'H'] - self._cycle_states[2, 'H']) * self._Q_cas_hot / self._Q_cond
+            h_4 -= (self._cycle_states[1, 'H'] - self._cycle_states[2, 'H']) * self._Q_cas_heat / self._Q_cond
         self._compute_state_from_pressure_enthalpy(
             P=self._cycle_states[1, 'P'],
             h=h_4,
         )
         self._save_cycle_state(4)
-        self._q_cas_hot = (self._cycle_states[1, 'H'] - self._cycle_states[4, 'H'])
+        self._q_cas_heat = (self._cycle_states[1, 'H'] - self._cycle_states[4, 'H'])
         self._q_heat = (self._cycle_states[4, 'H'] - self._cycle_states[2, 'H']) 
 
         # 5 - Hot side of cascade heat exchanger outlet (if it exists, Q_cas_heat > 0)
