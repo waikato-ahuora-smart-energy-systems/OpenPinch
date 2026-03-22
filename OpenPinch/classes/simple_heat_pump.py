@@ -147,7 +147,7 @@ class SimpleHeatPumpCycle:
         return self._Q_cond
 
     @property
-    def q_cas_hot(self) -> Optional[float]:
+    def q_cas_heat(self) -> Optional[float]:
         return self._q_cas_heat
 
     @property
@@ -185,11 +185,15 @@ class SimpleHeatPumpCycle:
     @property
     def COP_h(self) -> Optional[float]:
         self._require_solution()
+        if abs(self._w_net) <= 1e-9:
+            raise ZeroDivisionError('COP_h is undefined when net specific work is zero.')
         return self._q_cond / self._w_net
 
     @property
     def COP_r(self) -> Optional[float]:
         self._require_solution()
+        if abs(self._w_net) <= 1e-9:
+            raise ZeroDivisionError('COP_r is undefined when net specific work is zero.')
         return self._q_evap / self._w_net
 
     @property
@@ -359,6 +363,7 @@ class SimpleHeatPumpCycle:
         float
             Compressor power requirement for the solved operating point [W].
         """
+        self._solved = False
         self._validate_solve_inputs(
             refrigerant=refrigerant,
         )
@@ -479,7 +484,7 @@ class SimpleHeatPumpCycle:
         include_cond: bool = False, 
         include_evap: bool = False, 
         is_process_stream: bool = False
-    ) -> Tuple[StreamCollection, StreamCollection]:
+    ) -> StreamCollection:
 
         def _build_streams(profile: np.ndarray): 
             sc = StreamCollection()
