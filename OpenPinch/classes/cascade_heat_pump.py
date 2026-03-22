@@ -31,6 +31,7 @@ class CascadeHeatPumpCycle:
         self._Q_cas_heat = []
         self._Q_cool = []
 
+        self._num_cycles = 1
         self._dtcont: float = 0.0
         self._dt_diff_max: float = 0.5 # Default value, used in piecewise approximation of non linear T-h profiles      
         self._solved: bool = False
@@ -133,47 +134,74 @@ class CascadeHeatPumpCycle:
     def dt_cascade_hx(self) -> float:
         return self._dt_cascade_hx
     
+    @property
+    def num_cycles(self) -> int:
+        return self._num_cycles
+    
+
+    def _validate_cascade_hp_input_array(
+        arr: np.ndarray, 
+        n_heat: int, 
+        n_cool: int, 
+        is_cond_attri: bool = True
+    ):
+        if arr.size == 1:
+            arr_new = arr * np.ones()
+        elif arr.size == n_cool and is_cond_attri == False:
+            arr_new = np.concatenate([
+                np.zeros(n_heat-1),
+                arr,
+            ])
+        elif arr.size == n_heat and is_cond_attri == True:
+            arr_new = np.concatenate([
+                arr,
+                np.zeros(n_cool-1),
+            ])
+        else:
+            raise ValueError("Incompatible input to solving a cascade heat pump.")
+        return arr_new    
+
 
     def solve(
         self,
-        T_evap: List[float] | float,
-        T_cond: List[float], 
+        T_evap: np.ndarray,
+        T_cond: np.ndarray, 
         *,
-        dT_superheat: List[float] | float = 0.0,
-        dT_subcool: List[float] | float = 0.0,
-        eta_comp: List[float] | float = 0.7,
+        dT_superheat: np.ndarray = 0.0,
+        dT_subcool: np.ndarray = 0.0,
+        eta_comp: float = 0.7,
         refrigerant: List[str] | str = "water",
-        ihx_gas_dt: List[float] | float = 10.0,
-        Q_heat: List[float] | float = 1.0,
-        Q_cas_heat: List[float] | float = 0.0,
-        Q_cool: List[float] | float = None,
-        dt_cascade_hx: float = 1.0,
+        ihx_gas_dt: np.ndarray | float = 10.0,
+        Q_heat: np.ndarray = 1.0,
+        Q_cas_heat: np.ndarray = 0.0,
+        Q_cool: np.ndarray = None,
+        dt_cascade_hx: np.ndarray = 1.0,
     ) -> float:
         """
         Solve the heat-pump cycle for the provided operating point.
 
         Parameters
         ----------
-        T_evap : List[float] 
+        T_evap : np.ndarray
             Liquid saturation temperature in the evaporator [deg C].
-        T_cond : List[float]
+        T_cond : np.ndarray
             Gas saturation temperature in the condenser [deg C].
-        dT_superheat : List[float], optional
+        dT_superheat : np.ndarray, optional
             Degree of superheating of the suction gas, supplied by the process [K].
-        dT_subcool : List[float], optional
+        dT_subcool : np.ndarray, optional
             Degree of subcooling after the condenser, heat delivered to the process [K].
-        eta_comp : List[float], optional
+        eta_comp : float, optional
             Isentropic efficiency of the compressor [-].
         refrigerant : List[str], optional
             Cycle refrigerant; supports multi-component fluids.
-        ihx_gas_dt : List[float], optional
+        ihx_gas_dt : np.ndarray | float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
-        Q_heat : List[float], optional
+        Q_heat : np.ndarray, optional
             Heat delivered to the process [W].
-        Q_cas_heat : List[float], optional
+        Q_cas_heat : np.ndarray, optional
             Extra condenser heat transferred to the next cascade cycle [W].
             Used only for cascade configurations.
-        Q_cool : List[float], optional
+        Q_cool : np.ndarray, optional
             Cooling delivered to the process [W]; remaining cooling is supplied by
             a lower cascade cycle in cascade configurations.
 
@@ -185,50 +213,60 @@ class CascadeHeatPumpCycle:
         self._solved = False
         self._dt_cascade_hx = dt_cascade_hx
 
-        if isinstance(T_cond, float):
-            T_cond = [T_cond]
-        if isinstance(T_evap, float):
-            T_evap = [T_evap]
-        if min(T_cond) < max(T_evap):
+        if T_cond.min() < T_evap.max():
             raise ValueError("Invalid condenser and evaporator temperatures.")
 
-        T_cond = np.array(T_cond).sort()[::-1]
-        T_evap = np.array(T_evap).sort()[::-1]
-        n_heat = T_cond.size
-        n_cool = T_evap.size
+        T_cond = T_cond.sort()[::-1]
+        T_evap = T_evap.sort()[::-1]
 
         T_cond_all = np.concatenate([
             T_cond,
             T_evap[:-1] + self._dt_cascade_hx,
-        ]).sort()
+        ]).sort()[::-1]
 
         T_evap_all = np.concatenate([
             T_cond[1:] - self._dt_cascade_hx,
             T_evap,
-        ]).sort()        
+        ]).sort()[::-1]
 
-        if T_evap_all.size != T_cond_all.size:
-            raise ValueError("Mismatched number of heat pumps in the cascade.")
+        self._num_cycles = T_evap_all.size - 1
+        n_heat = T_cond.size
+        n_cool = T_evap.size
 
-        self._num_cycles = T_evap_all.size
+        dT_superheat_all = self._validate_cascade_hp_input_array(dT_superheat, n_heat, n_cool, False)
+        dT_subcool_all = self._validate_cascade_hp_input_array(dT_subcool, n_heat, n_cool, True)
+        Q_heat_all = self._validate_cascade_hp_input_array(Q_heat, n_heat, n_cool, True)
+        Q_cas_heat_all = self._validate_cascade_hp_input_array(Q_cas_heat, n_heat, n_cool, True)
+        Q_cool_all = self._validate_cascade_hp_input_array(Q_cool, n_heat, n_cool, False)
 
+        if isinstance(refrigerant, list):
+            if len(refrigerant) != self._num_cycles:
+                raise ValueError(f"Number of refrigerants must match the number of heat pumps, {self._num_cycles}.")
+            refrigerant_all = refrigerant
+        else:
+            refrigerant_all = [refrigerant] * self._num_cycles
 
+        if isinstance(ihx_gas_dt, float):
+            ihx_gas_dt_all = ihx_gas_dt * np.ones(self._num_cycles)
+        else:
+            if ihx_gas_dt.size != self._num_cycles:
+                raise ValueError("ihx_gas_dt must match the number of heat pumps.")
+            ihx_gas_dt_all = ihx_gas_dt
 
-        
 
         for i in range(self._num_cycles):
             hp = SimpleHeatPumpCycle()
             hp.solve(
                 T_evap=T_evap_all[i],
                 T_cond=T_cond_all[i],
-                # TODO: prior to the for loop, construct lists of the correct length to match the number of simples heat pumps. Analyse the sitution to figure out how this should be done. 
-                dT_subcool=dT_subcool[i] if isinstance(dT_subcool, list) else dT_subcool,
-                eta_comp=eta_comp[i] if isinstance(eta_comp, list) else eta_comp,
-                refrigerant=refrigerant[i] if isinstance(refrigerant, list) else refrigerant,
-                ihx_gas_dt=ihx_gas_dt[i] if isinstance(ihx_gas_dt, list) else ihx_gas_dt,
-                Q_heat=Q_heat[i] if isinstance(Q_heat, list) else Q_heat,
-                Q_cas_heat=Q_cas_heat[i] if isinstance(Q_cas_heat, list) else Q_cas_heat,
-                Q_cool=Q_cool[i] if isinstance(Q_cool, list) else Q_cool,     
+                dT_superheat=dT_superheat_all[i],
+                dT_subcool=dT_subcool_all[i],
+                eta_comp=eta_comp,
+                refrigerant=refrigerant_all[i],
+                ihx_gas_dt=ihx_gas_dt_all[i],
+                Q_heat=Q_heat_all[i],
+                Q_cas_heat=Q_cas_heat_all[i],
+                Q_cool=Q_cool_all[i],
             )
             self._subcycles.append(hp)
 
