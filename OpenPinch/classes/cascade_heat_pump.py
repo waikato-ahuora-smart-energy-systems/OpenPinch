@@ -18,42 +18,21 @@ class CascadeHeatPumpCycle:
     """
 
     def __init__(self):
-        self._subcycles = []
-
-        self._T_evap = []
-        self._T_cond = []
-        self._dT_superheat = []
-        self._dT_subcool = []
-        self._eta_comp = []
-        self._refrigerant = []
-        self._ihx_gas_dt = []
-        self._Q_heat = []
-        self._Q_cas_heat = []
-        self._Q_cool = []
-
+        self._subcycles = None
+        self._T_evap = None
+        self._T_cond = None
+        self._dT_superheat = None
+        self._dT_subcool = None
+        self._eta_comp = None
+        self._refrigerant = None
+        self._ihx_gas_dt = None
+        self._Q_heat = None
+        self._Q_cas_heat = None
+        self._Q_cool = None
         self._num_cycles = 1
         self._dtcont: float = 0.0
         self._dt_diff_max: float = 0.5 # Default value, used in piecewise approximation of non linear T-h profiles      
         self._solved: bool = False
-
-
-        ### check
-        # self._w_net: Optional[float] = None
-        # self._q_cond: Optional[float] = None
-        # self._Q_cond: Optional[float] = None
-        # self._q_cas_heat: Optional[float] = None
-        # self._Q_cas_heat: Optional[float] = None
-        # self._q_heat: Optional[float] = None
-        
-        # self._q_evap: Optional[float] = None
-        # self._Q_evap: Optional[float] = None
-        # self._q_cas_cool: Optional[float] = None
-        # self._Q_cas_cool: Optional[float] = None
-        # self._q_cool: Optional[float] = None
-        # self._Q_cool: Optional[float] = None
-
-        # self._m_dot: Optional[float] = None
-        # self._work: Optional[float] = None
 
 
     @property
