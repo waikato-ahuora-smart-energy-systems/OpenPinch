@@ -1,8 +1,8 @@
 """Simple Heat Pump cycle utilities that wrap CoolProp."""
 
-from __future__ import annotations
+# from __future__ import annotations
 
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence
 
 import CoolProp
 from CoolProp.Plots.Common import PropertyDict, SIunits, process_fluid_state
@@ -197,12 +197,8 @@ class SimpleHeatPumpCycle:
         return self._q_evap / self._w_net
 
     @property
-    def dt_diff_max(self) -> PropertyDict:
+    def dt_diff_max(self) -> Optional[float]:
         return self._dt_diff_max
-
-    @dt_diff_max.setter
-    def dt_diff_max(self, value: float) -> None:
-        self._dt_diff_max = value
 
     @property
     def refrigerant(self) -> Optional[str]:
@@ -483,8 +479,13 @@ class SimpleHeatPumpCycle:
         self, 
         include_cond: bool = False, 
         include_evap: bool = False, 
-        is_process_stream: bool = False
+        is_process_stream: bool = False,
+        dtcont: float = 0.0,
+        dt_diff_max: float = 0.5,
     ) -> StreamCollection:
+        self._dtcont = dtcont
+        self._dt_diff_max = dt_diff_max
+        streams = StreamCollection()
 
         def _build_streams(profile: np.ndarray): 
             sc = StreamCollection()
@@ -508,7 +509,6 @@ class SimpleHeatPumpCycle:
                 sc.add(s)
             return sc
         
-        streams = StreamCollection()
         if include_cond:
             streams += _build_streams(
                 self._build_condenser_profile()

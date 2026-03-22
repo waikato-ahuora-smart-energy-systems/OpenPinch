@@ -1368,12 +1368,12 @@ def _build_simulated_hps_streams(
     """Aggregate condenser/gas-cooler and evaporator/gas-heater streams for each simulated HP cycle."""
     hp_streams = StreamCollection()
     for hp in hp_list:
-        hp.dtcont = dtcont_hp
         hp_streams.add_many(
             hp.build_stream_collection(
                 include_cond=True, 
                 include_evap=True, 
-                is_process_stream=False
+                is_process_stream=False,
+                dtcont=dtcont_hp,
             )
         )
     return hp_streams.get_hot_streams(), hp_streams.get_cold_streams()
