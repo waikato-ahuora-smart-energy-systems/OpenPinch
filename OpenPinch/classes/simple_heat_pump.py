@@ -483,6 +483,8 @@ class SimpleHeatPumpCycle:
         dtcont: float = 0.0,
         dt_diff_max: float = 0.5,
     ) -> StreamCollection:
+        
+        self._require_solution()
         self._dtcont = dtcont
         self._dt_diff_max = dt_diff_max
         streams = StreamCollection()
