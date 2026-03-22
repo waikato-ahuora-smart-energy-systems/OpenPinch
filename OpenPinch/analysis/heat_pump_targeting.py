@@ -55,8 +55,8 @@ def get_heat_pump_targets(
         targeting is skipped by the configuration screens.
     """    
     ######### Analysis Options #########
-    zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
-    zone_config.N_EVAP = 3
+    # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
+    # zone_config.N_EVAP = 3
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     # zone_config.HP_TYPE = HeatPumpType.Brayton.value
@@ -628,13 +628,14 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     Q_ext = args.Q_hp_target - Q_cond.sum()
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
+    obj = (work_hp.sum() + Q_ext / args.price_ratio) / args.Q_hp_target
 
     if debug:
-        res = _get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args)     
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))        
+        res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)     
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {obj} = {work_hp} + {Q_ext}"))        
 
     return {
-        "obj": (work_hp.sum() + Q_ext / args.price_ratio) / args.Q_hp_target, 
+        "obj": obj, 
         "utility_tot": work_hp.sum() + Q_ext, 
         "work_hp": work_hp.sum(),
         "Q_ext": Q_ext,
