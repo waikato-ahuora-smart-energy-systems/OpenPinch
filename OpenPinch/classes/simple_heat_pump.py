@@ -452,7 +452,7 @@ class SimpleHeatPumpCycle:
         self._q_heat = (self._cycle_states[4, 'H'] - self._cycle_states[2, 'H']) 
 
         # 5 - Hot side of cascade heat exchanger outlet (if it exists, Q_cas_heat > 0)
-        if self._Q_cool == None:
+        if self._Q_cool == None or np.isnan(self._Q_cool):
             self._Q_cool = self._Q_evap
         elif self._Q_cool > self._Q_evap:
             self._Q_cool = self._Q_evap
@@ -489,16 +489,17 @@ class SimpleHeatPumpCycle:
         self._dt_diff_max = dt_diff_max
         streams = StreamCollection()
 
-        def _build_streams(profile: np.ndarray): 
+        def _build_streams(profile: np.ndarray, is_condenser: bool = True): 
             sc = StreamCollection()
             for i in range(len(profile) - 1):
                 h1, T1 = profile[i]
                 h2, T2 = profile[i+1]
 
-                name = f"Condenser_{i+1}" if T2 < T1 else f"Evaporator_{i+1}"
-
-                if abs(T1 - T2) < 0.01: # Catch phase change
-                    T2 = T1 - 0.01 if T2 < T1 else T1 + 0.01
+                if abs(T1 - T2) < 0.01:
+                    name = f"Heater_{i+1}" if is_condenser else f"Cooler_{i+1}"
+                    T2 = T1 - 0.01 if is_condenser else T1 + 0.01
+                else:
+                    name = f"Heater_{i+1}" if T1 > T2 else f"Cooler_{i+1}"
 
                 s = Stream(
                     name=name,
@@ -513,11 +514,13 @@ class SimpleHeatPumpCycle:
         
         if include_cond:
             streams += _build_streams(
-                self._build_condenser_profile()
+                self._build_condenser_profile(),
+                is_condenser=True,
             )
         if include_evap:
             streams += _build_streams(
-                self._build_evaporator_profile()
+                self._build_evaporator_profile(),
+                is_condenser=False,                
             )            
         return streams
 
@@ -542,7 +545,7 @@ class SimpleHeatPumpCycle:
         p_high = self.Ps[4]
         t_h_curve_points = []
 
-        if p_high < self._p_crit:    
+        if p_high < self._p_crit and H[4] > H[2]:    
             # Saturated vapor at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_high, 1.0)
             h_sat_vapor = self._state.hmass()
@@ -552,22 +555,22 @@ class SimpleHeatPumpCycle:
             h_sat_liquid = self._state.hmass()
 
             if H[4] > h_sat_vapor:
-                for h in np.linspace(H[4], h_sat_vapor, 21):
+                for h in np.linspace(H[4], max(h_sat_vapor, H[2]), 21):
                     self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
                     t_h_curve_points.append([h, float(self._state.T())])
             
-            if H[4] > h_sat_liquid:
-                for h in np.linspace(min(h_sat_vapor, H[4]), h_sat_liquid, 21):
+            if H[4] > h_sat_liquid and not(H[2] > h_sat_vapor):
+                for h in np.linspace(min(h_sat_vapor, H[4]), max(h_sat_liquid, H[2]), 21):
                     if h != h_sat_vapor or H[4] < h_sat_vapor:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
                         t_h_curve_points.append([h, float(self._state.T())])            
             
             if H[2] < h_sat_liquid:
-                for h in np.linspace(h_sat_liquid, H[2], 21):
+                for h in np.linspace(min(h_sat_liquid, H[4]), H[2], 21):
                     if h != h_sat_liquid or H[4] < h_sat_liquid:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
                         t_h_curve_points.append([h, float(self._state.T())])
-
+            
         else:
             # Determine supercritical gas cooler profile
             for h in np.linspace(H[4], H[2], 61):
@@ -579,7 +582,7 @@ class SimpleHeatPumpCycle:
         # Convert temperature to °C if not SI
         t_h_curve_points[:, 1] -= 273.15
 
-        self._condenser_th_profile = t_h_curve_points
+        self._condenser_th_curve = t_h_curve_points
 
         # Calculate a piece-wise linear approximation of the condenser or gas cooler profile
         condenser_profile = get_piecewise_data_points(
@@ -587,6 +590,7 @@ class SimpleHeatPumpCycle:
             is_hot_stream=True, 
             dt_diff_max=self._dt_diff_max,
         )
+        self._condenser_profile = condenser_profile
         return condenser_profile
 
 
@@ -610,7 +614,7 @@ class SimpleHeatPumpCycle:
         p_low = self.Ps[0]
         t_h_curve_points = []
 
-        if p_low < self._p_crit:    
+        if p_low < self._p_crit and H[5] > H[3]:    
             # Saturated vapor at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_low, 1.0)
             h_sat_vapor = self._state.hmass()
@@ -620,24 +624,25 @@ class SimpleHeatPumpCycle:
             h_sat_liquid = self._state.hmass()
 
             if H[3] < h_sat_liquid:
-                for h in np.linspace(H[3], h_sat_liquid, 21):
+                for h in np.linspace(H[3], min(h_sat_liquid, H[5]), 21):
                     self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
                     t_h_curve_points.append([h, float(self._state.T())])
             
-            if H[3] < h_sat_vapor:
-                for h in np.linspace(max(h_sat_liquid, H[3]), min(h_sat_vapor, H[0]), 21):
+            if H[3] < h_sat_vapor and not(H[5] < h_sat_liquid):
+                for h in np.linspace(max(h_sat_liquid, H[3]), min(h_sat_vapor, H[5]), 21):
                     if h != h_sat_liquid or H[3] > h_sat_liquid:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
-                        t_h_curve_points.append([h, float(self._state.T())])            
-            if H[0] > h_sat_vapor or H[0] < H[3]:
-                for h in np.linspace(max(h_sat_vapor, H[3]), H[0], 21):
+                        t_h_curve_points.append([h, float(self._state.T())])  
+
+            if H[5] > h_sat_vapor:
+                for h in np.linspace(max(h_sat_vapor, H[3]), H[5], 21):
                     if h != h_sat_vapor or H[3] > h_sat_vapor:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
                         t_h_curve_points.append([h, float(self._state.T())])
 
         else:
             # Determine supercritical gas heater profile
-            for h in np.linspace(H[3], H[0], 61):
+            for h in np.linspace(H[3], H[5], 61):
                 self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
                 t_h_curve_points.append([h, float(self._state.T())])
         
@@ -646,7 +651,7 @@ class SimpleHeatPumpCycle:
         # Convert temperature to °C if not SI
         t_h_curve_points[:, 1] -= 273.15
 
-        self._evaporator_th_profile = t_h_curve_points
+        self._evaporator_th_curve = t_h_curve_points
 
         # Calculate a piece-wise linear approximation of the evaporator or gas heater profile
         evaporator_profile = get_piecewise_data_points(
@@ -654,6 +659,7 @@ class SimpleHeatPumpCycle:
             is_hot_stream=False, 
             dt_diff_max=self._dt_diff_max,
         )
+        self._evaporator_profile = evaporator_profile
         return evaporator_profile
 
 

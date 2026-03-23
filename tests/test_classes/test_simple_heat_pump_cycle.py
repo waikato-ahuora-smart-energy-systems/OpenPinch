@@ -244,39 +244,34 @@ def test_heat_pump_cycle_case_9():
     assert np.isclose(cycle.Q_evap, cycle.Q_cool + cycle.Q_cas_cool, 0.0)
     assert np.isclose(cycle.Q_cond, cycle.Q_heat + cycle.Q_cas_heat, 0.0)
 
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    assert np.isclose(sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0)
+    assert np.isclose(sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0)
 
-# def test_heat_pump_cycle_case_10():
-#     T_evap = 5 # degC, evaporator saturation temperature
-#     T_cond = 170 # degC, condenser saturation temperature
-#     dT_superheat = 10.0  # K superheat
-#     dT_subcool = 10.0  # K subcooling
 
-#     cycle1 = SimpleHeatPumpCycle()
-#     cycle1.solve(
-#         T_evap = T_evap,
-#         T_cond = T_cond,
-#         dT_superheat = dT_superheat,
-#         dT_subcool = dT_subcool,        
-#         ihx_gas_dt=10,
-#         eta_comp = 0.75,
-#         refrigerant="R601",
-#         Q_heat=500,
-#         Q_cas_heat=500,
-#     )
+def test_heat_pump_cycle_case_10():
+    T_evap = 0.0 # degC, evaporator saturation temperature
+    T_cond = 24 # degC, condenser saturation temperature
+    dT_superheat = 5.0  # K superheat
+    dT_subcool = 2.0  # K subcooling
 
-#     cycle2 = SimpleHeatPumpCycle()
-#     cycle2.solve(
-#         T_evap = T_evap,
-#         T_cond = T_cond,
-#         dT_superheat = dT_superheat,
-#         dT_subcool = dT_subcool,        
-#         ihx_gas_dt=10,
-#         eta_comp = 0.75,
-#         refrigerant="R601",
-#         Q_heat=500,
-#         Q_cas_heat=500,
-#     )
+    cycle = SimpleHeatPumpCycle()
+    cycle.solve(
+        T_evap = T_evap,
+        T_cond = T_cond,
+        dT_superheat = dT_superheat,
+        dT_subcool = dT_subcool,        
+        ihx_gas_dt=10,
+        eta_comp = 0.7,
+        refrigerant="R134A",
+        Q_heat=0.0,
+        Q_cas_heat=900,
+        Q_cool=np.nan,
+    )
+    _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
+    assert np.isclose(cycle.Q_evap, cycle.Q_cool + cycle.Q_cas_cool, 0.0)
+    assert np.isclose(cycle.Q_cond, cycle.Q_heat + cycle.Q_cas_heat, 0.0)
 
-#     assert np.isclose(cycle2.m_dot, cycle1.m_dot, 0.0)
-#     assert np.isclose(cycle2.Q_cond, cycle1.Q_cond, 0.0)
-#     assert np.isclose(cycle2.work, cycle1.work, 0.0)
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    assert np.isclose(sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0)
+    assert np.isclose(sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0)
