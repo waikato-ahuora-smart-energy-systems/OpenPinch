@@ -62,6 +62,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_exp: float
     dtcont_hp: float
     dt_hp_ihx: float
+    dt_cascade_hx: float
     dt_phase_change: float
     price_ratio: float
     is_direct_integration: bool
@@ -72,6 +73,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_hp_carnot: float
     eta_he_carnot: float
     refrigerant_ls: List[str]
+    do_refrigerant_sort: bool
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None

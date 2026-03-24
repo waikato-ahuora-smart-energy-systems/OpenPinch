@@ -17,6 +17,7 @@ from ..classes.stream_collection import StreamCollection
 from ..classes.problem_table import ProblemTable
 from ..classes.simple_heat_pump import SimpleHeatPumpCycle
 from ..classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
+from ..classes.cascade_heat_pump import CascadeHeatPumpCycle
 
 __all__ = ["get_heat_pump_targets", "calc_heat_pump_cascade", "plot_multi_hp_profiles_from_results"]
 
@@ -56,6 +57,7 @@ def get_heat_pump_targets(
     """    
     ######### Analysis Options #########
     # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
+    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
     # zone_config.N_EVAP = 3
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
     # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
@@ -233,11 +235,13 @@ def _prepare_heat_pump_target_inputs(
         eta_he_carnot=zone_config.ETA_HE_CARNOT,
         dtcont_hp=zone_config.DTMIN_HP,
         dt_hp_ihx = zone_config.DT_HP_IHX,
+        dt_cascade_hx = zone_config.DT_CASCADE_HX,
         load_fraction=zone_config.HP_LOAD_FRACTION,
         T_env=zone_config.T_ENV,
         dt_env_cont=zone_config.DT_ENV_CONT,
         dt_phase_change=zone_config.DT_PHASE_CHANGE,
         refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
+        do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
         price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL,
         max_multi_start=zone_config.MAX_HP_MULTISTART,
         net_hot_streams=net_hot_streams,
@@ -380,6 +384,8 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
             opt = m
 
     res = _compute_multi_temperature_carnot_hp_opt_obj(opt.x, args, debug=args.debug)
+    if res["opt_success"] == False:
+        raise ValueError("Multi-temperature Carnot heat pump targeting failed to return an optimal result.")
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
 
@@ -545,6 +551,232 @@ def _parse_multi_temperature_carnot_hp_state_variables(
 
 
 #######################################################################################################
+# Helper functions: Optimise cascade heat pump placement with CoolProp simulation
+#######################################################################################################
+
+@timing_decorator
+def _optimise_cascade_heat_pump_placement(
+    args: HeatPumpTargetInputs
+) -> HeatPumpTargetOutputs:
+    """Optimise the integration of a cascade heat-pump with a specified number of condensers and evaporators.
+    """
+    # Use as initialisation
+    init_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
+
+    # Validate specific inputs related to this approach
+    num_stages = int(args.n_cond + args.n_evap - 1)
+    args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
+
+    # Prepare and run the optimisation
+    x0, bnds = _get_x0_and_bnds_for_cascade_hp_opt(init_res.T_cond, init_res.Q_cond, init_res.T_evap, init_res.Q_evap, args)
+
+    opt = minimize(
+        fun=lambda x: _compute_cascade_hp_system_performance(x, args)["obj"],
+        x0=x0,
+        method="COBYQA",
+        bounds=bnds,
+        options={'disp': False, 'maxiter': 1000},
+        tol=1e-6,
+    )
+
+    if isinstance(opt.x, np.ndarray):
+        res = _compute_cascade_hp_system_performance(opt.x, args, debug=args.debug)
+        res["opt_success"] = opt.success
+    else:
+        raise ValueError("Optimal placement of cascade vapour-compression heat pump failed:", opt.message)
+
+    return HeatPumpTargetOutputs.model_validate(res)
+
+
+def _get_x0_and_bnds_for_cascade_hp_opt(
+    T_cond: np.ndarray, 
+    Q_heat: np.ndarray, 
+    T_evap: np.ndarray,
+    Q_cool: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> Tuple[np.ndarray, list]:
+    """Build initial guesses and bounds for the condenser/evaporator temperature.
+    """
+    x_cond_bnds = []
+    x_evap_bnds = []
+    for i, refrigerant in enumerate(args.refrigerant_ls):
+        T_min, T_max = PropsSI('Tmin', refrigerant) - 273.15, PropsSI('Tmax', refrigerant) - 273.15
+        if i+1 <= T_cond.size:
+            T_cond_bnds = np.array((
+                min(args.T_cold[0], T_max - 1),
+                max(args.T_cold[-1] + args.dt_phase_change, T_min + 1),
+            ))
+            if T_cond_bnds[1] > T_cond_bnds[0]:
+                T_cond_bnds[0] = T_cond_bnds[1]
+            x_cond_bnds += [(
+                (args.T_cold[0] - T_cond_bnds[0]) / args.dt_range_max,
+                (args.T_cold[0] - T_cond_bnds[1]) / args.dt_range_max,
+            )]
+
+        if i+1 >= T_cond.size:
+            T_evap_bnds = np.array((
+                max(args.T_hot[-1], T_min + 1),
+                min(args.T_hot[0] - args.dt_phase_change, T_max - 1), # Account for evap stream temp rise minimum
+            ))
+            if T_evap_bnds[0] > T_evap_bnds[1]:
+                T_evap_bnds[1] = T_evap_bnds[0]        
+            x_evap_bnds += [(
+                (T_evap_bnds[0] - args.T_hot[-1]) / args.dt_range_max,
+                (T_evap_bnds[1] - args.T_hot[-1]) / args.dt_range_max,
+            )]
+
+    x_sc_bnds = [
+        np.float64(args.dt_phase_change / args.dt_range_max), 
+        np.float64((args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max),
+    ]
+
+    if x_sc_bnds[0] > x_sc_bnds[1]:
+        x_sc_bnds[1] = x_sc_bnds[0]
+    
+    x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
+    x_sc = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_cond))])
+    y_heat = Q_heat / args.Q_hp_target
+    y_heat_bnds = (0.0, 1.0)
+
+    x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
+    y_cool = Q_cool / args.Q_hp_target
+    y_cool_bnds = (0.0, 1.0)
+
+    x_ls = []
+    bnds = []
+
+    def _build_lists(candidate, limits):
+        x_ls.extend(candidate[:])
+        if isinstance(limits, list):
+            for lim in limits:
+                bnds.append(lim)
+        else:
+            for _ in candidate:
+                bnds.append(limits)
+
+    pairs = [
+        (x_cond, x_cond_bnds),
+        (x_sc,   tuple(x_sc_bnds)  ),
+        (y_heat, tuple(y_heat_bnds)),
+        (x_evap, x_evap_bnds),
+    ]
+    if y_cool.size > 1:
+        pairs.append(
+            (y_cool[:-1], tuple(y_cool_bnds))
+        )
+
+    for candidate, limits in pairs:
+        _build_lists(candidate, limits)
+        
+    x0 = np.array(x_ls) 
+
+    for i in range(x0.size):
+        if not(bnds[i][0] <= x0[i] <= bnds[i][1]):
+            x0[i] = (bnds[i][1] + bnds[i][0]) / 2
+
+    return x0, bnds
+
+
+def _parse_cascade_hp_state_variables(
+    x: np.ndarray, 
+    args: HeatPumpTargetInputs,
+) -> Tuple[np.ndarray]:
+    """Extract HP variables from optimization vector x.
+    """
+    n0, n1 = args.n_cond, args.n_evap 
+    T_cond = np.array(args.T_cold[0] - x[:n0] * args.dt_range_max, dtype=np.float64)
+    dT_subcool = np.array(x[n0:2*n0] * args.dt_range_max, dtype=np.float64)
+    Q_heat = np.array(x[2*n0:3*n0] * args.Q_hp_target, dtype=np.float64)
+    T_evap = np.array(x[3*n0:3*n0+n1] * args.dt_range_max + args.T_hot[-1], dtype=np.float64)
+    temp = np.array(x[3*n0+n1:] * args.Q_hp_target, dtype=np.float64)
+    Q_cool = np.concatenate([temp, np.nan]) if temp.size > 0 else np.array(np.nan)
+    return T_cond, dT_subcool, Q_heat, T_evap, Q_cool
+
+
+def _compute_cascade_hp_system_performance(
+    x: np.ndarray, 
+    args: HeatPumpTargetInputs, 
+    debug: bool = False,
+) -> float:
+    """Objective: minimize total compressor work for multi-HP configuration.
+    """
+    T_cond, dT_subcool, Q_heat, T_evap, Q_cool = _parse_cascade_hp_state_variables(x, args)
+
+    if _constrain_min_temperature_lift(x, args) < 0:
+        return {"obj": np.inf}
+    
+    hp = CascadeHeatPumpCycle()
+    hp.solve(
+        T_evap=T_evap,
+        T_cond=T_cond,
+        Q_heat=Q_heat,
+        Q_cool=Q_cool,
+        dT_subcool=dT_subcool,
+        eta_comp=args.eta_comp,
+        refrigerant=args.refrigerant_ls,
+        ihx_gas_dt=args.dt_hp_ihx,
+        dt_cascade_hx=args.dt_cascade_hx,
+    )
+
+    # Build streams based on heat pump profiles
+    hp_hot_streams = hp.build_stream_collection(
+        include_cond=True,
+        is_process_stream=False,
+        dtcont=args.dtcont_hp,
+    )    
+    hp_cold_streams = hp.build_stream_collection(
+        include_evap=True, 
+        is_process_stream=False,
+        dtcont=args.dtcont_hp,
+    )
+
+    # Determine the heat cascade
+    pt_cond = get_process_heat_cascade(
+        hot_streams=hp_hot_streams, 
+        cold_streams=args.net_cold_streams,
+        is_shifted=True,
+    )    
+    pt_evap = get_process_heat_cascade(
+        hot_streams=args.net_hot_streams, 
+        cold_streams=hp_cold_streams,
+        is_shifted=True,        
+    )
+
+    # Calculate key perfromance indicators
+    work_hp = hp.work
+    Q_ext = pt_cond.col[PT.H_NET.value][0] + pt_evap.col[PT.H_NET.value][0] # Acts as a penalty
+    c = pt_cond.col[PT.H_NET.value][-1]
+    Q_amb = max(hp.Q_evap - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
+    COP = (args.Q_hp_target - Q_ext) / work_hp
+    obj = (work_hp + Q_ext + c) / args.Q_hp_target
+
+    # For debugging purposes, a quick plot function
+    if debug:
+        plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
+        plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
+        plot_multi_hp_profiles_from_results(
+            args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
+            title=f"Obj {float(obj)} = {(work_hp / args.Q_hp_target)} + {(Q_ext / args.Q_hp_target)} + {(c / args.Q_hp_target)}"
+        )
+
+    return {
+        "obj": obj, 
+        "utility_tot": work_hp + Q_ext, 
+        "work_hp": work_hp,  
+        "Q_ext": Q_ext,
+        "T_cond": T_cond,
+        "dT_subcool": dT_subcool,
+        "Q_heat": Q_heat,            
+        "T_evap": T_evap,
+        "Q_cool": hp.Q_evap_arr,
+        "cop": COP,
+        "Q_amb": Q_amb,
+        "hp_hot_streams": hp_hot_streams,
+        "hp_cold_streams": hp_cold_streams,
+    }
+
+
+#######################################################################################################
 # Helper functions: Optimise multiple simple Carnot heat pump placement
 #######################################################################################################
 
@@ -650,7 +882,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
 
 #######################################################################################################
-# Helper functions: Optimise multi simple heat pumps (CoolProp simulation) placement
+# Helper functions: Optimise multi simple heat pumps placement with CoolProp simulation
 #######################################################################################################
 
 @timing_decorator
@@ -664,10 +896,10 @@ def _optimise_multi_simple_heat_pump_placement(
     init_res = _optimise_multi_simple_carnot_heat_pump_placement(args)
 
     # Validate specific inputs related to this approach
-    args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(args)
+    args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(int(args.n_cond), args)
 
     # Prepare and run the optimisation
-    x0, bnds = _prepare_multi_simple_hp_data_for_minimizer(init_res.T_cond, init_res.Q_cond, init_res.T_evap, args)
+    x0, bnds = _get_x0_and_bnds_for_multi_simple_hp_data_for_minimizer(init_res.T_cond, init_res.Q_cond, init_res.T_evap, args)
 
     opt = minimize(
         fun=lambda x: _compute_multi_simple_hp_system_performance(x, args)["obj"],
@@ -687,30 +919,7 @@ def _optimise_multi_simple_heat_pump_placement(
     return HeatPumpTargetOutputs.model_validate(res)
 
 
-def _validate_vapour_hp_refrigerant_ls(
-    args: HeatPumpTargetInputs,
-) -> list:
-    n_cond = int(args.n_cond)
-
-    if len(args.refrigerant_ls) > 0:
-        refrigerants = [
-            ref for ref, _ in sorted(
-                ((ref, PropsSI("Tcrit", ref)) for ref in args.refrigerant_ls),
-                key=lambda x: x[1],
-                reverse=True,
-            )
-        ]
-
-        if n_cond <= len(refrigerants):
-            return refrigerants[:n_cond]
-
-        padding = [refrigerants[-1]] * (n_cond - len(refrigerants))
-        return refrigerants + padding
-
-    return ["water" for _ in range(n_cond)]
-
-
-def _prepare_multi_simple_hp_data_for_minimizer(
+def _get_x0_and_bnds_for_multi_simple_hp_data_for_minimizer(
     T_cond: np.ndarray, 
     Q_cond: np.ndarray, 
     T_evap: np.ndarray,
@@ -820,17 +1029,11 @@ def _parse_multi_simple_hp_state_temperatures(
     """Extract HP variables from optimization vector x.
     """
     n = args.n_cond 
-
     T_cond = np.array(args.T_cold[0] - x[:n] * args.dt_range_max, dtype=np.float64)
-    i = n
-    dT_subcool = np.array(x[i:i+n] * args.dt_range_max, dtype=np.float64)
-    i += n
-    Q_cond = np.array(x[i:i+n] * args.Q_hp_target, dtype=np.float64)
-    i += n
-    T_evap = np.array(x[i:i+n] * args.dt_range_max + args.T_hot[-1], dtype=np.float64)
-    i += n
-    dT_superheat = np.array(x[i:] * args.dt_range_max, dtype=np.float64)
-
+    dT_subcool = np.array(x[n:2*n] * args.dt_range_max, dtype=np.float64)
+    Q_cond = np.array(x[2*n:3*n] * args.Q_hp_target, dtype=np.float64)
+    T_evap = np.array(x[3*n:4*n] * args.dt_range_max + args.T_hot[-1], dtype=np.float64)
+    dT_superheat = np.array(x[4*n:] * args.dt_range_max, dtype=np.float64)
     return T_cond, dT_subcool, Q_cond, T_evap, dT_superheat
 
 
@@ -856,7 +1059,7 @@ def _compute_multi_simple_hp_system_performance(
     )
 
     # Build streams based on heat pump profiles and determine the heat cascade
-    hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list)
+    hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list, dtcont_hp=args.dtcont_hp)
     pt_cond = get_process_heat_cascade(
         hot_streams=hp_hot_streams, 
         cold_streams=args.net_cold_streams,
@@ -1287,6 +1490,29 @@ def _get_heat_pump_cascade(
     }
 
 
+def _validate_vapour_hp_refrigerant_ls(
+    num_stages: int,
+    args: HeatPumpTargetInputs,    
+) -> list:
+    if len(args.refrigerant_ls) > 0:
+        if args.do_refrigerant_sort:
+            refrigerants = [
+                ref for ref, _ in sorted(
+                    ((ref, PropsSI("Tcrit", ref)) for ref in args.refrigerant_ls),
+                    key=lambda x: x[1],
+                    reverse=True,
+                )
+            ]
+        else:
+            refrigerants = args.refrigerant_ls
+        if num_stages <= len(refrigerants):
+            return refrigerants[:num_stages]
+
+        padding = [refrigerants[-1]] * (num_stages - len(refrigerants))
+        return refrigerants + padding
+    return ["water" for _ in range(num_stages)]
+
+
 def _prepare_latent_hp_profile(
     T_hp: list,
     Q_hp: list,
@@ -1362,7 +1588,7 @@ def _build_latent_streams(
 
 
 def _build_simulated_hps_streams(
-    hp_list: list, 
+    hp_list, 
     *,
     dtcont_hp: float = 0.0,
 ) -> Tuple[StreamCollection, StreamCollection]:
@@ -1407,5 +1633,6 @@ _HP_PLACEMENT_HANDLERS = {
     HeatPumpType.Brayton.value: _optimise_brayton_heat_pump_placement,
     HeatPumpType.MultiTempCarnot.value: _optimise_multi_temperature_carnot_heat_pump_placement,
     HeatPumpType.MultiSimpleVapourComp.value: _optimise_multi_simple_heat_pump_placement,
+    HeatPumpType.CascadeVapourComp.value: _optimise_cascade_heat_pump_placement,
     HeatPumpType.MultiSimpleCarnot.value: _optimise_multi_simple_carnot_heat_pump_placement,
 }
