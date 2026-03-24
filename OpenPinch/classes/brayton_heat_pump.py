@@ -111,7 +111,7 @@ class SimpleBraytonHeatPumpCycle:
             T_comp_in: float,
             T_comp_out: float,
             dT_gc: float,
-            Q_h_total: float,
+            Q_heat: float,
             eta_comp: float,
             eta_exp: float,
             is_recuperated: bool,
@@ -128,7 +128,7 @@ class SimpleBraytonHeatPumpCycle:
         dT_gc
             Temperature difference between compressor outlet and turbine inlet:
             dT_gc = T_comp_out - T_turb_in (temperature drop in HTHX)
-        Q_h_total
+        Q_heat
             Total heat duty of the HTHX (positive value for heat delivered to the process) [kW]
         eta_comp
             Compressor isentropic efficiency (fraction, e.g. 0.83)
@@ -141,7 +141,7 @@ class SimpleBraytonHeatPumpCycle:
         """
         # Save inputs
         self.refrigerant = refrigerant
-        self._Q_heat = Q_h_total
+        self._Q_heat = Q_heat
         
         # Note: is_recuperated parameter is not currently implemented
         # Future enhancement: add a recuperator component to the cycle
@@ -178,7 +178,7 @@ class SimpleBraytonHeatPumpCycle:
 
         Comp.set_attr(eta_s=eta_comp)
         # preserve original sign convention: in the original script HTHX.Q = -x[3]
-        HTHX.set_attr(pr=0.993, Q=-Q_h_total) #pr2=0.98, 
+        HTHX.set_attr(pr=0.993, Q=-Q_heat) #pr2=0.98, 
         LTHX.set_attr(pr=0.98) # pr2=0.995, ttd_l=10
         Turb.set_attr(eta_s=eta_exp)
 

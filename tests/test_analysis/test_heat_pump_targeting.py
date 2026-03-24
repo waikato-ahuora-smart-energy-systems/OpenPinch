@@ -217,31 +217,31 @@ def test_prepare_latent_hp_profile_handles_empty_input():
 
 
 def test_validate_vapour_hp_refrigerant_ls_defaults_to_water_and_matches_length():
-    args = SimpleNamespace(n_cond=3, refrigerant_ls=[])
+    args = SimpleNamespace(refrigerant_ls=[])
+    n = 3
+    refrigerants = _validate_vapour_hp_refrigerant_ls(n, args)
 
-    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
-
-    assert len(refrigerants) == args.n_cond
+    assert len(refrigerants) == n
     assert refrigerants == ["water", "water", "water"]
     assert all(isinstance(ref, str) for ref in refrigerants)
 
 
 def test_validate_vapour_hp_refrigerant_ls_preserves_length_when_provided():
-    args = SimpleNamespace(n_cond=2, refrigerant_ls=["Water", "Ammonia"])
+    args = SimpleNamespace(refrigerant_ls=["Water", "Ammonia"], do_refrigerant_sort=True)
+    n = 2
+    refrigerants = _validate_vapour_hp_refrigerant_ls(n, args)
 
-    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
-
-    assert len(refrigerants) == args.n_cond
+    assert len(refrigerants) == n
     assert refrigerants[0] == "Water"
     assert all(isinstance(ref, str) for ref in refrigerants)
 
 
 def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
-    args = SimpleNamespace(n_cond=4, refrigerant_ls=["Ammonia", "Water"])
+    args = SimpleNamespace(refrigerant_ls=["Ammonia", "Water"], do_refrigerant_sort=True)
+    n = 4
+    refrigerants = _validate_vapour_hp_refrigerant_ls(n, args)
 
-    refrigerants = _validate_vapour_hp_refrigerant_ls(args)
-
-    assert len(refrigerants) == args.n_cond
+    assert len(refrigerants) == n
     assert refrigerants[:2] == ["Water", "Ammonia"]
     assert refrigerants[2:] == ["Ammonia", "Ammonia"]
     assert all(isinstance(ref, str) for ref in refrigerants)

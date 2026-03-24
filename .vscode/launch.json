@@ -19,8 +19,8 @@
             "cwd": "${workspaceFolder}/tests/", 
             "args": [
             //   "-s",
-              "test_classes/test_stream_collection.py",
-            //   "test_utils/test_miscellaneous.py",
+              "test_classes/test_simple_heat_pump_cycle.py",
+              "test_classes/test_cascade_heat_pump_cycle.py",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
