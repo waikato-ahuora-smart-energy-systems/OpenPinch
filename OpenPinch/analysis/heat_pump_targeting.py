@@ -54,15 +54,7 @@ def get_heat_pump_targets(
     Returns:
         HeatPumpTargetOutputs with the optimal placement, or an empty dict when
         targeting is skipped by the configuration screens.
-    """    
-    ######### Analysis Options #########
-    # zone_config.HP_TYPE = HeatPumpType.MultiTempCarnot.value
-    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
-    # zone_config.N_EVAP = 3
-    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
-    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
-    # zone_config.HP_TYPE = HeatPumpType.Brayton.value
-    #############################
+    """
     args = _prepare_heat_pump_target_inputs(
         T_vals=T_vals,
         H_hot=np.abs(H_hot) * -1,
@@ -70,7 +62,7 @@ def get_heat_pump_targets(
         is_direct_integration=is_direct_integration,
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
-        debug=True,        
+        debug=False,        
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:

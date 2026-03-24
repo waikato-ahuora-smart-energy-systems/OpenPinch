@@ -205,3 +205,80 @@ def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
 
     with pytest.raises(ValueError):
         cycle.solve(**base)
+
+
+def test_cascade_solve_with_defaults_should_work_for_multistage():
+    """Regression: multistage solve should work with documented defaults."""
+    cycle = CascadeHeatPumpCycle()
+    cycle.solve(
+        T_evap=np.array([20.0, 0.0]),
+        T_cond=np.array([80.0, 60.0]),
+        dt_cascade_hx=5.0,
+        refrigerant="R134a",
+    )
+    assert cycle.num_cycles == 3
+    assert len(cycle.subcycles) == 3
+
+
+def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
+    """Only the last stage may be unspecified for Q_cool."""
+    cycle = CascadeHeatPumpCycle()
+    cycle.solve(
+        T_evap=np.array([20.0, 0.0]),
+        T_cond=np.array([80.0, 60.0]),
+        dt_cascade_hx=5.0,
+        dT_superheat=np.array([5.0, 5.0, 5.0]),
+        dT_subcool=np.array([2.0, 2.0, 2.0]),
+        ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+        eta_comp=0.75,
+        refrigerant=["R134a", "R134a", "R134a"],
+        Q_heat=np.array([1200.0, 700.0, 0.0]),
+        Q_cool=np.array([0.0, 100.0, np.nan]),
+    )
+
+    last = cycle.subcycles[-1]
+    assert np.isclose(last.Q_cool, last.Q_evap, rtol=1e-7, atol=1e-8)
+
+
+@pytest.mark.parametrize(
+    "bad_q_cool",
+    [
+        np.array([np.nan, 100.0, 300.0]),
+        np.array([0.0, np.nan, 300.0]),
+        np.array([None, 100.0, 300.0], dtype=object),
+        np.array([0.0, None, 300.0], dtype=object),
+    ],
+)
+def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
+    cycle = CascadeHeatPumpCycle()
+    with pytest.raises(ValueError):
+        cycle.solve(
+            T_evap=np.array([20.0, 0.0]),
+            T_cond=np.array([80.0, 60.0]),
+            dt_cascade_hx=5.0,
+            dT_superheat=np.array([5.0, 5.0, 5.0]),
+            dT_subcool=np.array([2.0, 2.0, 2.0]),
+            ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+            eta_comp=0.75,
+            refrigerant=["R134a", "R134a", "R134a"],
+            Q_heat=np.array([1200.0, 700.0, 0.0]),
+            Q_cool=bad_q_cool,
+        )
+
+
+def test_cascade_q_heat_nan_defaults_to_one_for_first_and_zero_elsewhere():
+    """Q_heat NaN defaults: index 0 -> 1.0, all other indices -> 0.0."""
+    cycle = CascadeHeatPumpCycle()
+    cycle.solve(
+        T_evap=np.array([20.0, 0.0]),
+        T_cond=np.array([80.0, 60.0]),
+        dt_cascade_hx=5.0,
+        dT_superheat=np.array([5.0, 5.0, 5.0]),
+        dT_subcool=np.array([2.0, 2.0, 2.0]),
+        ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+        eta_comp=0.75,
+        refrigerant=["R134a", "R134a", "R134a"],
+        Q_heat=np.array([np.nan, np.nan]),
+        Q_cool=np.array([0.0, 900.0]),
+    )
+    assert np.allclose(cycle.Q_heat_arr, np.array([1.0, 0.0, 0.0]), rtol=1e-7, atol=1e-8)
