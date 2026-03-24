@@ -51,7 +51,7 @@ class Configuration:
     HP_TYPE: str = HeatPumpType.MultiTempCarnot.value
     HP_LOAD_FRACTION: float = 1.0
     REFRIGERANTS: List[str] = ["water", "ammonia"]
-    DO_REFRIGERANT_SORT: bool = True  ########################## NEW ##########################
+    DO_REFRIGERANT_SORT: bool = True
     PRICE_RATIO_ELE_TO_FUEL: float = 1.0
     MAX_HP_MULTISTART: int = 10
     N_COND: int = 3
@@ -62,7 +62,7 @@ class Configuration:
     ETA_HE_CARNOT: float = 0.5
     DTMIN_HP: float = 0.0
     DT_HP_IHX: float = 0.0
-    DT_CASCADE_HX: float = 0.0  ########################## NEW ##########################
+    DT_CASCADE_HX: float = 0.0
 
     ### Cost targeting parameters ### 
     UTILITY_PRICE: float = 40
