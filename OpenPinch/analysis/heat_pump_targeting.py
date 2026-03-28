@@ -1,8 +1,9 @@
 """Target heat pump integration for given heating or cooler profiles."""
 
 import itertools
+import numpy as np
+from typing import Callable, Optional
 from scipy.optimize import (
-    differential_evolution,
     minimize,
     minimize_scalar
 )
@@ -55,6 +56,7 @@ def get_heat_pump_targets(
         HeatPumpTargetOutputs with the optimal placement, or an empty dict when
         targeting is skipped by the configuration screens.
     """
+    zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
     args = _prepare_heat_pump_target_inputs(
         T_vals=T_vals,
         H_hot=np.abs(H_hot) * -1,
@@ -62,7 +64,7 @@ def get_heat_pump_targets(
         is_direct_integration=is_direct_integration,
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
-        debug=False,        
+        debug=True,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:
@@ -299,9 +301,10 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
 ):
     """Balance net hot and cold duties using an ambient sink/source if required.
     """
+    Q_amb_max = 0.0
     delta_H = np.abs(H_cold).max() - np.abs(H_hot).max()
-    if np.abs(delta_H) < tol:
-        return H_hot, H_cold
+    # if np.abs(delta_H) < tol:
+    #     return T_hot, H_hot, T_cold, H_cold, Q_amb_max
     
     if H_hot.max() > tol:
         H_hot *= -1
@@ -326,7 +329,7 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
                 H_hot,
                 False,
             )
-            Q_amb_max = 0.0
+            
             
     # else: # Refrigeration
     #     if delta_H < -tol:
@@ -397,7 +400,7 @@ def _get_x0_and_bnds_for_multi_temperature_carnot_hp_opt(
         dt_range_max=args.dt_range_max,
         Q_hp_target=args.Q_hp_target,
     )
-    x0 = np.array(x0_cond_ls[0] + np.zeros(args.n_evap-1).tolist())
+    x0 = np.array(x0_cond_ls.tolist()[0] + np.zeros(args.n_evap-1).tolist())
     res = _compute_multi_temperature_carnot_hp_opt_obj(x0, args)
     x0_evap_ls = _initialise_multi_temperature_carnot_hp_optimisation(
         n=args.n_evap,
@@ -435,7 +438,7 @@ def _initialise_multi_temperature_carnot_hp_optimisation(
     if n_stages == 0:
         return []
     
-    args = {
+    func_kwargs = {
         "is_condenser": is_condenser,
         "map_fun": map_fun,
         "T0": T0,
@@ -445,22 +448,11 @@ def _initialise_multi_temperature_carnot_hp_optimisation(
         "Q_hp_target": Q_hp_target,
         "price_ratio": price_ratio,
     }
-    local_minima_fun, local_minima_x = dual_annealing_multiminima(
-        func=lambda x: _compute_entropy_generation_reduction_at_constant_T(x, args),
-        bounds=[(0.0, 1.0) for _ in range(n_stages)], 
+    return custom_optimiser(
+        func=_compute_entropy_generation_reduction_at_constant_T,
+        func_kwargs=func_kwargs,
+        bounds=[(0.0, 1.0) for _ in range(n_stages)],       
     )
-    for i, f in enumerate(local_minima_fun):
-        if f > 0 and i != 0:
-            break
-    local_minima_x = local_minima_x[:i]
-    if len(local_minima_x) == 0: 
-        res = differential_evolution(
-            func=lambda x: _compute_entropy_generation_reduction_at_constant_T(x, args),
-            bounds=[(0.0, 1.0) for _ in range(n_stages)], 
-        )
-        local_minima_x = [res.x]
-        
-    return local_minima_x
 
 
 def _compute_multi_temperature_carnot_hp_opt_obj(
@@ -565,7 +557,7 @@ def _optimise_cascade_heat_pump_placement(
     opt = minimize(
         fun=lambda x: _compute_cascade_hp_system_performance(x, args)["obj"],
         x0=x0,
-        method="COBYQA",
+        method="SLSQP",
         bounds=bnds,
         options={'disp': False, 'maxiter': 1000},
         tol=1e-6,
@@ -626,7 +618,7 @@ def _get_x0_and_bnds_for_cascade_hp_opt(
         x_sc_bnds[1] = x_sc_bnds[0]
     
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
-    x_sc = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_cond))])
+    x_sc = np.array([(x_sc_bnds[0] + x_sc_bnds[1]) / 2 for _ in range(len(T_cond))])
     y_heat = Q_heat / args.Q_hp_target
     y_heat_bnds = (0.0, 1.0)
 
@@ -681,7 +673,7 @@ def _parse_cascade_hp_state_variables(
     Q_heat = np.array(x[2*n0:3*n0] * args.Q_hp_target, dtype=np.float64)
     T_evap = np.array(x[3*n0:3*n0+n1] * args.dt_range_max + args.T_hot[-1], dtype=np.float64)
     temp = np.array(x[3*n0+n1:] * args.Q_hp_target, dtype=np.float64)
-    Q_cool = np.concatenate([temp, np.nan]) if temp.size > 0 else np.array(np.nan)
+    Q_cool = np.concatenate([temp.tolist(), [np.nan]]) if temp.size > 0 else np.array(np.nan)
     return T_cond, dT_subcool, Q_heat, T_evap, Q_cool
 
 
@@ -737,15 +729,15 @@ def _compute_cascade_hp_system_performance(
     # Calculate key perfromance indicators
     work_hp = hp.work
     Q_ext = pt_cond.col[PT.H_NET.value][0] + pt_evap.col[PT.H_NET.value][0] # Acts as a penalty
-    c = pt_cond.col[PT.H_NET.value][-1]
+    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2
     Q_amb = max(hp.Q_evap - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = (args.Q_hp_target - Q_ext) / work_hp
-    obj = (work_hp + Q_ext + c) / args.Q_hp_target
+    obj = (work_hp + Q_ext / args.price_ratio + c) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
     if debug:
-        plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
-        plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
+        # plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
+        # plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
             title=f"Obj {float(obj)} = {(work_hp / args.Q_hp_target)} + {(Q_ext / args.Q_hp_target)} + {(c / args.Q_hp_target)}"
@@ -780,13 +772,13 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
     """
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
     x0, bnds = _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(args)
-    _, local_minima_x = dual_annealing_multiminima(
-        func=lambda x_cond: _compute_multi_simple_carnot_hp_opt_obj(x_cond, args)["obj"],
+    local_minima_x = custom_optimiser(
+        func=_compute_multi_simple_carnot_hp_opt_obj,
         x0=x0,
-        bounds=bnds,
-        constraints=None,
-    )
-    res = _compute_multi_simple_carnot_hp_opt_obj(np.array(local_minima_x[0]), args, debug=args.debug)
+        func_kwargs=args,
+        bounds=bnds,    
+    )    
+    res = _compute_multi_simple_carnot_hp_opt_obj(local_minima_x[0], args, debug=args.debug)
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
 
@@ -1364,7 +1356,7 @@ def _compute_entropy_generation_reduction_at_constant_T(
         S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() + W / (T.max() + 273.15) / args["price_ratio"]
     else: 
         S_red = (Q * (args["T0"] - T) / ((T + 273.15) * (args["T0"] + 273.15))).sum()
-    return S_red # is negative, meaning a reduction in entropy generation
+    return {"obj": S_red} # is negative, meaning a reduction in entropy generation
 
 
 def _compute_entropic_average_temperature_in_K(

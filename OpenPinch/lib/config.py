@@ -122,7 +122,8 @@ class Configuration:
                 if key != "REFRIGERANTS":
                     setattr(self, key, options[key])
                 else:
-                    setattr(self, key, options[key].split(","))
+                    ref_ls = options[key].replace(";", ",").split(",")
+                    setattr(self, key, ref_ls)
 
     # def set_parameters(self, options: Options) -> None:
     #     """Apply checkbox- and turbine-related configuration from :class:`Options`."""
