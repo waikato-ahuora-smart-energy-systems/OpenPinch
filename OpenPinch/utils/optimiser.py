@@ -1,7 +1,6 @@
 """Optimise a given function using a parallelised dual annealing approach."""
 
 import os
-import pickle
 import numpy as np
 from typing import Callable, Optional
 from functools import partial
@@ -9,14 +8,6 @@ from concurrent.futures import ProcessPoolExecutor
 from scipy.optimize import (
     dual_annealing,
     minimize,
-)
-_DE_ALLOWED_KEYS = frozenset(
-    {
-        "strategy", "maxiter", "popsize", "tol", "mutation",
-        "recombination", "seed", "callback", "disp", "polish",
-        "init", "atol", "updating", "workers", "constraints",
-        "x0", "integrality", "vectorized",
-    }
 )
 _DA_ALLOWED_KEYS = frozenset(
     {
@@ -26,7 +17,7 @@ _DA_ALLOWED_KEYS = frozenset(
     }
 )
 
-__all__ = ["custom_optimiser", "dual_annealing_multiminima"]
+__all__ = ["dual_annealing_multiminima"]
 
 
 #######################################################################################################
@@ -34,6 +25,74 @@ __all__ = ["custom_optimiser", "dual_annealing_multiminima"]
 #######################################################################################################
 
 def dual_annealing_multiminima(
+    func: Callable,
+    x0: Optional[tuple] = None,
+    func_kwargs: Optional[dict] = {},
+    bounds: Optional[tuple] = None,
+    opt_kwargs: Optional[dict] = {},
+) -> list:
+    """
+    Multi-start dual annealing that returns verified local optima by:
+      - collecting candidate minima via callback across multiple runs,
+      - clustering them in normalized decision space,
+      - polishing each cluster representative via constrained local optimization,
+      - deduplicating polished minima.
+
+    Parameters
+    ----------
+    func : callable
+        Objective ``f(x, *args) -> scalar``, with ``x`` as a 1D array-like.
+    x0 : tuple
+        Tuple of initial variable values
+    func_kwargs : tuple
+        Extra arguments passed to ``func`` as ``func(x, *args)``.
+    bounds : sequence of (lb, ub)
+        Bounds [(lb1, ub1), ..., (lbn, ubn)].
+    opt_kwargs : dict
+        Optional keywords {
+            constraints : dict or sequence of dict, optional
+                SciPy-style constraints for `minimize` (e.g. for SLSQP or trust-constr).
+                They are applied only in the polishing step, not in dual_annealing itself.
+            n_runs : int
+                Number of independent dual_annealing runs with different seeds.
+            maxiter : int
+                dual_annealing global search iterations per run.
+            seed : int
+                Base seed; run r uses seed + r.
+            initial_temp, restart_temp_ratio, visit, accept, maxfun :
+                Standard dual_annealing parameters.
+            cluster_tol : float
+                Distance tolerance in *normalized* decision space (0-1 per dim)
+                for basin clustering.
+            max_minima : int or None
+                Maximum number of clustered minima to polish and return. If None,
+                all clustered representatives are polished.
+            local_method : str
+                Local method for polishing (e.g. 'SLSQP', 'L-BFGS-B', 'TNC', 'trust-constr').
+        }
+
+    Returns
+    -------
+    local_minima : list of ndarray
+        [ndarray, ...] verified and deduplicated minima.
+    """
+    objective = _set_objective_func(func=func, func_kwargs=func_kwargs)
+    da_kwargs = _filter_opt_kwargs(opt_kwargs, _DA_ALLOWED_KEYS)
+    local_minima_x = _get_da_multiminima_in_parallel(
+        func=objective,
+        x0=x0,
+        bounds=bounds,
+        **da_kwargs,
+    )        
+    return local_minima_x
+
+
+#######################################################################################################
+# Helper functions
+#######################################################################################################
+
+
+def _get_da_multiminima_in_parallel(
     func,
     bounds,
     x0=None,
@@ -49,49 +108,10 @@ def dual_annealing_multiminima(
     maxfun=1_000_000,
     # clustering parameters
     cluster_tol=0.02,      # normalized distance for *first* clustering
-    max_minima=8,       # maximum number of minima to polish/return
+    max_minima=4,       # maximum number of minima to polish/return
     local_method="SLSQP",  # default local method
 ):
-    """
-    Multi-start dual annealing that returns verified local optima by:
-      - collecting candidate minima via callback across multiple runs,
-      - clustering them in normalized decision space,
-      - polishing each cluster representative via constrained local optimization,
-      - deduplicating polished minima in (x, f) space.
 
-    Parameters
-    ----------
-    func : callable
-        Objective ``f(x, *args) -> scalar``, with ``x`` as a 1D array-like.
-    bounds : sequence of (lb, ub)
-        Bounds [(lb1, ub1), ..., (lbn, ubn)].
-    args : tuple
-        Extra arguments passed to ``func`` as ``func(x, *args)``.
-    constraints : dict or sequence of dict, optional
-        SciPy-style constraints for `minimize` (e.g. for SLSQP or trust-constr).
-        They are applied only in the polishing step, not in dual_annealing itself.
-    n_runs : int
-        Number of independent dual_annealing runs with different seeds.
-    maxiter : int
-        dual_annealing global search iterations per run.
-    seed : int
-        Base seed; run r uses seed + r.
-    initial_temp, restart_temp_ratio, visit, accept, maxfun :
-        Standard dual_annealing parameters.
-    cluster_tol : float
-        Distance tolerance in *normalized* decision space (0-1 per dim)
-        for basin clustering.
-    max_minima : int or None
-        Maximum number of clustered minima to polish and return. If None,
-        all clustered representatives are polished.
-    local_method : str
-        Local method for polishing (e.g. 'SLSQP', 'L-BFGS-B', 'TNC', 'trust-constr').
-
-    Returns
-    -------
-    local_minima : list of ndarray
-        [ndarray, ...] verified and deduplicated minima.
-    """
     # --------- 1. Run Dual Annealing to gather potential minima ----------
     bounds = np.asarray(bounds, dtype=float)
     lb = bounds[:, 0]
@@ -144,31 +164,6 @@ def dual_annealing_multiminima(
     local_minima_fun = polished_f[local_minima_idx]
     local_minima_x = polished_x[local_minima_idx]
     return np.asarray(local_minima_fun), np.asarray(local_minima_x)
-
-
-def custom_optimiser(
-    func: Callable,
-    x0: Optional[tuple] = None,
-    func_kwargs: Optional[dict] = {},
-    bounds: Optional[tuple] = None,
-    opt_kwargs: Optional[dict] = {},
-) -> list:
-    """
-    """
-    objective = _set_objective_func(func=func, func_kwargs=func_kwargs)
-    da_kwargs = _filter_opt_kwargs(opt_kwargs, _DA_ALLOWED_KEYS)
-    _, local_minima_x = dual_annealing_multiminima(
-        func=objective,
-        x0=x0,
-        bounds=bounds,
-        **da_kwargs,
-    )        
-    return local_minima_x
-
-
-#######################################################################################################
-# Helper functions
-#######################################################################################################
 
 
 def _collect_da_candidates(

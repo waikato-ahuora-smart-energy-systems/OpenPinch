@@ -28,6 +28,9 @@ Heat Pump Classes
 .. automodule:: OpenPinch.classes.simple_heat_pump
    :members:
 
+.. automodule:: OpenPinch.classes.multi_simple_heat_pump
+   :members:
+
 .. automodule:: OpenPinch.classes.cascade_heat_pump
    :members:
 
