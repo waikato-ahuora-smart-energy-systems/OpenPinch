@@ -309,7 +309,7 @@ def _cluster_candidates(
     Greedy clustering in normalized decision space based on x-similarity.
     For each cluster, keep the index with the minimum f value.
     """
-    if ub != lb:
+    if np.all(ub != lb):
         xs_norm = (xs - lb) / (ub - lb)
     else:
         xs_norm = (xs - lb) / (ub - lb + 1e-3)

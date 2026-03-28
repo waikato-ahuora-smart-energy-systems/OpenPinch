@@ -106,6 +106,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         Q_hp_target = min(zone_config.HP_LOAD_FRACTION, 1.0) * np.abs(pt.col[PT.H_HOT_UT.value]).max()
         if _validate_heat_pump_targeting_required(pt, True, zone_config) and Q_hp_target > 0:        
             hp_res = get_heat_pump_targets(
+                Q_hp_target=Q_hp_target,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_COLD_UT.value],
                 H_cold=pt.col[PT.H_HOT_UT.value],

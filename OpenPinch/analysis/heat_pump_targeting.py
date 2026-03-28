@@ -56,7 +56,7 @@ def get_heat_pump_targets(
         HeatPumpTargetOutputs with the optimal placement, or an empty dict when
         targeting is skipped by the configuration screens.
     """
-    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
+    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     args = _prepare_heat_pump_target_inputs(
         Q_hp_target=Q_hp_target,
         T_vals=T_vals,
@@ -65,7 +65,7 @@ def get_heat_pump_targets(
         is_direct_integration=is_direct_integration,
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
-        debug=True,
+        debug=False,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:
@@ -738,17 +738,20 @@ def _compute_cascade_hp_system_performance(
     work_hp = hp.work
     Q_ext = pt_cond.col[PT.H_NET.value][0] + pt_evap.col[PT.H_NET.value][0] # Acts as a penalty
     c = (pt_cond.col[PT.H_NET.value][-1]) ** 2
-    Q_amb = max(hp.Q_evap - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    COP = (args.Q_hp_target - Q_ext) / (work_hp + 1e-9)
+    Q_heat = hp.Q_heat_arr
+    Q_cool = hp.Q_cool_arr
+    Q_amb = max(Q_cool.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
+    COP = args.Q_hp_target / (work_hp + 1e-9)
     obj = (work_hp + Q_ext / args.price_ratio + c) / (args.Q_hp_target + 1e-9)
 
     # For debugging purposes, a quick plot function
     if debug:
         # plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
         # plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
+        inv_Q_target = 1.0 / (args.Q_hp_target + 1e-9)
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj)} = {(work_hp / (args.Q_hp_target + 1e-9))} + {(Q_ext / (args.Q_hp_target + 1e-9))} + {(c / (args.Q_hp_target + 1e-9))}"
+            title=f"Obj {float(obj):.5f} = {(work_hp * inv_Q_target):.5f} + {(Q_ext * inv_Q_target):.5f} + {(c * inv_Q_target):.5f}"
         )
 
     return {
@@ -760,7 +763,7 @@ def _compute_cascade_hp_system_performance(
         "dT_subcool": dT_subcool,
         "Q_heat": Q_heat,            
         "T_evap": T_evap,
-        "Q_cool": hp.Q_evap_arr,
+        "Q_cool": Q_cool,
         "cop": COP,
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
@@ -1061,8 +1064,21 @@ def _compute_multi_simple_hp_system_performance(
         args=args,
     )
 
-    # Build streams based on heat pump profiles and determine the heat cascade
-    hp_hot_streams, hp_cold_streams = _build_simulated_hps_streams(hp_list, dtcont_hp=args.dtcont_hp)
+    # Build streams based on heat pump profiles
+    hp_hot_streams = _build_simulated_hps_streams(
+        hp_list=hp_list, 
+        include_cond=True,
+        is_process_stream=False,
+        dtcont_hp=args.dtcont_hp,
+    )
+    hp_cold_streams = _build_simulated_hps_streams(
+        hp_list=hp_list, 
+        include_evap=True,
+        is_process_stream=False,
+        dtcont_hp=args.dtcont_hp,
+    )
+
+    # Determine the heat cascade
     pt_cond = get_process_heat_cascade(
         hot_streams=hp_hot_streams, 
         cold_streams=args.net_cold_streams,
@@ -1077,19 +1093,21 @@ def _compute_multi_simple_hp_system_performance(
     # Calculate key perfromance indicators
     work_hp = sum([hp.work for hp in hp_list])
     Q_ext = pt_cond.col[PT.H_NET.value][0] + pt_evap.col[PT.H_NET.value][0] # Acts as a penalty
-    c = pt_cond.col[PT.H_NET.value][-1]
-    Q_evap = np.array([hp.Q_evap for hp in hp_list])
-    Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    COP = (args.Q_hp_target - Q_ext) / (work_hp + 1e-9)
-    obj = (work_hp + Q_ext + c) / (args.Q_hp_target + 1e-9)
+    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2
+    Q_heat = np.array([hp.Q_cond for hp in hp_list])
+    Q_cool = np.array([hp.Q_evap for hp in hp_list])
+    Q_amb = max(Q_cool.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
+    COP = args.Q_hp_target / (work_hp + 1e-9)
+    obj = (work_hp + Q_ext / args.price_ratio + c) / (args.Q_hp_target + 1e-9)
 
     # For debugging purposes, a quick plot function
     if debug:
-        plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
-        plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
+        # plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
+        # plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
+        inv_Q_target = 1.0 / (args.Q_hp_target + 1e-9)
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj)} = {(work_hp / (args.Q_hp_target + 1e-9))} + {(Q_ext / (args.Q_hp_target + 1e-9))} + {(c / (args.Q_hp_target + 1e-9))}"
+            title=f"Obj {float(obj):.5f} = {(work_hp * inv_Q_target):.5f} + {(Q_ext * inv_Q_target):.5f} + {(c * inv_Q_target):.5f}"
         )
 
     return {
@@ -1099,10 +1117,10 @@ def _compute_multi_simple_hp_system_performance(
         "Q_ext": Q_ext,
         "T_cond": T_cond,
         "dT_subcool": dT_subcool,
-        "Q_cond": Q_cond,            
+        "Q_heat": Q_heat,            
         "T_evap": T_evap, 
         "dT_superheat": dT_superheat,
-        "Q_evap": Q_evap,
+        "Q_cool": Q_cool,
         "cop": COP,
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
@@ -1591,22 +1609,25 @@ def _build_latent_streams(
 
 
 def _build_simulated_hps_streams(
-    hp_list, 
+    hp_list,
     *,
+    is_process_stream: bool = False,
+    include_cond: bool = False,
+    include_evap: bool = False,
     dtcont_hp: float = 0.0,
-) -> Tuple[StreamCollection, StreamCollection]:
+) -> StreamCollection:
     """Aggregate condenser/gas-cooler and evaporator/gas-heater streams for each simulated HP cycle."""
     hp_streams = StreamCollection()
     for hp in hp_list:
         hp_streams.add_many(
             hp.build_stream_collection(
-                include_cond=True, 
-                include_evap=True, 
-                is_process_stream=False,
+                include_cond=include_cond, 
+                include_evap=include_evap, 
+                is_process_stream=is_process_stream,
                 dtcont=dtcont_hp,
             )
         )
-    return hp_streams.get_hot_streams(), hp_streams.get_cold_streams()
+    return hp_streams
 
 
 def _get_ambient_air_stream(
