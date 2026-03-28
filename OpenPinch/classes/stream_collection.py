@@ -1,13 +1,31 @@
 """Utility container for managing ordered sets of stream objects."""
 
 import csv
+import pickle
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Union
+from functools import partial
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
 
 from ..lib.enums import *
 
 if TYPE_CHECKING:
     from ..classes import Stream
+
+
+def _sort_by_attr(attr: str, stream: object):
+    return getattr(stream, attr)
+
+
+def _sort_by_attrs(attrs: Tuple[str, ...], stream: object):
+    return tuple(getattr(stream, attr) for attr in attrs)
+
+
+def _is_picklable(obj: object) -> bool:
+    try:
+        pickle.dumps(obj)
+        return True
+    except Exception:
+        return False
 
 
 class StreamCollection:
@@ -35,10 +53,20 @@ class StreamCollection:
 
     def __init__(self):
         self._streams: Dict[str, object] = {}
-        self._sort_key: Callable = lambda s: s.t_supply  # default: sort by name
+        self._sort_spec: Tuple[str, Any] = ("attr", "t_supply")
+        self._sort_key: Callable = partial(_sort_by_attr, "t_supply")
         self._sort_reverse: bool = True
         self._sorted_cache: List[object] = []
         self._needs_sort: bool = True
+
+    def _rebuild_sort_key(self):
+        mode, payload = self._sort_spec
+        if mode == "attr":
+            self._sort_key = partial(_sort_by_attr, payload)
+        elif mode == "attrs":
+            self._sort_key = partial(_sort_by_attrs, payload)
+        else:
+            self._sort_key = payload
 
     def add(self, stream, key: str = None, prevent_overwrite: bool = True):
         if key is None:
@@ -65,7 +93,8 @@ class StreamCollection:
     
     def get_hot_streams(self):
         hot_streams = StreamCollection()
-        hot_streams._sort_key = self._sort_key
+        hot_streams._sort_spec = self._sort_spec
+        hot_streams._rebuild_sort_key()
         hot_streams._sort_reverse = self._sort_reverse
         hot_streams._streams = {
             key: stream
@@ -78,7 +107,8 @@ class StreamCollection:
 
     def get_cold_streams(self):
         cold_streams = StreamCollection()
-        cold_streams._sort_key = self._sort_key
+        cold_streams._sort_spec = self._sort_spec
+        cold_streams._rebuild_sort_key()
         cold_streams._sort_reverse = self._sort_reverse
         cold_streams._streams = {
             key: stream
@@ -106,11 +136,12 @@ class StreamCollection:
         """Set the sorting key. Supports attribute names or custom lambdas."""
         self._sort_reverse = reverse
         if isinstance(key, str):
-            self._sort_key = lambda s: getattr(s, key)
+            self._sort_spec = ("attr", key)
         elif isinstance(key, list):
-            self._sort_key = lambda s: tuple(getattr(s, attr) for attr in key)
+            self._sort_spec = ("attrs", tuple(key))
         else:
-            self._sort_key = key
+            self._sort_spec = ("callable", key)
+        self._rebuild_sort_key()
         self._needs_sort = True
 
     def get_index(self, stream) -> int:
@@ -175,6 +206,18 @@ class StreamCollection:
         if not isinstance(other, StreamCollection):
             return NotImplemented
         return self._streams == other._streams
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        mode, payload = state.get("_sort_spec", ("attr", "t_supply"))
+        if mode == "callable" and not _is_picklable(payload):
+            state["_sort_spec"] = ("attr", "t_supply")
+        state["_sort_key"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._rebuild_sort_key()
 
     def export_to_csv(self, filename: str = "heat pump streams") -> Path:
         """Export stream data to ``results/<filename>`` and return the path written."""

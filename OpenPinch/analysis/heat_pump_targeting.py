@@ -2,7 +2,6 @@
 
 import itertools
 import numpy as np
-from typing import Callable, Optional
 from scipy.optimize import (
     minimize,
     minimize_scalar
@@ -28,7 +27,8 @@ __all__ = ["get_heat_pump_targets", "calc_heat_pump_cascade", "plot_multi_hp_pro
 #######################################################################################################
 
 
-def get_heat_pump_targets(
+def get_heat_pump_targets(  
+    Q_hp_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
@@ -56,8 +56,9 @@ def get_heat_pump_targets(
         HeatPumpTargetOutputs with the optimal placement, or an empty dict when
         targeting is skipped by the configuration screens.
     """
-    zone_config.HP_TYPE = HeatPumpType.MultiSimpleCarnot.value
+    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
     args = _prepare_heat_pump_target_inputs(
+        Q_hp_target=Q_hp_target,
         T_vals=T_vals,
         H_hot=np.abs(H_hot) * -1,
         H_cold=np.abs(H_cold),
@@ -181,6 +182,7 @@ def plot_multi_hp_profiles_from_results(
 
 
 def _prepare_heat_pump_target_inputs(
+    Q_hp_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
@@ -193,7 +195,6 @@ def _prepare_heat_pump_target_inputs(
     """
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
     T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, zone_config.DTMIN_HP, is_direct_integration)   
-    Q_hp_target = min(zone_config.HP_LOAD_FRACTION, 1.0) * np.abs(H_cold).max()
     T_cold, H_cold = _get_H_col_till_target_Q(Q_hp_target, T_cold, H_cold)
     T_hot, H_hot, T_cold, H_cold, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(
         T_hot=T_hot, 
@@ -236,7 +237,7 @@ def _prepare_heat_pump_target_inputs(
         dt_phase_change=zone_config.DT_PHASE_CHANGE,
         refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
         do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
-        price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL,
+        price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL if zone_config.PRICE_RATIO_ELE_TO_FUEL > 0.0 else 1,
         max_multi_start=zone_config.MAX_HP_MULTISTART,
         net_hot_streams=net_hot_streams,
         net_cold_streams=net_cold_streams,
@@ -400,6 +401,7 @@ def _get_x0_and_bnds_for_multi_temperature_carnot_hp_opt(
         dt_range_max=args.dt_range_max,
         Q_hp_target=args.Q_hp_target,
     )
+
     x0 = np.array(x0_cond_ls.tolist()[0] + np.zeros(args.n_evap-1).tolist())
     res = _compute_multi_temperature_carnot_hp_opt_obj(x0, args)
     x0_evap_ls = _initialise_multi_temperature_carnot_hp_optimisation(
@@ -493,21 +495,29 @@ def _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(
 
     Q_evap_max = Q_evap.sum()
     Q_cond_max = Q_cond.sum()
-    if Q_evap_max > Q_cond_max * (1 - 1 / cop):
-        Q_cond_tot = Q_cond_max
-        work_hp = Q_cond_tot / cop
-        Q_evap_tot = Q_cond_tot - work_hp
-        Q_evap *= (Q_evap_tot / Q_evap_max)
-    else: # Evaporator limits the heat pump
-        Q_evap_tot = Q_evap_max
-        work_hp = Q_evap_tot / (cop - 1)
-        Q_cond_tot = Q_evap_tot + work_hp
-        Q_cond *= (Q_cond_tot / Q_cond_max)
+    if cop > 1:
+        if Q_evap_max > Q_cond_max * (1 - 1 / cop):
+            Q_cond_tot = Q_cond_max
+            work_hp = Q_cond_tot / cop
+            Q_evap_tot = Q_cond_tot - work_hp
+            if Q_evap_max > 0: 
+                Q_evap *= (Q_evap_tot / Q_evap_max)
+        else: # Evaporator limits the heat pump
+            Q_evap_tot = Q_evap_max
+            work_hp = Q_evap_tot / (cop - 1)
+            Q_cond_tot = Q_evap_tot + work_hp
+            if Q_cond_max > 0:
+                Q_cond *= (Q_cond_tot / Q_cond_max)
+    elif cop == 1:
+        work_hp = Q_cond_tot = Q_cond_max
+        Q_evap = Q_evap_tot = 0.0
+    else:
+        raise ValueError("COP of heating cannot be less than 1.")    
 
     Q_ext = max(args.Q_hp_target - Q_cond_tot, 0.0) # Direct electric heating
 
     return {
-        "obj": (work_hp + Q_ext / args.price_ratio) / args.Q_hp_target, 
+        "obj": (work_hp + Q_ext / args.price_ratio) / (args.Q_hp_target + 1e-9), 
         "utility_tot": work_hp + Q_ext, 
         "work_hp": work_hp,  
         "Q_ext": Q_ext,
@@ -554,20 +564,18 @@ def _optimise_cascade_heat_pump_placement(
     # Prepare and run the optimisation
     x0, bnds = _get_x0_and_bnds_for_cascade_hp_opt(init_res.T_cond, init_res.Q_cond, init_res.T_evap, init_res.Q_evap, args)
 
-    opt = minimize(
-        fun=lambda x: _compute_cascade_hp_system_performance(x, args)["obj"],
-        x0=x0,
-        method="SLSQP",
-        bounds=bnds,
-        options={'disp': False, 'maxiter': 1000},
-        tol=1e-6,
-    )
+    local_minima_x = custom_optimiser(
+        func=_compute_cascade_hp_system_performance,
+        x0=x0,        
+        func_kwargs=args,
+        bounds=bnds,    
+    )   
 
-    if isinstance(opt.x, np.ndarray):
-        res = _compute_cascade_hp_system_performance(opt.x, args, debug=args.debug)
-        res["opt_success"] = opt.success
+    if local_minima_x.size > 0:
+        res = _compute_cascade_hp_system_performance(local_minima_x[0], args, debug=args.debug)
+        res["opt_success"] = True
     else:
-        raise ValueError("Optimal placement of cascade vapour-compression heat pump failed:", opt.message)
+        raise ValueError("Optimal placement of cascade vapour-compression heat pump failed.")
 
     return HeatPumpTargetOutputs.model_validate(res)
 
@@ -619,11 +627,11 @@ def _get_x0_and_bnds_for_cascade_hp_opt(
     
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
     x_sc = np.array([(x_sc_bnds[0] + x_sc_bnds[1]) / 2 for _ in range(len(T_cond))])
-    y_heat = Q_heat / args.Q_hp_target
+    y_heat = Q_heat / (args.Q_hp_target + 1e-9)
     y_heat_bnds = (0.0, 1.0)
 
     x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
-    y_cool = Q_cool / args.Q_hp_target
+    y_cool = Q_cool / (args.Q_hp_target + 1e-9)
     y_cool_bnds = (0.0, 1.0)
 
     x_ls = []
@@ -731,8 +739,8 @@ def _compute_cascade_hp_system_performance(
     Q_ext = pt_cond.col[PT.H_NET.value][0] + pt_evap.col[PT.H_NET.value][0] # Acts as a penalty
     c = (pt_cond.col[PT.H_NET.value][-1]) ** 2
     Q_amb = max(hp.Q_evap - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    COP = (args.Q_hp_target - Q_ext) / work_hp
-    obj = (work_hp + Q_ext / args.price_ratio + c) / args.Q_hp_target
+    COP = (args.Q_hp_target - Q_ext) / (work_hp + 1e-9)
+    obj = (work_hp + Q_ext / args.price_ratio + c) / (args.Q_hp_target + 1e-9)
 
     # For debugging purposes, a quick plot function
     if debug:
@@ -740,7 +748,7 @@ def _compute_cascade_hp_system_performance(
         # plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj)} = {(work_hp / args.Q_hp_target)} + {(Q_ext / args.Q_hp_target)} + {(c / args.Q_hp_target)}"
+            title=f"Obj {float(obj)} = {(work_hp / (args.Q_hp_target + 1e-9))} + {(Q_ext / (args.Q_hp_target + 1e-9))} + {(c / (args.Q_hp_target + 1e-9))}"
         )
 
     return {
@@ -819,7 +827,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     delta_T_lift = T_cond - T_evap
     perf = np.where(
         delta_T_lift > 0.0,
-        (T_evap + 273.15) / delta_T_lift * args.eta_hp_carnot + 1, # acting as a heat pump
+        (T_evap + 273.15) / (delta_T_lift + 1e-9) * args.eta_hp_carnot + 1, # acting as a heat pump
         1 / ((T_evap + 273.15) / (delta_T_lift * args.eta_he_carnot) + 1) # acting as a heat engine
     )
     work_hp = np.where(
@@ -844,7 +852,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     Q_ext = args.Q_hp_target - Q_cond.sum()
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    obj = (work_hp.sum() + Q_ext / args.price_ratio) / args.Q_hp_target
+    obj = (work_hp.sum() + Q_ext / args.price_ratio) / (args.Q_hp_target + 1e-9)
 
     if debug:
         res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)     
@@ -885,20 +893,31 @@ def _optimise_multi_simple_heat_pump_placement(
     # Prepare and run the optimisation
     x0, bnds = _get_x0_and_bnds_for_multi_simple_hp_data_for_minimizer(init_res.T_cond, init_res.Q_cond, init_res.T_evap, args)
 
-    opt = minimize(
-        fun=lambda x: _compute_multi_simple_hp_system_performance(x, args)["obj"],
-        x0=x0,
-        method="COBYQA",
-        bounds=bnds,
-        options={'disp': False, 'maxiter': 1000},
-        tol=1e-6,
-    )
+    # opt = minimize(
+    #     fun=lambda x: _compute_multi_simple_hp_system_performance(x, args)["obj"],
+    #     x0=x0,
+    #     method="COBYQA",
+    #     bounds=bnds,
+    #     options={'disp': False, 'maxiter': 1000},
+    #     tol=1e-6,
+    # )
+    local_minima_x = custom_optimiser(
+        func=_compute_multi_simple_hp_system_performance,
+        x0=x0,        
+        func_kwargs=args,
+        bounds=bnds,    
+    )   
 
-    if isinstance(opt.x, np.ndarray):
-        res = _compute_multi_simple_hp_system_performance(opt.x, args, debug=args.debug)
-        res["opt_success"] = opt.success
+    if local_minima_x.size > 0:
+        res = _compute_multi_simple_hp_system_performance(local_minima_x[0], args, debug=args.debug)
+        res["opt_success"] = True
     else:
-        raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)
+        raise ValueError("Optimal placement of multiple vapour-compression units failed.")            
+    # if isinstance(opt.x, np.ndarray):
+    #     res = _compute_multi_simple_hp_system_performance(opt.x, args, debug=args.debug)
+    #     res["opt_success"] = opt.success
+    # else:
+    #     raise ValueError("Optimal placement of multiple vapour-compression units failed:", opt.message)
 
     return HeatPumpTargetOutputs.model_validate(res)
 
@@ -958,7 +977,7 @@ def _get_x0_and_bnds_for_multi_simple_hp_data_for_minimizer(
 
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
     x_sc = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_cond))])
-    y_cond = Q_cond / args.Q_hp_target
+    y_cond = Q_cond / (args.Q_hp_target + 1e-9)
 
     x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
     x_sh = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_evap))])
@@ -1061,8 +1080,8 @@ def _compute_multi_simple_hp_system_performance(
     c = pt_cond.col[PT.H_NET.value][-1]
     Q_evap = np.array([hp.Q_evap for hp in hp_list])
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    COP = (args.Q_hp_target - Q_ext) / work_hp
-    obj = (work_hp + Q_ext + c) / args.Q_hp_target
+    COP = (args.Q_hp_target - Q_ext) / (work_hp + 1e-9)
+    obj = (work_hp + Q_ext + c) / (args.Q_hp_target + 1e-9)
 
     # For debugging purposes, a quick plot function
     if debug:
@@ -1070,7 +1089,7 @@ def _compute_multi_simple_hp_system_performance(
         plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj)} = {(work_hp / args.Q_hp_target)} + {(Q_ext / args.Q_hp_target)} + {(c / args.Q_hp_target)}"
+            title=f"Obj {float(obj)} = {(work_hp / (args.Q_hp_target + 1e-9))} + {(Q_ext / (args.Q_hp_target + 1e-9))} + {(c / (args.Q_hp_target + 1e-9))}"
         )
 
     return {
@@ -1222,14 +1241,14 @@ def _compute_brayton_hp_system_performance(
     c = (pt_gas_cooler.col[PT.H_NET.value][-1] + pt_gas_heater.col[PT.H_NET.value][0]) * 10 # Penalty for supplying too much heat
     Q_ext = pt_gas_cooler.col[PT.H_NET.value][0] # Extra heating required on either side of the gcc 
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
-    COP = (args.Q_hp_target - Q_ext) / work_hp
+    COP = (args.Q_hp_target - Q_ext) / (work_hp + 1e-9)
     Q_amb = max(Q_cool.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0)
-    obj = (work_hp + Q_ext + c) / args.Q_hp_target
+    obj = (work_hp + Q_ext + c) / (args.Q_hp_target + 1e-9)
 
     if 0:
         plot_multi_hp_profiles_from_results(pt_gas_cooler.col[PT.T.value], pt_gas_cooler.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(pt_gas_heater.col[PT.T.value], pt_gas_heater.col[PT.H_NET.value])
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, title=f"T_hi {T_comp_out} -> {float(obj), float(c / args.Q_hp_target)}")
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, title=f"T_hi {T_comp_out} -> {float(obj), float(c / (args.Q_hp_target + 1e-9))}")
 
     return {
         "obj": obj, 

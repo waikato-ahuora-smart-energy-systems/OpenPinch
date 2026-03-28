@@ -67,7 +67,8 @@ def compute_direct_integration_targets(zone: Zone):
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
     if zone.identifier in [Z.P.value]:
-        if _validate_heat_pump_targeting_required(pt, True, zone_config):
+        Q_hp_target = min(zone_config.HP_LOAD_FRACTION, 1.0) * np.abs(pt.col[PT.H_NET_COLD.value]).max()
+        if _validate_heat_pump_targeting_required(pt, True, zone_config) and Q_hp_target > 0:
             hp_res = get_heat_pump_targets(
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
