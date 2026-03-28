@@ -1,3 +1,5 @@
+"""CSV ingestion helpers that mirror the workbook-to-JSON conversion flow."""
+
 import json
 from typing import IO, Union
 
@@ -47,11 +49,7 @@ def get_problem_from_csv(
     Returns
     -------
     dict
-        {
-          "streams": [...],
-          "utilities": [...],
-          "options": {...}
-        }
+        Dictionary containing ``streams``, ``utilities``, and ``options`` keys.
     """
     streams_data = _parse_csv_with_units(
         streams_csv,
@@ -118,9 +116,7 @@ def get_results_from_csv(
     Returns
     -------
     dict
-        {
-          "targets": [...]
-        }
+        Dictionary containing a ``targets`` key.
     """
     results_data = _parse_csv_with_units(
         summary_csv,

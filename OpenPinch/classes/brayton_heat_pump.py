@@ -1,3 +1,9 @@
+"""Brayton-cycle heat-pump model used by advanced utility targeting workflows.
+
+The class in this module wraps a TESPy network while exposing a simplified API
+compatible with other OpenPinch heat-pump cycle helpers.
+"""
+
 from __future__ import annotations
 
 import warnings
@@ -18,23 +24,19 @@ from .stream_collection import StreamCollection
 class SimpleBraytonHeatPumpCycle:
     """Brayton heat pump cycle using TESPy internally.
 
-    Public API mirrors the simple Rankine `HeatPumpCycle` class so the
+    Public API mirrors the simple Rankine ``HeatPumpCycle`` class so the
     object is interchangeable in downstream code.
 
     Notes
     -----
-    - The solver uses the TESPy `Network.solve(mode='design')` call (as
-      requested by the user).
+    - The solver uses ``Network.solve(mode="design")``.
     - Pressures are left to TESPy to determine (option A). The user
       provides compressor inlet/outlet temperatures and the heat duty in
       the HTHX (Q_ht). Compressor and turbine isentropic efficiencies
       must be specified.
-    - The 4 cycle states are mapped as follows (matching the provided
-      Brayton script):
-        0: compressor inlet (C1)
-        1: compressor outlet (C2)
-        2: turbine inlet (C3)
-        3: turbine outlet (C4)
+    - The cycle-state mapping is:
+      ``0=C1 compressor inlet``, ``1=C2 compressor outlet``,
+      ``2=C3 turbine inlet``, ``3=C4 turbine outlet``.
     """
 
     STATECOUNT = 4

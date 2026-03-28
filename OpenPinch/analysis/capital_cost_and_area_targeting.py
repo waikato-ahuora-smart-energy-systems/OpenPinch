@@ -20,6 +20,23 @@ def get_capital_cost_targets(
     num_units: int,
     zone_config: Configuration,
 ) -> dict:
+    """Estimate equipment and annualized capital costs from area/unit targets.
+
+    Parameters
+    ----------
+    area:
+        Total heat-transfer area target from balanced composite curves.
+    num_units:
+        Minimum exchanger count estimate for the same targeting scenario.
+    zone_config:
+        Active configuration containing fixed/variable cost coefficients,
+        capital exponent, discount rate, and service life assumptions.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(capital_cost, annual_capital_cost)``.
+    """
     capital_cost = compute_capital_cost(
         area, 
         num_units, 

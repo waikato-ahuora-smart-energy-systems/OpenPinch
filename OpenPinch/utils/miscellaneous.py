@@ -123,6 +123,7 @@ def clean_composite_curve(
 
 
 def graph_simple_cc_plot(Tc, Hc, Th, Hh):
+    """Render a quick Matplotlib plot of hot/cold composite curves for debugging."""
     fig, ax = plt.subplots()
     ax.plot(Hc, Tc, label="Cold composite")
     ax.plot(Hh, Th, label="Hot composite")

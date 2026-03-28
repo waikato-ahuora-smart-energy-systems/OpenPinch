@@ -1,3 +1,9 @@
+"""Enumerations defining canonical labels across OpenPinch.
+
+These enums standardize zone types, stream classifications, problem-table
+column names, graph labels, and options keys used by configuration and schemas.
+"""
+
 from enum import Enum
 
 
@@ -54,6 +60,8 @@ class HeatPump(Enum):
 
 
 class HeatPumpType(str, Enum):
+    """Supported heat-pump targeting model families."""
+
     MultiTempCarnot = "Multi-temperature Carnot cycles"
     MultiSimpleCarnot = "Multiple simple Carnot cycles"
     Brayton = "Brayton cycle"
@@ -187,6 +195,8 @@ class LineColour(Enum):
 
 
 class GraphType(Enum):
+    """Graph groups available in the OpenPinch reporting payload."""
+
     CC = "Composite Curves"
     SCC = "Shifted Composite Curves"
     BCC = "Balanced Composite Curves"
@@ -222,11 +232,15 @@ class LegendSeries(Enum):
 
 
 class SummaryRowType(Enum):
+    """Row semantics for tabular summary output."""
+
     CONTENT = "content"
     FOOTER = "footer"
 
 
 class TurbineModel(Enum):
+    """Alternative turbine performance correlations used in power targeting."""
+
     MEDINA_FLORES = "Medina-Flores et al. (2010)"
     SUN_SMITH = "Sun & Smith (2015)"
     VARBANOV = "Varbanov et al. (2004)"
@@ -234,6 +248,8 @@ class TurbineModel(Enum):
 
 
 class MainOptionsPropKeys(Enum):
+    """Workbook-compatible option keys for high-level analysis toggles."""
+
     Totally_Integrated_Site = "PROP_MOP_0"
     Total_Site = "PROP_MOP_1"
     Turbine_Work = "PROP_MOP_2"
@@ -244,6 +260,8 @@ class MainOptionsPropKeys(Enum):
 
 
 class TurbineOptionsPropKeys(Enum):
+    """Workbook-compatible option keys for turbine model inputs."""
+
     TURBINEFORM_T_TURBINE_BOX = "PROP_TOP_0"
     TURBINEFORM_P_TURBINE_BOX = "PROP_TOP_1"
     TURBINEFORM_MIN_EFF = "PROP_TOP_2"

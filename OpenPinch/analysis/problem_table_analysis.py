@@ -195,7 +195,19 @@ def problem_table_algorithm(
 
 def get_heat_recovery_target_from_pt(
     pt: ProblemTable,
-) -> dict:
+) -> float:
+    """Compute the heat-recovery target implied by a solved problem table.
+
+    Parameters
+    ----------
+    pt:
+        Problem table with populated ``H_hot`` and ``H_net`` columns.
+
+    Returns
+    -------
+    float
+        Maximum direct heat recovery for the analysed zone.
+    """
     return pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value]
 
 
@@ -321,4 +333,3 @@ def _get_T_start_on_opposite_cc(
     )
 
     return T_new
-

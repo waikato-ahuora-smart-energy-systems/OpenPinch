@@ -1,42 +1,15 @@
 API Reference
 =============
 
-High-level Services
--------------------
+OpenPinch is organised into a small public service layer and several modular
+packages that implement preparation, direct/indirect targeting, utilities,
+schema validation, and reporting. Use the pages below for full API details.
 
-.. automodule:: OpenPinch.main
-   :members: pinch_analysis_service, get_targets, get_visualise
-   :show-inheritance:
+.. toctree::
+   :maxdepth: 1
 
-Workflow Helpers
-----------------
-
-.. autoclass:: OpenPinch.classes.pinch_problem.PinchProblem
-   :members:
-   :show-inheritance:
-
-Domain Models
--------------
-
-.. autoclass:: OpenPinch.classes.stream.Stream
-   :members:
-   :show-inheritance:
-
-.. autoclass:: OpenPinch.classes.zone.Zone
-   :members:
-   :show-inheritance:
-
-Analysis Building Blocks
-------------------------
-
-.. automodule:: OpenPinch.analysis.data_preparation
-   :members: prepare_problem
-   :show-inheritance:
-
-.. automodule:: OpenPinch.analysis.process_analysis
-   :members: _get_process_targets
-   :show-inheritance:
-
-.. automodule:: OpenPinch.analysis.utility_targeting
-   :members: get_utility_targets, _target_utility, get_utility_heat_cascade
-   :show-inheritance:
+   api-core
+   api-analysis
+   api-classes
+   api-lib
+   api-utils

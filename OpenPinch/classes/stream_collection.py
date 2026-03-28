@@ -31,24 +31,13 @@ def _is_picklable(obj: object) -> bool:
 class StreamCollection:
     """A dynamic, ordered collection of streams.
 
-    Features:
-        - Add and remove streams by name.
-        - Prevent overwriting existing streams by auto-renaming.
-        - Set custom sort keys (attribute name, list of attributes, or callable).
-        - Supports efficient iteration with lazy sorting.
-        - Allows ascending or descending sorting.
+    Key features include:
 
-    Typical usage:
-        - Store and manage process streams or utility streams.
-        - Sort streams dynamically by attributes like temperature or flow.
-        - Avoid duplicate names automatically.
-
-    Example:
-        stream_data = StreamCollection()
-        stream_data.add(Stream("H1", 300, 400))
-        stream_data.set_sort_key(["t_target", "t_supply"], reverse=True)
-        for stream in stream_data:
-            print(stream.name, stream.t_supply, stream.t_target)
+    - Add and remove streams by name.
+    - Prevent overwriting existing streams by auto-renaming.
+    - Configure sort keys as attributes or callables.
+    - Iterate efficiently with lazy sorting.
+    - Support ascending or descending ordering.
     """
 
     def __init__(self):

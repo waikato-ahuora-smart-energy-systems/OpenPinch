@@ -1,3 +1,5 @@
+"""Plotly helper routines for quick temperature-enthalpy visual checks."""
+
 import plotly.graph_objects as go
 import numpy as np
 

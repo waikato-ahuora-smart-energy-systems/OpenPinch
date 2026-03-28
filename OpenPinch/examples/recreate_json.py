@@ -1,7 +1,10 @@
+"""Utility script to regenerate JSON fixtures from bundled Excel examples."""
+
 import os
 from OpenPinch.utils import *
 
 def create_problem_and_results_json():
+    """Convert each example workbook into paired problem/result JSON files."""
     # Set the file path to the directory of this script
     filepath_load = os.path.dirname(__file__)
     filepath_save = os.path.dirname(__file__)

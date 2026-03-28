@@ -1,3 +1,11 @@
+"""Direct heat-integration entry point for process and unit-level targeting.
+
+This module orchestrates the classical pinch-analysis workflow for a single
+zone: problem-table construction, utility targeting, optional heat-pump and
+area-cost calculations, and packaging of outputs into ``EnergyTarget``
+instances.
+"""
+
 from operator import attrgetter
 from typing import List, Tuple
 

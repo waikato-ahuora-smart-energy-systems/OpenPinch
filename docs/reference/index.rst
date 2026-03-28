@@ -1,12 +1,13 @@
 Reference Guide
 ===============
 
-The reference pages provide exhaustive API documentation and build instructions
-for contributors.
+The reference pages provide architecture context, complete API documentation,
+and local build instructions.
 
 .. toctree::
    :maxdepth: 1
 
+   architecture
    api
 
 .. _docs-build:

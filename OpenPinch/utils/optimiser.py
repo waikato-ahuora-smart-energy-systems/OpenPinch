@@ -1,13 +1,12 @@
-"""Target heat pump integration for given heating or cooler profiles."""
+"""Optimise a given function using a parallelised dual annealing approach."""
 
 import os
 import pickle
 import numpy as np
 from typing import Callable, Optional
 from functools import partial
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from scipy.optimize import (
-    differential_evolution,
     dual_annealing,
     minimize,
 )
@@ -54,7 +53,7 @@ def dual_annealing_multiminima(
     local_method="SLSQP",  # default local method
 ):
     """
-    Multi-start dual_annealing that returns *verified* local optima by:
+    Multi-start dual annealing that returns verified local optima by:
       - collecting candidate minima via callback across multiple runs,
       - clustering them in normalized decision space,
       - polishing each cluster representative via constrained local optimization,
@@ -63,11 +62,11 @@ def dual_annealing_multiminima(
     Parameters
     ----------
     func : callable
-        Objective f(x, *args) -> scalar, with x a 1D array-like.
+        Objective ``f(x, *args) -> scalar``, with ``x`` as a 1D array-like.
     bounds : sequence of (lb, ub)
         Bounds [(lb1, ub1), ..., (lbn, ubn)].
     args : tuple
-        Extra arguments passed to func as func(x, *args).
+        Extra arguments passed to ``func`` as ``func(x, *args)``.
     constraints : dict or sequence of dict, optional
         SciPy-style constraints for `minimize` (e.g. for SLSQP or trust-constr).
         They are applied only in the polishing step, not in dual_annealing itself.
@@ -367,13 +366,8 @@ def _polish_candidates(
     n_tasks = len(basin_reps_idx)
     n_workers = min(n_tasks, max(1, os.cpu_count() or 1))
 
-    try:
-        with ProcessPoolExecutor(max_workers=n_workers) as pool:
-            results = list(pool.map(worker_fn, basin_reps_idx))
-    except (pickle.PicklingError, AttributeError, TypeError):
-        # Fall back to threads when objective context is not picklable.
-        with ThreadPoolExecutor(max_workers=n_workers) as pool:
-            results = list(pool.map(worker_fn, basin_reps_idx))
+    with ProcessPoolExecutor(max_workers=n_workers) as pool:
+        results = list(pool.map(worker_fn, basin_reps_idx))
 
     polished_x = np.asarray([x for x, _ in results], dtype=float)
     polished_f = np.asarray([f for _, f in results], dtype=float)

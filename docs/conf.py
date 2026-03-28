@@ -71,12 +71,15 @@ autodoc_mock_imports = [
     "CoolProp",
     "coolprop",
     "matplotlib",
-    "numpy",
+    # "numpy",
     "openpyxl",
-    "pandas",
+    # "pandas",
     "pint",
+    "plotly",
     "pyxlsb",
     "scipy",
+    "streamlit",
+    "tespy",
 ]
 
 intersphinx_mapping = {

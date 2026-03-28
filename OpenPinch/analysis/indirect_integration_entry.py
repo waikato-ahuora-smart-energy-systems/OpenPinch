@@ -1,3 +1,10 @@
+"""Indirect heat-integration entry point for total site style targeting.
+
+The routines in this module aggregate process-level direct-integration outputs
+from subzones, construct site process/utility cascades, and calculate net
+utility balances after feasible inter-zone heat recovery.
+"""
+
 from copy import deepcopy
 from typing import Tuple
 
