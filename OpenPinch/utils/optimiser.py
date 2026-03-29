@@ -26,7 +26,7 @@ __all__ = ["dual_annealing_multiminima"]
 
 def dual_annealing_multiminima(
     func: Callable,
-    x0: Optional[tuple] = None,
+    x0_ls: Optional[tuple] = None,
     func_kwargs: Optional[dict] = {},
     bounds: Optional[tuple] = None,
     opt_kwargs: Optional[dict] = {},
@@ -42,7 +42,7 @@ def dual_annealing_multiminima(
     ----------
     func : callable
         Objective ``f(x, *args) -> scalar``, with ``x`` as a 1D array-like.
-    x0 : tuple
+    x0_ls : tuple
         Tuple of initial variable values
     func_kwargs : tuple
         Extra arguments passed to ``func`` as ``func(x, *args)``.
@@ -80,7 +80,7 @@ def dual_annealing_multiminima(
     da_kwargs = _filter_opt_kwargs(opt_kwargs, _DA_ALLOWED_KEYS)
     local_minima_x = _get_da_multiminima_in_parallel(
         func=objective,
-        x0=x0,
+        x0_ls=x0_ls,
         bounds=bounds,
         **da_kwargs,
     )        
@@ -95,19 +95,19 @@ def dual_annealing_multiminima(
 def _get_da_multiminima_in_parallel(
     func,
     bounds,
-    x0=None,
+    x0_ls=None,
     args=(),
     constraints=(),
     n_runs=6,
     maxiter=300,
-    seed=150,
+    seed=0,
     initial_temp=5230.0,
     restart_temp_ratio=2e-5,
     visit=2.62,
     accept=-5.0,
     maxfun=1_000_000,
     # clustering parameters
-    cluster_tol=0.02,      # normalized distance for *first* clustering
+    cluster_tol=0.01,      # normalized distance for *first* clustering
     max_minima=4,       # maximum number of minima to polish/return
     local_method="SLSQP",  # default local method
 ):
@@ -119,7 +119,7 @@ def _get_da_multiminima_in_parallel(
     all_x, all_f = _collect_da_candidates(
         func=func,
         bounds=bounds,
-        x0=x0,
+        x0_ls=x0_ls,
         args=args,
         n_runs=n_runs,
         maxiter=maxiter,
@@ -161,16 +161,16 @@ def _get_da_multiminima_in_parallel(
         ub=ub,
         tol_norm=cluster_tol,
     )
-    local_minima_fun = polished_f[local_minima_idx]
-    local_minima_x = polished_x[local_minima_idx]
-    return np.asarray(local_minima_fun), np.asarray(local_minima_x)
+    return np.asarray(
+        polished_x[local_minima_idx]
+    )
 
 
 def _collect_da_candidates(
-    func,
-    bounds,
-    x0,
-    args,
+    func: Callable,
+    bounds: tuple,
+    x0_ls:np.ndarray,
+    args: dict,
     n_runs: int,
     maxiter: int,
     seed: int,
@@ -187,7 +187,7 @@ def _collect_da_candidates(
         _run_da_single,
         func=func,
         bounds=bounds,
-        x0=x0,
+        x0_ls=x0_ls,
         args=args,
         maxiter=maxiter,
         seed=seed,
@@ -203,13 +203,6 @@ def _collect_da_candidates(
     else:
         with ProcessPoolExecutor(max_workers=n_jobs_eff) as pool:
             run_results = list(pool.map(run_fn, range(n_runs)))        
-        # try:
-        #     with ProcessPoolExecutor(max_workers=n_jobs_eff) as pool:
-        #         run_results = list(pool.map(run_fn, range(n_runs)))
-        # except (pickle.PicklingError, AttributeError, TypeError):
-        #     # Fall back to threads when objective context is not picklable.
-        #     with ThreadPoolExecutor(max_workers=n_jobs_eff) as pool:
-        #         run_results = list(pool.map(run_fn, range(n_runs)))
 
     for run_minima_x, run_minima_f in run_results:
         all_x.extend(run_minima_x)
@@ -220,10 +213,10 @@ def _collect_da_candidates(
 
 def _run_da_single(
     run: int,
-    func,
-    bounds,
-    x0,
-    args,
+    func: Callable,
+    bounds: tuple,
+    x0_ls: np.ndarray,
+    args: dict,
     maxiter: int,
     seed: int,
     initial_temp: float,
@@ -234,7 +227,8 @@ def _run_da_single(
 ) -> tuple[list[np.ndarray], list[float]]:
     run_minima_x = []
     run_minima_f = []
-
+    x0 = x0_ls[run % np.shape(x0_ls)[0]] if x0_ls is not None else None
+    
     def callback(x, f, context):
         # context: 0 = annealing, 1 = end of local search, 2 = end of run
         run_minima_x.append(np.array(x, dtype=float))

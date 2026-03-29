@@ -2,11 +2,7 @@
 
 import itertools
 import numpy as np
-from scipy.optimize import (
-    minimize,
-    minimize_scalar
-)
-
+from scipy.optimize import minimize, minimize_scalar
 from ..lib import *
 from ..utils import *
 from .problem_table_analysis import *
@@ -363,23 +359,15 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
     """
     x0_ls, bnds = _get_x0_and_bnds_for_multi_temperature_carnot_hp_opt(args)
-    minima = list(
-        map(
-            lambda x0: minimize(
-                fun=lambda x: _compute_multi_temperature_carnot_hp_opt_obj(x, args)["obj"],
-                x0=x0,
-                bounds=bnds,
-                method="SLSQP",            
-            ),
-            x0_ls
-        )
+    minima = dual_annealing_multiminima(
+        func=_compute_multi_temperature_carnot_hp_opt_obj,
+        x0_ls=x0_ls,
+        func_kwargs=args,
+        bounds=bnds,
     )
-    opt = minima[0]
-    for m in minima:
-        if opt["fun"] > m["fun"]:
-            opt = m
+    x = minima[0]
 
-    res = _compute_multi_temperature_carnot_hp_opt_obj(opt.x, args, debug=args.debug)
+    res = _compute_multi_temperature_carnot_hp_opt_obj(x, args, debug=args.debug)
     if res["opt_success"] == False:
         raise ValueError("Multi-temperature Carnot heat pump targeting failed to return an optimal result.")
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
@@ -416,9 +404,9 @@ def _get_x0_and_bnds_for_multi_temperature_carnot_hp_opt(
     )
     if len(x0_evap_ls) > 0:
         x0_ls = list(itertools.product(x0_cond_ls, x0_evap_ls))
-        x0_ls = [np.concatenate(x0) for x0 in x0_ls]
+        x0_ls = np.asarray([np.concatenate(x0) for x0 in x0_ls])
     else:
-        x0_ls = list(list(x0_cond_ls))
+        x0_ls = np.asarray(np.asarray(x0_cond_ls))
     bnds = [(0.0, 1.0) for _ in range(args.n_cond+args.n_evap-1)]
     return x0_ls, bnds
 
@@ -478,7 +466,10 @@ def _compute_multi_temperature_carnot_hp_opt_obj(
 
     if debug:
         res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))      
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {res["obj"]} = {res["work_hp"]} + {res["Q_ext"]}"))
+        plot_multi_hp_profiles_from_results(
+            args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], 
+            title=f"Obj {res["obj"]:.5f} = {(res["work_hp"] / args.Q_hp_target):.5f} + {(res["Q_ext"] / args.Q_hp_target):.5f}"
+        )
     return res
 
 
@@ -563,11 +554,11 @@ def _optimise_cascade_heat_pump_placement(
     args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
 
     # Prepare and run the optimisation
-    x0, bnds = _get_x0_and_bnds_for_cascade_hp_opt(init_res.T_cond, init_res.Q_cond, init_res.T_evap, init_res.Q_evap, args)
+    x0_ls, bnds = _get_x0_and_bnds_for_cascade_hp_opt(init_res.T_cond, init_res.Q_cond, init_res.T_evap, init_res.Q_evap, args)
 
     local_minima_x = dual_annealing_multiminima(
         func=_compute_cascade_hp_system_performance,
-        x0=x0,        
+        x0_ls=x0_ls,        
         func_kwargs=args,
         bounds=bnds,    
     )   
@@ -666,8 +657,8 @@ def _get_x0_and_bnds_for_cascade_hp_opt(
     for i in range(x0.size):
         if not(bnds[i][0] <= x0[i] <= bnds[i][1]):
             x0[i] = (bnds[i][1] + bnds[i][0]) / 2
-
-    return x0, bnds
+    x0_ls = np.asarray([x0])
+    return x0_ls, bnds
 
 
 def _parse_cascade_hp_state_variables(
@@ -782,10 +773,10 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout.
     """
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
-    x0, bnds = _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(args)
+    x0_ls, bnds = _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(args)
     local_minima_x = dual_annealing_multiminima(
         func=_compute_multi_simple_carnot_hp_opt_obj,
-        x0=x0,
+        x0_ls=x0_ls,
         func_kwargs=args,
         bounds=bnds,    
     )    
@@ -806,7 +797,8 @@ def _get_x0_and_bnds_for_multi_simple_carnot_hp_opt(
         )
     )
     bnds = [(0.0, ub_cond) for _ in range(args.n_cond-1)] + [(0.0, ub_evap) for _ in range(args.n_evap)]
-    return x0, bnds    
+    x0_ls = np.asarray([x0])
+    return x0_ls, bnds   
 
 
 def _compute_multi_simple_carnot_hp_opt_obj(
@@ -859,7 +851,10 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     if debug:
         res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)     
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], str(f"Obj: {obj} = {work_hp} + {Q_ext}"))        
+        plot_multi_hp_profiles_from_results(
+            args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], 
+            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f}"
+        )
 
     return {
         "obj": obj, 
@@ -899,7 +894,7 @@ def _optimise_multi_simple_heat_pump_placement(
 
     local_minima_x = dual_annealing_multiminima(
         func=_compute_multi_simple_hp_system_performance,
-        x0=x0,        
+        x0_ls=x0,        
         func_kwargs=args,
         bounds=bnds,    
     )   
@@ -912,7 +907,7 @@ def _optimise_multi_simple_heat_pump_placement(
 
     return HeatPumpTargetOutputs.model_validate(res)
 
-
+# TODO: Create two methods from this one. One focused on returning the bounds, and a second focused on returning x0.
 def _get_x0_and_bnds_for_multi_single_hp_opt(
     T_cond: np.ndarray, 
     Q_cond: np.ndarray, 
@@ -1002,7 +997,8 @@ def _get_x0_and_bnds_for_multi_single_hp_opt(
         if not(bnds[i][0] <= x0[i] <= bnds[i][1]):
             x0[i] = bnds[i][1] if i * 2 < x0.size else bnds[i][0]
 
-    return x0, bnds
+    x0_ls = np.asarray([x0])
+    return x0_ls, bnds
 
 
 def _constrain_min_temperature_lift(

@@ -102,7 +102,7 @@ class HeatPumpTargetOutputs(BaseModel):
 
     # --- Common objective / result fields -------------------------
     utility_tot: float
-    work_hp: float
+    work_hp: float | list | np.ndarray
     Q_ext: float
     Q_amb: float    
     cop: float | list | np.ndarray
