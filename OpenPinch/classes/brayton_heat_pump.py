@@ -42,6 +42,7 @@ class SimpleBraytonHeatPumpCycle:
     STATECOUNT = 4
 
     def __init__(self):
+        """Initialize an unsolved Brayton heat-pump cycle container."""
         # Keep minimal unit-system compatibility surface (not using CoolProp
         # unit dicts here); the simple heat pump used a PropertyDict. For
         # compatibility we accept the same constructor signature.
@@ -66,44 +67,108 @@ class SimpleBraytonHeatPumpCycle:
     # -- Properties to mimic HeatPumpCycle API -------------------------------------------------
     @property
     def cycle_states(self):
-        """Expose a simple state container (list-like) for compatibility similar to a CoolProp state container.
+        """Return cycle state data in a compatibility-oriented list structure.
+
+        Returns
+        -------
+        list[dict]
+            State dictionaries in cycle order:
+            ``0=compressor inlet``, ``1=compressor outlet``,
+            ``2=turbine inlet``, ``3=turbine outlet``.
         """
         return self._states
 
     @property
     def states(self):
+        """Alias for :attr:`cycle_states`.
+
+        Returns
+        -------
+        list[dict]
+            Cycle state dictionaries.
+        """
         return self.cycle_states
 
     @property
     def Hs(self) -> Sequence[float]:
+        """Return state specific enthalpies.
+
+        Returns
+        -------
+        Sequence[float]
+            Enthalpy values [J/kg] for states 0..3.
+        """
         self._require_solution()
         return [s['h'] for s in self._states]
 
     @property
     def Ts(self) -> Sequence[float]:
+        """Return state temperatures.
+
+        Returns
+        -------
+        Sequence[float]
+            Temperatures [degC] for states 0..3.
+        """
         self._require_solution()
         return [s['T'] for s in self._states]
 
     @property
     def Ps(self) -> Sequence[float]:
+        """Return state pressures.
+
+        Returns
+        -------
+        Sequence[float]
+            Pressures [Pa] for states 0..3.
+        """
         self._require_solution()
         return [s['p'] for s in self._states]
 
     @property
     def Ss(self) -> Sequence[float]:
+        """Return state specific entropies when available.
+
+        Returns
+        -------
+        Sequence[float]
+            Entropy values for states 0..3. Entries may be ``None`` when not
+            populated by the underlying model.
+        """
         self._require_solution()
         return [s.get('s') for s in self._states]
 
     @property
     def Q_heat(self) -> Optional[float]:
+        """Return configured heat-delivery target.
+
+        Returns
+        -------
+        float or None
+            Requested gas-cooler heat duty [kW].
+        """
         return self._Q_heat
     
     @property
     def Q_cool(self) -> Optional[float]:
+        """Return low-temperature heat-rejection duty after solution.
+
+        Returns
+        -------
+        float or None
+            LTHX duty [kW].
+        """
         return self._Q_cool
 
     @property
     def work_net(self) -> Optional[float]:
+        """Return net shaft work after solution.
+
+        Returns
+        -------
+        float or None
+            Compressor plus turbine power [kW] using TESPy sign convention.
+        """
         return self._work_net
     
 
@@ -123,23 +188,34 @@ class SimpleBraytonHeatPumpCycle:
 
         Parameters
         ----------
-        T_comp_in
-            Compressor inlet temperature [°C] (T1)
-        T_comp_out
-            Compressor outlet temperature [°C] (T2)
-        dT_gc
+        T_comp_in : float
+            Compressor inlet temperature [degC] (state 1).
+        T_comp_out : float
+            Compressor outlet temperature [degC] (state 2).
+        dT_gc : float
             Temperature difference between compressor outlet and turbine inlet:
-            dT_gc = T_comp_out - T_turb_in (temperature drop in HTHX)
-        Q_heat
-            Total heat duty of the HTHX (positive value for heat delivered to the process) [kW]
-        eta_comp
-            Compressor isentropic efficiency (fraction, e.g. 0.83)
-        eta_exp
-            Expander/turbine isentropic efficiency (fraction, e.g. 0.93)
-        is_recuperated
-            Whether the cycle includes recuperation (currently not implemented)
-        refrigerant
-            Working fluid name (currently fixed to air composition, not used)
+            ``dT_gc = T_comp_out - T_turb_in``.
+        Q_heat : float
+            Heat delivered in the gas cooler [kW], positive for process heating.
+        eta_comp : float
+            Compressor isentropic efficiency (fraction).
+        eta_exp : float
+            Turbine/expander isentropic efficiency (fraction).
+        is_recuperated : bool
+            Whether recuperation is requested. Currently ignored and downgraded
+            to a warning.
+        refrigerant : Any, optional
+            Working-fluid label accepted for API compatibility.
+
+        Returns
+        -------
+        None
+            The cycle object is updated in place with solved states and duties.
+
+        Raises
+        ------
+        RuntimeError
+            If TESPy solves but result extraction fails.
         """
         # Save inputs
         self.refrigerant = refrigerant
@@ -195,7 +271,7 @@ class SimpleBraytonHeatPumpCycle:
         self._conns = dict(s1=C1, s2=C2, s3=C3, s4=C4, s5=C5) #, s8=C8, s9=C9, s10=C10, s11=C11)
 
         try:
-            self._states[0]['T'] = C1.T.val  # [°C]
+            self._states[0]['T'] = C1.T.val  # [degC]
             self._states[0]['p'] = C1.p.val * 1e5  # bar -> Pa
             self._states[0]['h'] = C1.h.val * 1000.0  # kJ/kg -> J/kg
             self._states[0]['m'] = C1.m.val
@@ -228,13 +304,12 @@ class SimpleBraytonHeatPumpCycle:
 
 
     def _build_hthx_profile(self) -> np.ndarray:
-        """Build a simple 4-point T-h profile for the HTHX (hot side).
+        """Build a simplified gas-cooler T-h profile.
 
-        Points: [superheated inlet (C2), saturated vapor/liquid approximation (not
-        applicable for gas Brayton) ... bypassed; we produce a 4-point polyline
-        compatible with the Rankine routine]:
-
-        Return shape: (4,2) columns [h (J/kg), T (°C)]
+        Returns
+        -------
+        np.ndarray
+            Two-point profile with columns ``[h (J/kg), T (degC)]``.
         """
         self._require_solution()
         H = self.Hs
@@ -250,9 +325,12 @@ class SimpleBraytonHeatPumpCycle:
 
 
     def _build_lthx_profile(self) -> np.ndarray:
-        """Build a 3-point evaporator-style profile for the LTHX (cold side).
+        """Build a simplified gas-heater T-h profile.
 
-        Return shape: (3,2) columns [h (J/kg), T (°C)]
+        Returns
+        -------
+        np.ndarray
+            Two-point profile with columns ``[h (J/kg), T (degC)]``.
         """
         self._require_solution()
         H = self.Hs
@@ -266,15 +344,23 @@ class SimpleBraytonHeatPumpCycle:
 
 
     def get_hp_th_profiles(self) -> tuple[np.ndarray, np.ndarray]:
-        """Return condenser (HTHX) and evaporator (LTHX) T-h profiles."""
+        """Return hot- and cold-side T-h profiles.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            ``(HTHX_profile, LTHX_profile)``.
+        """
         return (self._build_hthx_profile(), self._build_lthx_profile())
 
 
     def get_hp_hot_and_cold_streams(self) -> tuple[StreamCollection, StreamCollection]:
-        """Return two StreamCollections (hot, cold) similar to HeatPumpCycle.
+        """Convert solved profiles to hot and cold utility stream collections.
 
-        Hot = HTHX (compressor outlet -> turbine inlet)
-        Cold = LTHX (turbine outlet -> compressor inlet)
+        Returns
+        -------
+        tuple[StreamCollection, StreamCollection]
+            Hot streams from HTHX and cold streams from LTHX.
         """
         self._require_solution()
 
@@ -306,6 +392,22 @@ class SimpleBraytonHeatPumpCycle:
 
     def build_stream_collection(self, include_cond: bool = False, include_evap: bool = False,
                                 is_process_stream: bool = False) -> StreamCollection:
+        """Build a combined stream collection for selected heat exchangers.
+
+        Parameters
+        ----------
+        include_cond : bool, default=False
+            Include hot-side (gas-cooler) streams.
+        include_evap : bool, default=False
+            Include cold-side (gas-heater) streams.
+        is_process_stream : bool, default=False
+            Compatibility argument retained for shared API alignment.
+
+        Returns
+        -------
+        StreamCollection
+            Aggregated stream collection based on selected sides.
+        """
 
         sc = StreamCollection()
         if include_cond:
@@ -318,5 +420,12 @@ class SimpleBraytonHeatPumpCycle:
 
 
     def _require_solution(self) -> None:
+        """Validate that the cycle has been solved before data access.
+
+        Raises
+        ------
+        RuntimeError
+            If ``solve`` has not been called successfully.
+        """
         if not self._solved:
             raise RuntimeError('Solve the cycle before accessing results.')

@@ -31,6 +31,15 @@ Problem Tables and Utilities
 Advanced Analyses
 -----------------
 
+Heat Pump Targeting API
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Public entry points exposed by ``OpenPinch.analysis.heat_pump_targeting``:
+
+- :func:`OpenPinch.analysis.heat_pump_targeting.get_heat_pump_targets`
+- :func:`OpenPinch.analysis.heat_pump_targeting.calc_heat_pump_cascade`
+- :func:`OpenPinch.analysis.heat_pump_targeting.plot_multi_hp_profiles_from_results`
+
 .. automodule:: OpenPinch.analysis.heat_pump_targeting
    :members:
 

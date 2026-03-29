@@ -31,50 +31,38 @@ def dual_annealing_multiminima(
     bounds: Optional[tuple] = None,
     opt_kwargs: Optional[dict] = {},
 ) -> list:
-    """
-    Multi-start dual annealing that returns verified local optima by:
-      - collecting candidate minima via callback across multiple runs,
-      - clustering them in normalized decision space,
-      - polishing each cluster representative via constrained local optimization,
-      - deduplicating polished minima.
+    """Return deduplicated local minima from multi-start dual annealing.
+
+    The routine performs four stages:
+
+    1. collect candidate minima from multiple dual-annealing runs,
+    2. cluster candidates in normalized decision space,
+    3. polish one representative per cluster with local optimization,
+    4. re-cluster polished solutions to remove duplicates.
 
     Parameters
     ----------
     func : callable
-        Objective ``f(x, *args) -> scalar``, with ``x`` as a 1D array-like.
-    x0_ls : tuple
-        Tuple of initial variable values
-    func_kwargs : tuple
-        Extra arguments passed to ``func`` as ``func(x, *args)``.
-    bounds : sequence of (lb, ub)
-        Bounds [(lb1, ub1), ..., (lbn, ubn)].
+        Objective called as ``func(x, func_kwargs)`` and expected to return a
+        mapping containing key ``"obj"``.
+    x0_ls : tuple, optional
+        Optional collection of initial decision vectors. When provided, run
+        ``r`` starts from ``x0_ls[r % len(x0_ls)]``.
+    func_kwargs : dict, optional
+        Extra data passed to ``func`` via the objective wrapper.
+    bounds : tuple, optional
+        Bounds ``((lb1, ub1), ..., (lbn, ubn))`` for the decision vector.
     opt_kwargs : dict
-        Optional keywords {
-            constraints : dict or sequence of dict, optional
-                SciPy-style constraints for `minimize` (e.g. for SLSQP or trust-constr).
-                They are applied only in the polishing step, not in dual_annealing itself.
-            n_runs : int
-                Number of independent dual_annealing runs with different seeds.
-            maxiter : int
-                dual_annealing global search iterations per run.
-            seed : int
-                Base seed; run r uses seed + r.
-            initial_temp, restart_temp_ratio, visit, accept, maxfun :
-                Standard dual_annealing parameters.
-            cluster_tol : float
-                Distance tolerance in *normalized* decision space (0-1 per dim)
-                for basin clustering.
-            max_minima : int or None
-                Maximum number of clustered minima to polish and return. If None,
-                all clustered representatives are polished.
-            local_method : str
-                Local method for polishing (e.g. 'SLSQP', 'L-BFGS-B', 'TNC', 'trust-constr').
-        }
+        Optional controls. Supported keys are:
+        ``constraints``, ``n_runs``, ``maxiter``, ``seed``, ``initial_temp``,
+        ``restart_temp_ratio``, ``visit``, ``accept``, ``maxfun``,
+        ``cluster_tol``, and ``max_minima``.
 
     Returns
     -------
-    local_minima : list of ndarray
-        [ndarray, ...] verified and deduplicated minima.
+    np.ndarray
+        Decision vectors for polished, deduplicated local minima, ordered by
+        objective value.
     """
     objective = _set_objective_func(func=func, func_kwargs=func_kwargs)
     da_kwargs = _filter_opt_kwargs(opt_kwargs, _DA_ALLOWED_KEYS)
@@ -111,6 +99,40 @@ def _get_da_multiminima_in_parallel(
     max_minima=4,       # maximum number of minima to polish/return
     local_method="SLSQP",  # default local method
 ):
+    """Run candidate collection, clustering, polishing, and deduplication.
+
+    Parameters
+    ----------
+    func : callable
+        Scalar objective function compatible with SciPy optimizers.
+    bounds : array-like
+        Per-variable lower/upper bounds.
+    x0_ls : array-like, optional
+        Optional initial vectors cycled across runs.
+    args : tuple, default=()
+        Positional arguments passed to ``func`` by SciPy.
+    constraints : sequence, default=()
+        SciPy-compatible constraints for the local polishing step.
+    n_runs : int, default=6
+        Number of independent dual-annealing runs.
+    maxiter : int, default=300
+        Maximum dual-annealing iterations per run.
+    seed : int, default=0
+        Base random seed. Run ``r`` uses ``seed + r``.
+    initial_temp, restart_temp_ratio, visit, accept, maxfun
+        Standard dual-annealing controls.
+    cluster_tol : float, default=0.01
+        Euclidean clustering tolerance in normalized decision space.
+    max_minima : int, default=4
+        Maximum number of basin representatives selected for polishing.
+    local_method : str, default="SLSQP"
+        Local optimizer used for candidate polishing.
+
+    Returns
+    -------
+    np.ndarray
+        Polished, deduplicated local-minimum decision vectors.
+    """
 
     # --------- 1. Run Dual Annealing to gather potential minima ----------
     bounds = np.asarray(bounds, dtype=float)
@@ -180,6 +202,32 @@ def _collect_da_candidates(
     accept: float,
     maxfun: int,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Collect candidate minima from multiple dual-annealing runs.
+
+    Parameters
+    ----------
+    func : Callable
+        Scalar objective function.
+    bounds : tuple
+        Per-variable lower/upper bounds.
+    x0_ls : np.ndarray
+        Optional initial vectors used to seed each run.
+    args : dict
+        Extra arguments forwarded to SciPy objective calls.
+    n_runs : int
+        Number of independent runs.
+    maxiter : int
+        Maximum dual-annealing iterations per run.
+    seed : int
+        Base random seed.
+    initial_temp, restart_temp_ratio, visit, accept, maxfun
+        Standard dual-annealing controls.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Candidate decision vectors and their objective values.
+    """
     all_x = []
     all_f = []
     n_jobs_eff = max(1, int(n_runs))
@@ -225,6 +273,32 @@ def _run_da_single(
     accept: float,
     maxfun: int,
 ) -> tuple[list[np.ndarray], list[float]]:
+    """Execute one dual-annealing run and record callback minima.
+
+    Parameters
+    ----------
+    run : int
+        Zero-based run index.
+    func : Callable
+        Scalar objective function.
+    bounds : tuple
+        Per-variable lower/upper bounds.
+    x0_ls : np.ndarray
+        Optional initial vectors cycled by run index.
+    args : dict
+        Extra arguments forwarded to SciPy objective calls.
+    maxiter : int
+        Maximum dual-annealing iterations.
+    seed : int
+        Base seed; this run uses ``seed + run``.
+    initial_temp, restart_temp_ratio, visit, accept, maxfun
+        Standard dual-annealing controls.
+
+    Returns
+    -------
+    tuple[list[np.ndarray], list[float]]
+        Candidate vectors and objective values gathered during the run.
+    """
     run_minima_x = []
     run_minima_f = []
     x0 = x0_ls[run % np.shape(x0_ls)[0]] if x0_ls is not None else None
@@ -258,10 +332,40 @@ def _run_da_single(
 
 
 def _objective_from_result_dict(x, func, func_kwargs):
+    """Adapt a mapping-returning objective to a scalar objective.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Decision vector.
+    func : Callable
+        Objective returning a dict-like result containing ``"obj"``.
+    func_kwargs : dict
+        Extra objective inputs.
+
+    Returns
+    -------
+    float
+        Scalar objective value ``func(...)[\"obj\"]``.
+    """
     return func(x, func_kwargs)["obj"]
 
 
 def _set_objective_func(func, func_kwargs):
+    """Create a scalar objective wrapper for SciPy optimizers.
+
+    Parameters
+    ----------
+    func : Callable
+        Objective returning a mapping with key ``"obj"``.
+    func_kwargs : dict
+        Extra data passed to ``func``.
+
+    Returns
+    -------
+    Callable
+        Callable of signature ``f(x) -> float``.
+    """
     return partial(_objective_from_result_dict, func=func, func_kwargs=func_kwargs)
 
 
@@ -274,6 +378,30 @@ def _polish_single_candidate(
     bounds_arg: Optional[np.ndarray],
     constraints,
 ) -> tuple[np.ndarray, float]:
+    """Run local optimization from one candidate point.
+
+    Parameters
+    ----------
+    idx : int
+        Index of the candidate in ``all_x``.
+    all_x : np.ndarray
+        Candidate decision vectors.
+    func : Callable
+        Scalar objective function.
+    args : Any
+        Positional arguments forwarded to ``minimize``.
+    local_method : str
+        Local optimizer name (for example ``"SLSQP"``).
+    bounds_arg : np.ndarray or None
+        Bounds used by compatible local methods.
+    constraints : Any
+        Constraints passed to ``minimize``.
+
+    Returns
+    -------
+    tuple[np.ndarray, float]
+        Polished decision vector and objective value.
+    """
     x0 = all_x[idx]
     res_loc = minimize(
         fun=func,
@@ -293,9 +421,23 @@ def _cluster_candidates(
     ub: np.ndarray,
     tol_norm: float,
 ) -> list:
-    """
-    Greedy clustering in normalized decision space based on x-similarity.
-    For each cluster, keep the index with the minimum f value.
+    """Cluster candidate points in normalized space and keep best per cluster.
+
+    Parameters
+    ----------
+    xs : np.ndarray
+        Candidate decision vectors.
+    fs : np.ndarray
+        Objective values associated with ``xs``.
+    lb, ub : np.ndarray
+        Lower and upper variable bounds used for normalization.
+    tol_norm : float
+        Maximum normalized Euclidean distance for cluster membership.
+
+    Returns
+    -------
+    list
+        Indices of selected representatives, sorted by objective value.
     """
     if np.all(ub != lb):
         xs_norm = (xs - lb) / (ub - lb)
@@ -338,6 +480,30 @@ def _polish_candidates(
     bounds: np.ndarray,
     constraints,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Polish clustered basin representatives in parallel.
+
+    Parameters
+    ----------
+    func : Callable
+        Scalar objective function.
+    args : dict
+        Positional arguments forwarded to the objective.
+    all_x : np.ndarray
+        Candidate vectors.
+    basin_reps_idx : list
+        Indices of representative candidates to polish.
+    local_method : str
+        Local optimizer name.
+    bounds : np.ndarray
+        Bounds for local methods that accept them.
+    constraints : Any
+        Constraints passed to local optimization.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Polished vectors and objective values.
+    """
     if not basin_reps_idx:
         return np.asarray([]), np.asarray([])
 
@@ -364,4 +530,18 @@ def _polish_candidates(
 
 
 def _filter_opt_kwargs(opt_kwargs: dict, allowed_keys: frozenset) -> dict:
+    """Return only optimizer keyword arguments supported by this module.
+
+    Parameters
+    ----------
+    opt_kwargs : dict
+        User-supplied optimizer keyword arguments.
+    allowed_keys : frozenset
+        Supported option names.
+
+    Returns
+    -------
+    dict
+        Filtered keyword dictionary with unsupported keys removed.
+    """
     return {k: v for k, v in opt_kwargs.items() if k in allowed_keys}

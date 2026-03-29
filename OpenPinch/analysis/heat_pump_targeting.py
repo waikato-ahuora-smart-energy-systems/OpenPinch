@@ -1,4 +1,4 @@
-"""Target heat pump integration for given heating or cooler profiles."""
+"""Heat-pump targeting and cascade-construction utilities for composite curves."""
 
 import itertools
 import numpy as np
@@ -31,26 +31,40 @@ def get_heat_pump_targets(
     zone_config: Configuration,
     is_direct_integration: bool,
     is_heat_pumping: bool,
-):
-    """Optimise multi-stage heat-pump placement for the supplied problem table.
+) -> HeatPumpTargetOutputs:
+    """Optimise heat-pump placement for a target duty and cascade profiles.
 
-    Args:
-        pt: ProblemTable that already contains the composite-cascade columns.
-        zone_config: Scenario configuration holding HP parameters, ambient data,
-            and targeting flags.
-        is_T_vals_shifted: Indicates whether ``pt`` temperatures already include
-            ΔTmin/2 shifting.
-        is_direct_integration: True when targeting is performed against the
-            process cascade; False for utility-only cascades.
-        is_heat_pumping: Selects heating mode (True) versus refrigeration (False).
-        n_cond: Number of condenser temperature levels to optimise.
-        n_evap: Number of evaporator temperature levels to optimise.
-        eta_comp: Assumed compressor isentropic efficiency for optimisation.
-        dtmin_hp: Minimum approach temperature enforced on the heat pump.
+    Parameters
+    ----------
+    Q_hp_target : float
+        Target condenser duty to be delivered by the heat-pump system [kW].
+    T_vals : np.ndarray
+        Temperature interval grid used by the background cascade [degC].
+    H_hot : np.ndarray
+        Net hot profile aligned with ``T_vals``. Values are interpreted as hot
+        availability and are normalised internally to negative values.
+    H_cold : np.ndarray
+        Net cold profile aligned with ``T_vals``. Values are interpreted as cold
+        demand and are normalised internally to positive values.
+    zone_config : Configuration
+        Zone-level configuration containing heat-pump type, stage counts,
+        efficiencies, refrigerants, and ambient settings.
+    is_direct_integration : bool
+        ``True`` for process-integrated targeting, ``False`` for utility-level
+        targeting.
+    is_heat_pumping : bool
+        ``True`` for heating mode, ``False`` for refrigeration mode.
 
-    Returns:
-        HeatPumpTargetOutputs with the optimal placement, or an empty dict when
-        targeting is skipped by the configuration screens.
+    Returns
+    -------
+    HeatPumpTargetOutputs
+        Validated optimisation output, including objective terms, cycle state
+        variables, and generated stream collections.
+
+    Raises
+    ------
+    ValueError
+        If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
     # zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
     args = _prepare_heat_pump_target_inputs(
@@ -77,7 +91,34 @@ def calc_heat_pump_cascade(
     is_T_vals_shifted: bool,
     is_direct_integration: bool,
 ) -> ProblemTable:
-    """Augment the base problem table with HP condenser/evaporator cascades."""
+    """Insert heat-pump cascade contributions into a problem table.
+
+    Parameters
+    ----------
+    pt : ProblemTable
+        Base problem table to augment. This object is modified in place.
+    res : HeatPumpTargetOutputs
+        Heat-pump targeting result containing condenser, evaporator, and ambient
+        stream collections.
+    is_T_vals_shifted : bool
+        Whether ``pt`` temperatures are already on the shifted temperature scale.
+    is_direct_integration : bool
+        Selects the destination net-cascade column:
+        ``PT.H_NET_HP_PRO`` for direct integration and ``PT.H_NET_HP_UT`` for
+        utility integration.
+
+    Returns
+    -------
+    ProblemTable
+        The same ``pt`` instance, after insertion of HP intervals and update of
+        HP-related columns.
+
+    Notes
+    -----
+    In-place updates include ``PT.H_HOT_HP``, ``PT.H_COLD_HP``, and
+    ``PT.H_NET_W_AIR``. Ambient-air interactions are included when present in
+    ``res.amb_stream``.
+    """
     t_hp = create_problem_table_with_t_int(
         streams=res.hp_hot_streams + res.hp_cold_streams, 
         is_shifted=is_T_vals_shifted,
@@ -142,8 +183,30 @@ def plot_multi_hp_profiles_from_results(
     hp_hot_streams: StreamCollection = None,
     hp_cold_streams: StreamCollection = None,
     title: str = None, 
-):
-    """Plot HP cascade and source/sink profiles.
+) -> None:
+    """Plot source/sink composites together with HP condenser/evaporator profiles.
+
+    Parameters
+    ----------
+    T_hot, H_hot : np.ndarray, optional
+        Temperature and heat-flow arrays for the sink-side composite.
+    T_cold, H_cold : np.ndarray, optional
+        Temperature and heat-flow arrays for the source-side composite.
+    hp_hot_streams, hp_cold_streams : StreamCollection, optional
+        Stream collections describing HP condenser and evaporator duties.
+        Plotting of HP profiles occurs only when both are provided.
+    title : str, optional
+        Figure title.
+
+    Returns
+    -------
+    None
+        This function creates and renders a matplotlib figure.
+
+    Notes
+    -----
+    When arrays are provided, each temperature vector must align with its
+    corresponding heat-flow vector.
     """
     plt.figure(figsize=(7, 5))
 
@@ -164,7 +227,7 @@ def plot_multi_hp_profiles_from_results(
 
     plt.title(title)
     plt.xlabel("Heat Flow / kW")
-    plt.ylabel("Temperature / °C")
+    plt.ylabel("Temperature / degC")
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.legend()
     plt.axvline(0.0, color='black', linewidth=2)
@@ -187,7 +250,29 @@ def _prepare_heat_pump_target_inputs(
     zone_config: Configuration = Configuration(),
     debug: bool = False,    
 ):
-    """Format temperature/enthalpy inputs and options for heat pump targeting.
+    """Build a validated optimisation-input bundle for heat-pump targeting.
+
+    Parameters
+    ----------
+    Q_hp_target : float
+        Target heat-pump duty [kW].
+    T_vals : np.ndarray
+        Background temperature grid [degC].
+    H_hot, H_cold : np.ndarray
+        Background hot/cold cascade coordinates aligned to ``T_vals``.
+    is_direct_integration : bool, default=True
+        Integration context flag used for temperature shifting.
+    is_heat_pumping : bool, default=True
+        Heating/refrigeration mode selection.
+    zone_config : Configuration
+        Configuration source for optimisation settings.
+    debug : bool, default=False
+        Enables optimisation debug plotting and extra diagnostics.
+
+    Returns
+    -------
+    HeatPumpTargetInputs
+        Normalised and validated optimisation arguments.
     """
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
     T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(T_vals, zone_config.DTMIN_HP, is_direct_integration)   
@@ -246,7 +331,22 @@ def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
     dtmin_hp: float,
     is_direct_integration: bool,
 ):
-    """Apply ΔTmin adjustments to cascade temperatures for heat pump calculations.
+    """Apply HP-specific temperature shifting to a cascade grid.
+
+    Parameters
+    ----------
+    T_vals : np.ndarray
+        Temperature interval grid [degC].
+    dtmin_hp : float
+        Minimum approach temperature for HP integration [K].
+    is_direct_integration : bool
+        ``True`` applies process-scale shifting; ``False`` applies utility-scale
+        shifting.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, float]
+        Shifted hot temperatures, shifted cold temperatures, and applied shift.
     """
     dT_shift = dtmin_hp * 0.5 if is_direct_integration else dtmin_hp * 1.5 # utility streams are real temperatures??? 
     T_hot  = T_vals - dT_shift
@@ -260,7 +360,23 @@ def _get_H_col_till_target_Q(
     H_vals: np.ndarray,  
     is_cold: bool = True,      
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Trim the cold composite to the target heat duty, interpolating the boundary point.
+    """Trim a cascade profile to a target duty using boundary interpolation.
+
+    Parameters
+    ----------
+    Q_max : float
+        Target absolute duty to retain.
+    T_vals : np.ndarray
+        Temperature coordinates of the profile.
+    H_vals : np.ndarray
+        Heat coordinates of the profile.
+    is_cold : bool, default=True
+        ``True`` trims from the cold-profile side, ``False`` from the hot side.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Trimmed temperature and heat arrays.
     """
     if abs(np.abs(H_vals).max() - Q_max) < tol:
         return T_vals, H_vals
@@ -296,7 +412,27 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
     dt_phase_change: float,
     is_heat_pumping: bool,    
 ):
-    """Balance net hot and cold duties using an ambient sink/source if required.
+    """Balance hot/cold targets with optional ambient-air exchange.
+
+    Parameters
+    ----------
+    T_hot, H_hot, T_cold, H_cold : np.ndarray
+        Cascade coordinates for hot and cold profiles.
+    dtcont : float
+        Effective temperature shift used for contact constraints.
+    T_env : float
+        Ambient temperature [degC].
+    dT_env_cont : float
+        Minimum ambient contact temperature difference [K].
+    dt_phase_change : float
+        Representative phase-change temperature span [K].
+    is_heat_pumping : bool
+        ``True`` for heating mode, ``False`` for refrigeration mode.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]
+        Updated ``(T_hot, H_hot, T_cold, H_cold, Q_amb_max)``.
     """
     Q_amb_max = 0.0
     delta_H = np.abs(H_cold).max() - np.abs(H_hot).max()
@@ -858,9 +994,23 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     args: HeatPumpTargetInputs,
     debug: bool = False,
 ) -> dict:
-    """Evaluate compressor work for a candidate HP placement defined by vector `x`.
-    """    
-    """Adjust evaporator ladder to honour minimum temperature limits."""
+    """Evaluate objective terms for a multi-simple Carnot HP placement.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Optimisation vector containing condenser and evaporator decision
+        variables.
+    args : HeatPumpTargetInputs
+        Full optimisation context.
+    debug : bool, default=False
+        Enables debug plotting of resulting profiles.
+
+    Returns
+    -------
+    dict
+        Objective components and reconstructed HP state/duty arrays.
+    """
 
     x_cond = np.array([0] + x[:(args.n_cond-1)].tolist())
     x_evap = x[(args.n_cond-1):]
@@ -959,6 +1109,7 @@ def _optimise_multi_simple_heat_pump_placement(
         raise ValueError("Optimal placement of multiple vapour-compression units failed.")            
 
     return HeatPumpTargetOutputs.model_validate(res)
+
 
 def _get_x0_for_multi_single_hp_opt(
     T_cond: np.ndarray, 
@@ -1401,6 +1552,22 @@ def _get_Q_max_from_T_hp_vals(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
 ) -> np.ndarray:
+    """Interpolate maximum available duty at selected temperature levels.
+
+    Parameters
+    ----------
+    T_hp : np.ndarray
+        Target heat-pump temperature levels.
+    T_vals : np.ndarray
+        Background cascade temperature coordinates.
+    H_vals : np.ndarray
+        Background cascade heat coordinates.
+
+    Returns
+    -------
+    np.ndarray
+        Absolute interpolated duties at each ``T_hp`` level.
+    """
     return np.abs(np.interp(T_hp, T_vals[::-1], H_vals[::-1]))
 
 
@@ -1556,6 +1723,22 @@ def _validate_vapour_hp_refrigerant_ls(
     num_stages: int,
     args: HeatPumpTargetInputs,    
 ) -> list:
+    """Validate and normalize refrigerant list length/order for staged cycles.
+
+    Parameters
+    ----------
+    num_stages : int
+        Required number of refrigerant entries.
+    args : HeatPumpTargetInputs
+        Optimisation input bundle containing refrigerant options.
+
+    Returns
+    -------
+    list
+        Refrigerant names with length exactly ``num_stages``. When insufficient
+        inputs are provided, the last refrigerant is repeated. When no
+        refrigerants are provided, ``"water"`` is used for all stages.
+    """
     if len(args.refrigerant_ls) > 0:
         if args.do_refrigerant_sort:
             refrigerants = [
@@ -1613,6 +1796,22 @@ def _get_carnot_hp_streams(
     Q_evap: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> dict:
+    """Build condenser and evaporator stream collections from Carnot outputs.
+
+    Parameters
+    ----------
+    T_cond, Q_cond : np.ndarray
+        Condenser temperature levels and duties.
+    T_evap, Q_evap : np.ndarray
+        Evaporator temperature levels and duties.
+    args : HeatPumpTargetInputs
+        Optimisation input bundle containing profile settings.
+
+    Returns
+    -------
+    dict
+        Mapping with ``hp_hot_streams`` and ``hp_cold_streams``.
+    """
     return {
         "hp_hot_streams": _build_latent_streams(T_cond, args.dt_phase_change, Q_cond, is_hot=True),
         "hp_cold_streams": _build_latent_streams(T_evap, args.dt_phase_change, Q_evap, is_hot=False),
@@ -1675,6 +1874,21 @@ def _get_ambient_air_stream(
     Q_amb: float,
     args: HeatPumpTargetInputs,
 ) -> StreamCollection:  
+    """Build ambient-air source/sink stream representation from ambient duty.
+
+    Parameters
+    ----------
+    Q_amb : float
+        Net ambient duty. Positive indicates ambient as heat source, negative as
+        sink.
+    args : HeatPumpTargetInputs
+        Optimisation input bundle containing ambient settings.
+
+    Returns
+    -------
+    StreamCollection
+        Ambient stream collection or an empty collection when duty is near zero.
+    """
     if -tol < Q_amb < tol:
         return StreamCollection()
     else:
