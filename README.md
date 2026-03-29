@@ -1,7 +1,6 @@
 # OpenPinch
 
-OpenPinch is an open-source toolkit for advanced Pinch Analysis and Total Site
-Integration. 
+OpenPinch is an open-source toolkit for advanced Pinch Analysis and Total Site Integration. 
 
 ## History
 
@@ -12,9 +11,9 @@ into wider optimisation workflows.
 
 ## Citation
 
-In scientific works, please cite this github repository, including the Pypi version number. Forks of OpenPinch should also reference back to this source ideally.
+In publications and forks, please cite and link the foundational open-access article and this github repository. 
 
-At present, a publication for citation is under peer-review, and the approperiate reference will be provided in due course.
+Timothy Gordon Walmsley, 2026. OpenPinch: An Open-Source Python Library for Advanced Pinch Analysis and Total Site Integration. Process Integration and Optimization for Sustainability. https://doi.org/10.1007/s41660-026-00729-6
 
 ## Highlights
 
