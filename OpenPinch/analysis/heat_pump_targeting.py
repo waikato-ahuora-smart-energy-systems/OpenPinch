@@ -52,7 +52,7 @@ def get_heat_pump_targets(
         HeatPumpTargetOutputs with the optimal placement, or an empty dict when
         targeting is skipped by the configuration screens.
     """
-    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
+    # zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
     args = _prepare_heat_pump_target_inputs(
         Q_hp_target=Q_hp_target,
         T_vals=T_vals,
@@ -61,7 +61,7 @@ def get_heat_pump_targets(
         is_direct_integration=is_direct_integration,
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
-        debug=True,
+        debug=False,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:
