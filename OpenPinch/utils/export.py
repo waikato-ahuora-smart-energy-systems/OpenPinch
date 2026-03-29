@@ -1,3 +1,5 @@
+"""Excel export utilities for OpenPinch targeting outputs."""
+
 import re
 from datetime import datetime
 from pathlib import Path

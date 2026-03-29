@@ -15,6 +15,8 @@ GCC_VERTICAL_TOL = 1e-3
 
 @dataclass(frozen=True)
 class GCCSeriesMeta:
+    """Legend metadata for a GCC-related data series rendered in output graphs."""
+
     label: str
     description: str
     preferred_stream_loc: Optional[StreamLoc] = None

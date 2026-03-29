@@ -1,3 +1,10 @@
+"""Configuration defaults and global numerical constants for OpenPinch.
+
+The :class:`Configuration` object centralizes option flags and numerical
+settings used across direct integration, utility targeting, and optional
+advanced routines such as heat-pump and cost targeting.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, List
@@ -11,7 +18,6 @@ if TYPE_CHECKING:
 # At present, the config includes many options corresponding to the Excel
 # workbook, but they are not considered during analysis.
 
-"""Global parameters."""
 C_to_K: float = 273.15  # degrees
 tol: float = 1e-6
 T_CRIT: float = 373.9  # C
@@ -122,7 +128,8 @@ class Configuration:
                 if key != "REFRIGERANTS":
                     setattr(self, key, options[key])
                 else:
-                    setattr(self, key, options[key].split(","))
+                    ref_ls = options[key].replace(";", ",").split(",")
+                    setattr(self, key, ref_ls)
 
     # def set_parameters(self, options: Options) -> None:
     #     """Apply checkbox- and turbine-related configuration from :class:`Options`."""

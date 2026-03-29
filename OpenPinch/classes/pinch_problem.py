@@ -1,3 +1,10 @@
+"""High-level convenience wrapper around the OpenPinch targeting service.
+
+``PinchProblem`` provides a script-friendly interface for loading validated
+inputs from JSON/Excel/CSV sources, running analysis, exporting results, and
+launching the Streamlit dashboard.
+"""
+
 import json
 from dataclasses import dataclass
 from pathlib import Path

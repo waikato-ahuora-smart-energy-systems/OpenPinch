@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_targeting import (
@@ -15,6 +16,14 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _map_x_to_T_cond,
     _map_x_to_T_evap,
     _validate_vapour_hp_refrigerant_ls,
+    _get_x0_for_multi_simple_carnot_hp_opt,
+    _get_bounds_for_multi_simple_carnot_hp_opt,
+    _get_x0_for_multi_single_hp_opt,
+    _get_bounds_for_multi_single_hp_opt,
+    _get_x0_for_cascade_hp_opt,
+    _get_bounds_for_cascade_hp_opt,
+    _get_x0_for_brayton_hp_opt,
+    _get_bounds_for_brayton_hp_opt,
 )
 
 
@@ -245,3 +254,86 @@ def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
     assert refrigerants[:2] == ["Water", "Ammonia"]
     assert refrigerants[2:] == ["Ammonia", "Ammonia"]
     assert all(isinstance(ref, str) for ref in refrigerants)
+
+
+def test_multi_simple_carnot_x0_and_bounds_shapes_are_consistent():
+    args = SimpleNamespace(
+        n_cond=3,
+        n_evap=3,
+        T_cold=np.array([140.0, 90.0, 20.0]),
+        T_hot=np.array([130.0, 70.0, 10.0]),
+        dt_range_max=130.0,
+    )
+
+    x0_ls = _get_x0_for_multi_simple_carnot_hp_opt(args)
+    bnds = _get_bounds_for_multi_simple_carnot_hp_opt(args)
+
+    assert x0_ls.shape == (1, (args.n_cond - 1) + args.n_evap)
+    assert len(bnds) == x0_ls.shape[1]
+    assert np.all((x0_ls[0] >= np.array([b[0] for b in bnds])) & (x0_ls[0] <= np.array([b[1] for b in bnds])))
+
+
+def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
+    CoolProp = pytest.importorskip("CoolProp")
+    _ = CoolProp  # silence lint in environments where ruff is enabled
+
+    args = SimpleNamespace(
+        T_cold=np.array([140.0, 80.0, 20.0]),
+        T_hot=np.array([130.0, 70.0, 10.0]),
+        dt_range_max=130.0,
+        dt_phase_change=1.0,
+        Q_hp_target=1000.0,
+        refrigerant_ls=["R134A", "R134A"],
+    )
+
+    T_cond = np.array([120.0, 90.0])
+    T_evap = np.array([50.0, 20.0])
+    Q_cond = np.array([600.0, 400.0])
+
+    bnds = _get_bounds_for_multi_single_hp_opt(T_cond, T_evap, args)
+    x0_ls = _get_x0_for_multi_single_hp_opt(T_cond, Q_cond, T_evap, args, bnds)
+
+    assert x0_ls.shape == (1, 10)
+    assert len(bnds) == x0_ls.shape[1]
+    assert np.all((x0_ls[0] >= np.array([b[0] for b in bnds])) & (x0_ls[0] <= np.array([b[1] for b in bnds])))
+
+
+def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
+    CoolProp = pytest.importorskip("CoolProp")
+    _ = CoolProp  # silence lint in environments where ruff is enabled
+
+    args = SimpleNamespace(
+        T_cold=np.array([140.0, 80.0, 20.0]),
+        T_hot=np.array([130.0, 70.0, 10.0]),
+        dt_range_max=130.0,
+        dt_phase_change=1.0,
+        Q_hp_target=1000.0,
+        refrigerant_ls=["R134A", "R134A", "R134A"],
+    )
+
+    T_cond = np.array([120.0, 90.0])
+    T_evap = np.array([50.0, 20.0])
+    Q_heat = np.array([600.0, 400.0])
+    Q_cool = np.array([500.0, 400.0])
+
+    bnds = _get_bounds_for_cascade_hp_opt(T_cond, T_evap, Q_cool, args)
+    x0_ls = _get_x0_for_cascade_hp_opt(T_cond, Q_heat, T_evap, Q_cool, args, bnds)
+
+    assert x0_ls.shape == (1, 9)
+    assert len(bnds) == x0_ls.shape[1]
+    assert np.all((x0_ls[0] >= np.array([b[0] for b in bnds])) & (x0_ls[0] <= np.array([b[1] for b in bnds])))
+
+
+def test_brayton_x0_and_bounds_shapes_are_consistent():
+    args = SimpleNamespace(
+        T_cold=np.array([140.0, 80.0, 20.0]),
+        T_hot=np.array([130.0, 70.0, 10.0]),
+        dt_range_max=130.0,
+    )
+
+    x0 = _get_x0_for_brayton_hp_opt(args)
+    bnds = _get_bounds_for_brayton_hp_opt(args)
+
+    assert len(x0) == 4
+    assert len(bnds) == 4
+    assert np.all((np.array(x0) >= np.array([b[0] for b in bnds])) & (np.array(x0) <= np.array([b[1] for b in bnds])))

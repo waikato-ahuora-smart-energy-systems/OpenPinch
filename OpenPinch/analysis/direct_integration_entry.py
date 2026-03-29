@@ -1,3 +1,11 @@
+"""Direct heat-integration entry point for process and unit-level targeting.
+
+This module orchestrates the classical pinch-analysis workflow for a single
+zone: problem-table construction, utility targeting, optional heat-pump and
+area-cost calculations, and packaging of outputs into ``EnergyTarget``
+instances.
+"""
+
 from operator import attrgetter
 from typing import List, Tuple
 
@@ -67,8 +75,10 @@ def compute_direct_integration_targets(zone: Zone):
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
     if zone.identifier in [Z.P.value]:
-        if _validate_heat_pump_targeting_required(pt, True, zone_config):
+        Q_hp_target = min(zone_config.HP_LOAD_FRACTION, 1.0) * np.abs(pt.col[PT.H_NET_COLD.value]).max()
+        if _validate_heat_pump_targeting_required(pt, True, zone_config) and Q_hp_target > 0:
             hp_res = get_heat_pump_targets(
+                Q_hp_target=Q_hp_target,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
                 H_cold=pt.col[PT.H_NET_COLD.value],

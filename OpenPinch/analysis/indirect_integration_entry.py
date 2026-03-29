@@ -1,3 +1,10 @@
+"""Indirect heat-integration entry point for total site style targeting.
+
+The routines in this module aggregate process-level direct-integration outputs
+from subzones, construct site process/utility cascades, and calculate net
+utility balances after feasible inter-zone heat recovery.
+"""
+
 from copy import deepcopy
 from typing import Tuple
 
@@ -103,8 +110,10 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
     if zone.identifier in [Z.S.value]:
-        if _validate_heat_pump_targeting_required(pt, True, zone_config):
+        Q_hp_target = min(zone_config.HP_LOAD_FRACTION, 1.0) * np.abs(pt.col[PT.H_HOT_UT.value]).max()
+        if _validate_heat_pump_targeting_required(pt, True, zone_config) and Q_hp_target > 0:        
             hp_res = get_heat_pump_targets(
+                Q_hp_target=Q_hp_target,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_COLD_UT.value],
                 H_cold=pt.col[PT.H_HOT_UT.value],

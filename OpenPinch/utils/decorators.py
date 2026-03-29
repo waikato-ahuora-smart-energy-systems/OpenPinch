@@ -1,10 +1,12 @@
+"""Decorators and lifecycle hooks for execution-time instrumentation."""
+
 import atexit
 import logging
 from collections import defaultdict
 from functools import wraps
 from time import perf_counter as timer
 
-import OpenPinch.lib.config as config
+# from ..lib import config
 
 from ..lib import *
 
@@ -78,6 +80,7 @@ def timing_decorator(func=None, *, activate_overide=False):
 
 @atexit.register
 def print_summary():
+    """Emit aggregated timing statistics collected by ``timing_decorator``."""
     if not _function_stats:
         return
 

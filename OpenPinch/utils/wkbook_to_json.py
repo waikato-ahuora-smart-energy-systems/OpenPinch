@@ -1,3 +1,5 @@
+"""Excel workbook ingestion helpers for OpenPinch problem/result payloads."""
+
 import json
 import pandas as pd
 
@@ -7,18 +9,13 @@ import pandas as pd
 
 
 def get_problem_from_excel(excel_file, output_json=None):
-    """
-    Reads the 'Streams' and 'Utilities' sheets from `excel_file`, assuming
-    each has:
-      - Row 1 = column names
-      - Row 2 = column units
-      - Row 3 onward = data
-    Then writes a JSON file (similar to the provided example) containing:
-      {
-        "streams": [...],
-        "utilities": [...],
-        "options": [...],
-      }
+    """Read workbook stream/utility sheets and return OpenPinch problem JSON.
+
+    Expected sheet layout:
+
+    - Row 1: column names
+    - Row 2: column units
+    - Row 3 onward: data rows
     """
 
     streams_data = _parse_sheet_with_units(excel_file, sheet_name="Stream Data")
@@ -46,16 +43,7 @@ def get_problem_from_excel(excel_file, output_json=None):
 
 
 def get_results_from_excel(excel_file, output_json, project_name):
-    """
-    Reads the 'Results' sheet from `excel_file`, assuming
-    each has:
-      - Row 1 = column names
-      - Row 2 = column units
-      - Row 3 onward = data
-    Then writes a JSON file (similar to the provided example) containing:
-      {
-        "graphs": [...]
-    """
+    """Read workbook summary results and return structured target JSON."""
     results_data = _parse_sheet_with_units(
         excel_file,
         sheet_name="Summary",

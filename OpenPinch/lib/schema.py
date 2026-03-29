@@ -1,3 +1,10 @@
+"""Pydantic schemas for OpenPinch inputs, outputs, and helper data contracts.
+
+These models define the validated wire format used by the high-level service,
+including stream/utility input payloads, zone hierarchies, target summaries,
+graph structures, and specialist analysis helper payloads.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union, Literal
@@ -86,6 +93,8 @@ class HeatPumpTargetInputs(BaseModel):
     debug: bool
 
 class HeatPumpTargetOutputs(BaseModel):
+    """Normalized output contract for heat-pump targeting routines."""
+
     model_config = ConfigDict(
         extra="forbid",
         arbitrary_types_allowed=True,
@@ -93,7 +102,7 @@ class HeatPumpTargetOutputs(BaseModel):
 
     # --- Common objective / result fields -------------------------
     utility_tot: float
-    work_hp: float
+    work_hp: float | list | np.ndarray
     Q_ext: float
     Q_amb: float    
     cop: float | list | np.ndarray
@@ -284,6 +293,8 @@ class TargetInput(BaseModel):
 
 # ---- Problem table / TH data (for tests & I/O) -------------------------------
 class THSchema(BaseModel):
+    """Temperature-enthalpy series payload used for problem-table exchange."""
+
     T: List[float]
     H_hot: Optional[List[float]] = None
     H_cold: Optional[List[float]] = None
@@ -293,11 +304,15 @@ class THSchema(BaseModel):
 
 
 class ProblemTableDataSchema(BaseModel):
+    """Named container for a single temperature-enthalpy profile."""
+
     name: str
     data: THSchema
 
 
 class GetInputOutputData(BaseModel):
+    """Aggregate structure used by legacy I/O helpers and tests."""
+
     plant_profile_data: List[ProblemTableDataSchema]
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
@@ -308,6 +323,8 @@ class GetInputOutputData(BaseModel):
 
 
 class NonLinearStream(BaseModel):
+    """Nonlinear stream definition used by piecewise linearisation utilities."""
+
     t_supply: float
     t_target: float
     p_supply: float
@@ -318,6 +335,8 @@ class NonLinearStream(BaseModel):
 
 
 class LineariseInput(BaseModel):
+    """Input bundle for stream linearisation workflows."""
+
     t_h_data: List
     num_intervals: Optional[int] = 100
     t_min: Optional[float] = 1
@@ -327,6 +346,8 @@ class LineariseInput(BaseModel):
 
 
 class LineariseOutput(BaseModel):
+    """Output payload containing generated linearised stream segments."""
+
     streams: List[Optional[list]]
 
 
@@ -334,8 +355,12 @@ class LineariseOutput(BaseModel):
 
 
 class VisualiseInput(BaseModel):
+    """Input payload for graph visualisation conversion routines."""
+
     zones: list
 
 
 class VisualiseOutput(BaseModel):
+    """Graph payload returned by visualisation conversion routines."""
+
     graphs: List[GraphSet]

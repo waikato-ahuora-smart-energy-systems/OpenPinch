@@ -12,6 +12,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+Hidden/
 eggs/
 .eggs/
 lib64/

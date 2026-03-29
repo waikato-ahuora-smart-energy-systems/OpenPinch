@@ -31,6 +31,22 @@ def get_additional_GCCs(
     do_vert_cc_calc: bool = False,
     do_assisted_ht_calc: bool = False,
 ) -> ProblemTable:        
+    """Populate derived GCC variants used by utility and integration targeting.
+
+    Parameters
+    ----------
+    pt:
+        Problem table containing baseline ``H_net`` and composite-curve columns.
+    do_vert_cc_calc:
+        Enable vertical heat-transfer transformation for assisted integration.
+    do_assisted_ht_calc:
+        Enable pocket extraction and assisted heat-transfer GCC adjustments.
+
+    Returns
+    -------
+    ProblemTable
+        Updated problem table with additional GCC-related columns.
+    """
     # Calculate various GCC profiles
     get_GCC_without_pockets(pt)
     
