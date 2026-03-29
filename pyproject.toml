@@ -20,7 +20,7 @@ dependencies=[
   "tespy",
   "pytest>=9.0.2",
 ]
-version = "0.1.7"
+version = "0.1.8"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
