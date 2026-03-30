@@ -14,7 +14,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import MainOptionsPropKeys, StreamType, TurbineOptionsPropKeys
 
-from ..classes.stream_collection import StreamCollection
+from ..classes import (
+    StreamCollection, 
+    CascadeHeatPumpCycle, 
+    SimpleBraytonHeatPumpCycle, 
+    MultiSimpleHeatPumpCycle
+)
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
@@ -130,6 +135,8 @@ class HeatPumpTargetOutputs(BaseModel):
     dT_comp: Optional[np.ndarray] = None
     Q_heat: Optional[np.ndarray] = None
     Q_cool: Optional[np.ndarray] = None
+
+    hp_model: Optional[list | CascadeHeatPumpCycle | SimpleBraytonHeatPumpCycle | MultiSimpleHeatPumpCycle] = None
 
 
 # ---- Targeting results -------------------------------------------------------

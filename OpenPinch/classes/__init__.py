@@ -16,3 +16,4 @@ from .pinch_problem import PinchProblem
 from .simple_heat_pump import SimpleHeatPumpCycle
 from .multi_simple_heat_pump import MultiSimpleHeatPumpCycle
 from .brayton_heat_pump import SimpleBraytonHeatPumpCycle
+from .cascade_heat_pump import CascadeHeatPumpCycle

@@ -860,7 +860,7 @@ def _compute_cascade_hp_system_performance(
     x: np.ndarray, 
     args: HeatPumpTargetInputs, 
     debug: bool = False,
-) -> float:
+) -> dict:
     """Objective: minimise total compressor work for multi-HP configuration.
     """
     T_cond, dT_subcool, Q_heat, T_evap, Q_cool = _parse_cascade_hp_state_variables(x, args)
@@ -909,8 +909,6 @@ def _compute_cascade_hp_system_performance(
     work_hp = hp.work
     Q_ext = pt_cond.col[PT.H_NET.value][0] # Acts as a penalty
     c = (pt_cond.col[PT.H_NET.value][-1]) ** 2 + pt_evap.col[PT.H_NET.value][0] ** 2
-    # Q_heat = hp.Q_heat_arr
-    # Q_cool = hp.Q_cool_arr
     Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
     obj = (work_hp + Q_ext / args.price_ratio + c) / args.Q_hp_target
@@ -938,6 +936,7 @@ def _compute_cascade_hp_system_performance(
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
         "hp_cold_streams": hp_cold_streams,
+        "hp_model": hp,
     }
 
 
@@ -1263,7 +1262,7 @@ def _compute_multi_simple_hp_system_performance(
     x: np.ndarray, 
     args: HeatPumpTargetInputs, 
     debug: bool = False,
-) -> float:
+) -> dict:
     """Objective: minimize total compressor work for multi-HP configuration.
     """
     T_cond, dT_subcool, Q_heat, T_evap, dT_superheat = _parse_multi_simple_hp_state_temperatures(x, args)
@@ -1339,6 +1338,7 @@ def _compute_multi_simple_hp_system_performance(
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
         "hp_cold_streams": hp_cold_streams,
+        "hp_model": hp,        
     }
 
 
@@ -1475,6 +1475,7 @@ def _compute_brayton_hp_system_performance(
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
         "hp_cold_streams": hp_cold_streams,
+        "hp_model": hp_list,        
     }
 
 
