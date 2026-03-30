@@ -7,19 +7,14 @@ graph structures, and specialist analysis helper payloads.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import MainOptionsPropKeys, StreamType, TurbineOptionsPropKeys
 
-from ..classes import (
-    StreamCollection, 
-    CascadeHeatPumpCycle, 
-    SimpleBraytonHeatPumpCycle, 
-    MultiSimpleHeatPumpCycle
-)
+from ..classes.stream_collection import StreamCollection
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
@@ -136,7 +131,7 @@ class HeatPumpTargetOutputs(BaseModel):
     Q_heat: Optional[np.ndarray] = None
     Q_cool: Optional[np.ndarray] = None
 
-    hp_model: Optional[list | CascadeHeatPumpCycle | SimpleBraytonHeatPumpCycle | MultiSimpleHeatPumpCycle] = None
+    hp_model: Optional[Any] = None
 
 
 # ---- Targeting results -------------------------------------------------------
