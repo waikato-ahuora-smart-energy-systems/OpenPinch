@@ -10,6 +10,10 @@ from .wkbook_to_json import (
     _write_problem_to_dict_and_list,
     _write_targets_to_dict_and_list,
 )
+from .input_validation import validate_stream_data, validate_utility_data
+
+__all__ = ["get_problem_from_csv", "get_results_from_csv"]
+
 
 #######################################################################################################
 # Public API
@@ -58,6 +62,7 @@ def get_problem_from_csv(
         row_data=row_data,
         encoding=encoding,
     )
+    streams_data = validate_stream_data(streams_data)
     utilities_data = _parse_csv_with_units(
         utilities_csv,
         kind="Utility Data",
@@ -65,6 +70,7 @@ def get_problem_from_csv(
         row_data=row_data,
         encoding=encoding,
     )
+    utilities_data = validate_utility_data(utilities_data)
     options_data = dict()
 
     output_dict = {
@@ -193,7 +199,7 @@ def _parse_csv_with_units(
                 return x
         return x
 
-    df_data = df_data.applymap(_to_number_maybe)
+    df_data = df_data.map(_to_number_maybe)
 
     units_map = dict(zip(col_names, col_units))
 

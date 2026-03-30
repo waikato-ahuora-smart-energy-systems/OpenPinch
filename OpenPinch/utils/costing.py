@@ -1,5 +1,12 @@
 """Utility helpers for costing heat exchangers."""
 
+__all__ = ["compute_capital_recovery_factor", "compute_capital_cost", "compute_annual_capital_cost"]
+
+
+#######################################################################################################
+# Public API
+#######################################################################################################
+
 
 def compute_capital_recovery_factor(interest_rate: float, years: int) -> float:
     """Calculates the Capital Recovery Factor (CRF), also known as the annualisation factor."""
