@@ -112,3 +112,20 @@ def test_manual_setters(hot_stream):
     assert hot_stream.t_max_star == 300
     assert hot_stream.CP == 100
     assert hot_stream.rCP == 50
+
+
+def test_zero_heat_flow_isothermal_stream_initialises_without_error():
+    s = DummyStream(
+        name="ZeroDuty",
+        t_supply=100.0,
+        t_target=100.0,
+        heat_flow=0.0,
+        dt_cont=5.0,
+    )
+
+    assert s.type == StreamType.Both.value
+    assert s.t_min == 100.0
+    assert s.t_max == 100.0
+    assert s.t_min_star == 100.0
+    assert s.t_max_star == 100.0
+    assert s.CP == 0.0

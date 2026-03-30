@@ -275,9 +275,13 @@ class Stream:
                     # Hot stream
                     self._t_target = self._t_supply - 0.01
                     self._set_hot_stream_min_max_temperatures()
+                else:
+                    # Zero-duty isothermal stream: keep temperatures unchanged and classify as neutral.
+                    self._set_neutral_stream_min_max_temperatures()
 
         if isinstance(self._heat_flow, float | int):
-            self._CP = self._heat_flow / (self._t_max - self._t_min)
+            dt = self._t_max - self._t_min
+            self._CP = self._heat_flow / dt if abs(dt) > 0.0 else 0.0
         elif isinstance(self._CP, float | int):
             self._heat_flow = self._CP * (self._t_max - self._t_min)
 
@@ -325,3 +329,10 @@ class Stream:
         self._t_max_star = self._t_max + self._dt_cont
         if self._type is None:
             self._type = StreamType.Cold.value
+
+    def _set_neutral_stream_min_max_temperatures(self):
+        self._t_min = self._t_supply
+        self._t_max = self._t_target
+        self._t_min_star = self._t_min
+        self._t_max_star = self._t_max
+        self._type = StreamType.Both.value
