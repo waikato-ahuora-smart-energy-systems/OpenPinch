@@ -16,7 +16,6 @@ from . import (
     problem_table_algorithm,
     get_heat_pump_targets,
     calc_heat_pump_cascade,
-    plot_multi_hp_profiles_from_results,
     get_heat_recovery_target_from_pt,
     set_zonal_targets,
 )
@@ -130,18 +129,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 is_T_vals_shifted=True,
                 is_direct_integration=False,
             )
-            if 0:
-                plot_multi_hp_profiles_from_results(
-                    T_hot=pt.col[PT.T.value],
-                    H_hot=pt.col[PT.H_COLD_UT.value],
-                    T_cold=pt.col[PT.T.value],                    
-                    H_cold=pt.col[PT.H_HOT_UT.value],
-                    hp_hot_streams=hp_res.hp_hot_streams,
-                    hp_cold_streams=hp_res.hp_cold_streams,
-                )
-                pt.export(
-                    filename=("PT--" + zone_config.TOP_ZONE_NAME.split('.')[0] + "-" + zone.name + "--" + "-".join([r.strip().upper() for r in zone_config.REFRIGERANTS]))
-                )
 
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
@@ -149,8 +136,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     #         pass
     #         # s_tsi = get_power_cogeneration_above_pinch(s_tsi)
     #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
-
-    graphs = _save_graph_data(pt, pt_real)
 
     target_values = _set_sites_targets(
         hot_utility_target,
@@ -163,7 +148,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
             "pt": pt,
             "pt_real": pt_real,
             "target_values": target_values,
-            "graphs": graphs,
+            "graphs": _save_graph_data(pt, pt_real),
             "hot_utilities": hot_utilities,
             "cold_utilities": cold_utilities,
             "hot_pinch": hot_pinch,
@@ -343,16 +328,8 @@ def _save_graph_data(
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {
-        GT.TSP.value: pt[
-            [
-                PT.T.value,
-                PT.H_NET_HOT.value,
-                PT.H_NET_COLD.value,
-                PT.H_HOT_UT.value,
-                PT.H_COLD_UT.value,
-            ]
-        ],
-        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value]],
+        GT.TSP.value: pt[[PT.T.value, PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
+        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP_UT.value]],
     }
 
 
