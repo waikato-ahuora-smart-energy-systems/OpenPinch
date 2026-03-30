@@ -7,7 +7,7 @@ graph structures, and specialist analysis helper payloads.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
@@ -130,6 +130,8 @@ class HeatPumpTargetOutputs(BaseModel):
     dT_comp: Optional[np.ndarray] = None
     Q_heat: Optional[np.ndarray] = None
     Q_cool: Optional[np.ndarray] = None
+
+    hp_model: Optional[Any] = None
 
 
 # ---- Targeting results -------------------------------------------------------

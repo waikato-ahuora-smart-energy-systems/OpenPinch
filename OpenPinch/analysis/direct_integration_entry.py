@@ -24,7 +24,6 @@ from . import (
     get_additional_GCCs,
     get_heat_pump_targets,
     calc_heat_pump_cascade,
-    plot_multi_hp_profiles_from_results,
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -95,16 +94,6 @@ def compute_direct_integration_targets(zone: Zone):
                 is_T_vals_shifted=True,
                 is_direct_integration=True,
             )
-            if 0:
-                plot_multi_hp_profiles_from_results(
-                    T_hot=pt.col[PT.T.value],
-                    H_hot=pt.col[PT.H_NET_HOT.value],
-                    T_cold=pt.col[PT.T.value],                    
-                    H_cold=pt.col[PT.H_NET_COLD.value],
-                    hp_hot_streams=hp_res.hp_hot_streams,
-                    hp_cold_streams=hp_res.hp_cold_streams,
-                )
-                pass
     
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True

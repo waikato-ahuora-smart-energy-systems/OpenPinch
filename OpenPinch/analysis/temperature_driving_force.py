@@ -1,4 +1,4 @@
-"""Temperature driving force method."""
+"""Temperature-driving-force calculations for composite-curve analysis."""
 import numpy as np 
 
 from ..classes import *
@@ -17,8 +17,32 @@ def get_temperature_driving_forces(
         T_cold: np.array, 
         H_cold: np.array,
         min_dT: float = 0,
-) -> float:
-    """Determines the temeprature driving force plot using vectorized numpy operations."""
+) -> dict[str, np.ndarray]:
+    """Compute interval temperature-driving-force data between two composites.
+
+    Parameters
+    ----------
+    T_hot, H_hot : np.array
+        Temperature and heat-flow coordinates for the hot composite curve.
+    T_cold, H_cold : np.array
+        Temperature and heat-flow coordinates for the cold composite curve.
+    min_dT : float, default=0
+        Minimum approach-temperature offset subtracted from each end-point
+        driving force.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Mapping with interval grid and per-interval values:
+        ``h_vals``, ``delta_T1``, ``delta_T2``, ``dh_vals``, ``t_h1``,
+        ``t_h2``, ``t_c1``, ``t_c2``.
+
+    Raises
+    ------
+    ValueError
+        If input arrays are empty, mismatched in length, or represent
+        unbalanced hot/cold duties.
+    """
     dp = int(-math.log10(tol))
     T_hot = np.asarray(T_hot, dtype=float).round(dp)
     H_hot = np.asarray(H_hot, dtype=float).round(dp)
@@ -76,12 +100,41 @@ def get_temperature_driving_forces(
 #######################################################################################################
 
 def _build_h_grid(h_hot: np.ndarray, h_cold: np.ndarray) -> np.ndarray:
-    """Create a unified, sorted heat-flow grid across both curves."""
+    """Create a sorted heat-flow grid shared by hot and cold composites.
+
+    Parameters
+    ----------
+    h_hot, h_cold : np.ndarray
+        Heat-flow coordinates.
+
+    Returns
+    -------
+    np.ndarray
+        Sorted union of both heat-flow arrays.
+    """
     return np.union1d(h_hot, h_cold).astype(float, copy=False)
 
 
 def _normalise_curve(h_vals: np.ndarray, t_vals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Ensure a composite curve has ascending heat flow and starts at zero."""
+    """Orient a composite curve and shift heat flow so it starts at zero.
+
+    Parameters
+    ----------
+    h_vals : np.ndarray
+        Heat-flow coordinates.
+    t_vals : np.ndarray
+        Temperature coordinates aligned with ``h_vals``.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Normalized heat-flow and temperature arrays.
+
+    Raises
+    ------
+    ValueError
+        If ``h_vals`` and ``t_vals`` do not have equal length.
+    """
     if h_vals.size != t_vals.size:
         raise ValueError("Composite curve temperature and heat arrays must be the same length.")
 
@@ -99,12 +152,34 @@ def _normalise_curve(h_vals: np.ndarray, t_vals: np.ndarray) -> tuple[np.ndarray
 
 
 def _collect_discontinuities(h_hot: np.ndarray, h_cold: np.ndarray) -> set[float]:
-    """Identify heat loads where either curve has a vertical segment."""
+    """Return heat-load positions where either curve has a discontinuity.
+
+    Parameters
+    ----------
+    h_hot, h_cold : np.ndarray
+        Heat-flow coordinates for hot and cold curves.
+
+    Returns
+    -------
+    set[float]
+        Combined discontinuity heat-load values.
+    """
     return set(_discontinuity_values(h_hot)) | set(_discontinuity_values(h_cold))
 
 
 def _discontinuity_values(h_vals: np.ndarray) -> np.ndarray:
-    """Return the heat loads associated with zero-width segments."""
+    """Extract heat-load values associated with zero-width segments.
+
+    Parameters
+    ----------
+    h_vals : np.ndarray
+        Heat-flow coordinates.
+
+    Returns
+    -------
+    np.ndarray
+        Heat-load values at repeated adjacent coordinates.
+    """
     if h_vals.size < 2:
         return np.empty(0, dtype=float)
     mask = np.isclose(np.diff(h_vals), 0.0, atol=tol)
@@ -114,7 +189,20 @@ def _discontinuity_values(h_vals: np.ndarray) -> np.ndarray:
 
 
 def _is_discontinuity(value: float, discontinuities: set[float]) -> bool:
-    """Check if a heat load corresponds to a discontinuity."""
+    """Check whether a heat-load value matches a known discontinuity.
+
+    Parameters
+    ----------
+    value : float
+        Heat-load value to test.
+    discontinuities : set[float]
+        Known discontinuity values.
+
+    Returns
+    -------
+    bool
+        ``True`` when ``value`` is within tolerance of any discontinuity.
+    """
     for disc in discontinuities:
         if abs(value - disc) <= tol:
             return True
