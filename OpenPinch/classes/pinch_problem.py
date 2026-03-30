@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
 from ..utils import *
+from ..utils.input_validation import validate_stream_data, validate_utility_data
 from ..lib import *
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
@@ -129,6 +130,18 @@ class PinchProblem:
                     self._problem_data = json.load(f)
             except Exception as e:
                 raise ValueError(f"Failed to parse JSON from {src_path}: {e}") from e
+            if isinstance(self._problem_data, dict) and isinstance(
+                self._problem_data.get("streams"), list
+            ):
+                self._problem_data["streams"] = validate_stream_data(
+                    self._problem_data["streams"]
+                )
+            if isinstance(self._problem_data, dict) and isinstance(
+                self._problem_data.get("utilities"), list
+            ):
+                self._problem_data["utilities"] = validate_utility_data(
+                    self._problem_data["utilities"]
+                )
             self._problem_filepath = src_path
             return self._problem_data
 
@@ -220,6 +233,18 @@ class PinchProblem:
         """Build directly from an in-memory JSON-like dict."""
         obj = cls(problem_filepath=None, results_dir=None, run=False)
         obj._problem_data = data
+        if isinstance(obj._problem_data, dict) and isinstance(
+            obj._problem_data.get("streams"), list
+        ):
+            obj._problem_data["streams"] = validate_stream_data(
+                obj._problem_data["streams"]
+            )
+        if isinstance(obj._problem_data, dict) and isinstance(
+            obj._problem_data.get("utilities"), list
+        ):
+            obj._problem_data["utilities"] = validate_utility_data(
+                obj._problem_data["utilities"]
+            )
         return obj
 
     def to_problem_json(self) -> JsonDict:

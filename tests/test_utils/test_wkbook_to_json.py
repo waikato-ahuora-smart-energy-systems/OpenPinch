@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from OpenPinch.utils.wkbook_to_json import (
+    _validate_stream_data,
     get_problem_from_excel,
     get_results_from_excel,
 )
@@ -217,3 +218,50 @@ def test_get_results_from_excel_writes_json_when_path_given(tmp_path: Path):
     # Function returns the dict and writes the JSON file
     assert out_json.exists()
     assert out["targets"]  # non-empty
+
+
+def test_validate_stream_data_inherits_missing_zone_from_previous_stream():
+    streams = [
+        {"zone": "Zone A", "name": "H1"},
+        {"zone": None, "name": "C1"},
+        {"zone": "", "name": "H2"},
+        {"zone": "2", "name": "3"},
+        {"zone": None, "name": "4"},
+    ]
+
+    out = _validate_stream_data(streams)
+
+    assert [s["zone"] for s in out] == ["Zone A", "Zone A", "Zone A", "Z2", "Z2"]
+    assert [s["name"] for s in out] == ["H1", "C1", "H2", "S3", "S4"]
+
+
+def test_validate_stream_data_defaults_first_missing_zone_then_inherits():
+    streams = [
+        {"zone": None, "name": "H1"},
+        {"zone": "", "name": "C1"},
+        {"zone": "Zone B", "name": "H2"},
+        {"zone": None, "name": "C2"},
+    ]
+
+    out = _validate_stream_data(streams)
+
+    assert [s["zone"] for s in out] == [
+        "Process Zone",
+        "Process Zone",
+        "Zone B",
+        "Zone B",
+    ]
+
+
+def test_validate_stream_data_defaults_name_when_zone_and_name_missing():
+    streams = [
+        {"zone": None, "name": None, "t_supply": {"value": 150.0, "units": "degC"}},
+        {"zone": "", "name": "", "t_supply": {"value": 140.0, "units": "degC"}},
+        {"zone": "Zone C", "name": "H3", "t_supply": {"value": 130.0, "units": "degC"}},
+        {"zone": None, "name": None, "t_supply": {"value": 120.0, "units": "degC"}},
+    ]
+
+    out = _validate_stream_data(streams)
+
+    assert [s["zone"] for s in out] == ["Process Zone", "Process Zone", "Zone C", "Zone C"]
+    assert [s["name"] for s in out] == ["S1", "S2", "H3", "S3"]

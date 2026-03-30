@@ -13,7 +13,7 @@ from OpenPinch.classes.pinch_problem import PinchProblem
 def sample_problem():
     return {
         "options": {"dt_min": 10},
-        "streams": [{"name": "H1", "supply_T": 150, "target_T": 60, "cp": 2.0}],
+        "streams": [{"zone": "Z1", "name": "H1", "supply_T": 150, "target_T": 60, "cp": 2.0}],
         "utilities": [{"name": "LP Steam", "T": 150, "cost": 20}],
     }
 
@@ -201,3 +201,28 @@ def test_repr_changes_with_state(tmp_path: Path):
 def test_from_json_builds_and_roundtrips(sample_problem):
     obj = PinchProblem.from_json(sample_problem)
     assert obj.to_problem_json() == sample_problem
+
+
+def test_load_json_normalises_missing_zone_and_name(tmp_path: Path):
+    payload = {
+        "options": {},
+        "utilities": [
+            {"name": None, "type": "Hot"},
+            {"name": "", "type": "Cold"},
+            {"name": "HP Steam", "type": "Hot"},
+        ],
+        "streams": [
+            {"zone": "Zone A", "name": "H1", "t_supply": 150},
+            {"zone": None, "name": None, "t_supply": 140},
+            {"zone": "", "name": "", "t_supply": 130},
+        ],
+    }
+    p = tmp_path / "problem.json"
+    p.write_text(json.dumps(payload), encoding="utf-8")
+
+    obj = PinchProblem(run=False)
+    out = obj.load(p)
+
+    assert [s["zone"] for s in out["streams"]] == ["Zone A", "Zone A", "Zone A"]
+    assert [s["name"] for s in out["streams"]] == ["H1", "S1", "S2"]
+    assert [u["name"] for u in out["utilities"]] == ["HP Steam"]
