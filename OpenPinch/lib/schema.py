@@ -93,7 +93,7 @@ class HeatPumpTargetInputs(BaseModel):
     debug: bool
 
 class HeatPumpTargetOutputs(BaseModel):
-    """Normalized output contract for heat-pump targeting routines."""
+    """Normalized output requirement for heat pump targeting routines."""
 
     model_config = ConfigDict(
         extra="forbid",

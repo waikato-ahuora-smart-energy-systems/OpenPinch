@@ -2,7 +2,7 @@
 
 The :class:`Configuration` object centralizes option flags and numerical
 settings used across direct integration, utility targeting, and optional
-advanced routines such as heat-pump and cost targeting.
+advanced routines such as heat pump and cost targeting.
 """
 
 from __future__ import annotations

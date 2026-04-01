@@ -1,3 +1,5 @@
+"""Regression tests for utility targeting analysis routines."""
+
 import json
 import os
 
@@ -13,6 +15,7 @@ from OpenPinch.analysis.utility_targeting import _target_utility
 
 
 def get_test_filenames():
+    """Return test filenames used by this test module."""
     test_data_dir = os.path.dirname(__file__) + "/test_utility_targeting_data"
     return [
         filename

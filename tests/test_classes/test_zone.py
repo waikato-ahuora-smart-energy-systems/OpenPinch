@@ -1,3 +1,5 @@
+"""Regression tests for the zone classes."""
+
 import pytest
 
 from OpenPinch.classes import *
@@ -6,16 +8,19 @@ from OpenPinch.lib import *
 
 @pytest.fixture
 def dummy_zone():
+    """Return dummy zone data used by this test module."""
     return Zone(name="Z1")
 
 
 @pytest.fixture
 def dummy_tar():
+    """Return dummy tar data used by this test module."""
     return EnergyTarget("Z1")
 
 
 @pytest.fixture
 def sample_streams():
+    """Return sample streams data used by this test module."""
     return [
         Stream(name="Hot1", t_supply=400, t_target=200, heat_flow=1),
         Stream(name="Cold1", t_supply=100, t_target=300, heat_flow=1),
@@ -24,6 +29,7 @@ def sample_streams():
 
 @pytest.fixture
 def sample_utilities():
+    """Return sample utilities data used by this test module."""
     u1 = Stream(name="Steam", t_supply=450, t_target=250, is_process_stream=False)
     u1.ut_cost = 100
     u2 = Stream(name="CoolingWater", t_supply=25, t_target=40, is_process_stream=False)

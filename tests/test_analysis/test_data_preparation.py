@@ -57,16 +57,19 @@ from OpenPinch.lib import *
 
 @pytest.fixture
 def dummy_config():
+    """Return dummy config data used by this test module."""
     return Configuration()
 
 
 @pytest.fixture
 def dummy_site(dummy_config):
+    """Return dummy site data used by this test module."""
     return Zone(name="test_site", zone_config=dummy_config)
 
 
 @pytest.fixture
 def dummy_streams():
+    """Return dummy streams data used by this test module."""
     return [
         StreamSchema.model_validate(
             {
@@ -95,6 +98,7 @@ def dummy_streams():
 
 @pytest.fixture
 def dummy_utilities():
+    """Return dummy utilities data used by this test module."""
     return [
         UtilitySchema.model_validate(
             {
@@ -787,6 +791,7 @@ from OpenPinch.analysis.data_preparation import _validate_zone_tree_structure
 
 
 def make_stream(zone: str) -> StreamSchema:
+    """Build stream data used by this test module."""
     return StreamSchema(
         name="TestStream",
         zone=zone,
@@ -1018,6 +1023,7 @@ from OpenPinch.analysis.data_preparation import _create_nested_zones
 @pytest.fixture
 def config():
     # Minimal mock config with required attributes
+    """Test helper for config."""
     class Config:
         TOP_ZONE_NAME = "MySite"
         TOP_ZONE_IDENTIFIER = ZoneType.S.value
@@ -1027,6 +1033,7 @@ def config():
 
 def make_zone_tree_schema():
     # Example nested structure: Site -> Area1 -> Line1
+    """Build zone tree schema data used by this test module."""
     return ZoneTreeSchema(
         name="MySite",
         type=ZoneType.S.value,

@@ -1,3 +1,5 @@
+"""Local entry point for running a bundled OpenPinch example case."""
+
 from pathlib import Path
 
 from OpenPinch import *

@@ -58,7 +58,7 @@ def compute_LMTD_from_ts(
 
 
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
-    """Return heat-exchanger effectiveness for the specified arrangement/NTU/c ratio."""
+    """Return heat exchanger effectiveness for the specified arrangement/NTU/c ratio."""
     if Passes == None:
         Passes = 1
 

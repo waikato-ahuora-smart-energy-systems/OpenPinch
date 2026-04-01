@@ -1,3 +1,5 @@
+"""Regression tests for temperature driving force analysis routines."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -8,6 +10,7 @@ from OpenPinch.analysis.temperature_driving_force import (
 
 
 def _base_curves():
+    """Return baseline hot and cold curves for the driving-force tests."""
     T_hot = np.array([400.0, 350.0, 300.0, 300.0])
     H_hot = np.array([200.0,   100.0, 100.0, 0.0])
     T_cold = np.array([325.0, 250.0, 100.0])
@@ -16,6 +19,7 @@ def _base_curves():
 
 
 def _get_expected_base_results():
+    """Return the expected reference results for the baseline curves."""
     expected_h = np.array([0.0, 50.0, 100.0, 200.0])
     expected_delta_T1 = np.array([200.0, 50.0, 75.0])
     expected_delta_T2 = np.array([50.0, 25.0, 75.0])

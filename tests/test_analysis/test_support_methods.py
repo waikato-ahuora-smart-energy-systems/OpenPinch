@@ -1,3 +1,5 @@
+"""Regression tests for support methods analysis routines."""
+
 import math
 
 import pytest

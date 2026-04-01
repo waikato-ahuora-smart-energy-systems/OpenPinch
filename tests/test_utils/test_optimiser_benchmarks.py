@@ -1,3 +1,5 @@
+"""Regression tests for optimiser benchmarks utility helpers."""
+
 import time
 
 import numpy as np
@@ -30,6 +32,7 @@ def _run_benchmark(
     bounds,
     opt_kwargs,
 ):
+    """Run benchmark for this test module."""
     start = time.perf_counter()
     minima = multiminima(
         func=objective,

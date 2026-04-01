@@ -1,3 +1,5 @@
+"""Regression tests for graphs analysis routines."""
+
 from unittest.mock import MagicMock
 
 import pytest

@@ -1,3 +1,5 @@
+"""Regression tests for optimiser handles utility helpers."""
+
 import numpy as np
 import pytest
 
@@ -7,11 +9,13 @@ from OpenPinch.utils.blackbox_minimisers import multiminima
 
 
 def _convex_quadratic(x, _):
+    """Convex quadratic objective used by the optimiser tests."""
     x = np.asarray(x, dtype=float)
     return {"obj": float((x[0] - 0.4) ** 2 + (x[1] + 0.25) ** 2)}
 
 
 def _run_multiminima(handle):
+    """Run multiminima for this test module."""
     return multiminima(
         func=_convex_quadratic,
         bounds=((-1.0, 1.0), (-1.0, 1.0)),

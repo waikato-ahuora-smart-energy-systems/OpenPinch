@@ -1,3 +1,5 @@
+"""Regression tests for wkbook to json utility helpers."""
+
 from pathlib import Path
 
 import pandas as pd

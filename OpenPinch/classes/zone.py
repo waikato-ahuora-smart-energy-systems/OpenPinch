@@ -13,9 +13,7 @@ if TYPE_CHECKING:
 
 
 class Zone:
-    """Class representing any type of defined spatial zone (i.e., operation,
-    process zone, site, region, utility zone) with its energy targets.
-    """
+    """Hierarchical zone containing streams, utilities, targets, and subzones."""
 
     def __init__(
         self,
@@ -24,6 +22,7 @@ class Zone:
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
     ):
+        """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
         self._name = name
         self._identifier = identifier
@@ -46,6 +45,7 @@ class Zone:
 
     @property
     def name(self):
+        """Display name used when addressing the zone in the hierarchy."""
         return self._name
 
     @name.setter
@@ -54,6 +54,7 @@ class Zone:
 
     @property
     def identifier(self):
+        """Zone type identifier from :class:`ZoneType`."""
         return self._identifier
 
     @identifier.setter
@@ -62,6 +63,7 @@ class Zone:
 
     @property
     def config(self):
+        """Configuration object controlling analysis behaviour for this zone."""
         return self._config
 
     @config.setter
@@ -70,6 +72,7 @@ class Zone:
 
     @property
     def parent_zone(self):
+        """Direct parent zone in the site hierarchy, if any."""
         return self._parent_zone
 
     @parent_zone.setter
@@ -78,6 +81,7 @@ class Zone:
 
     @property
     def active(self) -> bool:
+        """Whether the zone participates in the current analysis."""
         return bool(self._active)
 
     @active.setter
@@ -86,6 +90,7 @@ class Zone:
 
     @property
     def hot_streams(self):
+        """Process streams that release heat within this zone."""
         return self._hot_streams
 
     @hot_streams.setter
@@ -94,6 +99,7 @@ class Zone:
 
     @property
     def cold_streams(self):
+        """Process streams that require heat within this zone."""
         return self._cold_streams
 
     @cold_streams.setter
@@ -102,6 +108,7 @@ class Zone:
 
     @property
     def net_hot_streams(self):
+        """Net hot streams derived from zonal aggregation."""
         return self._net_hot_streams
 
     @net_hot_streams.setter
@@ -110,6 +117,7 @@ class Zone:
 
     @property
     def net_cold_streams(self):
+        """Net cold streams derived from zonal aggregation."""
         return self._net_cold_streams
 
     @net_cold_streams.setter
@@ -118,6 +126,7 @@ class Zone:
 
     @property
     def hot_utilities(self):
+        """Hot utility streams assigned to the zone."""
         return self._hot_utilities
 
     @hot_utilities.setter
@@ -126,6 +135,7 @@ class Zone:
 
     @property
     def cold_utilities(self):
+        """Cold utility streams assigned to the zone."""
         return self._cold_utilities
 
     @cold_utilities.setter
@@ -134,6 +144,7 @@ class Zone:
 
     @property
     def graphs(self):
+        """Graphs generated for this zone."""
         return self._graphs
 
     @graphs.setter
@@ -142,34 +153,42 @@ class Zone:
 
     @property
     def subzones(self):
+        """Immediate child zones keyed by name."""
         return self._subzones
 
     @property
     def targets(self):
+        """Energy targets keyed by target name."""
         return self._targets
 
     @property
     def process_streams(self):
+        """Combined hot and cold process streams for the zone."""
         return self._hot_streams + self._cold_streams
 
     @property
     def net_process_streams(self):
+        """Combined net hot and net cold process streams for the zone."""
         return self._net_hot_streams + self._net_cold_streams
 
     @property
     def utility_streams(self):
+        """Combined hot and cold utility streams for the zone."""
         return self._hot_utilities + self._cold_utilities
 
     @property
     def all_streams(self):
+        """All process and utility streams defined on the zone."""
         return self.process_streams + self.utility_streams
 
     @property
     def all_net_streams(self):
+        """All net-process and utility streams defined on the zone."""
         return self.net_process_streams + self.utility_streams
 
     # === Methods ===
     def add_graph(self, name: str, result):
+        """Store a graph result under ``name`` for later export or display."""
         self._graphs[name] = result
 
     def add_zone(self, zone_to_add, sub: bool = True):
@@ -218,6 +237,7 @@ class Zone:
             self.add_target(t)
 
     def add_target_from_results(self, target_id: str = None, results: dict = None):
+        """Create and register an :class:`EnergyTarget` from a result mapping."""
         target_name = f"{self.name}/{target_id}" if target_id is not None else self.name
         res = EnergyTarget(target_name, target_id, self.parent_zone, zone_config=self.config)
         for key, value in results.items():
@@ -225,6 +245,7 @@ class Zone:
         self.add_target(res)
 
     def get_subzone(self, loc: str):
+        """Resolve a slash-delimited zone path relative to this zone."""
         loc_address = loc.split("/")
         zone = self
         for sub in loc_address:
@@ -235,6 +256,7 @@ class Zone:
         return zone
 
     def calc_utility_cost(self):
+        """Calculate and cache the annual utility cost across assigned utilities."""
         self._utility_cost = sum([u.ut_cost for u in self.utility_streams])
         return self._utility_cost
 

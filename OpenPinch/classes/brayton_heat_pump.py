@@ -1,7 +1,7 @@
-"""Brayton-cycle heat-pump model used by advanced utility targeting workflows.
+"""Brayton-cycle heat pump model used by advanced utility targeting workflows.
 
 The class in this module wraps a TESPy network while exposing a simplified API
-compatible with other OpenPinch heat-pump cycle helpers.
+compatible with other OpenPinch heat pump cycle helpers.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ class SimpleBraytonHeatPumpCycle:
     STATECOUNT = 4
 
     def __init__(self):
-        """Initialize an unsolved Brayton heat-pump cycle container."""
+        """Initialize an unsolved Brayton heat pump cycle container."""
         # Keep minimal unit-system compatibility surface (not using CoolProp
         # unit dicts here); the simple heat pump used a PropertyDict. For
         # compatibility we accept the same constructor signature.

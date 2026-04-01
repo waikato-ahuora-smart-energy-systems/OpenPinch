@@ -1,3 +1,5 @@
+"""Regression tests for miscellaneous utility helpers."""
+
 import math
 
 import pytest

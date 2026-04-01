@@ -1,3 +1,5 @@
+"""Regression tests for interpolator utility helpers."""
+
 import pytest
 
 from OpenPinch.utils import linear_interpolation

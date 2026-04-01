@@ -1,3 +1,5 @@
+"""Regression tests for csv to json utility helpers."""
+
 from pathlib import Path
 
 import pandas as pd
@@ -6,6 +8,7 @@ from OpenPinch.utils.csv_to_json import get_problem_from_csv
 
 
 def _write_stream_csv(path: Path) -> None:
+    """Write stream csv data used by this test module."""
     rows = [
         ["ignored"] * 9,
         [None, None, "degC", "degC", "kW", "K", "kW/mK", None, None],
@@ -17,6 +20,7 @@ def _write_stream_csv(path: Path) -> None:
 
 
 def _write_utility_csv(path: Path) -> None:
+    """Write utility csv data used by this test module."""
     rows = [
         ["ignored"] * 8,
         [None, None, "degC", "degC", "K", "$/MWh", "kW/mK", "kW"],

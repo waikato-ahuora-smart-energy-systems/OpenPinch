@@ -16,9 +16,7 @@ if TYPE_CHECKING:
 
 
 class EnergyTarget:
-    """
-    Class representing energy targets.
-    """
+    """Aggregated targeting results for a zone or sub-problem."""
 
     def __init__(
         self,
@@ -27,6 +25,7 @@ class EnergyTarget:
         parent_zone: "Zone" = None,
         zone_config: Optional[Configuration] = None,
     ):
+        """Initialise a target container with empty tables, utilities, and metrics."""
         # === Metadata ===
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
@@ -77,6 +76,7 @@ class EnergyTarget:
     # === Properties ===
     @property
     def name(self):
+        """Display name of the target."""
         return self._name
 
     @name.setter
@@ -85,6 +85,7 @@ class EnergyTarget:
 
     @property
     def identifier(self):
+        """Target type identifier from :class:`TargetType`."""
         return self._identifier
 
     @identifier.setter
@@ -93,6 +94,7 @@ class EnergyTarget:
 
     @property
     def config(self):
+        """Configuration used to generate the target."""
         return self._config
 
     @config.setter
@@ -101,6 +103,7 @@ class EnergyTarget:
 
     @property
     def parent_zone(self):
+        """Zone that owns this target, when applicable."""
         return self._parent_zone
 
     @parent_zone.setter
@@ -109,7 +112,7 @@ class EnergyTarget:
 
     @property
     def active(self) -> bool:
-        """Whether the stream is active in analysis."""
+        """Whether the target is active in analysis."""
         if isinstance(self._active, Value):
             return self._active.value
         else:
@@ -121,6 +124,7 @@ class EnergyTarget:
 
     @property
     def pt(self):
+        """Shifted problem table associated with the target."""
         return self._problem_table
 
     @pt.setter
@@ -129,6 +133,7 @@ class EnergyTarget:
 
     @property
     def pt_real(self):
+        """Problem table expressed in real temperatures."""
         return self._problem_table_real
 
     @pt_real.setter
@@ -137,6 +142,7 @@ class EnergyTarget:
 
     @property
     def hot_utilities(self):
+        """Hot utility streams required by the target."""
         return self._hot_utilities
 
     @hot_utilities.setter
@@ -145,6 +151,7 @@ class EnergyTarget:
 
     @property
     def cold_utilities(self):
+        """Cold utility streams required by the target."""
         return self._cold_utilities
 
     @cold_utilities.setter
@@ -153,6 +160,7 @@ class EnergyTarget:
 
     @property
     def graphs(self):
+        """Graphs generated for the target."""
         return self._graphs
 
     @graphs.setter
@@ -161,10 +169,12 @@ class EnergyTarget:
 
     @property
     def utility_streams(self):
+        """Combined hot and cold utility streams for the target."""
         return self._hot_utilities + self._cold_utilities
 
     @property
     def area(self):
+        """Estimated total heat exchanger area."""
         return self._area
 
     @area.setter
@@ -173,6 +183,7 @@ class EnergyTarget:
 
     @property
     def capital_cost(self):
+        """Estimated capital cost for the target network."""
         return self._capital_cost
 
     @capital_cost.setter
@@ -181,6 +192,7 @@ class EnergyTarget:
 
     @property
     def cold_pinch(self):
+        """Cold-side pinch temperature."""
         return self._cold_pinch
 
     @cold_pinch.setter
@@ -189,6 +201,7 @@ class EnergyTarget:
 
     @property
     def cold_utility_target(self):
+        """Minimum cold-utility demand."""
         return self._cold_utility_target
 
     @cold_utility_target.setter
@@ -197,6 +210,7 @@ class EnergyTarget:
 
     @property
     def degree_of_int(self):
+        """Degree of integration achieved by the target."""
         return self._degree_of_int
 
     @degree_of_int.setter
@@ -205,6 +219,7 @@ class EnergyTarget:
 
     @property
     def ETE(self):
+        """Exergy-transfer efficiency metric."""
         return self._ETE
 
     @ETE.setter
@@ -213,6 +228,7 @@ class EnergyTarget:
 
     @property
     def exergy_des_min(self):
+        """Minimum exergy destruction predicted for the target."""
         return self._exergy_des_min
 
     @exergy_des_min.setter
@@ -221,6 +237,7 @@ class EnergyTarget:
 
     @property
     def exergy_req_min(self):
+        """Minimum external exergy requirement for the target."""
         return self._exergy_req_min
 
     @exergy_req_min.setter
@@ -229,6 +246,7 @@ class EnergyTarget:
 
     @property
     def exergy_sinks(self):
+        """Total exergy absorbed by sinks."""
         return self._exergy_sinks
 
     @exergy_sinks.setter
@@ -237,6 +255,7 @@ class EnergyTarget:
 
     @property
     def exergy_sources(self):
+        """Total exergy available from sources."""
         return self._exergy_sources
 
     @exergy_sources.setter
@@ -245,6 +264,7 @@ class EnergyTarget:
 
     @property
     def heat_recovery_target(self):
+        """Maximum process-to-process heat recovery target."""
         return self._heat_recovery_target
 
     @heat_recovery_target.setter
@@ -253,6 +273,7 @@ class EnergyTarget:
 
     @property
     def heat_recovery_limit(self):
+        """Upper bound on feasible heat recovery."""
         return self._heat_recovery_limit
 
     @heat_recovery_limit.setter
@@ -261,6 +282,7 @@ class EnergyTarget:
 
     @property
     def utility_heat_recovery_target(self):
+        """Heat recovery achieved after accounting for utilities."""
         return self._utility_heat_recovery_target
 
     @utility_heat_recovery_target.setter
@@ -269,6 +291,7 @@ class EnergyTarget:
 
     @property
     def hot_pinch(self):
+        """Hot-side pinch temperature."""
         return self._hot_pinch
 
     @hot_pinch.setter
@@ -277,6 +300,7 @@ class EnergyTarget:
 
     @property
     def hot_utility_target(self):
+        """Minimum hot utility demand."""
         return self._hot_utility_target
 
     @hot_utility_target.setter
@@ -285,6 +309,7 @@ class EnergyTarget:
 
     @property
     def num_units(self):
+        """Estimated minimum number of heat exchanger units."""
         return self._num_units
 
     @num_units.setter
@@ -293,6 +318,7 @@ class EnergyTarget:
 
     @property
     def capital_cost(self):
+        """Estimated capital cost for the target network."""
         return self._capital_cost
 
     @capital_cost.setter
@@ -301,6 +327,7 @@ class EnergyTarget:
 
     @property
     def total_cost(self):
+        """Combined capital and operating cost target."""
         return self._total_cost
 
     @total_cost.setter
@@ -309,6 +336,7 @@ class EnergyTarget:
 
     @property
     def utility_cost(self):
+        """Operating cost contribution from utilities."""
         return self._utility_cost
 
     @utility_cost.setter
@@ -317,6 +345,7 @@ class EnergyTarget:
 
     @property
     def work_target(self):
+        """Potential work output from cogeneration analysis."""
         return self._w_target
 
     @work_target.setter
@@ -325,6 +354,7 @@ class EnergyTarget:
 
     @property
     def turbine_efficiency_target(self):
+        """Turbine efficiency associated with the work target."""
         return self._w_eff_target
 
     @turbine_efficiency_target.setter
@@ -333,6 +363,7 @@ class EnergyTarget:
 
     @property
     def target_values(self):
+        """Bulk assignment mapping used to populate target attributes."""
         return self._target_values
 
     @target_values.setter
@@ -343,16 +374,16 @@ class EnergyTarget:
 
     # === Methods ===
     def add_graph(self, name: str, result):
+        """Store a graph result under ``name`` for later export or display."""
         self._graphs[name] = result
 
     def calc_utility_cost(self):
+        """Calculate and cache the total utility cost for the target."""
         self._utility_cost = sum([u.ut_cost for u in self.utility_streams])
         return self._utility_cost
 
     def serialize_json(self, isTotal=False):
-        """
-        Serialize process into json for return data
-        """
+        """Serialise the target into the summary structure used by exports."""
 
         degree_of_integration = None
         if self.degree_of_int:

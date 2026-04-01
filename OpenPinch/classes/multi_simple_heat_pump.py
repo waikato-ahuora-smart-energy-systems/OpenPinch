@@ -1,4 +1,4 @@
-"""Simple Heat Pump cycle utilities that wrap CoolProp."""
+"""Parallel heat pump network assembled from multiple simple subcycles."""
 
 from __future__ import annotations
 
@@ -13,12 +13,10 @@ __all__ = ["MultiSimpleHeatPumpCycle"]
 
 
 class MultiSimpleHeatPumpCycle:
-    """
-    Compute multiple simple vapor compression heat pump cycles
-    operated in parallel.
-    """
+    """Parallel set of vapour-compression heat pumps solved independently."""
 
     def __init__(self):
+        """Initialise an unsolved multi-cycle heat pump model."""
         self._subcycles = []
         self._num_cycles = 1
         self._dtcont: float = 0.0
@@ -27,80 +25,96 @@ class MultiSimpleHeatPumpCycle:
 
     @property
     def Q_evap(self) -> Optional[float]:
+        """Total evaporator duty across all subcycles."""
         self._require_solution()
         return sum(cycle.Q_evap for cycle in self._subcycles)
 
     @property
     def Q_evap_arr(self) -> Optional[np.ndarray]:
+        """Per-subcycle evaporator duties."""
         self._require_solution()
         return np.array([cycle.Q_evap for cycle in self._subcycles])
 
     @property
     def Q_cas_cool(self) -> Optional[float]:
+        """Total cooling handed off to cascade coupling, if used."""
         self._require_solution()
         return sum(cycle.Q_cas_cool for cycle in self._subcycles)
 
     @property
     def Q_cas_cool_arr(self) -> Optional[np.ndarray]:
+        """Per-subcycle cooling handed off to cascade coupling."""
         self._require_solution()
         return np.array([cycle.Q_cas_cool for cycle in self._subcycles])
 
     @property
     def Q_cool(self) -> Optional[float]:
+        """Total cooling delivered to the process."""
         self._require_solution()
         return sum(cycle.Q_cool for cycle in self._subcycles)
 
     @property
     def Q_cool_arr(self) -> Optional[np.ndarray]:
+        """Per-subcycle cooling delivered to the process."""
         self._require_solution()
         return np.array([cycle.Q_cool for cycle in self._subcycles])
 
     @property
     def Q_cond(self) -> Optional[float]:
+        """Total condenser duty across all subcycles."""
         self._require_solution()
         return sum(cycle.Q_cond for cycle in self._subcycles)
 
     @property
     def Q_cond_arr(self) -> Optional[np.ndarray]:
+        """Per-subcycle condenser duties."""
         self._require_solution()
         return np.array([cycle.Q_cond for cycle in self._subcycles])
 
     @property
     def Q_cas_heat(self) -> Optional[float]:
+        """Total heat handed off to any downstream cascade usage."""
         self._require_solution()
         return sum(cycle.Q_cas_heat for cycle in self._subcycles)
 
     @property
     def Q_cas_heat_arr(self) -> Optional[np.ndarray]:
+        """Per-subcycle heat handed off to any downstream cascade usage."""
         self._require_solution()
         return np.array([cycle.Q_cas_heat for cycle in self._subcycles])
 
     @property
     def Q_heat(self) -> Optional[float]:
+        """Total heat delivered to the process."""
         self._require_solution()
         return sum(cycle.Q_heat for cycle in self._subcycles)
 
     @property
     def Q_heat_arr(self) -> Optional[np.ndarray]:
+        """Per-subcycle heat delivered to the process."""
         self._require_solution()
         return np.array([cycle.Q_heat for cycle in self._subcycles])
 
     @property
     def work(self) -> Optional[float]:
+        """Total compressor work across all subcycles."""
         self._require_solution()
         return sum(cycle.work for cycle in self._subcycles)
 
     @property
     def work_arr(self) -> Optional[np.ndarray]:
+        """Per-subcycle compressor work."""
         self._require_solution()
         return np.array([cycle.work for cycle in self._subcycles])
 
     @property
     def dtcont(self) -> Optional[float]:
+        """Minimum temperature approach propagated to derived stream profiles."""
         return self._dtcont
 
     @property
     def COP_h(self) -> Optional[float]:
+        """Heating coefficient of performance for the full network."""
         self._require_solution()
         if abs(self.work) <= 1e-9:
             raise ZeroDivisionError("COP_h is undefined when net work is zero.")
@@ -108,6 +122,7 @@ class MultiSimpleHeatPumpCycle:
 
     @property
     def COP_r(self) -> Optional[float]:
+        """Cooling coefficient of performance for the full network."""
         self._require_solution()
         if abs(self.work) <= 1e-9:
             raise ZeroDivisionError("COP_r is undefined when net work is zero.")
@@ -115,6 +130,7 @@ class MultiSimpleHeatPumpCycle:
 
     @property
     def COP_o(self) -> Optional[float]:
+        """Overall coefficient of performance based on heating plus cooling."""
         self._require_solution()
         if abs(self.work) <= 1e-9:
             raise ZeroDivisionError("COP_o is undefined when net work is zero.")
@@ -122,49 +138,59 @@ class MultiSimpleHeatPumpCycle:
 
     @property
     def dt_diff_max(self) -> Optional[float]:
+        """Maximum piecewise temperature error for derived stream profiles."""
         return self._dt_diff_max
 
     @property
     def refrigerant(self) -> np.ndarray:
+        """Refrigerant assigned to each solved subcycle."""
         self._require_solution()
         return np.array([cycle.refrigerant for cycle in self._subcycles])
 
     @property
     def T_evap(self) -> np.ndarray:
+        """Evaporating temperatures for each solved subcycle."""
         self._require_solution()
         return np.array([cycle.T_evap for cycle in self._subcycles])
 
     @property
     def T_cond(self) -> np.ndarray:
+        """Condensing temperatures for each solved subcycle."""
         self._require_solution()
         return np.array([cycle.T_cond for cycle in self._subcycles])
 
     @property
     def dT_superheat(self) -> np.ndarray:
+        """Applied superheat for each solved subcycle."""
         self._require_solution()
         return np.array([cycle.dT_superheat for cycle in self._subcycles])
 
     @property
     def dT_subcool(self) -> np.ndarray:
+        """Applied subcooling for each solved subcycle."""
         self._require_solution()
         return np.array([cycle.dT_subcool for cycle in self._subcycles])
 
     @property
     def eta_comp(self) -> np.ndarray:
+        """Compressor efficiency used for each solved subcycle."""
         self._require_solution()
         return np.array([cycle.eta_comp for cycle in self._subcycles])
 
     @property
     def dt_ihx_gas_side(self) -> np.ndarray:
+        """Internal heat exchanger gas-side delta-T for each subcycle."""
         self._require_solution()
         return np.array([cycle.dt_ihx_gas_side for cycle in self._subcycles])
 
     @property
     def num_cycles(self) -> int:
+        """Number of simple heat pump subcycles in the network."""
         return self._num_cycles
 
     @property
     def subcycles(self) -> List[SimpleHeatPumpCycle]:
+        """Solved simple heat pump subcycles that make up the network."""
         return self._subcycles
 
     def _as_1d_numeric_array(
@@ -303,7 +329,7 @@ class MultiSimpleHeatPumpCycle:
         Q_cool: np.ndarray | float | None = None,
     ) -> float:
         """
-        Solve a set of parallel simple heat-pump cycles.
+        Solve a set of parallel simple heat pump cycles.
 
         Parameters
         ----------
@@ -398,6 +424,7 @@ class MultiSimpleHeatPumpCycle:
         dtcont: float = 0.0,
         dt_diff_max: float = 0.5,
     ) -> StreamCollection:
+        """Combine piecewise stream approximations from every solved subcycle."""
         self._require_solution()
         self._dtcont = dtcont
         self._dt_diff_max = dt_diff_max

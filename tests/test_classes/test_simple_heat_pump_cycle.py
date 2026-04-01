@@ -1,3 +1,5 @@
+"""Regression tests for the simple heat pump cycle classes."""
+
 import math
 
 import numpy as np
@@ -17,6 +19,7 @@ def _validate_results(
     dT_superheat,
     dT_subcool,
 ):
+    """Validate results for this test module."""
     cond_streams = cycle.build_stream_collection(include_cond=True)
     evap_streams = cycle.build_stream_collection(include_evap=True)
 

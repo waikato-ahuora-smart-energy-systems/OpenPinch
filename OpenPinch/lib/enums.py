@@ -60,7 +60,7 @@ class HeatPump(Enum):
 
 
 class HeatPumpType(str, Enum):
-    """Supported heat-pump targeting model families."""
+    """Supported heat pump targeting model families."""
 
     MultiTempCarnot = "Multi-temperature Carnot cycles"
     MultiSimpleCarnot = "Multiple simple Carnot cycles"

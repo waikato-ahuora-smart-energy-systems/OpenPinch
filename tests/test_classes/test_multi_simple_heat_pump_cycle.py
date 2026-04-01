@@ -1,3 +1,5 @@
+"""Regression tests for the multi simple heat pump cycle classes."""
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,7 @@ from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
 
 
 def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
+    """Assert that stage matches simple for this test module."""
     ref = SimpleHeatPumpCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 

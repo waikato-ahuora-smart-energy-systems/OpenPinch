@@ -1,3 +1,5 @@
+"""Regression tests for exergy targeting analysis routines."""
+
 import math
 
 import pytest

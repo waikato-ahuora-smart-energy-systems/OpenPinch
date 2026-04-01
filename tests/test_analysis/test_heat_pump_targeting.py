@@ -1,3 +1,5 @@
+"""Regression tests for heat pump targeting analysis routines."""
+
 from types import SimpleNamespace
 
 import numpy as np
@@ -28,14 +30,17 @@ from OpenPinch.analysis.heat_pump_targeting import (
 
 
 def get_temperatures():
+    """Return temperatures used by this test module."""
     return np.array([140.0, 90.0, 75.0, 60.0, 50.0, 40.0, 20.0])
 
 
 def get_cold_cc():
+    """Return cold cc used by this test module."""
     return np.array([1000.0, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 
 def get_hot_cc():
+    """Return hot cc used by this test module."""
     return np.array([0.0, 0.0, 0.0, 0.0, -400.0, -400.0, -800.0])
 
 

@@ -32,12 +32,12 @@ def get_heat_pump_targets(
     is_direct_integration: bool,
     is_heat_pumping: bool,
 ) -> HeatPumpTargetOutputs:
-    """Optimise heat-pump placement for a target duty and cascade profiles.
+    """Optimise heat pump placement for a target duty and cascade profiles.
 
     Parameters
     ----------
     Q_hp_target : float
-        Target condenser duty to be delivered by the heat-pump system [kW].
+        Target condenser duty to be delivered by the heat pump system [kW].
     T_vals : np.ndarray
         Temperature interval grid used by the background cascade [degC].
     H_hot : np.ndarray
@@ -47,7 +47,7 @@ def get_heat_pump_targets(
         Net cold profile aligned with ``T_vals``. Values are interpreted as cold
         demand and are normalised internally to positive values.
     zone_config : Configuration
-        Zone-level configuration containing heat-pump type, stage counts,
+        Zone-level configuration containing heat pump type, stage counts,
         efficiencies, refrigerants, and ambient settings.
     is_direct_integration : bool
         ``True`` for process-integrated targeting, ``False`` for utility-level
@@ -91,7 +91,7 @@ def calc_heat_pump_cascade(
     is_T_vals_shifted: bool,
     is_direct_integration: bool,
 ) -> ProblemTable:
-    """Insert heat-pump cascade contributions into a problem table.
+    """Insert heat pump cascade contributions into a problem table.
 
     Parameters
     ----------
@@ -250,12 +250,12 @@ def _prepare_heat_pump_target_inputs(
     zone_config: Configuration = Configuration(),
     debug: bool = False,    
 ):
-    """Build a validated optimisation-input bundle for heat-pump targeting.
+    """Build a validated optimisation-input bundle for heat pump targeting.
 
     Parameters
     ----------
     Q_hp_target : float
-        Target heat-pump duty [kW].
+        Target heat pump duty [kW].
     T_vals : np.ndarray
         Background temperature grid [degC].
     H_hot, H_cold : np.ndarray
@@ -493,7 +493,7 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
 def _optimise_multi_temperature_carnot_heat_pump_placement(
     args: HeatPumpTargetInputs
 ) -> HeatPumpTargetOutputs:
-    """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
+    """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout.
     """
     x0_ls = _get_x0_for_multi_temperature_carnot_hp_opt(args)
     bnds = _get_bounds_for_multi_temperature_carnot_hp_opt(args)
@@ -693,7 +693,7 @@ def _parse_multi_temperature_carnot_hp_state_variables(
 def _optimise_cascade_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
-    """Optimise the integration of a cascade heat-pump with a specified number of condensers and evaporators.
+    """Optimise the integration of a cascade heat pump with a specified number of condensers and evaporators.
     """
     num_stages = int(args.n_cond + args.n_evap - 1)
 
@@ -1089,7 +1089,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 def _optimise_multi_simple_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
-    """Optimise the integration of multiple single heat-pump units with a specified number of units.
+    """Optimise the integration of multiple single heat pump units with a specified number of units.
     """
     num_stages = args.n_cond = args.n_evap = int(max(args.n_cond, args.n_evap))
     
@@ -1568,7 +1568,7 @@ def _get_Q_max_from_T_hp_vals(
     Parameters
     ----------
     T_hp : np.ndarray
-        Target heat-pump temperature levels.
+        Target heat pump temperature levels.
     T_vals : np.ndarray
         Background cascade temperature coordinates.
     H_vals : np.ndarray

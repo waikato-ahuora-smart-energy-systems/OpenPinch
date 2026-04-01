@@ -1,3 +1,5 @@
+"""Regression tests for the value classes."""
+
 import pandas as pd
 
 from OpenPinch.classes import *

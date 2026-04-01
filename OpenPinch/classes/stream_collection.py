@@ -41,6 +41,7 @@ class StreamCollection:
     """
 
     def __init__(self):
+        """Initialise an empty collection sorted by descending supply temperature."""
         self._streams: Dict[str, object] = {}
         self._sort_spec: Tuple[str, Any] = ("attr", "t_supply")
         self._sort_key: Callable = partial(_sort_by_attr, "t_supply")
@@ -58,6 +59,7 @@ class StreamCollection:
             self._sort_key = payload
 
     def add(self, stream, key: str = None, prevent_overwrite: bool = True):
+        """Insert a stream, optionally renaming the key to avoid collisions."""
         if key is None:
             key = stream.name
         original_key = key
@@ -70,6 +72,7 @@ class StreamCollection:
         self._needs_sort = True
 
     def add_many(self, streams, keys=None, prevent_overwrite: bool = True):
+        """Insert several streams, optionally using explicit keys for each stream."""
         if keys == None:
             for stream in streams:
                 self.add(stream, prevent_overwrite=prevent_overwrite)
@@ -81,6 +84,7 @@ class StreamCollection:
     
     
     def get_hot_streams(self):
+        """Return a new collection containing only hot streams."""
         hot_streams = StreamCollection()
         hot_streams._sort_spec = self._sort_spec
         hot_streams._rebuild_sort_key()
@@ -95,6 +99,7 @@ class StreamCollection:
 
 
     def get_cold_streams(self):
+        """Return a new collection containing only cold streams."""
         cold_streams = StreamCollection()
         cold_streams._sort_spec = self._sort_spec
         cold_streams._rebuild_sort_key()
@@ -109,12 +114,14 @@ class StreamCollection:
 
 
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
+        """Replace the collection contents with the provided stream mapping."""
         self._streams = {}
         for stream in stream_dict.values():
             self._streams[stream.name] = stream
         self._needs_sort = True
 
     def remove(self, stream_name: str):
+        """Remove a stream by name."""
         if stream_name in self._streams:
             del self._streams[stream_name]
             self._needs_sort = True

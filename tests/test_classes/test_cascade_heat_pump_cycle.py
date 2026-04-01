@@ -1,3 +1,5 @@
+"""Regression tests for the cascade heat pump cycle classes."""
+
 import numpy as np
 import pytest
 
@@ -23,6 +25,7 @@ def _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx):
 
 
 def _assert_stage_matches_simple(cascade, i, *, T_evap, T_cond, **kwargs):
+    """Assert that stage matches simple for this test module."""
     ref = SimpleHeatPumpCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 

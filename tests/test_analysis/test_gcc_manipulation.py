@@ -1,3 +1,5 @@
+"""Regression tests for gcc manipulation analysis routines."""
+
 import os
 
 import pandas as pd, numpy as np
@@ -12,6 +14,7 @@ from OpenPinch.analysis.gcc_manipulation import *
 
 
 def get_test_filenames():
+    """Return test filenames used by this test module."""
     test_data_dir = os.path.dirname(__file__) + "/test_utility_targeting_data"
     return [
         filename
@@ -23,6 +26,7 @@ def get_test_filenames():
 """Tests for get_GCC_without_pockets."""
 
 def make_df(t_vals, h_net_vals) -> ProblemTable:
+    """Build df data used by this test module."""
     return ProblemTable(
         {
             PT.T.value: pd.Series(t_vals, dtype="float64"),

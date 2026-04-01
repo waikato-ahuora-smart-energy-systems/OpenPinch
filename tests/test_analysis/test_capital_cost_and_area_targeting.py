@@ -1,3 +1,5 @@
+"""Regression tests for capital cost and area targeting analysis routines."""
+
 import numpy as np
 import pytest
 
