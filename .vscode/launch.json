@@ -20,9 +20,10 @@
             "args": [
             //   "-s",
             //   "tests/test_classes/test_simple_heat_pump_cycle.py",
-              "tests/test_classes/test_cascade_heat_pump_cycle.py",
+            //   "tests/test_classes/test_cascade_heat_pump_cycle.py",
             //   "tests/test_utils/test_optimiser_benchmarks.py",
-              "tests/test_utils/test_optimiser_handles.py",
+            //   "tests/test_utils/test_optimiser_handles.py",
+              "tests/test_utils/test_export.py",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

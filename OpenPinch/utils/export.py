@@ -80,10 +80,13 @@ def _split_vu(x: Any) -> Tuple[Optional[float], Optional[str]]:
 
 def _autosize_columns(df: pd.DataFrame, ws, start_col: int = 1, header_row: int = 1):
     """Best-effort column width:  max(len(header), max len cell)."""
-    for i, col in enumerate(df.columns, start=start_col):
+    for offset, col in enumerate(df.columns):
+        i = start_col + offset
         max_len = len(str(col))
-        for val in df[col].astype(str):
-            max_len = max(max_len, len(val))
+        column_values = df.iloc[:, offset]
+        for val in column_values:
+            text = "" if pd.isna(val) else str(val)
+            max_len = max(max_len, len(text))
         ws.column_dimensions[ws.cell(row=header_row, column=i).column_letter].width = min(
             max_len + 2, 40
         )
