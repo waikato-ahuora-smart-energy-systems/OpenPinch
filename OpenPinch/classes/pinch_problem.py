@@ -35,6 +35,10 @@ class PinchProblem:
     - Excel problem files (use Excel_Version/Data_input_template.xlsx)
     - CSV bundles: either a directory containing ``streams.csv`` and ``utilities.csv``
       or an explicit ``(streams_csv_path, utilities_csv_path)`` tuple
+
+    The object caches both the raw problem definition and the solved analysis
+    result so subsequent export, dashboard, or inspection steps do not need to
+    rerun the numerical workflow unless the inputs change.
     """
 
     problem_filepath: Optional[Path] = None
@@ -43,7 +47,7 @@ class PinchProblem:
     # Internal state
     problem_data: Optional[JsonDict] = None
     _project_name: str = 'Untitled'
-    _results: Optional[JsonDict] = None
+    _results: Optional[TargetOutput] = None
     _master_zone: Optional["Zone"] = None
 
     def __init__(
@@ -57,12 +61,12 @@ class PinchProblem:
         Parameters
         ----------
         problem_filepath:
-            Path to a JSON/Excel problem definition or tuple/directory handled by :meth:`load`.
+            Path to a JSON or Excel problem definition handled by :meth:`load`.
         results_dir:
             Destination directory for exported Excel summaries. May be ``None`` if export
             is handled later.
         run:
-            When ``True`` (default) load the problem immediately, execute targeting, and
+            When ``True``, execute targeting immediately after construction and
             export results if ``results_dir`` is provided.
         """
         if problem_filepath is not None:
@@ -94,7 +98,10 @@ class PinchProblem:
     # Public API
     # ----------------------------------------------------------------------------
 
-    def load(self, source: Union[TargetInput, PathLike, Tuple[PathLike, PathLike]]) -> JsonDict:
+    def load(
+        self,
+        source: Union[TargetInput, PathLike, Tuple[PathLike, PathLike]],
+    ) -> TargetInput | JsonDict:
         """Load input data from one of:
 
         - JSON file path (``*.json``)
@@ -104,8 +111,8 @@ class PinchProblem:
 
         Returns
         -------
-        dict
-            The loaded input structure.
+        TargetInput or dict
+            The loaded input structure ready for targeting.
         """
         if isinstance(source, TargetInput):
             self._problem_data = source
@@ -172,7 +179,7 @@ class PinchProblem:
         )
 
     def target(self) -> TargetOutput:
-        """Run the targeting analysis against the loaded input and cache the results."""
+        """Run the targeting analysis against the loaded input and cache the result."""
         if self._problem_data is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
         if self._results is None:
@@ -184,7 +191,7 @@ class PinchProblem:
         return self._results
 
     def export_to_Excel(self, results_dir: Optional[PathLike] = None) -> Path:
-        """Export the results to JSON. Returns the path written."""
+        """Export the solved target summary and problem tables to an Excel file."""
         if results_dir is not None:
             self.results_dir = Path(results_dir)
 
@@ -202,20 +209,20 @@ class PinchProblem:
             out_dir=self.results_dir,
         )
 
-        return output_path
+        return Path(output_path)
 
     @property
-    def problem_filepath(self) -> Optional[JsonDict]:
+    def problem_filepath(self) -> Optional[Path]:
         """Return the filepath of the problem that was loaded or supplied."""
         return self._problem_filepath
 
     @property
-    def problem_data(self) -> Optional[JsonDict]:
+    def problem_data(self) -> Optional[TargetInput | JsonDict]:
         """Return the raw problem definition that was loaded or supplied."""
         return self._problem_data
 
     @property
-    def results(self) -> Optional[JsonDict]:
+    def results(self) -> Optional[TargetOutput]:
         """Return the cached targeting results, if targeting has been executed."""
         return self._results
 
@@ -230,7 +237,7 @@ class PinchProblem:
 
     @classmethod
     def from_json(cls, data: JsonDict) -> "PinchProblem":
-        """Build directly from an in-memory JSON-like dict."""
+        """Build from an in-memory mapping and apply the normal input cleaners."""
         obj = cls(problem_filepath=None, results_dir=None, run=False)
         obj._problem_data = data
         if isinstance(obj._problem_data, dict) and isinstance(
@@ -248,7 +255,7 @@ class PinchProblem:
         return obj
 
     def to_problem_json(self) -> JsonDict:
-        """Return the canonical problem JSON (streams/utilities/options)."""
+        """Return the currently loaded problem payload in its canonical mapping form."""
         if self._problem_data is None:
             raise RuntimeError(
                 "No problem_data available. Did you call load(...) or from_json(...)?"

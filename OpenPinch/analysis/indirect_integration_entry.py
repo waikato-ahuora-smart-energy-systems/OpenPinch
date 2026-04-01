@@ -29,8 +29,12 @@ __all__ = ["compute_indirect_integration_targets"]
 
 
 def compute_indirect_integration_targets(zone: Zone) -> Zone:
-    """Targets indirect heat integration, such as for Total Site, 
-    after computing direct heat integration in subzones.
+    """Compute indirect integration targets for an aggregated zone.
+
+    The routine assumes the relevant child zones have already been solved for
+    direct integration. It then sums subzone targets, builds site-level net
+    stream cascades, performs utility-to-utility balancing, and records the
+    resulting total-site style target on ``zone`` before returning it.
     """
     zone_config: Configuration = zone.config
     res: dict = {}

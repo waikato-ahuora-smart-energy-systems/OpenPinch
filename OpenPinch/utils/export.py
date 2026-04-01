@@ -21,13 +21,29 @@ def export_target_summary_to_excel_with_units(
     master_zone: "Zone", 
     out_dir: str = ".",
 ) -> str:
-    """
-    Export TargetOutput to an Excel workbook with values and units.
-      Sheet 'Summary'       : One row per TargetResults with value/unit columns
-      Sheet 'PinchTemps'    : Hot/Cold pinch temps per target
-      Sheet 'Utilities'     : Flattened hot & cold utilities (value+unit)
+    """Export solved targets and problem tables to an Excel workbook.
 
-    Returns the path to the saved workbook.
+    Parameters
+    ----------
+    target_response:
+        Structured response returned by the high-level targeting service.
+    master_zone:
+        Solved zone hierarchy used to export shifted and real problem tables for
+        the master zone and all subzones. May be ``None`` when only the summary
+        sheet is required.
+    out_dir:
+        Destination directory for the workbook.
+
+    Returns
+    -------
+    str
+        Absolute or relative path to the workbook that was written.
+
+    Notes
+    -----
+    The workbook currently includes a summary sheet plus one or more problem-
+    table sheets. Value-with-unit objects are flattened into adjacent
+    ``(value)`` and ``(unit)`` columns for easy review in Excel.
     """
     df_summary = _build_summary_dataframe(target_response.targets)
 
@@ -182,7 +198,7 @@ def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> No
 
 
 def _write_problem_tables(master_zone: Optional["Zone"], writer: pd.ExcelWriter) -> None:
-    """Emit shifted/real problem tables for master zone and all subzones."""
+    """Emit shifted and real-temperature problem tables for every solved zone."""
     if master_zone is None:
         return
 

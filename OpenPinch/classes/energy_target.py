@@ -16,7 +16,14 @@ if TYPE_CHECKING:
 
 
 class EnergyTarget:
-    """Aggregated targeting results for a zone or sub-problem."""
+    """Aggregated targeting results for a zone or sub-problem.
+
+    Each instance stores the numerical outputs of one solved targeting stage,
+    including problem tables, utility assignments, pinch temperatures, economic
+    metrics, and optional advanced-analysis results. These objects are attached
+    to :class:`~OpenPinch.classes.zone.Zone` instances during analysis and are
+    later serialised into :class:`~OpenPinch.lib.schema.TargetResults`.
+    """
 
     def __init__(
         self,

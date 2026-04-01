@@ -13,7 +13,14 @@ if TYPE_CHECKING:
 
 
 class Zone:
-    """Hierarchical zone containing streams, utilities, targets, and subzones."""
+    """Hierarchical analysis boundary containing streams, utilities, and targets.
+
+    Zones form the backbone of the in-memory OpenPinch model. Each zone can own
+    process streams, utility streams, solved targets, generated graphs, and
+    nested child zones. Direct and indirect integration routines progressively
+    populate this structure as the analysis moves from local process scopes up
+    to site-style aggregation.
+    """
 
     def __init__(
         self,

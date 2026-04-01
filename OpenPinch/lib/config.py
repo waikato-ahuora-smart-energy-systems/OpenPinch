@@ -26,7 +26,14 @@ LOG_TIMING = False
 
 
 class Configuration:
-    """Runtime configuration defaults."""
+    """Runtime configuration defaults used throughout OpenPinch.
+
+    The attributes on this class combine global numerical settings, workbook-
+    compatible feature flags, and advanced-analysis parameters such as heat-pump
+    or costing options. A ``Configuration`` instance is attached to each
+    :class:`~OpenPinch.classes.zone.Zone` so workflows can vary behaviour by
+    hierarchy level if needed.
+    """
     
     ### General parameters ###
     TOP_ZONE_NAME: str = "Site"

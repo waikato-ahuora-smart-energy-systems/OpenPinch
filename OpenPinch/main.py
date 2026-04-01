@@ -25,7 +25,11 @@ __all__ = ["pinch_analysis_service", "get_targets", "get_visualise", "extract_re
 
 
 @timing_decorator
-def pinch_analysis_service(data: Any, project_name: str = "Project", is_return_full_results: bool = False) -> TargetOutput:
+def pinch_analysis_service(
+    data: Any,
+    project_name: str = "Project",
+    is_return_full_results: bool = False,
+) -> TargetOutput | tuple[TargetOutput, Zone]:
     """Validate user data, run the targeting workflow, and return structured results.
 
     Parameters
@@ -35,12 +39,16 @@ def pinch_analysis_service(data: Any, project_name: str = "Project", is_return_f
         Dictionaries, Pydantic models, and dataclass-like objects are accepted.
     project_name:
         Optional label used in generated graphs and result files.
+    is_return_full_results:
+        When ``True``, return both the validated
+        :class:`~OpenPinch.lib.schema.TargetOutput` and the solved
+        :class:`~OpenPinch.classes.zone.Zone` hierarchy.
 
     Returns
     -------
-    TargetOutput
-        Pydantic model containing site, zone, and utility targets plus summary
-        tables ready for serialisation.
+    TargetOutput or tuple[TargetOutput, Zone]
+        Validated response payload, optionally paired with the in-memory zone
+        tree for advanced inspection and post-processing.
     """
     # Validate request data using Pydantic model
     request_data = TargetInput.model_validate(data)
@@ -67,12 +75,14 @@ def pinch_analysis_service(data: Any, project_name: str = "Project", is_return_f
     return validated_data if not is_return_full_results else (validated_data, master_zone)
 
 
-def get_targets(master_zone: Zone) -> dict:
-    """Conduct core Pinch Analysis and total site targeting.
+def get_targets(master_zone: Zone) -> Zone:
+    """Dispatch a prepared zone tree to the appropriate targeting routine.
 
-    This function is a lower-level hook compared to :func:`pinch_analysis_service`.
-    It expects already validated option blocks and stream/utility schemas, and it
-    returns a dictionary ready for conversion into :class:`TargetOutput`.
+    This function is a lower-level hook compared to
+    :func:`pinch_analysis_service`. It expects a fully prepared
+    :class:`~OpenPinch.classes.zone.Zone` hierarchy and returns the same zone
+    tree after the relevant direct and indirect integration targets have been
+    populated.
     """
 
     handler = _TARGET_HANDLERS.get(master_zone.identifier)
@@ -83,7 +93,7 @@ def get_targets(master_zone: Zone) -> dict:
 
 
 def extract_results(master_zone: Zone) -> dict:
-    """Serializes results data into a dictionaty from options."""
+    """Serialise solved targets, generated utilities, and graph payloads."""
     return {
         "name": master_zone.name,
         "targets": _get_report(master_zone),

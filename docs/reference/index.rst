@@ -4,6 +4,10 @@ Reference Guide
 The reference pages provide architecture context, complete API documentation,
 and local build instructions.
 
+Use :doc:`architecture` to understand how zones, problem tables, and targeting
+stages fit together. Use :doc:`api` when you need callable signatures,
+configuration objects, schema definitions, or lower-level analysis modules.
+
 .. toctree::
    :maxdepth: 1
 
