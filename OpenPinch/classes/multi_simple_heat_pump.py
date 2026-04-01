@@ -155,9 +155,9 @@ class MultiSimpleHeatPumpCycle:
         return np.array([cycle.eta_comp for cycle in self._subcycles])
 
     @property
-    def ihx_gas_dt(self) -> np.ndarray:
+    def dt_ihx_gas_side(self) -> np.ndarray:
         self._require_solution()
-        return np.array([cycle.ihx_gas_dt for cycle in self._subcycles])
+        return np.array([cycle.dt_ihx_gas_side for cycle in self._subcycles])
 
     @property
     def num_cycles(self) -> int:
@@ -298,7 +298,7 @@ class MultiSimpleHeatPumpCycle:
         dT_subcool: np.ndarray = 0.0,
         eta_comp: float = 0.7,
         refrigerant: List[str] | str = "water",
-        ihx_gas_dt: np.ndarray | float = 10.0,
+        dt_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray | float | None = None,
         Q_cool: np.ndarray | float | None = None,
     ) -> float:
@@ -319,7 +319,7 @@ class MultiSimpleHeatPumpCycle:
             Isentropic efficiency of the compressor [-].
         refrigerant : List[str] | str, optional
             Cycle refrigerants; one per heat pump or a scalar value.
-        ihx_gas_dt : np.ndarray | float, optional
+        dt_ihx_gas_side : np.ndarray | float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : np.ndarray | float | None, optional
             Heat delivered to the process [W].
@@ -362,12 +362,12 @@ class MultiSimpleHeatPumpCycle:
         else:
             refrigerant_all = [refrigerant] * self._num_cycles
 
-        if np.isscalar(ihx_gas_dt):
-            ihx_gas_dt_all = np.full(self._num_cycles, ihx_gas_dt, dtype=float)
+        if np.isscalar(dt_ihx_gas_side):
+            ihx_gas_dt_all = np.full(self._num_cycles, dt_ihx_gas_side, dtype=float)
         else:
-            ihx_gas_dt_all = np.asarray(ihx_gas_dt, dtype=float)
+            ihx_gas_dt_all = np.asarray(dt_ihx_gas_side, dtype=float)
             if ihx_gas_dt_all.size != self._num_cycles:
-                raise ValueError("ihx_gas_dt must match the number of heat pumps.")
+                raise ValueError("dt_ihx_gas_side must match the number of heat pumps.")
 
         for i in range(self._num_cycles):
             hp = SimpleHeatPumpCycle()
@@ -378,7 +378,7 @@ class MultiSimpleHeatPumpCycle:
                 dT_subcool=dT_subcool_all[i],
                 eta_comp=eta_comp,
                 refrigerant=refrigerant_all[i],
-                ihx_gas_dt=ihx_gas_dt_all[i],
+                dt_ihx_gas_side=ihx_gas_dt_all[i],
                 Q_heat=Q_heat_all[i],
                 Q_cool=Q_cool_all[i],
             )

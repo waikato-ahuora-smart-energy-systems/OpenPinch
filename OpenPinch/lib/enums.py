@@ -272,3 +272,11 @@ class TurbineOptionsPropKeys(Enum):
     TURBINEFORM_ABOVE_PINCH_CHECKBOX = "PROP_TOP_7"
     TURBINEFORM_BELOW_PINCH_CHECKBOX = "PROP_TOP_8"
     TURBINEFORM_CONDESATE_FLASH_CORRECTION = "PROP_TOP_9"
+
+class BB_Minimiser(str, Enum):
+    """Supported optimisation backends for multistart black-box search."""
+
+    DA = "dual_annealing"
+    CMAES = "cmaes"
+    BO = "bo"
+    RBF = "rbf_surrogate"

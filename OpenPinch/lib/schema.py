@@ -84,10 +84,10 @@ class HeatPumpTargetInputs(BaseModel):
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
-    dT_superheat: Optional[np.ndarray] = None 
-    unit_system: Optional[str] = "EUR"
+    dT_superheat: Optional[np.ndarray] = None
     net_hot_streams: Optional[StreamCollection] = StreamCollection()
     net_cold_streams: Optional[StreamCollection] = StreamCollection()
+    bb_minimiser: Optional[str] = None
 
     # Debug mode toogle
     debug: bool

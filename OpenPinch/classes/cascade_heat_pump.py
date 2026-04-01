@@ -23,6 +23,7 @@ class CascadeHeatPumpCycle:
         self._dtcont: float = 0.0
         self._dt_diff_max: float = 0.5 # Default value, used in piecewise approximation of non linear T-h profiles      
         self._solved: bool = False
+        self._max_work: float = 0.0
 
     @property
     def Q_evap(self) -> Optional[float]:
@@ -86,8 +87,11 @@ class CascadeHeatPumpCycle:
 
     @property
     def work(self) -> Optional[float]:
-        self._require_solution()
-        return sum(cycle.work for cycle in self._subcycles)
+        if self.solved:
+            return sum(cycle.work for cycle in self._subcycles)
+        else:
+            return self._max_work
+
 
     @property
     def work_arr(self) -> Optional[float]:
@@ -154,9 +158,9 @@ class CascadeHeatPumpCycle:
         return np.array([cycle.eta_comp for cycle in self._subcycles])
 
     @property
-    def ihx_gas_dt(self) -> np.ndarray:
+    def dt_ihx_gas_side(self) -> np.ndarray:
         self._require_solution()
-        return np.array([cycle.ihx_gas_dt for cycle in self._subcycles])
+        return np.array([cycle.dt_ihx_gas_side for cycle in self._subcycles])
 
     @property
     def dt_cascade_hx(self) -> float:
@@ -170,6 +174,10 @@ class CascadeHeatPumpCycle:
     @property
     def subcycles(self) -> List[SimpleHeatPumpCycle]:
         return self._subcycles    
+
+    @property
+    def solved(self) -> bool:
+        return self._solved   
 
     def _as_1d_numeric_array(
         self,
@@ -195,7 +203,7 @@ class CascadeHeatPumpCycle:
 
     def _normalize_dT_superheat(
         self,
-        dT_superheat,
+        dT_superheat: np.ndarray,
         n_heat: int,
         n_cool: int,
     ) -> np.ndarray:
@@ -212,7 +220,7 @@ class CascadeHeatPumpCycle:
 
     def _normalize_dT_subcool(
         self,
-        dT_subcool,
+        dT_subcool: np.ndarray,
         n_heat: int,
         n_cool: int,
     ) -> np.ndarray:
@@ -229,7 +237,7 @@ class CascadeHeatPumpCycle:
 
     def _normalize_Q_heat(
         self,
-        Q_heat,
+        Q_heat: np.ndarray,
         n_heat: int,
         n_cool: int,
     ) -> np.ndarray:
@@ -260,7 +268,7 @@ class CascadeHeatPumpCycle:
 
     def _normalize_Q_cool(
         self,
-        Q_cool,
+        Q_cool: np.ndarray,
         n_heat: int,
         n_cool: int,
     ) -> np.ndarray:
@@ -311,6 +319,16 @@ class CascadeHeatPumpCycle:
             arr[-1] = None if np.isnan(last_float) else last_float
 
         return arr
+    
+
+    def _validate_T_cond_and_evap(self, T_cond: np.ndarray, T_evap: np.ndarray) -> float:
+        return (
+            np.min([T_cond.min() - T_evap.max() + self._dt_cascade_hx, 0.0])
+            + 
+            np.min([(T_cond - np.roll(T_cond, 1))[:-1].sum(), 0.0]) 
+            +
+            np.min([(T_evap - np.roll(T_evap, 1))[:-1].sum(), 0.0])
+        ) * -1
 
 
     def solve(
@@ -322,8 +340,8 @@ class CascadeHeatPumpCycle:
         dT_subcool: np.ndarray = 0.0,
         eta_comp: float = 0.7,
         refrigerant: List[str] | str = "water",
-        ihx_gas_dt: np.ndarray | float = 10.0,
-        Q_heat: np.ndarray | float | None = None,
+        dt_ihx_gas_side: np.ndarray | float = 10.0,
+        Q_heat: np.ndarray = np.array([1]),
         Q_cool: np.ndarray | float | None = None,
         dt_cascade_hx: float = 1.0,
     ) -> float:
@@ -344,7 +362,7 @@ class CascadeHeatPumpCycle:
             Isentropic efficiency of the compressor [-].
         refrigerant : List[str], optional
             Cycle refrigerant; supports multi-component fluids.
-        ihx_gas_dt : np.ndarray | float, optional
+        dt_ihx_gas_side : np.ndarray | float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : np.ndarray, optional
             Heat delivered to the process [W].
@@ -364,11 +382,11 @@ class CascadeHeatPumpCycle:
         T_cond = np.asarray(T_cond, dtype=float)
         T_evap = np.asarray(T_evap, dtype=float)
 
-        if T_cond.min() < T_evap.max() + self._dt_cascade_hx:
-            raise ValueError("Invalid condenser and evaporator temperatures.")
-
-        T_cond = np.sort(T_cond)[::-1]
-        T_evap = np.sort(T_evap)[::-1]
+        self._max_work = Q_heat.sum()
+        inf = self._validate_T_cond_and_evap(T_cond, T_evap)
+        if inf > 0.0:
+            self._max_work *= (inf + 1)
+            return self._max_work
 
         T_cond_all = np.sort(np.concatenate([
             T_cond,
@@ -399,12 +417,12 @@ class CascadeHeatPumpCycle:
         else:
             refrigerant_all = [refrigerant] * self._num_cycles
 
-        if np.isscalar(ihx_gas_dt):
-            ihx_gas_dt_all = np.full(self._num_cycles, ihx_gas_dt, dtype=float)
+        if np.isscalar(dt_ihx_gas_side):
+            ihx_gas_dt_all = np.full(self._num_cycles, dt_ihx_gas_side, dtype=float)
         else:
-            ihx_gas_dt_all = np.asarray(ihx_gas_dt, dtype=float)
+            ihx_gas_dt_all = np.asarray(dt_ihx_gas_side, dtype=float)
             if ihx_gas_dt_all.size != self._num_cycles:
-                raise ValueError("ihx_gas_dt must match the number of heat pumps.")
+                raise ValueError("dt_ihx_gas_side must match the number of heat pumps.")
 
         Q_cas_heat = 0.0
         for i in range(self._num_cycles):
@@ -416,7 +434,7 @@ class CascadeHeatPumpCycle:
                 dT_subcool=dT_subcool_all[i],
                 eta_comp=eta_comp,
                 refrigerant=refrigerant_all[i],
-                ihx_gas_dt=ihx_gas_dt_all[i],
+                dt_ihx_gas_side=ihx_gas_dt_all[i],
                 Q_heat=Q_heat_all[i],
                 Q_cas_heat=Q_cas_heat,
                 Q_cool=Q_cool_all[i],

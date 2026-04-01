@@ -225,7 +225,7 @@ class SimpleHeatPumpCycle:
         return self._eta_comp
 
     @property
-    def ihx_gas_dt(self) -> float:
+    def dt_ihx_gas_side(self) -> float:
         return self._ihx_gas_dt
 
 
@@ -264,7 +264,14 @@ class SimpleHeatPumpCycle:
         except:
             self._state.update(CoolProp.PQ_INPUTS, P, phase) # Close to saturated liquid/vapour  
         return self._state
-    
+
+    def _compute_state_from_pressure_quality(
+        self,
+        P: float,
+        Q: float,
+    ) -> CoolProp.AbstractState:
+        self._state.update(CoolProp.PQ_INPUTS, P, Q)
+        return self._state
 
     def _compute_compressor_outlet_state(
         self, 
@@ -321,7 +328,7 @@ class SimpleHeatPumpCycle:
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
         refrigerant: str = "water",
-        ihx_gas_dt: float = 40.0,
+        dt_ihx_gas_side: float = 40.0,
         Q_heat: float = 1.0,
         Q_cas_heat: float = 0.0,
         Q_cool: float = None,
@@ -343,7 +350,7 @@ class SimpleHeatPumpCycle:
             Isentropic efficiency of the compressor [-].
         refrigerant : str, optional
             Cycle refrigerant; supports multi-component fluids.
-        ihx_gas_dt : float, optional
+        dt_ihx_gas_side : float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : float, optional
             Heat delivered to the process [W].
@@ -374,7 +381,7 @@ class SimpleHeatPumpCycle:
         self._Q_cas_heat = Q_cas_heat
         self._Q_cool = Q_cool
         self._eta_comp = eta_comp
-        self._ihx_gas_dt = max(min(ihx_gas_dt, T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2), 0.0)
+        self._ihx_gas_dt = max(min(dt_ihx_gas_side, T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2), 0.0)
 
         T_evap = self._convert_C_to_K(T_evap)
         T_cond = self._convert_C_to_K(T_cond)
@@ -410,14 +417,23 @@ class SimpleHeatPumpCycle:
         )
         self._save_cycle_state(1)
 
-        # 2 - Condenser outlet / IHX inlet (source)
+        # 2 - Condenser outlet / IHX inlet (source) *******************************************
+        self._compute_state_from_pressure_quality(
+            P=P_lo,
+            Q=0,
+        )
+        h_cond_out_min = self._state.hmass() + dh_ihx  # Find the limit to subcooling the condensate
         self._compute_state_from_pressure_temperature(
             P=P_hi,
             T=T_cond - dT_subcool,
             phase=0,
         )
-        self._save_cycle_state(2)    
-
+        self._compute_state_from_pressure_enthalpy(
+            P=P_hi,
+            h=max(h_cond_out_min, self._state.hmass())
+        )
+        self._dT_subcool = T_cond - self._state.T()
+        self._save_cycle_state(2)
         if self._cycle_states[1, 'H'] <= self._cycle_states[2, 'H']:
             raise  ValueError('Condenser cannot have a negative or zero enthalpy change.')  
         

@@ -47,7 +47,6 @@ class SimpleBraytonHeatPumpCycle:
         # unit dicts here); the simple heat pump used a PropertyDict. For
         # compatibility we accept the same constructor signature.
         self.refrigerant = None
-        self.unit_system = None
         self._Q_heat: Optional[float] = None
         self._Q_cool: Optional[float] = None
 

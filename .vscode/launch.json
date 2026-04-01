@@ -16,11 +16,13 @@
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
-            "cwd": "${workspaceFolder}/tests/", 
+            "cwd": "${workspaceFolder}", 
             "args": [
             //   "-s",
-              "test_classes/test_simple_heat_pump_cycle.py",
-              "test_classes/test_cascade_heat_pump_cycle.py",
+            //   "tests/test_classes/test_simple_heat_pump_cycle.py",
+              "tests/test_classes/test_cascade_heat_pump_cycle.py",
+            //   "tests/test_utils/test_optimiser_benchmarks.py",
+              "tests/test_utils/test_optimiser_handles.py",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
