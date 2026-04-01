@@ -22,6 +22,7 @@ def _load_problem(problem_path: str) -> PinchProblem:
 
 
 def validate_problem_path(problem_path) -> None:
+    """Stop the Streamlit app early when the configured problem file is missing."""
     if not problem_path.exists():
         st.error(
             f"Problem file not found at {problem_path}. "

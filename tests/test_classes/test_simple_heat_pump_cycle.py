@@ -1,3 +1,5 @@
+"""Regression tests for the simple heat pump cycle classes."""
+
 import math
 
 import numpy as np
@@ -17,6 +19,7 @@ def _validate_results(
     dT_superheat,
     dT_subcool,
 ):
+    """Validate results for this test module."""
     cond_streams = cycle.build_stream_collection(include_cond=True)
     evap_streams = cycle.build_stream_collection(include_evap=True)
 
@@ -51,7 +54,7 @@ def test_heat_pump_cycle_case_1():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,
-        ihx_gas_dt=5.0,
+        dt_ihx_gas_side=5.0,
         eta_comp = 0.75,
         refrigerant="R134a",
         Q_heat=1000,
@@ -70,7 +73,7 @@ def test_heat_pump_cycle_case_2():
     cycle.solve(
         T_evap = T_evap,
         T_cond = T_cond,
-        ihx_gas_dt=5.0,
+        dt_ihx_gas_side=5.0,
         eta_comp = 0.75,
         refrigerant="R134a",
         Q_heat=1000,
@@ -89,7 +92,7 @@ def test_heat_pump_cycle_case_3():
     cycle.solve(
         T_evap = T_evap,
         T_cond = T_cond,
-        ihx_gas_dt=5.0,
+        dt_ihx_gas_side=5.0,
         eta_comp = 0.75,
         refrigerant="R134a",
         Q_heat=0,
@@ -110,7 +113,7 @@ def test_heat_pump_cycle_case_4():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=0,
+        dt_ihx_gas_side=0,
         eta_comp = 0.75,
         refrigerant="R134a",
         Q_heat=1000,
@@ -131,7 +134,7 @@ def test_heat_pump_cycle_case_5():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=0,
+        dt_ihx_gas_side=0,
         eta_comp = 0.75,
         refrigerant="R601",
         Q_heat=1000,
@@ -152,7 +155,7 @@ def test_heat_pump_cycle_case_6():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=0,
+        dt_ihx_gas_side=0,
         eta_comp = 0.75,
         refrigerant="R601",
         Q_heat=1000,
@@ -173,7 +176,7 @@ def test_heat_pump_cycle_case_7():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=10,
+        dt_ihx_gas_side=10,
         eta_comp = 0.75,
         refrigerant="R601",
         Q_heat=1000,
@@ -194,7 +197,7 @@ def test_heat_pump_cycle_case_8():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=10,
+        dt_ihx_gas_side=10,
         eta_comp = 0.75,
         refrigerant="R601",
         Q_heat=500,
@@ -208,7 +211,7 @@ def test_heat_pump_cycle_case_8():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=10,
+        dt_ihx_gas_side=10,
         eta_comp = 0.75,
         refrigerant="R601",
         Q_heat=500,
@@ -233,7 +236,7 @@ def test_heat_pump_cycle_case_9():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=10,
+        dt_ihx_gas_side=10,
         eta_comp = 0.75,
         refrigerant="R601",
         Q_heat=500,
@@ -261,7 +264,7 @@ def test_heat_pump_cycle_case_10():
         T_cond = T_cond,
         dT_superheat = dT_superheat,
         dT_subcool = dT_subcool,        
-        ihx_gas_dt=10,
+        dt_ihx_gas_side=10,
         eta_comp = 0.7,
         refrigerant="R134A",
         Q_heat=0.0,

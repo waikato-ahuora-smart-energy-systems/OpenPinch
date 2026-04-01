@@ -1,3 +1,5 @@
+"""Regression tests for the cascade heat pump cycle classes."""
+
 import numpy as np
 import pytest
 
@@ -23,6 +25,7 @@ def _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx):
 
 
 def _assert_stage_matches_simple(cascade, i, *, T_evap, T_cond, **kwargs):
+    """Assert that stage matches simple for this test module."""
     ref = SimpleHeatPumpCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 
@@ -44,12 +47,12 @@ def test_cascade_requires_solution_before_dependent_properties():
 
 def test_cascade_rejects_invalid_temperature_order():
     cycle = CascadeHeatPumpCycle()
-    with pytest.raises(ValueError):
-        cycle.solve(
-            T_evap=np.array([35.0, 25.0]),
-            T_cond=np.array([30.0, 20.0]),
-            refrigerant="R134a",
-        )
+    cycle.solve(
+        T_evap=np.array([35.0, 25.0]),
+        T_cond=np.array([30.0, 20.0]),
+        refrigerant="R134a",
+    )    
+    assert cycle.solved == False
 
 
 def test_cascade_num_cycles_matches_network_definition():
@@ -66,7 +69,7 @@ def test_cascade_num_cycles_matches_network_definition():
         dt_cascade_hx=dt_cascade_hx,
         dT_superheat=np.array([5.0, 5.0, 5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0, 2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0, 5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0, 5.0, 5.0]),
         refrigerant=["R134a", "R134a", "R134a", "R134a"],
         Q_heat=Q_heat,
         Q_cool=Q_cool,
@@ -96,7 +99,7 @@ def test_each_cascade_stage_matches_simple_heat_pump_solution():
 
     dT_superheat = np.array([6.0, 4.0, 2.0])
     dT_subcool = np.array([3.0, 2.0, 1.0])
-    ihx_gas_dt = np.array([8.0, 6.0, 4.0])
+    dt_ihx_gas_side = np.array([8.0, 6.0, 4.0])
     Q_heat = np.array([1200.0, 700.0])
     Q_cool = np.array([100.0, 900.0])
     Q_heat_all = np.array([1200.0, 700.0, 0.0])
@@ -110,7 +113,7 @@ def test_each_cascade_stage_matches_simple_heat_pump_solution():
         dt_cascade_hx=dt_cascade_hx,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        ihx_gas_dt=ihx_gas_dt,
+        dt_ihx_gas_side=dt_ihx_gas_side,
         refrigerant=refrigerant,
         eta_comp=eta_comp,
         Q_heat=Q_heat,
@@ -127,7 +130,7 @@ def test_each_cascade_stage_matches_simple_heat_pump_solution():
             T_cond=T_cond_all[i],
             dT_superheat=dT_superheat[i],
             dT_subcool=dT_subcool[i],
-            ihx_gas_dt=ihx_gas_dt[i],
+            dt_ihx_gas_side=dt_ihx_gas_side[i],
             refrigerant=refrigerant[i],
             eta_comp=eta_comp,
             Q_heat=Q_heat_all[i],
@@ -144,7 +147,7 @@ def test_cascade_aggregates_match_sum_of_stage_results():
         dt_cascade_hx=5.0,
         dT_superheat=np.array([5.0, 5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a", "R134a"],
         Q_heat=np.array([1200.0, 700.0, 0.0]),
@@ -166,7 +169,7 @@ def test_cascade_build_stream_collection_is_union_of_stage_streams():
         dt_cascade_hx=5.0,
         dT_superheat=np.array([5.0, 5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a", "R134a"],
         Q_heat=np.array([1200.0, 700.0, 0.0]),
@@ -185,7 +188,7 @@ def test_cascade_build_stream_collection_is_union_of_stage_streams():
     "bad_kwargs",
     [
         {"refrigerant": ["R134a", "R134a"]},
-        {"ihx_gas_dt": np.array([5.0, 5.0])},
+        {"dt_ihx_gas_side": np.array([5.0, 5.0])},
     ],
 )
 def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
@@ -199,7 +202,7 @@ def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
         Q_heat=np.array([1200.0, 700.0, 0.0]),
         Q_cool=np.array([0.0, 0.0, 900.0]),
         refrigerant=["R134a", "R134a", "R134a"],
-        ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
     )
     base.update(bad_kwargs)
 
@@ -229,7 +232,7 @@ def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
         dt_cascade_hx=5.0,
         dT_superheat=np.array([5.0, 5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a", "R134a"],
         Q_heat=np.array([1200.0, 700.0, 0.0]),
@@ -258,7 +261,7 @@ def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
             dt_cascade_hx=5.0,
             dT_superheat=np.array([5.0, 5.0, 5.0]),
             dT_subcool=np.array([2.0, 2.0, 2.0]),
-            ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+            dt_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
             eta_comp=0.75,
             refrigerant=["R134a", "R134a", "R134a"],
             Q_heat=np.array([1200.0, 700.0, 0.0]),
@@ -275,7 +278,7 @@ def test_cascade_q_heat_nan_defaults_to_one_for_first_and_zero_elsewhere():
         dt_cascade_hx=5.0,
         dT_superheat=np.array([5.0, 5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a", "R134a"],
         Q_heat=np.array([np.nan, np.nan]),

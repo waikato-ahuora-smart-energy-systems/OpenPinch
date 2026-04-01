@@ -172,6 +172,7 @@ class _TurbineState:
     """Mutable turbine calculation state passed between iterations."""
 
     def __init__(self, params: dict, data: dict):
+        """Capture the solver inputs that are updated across turbine iterations."""
         self.P_out = data["P_out"]
         self.Q_users = data["Q_users"]
         self.w_k = data["w_k"]
@@ -193,6 +194,7 @@ class _TurbineState:
         self.m_in_est = data["m_in_est"]
 
     def max_mass_flow(self, mass_flow: float) -> float:
+        """Return the maximum allowable flow at the configured turbine load."""
         return mass_flow / self.load_frac if self.load_frac > 0 else 0.0
 
 

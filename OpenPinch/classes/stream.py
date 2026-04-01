@@ -6,7 +6,14 @@ from ..lib.enums import *
 
 
 class Stream:
-    """Class representing a generic stream (process or utility)."""
+    """Generic thermal stream used for both process and utility duties.
+
+    A :class:`Stream` stores supply/target states together with derived values
+    such as hot/cold classification, shifted temperature bounds, heat-capacity
+    flow rate, and simple economic attributes. The same class is reused for
+    process streams, utilities, and derived net streams created during site-
+    level aggregation.
+    """
 
     def __init__(
         self,

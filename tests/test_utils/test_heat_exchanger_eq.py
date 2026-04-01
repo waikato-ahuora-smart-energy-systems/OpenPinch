@@ -1,3 +1,5 @@
+"""Regression tests for heat exchanger eq utility helpers."""
+
 import math
 
 import pytest

@@ -1,4 +1,4 @@
-"""Simple Heat Pump cycle utilities that wrap CoolProp."""
+"""Simple vapour-compression heat pump cycle utilities built on CoolProp."""
 
 # from __future__ import annotations
 
@@ -17,14 +17,12 @@ from ..utils.stream_linearisation import get_piecewise_data_points
 __all__ = ['SimpleHeatPumpCycle']
 
 class SimpleHeatPumpCycle:
-    """
-    Compute a simple vapor compression heat pump cycle 
-    with or without an internal heat exchanger.
-    """
+    """Single vapour-compression heat pump cycle with optional internal heat exchange."""
 
     STATECOUNT = 6
 
     def __init__(self):
+        """Initialise an unsolved cycle with default operating assumptions."""
         self._system = SIunits()
         self._cycle_states = StateContainer(unit_system=self._system)
 
@@ -59,10 +57,12 @@ class SimpleHeatPumpCycle:
 
     @property
     def system(self) -> PropertyDict:
+        """CoolProp unit-system definition used by stored state points."""
         return self._system
 
     @property
     def state(self):
+        """Underlying CoolProp fluid state used during cycle calculations."""
         return self._state
 
     @state.setter
@@ -75,6 +75,7 @@ class SimpleHeatPumpCycle:
 
     @property
     def cycle_states(self) -> StateContainer:
+        """Container holding the six solved cycle states."""
         return self._cycle_states
 
     @cycle_states.setter
@@ -92,90 +93,111 @@ class SimpleHeatPumpCycle:
 
     @property
     def state_points(self) -> StateContainer:
+        """State points around the cycle."""
         return self._cycle_states
 
     @property
     def Hs(self) -> Sequence[float]:
+        """Specific enthalpies for the solved state points."""
         self._require_solution()
         return [self._cycle_states[i, 'H'] for i in self._cycle_states]
 
     @property
     def Ss(self) -> Sequence[float]:
+        """Specific entropies for the solved state points."""
         self._require_solution()
         return [self._cycle_states[i, 'S'] for i in self._cycle_states]
 
     @property
     def Ts(self) -> Sequence[float]:
+        """Temperatures for the solved state points."""
         self._require_solution()
         return [self._cycle_states[i, 'T'] for i in self._cycle_states]
 
     @property
     def Ps(self) -> Sequence[float]:
+        """Pressures for the solved state points."""
         self._require_solution()
         return [self._cycle_states[i, 'P'] for i in self._cycle_states]
 
     @property
     def q_evap(self) -> Optional[float]:
+        """Specific evaporator duty."""
         return self._q_evap
 
     @property
     def Q_evap(self) -> Optional[float]:
+        """Total evaporator duty."""
         return self._Q_evap
 
     @property
     def q_cas_cool(self) -> Optional[float]:
+        """Specific cooling passed to a lower cascade stage."""
         return self._q_cas_cool
 
     @property
     def Q_cas_cool(self) -> Optional[float]:
+        """Total cooling passed to a lower cascade stage."""
         return self._Q_cas_cool
      
     @property
     def q_cool(self) -> Optional[float]:
+        """Specific cooling delivered to the process."""
         return self._q_cool
 
     @property
     def Q_cool(self) -> Optional[float]:
+        """Total cooling delivered to the process."""
         return self._Q_cool
     
     @property
     def q_cond(self) -> Optional[float]:
+        """Specific condenser duty."""
         return self._q_cond
 
     @property
     def Q_cond(self) -> Optional[float]:
+        """Total condenser duty."""
         return self._Q_cond
 
     @property
     def q_cas_heat(self) -> Optional[float]:
+        """Specific heat passed to an upper cascade stage."""
         return self._q_cas_heat
 
     @property
     def Q_cas_heat(self) -> Optional[float]:
+        """Total heat passed to an upper cascade stage."""
         return self._Q_cas_heat
  
     @property
     def q_heat(self) -> Optional[float]:
+        """Specific heat delivered to the process."""
         return self._q_heat
 
     @property
     def Q_heat(self) -> Optional[float]:
+        """Total heat delivered to the process."""
         return self._Q_heat
 
     @property
     def w_net(self) -> Optional[float]:
+        """Specific compressor work input."""
         return self._w_net
 
     @property
     def work(self) -> Optional[float]:
+        """Total compressor work input."""
         return self._work
 
     @property
     def m_dot(self) -> Optional[float]:
+        """Working-fluid mass flow rate."""
         return self._m_dot
     
     @property
     def dtcont(self) -> Optional[float]:
+        """Minimum temperature approach carried into derived stream profiles."""
         return self._dtcont
     
     @dtcont.setter
@@ -184,6 +206,7 @@ class SimpleHeatPumpCycle:
 
     @property
     def COP_h(self) -> Optional[float]:
+        """Heating coefficient of performance based on process heat duty."""
         self._require_solution()
         if abs(self._w_net) <= 1e-9:
             raise ZeroDivisionError('COP_h is undefined when net specific work is zero.')
@@ -191,6 +214,7 @@ class SimpleHeatPumpCycle:
 
     @property
     def COP_r(self) -> Optional[float]:
+        """Cooling coefficient of performance based on process cooling duty."""
         self._require_solution()
         if abs(self._w_net) <= 1e-9:
             raise ZeroDivisionError('COP_r is undefined when net specific work is zero.')
@@ -198,34 +222,42 @@ class SimpleHeatPumpCycle:
 
     @property
     def dt_diff_max(self) -> Optional[float]:
+        """Maximum piecewise temperature error for derived stream profiles."""
         return self._dt_diff_max
 
     @property
     def refrigerant(self) -> Optional[str]:
+        """Refrigerant name used for the solved cycle."""
         return self._refrigerant
 
     @property
     def T_evap(self) -> Optional[float]:
+        """Evaporating temperature in degrees Celsius."""
         return self._T_evap
 
     @property
     def T_cond(self) -> Optional[float]:
+        """Condensing temperature in degrees Celsius."""
         return self._T_cond
 
     @property
     def dT_superheat(self) -> float:
+        """Applied compressor-inlet superheat."""
         return self._dT_superheat
 
     @property
     def dT_subcool(self) -> float:
+        """Applied condenser-outlet subcooling."""
         return self._dT_subcool
 
     @property
     def eta_comp(self) -> float:
+        """Isentropic compressor efficiency."""
         return self._eta_comp
 
     @property
-    def ihx_gas_dt(self) -> float:
+    def dt_ihx_gas_side(self) -> float:
+        """Gas-side temperature change across the internal heat exchanger."""
         return self._ihx_gas_dt
 
 
@@ -264,7 +296,14 @@ class SimpleHeatPumpCycle:
         except:
             self._state.update(CoolProp.PQ_INPUTS, P, phase) # Close to saturated liquid/vapour  
         return self._state
-    
+
+    def _compute_state_from_pressure_quality(
+        self,
+        P: float,
+        Q: float,
+    ) -> CoolProp.AbstractState:
+        self._state.update(CoolProp.PQ_INPUTS, P, Q)
+        return self._state
 
     def _compute_compressor_outlet_state(
         self, 
@@ -321,13 +360,13 @@ class SimpleHeatPumpCycle:
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
         refrigerant: str = "water",
-        ihx_gas_dt: float = 40.0,
+        dt_ihx_gas_side: float = 40.0,
         Q_heat: float = 1.0,
         Q_cas_heat: float = 0.0,
         Q_cool: float = None,
     ) -> float:
         """
-        Solve the heat-pump cycle for the provided operating point.
+        Solve the heat pump cycle for the provided operating point.
 
         Parameters
         ----------
@@ -343,7 +382,7 @@ class SimpleHeatPumpCycle:
             Isentropic efficiency of the compressor [-].
         refrigerant : str, optional
             Cycle refrigerant; supports multi-component fluids.
-        ihx_gas_dt : float, optional
+        dt_ihx_gas_side : float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : float, optional
             Heat delivered to the process [W].
@@ -374,7 +413,7 @@ class SimpleHeatPumpCycle:
         self._Q_cas_heat = Q_cas_heat
         self._Q_cool = Q_cool
         self._eta_comp = eta_comp
-        self._ihx_gas_dt = max(min(ihx_gas_dt, T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2), 0.0)
+        self._ihx_gas_dt = max(min(dt_ihx_gas_side, T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2), 0.0)
 
         T_evap = self._convert_C_to_K(T_evap)
         T_cond = self._convert_C_to_K(T_cond)
@@ -410,14 +449,23 @@ class SimpleHeatPumpCycle:
         )
         self._save_cycle_state(1)
 
-        # 2 - Condenser outlet / IHX inlet (source)
+        # 2 - Condenser outlet / IHX inlet (source) *******************************************
+        self._compute_state_from_pressure_quality(
+            P=P_lo,
+            Q=0,
+        )
+        h_cond_out_min = self._state.hmass() + dh_ihx  # Find the limit to subcooling the condensate
         self._compute_state_from_pressure_temperature(
             P=P_hi,
             T=T_cond - dT_subcool,
             phase=0,
         )
-        self._save_cycle_state(2)    
-
+        self._compute_state_from_pressure_enthalpy(
+            P=P_hi,
+            h=max(h_cond_out_min, self._state.hmass())
+        )
+        self._dT_subcool = T_cond - self._state.T()
+        self._save_cycle_state(2)
         if self._cycle_states[1, 'H'] <= self._cycle_states[2, 'H']:
             raise  ValueError('Condenser cannot have a negative or zero enthalpy change.')  
         
@@ -483,7 +531,7 @@ class SimpleHeatPumpCycle:
         dtcont: float = 0.0,
         dt_diff_max: float = 0.5,
     ) -> StreamCollection:
-        
+        """Approximate condenser and evaporator duties as piecewise stream segments."""
         self._require_solution()
         self._dtcont = dtcont
         self._dt_diff_max = dt_diff_max

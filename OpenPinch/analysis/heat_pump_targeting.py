@@ -32,12 +32,12 @@ def get_heat_pump_targets(
     is_direct_integration: bool,
     is_heat_pumping: bool,
 ) -> HeatPumpTargetOutputs:
-    """Optimise heat-pump placement for a target duty and cascade profiles.
+    """Optimise heat pump placement for a target duty and cascade profiles.
 
     Parameters
     ----------
     Q_hp_target : float
-        Target condenser duty to be delivered by the heat-pump system [kW].
+        Target condenser duty to be delivered by the heat pump system [kW].
     T_vals : np.ndarray
         Temperature interval grid used by the background cascade [degC].
     H_hot : np.ndarray
@@ -47,7 +47,7 @@ def get_heat_pump_targets(
         Net cold profile aligned with ``T_vals``. Values are interpreted as cold
         demand and are normalised internally to positive values.
     zone_config : Configuration
-        Zone-level configuration containing heat-pump type, stage counts,
+        Zone-level configuration containing heat pump type, stage counts,
         efficiencies, refrigerants, and ambient settings.
     is_direct_integration : bool
         ``True`` for process-integrated targeting, ``False`` for utility-level
@@ -66,7 +66,7 @@ def get_heat_pump_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    # zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
+    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     args = _prepare_heat_pump_target_inputs(
         Q_hp_target=Q_hp_target,
         T_vals=T_vals,
@@ -91,7 +91,7 @@ def calc_heat_pump_cascade(
     is_T_vals_shifted: bool,
     is_direct_integration: bool,
 ) -> ProblemTable:
-    """Insert heat-pump cascade contributions into a problem table.
+    """Insert heat pump cascade contributions into a problem table.
 
     Parameters
     ----------
@@ -250,12 +250,12 @@ def _prepare_heat_pump_target_inputs(
     zone_config: Configuration = Configuration(),
     debug: bool = False,    
 ):
-    """Build a validated optimisation-input bundle for heat-pump targeting.
+    """Build a validated optimisation-input bundle for heat pump targeting.
 
     Parameters
     ----------
     Q_hp_target : float
-        Target heat-pump duty [kW].
+        Target heat pump duty [kW].
     T_vals : np.ndarray
         Background temperature grid [degC].
     H_hot, H_cold : np.ndarray
@@ -320,6 +320,7 @@ def _prepare_heat_pump_target_inputs(
         do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
         price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL if zone_config.PRICE_RATIO_ELE_TO_FUEL > 0.0 else 1,
         max_multi_start=zone_config.MAX_HP_MULTISTART,
+        bb_minimiser=zone_config.BB_MINIMISER,
         net_hot_streams=net_hot_streams,
         net_cold_streams=net_cold_streams,
         debug=debug,
@@ -492,15 +493,16 @@ def _balance_hot_and_cold_heat_loads_with_ambient_air(
 def _optimise_multi_temperature_carnot_heat_pump_placement(
     args: HeatPumpTargetInputs
 ) -> HeatPumpTargetOutputs:
-    """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat-pump layout.
+    """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout.
     """
     x0_ls = _get_x0_for_multi_temperature_carnot_hp_opt(args)
     bnds = _get_bounds_for_multi_temperature_carnot_hp_opt(args)
-    minima = dual_annealing_multiminima(
+    minima = multiminima(
         func=_compute_multi_temperature_carnot_hp_opt_obj,
         x0_ls=x0_ls,
         func_kwargs=args,
         bounds=bnds,
+        optimiser_handle=args.bb_minimiser,
     )
     x = minima[0]
 
@@ -525,6 +527,7 @@ def _get_x0_for_multi_temperature_carnot_hp_opt(
         H_vals=args.H_cold,
         dt_range_max=args.dt_range_max,
         Q_hp_target=args.Q_hp_target,
+        bb_minimiser=args.bb_minimiser,
     )
 
     x0 = np.array(x0_cond_ls.tolist()[0] + np.zeros(args.n_evap-1).tolist())
@@ -538,6 +541,7 @@ def _get_x0_for_multi_temperature_carnot_hp_opt(
         H_vals=args.H_hot,
         dt_range_max=args.dt_range_max,
         price_ratio=args.price_ratio,
+        bb_minimiser=args.bb_minimiser,
     )
     if len(x0_evap_ls) > 0:
         x0_ls = list(itertools.product(x0_cond_ls, x0_evap_ls))
@@ -562,8 +566,10 @@ def _initialise_multi_temperature_carnot_hp_optimisation(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     dt_range_max: float,
+    *,
     Q_hp_target: float = None,
     price_ratio: float = 1,
+    bb_minimiser: str = None,
 ) -> list:
     """Build initial guesses based on a simple area maximisation problem, i.e., sum(Q x delta T).
     """
@@ -581,10 +587,11 @@ def _initialise_multi_temperature_carnot_hp_optimisation(
         "Q_hp_target": Q_hp_target,
         "price_ratio": price_ratio,
     }
-    return dual_annealing_multiminima(
+    return multiminima(
         func=_compute_entropy_generation_reduction_at_constant_T,
         func_kwargs=func_kwargs,
-        bounds=[(0.0, 1.0) for _ in range(n_stages)],       
+        bounds=[(0.0, 1.0) for _ in range(n_stages)],
+        optimiser_handle=bb_minimiser,
     )
 
 
@@ -618,7 +625,7 @@ def _compute_multi_temperature_carnot_hp_opt_obj(
 
 def _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(
     T_lo: np.ndarray, 
-    input_args: list
+    input_args: list,
 ) -> dict:
     """Adjust evaporator ladder to honour minimum temperature limits."""
     args, T_cond, Q_cond_0, x_evap, success = input_args
@@ -684,9 +691,9 @@ def _parse_multi_temperature_carnot_hp_state_variables(
 
 @timing_decorator
 def _optimise_cascade_heat_pump_placement(
-    args: HeatPumpTargetInputs
+    args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
-    """Optimise the integration of a cascade heat-pump with a specified number of condensers and evaporators.
+    """Optimise the integration of a cascade heat pump with a specified number of condensers and evaporators.
     """
     num_stages = int(args.n_cond + args.n_evap - 1)
 
@@ -712,11 +719,12 @@ def _optimise_cascade_heat_pump_placement(
         bnds=bnds,
     )
 
-    local_minima_x = dual_annealing_multiminima(
+    local_minima_x = multiminima(
         func=_compute_cascade_hp_system_performance,
         x0_ls=x0_ls,        
         func_kwargs=args,
-        bounds=bnds,    
+        bounds=bnds,
+        optimiser_handle=args.bb_minimiser,        
     )   
 
     if local_minima_x.size > 0:
@@ -864,9 +872,6 @@ def _compute_cascade_hp_system_performance(
     """Objective: minimise total compressor work for multi-HP configuration.
     """
     T_cond, dT_subcool, Q_heat, T_evap, Q_cool = _parse_cascade_hp_state_variables(x, args)
-
-    if _constrain_min_temperature_lift(x, args) < 0:
-        return {"obj": np.inf}
     
     hp = CascadeHeatPumpCycle()
     hp.solve(
@@ -877,9 +882,12 @@ def _compute_cascade_hp_system_performance(
         dT_subcool=dT_subcool,
         eta_comp=args.eta_comp,
         refrigerant=args.refrigerant_ls,
-        ihx_gas_dt=args.dt_hp_ihx,
+        dt_ihx_gas_side=args.dt_hp_ihx,
         dt_cascade_hx=args.dt_cascade_hx,
     )
+    if not(hp.solved):
+        obj = (hp.work / args.Q_hp_target + 1)
+        return {"obj": obj}
 
     # Build streams based on heat pump profiles
     hp_hot_streams = hp.build_stream_collection(
@@ -946,18 +954,19 @@ def _compute_cascade_hp_system_performance(
 
 @timing_decorator
 def _optimise_multi_simple_carnot_heat_pump_placement(
-    args: HeatPumpTargetInputs
+    args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout.
     """
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
     x0_ls = _get_x0_for_multi_simple_carnot_hp_opt(args)
     bnds = _get_bounds_for_multi_simple_carnot_hp_opt(args)
-    local_minima_x = dual_annealing_multiminima(
+    local_minima_x = multiminima(
         func=_compute_multi_simple_carnot_hp_opt_obj,
         x0_ls=x0_ls,
         func_kwargs=args,
-        bounds=bnds,    
+        bounds=bnds,
+        optimiser_handle=args.bb_minimiser,        
     )    
     res = _compute_multi_simple_carnot_hp_opt_obj(local_minima_x[0], args, debug=args.debug)
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
@@ -965,7 +974,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
 
 
 def _get_x0_for_multi_simple_carnot_hp_opt(
-    args: HeatPumpTargetInputs
+    args: HeatPumpTargetInputs,
 ) -> np.ndarray:
     """Build initial guesses for the multi-simple Carnot HP optimizer."""
     ub_cond = (args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max
@@ -980,7 +989,7 @@ def _get_x0_for_multi_simple_carnot_hp_opt(
 
 
 def _get_bounds_for_multi_simple_carnot_hp_opt(
-    args: HeatPumpTargetInputs
+    args: HeatPumpTargetInputs,
 ) -> list:
     """Build bounds for the multi-simple Carnot HP optimizer."""
     ub_cond = (args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max
@@ -1080,7 +1089,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 def _optimise_multi_simple_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
-    """Optimise the integration of multiple single heat-pump units with a specified number of units.
+    """Optimise the integration of multiple single heat pump units with a specified number of units.
     """
     num_stages = args.n_cond = args.n_evap = int(max(args.n_cond, args.n_evap))
     
@@ -1094,11 +1103,12 @@ def _optimise_multi_simple_heat_pump_placement(
     bnds = _get_bounds_for_multi_single_hp_opt(init_res.T_cond, init_res.T_evap, args)
     x0 = _get_x0_for_multi_single_hp_opt(init_res.T_cond, init_res.Q_cond, init_res.T_evap, args, bnds)
 
-    local_minima_x = dual_annealing_multiminima(
+    local_minima_x = multiminima(
         func=_compute_multi_simple_hp_system_performance,
         x0_ls=x0,        
         func_kwargs=args,
-        bounds=bnds,    
+        bounds=bnds,
+        optimiser_handle=args.bb_minimiser,        
     )   
 
     if local_minima_x.size > 0:
@@ -1278,7 +1288,7 @@ def _compute_multi_simple_hp_system_performance(
         dT_subcool=dT_subcool,
         eta_comp=args.eta_comp,
         refrigerant=args.refrigerant_ls,
-        ihx_gas_dt=args.dt_hp_ihx,
+        dt_ihx_gas_side=args.dt_hp_ihx,
         Q_heat=Q_heat,
     )
 
@@ -1558,7 +1568,7 @@ def _get_Q_max_from_T_hp_vals(
     Parameters
     ----------
     T_hp : np.ndarray
-        Target heat-pump temperature levels.
+        Target heat pump temperature levels.
     T_vals : np.ndarray
         Background cascade temperature coordinates.
     H_vals : np.ndarray

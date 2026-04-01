@@ -1,3 +1,5 @@
+"""Regression tests for wkbook to json ut targeting analysis routines."""
+
 import json
 import os
 
@@ -7,6 +9,7 @@ import pandas as pd
 def get_column_names_and_units(df_full, sheet_name, row_units=1):
     # First row = column names
     # Second row = units
+    """Return column names and units used by this test module."""
     if sheet_name == "Stream Data":
         col_names = [
             "zone",
@@ -160,7 +163,7 @@ def parse_sheet_for_gcc_with_units(excel_file, sheet_name, row_units=1, row_data
 
 
 def write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> list:
-    # Convert each row to a dictionary, attaching units where appropriate
+    """Write problem to dict and list data used by this test module."""
     records = []
     for _, row in df_data.iterrows():
         entry = {}
@@ -184,7 +187,7 @@ def write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
 
 
 def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> list:
-    # Convert each row to a dictionary, attaching units where appropriate
+    """Write targets to dict and list data used by this test module."""
     records = []
     for _, row in df_data.iterrows():
         if not isinstance(row["name"], str):
@@ -264,8 +267,7 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
 
 
 def write_dataframe_to_dict_and_list(df_data: pd.DataFrame) -> list:
-    # Convert each row to a dictionary, attaching units where appropriate
-    # Convert each row to a dictionary, attaching units where appropriate
+    """Write dataframe to dict and list data used by this test module."""
     records = {}
     for col in df_data.columns.to_list():
         value = df_data[col].to_list()

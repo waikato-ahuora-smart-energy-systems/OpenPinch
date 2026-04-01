@@ -1,3 +1,5 @@
+"""End-to-end tests for main."""
+
 import json
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from OpenPinch.lib import *
 
 
 def get_example_problem_filepaths():
+    """Return example problem filepaths used by this test module."""
     test_data_dir = Path(__file__).resolve().parents[2] / "OpenPinch" / "examples" / "stream_data"
     return [
         filepath

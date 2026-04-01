@@ -156,6 +156,11 @@ def _parse_sheet_with_units(
     # Build a mapping from column -> unit (from Row 2)
     units_map = dict(zip(col_names, col_units))
 
+    if sheet_name != "Summary":
+        keep = ["t_supply", "t_target", "heat_flow", "dt_cont", "htc"]
+        units_map = {key: units_map[key] for key in keep if key in units_map}
+
+
     if sheet_name == "Summary":
         return _write_targets_to_dict_and_list(df_data, units_map, project_name)
     else:
@@ -283,8 +288,8 @@ def _write_targets_to_dict_and_list(
     clean_df = clean_df.where(~clean_df.isna(), None)
     base_records = clean_df[other_cols].to_dict(orient="records")
 
-    hot_units = {col: units_map[col] for col in hot_cols}
-    cold_units = {col: units_map[col] for col in cold_cols}
+    hot_units = {col: units_map.get(col) for col in hot_cols}
+    cold_units = {col: units_map.get(col) for col in cold_cols}
 
     hot_matrix = clean_df[hot_cols].to_numpy(dtype=float) if hot_cols else None
     cold_matrix = clean_df[cold_cols].to_numpy(dtype=float) if cold_cols else None

@@ -12,6 +12,6 @@ from .export import *
 from .heat_exchanger import *
 from .input_validation import *
 from .miscellaneous import *
-from .optimiser import *
+from .blackbox_minimisers import *
 from .water_properties import *
 from .wkbook_to_json import *

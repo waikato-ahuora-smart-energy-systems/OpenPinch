@@ -2,7 +2,7 @@
 
 The :class:`Configuration` object centralizes option flags and numerical
 settings used across direct integration, utility targeting, and optional
-advanced routines such as heat-pump and cost targeting.
+advanced routines such as heat pump and cost targeting.
 """
 
 from __future__ import annotations
@@ -26,7 +26,14 @@ LOG_TIMING = False
 
 
 class Configuration:
-    """Runtime configuration defaults."""
+    """Runtime configuration defaults used throughout OpenPinch.
+
+    The attributes on this class combine global numerical settings, workbook-
+    compatible feature flags, and advanced-analysis parameters such as heat-pump
+    or costing options. A ``Configuration`` instance is attached to each
+    :class:`~OpenPinch.classes.zone.Zone` so workflows can vary behaviour by
+    hierarchy level if needed.
+    """
     
     ### General parameters ###
     TOP_ZONE_NAME: str = "Site"
@@ -69,6 +76,7 @@ class Configuration:
     DTMIN_HP: float = 0.0
     DT_HP_IHX: float = 0.0
     DT_CASCADE_HX: float = 0.0
+    BB_MINIMISER: str = BB_Minimiser.CMAES.value
 
     ### Cost targeting parameters ### 
     UTILITY_PRICE: float = 40

@@ -1,3 +1,5 @@
+"""Regression tests for direct integration entry analysis routines."""
+
 from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *

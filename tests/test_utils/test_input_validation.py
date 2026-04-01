@@ -1,3 +1,5 @@
+"""Regression tests for input validation utility helpers."""
+
 import pandas as pd
 
 from OpenPinch.utils.input_validation import (

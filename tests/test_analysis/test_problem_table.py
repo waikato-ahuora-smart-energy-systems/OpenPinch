@@ -1,3 +1,5 @@
+"""Regression tests for problem table analysis routines."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -10,6 +12,7 @@ from OpenPinch.lib import *
 
 # Core helper function
 def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
+    """Build stream data used by this test module."""
     return Stream(
         name,
         t_supply,
@@ -21,6 +24,7 @@ def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
 
 
 def _make_problem_table_for_interval_tests():
+    """Build problem table for interval tests data used by this test module."""
     data = {
         PT.T.value: [300.0, 200.0, 100.0],
         PT.DELTA_T.value: [0.0, 100.0, 100.0],
@@ -146,6 +150,7 @@ from OpenPinch.analysis.problem_table_analysis import problem_table_algorithm
 
 
 def make_simple_problem_table():
+    """Build simple problem table data used by this test module."""
     data = {
         PT.T.value: [400, 300, 200],
         PT.CP_HOT.value: [0, 2.0, 1.0],
@@ -880,12 +885,14 @@ from OpenPinch.analysis.problem_table_analysis import set_zonal_targets
 
 @pytest.fixture
 def dummy_zone():
+    """Return dummy zone data used by this test module."""
     return Zone(name="Z_Test")
 
 
 @pytest.fixture
 def dummy_problem_table():
     # Basic dummy PT with 3 intervals
+    """Return dummy problem table data used by this test module."""
     return ProblemTable(
         {
             PT.T.value: [400, 300, 200],
@@ -899,6 +906,7 @@ def dummy_problem_table():
 @pytest.fixture
 def dummy_problem_table_star():
     # Star PT should be shifted relative to original
+    """Return dummy problem table star data used by this test module."""
     return ProblemTable(
         {
             PT.T.value: [400, 300, 200],
@@ -1041,6 +1049,7 @@ from OpenPinch.analysis.problem_table_analysis import create_problem_table_with_
 
 
 def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
+    """Build stream data used by this test module."""
     return Stream(
         name=name,
         t_supply=t_supply,

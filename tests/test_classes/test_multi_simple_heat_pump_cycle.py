@@ -1,3 +1,5 @@
+"""Regression tests for the multi simple heat pump cycle classes."""
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,7 @@ from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
 
 
 def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
+    """Assert that stage matches simple for this test module."""
     ref = SimpleHeatPumpCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 
@@ -55,7 +58,7 @@ def test_each_parallel_stage_matches_simple_heat_pump_solution():
     T_evap = np.array([20.0, 0.0])
     dT_superheat = np.array([6.0, 4.0])
     dT_subcool = np.array([3.0, 2.0])
-    ihx_gas_dt = np.array([8.0, 6.0])
+    dt_ihx_gas_side = np.array([8.0, 6.0])
     Q_heat = np.array([1200.0, 700.0])
     Q_cool = np.array([900.0, 400.0])
     refrigerant = ["R134a", "R134a"]
@@ -66,7 +69,7 @@ def test_each_parallel_stage_matches_simple_heat_pump_solution():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        ihx_gas_dt=ihx_gas_dt,
+        dt_ihx_gas_side=dt_ihx_gas_side,
         refrigerant=refrigerant,
         eta_comp=eta_comp,
         Q_heat=Q_heat,
@@ -81,7 +84,7 @@ def test_each_parallel_stage_matches_simple_heat_pump_solution():
             T_cond=T_cond[i],
             dT_superheat=dT_superheat[i],
             dT_subcool=dT_subcool[i],
-            ihx_gas_dt=ihx_gas_dt[i],
+            dt_ihx_gas_side=dt_ihx_gas_side[i],
             refrigerant=refrigerant[i],
             eta_comp=eta_comp,
             Q_heat=Q_heat[i],
@@ -96,7 +99,7 @@ def test_parallel_aggregates_match_sum_of_stage_results():
         T_cond=np.array([80.0, 60.0]),
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a"],
         Q_heat=np.array([1200.0, 700.0]),
@@ -117,7 +120,7 @@ def test_parallel_build_stream_collection_is_union_of_stage_streams():
         T_cond=np.array([80.0, 60.0]),
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a"],
         Q_heat=np.array([1200.0, 700.0]),
@@ -136,7 +139,7 @@ def test_parallel_build_stream_collection_is_union_of_stage_streams():
     "bad_kwargs",
     [
         {"refrigerant": ["R134a", "R134a", "R134a"]},
-        {"ihx_gas_dt": np.array([5.0, 5.0, 5.0])},
+        {"dt_ihx_gas_side": np.array([5.0, 5.0, 5.0])},
         {"dT_superheat": np.array([5.0, 5.0, 5.0])},
         {"dT_subcool": np.array([2.0, 2.0, 2.0])},
     ],
@@ -149,7 +152,7 @@ def test_parallel_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
         Q_heat=np.array([1200.0, 700.0]),
         Q_cool=np.array([900.0, 500.0]),
         refrigerant=["R134a", "R134a"],
-        ihx_gas_dt=np.array([5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0]),
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
     )
@@ -166,7 +169,7 @@ def test_parallel_q_cool_nan_and_none_are_allowed_for_any_cycle():
         T_cond=np.array([80.0, 60.0]),
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a"],
         Q_heat=np.array([1200.0, 700.0]),
@@ -184,7 +187,7 @@ def test_parallel_q_heat_nan_defaults_to_one_for_each_stage():
         T_cond=np.array([80.0, 60.0]),
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a"],
         Q_heat=np.array([np.nan, np.nan]),
@@ -200,7 +203,7 @@ def test_parallel_streams_match_aggregate_heat():
         T_cond=np.array([80.0, 60.0]),
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
-        ihx_gas_dt=np.array([5.0, 5.0]),
+        dt_ihx_gas_side=np.array([5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a"],
         Q_heat=np.array([1200.0, 700.0]),

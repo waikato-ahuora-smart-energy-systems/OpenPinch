@@ -1,3 +1,5 @@
+"""Regression tests for the pinch problem classes."""
+
 import json
 
 # import types
@@ -11,6 +13,7 @@ from OpenPinch.classes.pinch_problem import PinchProblem
 
 @pytest.fixture
 def sample_problem():
+    """Return sample problem data used by this test module."""
     return {
         "options": {"dt_min": 10},
         "streams": [{"zone": "Z1", "name": "H1", "supply_T": 150, "target_T": 60, "cp": 2.0}],

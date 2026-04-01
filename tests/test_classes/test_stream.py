@@ -1,3 +1,5 @@
+"""Regression tests for the stream classes."""
+
 import pytest
 
 from OpenPinch.classes import *
@@ -12,6 +14,7 @@ class DummyStream(Stream):
 
 @pytest.fixture
 def hot_stream():
+    """Return a representative hot stream used by this test module."""
     return DummyStream(
         name="Hot1",
         t_supply=300,
@@ -25,6 +28,7 @@ def hot_stream():
 
 @pytest.fixture
 def cold_stream():
+    """Return a representative cold stream used by this test module."""
     return DummyStream(
         name="Cold1",
         t_supply=100,

@@ -50,6 +50,7 @@ class StreamlitGraphSet:
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, object]) -> "StreamlitGraphSet":
+        """Build a graph-set wrapper from the JSON-style graph payload."""
         return cls(
             name=str(payload.get("name", "Graph Set")),
             graphs=list(payload.get("graphs", [])),

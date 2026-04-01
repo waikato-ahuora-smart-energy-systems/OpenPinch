@@ -1,3 +1,5 @@
+"""Regression tests for water properties utility helpers."""
+
 from OpenPinch.utils.water_properties import *
 
 

@@ -1,3 +1,5 @@
+"""Regression tests for the stream collection classes."""
+
 import pytest
 
 from OpenPinch.classes import *
@@ -11,6 +13,7 @@ from uuid import uuid4
 
 @pytest.fixture
 def sample_streams():
+    """Return sample streams data used by this test module."""
     s1 = Stream(name="A", t_supply=150, t_target=100, heat_flow=1)
     s2 = Stream(name="B", t_supply=180, t_target=120, heat_flow=1)
     s3 = Stream(name="C", t_supply=130, t_target=90, heat_flow=1)
