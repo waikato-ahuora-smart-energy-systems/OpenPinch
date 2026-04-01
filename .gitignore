@@ -13,6 +13,8 @@ develop-eggs/
 dist/
 downloads/
 Hidden/
+run.py
+.vscode/
 eggs/
 .eggs/
 lib64/
