@@ -66,7 +66,7 @@ def get_heat_pump_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
+    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
     args = _prepare_heat_pump_target_inputs(
         Q_hp_target=Q_hp_target,
         T_vals=T_vals,
@@ -496,11 +496,10 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout.
     """
-    x0_ls = _get_x0_for_multi_temperature_carnot_hp_opt(args)
     bnds = _get_bounds_for_multi_temperature_carnot_hp_opt(args)
     minima = multiminima(
         func=_compute_multi_temperature_carnot_hp_opt_obj,
-        x0_ls=x0_ls,
+        x0_ls=None,
         func_kwargs=args,
         bounds=bnds,
         optimiser_handle=args.bb_minimiser,
@@ -514,86 +513,11 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     return HeatPumpTargetOutputs.model_validate(res)
 
 
-def _get_x0_for_multi_temperature_carnot_hp_opt(
-    args: HeatPumpTargetInputs
-) -> np.ndarray:
-    """Return initial solution vectors for the Carnot HP optimizer.
-    """
-    x0_cond_ls = _initialise_multi_temperature_carnot_hp_optimisation(
-        n=args.n_cond,
-        is_condenser=True,
-        T0=args.T_cold[0],
-        map_fun=_map_x_to_T_cond,
-        T_vals=args.T_cold,
-        H_vals=args.H_cold,
-        dt_range_max=args.dt_range_max,
-        Q_hp_target=args.Q_hp_target,
-        bb_minimiser=args.bb_minimiser,
-    )
-
-    x0 = np.array(x0_cond_ls.tolist()[0] + np.zeros(args.n_evap-1).tolist())
-    res = _compute_multi_temperature_carnot_hp_opt_obj(x0, args)
-    x0_evap_ls = _initialise_multi_temperature_carnot_hp_optimisation(
-        n=args.n_evap,
-        is_condenser=False,
-        T0=res["T_evap"][-1],
-        map_fun=_map_x_to_T_evap,
-        T_vals=args.T_hot,
-        H_vals=args.H_hot,
-        dt_range_max=args.dt_range_max,
-        price_ratio=args.price_ratio,
-        bb_minimiser=args.bb_minimiser,
-    )
-    if len(x0_evap_ls) > 0:
-        x0_ls = list(itertools.product(x0_cond_ls, x0_evap_ls))
-        x0_ls = np.asarray([np.concatenate(x0) for x0 in x0_ls])
-    else:
-        x0_ls = np.asarray(np.asarray(x0_cond_ls))
-    return x0_ls
-
-
 def _get_bounds_for_multi_temperature_carnot_hp_opt(
     args: HeatPumpTargetInputs
 ) -> list:
     """Return bounds for the Carnot HP optimizer."""
     return [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap - 1)]
-
-
-def _initialise_multi_temperature_carnot_hp_optimisation(
-    n: float,
-    is_condenser: bool,
-    T0: float,
-    map_fun,
-    T_vals: np.ndarray,
-    H_vals: np.ndarray,
-    dt_range_max: float,
-    *,
-    Q_hp_target: float = None,
-    price_ratio: float = 1,
-    bb_minimiser: str = None,
-) -> list:
-    """Build initial guesses based on a simple area maximisation problem, i.e., sum(Q x delta T).
-    """
-    n_stages = n if is_condenser else n-1
-    if n_stages == 0:
-        return []
-    
-    func_kwargs = {
-        "is_condenser": is_condenser,
-        "map_fun": map_fun,
-        "T0": T0,
-        "T_vals": T_vals,
-        "H_vals": H_vals,
-        "dt_range_max": dt_range_max,
-        "Q_hp_target": Q_hp_target,
-        "price_ratio": price_ratio,
-    }
-    return multiminima(
-        func=_compute_entropy_generation_reduction_at_constant_T,
-        func_kwargs=func_kwargs,
-        bounds=[(0.0, 1.0) for _ in range(n_stages)],
-        optimiser_handle=bb_minimiser,
-    )
 
 
 def _compute_multi_temperature_carnot_hp_opt_obj(
@@ -952,7 +876,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout.
     """
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
-    x0_ls = _get_x0_for_multi_simple_carnot_hp_opt(args)
+    x0_ls = None # _get_x0_for_multi_simple_carnot_hp_opt(args)
     bnds = _get_bounds_for_multi_simple_carnot_hp_opt(args)
     local_minima_x = multiminima(
         func=_compute_multi_simple_carnot_hp_opt_obj,
@@ -964,21 +888,6 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
     res = _compute_multi_simple_carnot_hp_opt_obj(local_minima_x[0], args, debug=args.debug)
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
-
-
-def _get_x0_for_multi_simple_carnot_hp_opt(
-    args: HeatPumpTargetInputs,
-) -> np.ndarray:
-    """Build initial guesses for the multi-simple Carnot HP optimizer."""
-    ub_cond = (args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max
-    ub_evap = (args.T_hot[0] - args.T_hot[-1]) / args.dt_range_max
-    x0 = np.concatenate(
-        (
-            np.linspace(0, ub_cond, args.n_cond + 1)[1:-1], 
-            np.linspace(ub_evap, 0, args.n_evap + 1)[1:]
-        )
-    )
-    return np.asarray([x0])
 
 
 def _get_bounds_for_multi_simple_carnot_hp_opt(
@@ -1595,22 +1504,6 @@ def _get_Q_vals_from_T_hp_vals(
     Q = H - temp
     Q_hx = Q[:-1]
     return np.where(Q_hx > 0.0, Q_hx, 0.0)    
-
-
-def _compute_entropy_generation_reduction_at_constant_T(
-    x: int,
-    args: dict,
-) -> np.ndarray:    
-    """Compute the reduction in entropy generation as a result of selection of x; used for seeding the Carnot HP optimisation.
-    """
-    T = args["map_fun"](x, args["T0"], args["dt_range_max"])
-    Q = _get_Q_vals_from_T_hp_vals(T, args["T_vals"], args["H_vals"], args["is_condenser"])
-    if args["is_condenser"]:
-        W = args["Q_hp_target"] - Q.sum()
-        S_red = (Q * (T - args["T0"]) / ((T + 273.15) * (args["T0"] + 273.15))).sum() + W / (T.max() + 273.15) / args["price_ratio"]
-    else: 
-        S_red = (Q * (args["T0"] - T) / ((T + 273.15) * (args["T0"] + 273.15))).sum()
-    return {"obj": S_red} # is negative, meaning a reduction in entropy generation
 
 
 def _compute_entropic_average_temperature_in_K(
