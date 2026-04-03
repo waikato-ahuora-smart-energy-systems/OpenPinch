@@ -81,6 +81,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_he_carnot: float
     refrigerant_ls: List[str]
     do_refrigerant_sort: bool
+    initialise_simulated_hp: bool
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None

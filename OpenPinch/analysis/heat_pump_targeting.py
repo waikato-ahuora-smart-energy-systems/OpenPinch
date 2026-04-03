@@ -66,7 +66,7 @@ def get_heat_pump_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    # zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
+    zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
     args = _prepare_heat_pump_target_inputs(
         Q_hp_target=Q_hp_target,
         T_vals=T_vals,
@@ -75,7 +75,7 @@ def get_heat_pump_targets(
         is_direct_integration=is_direct_integration,
         is_heat_pumping=is_heat_pumping,        
         zone_config=zone_config,
-        debug=False,
+        debug=True,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:
@@ -303,8 +303,8 @@ def _prepare_heat_pump_target_inputs(
         dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
         is_direct_integration=bool(is_direct_integration),
         is_heat_pumping=bool(is_heat_pumping),
-        n_cond=zone_config.N_COND,
-        n_evap=zone_config.N_EVAP,
+        n_cond=zone_config.N_COND +1,
+        n_evap=zone_config.N_EVAP +1,
         eta_comp=zone_config.ETA_COMP,
         eta_exp=zone_config.ETA_EXP,
         eta_hp_carnot=zone_config.ETA_HP_CARNOT,
@@ -324,6 +324,7 @@ def _prepare_heat_pump_target_inputs(
         net_hot_streams=net_hot_streams,
         net_cold_streams=net_cold_streams,
         debug=debug,
+        initialise_simulated_hp=zone_config.INITIALISE_SIMULATED_HP,
     )
 
 
@@ -698,18 +699,15 @@ def _optimise_cascade_heat_pump_placement(
     num_stages = int(args.n_cond + args.n_evap - 1)
 
     # Use as initialisation
-    init_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
+    if args.initialise_simulated_hp:
+        init_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
 
     # Validate specific inputs related to this approach
     args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
 
     # Prepare and run the optimisation
-    bnds = _get_bounds_for_cascade_hp_opt(
-        T_cond=init_res.T_cond,
-        T_evap=init_res.T_evap,
-        Q_cool=init_res.Q_evap,
-        args=args,
-    )
+    bnds = _get_bounds_for_cascade_hp_opt(args)
+    
     x0_ls = _get_x0_for_cascade_hp_opt(
         T_cond=init_res.T_cond,
         Q_heat=init_res.Q_cond,
@@ -717,7 +715,7 @@ def _optimise_cascade_heat_pump_placement(
         Q_cool=init_res.Q_evap,
         args=args,
         bnds=bnds,
-    )
+    ) if args.initialise_simulated_hp else None
 
     local_minima_x = multiminima(
         func=_compute_cascade_hp_system_performance,
@@ -777,9 +775,6 @@ def _get_x0_for_cascade_hp_opt(
 
 
 def _get_bounds_for_cascade_hp_opt(
-    T_cond: np.ndarray,
-    T_evap: np.ndarray,
-    Q_cool: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> list:
     """Build bounds for the cascade condenser/evaporator optimization."""
@@ -787,7 +782,7 @@ def _get_bounds_for_cascade_hp_opt(
     x_evap_bnds = []
     for i, refrigerant in enumerate(args.refrigerant_ls):
         T_min, T_max = PropsSI("Tmin", refrigerant) - 273.15, PropsSI("Tmax", refrigerant) - 273.15
-        if i + 1 <= T_cond.size:
+        if i + 1 <= args.n_cond:
             T_cond_bnds = np.array(
                 (
                     min(args.T_cold[0], T_max - 1),
@@ -803,7 +798,7 @@ def _get_bounds_for_cascade_hp_opt(
                 )
             ]
 
-        if i + 1 >= T_cond.size:
+        if i + 1 >= args.n_cond:
             T_evap_bnds = np.array(
                 (
                     max(args.T_hot[-1], T_min + 1),
@@ -837,13 +832,13 @@ def _get_bounds_for_cascade_hp_opt(
         else:
             bnds.extend([limits] * count)
 
-    _build_bounds(len(T_cond), x_cond_bnds)
-    _build_bounds(len(T_cond), x_sc_bnds)
-    _build_bounds(len(T_cond), y_heat_bnds)
-    _build_bounds(len(T_evap), x_evap_bnds)
+    _build_bounds(args.n_cond, x_cond_bnds)
+    _build_bounds(args.n_cond, x_sc_bnds)
+    _build_bounds(args.n_cond, y_heat_bnds)
+    _build_bounds(args.n_evap, x_evap_bnds)
 
-    if np.asarray(Q_cool).size > 1:
-        _build_bounds(len(T_evap) - 1, y_cool_bnds)
+    if args.n_evap > 1:
+        _build_bounds(args.n_evap - 1, y_cool_bnds)
 
     return bnds
 
@@ -915,16 +910,14 @@ def _compute_cascade_hp_system_performance(
 
     # Calculate key perfromance indicators
     work_hp = hp.work
-    Q_ext = pt_cond.col[PT.H_NET.value][0] # Acts as a penalty
-    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2 + pt_evap.col[PT.H_NET.value][0] ** 2
+    Q_ext = pt_cond.col[PT.H_NET.value][0] # Alternative to heat pump, an external heat source
+    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2 + (pt_evap.col[PT.H_NET.value][0]) ** 2 + (hp.penalty) ** 2
     Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
-    obj = (work_hp + Q_ext / args.price_ratio + c) / args.Q_hp_target
+    obj = (work_hp + (Q_ext / args.price_ratio) + c) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
     if debug:
-        # plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
-        # plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
             title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(c / args.Q_hp_target):.5f}"
@@ -1094,14 +1087,21 @@ def _optimise_multi_simple_heat_pump_placement(
     num_stages = args.n_cond = args.n_evap = int(max(args.n_cond, args.n_evap))
     
     # Use as initialisation
-    init_res = _optimise_multi_simple_carnot_heat_pump_placement(args)
+    if args.initialise_simulated_hp:
+        init_res = _optimise_multi_simple_carnot_heat_pump_placement(args)
 
     # Validate specific inputs related to this approach
     args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
 
     # Prepare and run the optimisation
-    bnds = _get_bounds_for_multi_single_hp_opt(init_res.T_cond, init_res.T_evap, args)
-    x0 = _get_x0_for_multi_single_hp_opt(init_res.T_cond, init_res.Q_cond, init_res.T_evap, args, bnds)
+    bnds = _get_bounds_for_multi_single_hp_opt(args)
+    x0 = _get_x0_for_multi_single_hp_opt(
+        T_cond=init_res.T_cond, 
+        Q_cond=init_res.Q_cond, 
+        T_evap=init_res.T_evap, 
+        args=args, 
+        bnds=bnds,
+    ) if args.initialise_simulated_hp else None
 
     local_minima_x = multiminima(
         func=_compute_multi_simple_hp_system_performance,
@@ -1167,8 +1167,6 @@ def _get_x0_for_multi_single_hp_opt(
 
 
 def _get_bounds_for_multi_single_hp_opt(
-    T_cond: np.ndarray,
-    T_evap: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> list:
     """Build bounds for the multi single-HP condenser/evaporator optimization."""
@@ -1176,7 +1174,7 @@ def _get_bounds_for_multi_single_hp_opt(
     x_evap_bnds = []
     for i, refrigerant in enumerate(args.refrigerant_ls):
         T_min, T_max = PropsSI("Tmin", refrigerant) - 273.15, PropsSI("Tmax", refrigerant) - 273.15
-        if i == T_cond.size:
+        if i == args.n_cond:
             break
 
         T_cond_bnds = np.array(
@@ -1233,11 +1231,11 @@ def _get_bounds_for_multi_single_hp_opt(
         else:
             bnds.extend([limits] * count)
 
-    _build_bounds(len(T_cond), x_cond_bnds)
-    _build_bounds(len(T_cond), x_sc_bnds)
-    _build_bounds(len(T_cond), y_cond_bnds)
-    _build_bounds(len(T_evap), x_evap_bnds)
-    _build_bounds(len(T_evap), x_sh_bnds)
+    _build_bounds(args.n_cond, x_cond_bnds)
+    _build_bounds(args.n_cond, x_sc_bnds)
+    _build_bounds(args.n_cond, y_cond_bnds)
+    _build_bounds(args.n_cond, x_evap_bnds)
+    _build_bounds(args.n_cond, x_sh_bnds)
 
     return bnds
 
@@ -1318,11 +1316,11 @@ def _compute_multi_simple_hp_system_performance(
 
     # Calculate key perfromance indicators
     work_hp = hp.work
-    Q_ext = pt_cond.col[PT.H_NET.value][0] # Acts as a penalty
-    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2 + pt_evap.col[PT.H_NET.value][0] ** 2
+    Q_ext = pt_cond.col[PT.H_NET.value][0] # Alternative to heat pump, an external heat source
+    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2 + (pt_evap.col[PT.H_NET.value][0]) ** 2 + (hp.penalty) ** 2    
     Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
-    obj = (work_hp + Q_ext / args.price_ratio + c) / args.Q_hp_target
+    obj = (work_hp + (Q_ext / args.price_ratio) + c) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
     if debug:

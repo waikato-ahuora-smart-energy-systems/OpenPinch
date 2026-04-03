@@ -51,6 +51,7 @@ class SimpleHeatPumpCycle:
 
         self._m_dot: Optional[float] = None
         self._work: Optional[float] = None
+        self._penalty: Optional[float] = None
         self._refrigerant: Optional[str] = None
         self._T_evap: Optional[float] = None
         self._T_cond: Optional[float] = None
@@ -189,10 +190,15 @@ class SimpleHeatPumpCycle:
     def work(self) -> Optional[float]:
         """Total compressor work input."""
         return self._work
-
+    
+    @property
+    def penalty(self) -> Optional[float]:
+        """Total penalty for excessive subcooling."""
+        return self._penalty
+        
     @property
     def m_dot(self) -> Optional[float]:
-        """Working-fluid mass flow rate."""
+        """Working fluid mass flow rate."""
         return self._m_dot
     
     @property
@@ -260,6 +266,11 @@ class SimpleHeatPumpCycle:
         """Gas-side temperature change across the internal heat exchanger."""
         return self._ihx_gas_dt
 
+    @property
+    def solved(self) -> bool:
+        """Flag if the cycle has been solved or not."""
+        return self._solved
+    
 
     def _validate_solve_inputs(
         self,
@@ -449,7 +460,7 @@ class SimpleHeatPumpCycle:
         )
         self._save_cycle_state(1)
 
-        # 2 - Condenser outlet / IHX inlet (source) *******************************************
+        # 2 - Condenser outlet / IHX inlet (source)
         self._compute_state_from_pressure_quality(
             P=P_lo,
             Q=0,
@@ -460,10 +471,12 @@ class SimpleHeatPumpCycle:
             T=T_cond - dT_subcool,
             phase=0,
         )
+        h_cond_out_tar = self._state.hmass()
         self._compute_state_from_pressure_enthalpy(
             P=P_hi,
-            h=max(h_cond_out_min, self._state.hmass())
+            h=max(h_cond_out_min, h_cond_out_tar)
         )
+        dh_penalty = max(h_cond_out_min - h_cond_out_tar, 0.0)
         self._dT_subcool = T_cond - self._state.T()
         self._save_cycle_state(2)
         if self._cycle_states[1, 'H'] <= self._cycle_states[2, 'H']:
@@ -482,6 +495,7 @@ class SimpleHeatPumpCycle:
         self._q_cond = (self._cycle_states[1, 'H'] - self._cycle_states[2, 'H'])
         self._w_net = self._q_cond - self._q_evap
         self._work = self._m_dot * self._w_net
+        self._penalty = self._m_dot * dh_penalty
 
         # Extra states for cascade heat exchangers
         # Condenser side - state 4
