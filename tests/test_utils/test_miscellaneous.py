@@ -145,4 +145,22 @@ def test_clean_composite_curve_ends_5():
     y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
     assert len(x_clean) == 0
     assert len(y_clean) == 0
-    
+
+
+def test_g_ineq_penalty_square_default():
+    assert g_ineq_penalty(2.0) == pytest.approx(40.0)
+
+
+def test_g_ineq_penalty_square_custom_rho():
+    assert g_ineq_penalty(-3.0, rho=2.0, form="square") == pytest.approx(18.0)
+
+
+def test_g_ineq_penalty_square_root_smoothing():
+    g, eta, rho = -0.2, 0.5, 4.0
+    expected = 0.5 * rho * (g + (g**2 + eta**2) ** 0.5)
+    assert g_ineq_penalty(g, eta=eta, rho=rho, form="square_root_smoothing") == pytest.approx(expected)
+
+
+def test_g_ineq_penalty_invalid_form():
+    with pytest.raises(ValueError, match="Unrecognised penalty function"):
+        g_ineq_penalty(1.0, form="invalid")

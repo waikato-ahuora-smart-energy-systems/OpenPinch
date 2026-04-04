@@ -192,3 +192,18 @@ def make_monotonic(
         adjusted[mask] += offsets[mask]
 
     return adjusted
+
+def g_ineq_penalty(
+    g: float,
+    *,
+    eta: float = 0.01,
+    rho: float = 10,
+    form: str = "square",
+):
+    """Return a penalty value for an inequality-constraint residual."""
+    if form == "square_root_smoothing": 
+        return 0.5 * rho * (g + ((g) ** 2 + (eta) ** 2) ** 0.5)
+    elif form == "square":
+        return rho * (g) ** 2
+    else:
+        raise ValueError("Unrecognised penalty function.")

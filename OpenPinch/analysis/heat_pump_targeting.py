@@ -321,6 +321,8 @@ def _prepare_heat_pump_target_inputs(
         price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL if zone_config.PRICE_RATIO_ELE_TO_FUEL > 0.0 else 1,
         max_multi_start=zone_config.MAX_HP_MULTISTART,
         bb_minimiser=zone_config.BB_MINIMISER,
+        eta_penalty=0.001,
+        rho_penalty=100,        
         net_hot_streams=net_hot_streams,
         net_cold_streams=net_cold_streams,
         debug=debug,
@@ -785,7 +787,7 @@ def _parse_cascade_hp_state_variables(
 
 def _compute_cascade_hp_system_performance(
     x: np.ndarray, 
-    args: HeatPumpTargetInputs, 
+    args: HeatPumpTargetInputs,
     debug: bool = False,
 ) -> dict:
     """Objective: minimise total compressor work for multi-HP configuration.
@@ -835,16 +837,17 @@ def _compute_cascade_hp_system_performance(
     # Calculate key perfromance indicators
     work_hp = hp.work
     Q_ext = pt_cond.col[PT.H_NET.value][0] # Alternative to heat pump, an external heat source
-    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2 + (pt_evap.col[PT.H_NET.value][0]) ** 2 + (hp.penalty) ** 2
+    g_ls = [pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty]
+    p = sum([g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty) for g in g_ls])  
     Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
-    obj = (work_hp + (Q_ext / args.price_ratio) + c) / args.Q_hp_target
+    obj = (work_hp + (Q_ext / args.price_ratio) + p) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
     if debug:
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(c / args.Q_hp_target):.5f}"
+            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(sum(g_ls) / args.Q_hp_target):.5f}"
         )
 
     return {
@@ -1226,18 +1229,17 @@ def _compute_multi_simple_hp_system_performance(
     # Calculate key perfromance indicators
     work_hp = hp.work
     Q_ext = pt_cond.col[PT.H_NET.value][0] # Alternative to heat pump, an external heat source
-    c = (pt_cond.col[PT.H_NET.value][-1]) ** 2 + (pt_evap.col[PT.H_NET.value][0]) ** 2 + (hp.penalty) ** 2    
+    g_ls = [pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty]
+    p = sum([g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty) for g in g_ls])
     Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
     COP = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
-    obj = (work_hp + (Q_ext / args.price_ratio) + c) / args.Q_hp_target
+    obj = (work_hp + (Q_ext / args.price_ratio) + p) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
     if debug:
-        # plot_multi_hp_profiles_from_results(pt_cond.col[PT.T.value], pt_cond.col[PT.H_NET.value])
-        # plot_multi_hp_profiles_from_results(pt_evap.col[PT.T.value], pt_evap.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(c / args.Q_hp_target):.5f}"
+            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(sum(g_ls) / args.Q_hp_target):.5f}"
         )
 
     return {

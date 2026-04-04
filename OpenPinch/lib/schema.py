@@ -89,6 +89,8 @@ class HeatPumpTargetInputs(BaseModel):
     net_hot_streams: Optional[StreamCollection] = StreamCollection()
     net_cold_streams: Optional[StreamCollection] = StreamCollection()
     bb_minimiser: Optional[str] = None
+    eta_penalty: Optional[float] = 0.01
+    rho_penalty: Optional[float] = 10
 
     # Debug mode toogle
     debug: bool
