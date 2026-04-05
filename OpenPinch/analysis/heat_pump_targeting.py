@@ -850,7 +850,7 @@ def _compute_cascade_hp_system_performance(
     g_ls = [pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty]
     p = sum([g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty) for g in g_ls])  
     Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    COP = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
+    cop = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
     obj = (work_hp + (Q_ext / args.price_ratio) + p) / args.Q_hp_target
 
     # For debugging purposes, a quick plot function
@@ -870,7 +870,7 @@ def _compute_cascade_hp_system_performance(
         "Q_heat": hp.Q_heat_arr,          
         "T_evap": T_evap,
         "Q_cool": hp.Q_cool_arr,
-        "cop": COP,
+        "cop": cop,
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
         "hp_cold_streams": hp_cold_streams,
