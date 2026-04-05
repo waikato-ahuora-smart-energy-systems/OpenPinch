@@ -527,7 +527,24 @@ def _get_bounds_for_multi_temperature_carnot_hp_opt(
     args: HeatPumpTargetInputs
 ) -> list:
     """Return bounds for the Carnot HP optimizer."""
-    return [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap - 1)]
+    return [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
+
+
+def _parse_multi_temperature_carnot_hp_state_variables(
+    x: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Compile the full list of condenser and evaporator temperature levels.
+    """
+    x = np.asarray(x, dtype=np.float64).reshape(-1)
+    
+    T_cond = _map_x_to_T(x[:int(args.n_cond)], args.T_cold[0], args.T_cold[-1])
+    Q_cond = _get_Q_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold, is_cond=True)
+
+    T_evap = _map_x_to_T(x[int(args.n_cond):], args.T_hot[-1], args.T_hot[0])
+    Q_evap = _get_Q_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, is_cond=False)    
+
+    return T_cond, Q_cond, T_evap, Q_evap
 
 
 def _compute_multi_temperature_carnot_hp_opt_obj(
@@ -538,63 +555,30 @@ def _compute_multi_temperature_carnot_hp_opt_obj(
 ) -> dict:
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
     """
-    x_cond, x_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args.n_cond)
-    T_cond = _map_x_to_T_cond(x_cond, args.T_cold[0], args.dt_range_max)
-    Q_cond = _get_Q_vals_from_T_hp_vals(T_cond, args.T_cold, args.H_cold, True)
+    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args)
 
-    opt = minimize_scalar(
-        fun=lambda T: _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(T, [args, T_cond, Q_cond, x_evap, None])["obj"],
-        bracket=(args.T_hot[-1], args.T_hot[0]),
-        method="brent",
-        tol=1e-6,
-    )
-    res = _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(opt.x, [args, T_cond, Q_cond, x_evap, opt.success])
+    cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
+  
+    Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
+    
+    work_hp_from_evap = Q_evap.sum() / (cop - 1)
+    work_hp_from_cond = Q_cond.sum() / cop
+    work_hp = max(work_hp_from_evap, work_hp_from_cond)
+
+    g = work_hp_from_evap - work_hp_from_cond
+    p = g_ineq_penalty(g, rho=args.rho_penalty, form="square")
+    Q_ext = max(args.Q_hp_target - Q_cond.sum(), 0.0) # e.g., direct electric heating
+    obj = _calc_obj(work_hp, Q_ext, args.Q_hp_target, args.price_ratio, p)
 
     if debug:
-        res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))      
+        res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], 
-            title=f"Obj {res['obj']:.5f} = {(res['work_hp'] / args.Q_hp_target):.5f} + {(res['Q_ext'] / args.Q_hp_target):.5f}"
-        )
-    return res
-
-
-def _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(
-    T_lo: np.ndarray, 
-    input_args: list,
-) -> dict:
-    """Adjust evaporator ladder to honour minimum temperature limits."""
-    args, T_cond, Q_cond_0, x_evap, success = input_args
-    Q_cond = Q_cond_0.copy()
-    T_evap = _map_x_to_T_evap(x_evap, T_lo, args.dt_range_max)
-    Q_evap = _get_Q_vals_from_T_hp_vals(T_evap, args.T_hot, args.H_hot, False)
-    cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
-
-    Q_evap_max = Q_evap.sum()
-    Q_cond_max = Q_cond.sum()
-    if cop > 1:
-        if Q_evap_max > Q_cond_max * (1 - 1 / cop):
-            Q_cond_tot = Q_cond_max
-            work_hp = Q_cond_tot / cop
-            Q_evap_tot = Q_cond_tot - work_hp
-            if Q_evap_max > 0: 
-                Q_evap *= (Q_evap_tot / Q_evap_max)
-        else: # Evaporator limits the heat pump
-            Q_evap_tot = Q_evap_max
-            work_hp = Q_evap_tot / (cop - 1)
-            Q_cond_tot = Q_evap_tot + work_hp
-            if Q_cond_max > 0:
-                Q_cond *= (Q_cond_tot / Q_cond_max)
-    elif cop == 1:
-        work_hp = Q_cond_tot = Q_cond_max
-        Q_evap = Q_evap_tot = 0.0
-    else:
-        raise ValueError("COP of heating cannot be less than 1.")    
-
-    Q_ext = max(args.Q_hp_target - Q_cond_tot, 0.0) # Direct electric heating
+            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(g / args.Q_hp_target):.5f}"
+        )        
 
     return {
-        "obj": (work_hp + Q_ext / args.price_ratio) / args.Q_hp_target, 
+        "obj": obj, 
         "utility_tot": work_hp + Q_ext, 
         "work_hp": work_hp,  
         "Q_ext": Q_ext,
@@ -603,22 +587,9 @@ def _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(
         "T_evap": T_evap, 
         "Q_evap": Q_evap, 
         "cop": cop,
-        "Q_amb": max(Q_evap.sum() - (np.abs(args.H_hot).max() - args.Q_amb_max), args.Q_amb_max),
-        "opt_success": success,
+        "Q_amb": Q_amb,
+        "opt_success": True,
     }
-
-
-def _parse_multi_temperature_carnot_hp_state_variables(
-    x: np.ndarray, 
-    n_cond: float,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Compile the full list of condenser and evaporator temperature levels.
-    """
-    x = np.asarray(x, dtype=np.float64).reshape(-1)
-    n_cond_vars = int(n_cond)
-    x_cond = x[:n_cond_vars]
-    x_evap = np.concatenate((x[n_cond_vars:], np.array([0.0], dtype=np.float64)))
-    return x_cond, x_evap
 
 
 #######################################################################################################
@@ -846,18 +817,18 @@ def _compute_cascade_hp_system_performance(
 
     # Calculate key perfromance indicators
     work_hp = hp.work
-    Q_ext = pt_cond.col[PT.H_NET.value][0] # Alternative to heat pump, an external heat source
-    g_ls = [pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty]
-    p = sum([g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty) for g in g_ls])  
-    Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    cop = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
-    obj = (work_hp + (Q_ext / args.price_ratio) + p) / args.Q_hp_target
+    cop = args.Q_hp_target / work_hp if work_hp > 0 else 1.0
+    Q_amb = _calc_Q_amb(hp.Q_cool, np.abs(args.H_hot[-1]), args.Q_amb_max)
+    
+    Q_ext = pt_cond.col[PT.H_NET.value][0] # e.g., direct eletric heating
+    g = np.array([pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty])
+    p = g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty, form="square")
+    obj = _calc_obj(work_hp, Q_ext, args.Q_hp_target, args.price_ratio, p)
 
-    # For debugging purposes, a quick plot function
-    if debug:
+    if debug: # for debugging purposes, a quick plot function
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(sum(g_ls) / args.Q_hp_target):.5f}"
+            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(g.sum() / args.Q_hp_target):.5f}"
         )
 
     return {
@@ -972,8 +943,9 @@ def _compute_multi_simple_carnot_hp_opt_obj(
         Q_evap_max -= np.float64(Q_evap[i].sum())
 
     Q_ext = args.Q_hp_target - Q_cond.sum()
-    Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    obj = (work_hp.sum() - work_he.sum() + Q_ext / args.price_ratio) / args.Q_hp_target
+    Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
+
+    obj = _calc_obj(work_hp.sum() - work_he.sum(), Q_ext, args.Q_hp_target, args.price_ratio)
 
     if debug:
         res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)     
@@ -985,7 +957,8 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     return {
         "obj": obj, 
         "utility_tot": work_hp.sum() - work_he.sum() + Q_ext, 
-        "work_hp": work_hp.sum() - work_he.sum(),
+        "work_hp": work_hp.sum(),
+        "work_he": work_he.sum(),
         "Q_ext": Q_ext,
         "T_cond": T_cond,
         "Q_cond": Q_cond,            
@@ -1239,18 +1212,19 @@ def _compute_multi_simple_hp_system_performance(
 
     # Calculate key perfromance indicators
     work_hp = hp.work
+    cop = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
+    Q_amb = _calc_Q_amb(hp.Q_cool, np.abs(args.H_hot[-1]), args.Q_amb_max)
+    
+    g = np.array([pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty])
+    p = g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty, form="square")
     Q_ext = pt_cond.col[PT.H_NET.value][0] # Alternative to heat pump, an external heat source
-    g_ls = [pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty]
-    p = sum([g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty) for g in g_ls])
-    Q_amb = max(hp.Q_cool - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    COP = args.Q_hp_target / work_hp if work_hp > 0 else 1.0 
-    obj = (work_hp + (Q_ext / args.price_ratio) + p) / args.Q_hp_target
+    obj = _calc_obj(work_hp, Q_ext, args.Q_hp_target, args.price_ratio, p)
 
     # For debugging purposes, a quick plot function
     if debug:
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, 
-            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(sum(g_ls) / args.Q_hp_target):.5f}"
+            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hp_target):.5f} + {(Q_ext / args.Q_hp_target):.5f} + {(g.sum() / args.Q_hp_target):.5f}"
         )
 
     return {
@@ -1264,7 +1238,7 @@ def _compute_multi_simple_hp_system_performance(
         "T_evap": T_evap, 
         "dT_superheat": dT_superheat,
         "Q_cool": hp.Q_cool_arr,
-        "cop": COP,
+        "cop": cop,
         "Q_amb": Q_amb,
         "hp_hot_streams": hp_hot_streams,
         "hp_cold_streams": hp_cold_streams,
@@ -1382,8 +1356,8 @@ def _compute_brayton_hp_system_performance(
     Q_ext = pt_gas_cooler.col[PT.H_NET.value][0] # Extra heating required on either side of the gcc 
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     COP = (args.Q_hp_target - Q_ext) / (work_hp + 1e-9)
-    Q_amb = max(Q_cool.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0)
-    obj = (work_hp + Q_ext + c) / args.Q_hp_target
+    Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
+    obj = _calc_obj(work_hp, Q_ext, args.Q_hp_target, penalty=c)
 
     if 0:
         plot_multi_hp_profiles_from_results(pt_gas_cooler.col[PT.T.value], pt_gas_cooler.col[PT.H_NET.value])
@@ -1541,8 +1515,8 @@ def _compute_COP_estimate_from_carnot_limit(
     T_evap: np.ndarray,
     Q_evap: np.ndarray,
     *,
-    eff: float = 0.5, 
-    min_dt_lift: float = 1.0,          
+    eff: float = 0.5,
+    min_dt_lift: float = 0.1,          
 ):  
     """Estimate COP by scaling the Carnot limit using entropic mean temperatures.
     """
@@ -1606,9 +1580,24 @@ def _map_x_to_T_evap(
     """    
     temp = []
     for i in range(x.size):
-        temp.append(x[::-1][i] * deltaT_range + T_lo)
+        temp.append(T_lo + x[::-1][i] * deltaT_range)
         T_lo = temp[-1]
     return np.array(temp).flatten()[::-1]
+
+
+def _map_x_to_T(
+    x: np.ndarray,
+    T_0: float, 
+    T_1: float,
+    
+) -> np.ndarray:
+    """Recover evaporator temperatures from normalized x values.
+    """    
+    temp = []
+    for i in range(x.size):
+        temp.append(T_0 - x[::-1][i] * (T_0 - T_1))
+        T_0 = temp[-1]
+    return np.sort(np.array(temp).flatten())[::-1]
 
 
 def _get_heat_pump_cascade(
@@ -1819,6 +1808,26 @@ def _get_ambient_air_stream(
             is_process_stream=True,
             prefix="AIR",
         )     
+
+
+def _calc_obj(
+    work_hp: float,
+    Q_ext: float,
+    Q_hp_target: float,
+    price_ratio: float = 1.0,
+    penalty: float = 0.0,
+) -> float:
+    """Return the normalized objective value."""
+    return (work_hp + Q_ext / price_ratio + penalty) / Q_hp_target
+
+
+def _calc_Q_amb(
+    Q_evap_total: float,
+    H_hot_limit: float,
+    Q_amb_max: float,
+) -> float:
+    """Return ambient heat exchange required beyond process hot availability."""
+    return max(Q_evap_total - (H_hot_limit - Q_amb_max), 0.0)
 
 
 #######################################################################################################

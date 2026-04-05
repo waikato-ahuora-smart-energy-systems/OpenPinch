@@ -194,16 +194,23 @@ def make_monotonic(
     return adjusted
 
 def g_ineq_penalty(
-    g: float,
+    g: float | np.ndarray,
     *,
     eta: float = 0.01,
     rho: float = 10,
     form: str = "square",
-):
+) -> np.float64:
     """Return a penalty value for an inequality-constraint residual."""
-    if form == "square_root_smoothing": 
-        return 0.5 * rho * (g + ((g) ** 2 + (eta) ** 2) ** 0.5)
-    elif form == "square":
-        return rho * (g) ** 2
+    if form.lower() == "square_root_smoothing" or form.lower() == "square root smoothing": 
+        p = 0.5 * rho * (g + ((g) ** 2 + (eta) ** 2) ** 0.5)
+    elif form.lower() == "square":
+        p = rho * (g ** 2)
     else:
-        raise ValueError("Unrecognised penalty function.")
+        raise ValueError("Unrecognised penalty function form selection.")
+
+    if isinstance(p, float):
+        return np.float64(p)
+    elif isinstance(p, np.ndarray):
+        return p.sum()
+    else:
+        raise ValueError("Return of the penalty function failed due to unrecognised type.")

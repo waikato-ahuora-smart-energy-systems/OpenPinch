@@ -106,6 +106,7 @@ class HeatPumpTargetOutputs(BaseModel):
     # --- Common objective / result fields -------------------------
     utility_tot: float
     work_hp: float | list | np.ndarray
+    work_he: Optional[float | list | np.ndarray] = None
     Q_ext: float
     Q_amb: float    
     cop: float | list | np.ndarray

@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Main Debugger",
+            "name": "Run",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/run.py",
