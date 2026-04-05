@@ -245,6 +245,7 @@ def _prepare_heat_pump_target_inputs(
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
+    *,
     is_direct_integration: bool = True,
     is_heat_pumping: bool = True,
     zone_config: Configuration = Configuration(),
@@ -362,6 +363,7 @@ def _get_H_col_till_target_Q(
     Q_max: float,        
     T_vals: np.ndarray,    
     H_vals: np.ndarray,  
+    *,
     is_cold: bool = True,      
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Trim a cascade profile to a target duty using boundary interpolation.
@@ -525,6 +527,7 @@ def _get_bounds_for_multi_temperature_carnot_hp_opt(
 def _compute_multi_temperature_carnot_hp_opt_obj(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
+    *,
     debug: bool = False,
 ) -> dict:
     """Evaluate compressor work for a candidate HP placement defined by vector `x`.
@@ -585,7 +588,7 @@ def _get_optimal_min_evap_T_for_multi_temperature_carnot_hp(
     Q_ext = max(args.Q_hp_target - Q_cond_tot, 0.0) # Direct electric heating
 
     return {
-        "obj": (work_hp + Q_ext / args.price_ratio) / (args.Q_hp_target + 1e-9), 
+        "obj": (work_hp + Q_ext / args.price_ratio) / args.Q_hp_target, 
         "utility_tot": work_hp + Q_ext, 
         "work_hp": work_hp,  
         "Q_ext": Q_ext,
@@ -679,9 +682,9 @@ def _get_x0_for_cascade_hp_opt(
     
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
     x_sc = np.array([(x_sc_bnds[0] + x_sc_bnds[1]) / 2 for _ in range(len(T_cond))])
-    y_heat = Q_heat / (args.Q_hp_target + 1e-9)
+    y_heat = Q_heat / args.Q_hp_target
     x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
-    y_cool = Q_cool / (args.Q_hp_target + 1e-9)
+    y_cool = Q_cool / args.Q_hp_target
 
     x_ls = []
     for candidate in [x_cond, x_sc, y_heat, x_evap]:
@@ -788,6 +791,7 @@ def _parse_cascade_hp_state_variables(
 def _compute_cascade_hp_system_performance(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
+    *,
     debug: bool = False,
 ) -> dict:
     """Objective: minimise total compressor work for multi-HP configuration.
@@ -905,6 +909,7 @@ def _get_bounds_for_multi_simple_carnot_hp_opt(
 def _compute_multi_simple_carnot_hp_opt_obj(
     x: np.ndarray, 
     args: HeatPumpTargetInputs,
+    *,
     debug: bool = False,
 ) -> dict:
     """Evaluate objective terms for a multi-simple Carnot HP placement.
@@ -935,21 +940,23 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     
     T_evap = np.array(x_evap) * np.float64(args.dt_range_max) + args.T_hot[-1]
     delta_T_lift = T_cond - T_evap
-    perf = np.where(
-        delta_T_lift > 0.0,
-        (T_evap + 273.15) / (delta_T_lift + 1e-9) * args.eta_hp_carnot + 1, # acting as a heat pump
-        1 / ((T_evap + 273.15) / (delta_T_lift * args.eta_he_carnot) + 1) # acting as a heat engine
-    )
-    work_hp = np.where(
-        np.isclose(perf, 0.0),
-        0.0,
-        Q_cond / perf,
-    )
-    Q_evap = Q_cond - work_hp
+
+    if np.isclose(delta_T_lift, 0.0):
+        work_hp = work_he = 0.0
+    elif delta_T_lift > 0.0: # acting as a heat pump
+        cop = (T_evap + 273.15) / (delta_T_lift + 1e-9) * args.eta_hp_carnot + 1
+        work_hp = Q_cond / cop
+        work_he = 0.0
+    else: # delta_T_lift < 0.0, i.e., acting as a heat engine
+        eff = 1 / ((T_evap + 273.15) / (delta_T_lift * args.eta_he_carnot) + 1)
+        work_hp = 0.0
+        work_he = Q_cond * eff    
+
+    Q_evap = Q_cond - work_hp + work_he
     Q_evap_max = _get_Q_max_from_T_hp_vals(T_evap, args.T_hot, args.H_hot)
 
-    for T in np.sort(np.unique(T_evap))[::-1]:
-        i = np.isclose(T_evap, T, tol) # can be multiple instances
+    for t in np.sort(np.unique(T_evap))[::-1]:
+        i = np.isclose(T_evap, t, tol) # can be multiple instances
         Q_evap_available = Q_evap_max[i].min()
         Q_evap_required = Q_evap[i].sum()
         theta = np.clip(Q_evap_available / Q_evap_required, 0.0, 1.0) if Q_evap_required > tol else 0.0
@@ -962,7 +969,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     Q_ext = args.Q_hp_target - Q_cond.sum()
     Q_amb = max(Q_evap.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0.0)
-    obj = (work_hp.sum() + Q_ext / args.price_ratio) / (args.Q_hp_target + 1e-9)
+    obj = (work_hp.sum() + Q_ext / args.price_ratio) / args.Q_hp_target
 
     if debug:
         res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)     
@@ -1057,7 +1064,7 @@ def _get_x0_for_multi_single_hp_opt(
 
     x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
     x_sc = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_cond))])
-    y_cond = Q_cond / (args.Q_hp_target + 1e-9)
+    y_cond = Q_cond / args.Q_hp_target
 
     x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
     x_sh = np.array([args.dt_phase_change / args.dt_range_max for _ in range(len(T_evap))])
@@ -1372,12 +1379,12 @@ def _compute_brayton_hp_system_performance(
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     COP = (args.Q_hp_target - Q_ext) / (work_hp + 1e-9)
     Q_amb = max(Q_cool.sum() - (np.abs(args.H_hot[-1]) - args.Q_amb_max), 0)
-    obj = (work_hp + Q_ext + c) / (args.Q_hp_target + 1e-9)
+    obj = (work_hp + Q_ext + c) / args.Q_hp_target
 
     if 0:
         plot_multi_hp_profiles_from_results(pt_gas_cooler.col[PT.T.value], pt_gas_cooler.col[PT.H_NET.value])
         plot_multi_hp_profiles_from_results(pt_gas_heater.col[PT.T.value], pt_gas_heater.col[PT.H_NET.value])
-        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, title=f"T_hi {T_comp_out} -> {float(obj), float(c / (args.Q_hp_target + 1e-9))}")
+        plot_multi_hp_profiles_from_results(args.T_hot, args.H_hot, args.T_cold, args.H_cold, hp_hot_streams, hp_cold_streams, title=f"T_hi {T_comp_out} -> {float(obj), float(c / args.Q_hp_target)}")
 
     return {
         "obj": obj, 
@@ -1495,6 +1502,7 @@ def _get_Q_vals_from_T_hp_vals(
     T_hp: np.ndarray,
     T_vals: np.ndarray,
     H_vals: np.ndarray,
+    *,
     is_cond: bool = True,
 ) -> np.ndarray:
     """Interpolate the cascade at a specified temperature to find the corresponding duty for each temperature level.
@@ -1510,7 +1518,8 @@ def _get_Q_vals_from_T_hp_vals(
 
 def _compute_entropic_average_temperature_in_K(
     T: np.ndarray,
-    Q: np.ndarray,     
+    Q: np.ndarray,
+    *,   
     T_units: str = "C",   
 ):
     """Compute the entropic average temperature.
@@ -1526,9 +1535,10 @@ def _compute_COP_estimate_from_carnot_limit(
     T_cond: np.ndarray,
     Q_cond: np.ndarray, 
     T_evap: np.ndarray,
-    Q_evap: np.ndarray,  
+    Q_evap: np.ndarray,
+    *,
     eff: float = 0.5, 
-    min_dt_lift: float = 3.0,          
+    min_dt_lift: float = 1.0,          
 ):  
     """Estimate COP by scaling the Carnot limit using entropic mean temperatures.
     """
@@ -1667,6 +1677,7 @@ def _prepare_latent_hp_profile(
     Q_hp: list,
     dT_phase_change: float,
     is_hot: bool,
+    *,
     i: int = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Clamp near-equal HP levels and merge their heat duties.
