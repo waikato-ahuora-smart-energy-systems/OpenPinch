@@ -557,20 +557,26 @@ def _compute_multi_temperature_carnot_hp_opt_obj(
     """
     T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args)
 
+    # Determine the work of the heat pump based on the limiting side
     cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
-  
-    Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
-    
     work_hp_from_evap = Q_evap.sum() / (cop - 1)
     work_hp_from_cond = Q_cond.sum() / cop
-    work_hp = max(work_hp_from_evap, work_hp_from_cond)
+    work_hp = min(work_hp_from_evap, work_hp_from_cond)
 
+    # Scale the side that has excess duty available
+    scale_cond = min(work_hp_from_evap / work_hp_from_cond, 1) if work_hp_from_cond > 0.0 else 0.0
+    Q_cond *= scale_cond
+    scale_evap = min(work_hp_from_cond / work_hp_from_evap, 1) if work_hp_from_evap > 0.0 else 0.0
+    Q_evap *= scale_evap
+
+    # Determine the key performance metrics of the heat pump
+    Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
     g = work_hp_from_evap - work_hp_from_cond
     p = g_ineq_penalty(g, rho=args.rho_penalty, form="square")
     Q_ext = max(args.Q_hp_target - Q_cond.sum(), 0.0) # e.g., direct electric heating
     obj = _calc_obj(work_hp, Q_ext, args.Q_hp_target, args.price_ratio, p)
 
-    if debug:
+    if debug: # If in debug mode, plot the graph immediately
         res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)
         plot_multi_hp_profiles_from_results(
             args.T_hot, args.H_hot, args.T_cold, args.H_cold, res["hp_hot_streams"], res["hp_cold_streams"], 
