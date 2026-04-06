@@ -507,7 +507,7 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout.
     """
-    bnds = _get_bounds_for_multi_temperature_carnot_hp_opt(args)
+    bnds = _get_bounds_for_carnot_hp_opt(args)
     minima = multiminima(
         func=_compute_multi_temperature_carnot_hp_opt_obj,
         func_kwargs=args,
@@ -521,13 +521,6 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
         raise ValueError("Multi-temperature Carnot heat pump targeting failed to return an optimal result.")
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
-
-
-def _get_bounds_for_multi_temperature_carnot_hp_opt(
-    args: HeatPumpTargetInputs
-) -> list:
-    """Return bounds for the Carnot HP optimizer."""
-    return [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
 
 
 def _parse_multi_temperature_carnot_hp_state_variables(
@@ -569,7 +562,7 @@ def _compute_multi_temperature_carnot_hp_opt_obj(
 
     # Determine the key performance metrics of the heat pump
     Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
-    g = work_hp_from_evap - work_hp_from_cond
+    g = cop * Q_evap.sum() - (cop - 1) * Q_cond.sum()
     p = g_ineq_penalty(g, rho=args.rho_penalty, form="square")
     Q_ext = max(args.Q_hp_target - Q_cond.sum(), 0.0) # e.g., direct electric heating
     obj = _calc_obj(work_hp, Q_ext, args.Q_hp_target, args.price_ratio, p)
@@ -864,7 +857,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout.
     """
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
-    bnds = _get_bounds_for_multi_simple_carnot_hp_opt(args)
+    bnds = _get_bounds_for_carnot_hp_opt(args)
     local_minima_x = multiminima(
         func=_compute_multi_simple_carnot_hp_opt_obj,
         func_kwargs=args,
@@ -874,13 +867,6 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
     res = _compute_multi_simple_carnot_hp_opt_obj(local_minima_x[0], args, debug=args.debug)
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
-
-
-def _get_bounds_for_multi_simple_carnot_hp_opt(
-    args: HeatPumpTargetInputs,
-) -> list:
-    """Build bounds for the multi-simple Carnot HP optimizer."""
-    return [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
 
 
 def _parse_multi_simple_carnot_hp_state_variables(
@@ -1605,6 +1591,13 @@ def _prepare_latent_hp_profile(
             break
     
     return T_hp, Q_hp
+
+
+def _get_bounds_for_carnot_hp_opt(
+    args: HeatPumpTargetInputs,
+) -> list:
+    """Build bounds for the Carnot HP optimizer."""
+    return [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
 
 
 def _get_carnot_hp_streams(
