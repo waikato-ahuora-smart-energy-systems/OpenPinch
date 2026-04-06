@@ -76,7 +76,8 @@ class Configuration:
     DTMIN_HP: float = 0.0
     DT_HP_IHX: float = 0.0
     DT_CASCADE_HX: float = 0.0
-    BB_MINIMISER: str = BB_Minimiser.CMAES.value
+    BB_MINIMISER: str = BB_Minimiser.RBF.value ### add to the template
+    INITIALISE_SIMULATED_HP: bool = True ### add to the template
 
     ### Cost targeting parameters ### 
     UTILITY_PRICE: float = 40

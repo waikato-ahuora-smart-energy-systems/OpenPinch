@@ -103,13 +103,20 @@ class CascadeHeatPumpCycle:
         else:
             return self._max_work
 
-
     @property
     def work_arr(self) -> Optional[float]:
         """Per-subcycle compressor work."""
         self._require_solution()
         return np.array([cycle.work for cycle in self._subcycles])
 
+    @property
+    def penalty(self) -> Optional[float]:
+        """Total penalty for excessive subcooling."""
+        if self.solved:
+            return sum(cycle.penalty if cycle.solved else 0 for cycle in self._subcycles)
+        else:
+            return 0
+    
     @property
     def dtcont(self) -> Optional[float]:
         """Minimum temperature approach propagated to derived stream profiles."""

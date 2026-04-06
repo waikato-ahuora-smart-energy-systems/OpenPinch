@@ -106,6 +106,14 @@ class MultiSimpleHeatPumpCycle:
         """Per-subcycle compressor work."""
         self._require_solution()
         return np.array([cycle.work for cycle in self._subcycles])
+    
+    @property
+    def penalty(self) -> Optional[float]:
+        """Total penalty for excessive subcooling."""
+        if self.solved:
+            return sum(cycle.penalty if cycle.solved else 0 for cycle in self._subcycles)
+        else:
+            return 0
 
     @property
     def dtcont(self) -> Optional[float]:
@@ -192,6 +200,12 @@ class MultiSimpleHeatPumpCycle:
     def subcycles(self) -> List[SimpleHeatPumpCycle]:
         """Solved simple heat pump subcycles that make up the network."""
         return self._subcycles
+    
+    @property
+    def solved(self) -> bool:
+        """Whether the parallel heat pumps have all been solved successfully."""
+        return self._solved
+   
 
     def _as_1d_numeric_array(
         self,

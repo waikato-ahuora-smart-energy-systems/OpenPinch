@@ -81,6 +81,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_he_carnot: float
     refrigerant_ls: List[str]
     do_refrigerant_sort: bool
+    initialise_simulated_hp: bool
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
@@ -88,6 +89,8 @@ class HeatPumpTargetInputs(BaseModel):
     net_hot_streams: Optional[StreamCollection] = StreamCollection()
     net_cold_streams: Optional[StreamCollection] = StreamCollection()
     bb_minimiser: Optional[str] = None
+    eta_penalty: Optional[float] = 0.01
+    rho_penalty: Optional[float] = 10
 
     # Debug mode toogle
     debug: bool
@@ -103,6 +106,7 @@ class HeatPumpTargetOutputs(BaseModel):
     # --- Common objective / result fields -------------------------
     utility_tot: float
     work_hp: float | list | np.ndarray
+    work_he: Optional[float | list | np.ndarray] = None
     Q_ext: float
     Q_amb: float    
     cop: float | list | np.ndarray

@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Main Debugger",
+            "name": "Run",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/run.py",
@@ -23,7 +23,8 @@
             //   "tests/test_classes/test_cascade_heat_pump_cycle.py",
             //   "tests/test_utils/test_optimiser_benchmarks.py",
             //   "tests/test_utils/test_optimiser_handles.py",
-              "tests/test_utils/test_export.py",
+            //   "tests/test_utils/test_export.py",
+                "tests/test_analysis/test_heat_pump_targeting.py",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
