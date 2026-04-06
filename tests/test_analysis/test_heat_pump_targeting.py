@@ -15,10 +15,7 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_H_col_till_target_Q,
     _prepare_latent_hp_profile,
-    _map_T_to_x_cond,
-    _map_T_to_x_evap,
-    _map_x_to_T_cond,
-    _map_x_to_T_evap,
+    _map_x_to_T,
     _optimise_brayton_heat_pump_placement,
     _validate_vapour_hp_refrigerant_ls,
     _get_bounds_for_multi_simple_carnot_hp_opt,
@@ -75,31 +72,25 @@ def test_compute_entropic_average_temperature_in_K_zero_net_duty_uses_arithmetic
     np.testing.assert_allclose(result, T.mean() + 273.15)
 
 
-def test_scale_and_unscale_cond_roundtrip_and_bounds():
-    T_cond = np.array([210.0, 190.0, 175.0, 160.0])
-    T_bounds = (150.0, 230.0)
+def test_map_x_to_T_returns_expected_descending_temperatures():
+    x = np.array([0.1, 0.2, 0.3])
+    T_0 = 200.0
+    T_1 = 100.0
 
-    scaled = _map_T_to_x_cond(T_cond, T_bounds[1], T_bounds[1] - T_bounds[0])
+    result = _map_x_to_T(x, T_0, T_1)
 
-    assert scaled.size == T_cond.size
-    assert np.all(scaled >= -1e-12)
-    assert np.all(scaled <= 1 + 1e-12)
-
-    restored = _map_x_to_T_cond(scaled, T_bounds[1], T_bounds[1] - T_bounds[0])
-    np.testing.assert_allclose(restored, T_cond)
+    np.testing.assert_allclose(result, np.array([190.0, 172.0, 150.4]))
 
 
-def test_scale_and_unscale_evap_roundtrip_and_bounds():
-    T_evap = np.array([65.0, 55.0, 45.0, 35.0])
-    T_bounds = (20.0, 80.0)
+def test_map_x_to_T_output_is_monotonically_descending():
+    x = np.array([0.4, 0.2, 0.1, 0.3])
+    T_0 = 180.0
+    T_1 = 60.0
 
-    scaled = _map_T_to_x_evap(T_evap, T_bounds[0], T_bounds[1] - T_bounds[0])
+    result = _map_x_to_T(x, T_0, T_1)
 
-    assert scaled.size == T_evap.size
-    np.testing.assert_allclose(scaled, [0.16666667, 0.16666667, 0.16666667, 0.25])
-
-    restored = _map_x_to_T_evap(scaled, T_bounds[0], T_bounds[1] - T_bounds[0])
-    np.testing.assert_allclose(restored, T_evap)
+    assert result.size == x.size
+    assert np.all(np.diff(result) <= 0.0)
 
 
 def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator():
@@ -124,16 +115,6 @@ def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator_w
 
     np.testing.assert_allclose(Q_cond, np.array([600.0, 0.0]))
     np.testing.assert_allclose(Q_evap, np.array([100.0, 600.0]))    
-
-
-def test_parse_carnot_hp_state_temperatures_reconstructs_state_vectors():
-    x = np.array([0.5, 0.5, 0.5])
-    n_cond = 3
-
-    T_cond, T_evap = _parse_multi_temperature_carnot_hp_state_variables(x, n_cond)
-
-    np.testing.assert_allclose(T_cond, np.array([0.5, 0.5, 0.5]))
-    np.testing.assert_allclose(T_evap, np.array([0.0]))
 
 
 def test_get_H_col_till_target_Q_returns_full_profile_when_target_matches_peak():
@@ -240,8 +221,9 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         Q_hp_target=300.0,
         Q_amb_max=0.0,
         price_ratio=1.0,
+        rho_penalty=10,
     )
-    x = np.array([0.0, 0.0, 0.25])
+    x = np.array([0.0, 0.0, 0.25, 0.25])
 
     res = _compute_multi_simple_carnot_hp_opt_obj(x, args)
 
