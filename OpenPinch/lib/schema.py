@@ -82,6 +82,7 @@ class HeatPumpTargetInputs(BaseModel):
     refrigerant_ls: List[str]
     do_refrigerant_sort: bool
     initialise_simulated_hp: bool
+    allow_integrated_expander: bool
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
