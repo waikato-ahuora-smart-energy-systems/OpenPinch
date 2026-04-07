@@ -10,7 +10,6 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _balance_hot_and_cold_heat_loads_with_ambient_air,
     _compute_entropic_average_temperature_in_K,
     _compute_COP_estimate_from_carnot_limit,
-    _get_Q_vals_from_T_hp_vals,
     _parse_multi_temperature_carnot_hp_state_variables,
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_H_col_till_target_Q,
@@ -18,7 +17,6 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _map_x_to_T,
     _optimise_brayton_heat_pump_placement,
     _validate_vapour_hp_refrigerant_ls,
-    _get_bounds_for_multi_simple_carnot_hp_opt,
     _get_x0_for_multi_single_hp_opt,
     _get_bounds_for_multi_single_hp_opt,
     _get_x0_for_cascade_hp_opt,
@@ -91,30 +89,6 @@ def test_map_x_to_T_output_is_monotonically_descending():
 
     assert result.size == x.size
     assert np.all(np.diff(result) <= 0.0)
-
-
-def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator():
-    T_vals = np.array([160.0, 140.0, 120.0, 90.0])
-    H_vals = np.array([700.0, 500.0, 300.0, 0.0])
-    T_hp = np.array([150.0, 110.0])
-
-    Q_cond = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals, is_cond=True)
-    Q_evap = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals - H_vals[0], is_cond=False)
-
-    np.testing.assert_allclose(Q_cond, np.array([400.0, 200.0]))
-    np.testing.assert_allclose(Q_evap, np.array([100.0, 400.0]))
-
-
-def test_get_H_vals_from_T_hp_vals_appends_origin_for_condenser_and_evaporator_with_out_of_range():
-    T_vals = np.array([160.0, 140.0, 120.0, 90.0])
-    H_vals = np.array([700.0, 500.0, 300.0, 0.0])
-    T_hp = np.array([150.0, 70.0])
-
-    Q_cond = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals, is_cond=True)
-    Q_evap = _get_Q_vals_from_T_hp_vals(T_hp, T_vals, H_vals - H_vals[0], is_cond=False)
-
-    np.testing.assert_allclose(Q_cond, np.array([600.0, 0.0]))
-    np.testing.assert_allclose(Q_evap, np.array([100.0, 600.0]))    
 
 
 def test_get_H_col_till_target_Q_returns_full_profile_when_target_matches_peak():
@@ -222,6 +196,7 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         Q_amb_max=0.0,
         price_ratio=1.0,
         rho_penalty=10,
+        allow_integrated_expander=False,
     )
     x = np.array([0.0, 0.0, 0.25, 0.25])
 
@@ -230,6 +205,47 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
     assert np.isfinite(res["obj"])
     assert np.isfinite(res["utility_tot"])
     assert res["Q_cond"].shape == (2,)
+
+
+def test_parse_multi_temperature_carnot_hp_state_variables_returns_expected_profiles():
+    args = SimpleNamespace(
+        n_cond=2,
+        n_evap=2,
+        T_cold=np.array([120.0, 80.0, 40.0]),
+        H_cold=np.array([300.0, 120.0, 0.0]),
+        T_hot=np.array([150.0, 90.0, 30.0]),
+        H_hot=np.array([0.0, -100.0, -280.0]),
+    )
+    x = np.array([0.5, 0.5, 0.25, 0.5])
+
+    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args)
+
+    np.testing.assert_allclose(T_cond, np.array([80.0, 60.0]))
+    np.testing.assert_allclose(Q_cond, np.array([60.0, 60.0]))
+    np.testing.assert_allclose(T_evap, np.array([120.0, 75.0]))
+    np.testing.assert_allclose(Q_evap, np.array([50.0, 95.0]))
+
+
+def test_parse_multi_temperature_carnot_hp_state_variables_respects_cond_evap_split_sizes():
+    args = SimpleNamespace(
+        n_cond=1,
+        n_evap=3,
+        T_cold=np.array([120.0, 80.0, 40.0]),
+        H_cold=np.array([300.0, 120.0, 0.0]),
+        T_hot=np.array([150.0, 90.0, 30.0]),
+        H_hot=np.array([0.0, -100.0, -280.0]),
+    )
+    x = np.array([0.4, 0.2, 0.5, 0.8])
+
+    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args)
+
+    assert T_cond.shape == (1,)
+    assert Q_cond.shape == (1,)
+    assert T_evap.shape == (3,)
+    assert Q_evap.shape == (3,)
+    assert np.all(np.diff(T_evap) <= 0.0)
+    assert np.all(Q_cond >= 0.0)
+    assert np.all(Q_evap >= 0.0)
 
 
 def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatch):

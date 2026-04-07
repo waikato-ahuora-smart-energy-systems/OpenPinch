@@ -523,7 +523,6 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     res.update(_get_carnot_hp_streams(res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args))
     return HeatPumpTargetOutputs.model_validate(res)
 
-
 def _parse_multi_temperature_carnot_hp_state_variables(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
