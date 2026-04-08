@@ -207,7 +207,7 @@ def test_get_hot_streams_can_invert_utility_without_mutating_original_streams():
         invert_utility=True,
     )
 
-    assert set(hot_streams._streams.keys()) == {"H_PRO", "C_UT"}
+    assert set(hot_streams._streams.keys()) == {"C_UT"}
     assert hot_streams["C_UT"].type == StreamType.Hot.value
     assert hot_streams["C_UT"].t_supply == original_target
     assert hot_streams["C_UT"].t_target == original_supply
@@ -298,7 +298,7 @@ def test_get_cold_streams_can_invert_utility_without_mutating_original_streams()
         invert_utility=True,
     )
 
-    assert set(cold_streams._streams.keys()) == {"C_PRO", "H_UT"}
+    assert set(cold_streams._streams.keys()) == {"H_UT"}
     assert cold_streams["H_UT"].type == StreamType.Cold.value
     assert cold_streams["H_UT"].t_supply == original_target
     assert cold_streams["H_UT"].t_target == original_supply
