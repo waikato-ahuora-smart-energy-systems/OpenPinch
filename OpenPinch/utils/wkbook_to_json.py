@@ -21,7 +21,7 @@ def get_problem_from_excel(excel_file, output_json=None):
 
     streams_data = _parse_sheet_with_units(excel_file, sheet_name="Stream Data")
     streams_data = validate_stream_data(streams_data)
-    
+
     utilities_data = _parse_sheet_with_units(excel_file, sheet_name="Utility Data")
     utilities_data = validate_utility_data(utilities_data)
 
@@ -160,7 +160,6 @@ def _parse_sheet_with_units(
         keep = ["t_supply", "t_target", "heat_flow", "dt_cont", "htc"]
         units_map = {key: units_map[key] for key in keep if key in units_map}
 
-
     if sheet_name == "Summary":
         return _write_targets_to_dict_and_list(df_data, units_map, project_name)
     else:
@@ -168,7 +167,7 @@ def _parse_sheet_with_units(
 
 
 def _parse_options_sheet(
-    excel_file, 
+    excel_file,
     sheet_name: str = "Options",
 ):
     """
@@ -278,11 +277,7 @@ def _write_targets_to_dict_and_list(
 
     hot_cols = [col for col in filtered.columns if col.startswith("HU::")]
     cold_cols = [col for col in filtered.columns if col.startswith("CU::")]
-    other_cols = [
-        col
-        for col in filtered.columns
-        if col not in hot_cols + cold_cols
-    ]
+    other_cols = [col for col in filtered.columns if col not in hot_cols + cold_cols]
 
     clean_df = filtered.replace({pd.NA: None})
     clean_df = clean_df.where(~clean_df.isna(), None)
@@ -332,7 +327,9 @@ def _write_targets_to_dict_and_list(
             if col == "temp_pinch":
                 if value not in (None, ""):
                     parts = str(value).split("; ")
-                is_process_target = record["name"] == f"{project_name}/Total Process Target"
+                is_process_target = (
+                    record["name"] == f"{project_name}/Total Process Target"
+                )
                 if is_process_target:
                     parts[0] = None
                     parts[-1] = None
@@ -348,11 +345,7 @@ def _write_targets_to_dict_and_list(
                     entry[col] = {"value": None, "units": unit}
                 else:
                     entry[col] = {"value": float(value) * 100, "units": unit}
-            elif (
-                pd.api.types.is_number(value)
-                and isinstance(unit, str)
-                and unit
-            ):
+            elif pd.api.types.is_number(value) and isinstance(unit, str) and unit:
                 entry[col] = {"value": float(value), "units": unit}
             else:
                 entry[col] = value if value is not None else None

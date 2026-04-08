@@ -31,6 +31,7 @@ def _make_stream(
         is_process_stream=is_process_stream,
     )
 
+
 # TODO: Check the test
 # def test_get_area_targets_returns_expected_total_area(monkeypatch):
 #     T_vals = np.array([300.0, 250.0, 200.0])

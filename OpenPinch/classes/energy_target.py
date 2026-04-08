@@ -189,15 +189,6 @@ class EnergyTarget:
         self._area = value
 
     @property
-    def capital_cost(self):
-        """Estimated capital cost for the target network."""
-        return self._capital_cost
-
-    @capital_cost.setter
-    def capital_cost(self, value):
-        self._capital_cost = value
-
-    @property
     def cold_pinch(self):
         """Cold-side pinch temperature."""
         return self._cold_pinch

@@ -14,7 +14,14 @@ from ..lib import *
 from ..utils import *
 
 
-__all__ = ["get_process_heat_cascade", "get_utility_heat_cascade", "create_problem_table_with_t_int", "problem_table_algorithm", "get_heat_recovery_target_from_pt", "set_zonal_targets"]
+__all__ = [
+    "get_process_heat_cascade",
+    "get_utility_heat_cascade",
+    "create_problem_table_with_t_int",
+    "problem_table_algorithm",
+    "get_heat_recovery_target_from_pt",
+    "set_zonal_targets",
+]
 
 
 #######################################################################################################
@@ -34,7 +41,7 @@ def get_process_heat_cascade(
     # Get all possible temperature intervals, remove duplicates and order from high to low
     if all_streams is None:
         all_streams = hot_streams + cold_streams
-    
+
     pt = create_problem_table_with_t_int(
         streams=all_streams,
         is_shifted=is_shifted,
@@ -42,8 +49,8 @@ def get_process_heat_cascade(
     )
     # Perform the heat cascade of the problem table
     problem_table_algorithm(
-        pt=pt, 
-        hot_streams=hot_streams, 
+        pt=pt,
+        hot_streams=hot_streams,
         cold_streams=cold_streams,
         is_shifted=is_shifted,
     )
@@ -66,8 +73,8 @@ def get_process_heat_cascade(
 
 def get_utility_heat_cascade(
     T_int_vals: np.ndarray,
-    hot_utilities: List[Stream] = None,
-    cold_utilities: List[Stream] = None,
+    hot_utilities: StreamCollection = None,
+    cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
 ) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
@@ -76,9 +83,9 @@ def get_utility_heat_cascade(
 
     h_net_values = pt_ut.col[PT.H_NET.value]
     H_NET_UT = h_net_values.max() - h_net_values
-    
-    h_ut_cc =  pt_ut.col[PT.H_HOT.value]
-    c_ut_cc =  pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max()
+
+    h_ut_cc = pt_ut.col[PT.H_HOT.value]
+    c_ut_cc = pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max()
 
     return {
         PT.H_NET_UT.value: H_NET_UT,
@@ -91,41 +98,47 @@ def get_utility_heat_cascade(
 
 
 def create_problem_table_with_t_int(
-    streams: List[Stream] | StreamCollection = [], 
+    streams: StreamCollection | StreamCollection = [],
     is_shifted: bool = True,
     zone_config: Configuration = None,
 ) -> Tuple[ProblemTable, ProblemTable]:
     """Returns ordered T and T* intervals for given streams and utilities."""
 
     T_vals = [
-        t 
-        for s in streams 
+        t
+        for s in streams
         for t in ((s.t_min_star, s.t_max_star) if is_shifted else (s.t_min, s.t_max))
     ]
 
     if isinstance(zone_config, Configuration):
         if zone_config.DO_TURBINE_WORK:
-            T_vals.extend([
-                zone_config.T_TURBINE_BOX, 
-                Tsat_p(zone_config.P_TURBINE_BOX),
-            ])
+            T_vals.extend(
+                [
+                    zone_config.T_TURBINE_BOX,
+                    Tsat_p(zone_config.P_TURBINE_BOX),
+                ]
+            )
 
         if zone_config.DO_EXERGY_TARGETING:
             T_vals.append(zone_config.T_ENV)
 
         if zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_UTILITY_HP_TARGETING:
             T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT)
-            T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT - zone_config.DT_PHASE_CHANGE)
+            T_vals.append(
+                zone_config.T_ENV
+                - zone_config.DT_ENV_CONT
+                - zone_config.DT_PHASE_CHANGE
+            )
             T_vals.append(zone_config.T_ENV + zone_config.DT_ENV_CONT)
-            T_vals.append(zone_config.T_ENV + zone_config.DT_ENV_CONT + zone_config.DT_PHASE_CHANGE)
+            T_vals.append(
+                zone_config.T_ENV
+                + zone_config.DT_ENV_CONT
+                + zone_config.DT_PHASE_CHANGE
+            )
 
     dp = int(-math.log10(tol))
     T_vals = np.array(T_vals).round(dp)
-    return ProblemTable(
-        {
-            PT.T.value: sorted(set(T_vals), reverse=True)
-        }
-    )
+    return ProblemTable({PT.T.value: sorted(set(T_vals), reverse=True)})
 
 
 def problem_table_algorithm(
@@ -151,16 +164,16 @@ def problem_table_algorithm(
     if cold_streams is not None:
         sum_cp_cold, sum_rcp_cold = _sum_mcp_between_temperature_boundaries(
             pt.col[PT.T.value], cold_streams, is_shifted
-        )    
+        )
         pt.col[PT.CP_COLD.value] = sum_cp_cold
         pt.col[PT.RCP_COLD.value] = sum_rcp_cold
     else:
         pt.col[PT.CP_COLD.value].fill(0.0)
-        pt.col[PT.RCP_COLD.value].fill(0.0)  
+        pt.col[PT.RCP_COLD.value].fill(0.0)
 
     # ΔT_i = T_{i-1} - T_i
     pt.col[PT.DELTA_T.value] = delta_with_zero_at_start(pt.col[PT.T.value])
-    
+
     # ΔH_hot = ΔT * CP_hot
     pt.col[PT.DELTA_H_HOT.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_HOT.value]
 
@@ -187,7 +200,9 @@ def problem_table_algorithm(
     shift = pt.col[PT.H_NET.value][-1] - min_H
 
     pt.col[PT.H_HOT.value] = pt.col[PT.H_HOT.value][-1] - pt.col[PT.H_HOT.value]
-    pt.col[PT.H_COLD.value] = pt.col[PT.H_COLD.value][-1] + shift - pt.col[PT.H_COLD.value]
+    pt.col[PT.H_COLD.value] = (
+        pt.col[PT.H_COLD.value][-1] + shift - pt.col[PT.H_COLD.value]
+    )
     pt.col[PT.H_NET.value] = pt.col[PT.H_NET.value] - min_H
 
     return pt
@@ -212,7 +227,7 @@ def get_heat_recovery_target_from_pt(
 
 
 def set_zonal_targets(
-    pt: ProblemTable, 
+    pt: ProblemTable,
     pt_real: ProblemTable,
 ) -> dict:
     """Assign thermal targets and integration degree to the zone based on process table data."""
@@ -220,13 +235,16 @@ def set_zonal_targets(
         "hot_utility_target": pt.loc[0, PT.H_NET.value],
         "cold_utility_target": pt.loc[-1, PT.H_NET.value],
         "heat_recovery_target": pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value],
-        "heat_recovery_limit": pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value],
+        "heat_recovery_limit": pt_real.loc[0, PT.H_HOT.value]
+        - pt_real.loc[-1, PT.H_NET.value],
         "degree_of_int": (
-            (pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value]) / (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value])
+            (pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value])
+            / (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value])
             if (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value]) > 0
             else 1.0
         ),
     }
+
 
 #######################################################################################################
 # Helper functions
@@ -235,12 +253,12 @@ def set_zonal_targets(
 
 def _sum_mcp_between_temperature_boundaries(
     temperatures: List[float],
-    streams: List[Stream],
+    streams: StreamCollection,
     is_shifted: bool = True,
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """Vectorized CP and rCP summation across temperature intervals."""
 
-    def calc_active_matrix(streams: List[Stream], use_shifted: bool) -> np.ndarray:
+    def calc_active_matrix(streams: StreamCollection, use_shifted: bool) -> np.ndarray:
         t_min = np.array([s.t_min_star if use_shifted else s.t_min for s in streams])
         t_max = np.array([s.t_max_star if use_shifted else s.t_max for s in streams])
 
@@ -254,22 +272,20 @@ def _sum_mcp_between_temperature_boundaries(
 
         return active
 
-    def sum_cp_rcp(streams: List[Stream], active: np.ndarray):
+    def sum_cp_rcp(streams: StreamCollection, active: np.ndarray):
         cp = np.array([s.CP for s in streams])
         rcp = np.array([s.rCP for s in streams])
         cp_sum = active @ cp
         rcp_sum = active @ rcp
         return np.insert(cp_sum, 0, 0.0), np.insert(rcp_sum, 0, 0.0)
-    
+
     is_active = calc_active_matrix(streams, is_shifted)
     cp_array, rcp_array = sum_cp_rcp(streams, is_active)
     return cp_array.tolist(), rcp_array.tolist()
 
 
 def _shift_pt_to_set_heat_recovery(
-    pt: ProblemTable, 
-    heat_recovery_target: float, 
-    current_heat_recovery: float
+    pt: ProblemTable, heat_recovery_target: float, current_heat_recovery: float
 ) -> ProblemTable:
     """Shift H_COLD and H_NET columns to match targeted heat recovery levels."""
     delta_shift = current_heat_recovery - heat_recovery_target
@@ -279,7 +295,7 @@ def _shift_pt_to_set_heat_recovery(
 
 
 def _insert_temperature_interval_into_pt_at_constant_h(
-        pt: ProblemTable
+    pt: ProblemTable,
 ) -> ProblemTable:
     """Insert temperature intervals into the process table where HCC and CCC intersect at constant enthalpy."""
     T_new = []
@@ -326,10 +342,12 @@ def _get_T_start_on_opposite_cc(
     cc_vals = pt.col[col_CC]
     T_vals = pt.col[col_T]
 
-    T_new = linear_interpolation( 
+    T_new = linear_interpolation(
         h0,
-        cc_vals[idx], cc_vals[idx + 1],
-        T_vals[idx], T_vals[idx + 1],
+        cc_vals[idx],
+        cc_vals[idx + 1],
+        T_vals[idx],
+        T_vals[idx + 1],
     )
 
     return T_new

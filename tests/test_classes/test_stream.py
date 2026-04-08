@@ -133,3 +133,81 @@ def test_zero_heat_flow_isothermal_stream_initialises_without_error():
     assert s.t_min_star == 100.0
     assert s.t_max_star == 100.0
     assert s.CP == 0.0
+
+
+# ===== Merged from test_stream_extra.py =====
+"""Additional branch coverage tests for Stream."""
+
+import pytest
+
+from OpenPinch.classes.stream import Stream
+from OpenPinch.lib.enums import StreamType
+
+
+def test_stream_pressure_and_enthalpy_property_getters():
+    s = Stream(name="S", t_supply=120.0, t_target=80.0, heat_flow=100.0, htc=1.0)
+    s.P_supply = 2.0
+    s.P_target = 1.5
+    s.h_supply = 900.0
+    s.h_target = 700.0
+
+    assert s.P_supply == 2.0
+    assert s.P_target == 1.5
+    assert s.h_supply == 900.0
+    assert s.h_target == 700.0
+
+
+def test_stream_equal_temperature_negative_heat_flow_sets_hot_profile():
+    s = Stream(name="Iso", t_supply=100.0, t_target=100.0, heat_flow=-50.0, htc=1.0)
+    assert s.type == StreamType.Hot.value
+    assert s.t_target == pytest.approx(99.99, abs=1e-6)
+
+
+def test_stream_update_attributes_uses_cp_when_heat_flow_non_numeric():
+    s = Stream(name="CP", t_supply=120.0, t_target=80.0, heat_flow=100.0, htc=1.0)
+    s._heat_flow = "unknown"
+    s._CP = 3.0
+    s._update_attributes()
+    assert s.heat_flow == pytest.approx(120.0)
+
+
+def test_stream_invert_swaps_states_for_utility_stream():
+    s = Stream(
+        name="U",
+        t_supply=180.0,
+        t_target=140.0,
+        P_supply=5.0,
+        P_target=3.0,
+        h_supply=1200.0,
+        h_target=900.0,
+        dt_cont=10.0,
+        heat_flow=400.0,
+        htc=2.0,
+        is_process_stream=False,
+    )
+
+    s.invert()
+
+    assert s.t_supply == 140.0
+    assert s.t_target == 180.0
+    assert s.P_supply == 3.0
+    assert s.P_target == 5.0
+    assert s.h_supply == 900.0
+    assert s.h_target == 1200.0
+    assert s.type == StreamType.Cold.value
+    assert s.t_min == 140.0
+    assert s.t_max == 180.0
+
+
+def test_stream_invert_raises_for_process_stream():
+    s = Stream(
+        name="P",
+        t_supply=180.0,
+        t_target=140.0,
+        heat_flow=400.0,
+        htc=2.0,
+        is_process_stream=True,
+    )
+
+    with pytest.raises(ValueError, match="Process streams cannot be inverted"):
+        s.invert()

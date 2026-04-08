@@ -55,15 +55,12 @@ def test_no_overlap_streams_are_skipped():
     hot = [make_stream("H1", 400, 500, 2)]
     cold = [make_stream("C1", 10, 80, 1.5)]
 
-    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, is_shifted=False
-    )
-    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, cold, is_shifted=False
-    )
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(T, hot, is_shifted=False)
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(T, cold, is_shifted=False)
 
     assert all(m == 0 for m in CP_hot)
     assert all(m == 0 for m in CP_cold)
+
 
 def test_export_writes_to_results_dir_and_uses_filename_stem():
     table = ProblemTable({PT.T.value: [100], PT.H_NET.value: [50]})
@@ -85,9 +82,7 @@ def test_stream_with_zero_cp_does_not_affect_result():
     hot = [make_stream("H1", 150, 250, 0)]
     cold = [make_stream("C1", 100, 200, 0)]
 
-    CP_hot, rCP_hot = _sum_mcp_between_temperature_boundaries(
-        T, hot, is_shifted=False
-    )
+    CP_hot, rCP_hot = _sum_mcp_between_temperature_boundaries(T, hot, is_shifted=False)
     CP_cold, rCP_cold = _sum_mcp_between_temperature_boundaries(
         T, cold, is_shifted=False
     )
@@ -103,12 +98,8 @@ def test_stream_on_boundary_is_included():
     hot = [make_stream("H1", 300, 200, 0, 1)]
     cold = [make_stream("C1", 100, 200, 0, 1)]
 
-    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, is_shifted=False
-    )
-    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, cold, is_shifted=False
-    )
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(T, hot, is_shifted=False)
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(T, cold, is_shifted=False)
 
     assert CP_hot == [0, 1, 0]
     assert CP_cold == [0, 0, 1]
@@ -119,12 +110,8 @@ def test_stream_spanning_multiple_intervals():
     hot = [make_stream("H1", 160, 290, 0, 2)]
     cold = []
 
-    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, is_shifted=False
-    )
-    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, cold, is_shifted=False
-    )
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(T, hot, is_shifted=False)
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(T, cold, is_shifted=False)
 
     assert CP_hot == [0, 2, 2, 2]
     assert CP_cold == [0, 0, 0, 0]
@@ -134,12 +121,8 @@ def test_empty_stream_lists_returns_zero():
     T = [300, 200, 100]
     hot, cold = [], []
 
-    CP_hot, _ = _sum_mcp_between_temperature_boundaries(
-        T, hot, is_shifted=False
-    )
-    CP_cold, _ = _sum_mcp_between_temperature_boundaries(
-        T, cold, is_shifted=False
-    )
+    CP_hot, _ = _sum_mcp_between_temperature_boundaries(T, hot, is_shifted=False)
+    CP_cold, _ = _sum_mcp_between_temperature_boundaries(T, cold, is_shifted=False)
 
     assert CP_hot == [0, 0, 0]
     assert CP_cold == [0, 0, 0]
@@ -382,8 +365,12 @@ def test_insert_temperature_interval_vectorises_across_top_middle_and_bottom():
             assert pt.loc[idx, label] == pytest.approx(0.0)
 
     mid_idx = int(np.where(np.isclose(pt.col[PT.T.value], 250.0))[0][0])
-    assert pt.loc[mid_idx, PT.CP_HOT.value] == pytest.approx(pt.loc[mid_idx + 1, PT.CP_HOT.value])
-    assert pt.loc[mid_idx, PT.CP_COLD.value] == pytest.approx(pt.loc[mid_idx + 1, PT.CP_COLD.value])
+    assert pt.loc[mid_idx, PT.CP_HOT.value] == pytest.approx(
+        pt.loc[mid_idx + 1, PT.CP_HOT.value]
+    )
+    assert pt.loc[mid_idx, PT.CP_COLD.value] == pytest.approx(
+        pt.loc[mid_idx + 1, PT.CP_COLD.value]
+    )
     assert pt.loc[mid_idx, PT.DELTA_T.value] == pytest.approx(
         pt.loc[mid_idx - 1, PT.T.value] - pt.loc[mid_idx, PT.T.value]
     )
@@ -870,11 +857,13 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             if pd.isna(expected_val) and pd.isna(result_val):
                 continue
 
-            assert expected_val == result_val or ( # 210, 6150, 85, 1000
+            assert expected_val == result_val or (  # 210, 6150, 85, 1000
                 isinstance(expected_val, float)
                 and isinstance(result_val, float)
                 and abs(expected_val - result_val) < 1e-2
-            ), f"Mismatch at row {row_index}, col {col}: expected {expected_val}, got {result_val}"
+            ), (
+                f"Mismatch at row {row_index}, col {col}: expected {expected_val}, got {result_val}"
+            )
 
 
 """Tests for set_zonal_targets function"""
@@ -995,7 +984,11 @@ def test_single_row_problem_table():
 
 
 """Test get_process_heat_cascade"""
-from OpenPinch.analysis.problem_table_analysis import get_process_heat_cascade, get_heat_recovery_target_from_pt, set_zonal_targets
+from OpenPinch.analysis.problem_table_analysis import (
+    get_process_heat_cascade,
+    get_heat_recovery_target_from_pt,
+    set_zonal_targets,
+)
 
 
 def test_problem_table_algorithm_executes():
@@ -1007,19 +1000,19 @@ def test_problem_table_algorithm_executes():
     z.pt_real = ProblemTable()
 
     pt = get_process_heat_cascade(
-        hot_streams=z.hot_streams, 
-        cold_streams=z.cold_streams, 
-        all_streams=z.all_streams, 
+        hot_streams=z.hot_streams,
+        cold_streams=z.cold_streams,
+        all_streams=z.all_streams,
         zone_config=z.config,
         is_shifted=True,
     )
     pt_real = get_process_heat_cascade(
-        hot_streams=z.hot_streams, 
-        cold_streams=z.cold_streams, 
-        all_streams=z.all_streams, 
+        hot_streams=z.hot_streams,
+        cold_streams=z.cold_streams,
+        all_streams=z.all_streams,
         zone_config=z.config,
         is_shifted=False,
-        known_heat_recovery=get_heat_recovery_target_from_pt(pt)
+        known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
     target_values = set_zonal_targets(
         pt=pt,

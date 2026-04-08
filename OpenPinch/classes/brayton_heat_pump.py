@@ -13,7 +13,7 @@ import numpy as np
 
 # TESPy imports
 from tespy.networks import Network
-from tespy.components import (CycleCloser, Compressor, Turbine, SimpleHeatExchanger)
+from tespy.components import CycleCloser, Compressor, Turbine, SimpleHeatExchanger
 from tespy.connections import Connection
 
 # Local stream API used by the simple heat pump
@@ -61,7 +61,9 @@ class SimpleBraytonHeatPumpCycle:
         self._work: Optional[float] = None
 
         # simple storage for 4 states: each state will be a dict with keys 'T', 'p', 'h', 's', 'm'
-        self._states = [dict(T=None, p=None, h=None, s=None, m=None) for _ in range(self.STATECOUNT)]
+        self._states = [
+            dict(T=None, p=None, h=None, s=None, m=None) for _ in range(self.STATECOUNT)
+        ]
 
     # -- Properties to mimic HeatPumpCycle API -------------------------------------------------
     @property
@@ -98,7 +100,7 @@ class SimpleBraytonHeatPumpCycle:
             Enthalpy values [J/kg] for states 0..3.
         """
         self._require_solution()
-        return [s['h'] for s in self._states]
+        return [s["h"] for s in self._states]
 
     @property
     def Ts(self) -> Sequence[float]:
@@ -110,7 +112,7 @@ class SimpleBraytonHeatPumpCycle:
             Temperatures [degC] for states 0..3.
         """
         self._require_solution()
-        return [s['T'] for s in self._states]
+        return [s["T"] for s in self._states]
 
     @property
     def Ps(self) -> Sequence[float]:
@@ -122,7 +124,7 @@ class SimpleBraytonHeatPumpCycle:
             Pressures [Pa] for states 0..3.
         """
         self._require_solution()
-        return [s['p'] for s in self._states]
+        return [s["p"] for s in self._states]
 
     @property
     def Ss(self) -> Sequence[float]:
@@ -135,7 +137,7 @@ class SimpleBraytonHeatPumpCycle:
             populated by the underlying model.
         """
         self._require_solution()
-        return [s.get('s') for s in self._states]
+        return [s.get("s") for s in self._states]
 
     @property
     def Q_heat(self) -> Optional[float]:
@@ -147,7 +149,7 @@ class SimpleBraytonHeatPumpCycle:
             Requested gas-cooler heat duty [kW].
         """
         return self._Q_heat
-    
+
     @property
     def Q_cool(self) -> Optional[float]:
         """Return low-temperature heat-rejection duty after solution.
@@ -169,19 +171,18 @@ class SimpleBraytonHeatPumpCycle:
             Compressor plus turbine power [kW] using TESPy sign convention.
         """
         return self._work_net
-    
 
     # -- Solver API ---------------------------------------------------------------------------
     def solve(
-            self,
-            T_comp_in: float,
-            T_comp_out: float,
-            dT_gc: float,
-            Q_heat: float,
-            eta_comp: float,
-            eta_exp: float,
-            is_recuperated: bool,
-            refrigerant=None,
+        self,
+        T_comp_in: float,
+        T_comp_out: float,
+        dT_gc: float,
+        Q_heat: float,
+        eta_comp: float,
+        eta_exp: float,
+        is_recuperated: bool,
+        refrigerant=None,
     ) -> None:
         """Solve the Brayton cycle using TESPy.
 
@@ -219,31 +220,34 @@ class SimpleBraytonHeatPumpCycle:
         # Save inputs
         self.refrigerant = refrigerant
         self._Q_heat = Q_heat
-        
+
         # Note: is_recuperated parameter is not currently implemented
         # Future enhancement: add a recuperator component to the cycle
         if is_recuperated:
-            warnings.warn("Recuperated Brayton cycle is not yet implemented. "
-                         "Proceeding with simple cycle.", UserWarning)
+            warnings.warn(
+                "Recuperated Brayton cycle is not yet implemented. "
+                "Proceeding with simple cycle.",
+                UserWarning,
+            )
 
         # Create TESPy network and components (following original script)
-        fluid_list = ['Ar', 'N2', 'CO2', 'O2']
+        fluid_list = ["Ar", "N2", "CO2", "O2"]
         BraytonHP = Network(fluids=fluid_list)
-        BraytonHP.set_attr(T_unit='C', p_unit='bar', h_unit='kJ / kg')
+        BraytonHP.set_attr(T_unit="C", p_unit="bar", h_unit="kJ / kg")
 
         # components
-        FlowStart = CycleCloser('cycle closer')
-        Comp = Compressor('compressor')
-        Turb = Turbine('turbine')
-        HTHX = SimpleHeatExchanger('HTHX')
-        LTHX = SimpleHeatExchanger('LTHX')
+        FlowStart = CycleCloser("cycle closer")
+        Comp = Compressor("compressor")
+        Turb = Turbine("turbine")
+        HTHX = SimpleHeatExchanger("HTHX")
+        LTHX = SimpleHeatExchanger("LTHX")
 
         # connections (labels match the original script)
-        C1 = Connection(FlowStart, 'out1', Comp, 'in1', label='s1')
-        C2 = Connection(Comp, 'out1', HTHX, 'in1', label='s2')
-        C3 = Connection(HTHX, 'out1', Turb, 'in1', label='s3')
-        C4 = Connection(Turb, 'out1', LTHX, 'in1', label='s4')
-        C5 = Connection(LTHX, 'out1', FlowStart, 'in1', label='s5')
+        C1 = Connection(FlowStart, "out1", Comp, "in1", label="s1")
+        C2 = Connection(Comp, "out1", HTHX, "in1", label="s2")
+        C3 = Connection(HTHX, "out1", Turb, "in1", label="s3")
+        C4 = Connection(Turb, "out1", LTHX, "in1", label="s4")
+        C5 = Connection(LTHX, "out1", FlowStart, "in1", label="s5")
 
         # set attributes as in the original script
         C1.set_attr(p=1.013, T=T_comp_in, fluid={"Air": 1})
@@ -255,40 +259,42 @@ class SimpleBraytonHeatPumpCycle:
 
         Comp.set_attr(eta_s=eta_comp)
         # preserve original sign convention: in the original script HTHX.Q = -x[3]
-        HTHX.set_attr(pr=0.993, Q=-Q_heat) #pr2=0.98, 
-        LTHX.set_attr(pr=0.98) # pr2=0.995, ttd_l=10
+        HTHX.set_attr(pr=0.993, Q=-Q_heat)  # pr2=0.98,
+        LTHX.set_attr(pr=0.98)  # pr2=0.995, ttd_l=10
         Turb.set_attr(eta_s=eta_exp)
 
-        BraytonHP.add_conns(C1, C2, C3, C4, C5) #, C8, C9, C10, C11)
+        BraytonHP.add_conns(C1, C2, C3, C4, C5)  # , C8, C9, C10, C11)
         BraytonHP.set_attr(iterinfo=False)
 
         # run TESPy design solve (as requested)
-        BraytonHP.solve(mode='design', print_results=False)
+        BraytonHP.solve(mode="design", print_results=False)
 
         # Save network and connections
         self._network = BraytonHP
-        self._conns = dict(s1=C1, s2=C2, s3=C3, s4=C4, s5=C5) #, s8=C8, s9=C9, s10=C10, s11=C11)
+        self._conns = dict(
+            s1=C1, s2=C2, s3=C3, s4=C4, s5=C5
+        )  # , s8=C8, s9=C9, s10=C10, s11=C11)
 
         try:
-            self._states[0]['T'] = C1.T.val  # [degC]
-            self._states[0]['p'] = C1.p.val * 1e5  # bar -> Pa
-            self._states[0]['h'] = C1.h.val * 1000.0  # kJ/kg -> J/kg
-            self._states[0]['m'] = C1.m.val
+            self._states[0]["T"] = C1.T.val  # [degC]
+            self._states[0]["p"] = C1.p.val * 1e5  # bar -> Pa
+            self._states[0]["h"] = C1.h.val * 1000.0  # kJ/kg -> J/kg
+            self._states[0]["m"] = C1.m.val
 
-            self._states[1]['T'] = C2.T.val
-            self._states[1]['p'] = C2.p.val * 1e5
-            self._states[1]['h'] = C2.h.val * 1000.0
-            self._states[1]['m'] = C2.m.val
+            self._states[1]["T"] = C2.T.val
+            self._states[1]["p"] = C2.p.val * 1e5
+            self._states[1]["h"] = C2.h.val * 1000.0
+            self._states[1]["m"] = C2.m.val
 
-            self._states[2]['T'] = C3.T.val
-            self._states[2]['p'] = C3.p.val * 1e5
-            self._states[2]['h'] = C3.h.val * 1000.0
-            self._states[2]['m'] = C3.m.val
+            self._states[2]["T"] = C3.T.val
+            self._states[2]["p"] = C3.p.val * 1e5
+            self._states[2]["h"] = C3.h.val * 1000.0
+            self._states[2]["m"] = C3.m.val
 
-            self._states[3]['T'] = C4.T.val
-            self._states[3]['p'] = C4.p.val * 1e5
-            self._states[3]['h'] = C4.h.val * 1000.0
-            self._states[3]['m'] = C4.m.val
+            self._states[3]["T"] = C4.T.val
+            self._states[3]["p"] = C4.p.val * 1e5
+            self._states[3]["h"] = C4.h.val * 1000.0
+            self._states[3]["m"] = C4.m.val
 
             self._work_net = Comp.P.val + Turb.P.val  # kW (signed)
             self._m_dot = C1.m.val
@@ -297,10 +303,9 @@ class SimpleBraytonHeatPumpCycle:
             self._solved = True
 
         except Exception as e:
-            raise RuntimeError(f'Failed to extract results from TESPy network: {e}')
+            raise RuntimeError(f"Failed to extract results from TESPy network: {e}")
 
         return self._work_net
-
 
     def _build_hthx_profile(self) -> np.ndarray:
         """Build a simplified gas-cooler T-h profile.
@@ -314,14 +319,16 @@ class SimpleBraytonHeatPumpCycle:
         H = self.Hs
         T = self.Ts
         # create a conservative 4 point: compressor outlet -> (same) -> (same) -> turbine inlet
-        profile = np.array([
-            [H[1], T[1]],
-            # [H[1], T[1]],
-            # [H[2], T[2]],
-            [H[2], T[2]],
-        ], dtype=float)
+        profile = np.array(
+            [
+                [H[1], T[1]],
+                # [H[1], T[1]],
+                # [H[2], T[2]],
+                [H[2], T[2]],
+            ],
+            dtype=float,
+        )
         return profile
-
 
     def _build_lthx_profile(self) -> np.ndarray:
         """Build a simplified gas-heater T-h profile.
@@ -334,13 +341,15 @@ class SimpleBraytonHeatPumpCycle:
         self._require_solution()
         H = self.Hs
         T = self.Ts
-        profile = np.array([
-            [H[3], T[3]],
-            # [H[3], T[3]],
-            [H[0], T[0]],
-        ], dtype=float)
+        profile = np.array(
+            [
+                [H[3], T[3]],
+                # [H[3], T[3]],
+                [H[0], T[0]],
+            ],
+            dtype=float,
+        )
         return profile
-
 
     def get_hp_th_profiles(self) -> tuple[np.ndarray, np.ndarray]:
         """Return hot- and cold-side T-h profiles.
@@ -351,7 +360,6 @@ class SimpleBraytonHeatPumpCycle:
             ``(HTHX_profile, LTHX_profile)``.
         """
         return (self._build_hthx_profile(), self._build_lthx_profile())
-
 
     def get_hp_hot_and_cold_streams(self) -> tuple[StreamCollection, StreamCollection]:
         """Convert solved profiles to hot and cold utility stream collections.
@@ -380,7 +388,13 @@ class SimpleBraytonHeatPumpCycle:
                 else:
                     t_target = T2
                 heat_flow = m_dot * abs(h1 - h2)
-                s = Stream(name=name, t_supply=T1, t_target=t_target, heat_flow=heat_flow, is_process_stream=False)
+                s = Stream(
+                    name=name,
+                    t_supply=T1,
+                    t_target=t_target,
+                    heat_flow=heat_flow,
+                    is_process_stream=False,
+                )
                 sc.add(s)
             return sc
 
@@ -388,9 +402,12 @@ class SimpleBraytonHeatPumpCycle:
         cold_sc = _build_streams(cold_profile, False)
         return hot_sc, cold_sc
 
-
-    def build_stream_collection(self, include_cond: bool = False, include_evap: bool = False,
-                                is_process_stream: bool = False) -> StreamCollection:
+    def build_stream_collection(
+        self,
+        include_cond: bool = False,
+        include_evap: bool = False,
+        is_process_stream: bool = False,
+    ) -> StreamCollection:
         """Build a combined stream collection for selected heat exchangers.
 
         Parameters
@@ -417,7 +434,6 @@ class SimpleBraytonHeatPumpCycle:
             sc += cold
         return sc
 
-
     def _require_solution(self) -> None:
         """Validate that the cycle has been solved before data access.
 
@@ -427,4 +443,4 @@ class SimpleBraytonHeatPumpCycle:
             If ``solve`` has not been called successfully.
         """
         if not self._solved:
-            raise RuntimeError('Solve the cycle before accessing results.')
+            raise RuntimeError("Solve the cycle before accessing results.")

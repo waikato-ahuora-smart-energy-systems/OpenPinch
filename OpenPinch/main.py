@@ -72,7 +72,9 @@ def pinch_analysis_service(
     validated_data = TargetOutput.model_validate(return_data)
 
     # Return data
-    return validated_data if not is_return_full_results else (validated_data, master_zone)
+    return (
+        validated_data if not is_return_full_results else (validated_data, master_zone)
+    )
 
 
 def get_targets(master_zone: Zone) -> Zone:
@@ -127,8 +129,7 @@ def get_visualise(data) -> dict:
 
 
 def _get_unit_operation_targets(zone: Zone):
-    """Populate a ``Zone`` with detailed unit operation-level pinch targets.
-    """
+    """Populate a ``Zone`` with detailed unit operation-level pinch targets."""
     if zone.config.DO_DIRECT_OPERATION_TARGETING:
         if len(zone.subzones) > 0:
             z: Zone
@@ -137,7 +138,9 @@ def _get_unit_operation_targets(zone: Zone):
                     if zone.config.DO_DIRECT_OPERATION_TARGETING:
                         compute_direct_integration_targets(z)
                 else:
-                    raise ValueError("Invalid zone nesting. Unit operation zones can only contain other operation zones.")
+                    raise ValueError(
+                        "Invalid zone nesting. Unit operation zones can only contain other operation zones."
+                    )
 
         compute_direct_integration_targets(zone)
 
@@ -145,9 +148,8 @@ def _get_unit_operation_targets(zone: Zone):
 
 
 def _get_process_targets(zone: Zone):
-    """Populate a ``Zone`` with detailed process-level pinch targets.
-    """
-    
+    """Populate a ``Zone`` with detailed process-level pinch targets."""
+
     if len(zone.subzones) > 0:
         z: Zone
         for z in zone.subzones.values():
@@ -156,7 +158,9 @@ def _get_process_targets(zone: Zone):
             elif z.identifier == ZoneType.P.value:
                 z = _get_process_targets(z)
             else:
-                raise ValueError("Invalid zone nesting. Process zones can only contain other process zones and operation zones.")
+                raise ValueError(
+                    "Invalid zone nesting. Process zones can only contain other process zones and operation zones."
+                )
 
         if zone.config.DO_INDIRECT_PROCESS_TARGETING:
             compute_indirect_integration_targets(zone)
@@ -172,23 +176,22 @@ def _get_site_targets(zone: Zone):
     site-level indirect integration through the utility system.
     """
 
-    # if zone.config.DO_DIRECT_SITE_TARGETING:
     # Totally integrated analysis for a site zone
     compute_direct_integration_targets(zone)
 
+    # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
-        # Targets process level energy requirements
-        z: Zone
         for z in zone.subzones.values():
-            # _get_process_targets(z)
             if z.identifier == ZoneType.O.value:
                 _get_unit_operation_targets(z)
             elif z.identifier == ZoneType.P.value:
                 _get_process_targets(z)
             elif z.identifier == ZoneType.S.value:
-                _get_site_targets(z)                
+                _get_site_targets(z)
             else:
-                raise ValueError("Invalid zone nesting. Sites zones can only contain site, process and operation zones.")
+                raise ValueError(
+                    "Invalid zone nesting. Sites zones can only contain site, process and operation zones."
+                )
 
         # Calculates TS targets based on different approaches
         compute_indirect_integration_targets(zone)
@@ -228,9 +231,9 @@ def _get_report(zone: Zone) -> dict:
     return targets
 
 
-def _get_utilities(zone: Zone) -> List[Stream]:
+def _get_utilities(zone: Zone) -> StreamCollection:
     """Gets a list of any default utilities generated during the analysis."""
-    utilities: List[Stream] = zone.hot_utilities + zone.cold_utilities
+    utilities: StreamCollection = zone.hot_utilities + zone.cold_utilities
     default_hu: Stream = next((u for u in utilities if u.name == "HU"), None)
     default_cu: Stream = next((u for u in utilities if u.name == "CU"), None)
     return [default_hu, default_cu]

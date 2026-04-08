@@ -52,7 +52,7 @@ class HeatPumpTargetInputs(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Calculated based on the case
-    Q_hp_target: float
+    Q_target: float
     Q_amb_max: float
     dt_range_max: float
 
@@ -72,7 +72,6 @@ class HeatPumpTargetInputs(BaseModel):
     dt_cascade_hx: float
     dt_phase_change: float
     price_ratio: float
-    is_direct_integration: bool
     is_heat_pumping: bool
     max_multi_start: int
     T_env: float
@@ -82,6 +81,7 @@ class HeatPumpTargetInputs(BaseModel):
     refrigerant_ls: List[str]
     do_refrigerant_sort: bool
     initialise_simulated_hp: bool
+    allow_integrated_expander: bool
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
@@ -94,6 +94,7 @@ class HeatPumpTargetInputs(BaseModel):
 
     # Debug mode toogle
     debug: bool
+
 
 class HeatPumpTargetOutputs(BaseModel):
     """Normalized output requirement for heat pump targeting routines."""
@@ -108,7 +109,7 @@ class HeatPumpTargetOutputs(BaseModel):
     work_hp: float | list | np.ndarray
     work_he: Optional[float | list | np.ndarray] = None
     Q_ext: float
-    Q_amb: float    
+    Q_amb: float
     cop: float | list | np.ndarray
     obj: float
     opt_success: bool

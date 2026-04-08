@@ -141,6 +141,82 @@ def test_get_hot_streams_filters_and_preserves_sort_settings():
     assert hot_streams._sort_reverse is False
 
 
+def test_get_hot_streams_includes_process_and_utility_when_enabled():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="H_PRO",
+            t_supply=200,
+            t_target=150,
+            heat_flow=1,
+            is_process_stream=True,
+        )
+    )
+    sc.add(
+        Stream(
+            name="H_UT",
+            t_supply=220,
+            t_target=170,
+            heat_flow=1,
+            is_process_stream=False,
+        )
+    )
+    sc.add(
+        Stream(
+            name="C_PRO", t_supply=80, t_target=120, heat_flow=1, is_process_stream=True
+        )
+    )
+    sc.add(
+        Stream(
+            name="C_UT", t_supply=70, t_target=130, heat_flow=1, is_process_stream=False
+        )
+    )
+
+    hot_streams = sc.get_hot_streams(
+        include_process_streams=True, include_utility_streams=True
+    )
+
+    assert set(hot_streams._streams.keys()) == {"H_PRO", "H_UT"}
+
+
+def test_get_hot_streams_can_invert_utility_without_mutating_original_streams():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="H_PRO",
+            t_supply=180,
+            t_target=100,
+            heat_flow=1,
+            is_process_stream=True,
+        )
+    )
+    sc.add(
+        Stream(
+            name="C_UT", t_supply=60, t_target=140, heat_flow=1, is_process_stream=False
+        )
+    )
+
+    original_utility = sc["C_UT"]
+    original_supply = original_utility.t_supply
+    original_target = original_utility.t_target
+    original_type = original_utility.type
+
+    hot_streams = sc.get_hot_streams(
+        include_process_streams=True,
+        include_utility_streams=True,
+        invert_utility=True,
+    )
+
+    assert set(hot_streams._streams.keys()) == {"C_UT"}
+    assert hot_streams["C_UT"].type == StreamType.Hot.value
+    assert hot_streams["C_UT"].t_supply == original_target
+    assert hot_streams["C_UT"].t_target == original_supply
+
+    assert original_utility.type == original_type
+    assert original_utility.t_supply == original_supply
+    assert original_utility.t_target == original_target
+
+
 def test_get_cold_streams_filters_and_preserves_sort_settings():
     sc = StreamCollection()
     sc.add(Stream(name="C1", t_supply=80, t_target=140, heat_flow=1))
@@ -154,6 +230,82 @@ def test_get_cold_streams_filters_and_preserves_sort_settings():
     assert set(cold_streams._streams.keys()) == {"C1", "C2"}
     assert [s.name for s in cold_streams] == ["C2", "C1"]
     assert cold_streams._sort_reverse is True
+
+
+def test_get_cold_streams_includes_process_and_utility_when_enabled():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="C_PRO", t_supply=80, t_target=140, heat_flow=1, is_process_stream=True
+        )
+    )
+    sc.add(
+        Stream(
+            name="C_UT", t_supply=90, t_target=150, heat_flow=1, is_process_stream=False
+        )
+    )
+    sc.add(
+        Stream(
+            name="H_PRO",
+            t_supply=210,
+            t_target=120,
+            heat_flow=1,
+            is_process_stream=True,
+        )
+    )
+    sc.add(
+        Stream(
+            name="H_UT",
+            t_supply=220,
+            t_target=130,
+            heat_flow=1,
+            is_process_stream=False,
+        )
+    )
+
+    cold_streams = sc.get_cold_streams(
+        include_process_streams=True, include_utility_streams=True
+    )
+
+    assert set(cold_streams._streams.keys()) == {"C_PRO", "C_UT"}
+
+
+def test_get_cold_streams_can_invert_utility_without_mutating_original_streams():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="C_PRO", t_supply=90, t_target=160, heat_flow=1, is_process_stream=True
+        )
+    )
+    sc.add(
+        Stream(
+            name="H_UT",
+            t_supply=220,
+            t_target=130,
+            heat_flow=1,
+            is_process_stream=False,
+        )
+    )
+
+    original_utility = sc["H_UT"]
+    original_supply = original_utility.t_supply
+    original_target = original_utility.t_target
+    original_type = original_utility.type
+
+    cold_streams = sc.get_cold_streams(
+        include_process_streams=True,
+        include_utility_streams=True,
+        invert_utility=True,
+    )
+
+    assert set(cold_streams._streams.keys()) == {"H_UT"}
+    assert cold_streams["H_UT"].type == StreamType.Cold.value
+    assert cold_streams["H_UT"].t_supply == original_target
+    assert cold_streams["H_UT"].t_target == original_supply
+
+    assert original_utility.type == original_type
+    assert original_utility.t_supply == original_supply
+    assert original_utility.t_target == original_target
 
 
 def test_export_to_csv(sample_streams):
@@ -181,3 +333,22 @@ def test_export_to_csv(sample_streams):
         assert {row["name"] for row in rows} == {s.name for s in sample_streams}
     finally:
         output_path.unlink(missing_ok=True)
+
+
+# ===== Merged from test_stream_collection_extra.py =====
+"""Additional branch coverage tests for StreamCollection."""
+
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
+
+
+def test_stream_collection_get_index_and_getitem_by_name():
+    collection = StreamCollection()
+    s1 = Stream(name="S1", t_supply=120.0, t_target=80.0, heat_flow=10.0, htc=1.0)
+    s2 = Stream(name="S2", t_supply=130.0, t_target=90.0, heat_flow=20.0, htc=1.0)
+    collection.add(s1)
+    collection.add(s2)
+
+    idx = collection.get_index(s1)
+    assert idx in (0, 1)
+    assert collection["S2"] is s2

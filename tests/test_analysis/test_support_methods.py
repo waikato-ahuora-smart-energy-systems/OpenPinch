@@ -40,7 +40,6 @@ def test_get_value_with_string_raises():
         get_value("100")
 
 
-
 """Test cases for the compute_capital_recovery_factor function."""
 
 

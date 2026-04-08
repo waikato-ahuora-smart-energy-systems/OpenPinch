@@ -11,15 +11,15 @@ from ..utils import *
 
 __all__ = [
     "get_additional_GCCs",
-    "get_GCC_without_pockets", 
-    "get_GCC_with_partial_pockets", 
+    "get_GCC_without_pockets",
+    "get_GCC_with_partial_pockets",
     "get_GCC_with_vertical_heat_transfer",
     "get_GCC_needing_utility",
     "get_GGC_pockets",
     "get_seperated_gcc_heat_load_profiles",
 ]
 
-# TODO: Implement exergy targeting through the exergetic GCC approach. 
+# TODO: Implement exergy targeting through the exergetic GCC approach.
 
 #######################################################################################################
 # Public API
@@ -30,7 +30,7 @@ def get_additional_GCCs(
     pt: ProblemTable,
     do_vert_cc_calc: bool = False,
     do_assisted_ht_calc: bool = False,
-) -> ProblemTable:        
+) -> ProblemTable:
     """Populate derived GCC variants used by utility and integration targeting.
 
     Parameters
@@ -49,7 +49,7 @@ def get_additional_GCCs(
     """
     # Calculate various GCC profiles
     get_GCC_without_pockets(pt)
-    
+
     if do_vert_cc_calc:
         pt.update(
             get_GCC_with_vertical_heat_transfer(
@@ -60,21 +60,11 @@ def get_additional_GCCs(
         )
 
     if do_assisted_ht_calc:
-        pt.update(
-            get_GGC_pockets(pt)
-        )
+        pt.update(get_GGC_pockets(pt))
 
-    pt.update(
-        get_GCC_needing_utility(
-            pt.col[PT.H_NET_NP.value]
-        )
-    )
-    pt.update(
-        get_seperated_gcc_heat_load_profiles(
-            pt.col[PT.H_NET_A.value]
-        )
-    )
-    return pt    
+    pt.update(get_GCC_needing_utility(pt.col[PT.H_NET_NP.value]))
+    pt.update(get_seperated_gcc_heat_load_profiles(pt.col[PT.H_NET_A.value]))
+    return pt
 
 
 def get_GCC_without_pockets(
@@ -82,7 +72,7 @@ def get_GCC_without_pockets(
 ) -> Tuple[ProblemTable, ProblemTable]:
     """Flatten GCC pockets by inserting breakpoints so the profile becomes monotonic."""
     pt.col[col_H_NP] = pt.col[col_H]
-    
+
     hot_pinch_loc, cold_pinch_loc, valid = pt.pinch_idx(col_H)
     if not valid:
         return pt
@@ -131,6 +121,7 @@ def get_GCC_with_partial_pockets(
     # pt.col[PT.H_NET_AI.value] = pt.col[PT.H_NET.value] - pt.col[PT.H_NET_PK.value]
     return pt
 
+
 def get_GCC_with_vertical_heat_transfer(
     h_cold: np.ndarray,
     h_hot: np.ndarray,
@@ -164,9 +155,7 @@ def get_GGC_pockets(pt: ProblemTable) -> Dict[str, np.ndarray]:
     """Store GCC pocket contribution (difference between real and pocket-free profiles)."""
     h_net_pk = np.subtract(pt.col[PT.H_NET.value], pt.col[PT.H_NET_NP.value])
     pt.col[PT.H_NET_PK.value] = h_net_pk
-    return {
-        PT.H_NET_PK.value: h_net_pk
-    }
+    return {PT.H_NET_PK.value: h_net_pk}
 
 
 def get_seperated_gcc_heat_load_profiles(
@@ -206,15 +195,19 @@ def get_seperated_gcc_heat_load_profiles(
         hut_max = -hot_profile[-1]
         hot_profile = hot_profile + hut_max
 
-    return {
-        PT.H_NET_HOT.value: hot_profile,
-        PT.H_NET_COLD.value: cold_profile,
-    } if is_process_stream else {
-        PT.H_HOT_UT.value: hot_profile,
-        PT.H_COLD_UT.value: cold_profile,
-        PT.RCP_HOT_UT.value: rcp_hot,
-        PT.RCP_COLD_UT.value: rcp_cold,        
-    }
+    return (
+        {
+            PT.H_NET_HOT.value: hot_profile,
+            PT.H_NET_COLD.value: cold_profile,
+        }
+        if is_process_stream
+        else {
+            PT.H_HOT_UT.value: hot_profile,
+            PT.H_COLD_UT.value: cold_profile,
+            PT.RCP_HOT_UT.value: rcp_hot,
+            PT.RCP_COLD_UT.value: rcp_cold,
+        }
+    )
 
 
 #######################################################################################################

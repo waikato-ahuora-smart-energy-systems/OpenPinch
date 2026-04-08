@@ -1,4 +1,3 @@
-
 """Streamlit helpers for visualising OpenPinch outputs.
 
 The functions in this module provide a lightweight dashboard scaffold that
@@ -151,7 +150,7 @@ def render_streamlit_dashboard(
     st.sidebar.markdown(
         f"<div class='op-utility-title'>Overview</div>",
         unsafe_allow_html=True,
-    )    
+    )
     st.sidebar.markdown(
         f"""
         <div class="op-metric-grid">
@@ -185,8 +184,8 @@ def render_streamlit_dashboard(
     )
 
     ut_dict = {
-        "Hot utilities" : target.hot_utilities, 
-        "Cold utilities" : target.cold_utilities,
+        "Hot utilities": target.hot_utilities,
+        "Cold utilities": target.cold_utilities,
     }
     for entry, utilities in ut_dict.items():
         st.sidebar.divider()
@@ -196,9 +195,9 @@ def render_streamlit_dashboard(
         )
         if utilities:
             cards = "".join(
-                f"<div class=\"op-utility-card\">"
-                f"<div class=\"op-utility-name\">{u.name}</div>"
-                f"<div class=\"op-utility-value\">{u.heat_flow:,.0f}&nbsp;kW</div>"
+                f'<div class="op-utility-card">'
+                f'<div class="op-utility-name">{u.name}</div>'
+                f'<div class="op-utility-value">{u.heat_flow:,.0f}&nbsp;kW</div>'
                 f"</div>"
                 for u in utilities
             )
@@ -208,12 +207,11 @@ def render_streamlit_dashboard(
             )
         else:
             st.sidebar.markdown(
-                "<div class=\"op-utility-grid\">"
-                "<div class=\"op-utility-card op-utility-empty\">Not required</div>"
+                '<div class="op-utility-grid">'
+                '<div class="op-utility-card op-utility-empty">Not required</div>'
                 "</div>",
                 unsafe_allow_html=True,
             )
-
 
     tabs = st.tabs(
         [
@@ -236,7 +234,10 @@ def render_streamlit_dashboard(
             for idx, graph in enumerate(graph_set.graphs):
                 column = columns[idx % 2]
                 with column:
-                    st.markdown(f"<div class='op-card-title'>{graph_names[idx]}</div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='op-card-title'>{graph_names[idx]}</div>",
+                        unsafe_allow_html=True,
+                    )
                     figure = _build_plotly_graph(graph)
                     st.plotly_chart(
                         figure,
@@ -245,16 +246,18 @@ def render_streamlit_dashboard(
                     )
 
     with tabs[1]:
-        pt_df = problem_table_to_dataframe(
-            target.pt, round_decimals=value_rounding
-        )
+        pt_df = problem_table_to_dataframe(target.pt, round_decimals=value_rounding)
         # problem_table_to_dataframe(target.pt, round_decimals=value_rounding)
         if pt_df.empty:
             st.info("No shifted problem table data available.")
         else:
-            st.badge("Extended problem table based on shifted process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
+            st.badge(
+                "Extended problem table based on shifted process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns."
+            )
             st.dataframe(pt_df, width="stretch")
-            default_loc = f"results/{selected_target_name.replace('/', '-')}_shifted.xlsx"
+            default_loc = (
+                f"results/{selected_target_name.replace('/', '-')}_shifted.xlsx"
+            )
 
             _build_download(
                 st=st,
@@ -272,7 +275,9 @@ def render_streamlit_dashboard(
         if pt_real_df.empty:
             st.info("No real-temperature problem table data available.")
         else:
-            st.badge("Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns.")
+            st.badge(
+                "Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns."
+            )
             st.dataframe(pt_real_df, width="stretch")
             default_loc = f"results/{selected_target_name.replace('/', '-')}_real.xlsx"
 
@@ -316,7 +321,7 @@ def _build_download(
                     out_file.write(buffer.getvalue())
                 st.success(f"Saved table to {destination}")
             except OSError as exc:
-                st.error(f"Failed to save file: {exc}")                   
+                st.error(f"Failed to save file: {exc}")
 
 
 def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
@@ -347,7 +352,9 @@ def _segment_trace(
     legend_label, series_id, show = _legend_details(segment, title, legend_seen)
     arrow = segment.get("arrow")
 
-    if graph_type in {"Site Utility Grand Composite Curve"} and _is_vertical_segment(x_vals):
+    if graph_type in {"Site Utility Grand Composite Curve"} and _is_vertical_segment(
+        x_vals
+    ):
         colour = _SEGMENT_COLOUR_MAP[LineColour.Other.value]
 
     if graph_type in {"Total Site Profiles", "Site Utility Grand Composite Curve"}:
@@ -355,7 +362,7 @@ def _segment_trace(
             arrow = ArrowHead.END.value
         elif arrow == ArrowHead.END.value:
             arrow = ArrowHead.START.value
-            
+
     line_trace = go.Scatter(
         x=x_vals,
         y=y_vals,
@@ -416,14 +423,18 @@ def _legend_details(
     legend_seen: Dict[str, bool],
 ) -> Tuple[str, str, bool]:
     series_label = segment.get("series")
-    legend_label = str(series_label).strip() if series_label else _legend_group_name(title)
+    legend_label = (
+        str(series_label).strip() if series_label else _legend_group_name(title)
+    )
     series_id = str(segment.get("series_id") or legend_label)
     show = not legend_seen.get(series_id, False)
     legend_seen[series_id] = True
     return legend_label, series_id, show
 
 
-def _arrow_indices(x_vals: List[float], y_vals: List[float], arrow: str) -> Tuple[int, int]:
+def _arrow_indices(
+    x_vals: List[float], y_vals: List[float], arrow: str
+) -> Tuple[int, int]:
     length = len(x_vals)
     if arrow == ArrowHead.START.value:
         tip_idx = 0
@@ -449,7 +460,9 @@ def _line_style(segment: Mapping[str, object], colour: str) -> dict:
     return style
 
 
-def _hover_template(segment: Mapping[str, object], title: str, legend_label: str) -> str:
+def _hover_template(
+    segment: Mapping[str, object], title: str, legend_label: str
+) -> str:
     descriptor = segment.get("series_description") or legend_label or title
     return (
         f"{descriptor}<br>"
@@ -475,7 +488,11 @@ def _apply_default_layout(fig: go.Figure) -> None:
         margin={"l": 50, "r": 28, "t": 64, "b": 48},
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
-        font={"family": "IBM Plex Sans, Inter, system-ui, sans-serif", "size": 13, "color": "#000000"},
+        font={
+            "family": "IBM Plex Sans, Inter, system-ui, sans-serif",
+            "size": 13,
+            "color": "#000000",
+        },
         hoverlabel={"bgcolor": "#ffffff", "font": {"color": "#000000"}},
     )
     fig.update_xaxes(
@@ -508,7 +525,9 @@ def _apply_default_layout(fig: go.Figure) -> None:
     )
 
 
-def _extract_segment_xy(segment: Mapping[str, object]) -> tuple[List[float], List[float]]:
+def _extract_segment_xy(
+    segment: Mapping[str, object],
+) -> tuple[List[float], List[float]]:
     """Return x/y coordinate lists for a graph segment payload."""
     points = segment.get("data_points", []) or []
     x_vals = [point["x"] for point in points if "x" in point and "y" in point]

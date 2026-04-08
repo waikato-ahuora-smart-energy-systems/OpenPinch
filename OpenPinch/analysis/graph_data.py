@@ -91,7 +91,13 @@ def visualise_graphs(graph_set: dict, graph) -> None:
                     data=graph_data,
                     label=graph_type,
                     name=f"{graph_type} Graph",
-                    value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_NET_UT.value],
+                    value_field=[
+                        PT.H_NET.value,
+                        PT.H_NET_NP.value,
+                        PT.H_NET_V.value,
+                        PT.H_NET_A.value,
+                        PT.H_NET_UT.value,
+                    ],
                     is_utility_profile=[False, False, False, False, True],
                 )
             )
@@ -151,7 +157,13 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 key=GT.GCC.value,
                 data=t.graphs[GT.GCC.value],
                 label="Grand Composite Curve",
-                value_field=[PT.H_NET.value, PT.H_NET_NP.value, PT.H_NET_V.value, PT.H_NET_A.value, PT.H_NET_UT.value],
+                value_field=[
+                    PT.H_NET.value,
+                    PT.H_NET_NP.value,
+                    PT.H_NET_V.value,
+                    PT.H_NET_A.value,
+                    PT.H_NET_UT.value,
+                ],
                 is_utility_profile=[False, False, False, False, True],
             )
         )
@@ -162,8 +174,18 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 graph_title=graphTitle,
                 key=GT.TSP.value,
                 data=t.graphs[GT.TSP.value],
-                col_keys=[PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value],
-                stream_types=[StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU],
+                col_keys=[
+                    PT.H_NET_HOT.value,
+                    PT.H_NET_COLD.value,
+                    PT.H_HOT_UT.value,
+                    PT.H_COLD_UT.value,
+                ],
+                stream_types=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                    StreamLoc.HotU,
+                    StreamLoc.ColdU,
+                ],
                 label="Total Site Profiles",
                 include_arrows=True,
             )
@@ -180,7 +202,7 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
                 is_utility_profile=[True],
             )
         )
-    
+
     if GT.GCC_HP.value in t.graphs:
         graphs.append(
             _make_gcc_graph(
@@ -239,7 +261,9 @@ def _normalise_gcc_flags(flag, count: int) -> List[bool]:
         return [bool(flag)] * count
     flags = list(flag)
     if len(flags) != count:
-        raise ValueError("`value_field` and `is_utility_profile` must have the same length.")
+        raise ValueError(
+            "`value_field` and `is_utility_profile` must have the same length."
+        )
     return [bool(item) for item in flags]
 
 
@@ -264,7 +288,7 @@ def _build_gcc_segments(
     is_utility_profile: bool,
     decolour: bool,
 ) -> List[dict]:
-    
+
     y_vals, x_vals = clean_composite_curve(y_vals, x_vals)
     counts: dict[StreamLoc, int] = defaultdict(int)
     segments: List[dict] = []
@@ -306,21 +330,31 @@ def _iter_gcc_segment_slices(
         classified = _classify_segment(x_vals[j] - x_vals[j + 1], is_utility_profile)
         next_j = j + 1
         while next_j < end:
-            next_class = _classify_segment(x_vals[next_j] - x_vals[next_j + 1], is_utility_profile)
+            next_class = _classify_segment(
+                x_vals[next_j] - x_vals[next_j + 1], is_utility_profile
+            )
             if next_class != classified:
                 break
             next_j += 1
         raw_loc = _segment_streamloc(classified)
         is_vertical = raw_loc == StreamLoc.Unassigned
-        stream_loc = preferred_stream_loc if is_vertical and preferred_stream_loc else raw_loc
+        stream_loc = (
+            preferred_stream_loc if is_vertical and preferred_stream_loc else raw_loc
+        )
         yield stream_loc, is_vertical, x_vals[j : next_j + 1], y_vals[j : next_j + 1]
         j = next_j
 
 
 def _segment_bounds(x_vals: List[float]) -> Tuple[int, int]:
-    start = next((i for i in range(len(x_vals) - 1) if abs(x_vals[i] - x_vals[i + 1]) > tol), 0)
+    start = next(
+        (i for i in range(len(x_vals) - 1) if abs(x_vals[i] - x_vals[i + 1]) > tol), 0
+    )
     end = next(
-        (i for i in range(len(x_vals) - 1, 0, -1) if abs(x_vals[i] - x_vals[i - 1]) > tol),
+        (
+            i
+            for i in range(len(x_vals) - 1, 0, -1)
+            if abs(x_vals[i] - x_vals[i - 1]) > tol
+        ),
         len(x_vals) - 1,
     )
     return start, end
@@ -420,7 +454,9 @@ def _graph_cc(
             if candidate in aliases:
                 stream_loc = aliases[candidate]
             else:
-                raise ValueError("Unrecognised composite curve stream location.") from None
+                raise ValueError(
+                    "Unrecognised composite curve stream location."
+                ) from None
 
     title_map = {
         StreamLoc.HotS: "Hot CC",
@@ -442,7 +478,7 @@ def _graph_cc(
             StreamLoc.HotU: ArrowHead.START.value,
             StreamLoc.ColdS: ArrowHead.END.value,
             StreamLoc.ColdU: ArrowHead.END.value,
-        }        
+        }
 
     if stream_loc not in title_map:
         raise ValueError("Unrecognised composite curve stream location.")
@@ -470,8 +506,10 @@ def _column_to_list(data, column_key: str) -> List[float]:
     try:
         if isinstance(data, ProblemTable):
             column = data.col[column_key]
-        elif hasattr(data, "col") and hasattr(data, "columns") and column_key in getattr(
-            data, "columns", []
+        elif (
+            hasattr(data, "col")
+            and hasattr(data, "columns")
+            and column_key in getattr(data, "columns", [])
         ):
             column = data.col[column_key]
         elif isinstance(data, dict):
@@ -479,7 +517,9 @@ def _column_to_list(data, column_key: str) -> List[float]:
         else:
             column = data[column_key]
     except (KeyError, AttributeError, TypeError) as exc:
-        raise KeyError(f"Column '{column_key}' not found in graph data payload.") from exc
+        raise KeyError(
+            f"Column '{column_key}' not found in graph data payload."
+        ) from exc
 
     if hasattr(column, "to_list"):
         return column.to_list()

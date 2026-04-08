@@ -14,7 +14,8 @@ from .stream_collection import StreamCollection
 from ..utils.stream_linearisation import get_piecewise_data_points
 
 
-__all__ = ['SimpleHeatPumpCycle']
+__all__ = ["SimpleHeatPumpCycle"]
+
 
 class SimpleHeatPumpCycle:
     """Single vapour-compression heat pump cycle with optional internal heat exchange."""
@@ -31,7 +32,7 @@ class SimpleHeatPumpCycle:
         self._eta_comp: float = 1.0
         self._ihx_gas_dt: float = 0.0
         self._dtcont: float = 0.0
-        self._dt_diff_max: float = 0.5 # Default value, used in piecewise approximation of non linear T-h profiles      
+        self._dt_diff_max: float = 0.5  # Default value, used in piecewise approximation of non linear T-h profiles
         self._solved: bool = False
 
         self._state = None
@@ -72,7 +73,7 @@ class SimpleHeatPumpCycle:
         self._solved = False
         self._p_crit = self._state.keyed_output(CoolProp.iP_critical)
         self._t_crit = self._state.keyed_output(CoolProp.iT_critical)
-        self._d_crit = self._state.keyed_output(CoolProp.irhomass_critical)        
+        self._d_crit = self._state.keyed_output(CoolProp.irhomass_critical)
 
     @property
     def cycle_states(self) -> StateContainer:
@@ -82,7 +83,7 @@ class SimpleHeatPumpCycle:
     @cycle_states.setter
     def cycle_states(self, value: StateContainer) -> None:
         if len(value) != self.STATECOUNT:
-            raise ValueError(f'Expected exactly {self.STATECOUNT} state points.')
+            raise ValueError(f"Expected exactly {self.STATECOUNT} state points.")
         value.units = self._system
         self._cycle_states = value
         self._solved = True
@@ -101,25 +102,25 @@ class SimpleHeatPumpCycle:
     def Hs(self) -> Sequence[float]:
         """Specific enthalpies for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, 'H'] for i in self._cycle_states]
+        return [self._cycle_states[i, "H"] for i in self._cycle_states]
 
     @property
     def Ss(self) -> Sequence[float]:
         """Specific entropies for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, 'S'] for i in self._cycle_states]
+        return [self._cycle_states[i, "S"] for i in self._cycle_states]
 
     @property
     def Ts(self) -> Sequence[float]:
         """Temperatures for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, 'T'] for i in self._cycle_states]
+        return [self._cycle_states[i, "T"] for i in self._cycle_states]
 
     @property
     def Ps(self) -> Sequence[float]:
         """Pressures for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, 'P'] for i in self._cycle_states]
+        return [self._cycle_states[i, "P"] for i in self._cycle_states]
 
     @property
     def q_evap(self) -> Optional[float]:
@@ -140,7 +141,7 @@ class SimpleHeatPumpCycle:
     def Q_cas_cool(self) -> Optional[float]:
         """Total cooling passed to a lower cascade stage."""
         return self._Q_cas_cool
-     
+
     @property
     def q_cool(self) -> Optional[float]:
         """Specific cooling delivered to the process."""
@@ -150,7 +151,7 @@ class SimpleHeatPumpCycle:
     def Q_cool(self) -> Optional[float]:
         """Total cooling delivered to the process."""
         return self._Q_cool
-    
+
     @property
     def q_cond(self) -> Optional[float]:
         """Specific condenser duty."""
@@ -170,7 +171,7 @@ class SimpleHeatPumpCycle:
     def Q_cas_heat(self) -> Optional[float]:
         """Total heat passed to an upper cascade stage."""
         return self._Q_cas_heat
- 
+
     @property
     def q_heat(self) -> Optional[float]:
         """Specific heat delivered to the process."""
@@ -190,32 +191,34 @@ class SimpleHeatPumpCycle:
     def work(self) -> Optional[float]:
         """Total compressor work input."""
         return self._work
-    
+
     @property
     def penalty(self) -> Optional[float]:
         """Total penalty for excessive subcooling."""
         return self._penalty
-        
+
     @property
     def m_dot(self) -> Optional[float]:
         """Working fluid mass flow rate."""
         return self._m_dot
-    
+
     @property
     def dtcont(self) -> Optional[float]:
         """Minimum temperature approach carried into derived stream profiles."""
         return self._dtcont
-    
+
     @dtcont.setter
     def dtcont(self, value: float):
-        self._dtcont = value  
+        self._dtcont = value
 
     @property
     def COP_h(self) -> Optional[float]:
         """Heating coefficient of performance based on process heat duty."""
         self._require_solution()
         if abs(self._w_net) <= 1e-9:
-            raise ZeroDivisionError('COP_h is undefined when net specific work is zero.')
+            raise ZeroDivisionError(
+                "COP_h is undefined when net specific work is zero."
+            )
         return self._q_cond / self._w_net
 
     @property
@@ -223,7 +226,9 @@ class SimpleHeatPumpCycle:
         """Cooling coefficient of performance based on process cooling duty."""
         self._require_solution()
         if abs(self._w_net) <= 1e-9:
-            raise ZeroDivisionError('COP_r is undefined when net specific work is zero.')
+            raise ZeroDivisionError(
+                "COP_r is undefined when net specific work is zero."
+            )
         return self._q_evap / self._w_net
 
     @property
@@ -270,18 +275,16 @@ class SimpleHeatPumpCycle:
     def solved(self) -> bool:
         """Flag if the cycle has been solved or not."""
         return self._solved
-    
 
     def _validate_solve_inputs(
         self,
-        refrigerant: str = None,    
+        refrigerant: str = None,
     ) -> bool:
         if refrigerant is not None:
             self.state = process_fluid_state(refrigerant)
         if self._state is None:
-            raise ValueError('A fluid must be specified before solving the cycle.')
+            raise ValueError("A fluid must be specified before solving the cycle.")
         return True
-    
 
     def _get_P_sat_from_T(
         self,
@@ -294,7 +297,6 @@ class SimpleHeatPumpCycle:
             self._state.update(CoolProp.QT_INPUTS, Q, T)
         return self._state.p()
 
-
     def _compute_state_from_pressure_temperature(
         self,
         P: float,
@@ -303,9 +305,11 @@ class SimpleHeatPumpCycle:
         phase: str = 1.0,
     ) -> CoolProp.AbstractState:
         try:
-            self._state.update(CoolProp.PT_INPUTS, P, T)          
+            self._state.update(CoolProp.PT_INPUTS, P, T)
         except:
-            self._state.update(CoolProp.PQ_INPUTS, P, phase) # Close to saturated liquid/vapour  
+            self._state.update(
+                CoolProp.PQ_INPUTS, P, phase
+            )  # Close to saturated liquid/vapour
         return self._state
 
     def _compute_state_from_pressure_quality(
@@ -317,50 +321,42 @@ class SimpleHeatPumpCycle:
         return self._state
 
     def _compute_compressor_outlet_state(
-        self, 
-        h_in: float, 
-        s_in: float, 
-        P_out: float
+        self, h_in: float, s_in: float, P_out: float
     ) -> CoolProp.AbstractState:
         self._state.update(CoolProp.PSmass_INPUTS, P_out, s_in)
         h_out_isentropic = self._state.hmass()
         h_out = h_in + (h_out_isentropic - h_in) / self._eta_comp
         self._state.update(CoolProp.HmassP_INPUTS, h_out, P_out)
         return self._state
-    
 
     def _compute_state_from_pressure_enthalpy(
-        self, 
-        P: float, 
+        self,
+        P: float,
         h: float,
     ):
         self._state.update(CoolProp.HmassP_INPUTS, h, P)
         return self._state
 
-
     def _convert_C_to_K(
         self,
         T: float,
     ):
-        return T + 273.15            
-
+        return T + 273.15
 
     def _convert_K_to_C(
         self,
         T: float,
     ):
-        return T - 273.15   
-
+        return T - 273.15
 
     def _save_cycle_state(
-        self, 
+        self,
         i: int,
     ):
-        self._cycle_states[i, 'H'] = float(self._state.hmass())
-        self._cycle_states[i, 'S'] = float(self._state.smass())
-        self._cycle_states[i, 'P'] = float(self._state.p())
-        self._cycle_states[i, 'T'] = float(self._state.T())
-
+        self._cycle_states[i, "H"] = float(self._state.hmass())
+        self._cycle_states[i, "S"] = float(self._state.smass())
+        self._cycle_states[i, "P"] = float(self._state.p())
+        self._cycle_states[i, "T"] = float(self._state.T())
 
     def solve(
         self,
@@ -424,7 +420,13 @@ class SimpleHeatPumpCycle:
         self._Q_cas_heat = Q_cas_heat
         self._Q_cool = Q_cool
         self._eta_comp = eta_comp
-        self._ihx_gas_dt = max(min(dt_ihx_gas_side, T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2), 0.0)
+        self._ihx_gas_dt = max(
+            min(
+                dt_ihx_gas_side,
+                T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2,
+            ),
+            0.0,
+        )
 
         T_evap = self._convert_C_to_K(T_evap)
         T_cond = self._convert_C_to_K(T_cond)
@@ -432,12 +434,12 @@ class SimpleHeatPumpCycle:
         P_hi = self._get_P_sat_from_T(T_cond)
 
         if P_lo > P_hi:
-            raise ValueError('Evaporator pressure must be below condenser pressure.')   
+            raise ValueError("Evaporator pressure must be below condenser pressure.")
 
         """Solve a basic four-state cycle given inlet/outlet temperatures and pressures."""
         # 0 - Evaporator outlet / IHX inlet
         self._compute_state_from_pressure_temperature(
-            P=P_lo, 
+            P=P_lo,
             T=T_evap + dT_superheat,
             phase=1,
         )
@@ -446,17 +448,15 @@ class SimpleHeatPumpCycle:
 
         # IHX outlet / compressor inlet
         self._compute_state_from_pressure_temperature(
-            P=P_lo, 
+            P=P_lo,
             T=T_evap + dT_superheat + self._ihx_gas_dt,
             phase=1,
-        )      
+        )
         dh_ihx = self._state.hmass() - hc_ihx_in
 
         # 1 - Compressor discharge (real)
         self._compute_compressor_outlet_state(
-            h_in=self._state.hmass(),
-            s_in=self._state.smass(),
-            P_out=P_hi
+            h_in=self._state.hmass(), s_in=self._state.smass(), P_out=P_hi
         )
         self._save_cycle_state(1)
 
@@ -465,7 +465,9 @@ class SimpleHeatPumpCycle:
             P=P_lo,
             Q=0,
         )
-        h_cond_out_min = self._state.hmass() + dh_ihx  # Find the limit to subcooling the condensate
+        h_cond_out_min = (
+            self._state.hmass() + dh_ihx
+        )  # Find the limit to subcooling the condensate
         self._compute_state_from_pressure_temperature(
             P=P_hi,
             T=T_cond - dT_subcool,
@@ -473,15 +475,16 @@ class SimpleHeatPumpCycle:
         )
         h_cond_out_tar = self._state.hmass()
         self._compute_state_from_pressure_enthalpy(
-            P=P_hi,
-            h=max(h_cond_out_min, h_cond_out_tar)
+            P=P_hi, h=max(h_cond_out_min, h_cond_out_tar)
         )
         dh_penalty = max(h_cond_out_min - h_cond_out_tar, 0.0)
         self._dT_subcool = T_cond - self._state.T()
         self._save_cycle_state(2)
-        if self._cycle_states[1, 'H'] <= self._cycle_states[2, 'H']:
-            raise  ValueError('Condenser cannot have a negative or zero enthalpy change.')  
-        
+        if self._cycle_states[1, "H"] <= self._cycle_states[2, "H"]:
+            raise ValueError(
+                "Condenser cannot have a negative or zero enthalpy change."
+            )
+
         # 3 - Expansion valve outlet / evaporator inlet
         self._compute_state_from_pressure_enthalpy(
             P=P_lo,
@@ -489,10 +492,12 @@ class SimpleHeatPumpCycle:
         )
         self._save_cycle_state(3)
 
-        self._m_dot = self._Q_cond / (self._cycle_states[1, 'H'] - self._cycle_states[2, 'H'])
-        self._q_evap = (self._cycle_states[0, 'H'] - self._cycle_states[3, 'H'])
+        self._m_dot = self._Q_cond / (
+            self._cycle_states[1, "H"] - self._cycle_states[2, "H"]
+        )
+        self._q_evap = self._cycle_states[0, "H"] - self._cycle_states[3, "H"]
         self._Q_evap = self._m_dot * self._q_evap
-        self._q_cond = (self._cycle_states[1, 'H'] - self._cycle_states[2, 'H'])
+        self._q_cond = self._cycle_states[1, "H"] - self._cycle_states[2, "H"]
         self._w_net = self._q_cond - self._q_evap
         self._work = self._m_dot * self._w_net
         self._penalty = self._m_dot * dh_penalty
@@ -502,16 +507,20 @@ class SimpleHeatPumpCycle:
         # Evaporator side - state 5
 
         # 4 - Hot side of cascade heat exchanger outlet (if it exists, Q_cas_heat > 0)
-        h_4 = self._cycle_states[1, 'H']
+        h_4 = self._cycle_states[1, "H"]
         if self._Q_cond > 0:
-            h_4 -= (self._cycle_states[1, 'H'] - self._cycle_states[2, 'H']) * self._Q_cas_heat / self._Q_cond
+            h_4 -= (
+                (self._cycle_states[1, "H"] - self._cycle_states[2, "H"])
+                * self._Q_cas_heat
+                / self._Q_cond
+            )
         self._compute_state_from_pressure_enthalpy(
-            P=self._cycle_states[1, 'P'],
+            P=self._cycle_states[1, "P"],
             h=h_4,
         )
         self._save_cycle_state(4)
-        self._q_cas_heat = (self._cycle_states[1, 'H'] - self._cycle_states[4, 'H'])
-        self._q_heat = (self._cycle_states[4, 'H'] - self._cycle_states[2, 'H']) 
+        self._q_cas_heat = self._cycle_states[1, "H"] - self._cycle_states[4, "H"]
+        self._q_heat = self._cycle_states[4, "H"] - self._cycle_states[2, "H"]
 
         # 5 - Hot side of cascade heat exchanger outlet (if it exists, Q_cas_heat > 0)
         if self._Q_cool == None or np.isnan(self._Q_cool):
@@ -522,11 +531,11 @@ class SimpleHeatPumpCycle:
         if self._m_dot > 0:
             self._q_cool = self._Q_cool / self._m_dot
         else:
-            self._q_cool = self._cycle_states[0, 'H'] - self._cycle_states[3, 'H']
+            self._q_cool = self._cycle_states[0, "H"] - self._cycle_states[3, "H"]
 
         self._compute_state_from_pressure_enthalpy(
-            P=self._cycle_states[3, 'P'],
-            h=self._cycle_states[3, 'H'] + self._q_cool,
+            P=self._cycle_states[3, "P"],
+            h=self._cycle_states[3, "H"] + self._q_cool,
         )
         self._save_cycle_state(5)
         self._q_cas_cool = self._q_evap - self._q_cool
@@ -536,11 +545,10 @@ class SimpleHeatPumpCycle:
         self._solved = True
         return self._work
 
-
     def build_stream_collection(
-        self, 
-        include_cond: bool = False, 
-        include_evap: bool = False, 
+        self,
+        include_cond: bool = False,
+        include_evap: bool = False,
         is_process_stream: bool = False,
         dtcont: float = 0.0,
         dt_diff_max: float = 0.5,
@@ -551,29 +559,29 @@ class SimpleHeatPumpCycle:
         self._dt_diff_max = dt_diff_max
         streams = StreamCollection()
 
-        def _build_streams(profile: np.ndarray, is_condenser: bool = True): 
+        def _build_streams(profile: np.ndarray, is_condenser: bool = True):
             sc = StreamCollection()
             for i in range(len(profile) - 1):
                 h1, T1 = profile[i]
-                h2, T2 = profile[i+1]
+                h2, T2 = profile[i + 1]
 
                 if abs(T1 - T2) < 0.01:
-                    name = f"Heater_{i+1}" if is_condenser else f"Cooler_{i+1}"
+                    name = f"Heater_{i + 1}" if is_condenser else f"Cooler_{i + 1}"
                     T2 = T1 - 0.01 if is_condenser else T1 + 0.01
                 else:
-                    name = f"Heater_{i+1}" if T1 > T2 else f"Cooler_{i+1}"
+                    name = f"Heater_{i + 1}" if T1 > T2 else f"Cooler_{i + 1}"
 
                 s = Stream(
                     name=name,
                     t_supply=T1,
                     t_target=T2,
-                    heat_flow=self._m_dot*abs(h1 - h2),
+                    heat_flow=self._m_dot * abs(h1 - h2),
                     is_process_stream=is_process_stream,
                     dt_cont=self._dtcont,
                 )
                 sc.add(s)
             return sc
-        
+
         if include_cond:
             streams += _build_streams(
                 self._build_condenser_profile(),
@@ -582,15 +590,14 @@ class SimpleHeatPumpCycle:
         if include_evap:
             streams += _build_streams(
                 self._build_evaporator_profile(),
-                is_condenser=False,                
-            )            
+                is_condenser=False,
+            )
         return streams
-
 
     def _build_condenser_profile(self) -> np.ndarray:
         """
         Construct a four-point condenser T-h polyline in the SimpleHeatPumpCycle's unit system.
-    
+
         Returns
         -------
         np.ndarray
@@ -599,19 +606,19 @@ class SimpleHeatPumpCycle:
         """
         # Ensure the cycle has been solved
         self._require_solution()
-    
+
         # Read temperatures and enthalpies from the solved cycle
         H = self.Hs  # [H0, H1, H2, H3] in J/kg
-    
+
         # Use saturation points from the state if needed
         p_high = self.Ps[4]
         t_h_curve_points = []
 
-        if p_high < self._p_crit and H[4] > H[2]:    
+        if p_high < self._p_crit and H[4] > H[2]:
             # Saturated vapor at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_high, 1.0)
             h_sat_vapor = self._state.hmass()
-        
+
             # Saturated liquid at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_high, 0.0)
             h_sat_liquid = self._state.hmass()
@@ -620,25 +627,27 @@ class SimpleHeatPumpCycle:
                 for h in np.linspace(H[4], max(h_sat_vapor, H[2]), 21):
                     self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
                     t_h_curve_points.append([h, float(self._state.T())])
-            
-            if H[4] > h_sat_liquid and not(H[2] > h_sat_vapor):
-                for h in np.linspace(min(h_sat_vapor, H[4]), max(h_sat_liquid, H[2]), 21):
+
+            if H[4] > h_sat_liquid and not (H[2] > h_sat_vapor):
+                for h in np.linspace(
+                    min(h_sat_vapor, H[4]), max(h_sat_liquid, H[2]), 21
+                ):
                     if h != h_sat_vapor or H[4] < h_sat_vapor:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
-                        t_h_curve_points.append([h, float(self._state.T())])            
-            
+                        t_h_curve_points.append([h, float(self._state.T())])
+
             if H[2] < h_sat_liquid:
                 for h in np.linspace(min(h_sat_liquid, H[4]), H[2], 21):
                     if h != h_sat_liquid or H[4] < h_sat_liquid:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
                         t_h_curve_points.append([h, float(self._state.T())])
-            
+
         else:
             # Determine supercritical gas cooler profile
             for h in np.linspace(H[4], H[2], 61):
                 self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
                 t_h_curve_points.append([h, float(self._state.T())])
-        
+
         t_h_curve_points = np.array(t_h_curve_points)
 
         # Convert temperature to °C if not SI
@@ -648,18 +657,17 @@ class SimpleHeatPumpCycle:
 
         # Calculate a piece-wise linear approximation of the condenser or gas cooler profile
         condenser_profile = get_piecewise_data_points(
-            curve=t_h_curve_points, 
-            is_hot_stream=True, 
+            curve=t_h_curve_points,
+            is_hot_stream=True,
             dt_diff_max=self._dt_diff_max,
         )
         self._condenser_profile = condenser_profile
         return condenser_profile
 
-
     def _build_evaporator_profile(self) -> np.ndarray:
         """
         Construct a three-point evaporator T-h polyline in the SimpleHeatPumpCycle's unit system.
-    
+
         Returns
         -------
         np.ndarray
@@ -668,19 +676,19 @@ class SimpleHeatPumpCycle:
         """
         # Ensure the cycle has been solved
         self._require_solution()
-    
+
         # Read temperatures and enthalpies from the solved cycle
         H = self.Hs  # [H0, H1, H2, H3] in J/kg
-    
+
         # Evaporator pressure
         p_low = self.Ps[0]
         t_h_curve_points = []
 
-        if p_low < self._p_crit and H[5] > H[3]:    
+        if p_low < self._p_crit and H[5] > H[3]:
             # Saturated vapor at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_low, 1.0)
             h_sat_vapor = self._state.hmass()
-        
+
             # Saturated liquid at condenser pressure
             self._state.update(CoolProp.PQ_INPUTS, p_low, 0.0)
             h_sat_liquid = self._state.hmass()
@@ -689,12 +697,14 @@ class SimpleHeatPumpCycle:
                 for h in np.linspace(H[3], min(h_sat_liquid, H[5]), 21):
                     self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
                     t_h_curve_points.append([h, float(self._state.T())])
-            
-            if H[3] < h_sat_vapor and not(H[5] < h_sat_liquid):
-                for h in np.linspace(max(h_sat_liquid, H[3]), min(h_sat_vapor, H[5]), 21):
+
+            if H[3] < h_sat_vapor and not (H[5] < h_sat_liquid):
+                for h in np.linspace(
+                    max(h_sat_liquid, H[3]), min(h_sat_vapor, H[5]), 21
+                ):
                     if h != h_sat_liquid or H[3] > h_sat_liquid:
                         self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
-                        t_h_curve_points.append([h, float(self._state.T())])  
+                        t_h_curve_points.append([h, float(self._state.T())])
 
             if H[5] > h_sat_vapor:
                 for h in np.linspace(max(h_sat_vapor, H[3]), H[5], 21):
@@ -707,7 +717,7 @@ class SimpleHeatPumpCycle:
             for h in np.linspace(H[3], H[5], 61):
                 self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
                 t_h_curve_points.append([h, float(self._state.T())])
-        
+
         t_h_curve_points = np.array(t_h_curve_points)
 
         # Convert temperature to °C if not SI
@@ -717,14 +727,13 @@ class SimpleHeatPumpCycle:
 
         # Calculate a piece-wise linear approximation of the evaporator or gas heater profile
         evaporator_profile = get_piecewise_data_points(
-            curve=t_h_curve_points, 
-            is_hot_stream=False, 
+            curve=t_h_curve_points,
+            is_hot_stream=False,
             dt_diff_max=self._dt_diff_max,
         )
         self._evaporator_profile = evaporator_profile
         return evaporator_profile
 
-
     def _require_solution(self) -> None:
         if not self._solved:
-            raise RuntimeError('Solve the cycle before accessing results.')
+            raise RuntimeError("Solve the cycle before accessing results.")

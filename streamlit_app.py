@@ -12,7 +12,9 @@ from OpenPinch import PinchProblem
 
 
 # Current case. Update this path if you want to switch datasets.
-PROBLEM_FILE = Path("OpenPinch/examples/OpenPinchWkbs/Ziyatdinov et al (example 2).xlsb")
+PROBLEM_FILE = Path(
+    "OpenPinch/examples/OpenPinchWkbs/Ziyatdinov et al (example 2).xlsb"
+)
 
 
 @st.cache_resource
@@ -28,7 +30,7 @@ def validate_problem_path(problem_path) -> None:
             f"Problem file not found at {problem_path}. "
             "Update PROBLEM_FILE to point to a valid case."
         )
-        st.stop()    
+        st.stop()
 
 
 if __name__ == "__main__":

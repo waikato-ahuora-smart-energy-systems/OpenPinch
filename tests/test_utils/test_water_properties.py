@@ -27,3 +27,18 @@ def test_thermo_functions():
     assert round(h_pT(P, T), 0) == round(h, 0)
     assert round(h_ps(P, s), 0) == round(h, 0)
     assert round(s_ph(P, h), 2) == round(s, 2)
+
+
+# ===== Merged from test_water_properties_extra.py =====
+"""Additional coverage tests for water property conversion edge cases."""
+
+from OpenPinch.utils import water_properties as wp
+
+
+def test_none_inputs_default_to_zero_for_unit_conversions():
+    assert wp.toSIunit_p(None) == 0
+    assert wp.fromSIunit_p(None) == 0
+    assert wp.toSIunit_T(None) == 273.15
+    assert wp.fromSIunit_T(None) == -273.15
+    assert wp.toSIunit_h(None) == 0
+    assert wp.fromSIunit_h(None) == 0

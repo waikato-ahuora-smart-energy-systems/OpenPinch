@@ -63,6 +63,7 @@ def test_classify_segment_utility_profile_colours():
     assert _classify_segment(0, is_utility_profile=True) == StreamLoc.Unassigned
     assert _classify_segment(0, is_utility_profile=True) == StreamLoc.Unassigned
 
+
 # ----------------------------------------------------------------------------------------------------
 # Integration Tests for Graph Set Creation
 # ----------------------------------------------------------------------------------------------------
@@ -114,8 +115,8 @@ def test_visualise_graphs_gcc_utility():
         PT.H_NET_AI.value: MagicMock(to_list=lambda: [0, -100]),
         PT.H_NET_NP.value: MagicMock(to_list=lambda: [0, -100]),
         PT.H_NET_V.value: MagicMock(to_list=lambda: [0, -100]),
-        PT.H_NET_PK.value: MagicMock(to_list=lambda: [0, -100]), 
-        PT.H_NET_UT.value: MagicMock(to_list=lambda: [0, -100]), 
+        PT.H_NET_PK.value: MagicMock(to_list=lambda: [0, -100]),
+        PT.H_NET_UT.value: MagicMock(to_list=lambda: [0, -100]),
     }
     visualise_graphs(graph_set, graph)
     assert len(graph_set["graphs"]) == 1

@@ -1,6 +1,10 @@
 """Utility helpers for costing heat exchangers."""
 
-__all__ = ["compute_capital_recovery_factor", "compute_capital_cost", "compute_annual_capital_cost"]
+__all__ = [
+    "compute_capital_recovery_factor",
+    "compute_capital_cost",
+    "compute_annual_capital_cost",
+]
 
 
 #######################################################################################################
@@ -16,26 +20,23 @@ def compute_capital_recovery_factor(interest_rate: float, years: int) -> float:
 
 
 def compute_capital_cost(
-    area: float, 
-    num_units: int, 
-    fixed_cost_factor: float, 
-    variable_cost_factor: float, 
+    area: float,
+    num_units: int,
+    fixed_cost_factor: float,
+    variable_cost_factor: float,
     n_exp_factor: float,
 ) -> float:
     """Determine the capital cost of a heat exchanger."""
     return (
-        num_units * fixed_cost_factor + num_units * variable_cost_factor * (area / num_units) ** n_exp_factor
+        num_units * fixed_cost_factor
+        + num_units * variable_cost_factor * (area / num_units) ** n_exp_factor
     )
 
 
 def compute_annual_capital_cost(
-    capital_cost: float,   
-    discount_rate: float, 
+    capital_cost: float,
+    discount_rate: float,
     service_life: float,
 ) -> float:
     """Determine the annualised capital cost of heat exchanger."""
-    return capital_cost * compute_capital_recovery_factor(
-        discount_rate, 
-        service_life
-    )
-
+    return capital_cost * compute_capital_recovery_factor(discount_rate, service_life)

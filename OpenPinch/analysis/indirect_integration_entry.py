@@ -13,11 +13,13 @@ from ..lib import *
 from ..utils import *
 from . import (
     get_process_heat_cascade,
+    get_additional_GCCs,
     problem_table_algorithm,
     get_heat_pump_targets,
     calc_heat_pump_cascade,
     get_heat_recovery_target_from_pt,
     set_zonal_targets,
+    plot_multi_hp_profiles_from_results,
 )
 
 __all__ = ["compute_indirect_integration_targets"]
@@ -39,7 +41,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     zone_config: Configuration = zone.config
     res: dict = {}
 
-    # Sum targets from subzones 
+    # Sum targets from subzones
     _sum_subzone_targets(zone)
 
     # Total site profiles - process side
@@ -48,61 +50,63 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         is_n_zone_depth=False,
         is_new_stream_collection=True,
     )
-    
+
     pt = get_process_heat_cascade(
-        hot_streams=zone.net_hot_streams, 
-        cold_streams=zone.net_cold_streams, 
-        all_streams=zone.all_net_streams, 
+        hot_streams=zone.net_hot_streams,
+        cold_streams=zone.net_cold_streams,
+        all_streams=zone.all_net_streams,
         zone_config=zone.config,
         is_shifted=True,
     )
     pt_real = get_process_heat_cascade(
-        hot_streams=zone.net_hot_streams, 
-        cold_streams=zone.net_cold_streams, 
-        all_streams=zone.all_net_streams, 
+        hot_streams=zone.net_hot_streams,
+        cold_streams=zone.net_cold_streams,
+        all_streams=zone.all_net_streams,
         zone_config=zone.config,
         is_shifted=False,
-        known_heat_recovery=get_heat_recovery_target_from_pt(pt)
+        known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
     target_values = set_zonal_targets(
         pt=pt,
         pt_real=pt_real,
     )
-    
+
     pt.update(
-        _get_site_process_heat_load_profiles(pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value])
+        _get_site_process_heat_load_profiles(
+            pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value]
+        )
     )
     pt_real.update(
-        _get_site_process_heat_load_profiles(pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value])
+        _get_site_process_heat_load_profiles(
+            pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value]
+        )
     )
 
     # Get utility duties based on the summation of subzones
     s_tzt: EnergyTarget = zone.targets[key_name(zone.name, TargetType.TZ.value)]
     hot_utilities = deepcopy(s_tzt.hot_utilities)
     cold_utilities = deepcopy(s_tzt.cold_utilities)
-    
-    # Apply the problem table algorithm to the simple sum of subzone utility use 
+
+    # Apply the problem table algorithm to the simple sum of subzone utility use
     pt.update(
         _get_site_utility_heat_cascade(
-            pt.col[PT.T.value], 
-            hot_utilities, 
-            cold_utilities, 
+            pt.col[PT.T.value],
+            hot_utilities,
+            cold_utilities,
             is_shifted=True,
         )
     )
     pt_real.update(
         _get_site_utility_heat_cascade(
-            pt_real.col[PT.T.value], 
-            hot_utilities, 
-            cold_utilities, 
+            pt_real.col[PT.T.value],
+            hot_utilities,
+            cold_utilities,
             is_shifted=False,
         )
     )
 
-    # Apply the utility targeting method to determine the net utility use and generation 
-    _match_utility_gen_and_use_at_same_level(
-        hot_utilities, cold_utilities
-    )
+    # Apply the utility targeting method to determine the net utility use and generation
+    _match_utility_gen_and_use_at_same_level(hot_utilities, cold_utilities)
 
     # Extract overall heat integration targets
     hot_utility_target = pt.loc[0, PT.H_NET_UT.value]
@@ -113,25 +117,38 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
     if zone.identifier in [Z.S.value]:
-        Q_hp_target = min(zone_config.HP_LOAD_FRACTION, 1.0) * np.abs(pt.col[PT.H_HOT_UT.value]).max()
-        if _validate_heat_pump_targeting_required(pt, True, zone_config) and Q_hp_target > 0:        
+        Q_target = (
+            min(zone_config.HP_LOAD_FRACTION, 1.0)
+            * np.abs(pt.col[PT.H_HOT_UT.value]).max()
+        )
+        if (
+            _validate_heat_pump_targeting_required(pt, True, zone_config)
+            and Q_target > 0
+        ):
+            # Create problem table based on inverted utility streams
+            pt_ut_gen = get_process_heat_cascade(
+                hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
+                cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
+                zone_config=zone.config,
+                is_shifted=True,
+            )
+            get_additional_GCCs(pt_ut_gen)
+            # Perform heat pump targeting on the correct cascades
             hp_res = get_heat_pump_targets(
-                Q_hp_target=Q_hp_target,
-                T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_COLD_UT.value],
-                H_cold=pt.col[PT.H_HOT_UT.value],
-                zone_config=zone_config, 
-                is_direct_integration=False,
+                Q_target=Q_target,
+                T_vals=pt_ut_gen.col[PT.T.value],
+                H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
+                H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
+                zone_config=zone_config,
                 is_heat_pumping=True,
             )
-            res.update(
-                hp_res
-            )
+            res.update(hp_res)
+            # Add the heat pump profile to the general problem table
             calc_heat_pump_cascade(
                 pt=pt,
                 res=hp_res,
                 is_T_vals_shifted=True,
-                is_direct_integration=False,
+                is_process_integration=False,
             )
 
     # if zone_config.DO_TURBINE_WORK:
@@ -158,7 +175,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
             "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
-        }            
+        }
     )
     zone.add_target_from_results(TargetType.TS.value, res)
     return zone
@@ -231,8 +248,7 @@ def _sum_subzone_targets(zone: Zone) -> Zone:
 
 
 def _reset_utility_heat_flows(
-    hot_utilities: StreamCollection, 
-    cold_utilities: StreamCollection
+    hot_utilities: StreamCollection, cold_utilities: StreamCollection
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Zero out utility heat flows prior to accumulating site-level demands."""
     hu: Stream
@@ -262,8 +278,7 @@ def _set_sites_targets(
 
 
 def _match_utility_gen_and_use_at_same_level(
-    hot_utilities: StreamCollection, 
-    cold_utilities: StreamCollection
+    hot_utilities: StreamCollection, cold_utilities: StreamCollection
 ) -> Tuple[StreamCollection, StreamCollection]:
     for u_h in hot_utilities:
         for u_c in cold_utilities:
@@ -277,7 +292,9 @@ def _match_utility_gen_and_use_at_same_level(
     return hot_utilities, cold_utilities
 
 
-def _compute_utility_cost(hot_utilities: StreamCollection, cold_utilities: StreamCollection) -> float:
+def _compute_utility_cost(
+    hot_utilities: StreamCollection, cold_utilities: StreamCollection
+) -> float:
     utility_cost = 0.0
     for u in hot_utilities + cold_utilities:
         utility_cost += u.ut_cost
@@ -285,7 +302,7 @@ def _compute_utility_cost(hot_utilities: StreamCollection, cold_utilities: Strea
 
 
 def _get_site_process_heat_load_profiles(
-    H_hot: np.ndarray, 
+    H_hot: np.ndarray,
     H_cold: np.ndarray,
 ) -> dict:
     return {
@@ -296,8 +313,8 @@ def _get_site_process_heat_load_profiles(
 
 def _get_site_utility_heat_cascade(
     T_int_vals: np.ndarray,
-    hot_utilities: List[Stream] = None,
-    cold_utilities: List[Stream] = None,
+    hot_utilities: StreamCollection = None,
+    cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
 ) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
@@ -305,17 +322,18 @@ def _get_site_utility_heat_cascade(
     problem_table_algorithm(pt_ut_hot, hot_streams=hot_utilities, is_shifted=is_shifted)
 
     pt_ut_cld = ProblemTable({PT.T.value: T_int_vals})
-    problem_table_algorithm(pt_ut_cld, cold_streams=cold_utilities, is_shifted=is_shifted)
+    problem_table_algorithm(
+        pt_ut_cld, cold_streams=cold_utilities, is_shifted=is_shifted
+    )
 
     pt_ut = ProblemTable({PT.T.value: T_int_vals})
-    problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted=is_shifted)    
-
+    problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted=is_shifted)
 
     h_net_values = pt_ut.col[PT.H_NET.value]
     H_NET_UT = h_net_values.max() - h_net_values
-    
-    h_ut_cc =  pt_ut_hot.col[PT.H_HOT.value]
-    c_ut_cc =  pt_ut_cld.col[PT.H_COLD.value] - pt_ut_cld.col[PT.H_COLD.value].max()
+
+    h_ut_cc = pt_ut_hot.col[PT.H_HOT.value]
+    c_ut_cc = pt_ut_cld.col[PT.H_COLD.value] - pt_ut_cld.col[PT.H_COLD.value].max()
 
     return {
         PT.H_NET_UT.value: H_NET_UT,
@@ -325,14 +343,22 @@ def _get_site_utility_heat_cascade(
 
 
 def _save_graph_data(
-    pt: ProblemTable, 
+    pt: ProblemTable,
     pt_real: ProblemTable,
 ) -> Zone:
     """Prepare graph-ready tables capturing site-level utility composite curves."""
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {
-        GT.TSP.value: pt[[PT.T.value, PT.H_NET_HOT.value, PT.H_NET_COLD.value, PT.H_HOT_UT.value, PT.H_COLD_UT.value]],
+        GT.TSP.value: pt[
+            [
+                PT.T.value,
+                PT.H_NET_HOT.value,
+                PT.H_NET_COLD.value,
+                PT.H_HOT_UT.value,
+                PT.H_COLD_UT.value,
+            ]
+        ],
         GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP_UT.value]],
     }
 
@@ -342,12 +368,13 @@ def _validate_heat_pump_targeting_required(
     is_heat_pumping: bool,
     zone_config: Configuration,
 ) -> bool:
-    return False if (
-        (zone_config.DO_UTILITY_HP_TARGETING == False)
-        or 
-        (pt.col[PT.H_NET_UT.value][0] < tol and is_heat_pumping == True)
-        or
-        (pt.col[PT.H_NET_UT.value][-1] < tol and is_heat_pumping == False)
-        or 
-        (zone_config.HP_LOAD_FRACTION < tol)
-    ) else True
+    return (
+        False
+        if (
+            (zone_config.DO_UTILITY_HP_TARGETING == False)
+            or (pt.col[PT.H_NET_UT.value][0] < tol and is_heat_pumping == True)
+            or (pt.col[PT.H_NET_UT.value][-1] < tol and is_heat_pumping == False)
+            or (zone_config.HP_LOAD_FRACTION < tol)
+        )
+        else True
+    )

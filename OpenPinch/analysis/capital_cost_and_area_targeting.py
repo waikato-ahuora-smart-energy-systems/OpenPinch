@@ -1,13 +1,19 @@
 """Area targeting methods."""
+
 import pandas as pd
-import numpy as np 
+import numpy as np
 
 from ..classes import *
 from ..lib import *
 from ..utils import *
 from .temperature_driving_force import *
 
-__all__ = ["get_balanced_CC", "get_capital_cost_targets", "get_area_targets", "get_min_number_hx"]
+__all__ = [
+    "get_balanced_CC",
+    "get_capital_cost_targets",
+    "get_area_targets",
+    "get_min_number_hx",
+]
 
 
 #######################################################################################################
@@ -38,9 +44,9 @@ def get_capital_cost_targets(
         ``(capital_cost, annual_capital_cost)``.
     """
     capital_cost = compute_capital_cost(
-        area, 
-        num_units, 
-        zone_config.FIXED_COST, 
+        area,
+        num_units,
+        zone_config.FIXED_COST,
         zone_config.VARIABLE_COST,
         zone_config.COST_EXP,
     )
@@ -48,7 +54,7 @@ def get_capital_cost_targets(
         capital_cost,
         zone_config.DISCOUNT_RATE,
         zone_config.SERV_LIFE,
-    )    
+    )
     return capital_cost, annual_capital_cost
 
 
@@ -61,7 +67,7 @@ def get_balanced_CC(
     RCP_hot: np.ndarray = None,
     RCP_cold: np.ndarray = None,
     RCP_hot_ut: np.ndarray = None,
-    RCP_cold_ut: np.ndarray = None,    
+    RCP_cold_ut: np.ndarray = None,
 ) -> ProblemTable:
     """Creates the balanced Composite Curve (CC) using both process and utility streams."""
     H_hot_bal = H_hot + H_hot_ut
@@ -70,12 +76,12 @@ def get_balanced_CC(
         PT.H_HOT_BAL.value: H_hot_bal,
         PT.H_COLD_BAL.value: H_cold_bal,
     }
-    
+
     if (
-        RCP_hot is not None and
-        RCP_cold is not None and
-        RCP_hot_ut is not None and
-        RCP_cold_ut is not None
+        RCP_hot is not None
+        and RCP_cold is not None
+        and RCP_hot_ut is not None
+        and RCP_cold_ut is not None
     ):
         dH_hot_bal = np.insert(
             H_hot_bal[:-1] - H_hot_bal[1:],
@@ -121,18 +127,20 @@ def get_area_targets(
     H_hot_bal: np.ndarray,
     H_cold_bal: np.ndarray,
     R_hot_bal: np.ndarray,
-    R_cold_bal: np.ndarray,   
+    R_cold_bal: np.ndarray,
 ) -> dict:
     """Estimates a heat transfer area target based on counter-current heat transfer using vectorized numpy operations."""
     if abs((H_hot_bal[0] - H_hot_bal[-1]) - (H_cold_bal[0] - H_cold_bal[-1])) > tol:
-        # Raise an error due to heat flow imbalance, which is a requirement for this analysis. 
-        raise ValueError("The temperature driving force plot requires the inputted composite curves to be balanced.")
+        # Raise an error due to heat flow imbalance, which is a requirement for this analysis.
+        raise ValueError(
+            "The temperature driving force plot requires the inputted composite curves to be balanced."
+        )
 
-    # Shift the hot and cold cascades to start from zero at the lowest temperature. 
+    # Shift the hot and cold cascades to start from zero at the lowest temperature.
     if abs(H_hot_bal[0]) > tol:
         H_hot_bal = H_hot_bal - H_hot_bal[-1]
     if abs(H_cold_bal[0]) > tol:
-        H_cold_bal = H_cold_bal - H_cold_bal[-1]    
+        H_cold_bal = H_cold_bal - H_cold_bal[-1]
 
     Th, Hh = clean_composite_curve_ends(T_vals, H_hot_bal)
     Tc, Hc = clean_composite_curve_ends(T_vals, H_cold_bal)
@@ -154,7 +162,7 @@ def get_area_targets(
     )
     with np.errstate(divide="ignore", invalid="ignore"):
         U_i = np.where(R_i > tol, 1.0 / R_i, 1.0)
-    if not(Q_i.shape == U_i.shape == dt_lm_i.shape):
+    if not (Q_i.shape == U_i.shape == dt_lm_i.shape):
         raise ValueError("Shape of heat exchanger area calculation arrays are unequal.")
     area_i = Q_i / (U_i * dt_lm_i)
     return area_i.sum()
@@ -169,27 +177,24 @@ def get_min_number_hx(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
 ) -> int:
-    """Estimates the minimum number of heat exchangers required for the pinch problem using vectorized interval logic.
-    """
+    """Estimates the minimum number of heat exchangers required for the pinch problem using vectorized interval logic."""
     num_hx: int = 0
     H_net_bal = H_cold_bal - H_hot_bal
     mask = np.isclose(H_net_bal, 0.0, atol=tol)
     mask_true_positions = np.flatnonzero(mask).tolist()
     idx_pairs = []
     for i in range(len(mask_true_positions) - 1):
-        if mask_true_positions[i] + 1 < mask_true_positions[i+1]:
-            idx_pairs.append(
-                (mask_true_positions[i], mask_true_positions[i+1])
-            )
+        if mask_true_positions[i] + 1 < mask_true_positions[i + 1]:
+            idx_pairs.append((mask_true_positions[i], mask_true_positions[i + 1]))
 
     for i0, i1 in idx_pairs:
         T_high, T_low = T_vals[i0], T_vals[i1]
         num_hx += _count_crossing(T_low, T_high, hot_streams)
-        num_hx += _count_crossing(T_low, T_high, cold_streams)        
+        num_hx += _count_crossing(T_low, T_high, cold_streams)
         num_hx += _count_utility_range_container(T_low, T_high, hot_utilities)
         num_hx += _count_utility_range_container(T_low, T_high, cold_utilities)
 
-    return int(num_hx- len(idx_pairs))
+    return int(num_hx - len(idx_pairs))
 
 
 #######################################################################################################
@@ -217,15 +222,11 @@ def _map_interval_resistances_to_tdf(
     interval_lower = T_vals[1:]
     interval_upper = T_vals[:-1]
 
-    active_hot = (
-        (t_h1[np.newaxis, :] >= interval_lower[:, np.newaxis] - tol)
-        & 
-        (t_h2[np.newaxis, :] <= interval_upper[:, np.newaxis] + tol)
+    active_hot = (t_h1[np.newaxis, :] >= interval_lower[:, np.newaxis] - tol) & (
+        t_h2[np.newaxis, :] <= interval_upper[:, np.newaxis] + tol
     )
-    active_cold = (
-        (t_c1[np.newaxis, :] >= interval_lower[:, np.newaxis] - tol)
-        & 
-        (t_c2[np.newaxis, :] <= interval_upper[:, np.newaxis] + tol)
+    active_cold = (t_c1[np.newaxis, :] >= interval_lower[:, np.newaxis] - tol) & (
+        t_c2[np.newaxis, :] <= interval_upper[:, np.newaxis] + tol
     )
     R_hot_mat = np.ones(shape=active_hot.shape) * R_hot_bal[1:, np.newaxis]
     R_cold_mat = np.ones(shape=active_hot.shape) * R_cold_bal[1:, np.newaxis]
@@ -245,11 +246,11 @@ def _count_crossing(T_low: float, T_high: float, streams: StreamCollection):
     )
 
 
-def _count_utility_range_container(T_low: float, T_high: float, utilities: StreamCollection):
+def _count_utility_range_container(
+    T_low: float, T_high: float, utilities: StreamCollection
+):
     """Count utility streams whose adjusted temperatures intersect interval [T_low, T_high]."""
     t_max = np.array([u.t_max_star for u in utilities])
     t_min = np.array([u.t_min_star for u in utilities])
     active = np.array([1 if u.heat_flow > tol else 0 for u in utilities])
-    return np.sum(
-        (t_min >= T_low - tol) & (t_max <= T_high + tol) & (active)
-    )
+    return np.sum((t_min >= T_low - tol) & (t_max <= T_high + tol) & (active))

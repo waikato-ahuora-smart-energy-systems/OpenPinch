@@ -1,21 +1,20 @@
 """Heat-exchanger performance correlations used by area targeting routines."""
 
 import math
-import numpy as np 
+import numpy as np
 
 from ..lib import HeatExchangerTypes as HX
 
 
 def compute_LMTD_from_dts(
-    delta_T1: float | list | np.ndarray, 
+    delta_T1: float | list | np.ndarray,
     delta_T2: float | list | np.ndarray,
-    
-) ->  np.ndarray:
+) -> np.ndarray:
     """Returns the log mean temperature difference (LMTD) for a counterflow heat exchanger."""
     # Check temperature directions for counter-current assumption
     delta_T1 = np.array(delta_T1)
     delta_T2 = np.array(delta_T2)
-    
+
     if delta_T1.round(6).min() <= 0 or delta_T2.round(6).min() <= 0:
         raise ValueError(
             f"Invalid temperature differences: ΔT1={delta_T1}, ΔT2={delta_T2}"
@@ -34,9 +33,9 @@ def compute_LMTD_from_dts(
 
 
 def compute_LMTD_from_ts(
-    T_hot_in: float | list | np.ndarray, 
-    T_hot_out: float | list | np.ndarray, 
-    T_cold_in: float | list | np.ndarray, 
+    T_hot_in: float | list | np.ndarray,
+    T_hot_out: float | list | np.ndarray,
+    T_cold_in: float | list | np.ndarray,
     T_cold_out: float | list | np.ndarray,
 ) -> float:
     """Returns the log mean temperature difference (LMTD) for a counterflow heat exchanger."""
@@ -52,8 +51,8 @@ def compute_LMTD_from_ts(
         raise ValueError("Cold fluid must heat up (T_cold_out > T_cold_in)")
 
     return compute_LMTD_from_dts(
-        T_hot_in - T_cold_out, # Inlet diff (hottest hot - hottest cold)
-        T_hot_out - T_cold_in, # Outlet diff (coldest hot - coldest cold)
+        T_hot_in - T_cold_out,  # Inlet diff (hottest hot - hottest cold)
+        T_hot_out - T_cold_in,  # Outlet diff (coldest hot - coldest cold)
     )
 
 

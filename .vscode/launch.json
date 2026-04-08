@@ -25,6 +25,7 @@
             //   "tests/test_utils/test_optimiser_handles.py",
             //   "tests/test_utils/test_export.py",
                 "tests/test_analysis/test_heat_pump_targeting.py",
+                // "tests/test_classes/test_stream_collection.py",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
