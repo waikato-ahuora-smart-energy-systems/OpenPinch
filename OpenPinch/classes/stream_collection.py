@@ -2,6 +2,7 @@
 
 import csv
 import pickle
+from copy import copy
 from pathlib import Path
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
@@ -67,7 +68,6 @@ class StreamCollection:
         while prevent_overwrite and key in self._streams:
             key = f"{original_key}_{counter}"
             counter += 1
-        # stream.name = key
         self._streams[key] = stream
         self._needs_sort = True
 
@@ -82,33 +82,71 @@ class StreamCollection:
             for stream, key in zip(streams, keys):
                 self.add(stream, key, prevent_overwrite)
 
-    def get_hot_streams(self):
-        """Return a new collection containing only hot streams."""
-        hot_streams = StreamCollection()
-        hot_streams._sort_spec = self._sort_spec
-        hot_streams._rebuild_sort_key()
-        hot_streams._sort_reverse = self._sort_reverse
-        hot_streams._streams = {
-            key: stream
-            for key, stream in self._streams.items()
-            if stream.type == StreamType.Hot.value
-        }
-        hot_streams._needs_sort = True
-        return hot_streams
+    def _build_stream_subset(
+        self,
+        target_type: str,
+        include_process_streams: bool = True,
+        include_utility_streams: bool = True,
+        invert_utility: bool = False,
+    ) -> "StreamCollection":
+        opposite_type = (
+            StreamType.Cold.value
+            if target_type == StreamType.Hot.value
+            else StreamType.Hot.value
+        )
+        subset = StreamCollection()
+        subset._sort_spec = self._sort_spec
+        subset._rebuild_sort_key()
+        subset._sort_reverse = self._sort_reverse
 
-    def get_cold_streams(self):
+        for key, stream in self._streams.items():
+            if stream.is_process_stream:
+                if include_process_streams and stream.type == target_type:
+                    subset._streams[key] = stream
+                continue
+
+            if not include_utility_streams:
+                continue
+
+            if invert_utility:
+                if stream.type != opposite_type:
+                    continue
+                inverted_stream = copy(stream)
+                inverted_stream.invert()
+                subset._streams[key] = inverted_stream
+            elif stream.type == target_type:
+                subset._streams[key] = stream
+
+        subset._needs_sort = True
+        return subset
+
+    def get_hot_streams(
+        self,
+        include_process_streams: bool = True,
+        include_utility_streams: bool = True,
+        invert_utility: bool = False,
+    ):
+        """Return a new collection containing only hot streams."""
+        return self._build_stream_subset(
+            target_type=StreamType.Hot.value,
+            include_process_streams=include_process_streams,
+            include_utility_streams=include_utility_streams,
+            invert_utility=invert_utility,
+        )
+
+    def get_cold_streams(
+        self,
+        include_process_streams: bool = True,
+        include_utility_streams: bool = True,
+        invert_utility: bool = False,
+    ):
         """Return a new collection containing only cold streams."""
-        cold_streams = StreamCollection()
-        cold_streams._sort_spec = self._sort_spec
-        cold_streams._rebuild_sort_key()
-        cold_streams._sort_reverse = self._sort_reverse
-        cold_streams._streams = {
-            key: stream
-            for key, stream in self._streams.items()
-            if stream.type == StreamType.Cold.value
-        }
-        cold_streams._needs_sort = True
-        return cold_streams
+        return self._build_stream_subset(
+            target_type=StreamType.Cold.value,
+            include_process_streams=include_process_streams,
+            include_utility_streams=include_utility_streams,
+            invert_utility=invert_utility,
+        )
 
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
         """Replace the collection contents with the provided stream mapping."""

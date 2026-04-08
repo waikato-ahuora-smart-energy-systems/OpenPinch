@@ -96,9 +96,9 @@ def test_map_x_to_T_output_is_monotonically_descending():
 def test_get_H_col_till_target_Q_returns_full_profile_when_target_matches_peak():
     T_cold = np.array([160.0, 150.0, 140.0, 130.0])
     H_cold = np.array([600.0, 450.0, 200.0, 0.0])
-    Q_hp_target = np.abs(H_cold).max()
+    Q_target = np.abs(H_cold).max()
 
-    T_out, H_out = _get_H_col_till_target_Q(Q_hp_target, T_cold.copy(), H_cold.copy())
+    T_out, H_out = _get_H_col_till_target_Q(Q_target, T_cold.copy(), H_cold.copy())
 
     np.testing.assert_allclose(T_out, T_cold)
     np.testing.assert_allclose(H_out, H_cold)
@@ -107,12 +107,12 @@ def test_get_H_col_till_target_Q_returns_full_profile_when_target_matches_peak()
 def test_get_H_col_till_target_Q_interpolates_to_target():
     T_cold = np.array([160.0, 150.0, 140.0, 130.0])
     H_cold = np.array([600.0, 400.0, 150.0, 0.0])
-    Q_hp_target = 250.0
+    Q_target = 250.0
 
-    T_out, H_out = _get_H_col_till_target_Q(Q_hp_target, T_cold.copy(), H_cold.copy())
+    T_out, H_out = _get_H_col_till_target_Q(Q_target, T_cold.copy(), H_cold.copy())
 
     np.testing.assert_allclose(T_out[0], 144.0)
-    np.testing.assert_allclose(H_out[0], Q_hp_target)
+    np.testing.assert_allclose(H_out[0], Q_target)
     np.testing.assert_allclose(T_out[1:], np.array([140.0, 130.0]))
     np.testing.assert_allclose(H_out[1:], np.array([150.0, 0.0]))
 
@@ -120,12 +120,12 @@ def test_get_H_col_till_target_Q_interpolates_to_target():
 def test_get_H_col_till_target_Q_interpolates_to_target_at_exisiting_temperature():
     T_cold = np.array([160.0, 150.0, 140.0, 130.0])
     H_cold = np.array([600.0, 400.0, 150.0, 0.0])
-    Q_hp_target = 150.0
+    Q_target = 150.0
 
-    T_out, H_out = _get_H_col_till_target_Q(Q_hp_target, T_cold.copy(), H_cold.copy())
+    T_out, H_out = _get_H_col_till_target_Q(Q_target, T_cold.copy(), H_cold.copy())
 
     np.testing.assert_allclose(T_out[0], 140.0)
-    np.testing.assert_allclose(H_out[0], Q_hp_target)
+    np.testing.assert_allclose(H_out[0], Q_target)
     np.testing.assert_allclose(T_out[:], np.array([140.0, 130.0]))
     np.testing.assert_allclose(H_out[:], np.array([150.0, 0.0]))
 
@@ -200,7 +200,7 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         dt_range_max=80.0,
         eta_hp_carnot=0.5,
         eta_he_carnot=0.5,
-        Q_hp_target=300.0,
+        Q_target=300.0,
         Q_amb_max=0.0,
         price_ratio=1.0,
         rho_penalty=10,
@@ -279,7 +279,7 @@ def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatc
         T_hot=np.array([100.0, 70.0, 30.0]),
         H_hot=np.array([0.0, -80.0, -160.0]),
         dt_range_max=90.0,
-        Q_hp_target=200.0,
+        Q_target=200.0,
         eta_comp=0.75,
         eta_exp=0.75,
         dt_phase_change=1.0,
@@ -387,7 +387,7 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
         n_evap=2,
         dt_range_max=130.0,
         dt_phase_change=1.0,
-        Q_hp_target=1000.0,
+        Q_target=1000.0,
         refrigerant_ls=["R134A", "R134A"],
     )
 
@@ -417,7 +417,7 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
         n_evap=2,
         dt_range_max=130.0,
         dt_phase_change=1.0,
-        Q_hp_target=1000.0,
+        Q_target=1000.0,
         refrigerant_ls=["R134A", "R134A", "R134A"],
     )
 
@@ -481,7 +481,7 @@ def _sc(*streams):
 
 def _base_args(**overrides):
     args = {
-        "Q_hp_target": 200.0,
+        "Q_target": 200.0,
         "Q_amb_max": 20.0,
         "dt_range_max": 110.0,
         "T_hot": np.array([140.0, 90.0, 40.0]),
@@ -497,7 +497,6 @@ def _base_args(**overrides):
         "dt_cascade_hx": 2.0,
         "dt_phase_change": 1.0,
         "price_ratio": 1.0,
-        "is_direct_integration": True,
         "is_heat_pumping": True,
         "max_multi_start": 2,
         "T_env": 20.0,
@@ -554,12 +553,11 @@ def test_get_heat_pump_targets_dispatch_and_invalid_handler(monkeypatch):
         hp._HP_PLACEMENT_HANDLERS, HeatPumpType.MultiSimpleVapourComp.value, _handler
     )
     out = hp.get_heat_pump_targets(
-        Q_hp_target=100.0,
+        Q_target=100.0,
         T_vals=np.array([120.0, 80.0]),
         H_hot=np.array([0.0, -50.0]),
         H_cold=np.array([50.0, 0.0]),
         zone_config=zone_cfg,
-        is_direct_integration=True,
         is_heat_pumping=True,
     )
     assert hasattr(out, "amb_stream")
@@ -569,12 +567,11 @@ def test_get_heat_pump_targets_dispatch_and_invalid_handler(monkeypatch):
     )
     with pytest.raises(ValueError, match="No valid heat pump targeting type selected"):
         hp.get_heat_pump_targets(
-            Q_hp_target=100.0,
+            Q_target=100.0,
             T_vals=np.array([120.0, 80.0]),
             H_hot=np.array([0.0, -50.0]),
             H_cold=np.array([50.0, 0.0]),
             zone_config=zone_cfg,
-            is_direct_integration=True,
             is_heat_pumping=True,
         )
 
@@ -630,7 +627,7 @@ def test_calc_heat_pump_cascade_branches(monkeypatch, q_amb):
         amb_stream=amb_stream,
     )
     out = hp.calc_heat_pump_cascade(
-        pt, res, is_T_vals_shifted=True, is_direct_integration=True
+        pt, res, is_T_vals_shifted=True, is_process_integration=True
     )
     assert isinstance(out, ProblemTable)
 
@@ -1204,7 +1201,7 @@ def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
     monkeypatch.setattr(
         hp,
         "_apply_temperature_shift_for_heat_pump_stream_dtmin_cont",
-        lambda T_vals, dtmin_hp, is_di: (
+        lambda T_vals, dtmin_hp: (
             np.array([95.0, 85.0, 75.0]),
             np.array([105.0, 95.0, 85.0]),
             5.0,
@@ -1239,7 +1236,7 @@ def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
         _fake_bg_streams,
     )
     out = hp._prepare_heat_pump_target_inputs(
-        Q_hp_target=10.0,
+        Q_target=10.0,
         T_vals=np.array([100.0, 90.0, 80.0]),
         H_hot=np.array([0.0, -5.0, -10.0]),
         H_cold=np.array([10.0, 5.0, 0.0]),
@@ -1251,11 +1248,11 @@ def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
 
 def test_temperature_shift_and_h_column_edge_branches():
     T_hot, T_cold, dT = hp._apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
-        np.array([100.0, 80.0]), 10.0, False
+        np.array([100.0, 80.0]), 10.0
     )
-    np.testing.assert_allclose(T_hot, np.array([85.0, 65.0]))
-    np.testing.assert_allclose(T_cold, np.array([115.0, 95.0]))
-    assert dT == 15.0
+    np.testing.assert_allclose(T_hot, np.array([95.0, 75.0]))
+    np.testing.assert_allclose(T_cold, np.array([105.0, 85.0]))
+    assert dT == 5.0
 
     t_i0, h_i0 = hp._get_H_col_till_target_Q(
         1000.0,
@@ -1301,7 +1298,7 @@ def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):
         dt_range_max=10.0,
         T_cold=np.array([50.0, 45.0]),
         T_hot=np.array([40.0, 35.0]),
-        Q_hp_target=100.0,
+        Q_target=100.0,
         refrigerant_ls=["R134A", "R134A"],
     )
     x0 = hp._get_x0_for_cascade_hp_opt(
@@ -1327,7 +1324,7 @@ def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):
         dt_range_max=10.0,
         T_cold=np.array([50.0, 45.0]),
         T_hot=np.array([40.0, 35.0]),
-        Q_hp_target=100.0,
+        Q_target=100.0,
         refrigerant_ls=["R134A"],
     )
     x0_ms = hp._get_x0_for_multi_single_hp_opt(
@@ -1352,7 +1349,7 @@ def test_multi_simple_carnot_zero_duty_and_debug_branches(monkeypatch):
     )
     out_zero = hp._compute_multi_simple_carnot_hp_opt_obj(
         np.array([0.1, 0.2]),
-        SimpleNamespace(Q_hp_target=100.0, price_ratio=1.0),
+        SimpleNamespace(Q_target=100.0, price_ratio=1.0),
     )
     assert "obj" in out_zero
     assert len(out_zero) == 1
@@ -1383,7 +1380,7 @@ def test_multi_simple_carnot_zero_duty_and_debug_branches(monkeypatch):
     out_debug = hp._compute_multi_simple_carnot_hp_opt_obj(
         np.array([0.1, 0.2]),
         SimpleNamespace(
-            Q_hp_target=100.0,
+            Q_target=100.0,
             price_ratio=1.0,
             T_hot=np.array([120.0, 80.0]),
             H_hot=np.array([0.0, -40.0]),
@@ -1420,7 +1417,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
         dt_hp_ihx=1.0,
         net_hot_streams=StreamCollection(),
         net_cold_streams=StreamCollection(),
-        Q_hp_target=40.0,
+        Q_target=40.0,
         Q_amb_max=0.0,
         eta_penalty=0.001,
         rho_penalty=10.0,
@@ -1509,7 +1506,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
     out_b = hp._compute_brayton_hp_system_performance(
         np.array([0.1, 0.2, 0.3, 0.8]),
         SimpleNamespace(
-            Q_hp_target=40.0,
+            Q_target=40.0,
             H_hot=np.array([0.0, -20.0]),
             net_hot_streams=StreamCollection(),
             net_cold_streams=StreamCollection(),

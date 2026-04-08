@@ -260,10 +260,10 @@ def _create_process_stream(stream: StreamSchema) -> Stream:
 
 def _get_hot_and_cold_utilities(
     utilities: List[UtilitySchema],
-    hot_streams: List[Stream],
-    cold_streams: List[Stream],
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
     zone_config: Configuration,
-) -> Tuple[List[Stream], List[Stream]]:
+) -> Tuple[StreamCollection, StreamCollection]:
     """Extracts all utility data into class instances."""
     HU_T_min, CU_T_max = _find_extreme_process_temperatures(hot_streams, cold_streams)
     utilities, addDefaultHU, addDefaultCU = _complete_utility_data(
@@ -282,7 +282,7 @@ def _get_hot_and_cold_utilities(
 
 
 def _find_extreme_process_temperatures(
-    hot_streams: List[Stream], cold_streams: List[Stream]
+    hot_streams: StreamCollection, cold_streams: StreamCollection
 ) -> Tuple[float, float]:
     """Find highest TT of a cold stream and lowest TT of a hot stream."""
     HU_T_min: float = -1e9
@@ -391,7 +391,7 @@ def _create_default_utility(
 
 def _create_utilities_list(
     utilities: List[UtilitySchema], utility_type: str
-) -> Tuple[List[Stream], List[UtilitySchema]]:
+) -> Tuple[StreamCollection, List[UtilitySchema]]:
     """Creates a sorted list of hot or cold Stream objects based on type."""
     created_utilities = StreamCollection()
 
@@ -438,7 +438,7 @@ def _create_utilities_list(
 
 
 def _set_utilities_for_zone_and_subzones(
-    zone: Zone, hot_utilities: List[Stream], cold_utilities: List[Stream]
+    zone: Zone, hot_utilities: StreamCollection, cold_utilities: StreamCollection
 ) -> Zone:
     """Adds hot and cold utilities to the zone and each subzone under zone."""
     zone.hot_utilities.add_many(copy.deepcopy(hot_utilities))

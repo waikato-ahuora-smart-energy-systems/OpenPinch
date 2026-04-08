@@ -299,7 +299,9 @@ class _DummyMultiCycle:
 def test_multi_simple_property_sweep_and_normalization_branches():
     cycle = MultiSimpleHeatPumpCycle()
     c1 = _fake_network_cycle()
-    c2 = _fake_network_cycle(T_evap=15.0, T_cond=75.0, work=30.0, Q_evap=50.0, Q_cond=90.0)
+    c2 = _fake_network_cycle(
+        T_evap=15.0, T_cond=75.0, work=30.0, Q_evap=50.0, Q_cond=90.0
+    )
     cycle._subcycles = [c1, c2]
     cycle._solved = True
 

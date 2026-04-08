@@ -169,3 +169,45 @@ def test_stream_update_attributes_uses_cp_when_heat_flow_non_numeric():
     s._CP = 3.0
     s._update_attributes()
     assert s.heat_flow == pytest.approx(120.0)
+
+
+def test_stream_invert_swaps_states_for_utility_stream():
+    s = Stream(
+        name="U",
+        t_supply=180.0,
+        t_target=140.0,
+        P_supply=5.0,
+        P_target=3.0,
+        h_supply=1200.0,
+        h_target=900.0,
+        dt_cont=10.0,
+        heat_flow=400.0,
+        htc=2.0,
+        is_process_stream=False,
+    )
+
+    s.invert()
+
+    assert s.t_supply == 140.0
+    assert s.t_target == 180.0
+    assert s.P_supply == 3.0
+    assert s.P_target == 5.0
+    assert s.h_supply == 900.0
+    assert s.h_target == 1200.0
+    assert s.type == StreamType.Cold.value
+    assert s.t_min == 140.0
+    assert s.t_max == 180.0
+
+
+def test_stream_invert_raises_for_process_stream():
+    s = Stream(
+        name="P",
+        t_supply=180.0,
+        t_target=140.0,
+        heat_flow=400.0,
+        htc=2.0,
+        is_process_stream=True,
+    )
+
+    with pytest.raises(ValueError, match="Process streams cannot be inverted"):
+        s.invert()

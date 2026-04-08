@@ -106,13 +106,13 @@ def get_utility_targets(
 
 
 def _target_utility(
-    utilities: List[Stream],
+    utilities: StreamCollection,
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     hot_pinch_row: int,
     cold_pinch_row: int,
     is_real_temperatures: bool = False,
-) -> List[Stream]:
+) -> StreamCollection:
     """Targets multiple utility use considering a fixed target temperature."""
     if len(utilities) == 0:
         return utilities
@@ -146,11 +146,11 @@ def _target_utility(
 def _assign_utility(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
-    u_ls: List[Stream],
+    u_ls: StreamCollection,
     pinch_row: int,
     is_hot_ut: bool,
     is_real_temperatures: bool,
-) -> List[Stream]:
+) -> StreamCollection:
     """Assigns utility heat duties based on vertical heat transfer across a pinch."""
     if is_hot_ut:
         T_segment = T_vals[: pinch_row + 1]

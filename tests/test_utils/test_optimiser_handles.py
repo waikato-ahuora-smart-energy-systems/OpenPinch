@@ -855,6 +855,8 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
     )
     assert x2.shape == (2, 1)
     assert f2.shape == (2,)
+
+
 """Regression tests for optimiser benchmarks utility helpers."""
 
 import time

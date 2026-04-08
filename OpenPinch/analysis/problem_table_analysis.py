@@ -73,8 +73,8 @@ def get_process_heat_cascade(
 
 def get_utility_heat_cascade(
     T_int_vals: np.ndarray,
-    hot_utilities: List[Stream] = None,
-    cold_utilities: List[Stream] = None,
+    hot_utilities: StreamCollection = None,
+    cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
 ) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
@@ -98,7 +98,7 @@ def get_utility_heat_cascade(
 
 
 def create_problem_table_with_t_int(
-    streams: List[Stream] | StreamCollection = [],
+    streams: StreamCollection | StreamCollection = [],
     is_shifted: bool = True,
     zone_config: Configuration = None,
 ) -> Tuple[ProblemTable, ProblemTable]:
@@ -253,12 +253,12 @@ def set_zonal_targets(
 
 def _sum_mcp_between_temperature_boundaries(
     temperatures: List[float],
-    streams: List[Stream],
+    streams: StreamCollection,
     is_shifted: bool = True,
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """Vectorized CP and rCP summation across temperature intervals."""
 
-    def calc_active_matrix(streams: List[Stream], use_shifted: bool) -> np.ndarray:
+    def calc_active_matrix(streams: StreamCollection, use_shifted: bool) -> np.ndarray:
         t_min = np.array([s.t_min_star if use_shifted else s.t_min for s in streams])
         t_max = np.array([s.t_max_star if use_shifted else s.t_max for s in streams])
 
@@ -272,7 +272,7 @@ def _sum_mcp_between_temperature_boundaries(
 
         return active
 
-    def sum_cp_rcp(streams: List[Stream], active: np.ndarray):
+    def sum_cp_rcp(streams: StreamCollection, active: np.ndarray):
         cp = np.array([s.CP for s in streams])
         rcp = np.array([s.rCP for s in streams])
         cp_sum = active @ cp

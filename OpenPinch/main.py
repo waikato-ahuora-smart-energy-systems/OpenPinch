@@ -231,9 +231,9 @@ def _get_report(zone: Zone) -> dict:
     return targets
 
 
-def _get_utilities(zone: Zone) -> List[Stream]:
+def _get_utilities(zone: Zone) -> StreamCollection:
     """Gets a list of any default utilities generated during the analysis."""
-    utilities: List[Stream] = zone.hot_utilities + zone.cold_utilities
+    utilities: StreamCollection = zone.hot_utilities + zone.cold_utilities
     default_hu: Stream = next((u for u in utilities if u.name == "HU"), None)
     default_cu: Stream = next((u for u in utilities if u.name == "CU"), None)
     return [default_hu, default_cu]

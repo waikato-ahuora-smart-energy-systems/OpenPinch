@@ -115,21 +115,28 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
     if zone.identifier in [Z.S.value]:
-        Q_hp_target = (
+        Q_target = (
             min(zone_config.HP_LOAD_FRACTION, 1.0)
             * np.abs(pt.col[PT.H_HOT_UT.value]).max()
         )
         if (
             _validate_heat_pump_targeting_required(pt, True, zone_config)
-            and Q_hp_target > 0
+            and Q_target > 0
         ):
+            # Create problem table based on inverted utility streams
+            pt_ut_gen = get_process_heat_cascade(
+                hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
+                cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
+                zone_config=zone.config,
+                is_shifted=True,
+            )            
+
             hp_res = get_heat_pump_targets(
-                Q_hp_target=Q_hp_target,
-                T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_COLD_UT.value],
-                H_cold=pt.col[PT.H_HOT_UT.value],
+                Q_target=Q_target,
+                T_vals=pt_ut_gen.col[PT.T.value],
+                H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
+                H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
                 zone_config=zone_config,
-                is_direct_integration=False,
                 is_heat_pumping=True,
             )
             res.update(hp_res)
@@ -137,7 +144,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 pt=pt,
                 res=hp_res,
                 is_T_vals_shifted=True,
-                is_direct_integration=False,
+                is_process_integration=False,
             )
 
     # if zone_config.DO_TURBINE_WORK:
@@ -302,8 +309,8 @@ def _get_site_process_heat_load_profiles(
 
 def _get_site_utility_heat_cascade(
     T_int_vals: np.ndarray,
-    hot_utilities: List[Stream] = None,
-    cold_utilities: List[Stream] = None,
+    hot_utilities: StreamCollection = None,
+    cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
 ) -> Dict[str, np.ndarray]:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""

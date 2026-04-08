@@ -295,6 +295,32 @@ class Stream:
         self._calc_utility_cost()
         self._calc_htr_and_cp_product()
 
+    def invert(self) -> None:
+        if self._is_process_stream:
+            raise ValueError(
+                "Logic error: Process streams cannot be inverted, only utility streams for their generation."
+            )
+
+        ts = self._t_supply
+        self._t_supply = self._t_target
+        self._t_target = ts
+
+        Ps = self._P_supply
+        self._P_supply = self._P_target
+        self._P_target = Ps
+
+        hs = self._h_supply
+        self._h_supply = self._h_target
+        self._h_target = hs
+
+        self._type = (
+            StreamType.Cold.value
+            if self._type == StreamType.Hot.value
+            else StreamType.Hot.value
+        )
+        self._is_process_stream = True
+        self._update_attributes()
+
     def set_heat_flow(self, value: float, units: str = "kW") -> None:
         """Sets the heat flow and updates CP and utility cost."""
         self._heat_flow = value

@@ -74,21 +74,20 @@ def compute_direct_integration_targets(zone: Zone):
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
     if zone.identifier in [Z.P.value]:
-        Q_hp_target = (
+        Q_target = (
             min(zone_config.HP_LOAD_FRACTION, 1.0)
             * np.abs(pt.col[PT.H_NET_COLD.value]).max()
         )
         if (
             _validate_heat_pump_targeting_required(pt, True, zone_config)
-            and Q_hp_target > 0
+            and Q_target > 0
         ):
             hp_res = get_heat_pump_targets(
-                Q_hp_target=Q_hp_target,
+                Q_target=Q_target,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
                 H_cold=pt.col[PT.H_NET_COLD.value],
                 zone_config=zone_config,
-                is_direct_integration=True,
                 is_heat_pumping=True,
             )
             res.update(hp_res)
@@ -96,7 +95,7 @@ def compute_direct_integration_targets(zone: Zone):
                 pt=pt,
                 res=hp_res,
                 is_T_vals_shifted=True,
-                is_direct_integration=True,
+                is_process_integration=True,
             )
 
     get_utility_targets(
@@ -248,7 +247,7 @@ def _add_net_segment_stateful(
     T_lb: float,
     curr_idx: int,
     dh_req: float,
-    utilities: List[Stream],
+    utilities: StreamCollection,
     remaining: List[float],
     net_streams: StreamCollection,
     k: int,
@@ -320,7 +319,9 @@ def _add_net_segment_stateful(
     return next_idx, k + 1
 
 
-def _initialise_utility_index(utilities: List[Stream], remaining: List[float]) -> int:
+def _initialise_utility_index(
+    utilities: StreamCollection, remaining: List[float]
+) -> int:
     """Returns the index of the first available utility with remaining capacity."""
     for idx, residual in enumerate(remaining):
         if residual > tol:
@@ -329,7 +330,7 @@ def _initialise_utility_index(utilities: List[Stream], remaining: List[float]) -
 
 
 def _find_next_available_utility(
-    start: int, utilities: List[Stream], remaining: List[float]
+    start: int, utilities: StreamCollection, remaining: List[float]
 ) -> int:
     """Return the index of the next utility that still has remaining duty."""
     if not utilities:

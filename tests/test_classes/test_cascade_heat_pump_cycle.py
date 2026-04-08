@@ -329,7 +329,9 @@ class _DummyCascadeCycle:
 def test_cascade_property_sweep_and_normalization_branches():
     cycle = CascadeHeatPumpCycle()
     c1 = _fake_network_cycle()
-    c2 = _fake_network_cycle(T_evap=10.0, T_cond=70.0, work=20.0, Q_evap=30.0, Q_cond=50.0)
+    c2 = _fake_network_cycle(
+        T_evap=10.0, T_cond=70.0, work=20.0, Q_evap=30.0, Q_cond=50.0
+    )
     cycle._subcycles = [c1, c2]
     cycle._solved = True
     cycle._dt_cascade_hx = 3.0
