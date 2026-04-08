@@ -459,9 +459,6 @@ def _rewrite_stream_zones_from_tree(
 
     _collect_paths(zone_tree, [])
 
-    if not all_paths:
-        return
-
     canonical_paths = {"/".join(path) for path in all_paths}
     root_name = zone_tree.name
     if zone_tree.children is None:
@@ -506,10 +503,6 @@ def _rewrite_stream_zones_from_tree(
 
         if label_joined in canonical_paths:
             stream.zone = label_joined
-            continue
-
-        if components_tuple in path_to_node:
-            stream.zone = "/".join(components_tuple)
             continue
 
         candidate_paths: List[Tuple[str, ...]] = []

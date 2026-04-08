@@ -14,8 +14,6 @@ if TYPE_CHECKING:
 __all__ = ["get_power_cogeneration_above_pinch"]
 
 # TODO: check implementation, refactor.
-
-
 #######################################################################################################
 # Public API
 #######################################################################################################
@@ -489,21 +487,28 @@ def Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
         },
     }
 
+    if t_type in (1, "BPST"):
+        t_type_key = "BPST"
+    elif t_type in (2, "CT"):
+        t_type_key = "CT"
+    else:
+        raise ValueError("Unsupported Sun model turbine type.")
+
     # Model coefficients where P in bar
     A0 = (
-        coeff[t_type]["a"][0]
-        + coeff[t_type]["a"][1] * (P_in)
-        + coeff[t_type]["a"][2] * (P_out)
+        coeff[t_type_key]["a"][0]
+        + coeff[t_type_key]["a"][1] * (P_in)
+        + coeff[t_type_key]["a"][2] * (P_out)
     )
     b0 = (
-        coeff[t_type]["b"][0]
-        + coeff[t_type]["b"][1] * (P_in)
-        + coeff[t_type]["b"][2] * (P_out)
+        coeff[t_type_key]["b"][0]
+        + coeff[t_type_key]["b"][1] * (P_in)
+        + coeff[t_type_key]["b"][2] * (P_out)
     )
     c0 = (
-        coeff[t_type]["c"][0]
-        + coeff[t_type]["c"][1] * (P_in)
-        + coeff[t_type]["c"][2] * (P_out)
+        coeff[t_type_key]["c"][0]
+        + coeff[t_type_key]["c"][1] * (P_in)
+        + coeff[t_type_key]["c"][2] * (P_out)
     )
 
     # Willan's line coefficients and predicted work (after isentropic and mechanical efficiency loss)
@@ -512,8 +517,8 @@ def Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
     w_act = n * m - W_int
     h_out = h_in - w_act / (n_mech * m)
 
-    if h_out <= h_sat + tol and t_type == 1:
-        w_act = Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, 2)
+    if h_out <= h_sat + tol and t_type_key == "BPST":
+        w_act = Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, "CT")
     return w_act
 
 
@@ -534,19 +539,31 @@ def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
         },
     }
 
+    if t_type in (1, "BPST"):
+        t_type_key = "BPST"
+    elif t_type in (2, "CT"):
+        t_type_key = "CT"
+    else:
+        raise ValueError("Unsupported THM turbine type.")
+
+    if t_size in (1, "<2MW"):
+        t_size_key = "<2MW"
+    elif t_size in (2, ">2MW"):
+        t_size_key = ">2MW"
+    else:
+        raise ValueError("Unsupported THM turbine size.")
+
     dT_sat = Tsat_p(P_in) - Tsat_p(P_out)
-    a = (coeff[t_type][t_size][0] + coeff[t_type][t_size][1] * dT_sat) * 1000
-    b = coeff[t_type][t_size][2] + coeff[t_type][t_size][3] * dT_sat
+    a = (coeff[t_type_key][t_size_key][0] + coeff[t_type_key][t_size_key][1] * dT_sat) * 1000
+    b = coeff[t_type_key][t_size_key][2] + coeff[t_type_key][t_size_key][3] * dT_sat
     w_max = (dh_is * m - a) / b
 
-    if w_max > 2000 and t_size == 1:
-        t_size = 2
-        w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size)
+    if w_max > 2000 and t_size_key == "<2MW":
+        w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, ">2MW", t_type_key)
 
     h_out = h_in - w_max / (n_mech * m)
-    if h_out <= h_sat + tol and t_type == 1:
-        t_type = 2
-        w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size, t_type)
+    if h_out <= h_sat + tol and t_type_key == "BPST":
+        w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size_key, "CT")
 
     return w_max
 
