@@ -20,7 +20,9 @@ class ZoneType(Enum):
     def __str__(self):
         return self.value
 
+
 Z = ZoneType
+
 
 class TargetType(Enum):
     """Different target calculation categories."""
@@ -135,14 +137,14 @@ class ProblemTableLabel(Enum):
     H_HOT_UT = "H_hot_utility"
     H_COLD_UT = "H_cold_utility"
     H_NET_HOT_UT = "H_hot_net_utility"
-    H_NET_COLD_UT = "H_cold_net_utility"      
+    H_NET_COLD_UT = "H_cold_net_utility"
     H_HOT_BAL = "H_hot_balanced"
     H_COLD_BAL = "H_cold_balanced"
 
     H_HOT_HP = "H_hot_hp_ut"
     H_COLD_HP = "H_cold_hp_ut"
     H_NET_HOT_2 = "H_hot_net_utility_after_hp"
-    H_NET_COLD_2 = "H_cold_net_utility_after_hp"      
+    H_NET_COLD_2 = "H_cold_net_utility_after_hp"
 
     RCP_HOT = "rCP_hot"
     RCP_COLD = "rCP_cold"
@@ -206,7 +208,7 @@ class GraphType(Enum):
     GCC_HP = "Grand Composite Curve with Heat Pump"
     # GCC_N = "Grand Composite Curve (No Pockets)"
     # GCC_V = "Vertical Grand Composite Curve"
-    # GCC_A = "Actual Grand Composite Curve"    
+    # GCC_A = "Actual Grand Composite Curve"
     # GCC_U = "Utility Grand Composite Curve"
     # GCC_U_real = "Utility Grand Composite Curve (Real)"
     # GCC_Lim = "Thermodynamic Limiting GCC"
@@ -272,6 +274,7 @@ class TurbineOptionsPropKeys(Enum):
     TURBINEFORM_ABOVE_PINCH_CHECKBOX = "PROP_TOP_7"
     TURBINEFORM_BELOW_PINCH_CHECKBOX = "PROP_TOP_8"
     TURBINEFORM_CONDESATE_FLASH_CORRECTION = "PROP_TOP_9"
+
 
 class BB_Minimiser(str, Enum):
     """Supported optimisation backends for multistart black-box search."""

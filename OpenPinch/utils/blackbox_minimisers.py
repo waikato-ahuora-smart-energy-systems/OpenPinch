@@ -10,35 +10,79 @@ from scipy.interpolate import RBFInterpolator
 from scipy.optimize import dual_annealing, minimize
 from scipy.special import erf
 from ..lib.enums import BB_Minimiser
+
 _DA_ALLOWED_KEYS = frozenset(
     {
-        "args", "constraints", "n_runs", "maxiter", "seed",
-        "initial_temp", "restart_temp_ratio", "visit", 
-        "accept", "maxfun", "cluster_tol", "max_minima",
+        "args",
+        "constraints",
+        "n_runs",
+        "maxiter",
+        "seed",
+        "initial_temp",
+        "restart_temp_ratio",
+        "visit",
+        "accept",
+        "maxfun",
+        "cluster_tol",
+        "max_minima",
     }
 )
 _CMA_ALLOWED_KEYS = frozenset(
     {
-        "args", "constraints", "n_runs", "maxiter", "seed",
-        "maxfun", "maxfevals", "popsize", "sigma0",
-        "cluster_tol", "max_minima", "local_method",
-        "tolx", "tolfun",
+        "args",
+        "constraints",
+        "n_runs",
+        "maxiter",
+        "seed",
+        "maxfun",
+        "maxfevals",
+        "popsize",
+        "sigma0",
+        "cluster_tol",
+        "max_minima",
+        "local_method",
+        "tolx",
+        "tolfun",
     }
 )
 _BO_ALLOWED_KEYS = frozenset(
     {
-        "args", "constraints", "n_runs", "maxiter", "seed",
-        "maxfun", "maxfevals", "cluster_tol", "max_minima",
-        "local_method", "n_init", "acq_candidates",
-        "lengthscale", "noise", "xi",
+        "args",
+        "constraints",
+        "n_runs",
+        "maxiter",
+        "seed",
+        "maxfun",
+        "maxfevals",
+        "cluster_tol",
+        "max_minima",
+        "local_method",
+        "n_init",
+        "acq_candidates",
+        "lengthscale",
+        "noise",
+        "xi",
     }
 )
 _RBF_ALLOWED_KEYS = frozenset(
     {
-        "args", "constraints", "n_runs", "maxiter", "seed",
-        "maxfun", "maxfevals", "cluster_tol", "max_minima",
-        "local_method", "n_init", "n_candidates", "kernel",
-        "epsilon", "smoothing", "degree", "distance_tol",
+        "args",
+        "constraints",
+        "n_runs",
+        "maxiter",
+        "seed",
+        "maxfun",
+        "maxfevals",
+        "cluster_tol",
+        "max_minima",
+        "local_method",
+        "n_init",
+        "n_candidates",
+        "kernel",
+        "epsilon",
+        "smoothing",
+        "degree",
+        "distance_tol",
     }
 )
 
@@ -100,7 +144,9 @@ def _get_multiminima_handler(
     if canonical_handle is BB_Minimiser.RBF:
         return _get_rbf_surrogate_multiminima_in_parallel
 
-    supported = ", ".join(method.value for method in _get_supported_multiminima_handles())
+    supported = ", ".join(
+        method.value for method in _get_supported_multiminima_handles()
+    )
     raise ValueError(
         f"Unsupported optimiser handle {canonical_handle!r}. Supported handles: {supported}."
     )
@@ -165,7 +211,9 @@ def _normalise_multiminima_handle(
     normalised = handle.strip().lower().replace(" ", "_")
     canonical = _MULTIMINIMA_HANDLE_ALIASES.get(normalised)
     if canonical is None:
-        supported = ", ".join(method.value for method in _get_supported_multiminima_handles())
+        supported = ", ".join(
+            method.value for method in _get_supported_multiminima_handles()
+        )
         raise ValueError(
             f"Unsupported optimiser handle {handle!r}. Supported handles: {supported}."
         )
@@ -187,8 +235,8 @@ def _get_da_multiminima_in_parallel(
     accept=-5.0,
     maxfun=1_000_000,
     # clustering parameters
-    cluster_tol=0.01,      # normalized distance for *first* clustering
-    max_minima=4,       # maximum number of minima to polish/return
+    cluster_tol=0.01,  # normalized distance for *first* clustering
+    max_minima=4,  # maximum number of minima to polish/return
     local_method="SLSQP",  # default local method
 ):
     """Return deduplicated local minima from multi-start dual annealing.
@@ -282,9 +330,7 @@ def _get_da_multiminima_in_parallel(
         ub=ub,
         tol_norm=cluster_tol,
     )
-    return np.asarray(
-        polished_x[local_minima_idx]
-    )
+    return np.asarray(polished_x[local_minima_idx])
 
 
 def _get_cma_multiminima_in_parallel(
@@ -494,7 +540,9 @@ def _run_cma_single(
         f_fixed = _evaluate_scalar_objective(func, mean, args)
         return [mean], [f_fixed]
 
-    lambda_pop = int(popsize) if popsize is not None else (4 + int(3 * np.log(n_dim + 1)))
+    lambda_pop = (
+        int(popsize) if popsize is not None else (4 + int(3 * np.log(n_dim + 1)))
+    )
     lambda_pop = max(4, lambda_pop)
     mu = lambda_pop // 2
     base_weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
@@ -528,7 +576,9 @@ def _run_cma_single(
 
         arz = rng.standard_normal((n_dim, n_eval))
         ary = B @ (D[:, np.newaxis] * arz)
-        arx = np.clip(mean[:, np.newaxis] + sigma * ary, lb[:, np.newaxis], ub[:, np.newaxis])
+        arx = np.clip(
+            mean[:, np.newaxis] + sigma * ary, lb[:, np.newaxis], ub[:, np.newaxis]
+        )
 
         fitness = np.empty(n_eval, dtype=float)
         for i in range(n_eval):
@@ -550,12 +600,14 @@ def _run_cma_single(
         n_select = min(mu, n_eval)
         weights = np.array(base_weights[:n_select], dtype=float)
         weights = weights / np.sum(weights)
-        mueff = 1.0 / np.sum(weights ** 2)
+        mueff = 1.0 / np.sum(weights**2)
 
         cc = (4.0 + mueff / n_dim) / (n_dim + 4.0 + 2.0 * mueff / n_dim)
         cs = (mueff + 2.0) / (n_dim + mueff + 5.0)
         c1 = 2.0 / ((n_dim + 1.3) ** 2 + mueff)
-        cmu = min(1.0 - c1, 2.0 * (mueff - 2.0 + 1.0 / mueff) / ((n_dim + 2.0) ** 2 + mueff))
+        cmu = min(
+            1.0 - c1, 2.0 * (mueff - 2.0 + 1.0 / mueff) / ((n_dim + 2.0) ** 2 + mueff)
+        )
         damps = 1.0 + 2.0 * max(0.0, np.sqrt((mueff - 1.0) / (n_dim + 1.0)) - 1.0) + cs
 
         old_mean = mean.copy()
@@ -567,7 +619,9 @@ def _run_cma_single(
         invsqrtC_y = B @ ((B.T @ y_w) / D)
         ps = (1.0 - cs) * ps + np.sqrt(cs * (2.0 - cs) * mueff) * invsqrtC_y
         norm_ps = np.linalg.norm(ps)
-        hsig_cond = norm_ps / np.sqrt(1.0 - (1.0 - cs) ** (2.0 * (generation + 1))) / chi_n
+        hsig_cond = (
+            norm_ps / np.sqrt(1.0 - (1.0 - cs) ** (2.0 * (generation + 1))) / chi_n
+        )
         hsig = 1.0 if hsig_cond < (1.4 + 2.0 / (n_dim + 1.0)) else 0.0
 
         pc = (1.0 - cc) * pc + hsig * np.sqrt(cc * (2.0 - cc) * mueff) * y_w
@@ -605,7 +659,9 @@ def _run_cma_single(
 
 def _default_cma_sigma(bounds: np.ndarray) -> float:
     """Return a dimension-scaled default initial CMA-ES step size."""
-    widths = np.asarray(bounds, dtype=float)[:, 1] - np.asarray(bounds, dtype=float)[:, 0]
+    widths = (
+        np.asarray(bounds, dtype=float)[:, 1] - np.asarray(bounds, dtype=float)[:, 0]
+    )
     finite_widths = widths[np.isfinite(widths) & (widths > 0)]
     if finite_widths.size == 0:
         return 1.0
@@ -1477,7 +1533,7 @@ def _propose_rbf_surrogate_candidate(
 def _collect_da_candidates(
     func: Callable,
     bounds: tuple,
-    x0_ls:np.ndarray,
+    x0_ls: np.ndarray,
     args: dict,
     n_runs: int,
     maxiter: int,
@@ -1591,7 +1647,7 @@ def _run_da_single(
     run_minima_x = []
     run_minima_f = []
     x0 = x0_ls[run % np.shape(x0_ls)[0]] if x0_ls is not None else None
-    
+
     def callback(x, f, context):
         # context: 0 = annealing, 1 = end of local search, 2 = end of run
         run_minima_x.append(np.array(x, dtype=float))
@@ -1796,7 +1852,9 @@ def _polish_candidates(
     if not basin_reps_idx:
         return np.asarray([]), np.asarray([])
 
-    bounds_arg = bounds if local_method.upper() in ("SLSQP", "L-BFGS-B", "TNC") else None
+    bounds_arg = (
+        bounds if local_method.upper() in ("SLSQP", "L-BFGS-B", "TNC") else None
+    )
     worker_fn = partial(
         _polish_single_candidate,
         all_x=all_x,

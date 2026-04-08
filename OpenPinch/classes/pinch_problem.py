@@ -46,7 +46,7 @@ class PinchProblem:
 
     # Internal state
     problem_data: Optional[JsonDict] = None
-    _project_name: str = 'Untitled'
+    _project_name: str = "Untitled"
     _results: Optional[TargetOutput] = None
     _master_zone: Optional["Zone"] = None
 
@@ -70,9 +70,7 @@ class PinchProblem:
             export results if ``results_dir`` is provided.
         """
         if problem_filepath is not None:
-            self.load(
-                source=Path(problem_filepath)
-            )
+            self.load(source=Path(problem_filepath))
         else:
             self._problem_filepath = None
             self._problem_data = None
@@ -92,7 +90,6 @@ class PinchProblem:
 
             if self.results_dir is not None:
                 self.export_to_Excel(self.results_dir)
-
 
     # ----------------------------------------------------------------------------
     # Public API
@@ -204,7 +201,7 @@ class PinchProblem:
             self.target()
 
         output_path = export_target_summary_to_excel_with_units(
-            target_response=self._results, 
+            target_response=self._results,
             master_zone=self._master_zone,
             out_dir=self.results_dir,
         )
@@ -286,7 +283,6 @@ class PinchProblem:
         value_rounding: int = 2,
     ) -> None:
         """Launch the Streamlit dashboard for the analysed problem."""
-
 
         active_zone = zone or self._master_zone
         if active_zone is None:

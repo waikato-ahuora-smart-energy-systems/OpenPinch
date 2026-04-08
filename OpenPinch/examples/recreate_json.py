@@ -3,6 +3,7 @@
 import os
 from OpenPinch.utils import *
 
+
 def create_problem_and_results_json():
     """Convert each example workbook into paired problem/result JSON files."""
     # Set the file path to the directory of this script
@@ -10,7 +11,9 @@ def create_problem_and_results_json():
     filepath_save = os.path.dirname(__file__)
 
     for filename in os.listdir(filepath_load):
-        if (filename.endswith(".xlsb") or filename.endswith(".xlsx")) and not filename.startswith("~$"):
+        if (
+            filename.endswith(".xlsb") or filename.endswith(".xlsx")
+        ) and not filename.startswith("~$"):
             excel_file = os.path.join(filepath_load, filename)
             project_name = os.path.splitext(filename)[0]
             p_json_file = filepath_save + "/stream_data/p_" + project_name + ".json"

@@ -96,6 +96,7 @@ class HeatPumpTargetInputs(BaseModel):
     # Debug mode toogle
     debug: bool
 
+
 class HeatPumpTargetOutputs(BaseModel):
     """Normalized output requirement for heat pump targeting routines."""
 
@@ -109,7 +110,7 @@ class HeatPumpTargetOutputs(BaseModel):
     work_hp: float | list | np.ndarray
     work_he: Optional[float | list | np.ndarray] = None
     Q_ext: float
-    Q_amb: float    
+    Q_amb: float
     cop: float | list | np.ndarray
     obj: float
     opt_success: bool

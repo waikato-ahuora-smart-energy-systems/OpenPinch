@@ -246,7 +246,9 @@ class Zone:
     def add_target_from_results(self, target_id: str = None, results: dict = None):
         """Create and register an :class:`EnergyTarget` from a result mapping."""
         target_name = f"{self.name}/{target_id}" if target_id is not None else self.name
-        res = EnergyTarget(target_name, target_id, self.parent_zone, zone_config=self.config)
+        res = EnergyTarget(
+            target_name, target_id, self.parent_zone, zone_config=self.config
+        )
         for key, value in results.items():
             setattr(res, key, value)
         self.add_target(res)
@@ -276,7 +278,12 @@ class Zone:
             and zone1._cold_utilities == zone2._cold_utilities
         )
 
-    def import_hot_and_cold_streams_from_sub_zones(self, get_net_streams: bool = False, is_n_zone_depth: bool = True, is_new_stream_collection: bool = True):
+    def import_hot_and_cold_streams_from_sub_zones(
+        self,
+        get_net_streams: bool = False,
+        is_n_zone_depth: bool = True,
+        is_new_stream_collection: bool = True,
+    ):
         """Get hot and cold streams from multiple subzones into two separate lists, maintaining references."""
         z: Zone
         s: Stream
@@ -284,13 +291,13 @@ class Zone:
             if is_new_stream_collection:
                 self._hot_streams = StreamCollection()
                 self._cold_streams = StreamCollection()
-            hs_dst = self._hot_streams 
+            hs_dst = self._hot_streams
             cs_dst = self._cold_streams
         else:
             if is_new_stream_collection:
                 self._net_hot_streams = StreamCollection()
                 self._net_cold_streams = StreamCollection()
-            hs_dst = self._net_hot_streams 
+            hs_dst = self._net_hot_streams
             cs_dst = self._net_cold_streams
 
         for z in self.subzones.values():
@@ -305,7 +312,7 @@ class Zone:
                 cs_src = z.net_cold_streams
 
             for s in hs_src:
-                key = f"{z.name}.{s.name}"  
+                key = f"{z.name}.{s.name}"
                 hs_dst.add(s, key)
 
             for s in cs_src:

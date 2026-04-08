@@ -5,6 +5,7 @@ and working with the structured results.  Detailed configuration and schema
 objects are re-exported from :mod:`OpenPinch.lib` for convenience so downstream
 code can construct validated inputs.
 """
+
 import warnings
 
 # Python 3.14 emits SyntaxWarning for legacy escape sequences in CoolProp docstrings.

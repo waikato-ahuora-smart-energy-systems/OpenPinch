@@ -81,8 +81,7 @@ class StreamCollection:
                 raise ValueError("Length of streams and keys must match.")
             for stream, key in zip(streams, keys):
                 self.add(stream, key, prevent_overwrite)
-    
-    
+
     def get_hot_streams(self):
         """Return a new collection containing only hot streams."""
         hot_streams = StreamCollection()
@@ -97,7 +96,6 @@ class StreamCollection:
         hot_streams._needs_sort = True
         return hot_streams
 
-
     def get_cold_streams(self):
         """Return a new collection containing only cold streams."""
         cold_streams = StreamCollection()
@@ -111,7 +109,6 @@ class StreamCollection:
         }
         cold_streams._needs_sort = True
         return cold_streams
-
 
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
         """Replace the collection contents with the provided stream mapping."""

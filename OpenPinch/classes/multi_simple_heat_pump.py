@@ -106,12 +106,14 @@ class MultiSimpleHeatPumpCycle:
         """Per-subcycle compressor work."""
         self._require_solution()
         return np.array([cycle.work for cycle in self._subcycles])
-    
+
     @property
     def penalty(self) -> Optional[float]:
         """Total penalty for excessive subcooling."""
         if self.solved:
-            return sum(cycle.penalty if cycle.solved else 0 for cycle in self._subcycles)
+            return sum(
+                cycle.penalty if cycle.solved else 0 for cycle in self._subcycles
+            )
         else:
             return 0
 
@@ -200,12 +202,11 @@ class MultiSimpleHeatPumpCycle:
     def subcycles(self) -> List[SimpleHeatPumpCycle]:
         """Solved simple heat pump subcycles that make up the network."""
         return self._subcycles
-    
+
     @property
     def solved(self) -> bool:
         """Whether the parallel heat pumps have all been solved successfully."""
         return self._solved
-   
 
     def _as_1d_numeric_array(
         self,
@@ -223,7 +224,9 @@ class MultiSimpleHeatPumpCycle:
         if arr.ndim == 0:
             arr = arr.reshape(1)
         if arr.ndim != 1:
-            raise ValueError("Incompatible input to solving a multiple simple heat pump system.")
+            raise ValueError(
+                "Incompatible input to solving a multiple simple heat pump system."
+            )
         if np.isnan(arr).all():
             arr = np.array([default], dtype=float)
         return arr
@@ -246,7 +249,9 @@ class MultiSimpleHeatPumpCycle:
         elif T_cond_arr.size == 1:
             T_cond_arr = np.full(T_evap_arr.size, T_cond_arr.item(), dtype=float)
         else:
-            raise ValueError("T_evap and T_cond must be scalar or have matching lengths.")
+            raise ValueError(
+                "T_evap and T_cond must be scalar or have matching lengths."
+            )
 
         if np.any(T_cond_arr <= T_evap_arr):
             raise ValueError("Invalid condenser and evaporator temperatures.")
@@ -283,7 +288,9 @@ class MultiSimpleHeatPumpCycle:
         elif arr.size == 1:
             arr_out = np.full(n_cycles, arr.item(), dtype=float)
         else:
-            raise ValueError("Incompatible Q_heat input to solving a multiple simple heat pump system.")
+            raise ValueError(
+                "Incompatible Q_heat input to solving a multiple simple heat pump system."
+            )
 
         nan_mask = np.isnan(arr_out)
         if np.any(nan_mask):
@@ -303,7 +310,9 @@ class MultiSimpleHeatPumpCycle:
         if arr.ndim == 0:
             arr = arr.reshape(1)
         if arr.ndim != 1:
-            raise ValueError("Incompatible Q_cool input to solving a multiple simple heat pump system.")
+            raise ValueError(
+                "Incompatible Q_cool input to solving a multiple simple heat pump system."
+            )
 
         if arr.size == 1:
             v = arr[0]
@@ -314,7 +323,9 @@ class MultiSimpleHeatPumpCycle:
         elif arr.size == n_cycles:
             arr = arr.copy()
         else:
-            raise ValueError("Incompatible Q_cool input to solving a multiple simple heat pump system.")
+            raise ValueError(
+                "Incompatible Q_cool input to solving a multiple simple heat pump system."
+            )
 
         for i in range(n_cycles):
             v = arr[i]
@@ -324,7 +335,9 @@ class MultiSimpleHeatPumpCycle:
             try:
                 v_float = float(v)
             except (TypeError, ValueError) as e:
-                raise ValueError("Q_cool values must be numeric, None, or np.nan.") from e
+                raise ValueError(
+                    "Q_cool values must be numeric, None, or np.nan."
+                ) from e
             arr[i] = None if np.isnan(v_float) else v_float
 
         return arr
@@ -398,7 +411,9 @@ class MultiSimpleHeatPumpCycle:
             elif len(refrigerant) == 1:
                 refrigerant_all = refrigerant * self._num_cycles
             else:
-                raise ValueError(f"Number of refrigerants must match the number of heat pumps, {self._num_cycles}.")
+                raise ValueError(
+                    f"Number of refrigerants must match the number of heat pumps, {self._num_cycles}."
+                )
         else:
             refrigerant_all = [refrigerant] * self._num_cycles
 

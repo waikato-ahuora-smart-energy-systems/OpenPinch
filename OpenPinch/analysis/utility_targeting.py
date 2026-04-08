@@ -50,18 +50,18 @@ def get_utility_targets(
         hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(PT.H_NET_A)
         is_real_temperatures = False
         _target_utility(
-            hot_utilities, 
-            pt.col[PT.T.value], 
+            hot_utilities,
+            pt.col[PT.T.value],
             pt.col[PT.H_NET_COLD.value],
-            hot_pinch_row, 
+            hot_pinch_row,
             cold_pinch_row,
             is_real_temperatures,
         )
         _target_utility(
-            cold_utilities, 
-            pt.col[PT.T.value], 
+            cold_utilities,
+            pt.col[PT.T.value],
             pt.col[PT.H_NET_HOT.value],
-            hot_pinch_row, 
+            hot_pinch_row,
             cold_pinch_row,
             is_real_temperatures,
         )
@@ -81,12 +81,12 @@ def get_utility_targets(
             is_process_stream=False,
         )
     )
-    if isinstance(pt_real, ProblemTable):    
+    if isinstance(pt_real, ProblemTable):
         pt_real.update(
             get_utility_heat_cascade(
-                pt_real.col[PT.T.value], 
-                hot_utilities, 
-                cold_utilities, 
+                pt_real.col[PT.T.value],
+                hot_utilities,
+                cold_utilities,
                 is_shifted=False,
             )
         )
@@ -106,11 +106,11 @@ def get_utility_targets(
 
 
 def _target_utility(
-    utilities: List[Stream], 
-    T_vals: np.ndarray, 
-    H_vals: np.ndarray, 
-    hot_pinch_row: int, 
-    cold_pinch_row: int, 
+    utilities: List[Stream],
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+    hot_pinch_row: int,
+    cold_pinch_row: int,
     is_real_temperatures: bool = False,
 ) -> List[Stream]:
     """Targets multiple utility use considering a fixed target temperature."""
@@ -122,12 +122,22 @@ def _target_utility(
 
     if utilities[0].type == StreamType.Hot.value and abs(H_vals[0]) > tol:
         utilities = _assign_utility(
-            T_vals, H_vals, utilities, hot_pinch_row, is_hot_ut=True, is_real_temperatures=is_real_temperatures
+            T_vals,
+            H_vals,
+            utilities,
+            hot_pinch_row,
+            is_hot_ut=True,
+            is_real_temperatures=is_real_temperatures,
         )
 
     elif utilities[0].type == StreamType.Cold.value and abs(H_vals[-1]) > tol:
         utilities = _assign_utility(
-            T_vals, H_vals, utilities, cold_pinch_row, is_hot_ut=False, is_real_temperatures=is_real_temperatures
+            T_vals,
+            H_vals,
+            utilities,
+            cold_pinch_row,
+            is_hot_ut=False,
+            is_real_temperatures=is_real_temperatures,
         )
 
     return utilities
@@ -147,16 +157,24 @@ def _assign_utility(
         H_segment = H_vals[: pinch_row + 1]
         segment_limit = H_segment[0]
     else:
-        T_segment = T_vals[pinch_row - 1:]
-        H_segment = H_vals[pinch_row - 1:]
+        T_segment = T_vals[pinch_row - 1 :]
+        H_segment = H_vals[pinch_row - 1 :]
         segment_limit = H_segment[-1]
 
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
         Ts, Tt = (
-            ((u.t_max, u.t_min) if is_real_temperatures else (u.t_max_star, u.t_min_star))
+            (
+                (u.t_max, u.t_min)
+                if is_real_temperatures
+                else (u.t_max_star, u.t_min_star)
+            )
             if is_hot_ut
-            else ((u.t_min, u.t_max) if is_real_temperatures else (u.t_min_star, u.t_max_star))
+            else (
+                (u.t_min, u.t_max)
+                if is_real_temperatures
+                else (u.t_min_star, u.t_max_star)
+            )
         )
 
         Q_ut_max = _maximise_utility_duty(
@@ -206,11 +224,7 @@ def _maximise_utility_duty(
         dt_tar = current_T - Tt
         dt_sup = next_T - Ts
 
-    valid_mask = (
-        (adjacent_H != current_H)
-        & (dt_sup >= -tol)
-        & (Q_pot > tol)
-    )
+    valid_mask = (adjacent_H != current_H) & (dt_sup >= -tol) & (Q_pot > tol)
     if not np.any(valid_mask):
         return 0.0
 
@@ -226,9 +240,7 @@ def _maximise_utility_duty(
     slope_mask = (-dt_tar_valid) > tol
     if np.any(slope_mask):
         Q_tt[slope_mask] = (
-            Q_pot_valid[slope_mask]
-            / (-dt_tar_valid[slope_mask])
-            * abs(Tt - Ts)
+            Q_pot_valid[slope_mask] / (-dt_tar_valid[slope_mask]) * abs(Tt - Ts)
         )
     Q_tt_max = Q_tt.min() if Q_tt.size > 0 else np.inf
 

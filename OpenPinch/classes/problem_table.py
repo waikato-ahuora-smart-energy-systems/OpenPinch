@@ -327,7 +327,9 @@ class ProblemTable:
         """Return the row indices of the hot and cold pinch temperatures."""
         column = col.value if isinstance(col, ProblemTableLabel) else col
         h_net = (
-            np.asarray(self.col[column]) if isinstance(column, str) else np.asarray(self.icol[column])
+            np.asarray(self.col[column])
+            if isinstance(column, str)
+            else np.asarray(self.icol[column])
         )
         n = h_net.size
 
@@ -382,21 +384,23 @@ class ProblemTable:
             self.icol[col] += dh
         return self.copy
 
-    def insert_temperature_interval(
-        self, T_ls: List[float] | float
-    ) -> int:
+    def insert_temperature_interval(self, T_ls: List[float] | float) -> int:
         """Insert any missing temperature intervals and return count inserted."""
         if self.data is None or self.data.shape[0] < 2 == 0:
             return 0
         T_vals = np.atleast_1d(np.asarray(T_ls, dtype=float))
         # Get unique missing values
-        T_insert = self._Ts_needing_insertion(T_vals)  
-        # S    
-        top_temps, interval_map, bottom_temps = self._categorise_insertion_targets(T_insert)
+        T_insert = self._Ts_needing_insertion(T_vals)
+        # S
+        top_temps, interval_map, bottom_temps = self._categorise_insertion_targets(
+            T_insert
+        )
         if top_temps.size == 0 and bottom_temps.size == 0 and not interval_map:
             return 0
-        
-        new_data, inserted = self._apply_interval_map(interval_map, top_temps, bottom_temps)
+
+        new_data, inserted = self._apply_interval_map(
+            interval_map, top_temps, bottom_temps
+        )
         self.data = new_data
         return inserted
 
@@ -496,7 +500,12 @@ class ProblemTable:
         )
         for lower_idx, temps in interval_map.items():
             next_row = self._append_placeholders(
-                new_data, row_meta, next_row, temps, label="mid", lower_idx=lower_idx,
+                new_data,
+                row_meta,
+                next_row,
+                temps,
+                label="mid",
+                lower_idx=lower_idx,
             )
         self._append_placeholders(
             new_data, row_meta, next_row, bottom_temps, label="bottom"
@@ -510,10 +519,14 @@ class ProblemTable:
         # 5) Rebuild top and bottom placeholder rows using existing helper.
         inserted_total = total_new
 
-        top_positions = [idx for idx, meta in enumerate(row_meta) if meta.get("type") == "top"]
+        top_positions = [
+            idx for idx, meta in enumerate(row_meta) if meta.get("type") == "top"
+        ]
         self._rebuild_edge_block(new_data, row_meta, top_positions, is_top=True)
 
-        bottom_positions = [idx for idx, meta in enumerate(row_meta) if meta.get("type") == "bottom"]
+        bottom_positions = [
+            idx for idx, meta in enumerate(row_meta) if meta.get("type") == "bottom"
+        ]
         self._rebuild_edge_block(new_data, row_meta, bottom_positions, is_top=False)
 
         # 6) Build and insert middle blocks, adjusting adjacent rows along the way.
@@ -538,7 +551,9 @@ class ProblemTable:
         self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Construct interpolated rows between existing bounds and return updated neighbours."""
-        rows, (t_idx, delta_idx) = self._initialise_insert_rows(row_top, row_bot, T_vals)
+        rows, (t_idx, delta_idx) = self._initialise_insert_rows(
+            row_top, row_bot, T_vals
+        )
         top_adjusted = row_top.copy()
         bottom_adjusted = row_bot.copy()
 
@@ -573,12 +588,20 @@ class ProblemTable:
 
         if is_top:
             neighbor_idx = next(
-                (idx for idx, meta in enumerate(row_meta) if meta.get("type") != edge_type),
+                (
+                    idx
+                    for idx, meta in enumerate(row_meta)
+                    if meta.get("type") != edge_type
+                ),
                 None,
             )
         else:
             neighbor_idx = next(
-                (idx for idx in range(len(row_meta) - 1, -1, -1) if row_meta[idx].get("type") != edge_type),
+                (
+                    idx
+                    for idx in range(len(row_meta) - 1, -1, -1)
+                    if row_meta[idx].get("type") != edge_type
+                ),
                 None,
             )
 
@@ -698,7 +721,9 @@ class ProblemTable:
         for i, temp in enumerate(temps_sorted):
             row = block[i]
             row[T_idx] = temp
-            row[delta_T_idx] = temp - neighbor[T_idx] if is_top_block else neighbor[T_idx] - temp
+            row[delta_T_idx] = (
+                temp - neighbor[T_idx] if is_top_block else neighbor[T_idx] - temp
+            )
             self._populate_from_neighbor(
                 row,
                 neighbor,
@@ -711,11 +736,11 @@ class ProblemTable:
             for i, temp in enumerate(block[:, delta_T_idx]):
                 if i == 0:
                     row_neighbor[delta_T_idx] = temp
-                elif i + 1 == block[:,0].size:
-                    block[i-1][delta_T_idx] = block[i][delta_T_idx]
+                elif i + 1 == block[:, 0].size:
+                    block[i - 1][delta_T_idx] = block[i][delta_T_idx]
                     block[i][delta_T_idx] = 0.0
                 else:
-                    block[i-1][delta_T_idx] = block[i][delta_T_idx]
+                    block[i - 1][delta_T_idx] = block[i][delta_T_idx]
 
         return block[::-1], row_neighbor
 
@@ -812,7 +837,9 @@ class ProblemTable:
             if rows.size:
                 rows[:, dh_idx] = rows[:, delta_idx] * rows[:, cp_idx]
             top_adjusted[dh_idx] = top_adjusted[delta_idx] * top_adjusted[cp_idx]
-            bottom_adjusted[dh_idx] = bottom_adjusted[delta_idx] * bottom_adjusted[cp_idx]
+            bottom_adjusted[dh_idx] = (
+                bottom_adjusted[delta_idx] * bottom_adjusted[cp_idx]
+            )
 
     def insert(self, row_dict: dict, index: int):
         """Insert a single row (dict of column: value) at the specified index."""

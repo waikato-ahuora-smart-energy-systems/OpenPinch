@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 
 
 def export_target_summary_to_excel_with_units(
-    target_response: "TargetOutput", 
-    master_zone: "Zone", 
+    target_response: "TargetOutput",
+    master_zone: "Zone",
     out_dir: str = ".",
 ) -> str:
     """Export solved targets and problem tables to an Excel workbook.
@@ -87,9 +87,9 @@ def _autosize_columns(df: pd.DataFrame, ws, start_col: int = 1, header_row: int 
         for val in column_values:
             text = "" if pd.isna(val) else str(val)
             max_len = max(max_len, len(text))
-        ws.column_dimensions[ws.cell(row=header_row, column=i).column_letter].width = min(
-            max_len + 2, 40
-        )
+        ws.column_dimensions[
+            ws.cell(row=header_row, column=i).column_letter
+        ].width = min(max_len + 2, 40)
 
 
 def _safe_name(name: str) -> str:
@@ -173,7 +173,9 @@ def _make_summary_row(t) -> dict:
     return base_columns | utility_columns | tail_columns
 
 
-def _utility_columns(hot_utils: Optional[Iterable], cold_utils: Optional[Iterable]) -> dict:
+def _utility_columns(
+    hot_utils: Optional[Iterable], cold_utils: Optional[Iterable]
+) -> dict:
     """Return flattened value/unit columns for the provided utilities."""
     columns: dict[str, Any] = {}
 
@@ -200,7 +202,9 @@ def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> No
     _autosize_columns(df_summary, writer.sheets["Summary"])
 
 
-def _write_problem_tables(master_zone: Optional["Zone"], writer: pd.ExcelWriter) -> None:
+def _write_problem_tables(
+    master_zone: Optional["Zone"], writer: pd.ExcelWriter
+) -> None:
     """Emit shifted and real-temperature problem tables for every solved zone."""
     if master_zone is None:
         return
@@ -213,7 +217,10 @@ def _write_problem_tables(master_zone: Optional["Zone"], writer: pd.ExcelWriter)
         for target_name, target in zone.targets.items():
             table_specs = (
                 (f"{zone.name} - {target_name} (Shifted)", getattr(target, "pt", None)),
-                (f"{zone.name} - {target_name} (Real)", getattr(target, "pt_real", None)),
+                (
+                    f"{zone.name} - {target_name} (Real)",
+                    getattr(target, "pt_real", None),
+                ),
             )
             for sheet_label, table in table_specs:
                 df = problem_table_to_dataframe(table, round_decimals=2)
@@ -251,7 +258,11 @@ def _unique_sheet_name(base: str, used: set[str]) -> str:
 
     for idx in range(2, 1000):
         suffix = f" ({idx})"
-        trimmed = candidate[: 31 - len(suffix)] if len(candidate) + len(suffix) > 31 else candidate
+        trimmed = (
+            candidate[: 31 - len(suffix)]
+            if len(candidate) + len(suffix) > 31
+            else candidate
+        )
         alt = f"{trimmed}{suffix}"
         if alt not in used:
             used.add(alt)

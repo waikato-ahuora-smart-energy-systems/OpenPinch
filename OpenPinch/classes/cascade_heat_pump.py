@@ -9,7 +9,8 @@ from .stream_collection import StreamCollection
 from .simple_heat_pump import SimpleHeatPumpCycle
 
 
-__all__ = ['CascadeHeatPumpCycle']
+__all__ = ["CascadeHeatPumpCycle"]
+
 
 class CascadeHeatPumpCycle:
     """Cascade of vapour-compression heat pumps coupled through cascade exchangers."""
@@ -19,7 +20,7 @@ class CascadeHeatPumpCycle:
         self._subcycles = []
         self._num_cycles = 1
         self._dtcont: float = 0.0
-        self._dt_diff_max: float = 0.5 # Default value, used in piecewise approximation of non linear T-h profiles      
+        self._dt_diff_max: float = 0.5  # Default value, used in piecewise approximation of non linear T-h profiles
         self._solved: bool = False
         self._max_work: float = 0.0
 
@@ -28,7 +29,7 @@ class CascadeHeatPumpCycle:
         """Total evaporator duty across all subcycles."""
         self._require_solution()
         return sum(cycle.Q_evap for cycle in self._subcycles)
-    
+
     @property
     def Q_evap_arr(self) -> Optional[float]:
         """Per-subcycle evaporator duties."""
@@ -40,13 +41,13 @@ class CascadeHeatPumpCycle:
         """Total cooling handed off to lower cascade stages."""
         self._require_solution()
         return sum(cycle.Q_cas_cool for cycle in self._subcycles)
-     
+
     @property
     def Q_cas_cool_arr(self) -> Optional[float]:
         """Per-subcycle cooling handed to lower cascade stages."""
         self._require_solution()
         return np.array([cycle.Q_cas_cool for cycle in self._subcycles])
-        
+
     @property
     def Q_cool(self) -> Optional[float]:
         """Total cooling delivered to the process."""
@@ -58,13 +59,13 @@ class CascadeHeatPumpCycle:
         """Per-subcycle cooling delivered to the process."""
         self._require_solution()
         return np.array([cycle.Q_cool for cycle in self._subcycles])
-    
+
     @property
     def Q_cond(self) -> Optional[float]:
         """Total condenser duty across all subcycles."""
         self._require_solution()
         return sum(cycle.Q_cond for cycle in self._subcycles)
-    
+
     @property
     def Q_cond_arr(self) -> Optional[float]:
         """Per-subcycle condenser duties."""
@@ -76,13 +77,13 @@ class CascadeHeatPumpCycle:
         """Total heat supplied to upper cascade stages."""
         self._require_solution()
         return sum(cycle.Q_cas_heat for cycle in self._subcycles)
- 
+
     @property
     def Q_cas_heat_arr(self) -> Optional[float]:
         """Per-subcycle heat supplied to upper cascade stages."""
         self._require_solution()
         return np.array([cycle.Q_cas_heat for cycle in self._subcycles])
-    
+
     @property
     def Q_heat(self) -> Optional[float]:
         """Total heat delivered to the process."""
@@ -113,10 +114,12 @@ class CascadeHeatPumpCycle:
     def penalty(self) -> Optional[float]:
         """Total penalty for excessive subcooling."""
         if self.solved:
-            return sum(cycle.penalty if cycle.solved else 0 for cycle in self._subcycles)
+            return sum(
+                cycle.penalty if cycle.solved else 0 for cycle in self._subcycles
+            )
         else:
             return 0
-    
+
     @property
     def dtcont(self) -> Optional[float]:
         """Minimum temperature approach propagated to derived stream profiles."""
@@ -137,7 +140,7 @@ class CascadeHeatPumpCycle:
         if abs(self.work) <= 1e-9:
             raise ZeroDivisionError("COP_r is undefined when net work is zero.")
         return self.Q_cool / self.work
-    
+
     @property
     def COP_o(self) -> Optional[float]:
         """Overall coefficient of performance based on heating plus cooling."""
@@ -198,21 +201,21 @@ class CascadeHeatPumpCycle:
         """Minimum approach temperature enforced between neighbouring stages."""
         self._require_solution()
         return self._dt_cascade_hx
-    
+
     @property
     def num_cycles(self) -> int:
         """Number of simple heat pump subcycles in the cascade."""
         return self._num_cycles
-    
+
     @property
     def subcycles(self) -> List[SimpleHeatPumpCycle]:
         """Solved simple heat pump subcycles that make up the cascade."""
-        return self._subcycles    
+        return self._subcycles
 
     @property
     def solved(self) -> bool:
         """Whether the cascade has been solved successfully."""
-        return self._solved   
+        return self._solved
 
     def _as_1d_numeric_array(
         self,
@@ -235,7 +238,6 @@ class CascadeHeatPumpCycle:
             arr = np.array([default], dtype=float)
         return arr
 
-
     def _normalize_dT_superheat(
         self,
         dT_superheat: np.ndarray,
@@ -250,8 +252,9 @@ class CascadeHeatPumpCycle:
             return np.full(n_cycles, arr.item(), dtype=float)
         if arr.size == n_cool:
             return np.concatenate([np.zeros(n_heat - 1), arr])
-        raise ValueError("Incompatible dT_superheat input to solving a cascade heat pump.")
-
+        raise ValueError(
+            "Incompatible dT_superheat input to solving a cascade heat pump."
+        )
 
     def _normalize_dT_subcool(
         self,
@@ -267,8 +270,9 @@ class CascadeHeatPumpCycle:
             return np.full(n_cycles, arr.item(), dtype=float)
         if arr.size == n_heat:
             return np.concatenate([arr, np.zeros(n_cool - 1)])
-        raise ValueError("Incompatible dT_subcool input to solving a cascade heat pump.")
-
+        raise ValueError(
+            "Incompatible dT_subcool input to solving a cascade heat pump."
+        )
 
     def _normalize_Q_heat(
         self,
@@ -289,7 +293,9 @@ class CascadeHeatPumpCycle:
         elif arr.size == n_heat:
             arr_out = np.concatenate([arr, np.zeros(n_cool - 1)])
         else:
-            raise ValueError("Incompatible Q_heat input to solving a cascade heat pump.")
+            raise ValueError(
+                "Incompatible Q_heat input to solving a cascade heat pump."
+            )
 
         # For Q_heat only: NaN defaults to 1 at the first stage and 0 otherwise.
         nan_mask = np.isnan(arr_out)
@@ -299,7 +305,6 @@ class CascadeHeatPumpCycle:
             arr_out = np.where(nan_mask, nan_defaults, arr_out)
 
         return arr_out
-
 
     def _normalize_Q_cool(
         self,
@@ -316,7 +321,9 @@ class CascadeHeatPumpCycle:
         if arr.ndim == 0:
             arr = arr.reshape(1)
         if arr.ndim != 1:
-            raise ValueError("Incompatible Q_cool input to solving a cascade heat pump.")
+            raise ValueError(
+                "Incompatible Q_cool input to solving a cascade heat pump."
+            )
 
         if arr.size == 1:
             v = arr[0]
@@ -327,9 +334,13 @@ class CascadeHeatPumpCycle:
         elif arr.size == n_cycles:
             arr = arr.copy()
         elif arr.size == n_cool:
-            arr = np.concatenate([np.zeros(n_heat - 1, dtype=object), arr]).astype(object)
+            arr = np.concatenate([np.zeros(n_heat - 1, dtype=object), arr]).astype(
+                object
+            )
         else:
-            raise ValueError("Incompatible Q_cool input to solving a cascade heat pump.")
+            raise ValueError(
+                "Incompatible Q_cool input to solving a cascade heat pump."
+            )
 
         for i in range(n_cycles - 1):
             v = arr[i]
@@ -338,7 +349,9 @@ class CascadeHeatPumpCycle:
             try:
                 v_float = float(v)
             except (TypeError, ValueError) as e:
-                raise ValueError("Q_cool values must be numeric, None, or np.nan.") from e
+                raise ValueError(
+                    "Q_cool values must be numeric, None, or np.nan."
+                ) from e
             if np.isnan(v_float):
                 raise ValueError("Only the last Q_cool value may be None or np.nan.")
             arr[i] = v_float
@@ -350,26 +363,26 @@ class CascadeHeatPumpCycle:
             try:
                 last_float = float(last)
             except (TypeError, ValueError) as e:
-                raise ValueError("Q_cool values must be numeric, None, or np.nan.") from e
+                raise ValueError(
+                    "Q_cool values must be numeric, None, or np.nan."
+                ) from e
             arr[-1] = None if np.isnan(last_float) else last_float
 
         return arr
-    
 
-    def _validate_T_cond_and_evap(self, T_cond: np.ndarray, T_evap: np.ndarray) -> float:
+    def _validate_T_cond_and_evap(
+        self, T_cond: np.ndarray, T_evap: np.ndarray
+    ) -> float:
         return (
             np.min([T_cond.min() - T_evap.max() + self._dt_cascade_hx, 0.0])
-            + 
-            np.min([(T_cond - np.roll(T_cond, 1))[:-1].sum(), 0.0]) 
-            +
-            np.min([(T_evap - np.roll(T_evap, 1))[:-1].sum(), 0.0])
+            + np.min([(T_cond - np.roll(T_cond, 1))[:-1].sum(), 0.0])
+            + np.min([(T_evap - np.roll(T_evap, 1))[:-1].sum(), 0.0])
         ) * -1
-
 
     def solve(
         self,
         T_evap: np.ndarray,
-        T_cond: np.ndarray, 
+        T_cond: np.ndarray,
         *,
         dT_superheat: np.ndarray = 0.0,
         dT_subcool: np.ndarray = 0.0,
@@ -420,18 +433,26 @@ class CascadeHeatPumpCycle:
         self._max_work = Q_heat.sum()
         inf = self._validate_T_cond_and_evap(T_cond, T_evap)
         if inf > 0.0:
-            self._max_work *= (inf + 1)
+            self._max_work *= inf + 1
             return self._max_work
 
-        T_cond_all = np.sort(np.concatenate([
-            T_cond,
-            T_evap[:-1] + self._dt_cascade_hx,
-        ]))[::-1]
+        T_cond_all = np.sort(
+            np.concatenate(
+                [
+                    T_cond,
+                    T_evap[:-1] + self._dt_cascade_hx,
+                ]
+            )
+        )[::-1]
 
-        T_evap_all = np.sort(np.concatenate([
-            T_cond[1:] - self._dt_cascade_hx,
-            T_evap,
-        ]))[::-1]
+        T_evap_all = np.sort(
+            np.concatenate(
+                [
+                    T_cond[1:] - self._dt_cascade_hx,
+                    T_evap,
+                ]
+            )
+        )[::-1]
 
         self._num_cycles = T_evap_all.size
         n_heat = T_cond.size
@@ -448,7 +469,9 @@ class CascadeHeatPumpCycle:
             elif len(refrigerant) == 1:
                 refrigerant_all = refrigerant * self._num_cycles
             else:
-                raise ValueError(f"Number of refrigerants must match the number of heat pumps, {self._num_cycles}.")
+                raise ValueError(
+                    f"Number of refrigerants must match the number of heat pumps, {self._num_cycles}."
+                )
         else:
             refrigerant_all = [refrigerant] * self._num_cycles
 
@@ -481,11 +504,10 @@ class CascadeHeatPumpCycle:
         self._solved = True
         return self.work
 
-
     def build_stream_collection(
         self,
-        include_cond: bool = False, 
-        include_evap: bool = False, 
+        include_cond: bool = False,
+        include_evap: bool = False,
         is_process_stream: bool = False,
         dtcont: float = 0.0,
         dt_diff_max: float = 0.5,
@@ -504,7 +526,6 @@ class CascadeHeatPumpCycle:
             )
         return streams
 
-
     def _require_solution(self) -> None:
         if not self._solved:
-            raise RuntimeError('Solve the cycle before accessing results.')
+            raise RuntimeError("Solve the cycle before accessing results.")

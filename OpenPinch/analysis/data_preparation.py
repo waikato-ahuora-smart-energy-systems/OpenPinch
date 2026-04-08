@@ -69,7 +69,9 @@ def prepare_problem(
         zone_tree, streams, utilities, zone_config
     )
     master_zone = Zone(
-        name=zone_config.TOP_ZONE_NAME, identifier=zone_config.TOP_ZONE_IDENTIFIER, zone_config=zone_config
+        name=zone_config.TOP_ZONE_NAME,
+        identifier=zone_config.TOP_ZONE_IDENTIFIER,
+        zone_config=zone_config,
     )
     master_zone = _create_nested_zones(master_zone, zone_tree, master_zone.config)
     master_zone = _get_process_streams_in_each_subzone(
@@ -109,7 +111,9 @@ def _get_validated_zone_info(
             try:
                 zone_type = type_map[normalized_type]
             except KeyError as exc:
-                raise ValueError("Zone name and type could not be identified correctly.") from exc
+                raise ValueError(
+                    "Zone name and type could not be identified correctly."
+                ) from exc
         else:
             zone_type = None
 
@@ -203,7 +207,9 @@ def _get_process_streams_in_each_subzone(
 
     for zone in _iter_zones(master_zone):
         zone_path = _get_zone_path_from_child(zone)
-        relative_zone_path = zone_path.split("/", 1)[1] if "/" in zone_path else zone_path
+        relative_zone_path = (
+            zone_path.split("/", 1)[1] if "/" in zone_path else zone_path
+        )
 
         matched_streams: List[StreamSchema] = []
         seen = set()
@@ -226,10 +232,14 @@ def _get_process_streams_in_each_subzone(
         for stream_schema in matched_streams:
             stream_obj = _create_process_stream(stream_schema)
             if stream_obj.type == StreamType.Hot.value:
-                key = ".".join([stream_schema.zone, StreamLoc.HotS.value, stream_schema.name])
+                key = ".".join(
+                    [stream_schema.zone, StreamLoc.HotS.value, stream_schema.name]
+                )
                 zone.hot_streams.add(stream_obj, key)
             else:
-                key = ".".join([stream_schema.zone, StreamLoc.ColdS.value, stream_schema.name])
+                key = ".".join(
+                    [stream_schema.zone, StreamLoc.ColdS.value, stream_schema.name]
+                )
                 zone.cold_streams.add(stream_obj)
     return master_zone
 
@@ -306,7 +316,11 @@ def _complete_utility_data(
 
         t_target = get_value(utility.t_target)
         if t_target is None or t_target == utility.t_supply:
-            delta = -zone_config.DT_PHASE_CHANGE if utility.type == "Hot" else zone_config.DT_PHASE_CHANGE
+            delta = (
+                -zone_config.DT_PHASE_CHANGE
+                if utility.type == "Hot"
+                else zone_config.DT_PHASE_CHANGE
+            )
             utility.t_target = utility.t_supply + delta
         else:
             utility.t_target = t_target
@@ -386,11 +400,7 @@ def _create_utilities_list(
         return -order if utility_type == StreamType.Hot.value else order
 
     candidates = sorted(
-        (
-            u
-            for u in utilities
-            if u.active and u.type in ["Both", utility_type]
-        ),
+        (u for u in utilities if u.active and u.type in ["Both", utility_type]),
         key=_sort_key,
     )
 
@@ -480,10 +490,7 @@ def _rewrite_stream_zones_from_tree(
             base_name = stream.name or f"{root_name}_Process"
             process_name = base_name
             counter = 1
-            while (
-                process_name in root_child_names
-                or process_name == root_name
-            ):
+            while process_name in root_child_names or process_name == root_name:
                 counter += 1
                 process_name = f"{base_name}_{counter}"
 
@@ -507,7 +514,9 @@ def _rewrite_stream_zones_from_tree(
 
         candidate_paths: List[Tuple[str, ...]] = []
         for path_tuple in path_to_node.keys():
-            if len(path_tuple) >= len(components_tuple) and list(path_tuple)[-len(components_tuple):] == list(components_tuple):
+            if len(path_tuple) >= len(components_tuple) and list(path_tuple)[
+                -len(components_tuple) :
+            ] == list(components_tuple):
                 candidate_paths.append(path_tuple)
 
         if len(candidate_paths) == 1:
@@ -528,9 +537,7 @@ def _validate_zone_tree_structure(
             parent_schema: ZoneTreeSchema, depth: int = 0
         ) -> ZoneTreeSchema:
             """Recursively construct a Zone hierarchy from a ZoneTreeSchema."""
-            zone_name, zone_type = _get_validated_zone_info(
-                parent_schema, depth=depth
-            )
+            zone_name, zone_type = _get_validated_zone_info(parent_schema, depth=depth)
             parent_schema.name = zone_name
             parent_schema.type = zone_type
 
@@ -625,7 +632,10 @@ def _validate_utilities_passed_in(utilities: List[UtilitySchema]) -> list:
 def _validate_config_data_completed(zone_config: Configuration) -> Configuration:
     """Validates that the configuration settings make logical sense."""
     # Check if annual operation time is set
-    if not isinstance(zone_config.ANNUAL_OP_TIME, (int, float)) or zone_config.ANNUAL_OP_TIME == 0:
+    if (
+        not isinstance(zone_config.ANNUAL_OP_TIME, (int, float))
+        or zone_config.ANNUAL_OP_TIME == 0
+    ):
         zone_config.ANNUAL_OP_TIME = 365 * 24  # h/y
     # Ensures the inlet pressure to the turbine is below the critical pressure
     # TODO: Add units to the turbine pressure

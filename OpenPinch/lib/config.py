@@ -34,7 +34,7 @@ class Configuration:
     :class:`~OpenPinch.classes.zone.Zone` so workflows can vary behaviour by
     hierarchy level if needed.
     """
-    
+
     ### General parameters ###
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER: str = ZoneType.S.value
@@ -42,11 +42,11 @@ class Configuration:
     DT_PHASE_CHANGE: float = 0.1
     HTC: float = 1.0
     T_ENV: float = 15
-    DT_ENV_CONT: float = 10 
+    DT_ENV_CONT: float = 10
     P_ENV: float = 101
     DECIMAL_PLACES: int = 2
 
-    ### Targeting analysis flags ### 
+    ### Targeting analysis flags ###
     DO_DIRECT_OPERATION_TARGETING: bool = False
     DO_DIRECT_SITE_TARGETING: bool = True
     DO_INDIRECT_PROCESS_TARGETING: bool = False
@@ -76,11 +76,11 @@ class Configuration:
     DTMIN_HP: float = 0.0
     DT_HP_IHX: float = 0.0
     DT_CASCADE_HX: float = 0.0
-    BB_MINIMISER: str = BB_Minimiser.RBF.value ### add to the template
-    INITIALISE_SIMULATED_HP: bool = True ### add to the template
-    ALLOW_INTEGRATED_EXPANDER: bool = False ### add to the template
+    BB_MINIMISER: str = BB_Minimiser.RBF.value  ### add to the template
+    INITIALISE_SIMULATED_HP: bool = True  ### add to the template
+    ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
 
-    ### Cost targeting parameters ### 
+    ### Cost targeting parameters ###
     UTILITY_PRICE: float = 40
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0

@@ -26,7 +26,10 @@ def get_value(val: Union[float, dict, ValueWithUnit]) -> float:
             f"Unsupported type: {type(val)}. Expected float, dict, or ValueWithUnit."
         )
 
-def linear_interpolation(xi: float, x1: float, x2: float, y1: float, y2: float) -> float:
+
+def linear_interpolation(
+    xi: float, x1: float, x2: float, y1: float, y2: float
+) -> float:
     """Performs linear interpolation to estimate y at a given x, using two known points (x1, y1) and (x2, y2)."""
     if x1 == x2:
         raise ValueError(
@@ -39,21 +42,13 @@ def linear_interpolation(xi: float, x1: float, x2: float, y1: float, y2: float) 
 
 
 def delta_with_zero_at_start(x: np.ndarray) -> np.ndarray:
-    """Compute difference between successive entries in a column and include a zero in the first entry."""  
-    return np.insert(
-        delta_vals(x),
-        0,
-        0.0
-    ) 
+    """Compute difference between successive entries in a column and include a zero in the first entry."""
+    return np.insert(delta_vals(x), 0, 0.0)
 
 
 def delta_vals(x: np.ndarray, descending_vals: bool = True) -> np.ndarray:
-    """Compute difference between successive entries in a column."""  
-    deltas = (
-        x[:-1] - x[1:] 
-        if descending_vals else
-        x[1:] - x[:-1]
-    )
+    """Compute difference between successive entries in a column."""
+    deltas = x[:-1] - x[1:] if descending_vals else x[1:] - x[:-1]
     deltas[np.abs(deltas) <= tol] = 0.0
     return deltas
 
@@ -64,17 +59,17 @@ def clean_composite_curve_ends(
     """Remove redundant points in composite curves."""
     y_vals = np.array(y_vals)
     x_vals = np.array(x_vals)
-    
+
     if np.all(np.isclose(x_vals, 0.0, atol=tol)) or np.abs(x_vals.var()) < tol:
         return np.array([]), np.array([])
-    
+
     mask_0 = ~np.isclose(x_vals, x_vals[0] * np.ones(len(x_vals)), atol=tol)
     start = np.flatnonzero(mask_0)[0] - 1
     mask_1 = ~np.isclose(x_vals, x_vals[-1] * np.ones(len(x_vals)), atol=tol)
     end = np.flatnonzero(mask_1)[-1] + 1
 
-    x_clean = x_vals[start:end+1]
-    y_clean = y_vals[start:end+1]      
+    x_clean = x_vals[start : end + 1]
+    y_clean = y_vals[start : end + 1]
     return y_clean, x_clean
 
 
@@ -158,11 +153,7 @@ def interp_with_plateaus(
     return np.interp(targets, h_monotonic, t_vals)
 
 
-def make_monotonic(
-    h_vals: np.ndarray, 
-    side: str, 
-    tol: float = 1e-6
-) -> np.ndarray:
+def make_monotonic(h_vals: np.ndarray, side: str, tol: float = 1e-6) -> np.ndarray:
     """Adjust an array so repeated values become strictly increasing for interpolation."""
     adjusted = np.asarray(h_vals, dtype=float).copy()
     if adjusted.size <= 1:
@@ -193,6 +184,7 @@ def make_monotonic(
 
     return adjusted
 
+
 def g_ineq_penalty(
     g: float | np.ndarray,
     *,
@@ -201,10 +193,13 @@ def g_ineq_penalty(
     form: str = "square",
 ) -> np.float64:
     """Return a penalty value for an inequality-constraint residual."""
-    if form.lower() == "square_root_smoothing" or form.lower() == "square root smoothing": 
+    if (
+        form.lower() == "square_root_smoothing"
+        or form.lower() == "square root smoothing"
+    ):
         p = 0.5 * rho * (g + ((g) ** 2 + (eta) ** 2) ** 0.5)
     elif form.lower() == "square":
-        p = rho * (g ** 2)
+        p = rho * (g**2)
     else:
         raise ValueError("Unrecognised penalty function form selection.")
 
@@ -213,4 +208,6 @@ def g_ineq_penalty(
     elif isinstance(p, np.ndarray):
         return p.sum()
     else:
-        raise ValueError("Return of the penalty function failed due to unrecognised type.")
+        raise ValueError(
+            "Return of the penalty function failed due to unrecognised type."
+        )

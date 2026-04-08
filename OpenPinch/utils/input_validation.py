@@ -26,8 +26,10 @@ def validate_stream_data(sd: pd.DataFrame):
         return text
 
     def _is_missing(value) -> bool:
-        return value is None or pd.isna(value) or (
-            isinstance(value, str) and not value.strip()
+        return (
+            value is None
+            or pd.isna(value)
+            or (isinstance(value, str) and not value.strip())
         )
 
     def _has_content(record: dict) -> bool:
@@ -112,4 +114,3 @@ def validate_utility_data(ud: pd.DataFrame):
             continue
         append(record)
     return cleaned
-

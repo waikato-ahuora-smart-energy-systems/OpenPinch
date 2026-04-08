@@ -237,7 +237,9 @@ def _iterate_turbine_state(state: _TurbineState) -> None:
         state.m_in_est += state.m_k[j]
 
 
-def _segment_work(state: _TurbineState, index: int, mass_flow: float, mass_flow_max: float) -> float:
+def _segment_work(
+    state: _TurbineState, index: int, mass_flow: float, mass_flow_max: float
+) -> float:
     if mass_flow <= 0:
         return 0.0
 
@@ -254,9 +256,7 @@ def _segment_work(state: _TurbineState, index: int, mass_flow: float, mass_flow_
             state.n_mech,
         )
     if model == "Medina-Flores et al. (2010)":
-        return Work_MedinaModel(
-            state.P_out[index - 1], mass_flow, state.dh_is_k[index]
-        )
+        return Work_MedinaModel(state.P_out[index - 1], mass_flow, state.dh_is_k[index])
     if model == "Varbanov et al. (2004)":
         return Work_THM(
             state.P_out[index - 1],
@@ -286,7 +286,9 @@ def _apply_efficiency_limits(
     return work, efficiency
 
 
-def _segment_enthalpy(h_prev: float, work: float, mass_flow: float, mech_eff: float) -> float:
+def _segment_enthalpy(
+    h_prev: float, work: float, mass_flow: float, mech_eff: float
+) -> float:
     if mass_flow <= 0:
         return h_prev
     return h_prev - work / (mass_flow * mech_eff)
@@ -298,7 +300,9 @@ def _segment_mass_flow(state: _TurbineState, index: int, mass_flow: float) -> fl
 
     if state.flash_correction:
         Q_flash = state.m_k[index - 1] * (state.h_tar[index - 1] - state.h_tar[index])
-        return (state.Q_users[index] - Q_flash) / (state.h_out[index] - state.h_tar[index])
+        return (state.Q_users[index] - Q_flash) / (
+            state.h_out[index] - state.h_tar[index]
+        )
 
     return state.Q_users[index] / (state.h_out[index] - state.h_tar[index])
 
@@ -554,7 +558,9 @@ def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
         raise ValueError("Unsupported THM turbine size.")
 
     dT_sat = Tsat_p(P_in) - Tsat_p(P_out)
-    a = (coeff[t_type_key][t_size_key][0] + coeff[t_type_key][t_size_key][1] * dT_sat) * 1000
+    a = (
+        coeff[t_type_key][t_size_key][0] + coeff[t_type_key][t_size_key][1] * dT_sat
+    ) * 1000
     b = coeff[t_type_key][t_size_key][2] + coeff[t_type_key][t_size_key][3] * dT_sat
     w_max = (dh_is * m - a) / b
 

@@ -3,7 +3,7 @@
 import math
 from ..lib import *
 
-__all__ = ['compute_exergetic_temperature']
+__all__ = ["compute_exergetic_temperature"]
 
 #######################################################################################################
 # Public API -- TODO: Need to restore exergy targeting
@@ -121,4 +121,3 @@ def compute_exergetic_temperature(
 #             GCC_X[1][i] = 0
 
 #     return GCC_X
-
