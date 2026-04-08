@@ -128,7 +128,9 @@ def calc_heat_pump_cascade(
         cold_utilities=res.hp_cold_streams,
         is_shifted=is_T_vals_shifted,
     )
-    col_H_net = PT.H_NET_HP_PRO.value if is_process_integration else PT.H_NET_HP_UT.value
+    col_H_net = (
+        PT.H_NET_HP_PRO.value if is_process_integration else PT.H_NET_HP_UT.value
+    )
     pt.update(
         {
             col_H_net: temp[PT.H_NET_UT.value],

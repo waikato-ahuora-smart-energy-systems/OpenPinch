@@ -13,11 +13,13 @@ from ..lib import *
 from ..utils import *
 from . import (
     get_process_heat_cascade,
+    get_additional_GCCs,
     problem_table_algorithm,
     get_heat_pump_targets,
     calc_heat_pump_cascade,
     get_heat_recovery_target_from_pt,
     set_zonal_targets,
+    plot_multi_hp_profiles_from_results,
 )
 
 __all__ = ["compute_indirect_integration_targets"]
@@ -129,8 +131,9 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
                 zone_config=zone.config,
                 is_shifted=True,
-            )            
-
+            )
+            pt_ut_gen = get_additional_GCCs(pt_ut_gen)
+            # Perform heat pump targeting on the correct cascades
             hp_res = get_heat_pump_targets(
                 Q_target=Q_target,
                 T_vals=pt_ut_gen.col[PT.T.value],
@@ -140,6 +143,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 is_heat_pumping=True,
             )
             res.update(hp_res)
+            # Add the heat pump profile to the general problem table
             calc_heat_pump_cascade(
                 pt=pt,
                 res=hp_res,

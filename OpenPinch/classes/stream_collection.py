@@ -89,6 +89,10 @@ class StreamCollection:
         include_utility_streams: bool = True,
         invert_utility: bool = False,
     ) -> "StreamCollection":
+        if invert_utility:
+            include_process_streams = False
+            include_utility_streams = True
+
         opposite_type = (
             StreamType.Cold.value
             if target_type == StreamType.Hot.value

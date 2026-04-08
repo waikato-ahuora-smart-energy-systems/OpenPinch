@@ -49,6 +49,7 @@ def get_results_filepath(problem_filepath: Path) -> Path:
 
 @pytest.mark.parametrize("p_filepath", get_example_problem_filepaths())
 def test_pinch_analysis_pipeline(p_filepath: Path):
+    """Validate each example problem produces target outputs matching reference results."""
     # if p_filepath.name != "p_pulp_mill.json":
     #     return True
 
