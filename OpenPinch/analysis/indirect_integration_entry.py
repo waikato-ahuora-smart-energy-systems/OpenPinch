@@ -132,7 +132,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 zone_config=zone.config,
                 is_shifted=True,
             )
-            pt_ut_gen = get_additional_GCCs(pt_ut_gen)
+            get_additional_GCCs(pt_ut_gen)
             # Perform heat pump targeting on the correct cascades
             hp_res = get_heat_pump_targets(
                 Q_target=Q_target,

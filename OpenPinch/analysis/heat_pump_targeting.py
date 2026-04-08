@@ -65,7 +65,7 @@ def get_heat_pump_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HP_TYPE = HeatPumpType.MultiSimpleVapourComp.value
+    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
     args = _prepare_heat_pump_target_inputs(
         Q_target=Q_target,
         T_vals=T_vals,
@@ -323,8 +323,8 @@ def _prepare_heat_pump_target_inputs(
         H_cold=H_cold,
         dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
         is_heat_pumping=bool(is_heat_pumping),
-        n_cond=zone_config.N_COND + 1,
-        n_evap=zone_config.N_EVAP + 1,
+        n_cond=zone_config.N_COND,
+        n_evap=zone_config.N_EVAP,
         eta_comp=zone_config.ETA_COMP,
         eta_exp=zone_config.ETA_EXP,
         eta_hp_carnot=zone_config.ETA_HP_CARNOT,
@@ -505,10 +505,12 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout."""
+    x0 = [0.0 for _ in range(args.n_cond + args.n_evap)]
     bnds = [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
     minima = multiminima(
         func=_compute_multi_temperature_carnot_hp_opt_obj,
         func_kwargs=args,
+        x0_ls=[x0],
         bounds=bnds,
         optimiser_handle=args.bb_minimiser,
     )
@@ -536,7 +538,7 @@ def _parse_multi_temperature_carnot_hp_state_variables(
     T_cond = _map_x_to_T(x[: int(args.n_cond)], args.T_cold[0], args.T_cold[-1])
     Q_cond = _get_Q_vals_from_T_vals(T_cond, args.T_cold, args.H_cold, is_cond=True)
     # Get evaproating temperatures and available duties at x
-    T_evap = _map_x_to_T(x[int(args.n_cond) :], args.T_hot[0], args.T_hot[-1])
+    T_evap = _map_x_to_T(x[int(args.n_cond) :], args.T_hot[-1], args.T_hot[0])
     Q_evap = _get_Q_vals_from_T_vals(T_evap, args.T_hot, args.H_hot, is_cond=False)
     return T_cond, Q_cond, T_evap, Q_evap
 
@@ -898,10 +900,12 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout."""
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
+    x0 = [0.0 for _ in range(args.n_cond + args.n_evap)]
     bnds = [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
     local_minima_x = multiminima(
         func=_compute_multi_simple_carnot_hp_opt_obj,
         func_kwargs=args,
+        x0_ls=[x0],
         bounds=bnds,
         optimiser_handle=args.bb_minimiser,
     )
@@ -927,7 +931,7 @@ def _parse_multi_simple_carnot_hp_state_variables(
     T_cond = _map_x_to_T(x_cond, args.T_cold[0], args.T_cold[-1])
     Q_cond = _get_Q_vals_from_T_vals(T_cond, args.T_cold, args.H_cold, is_cond=True)
 
-    T_evap = args.T_hot[-1] + np.array(x_evap) * (args.T_hot[0] - args.T_hot[-1])
+    T_evap = args.T_hot[-1] - np.array(x_evap) * (args.T_hot[-1] - args.T_hot[0])
 
     return T_cond, Q_cond, T_evap
 
@@ -940,10 +944,6 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 ) -> dict:
     """Evaluate compressor work for a candidate multiple single Carnot HP placement defined by vector `x`."""
     T_cond, Q_cond, T_evap = _parse_multi_simple_carnot_hp_state_variables(x, args)
-
-    if Q_cond.sum() < tol:
-        obj = _calc_obj(args.Q_target, 0.0, args.Q_target, args.price_ratio, 0.0)
-        return {"obj": obj}
 
     # Determine the work of each heat pump (or heat engine)
     delta_T_lift = T_cond - T_evap
@@ -960,7 +960,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     # Calculate evaporator duty
     Q_evap = Q_cond - work_hp + work_he
-    Q_evap_max = _get_Q_vals_from_T_vals(T_evap, args.T_hot, args.H_hot, is_cond=False)
+    Q_evap_max = _get_Q_vals_from_T_vals(T_evap, args.T_hot, args.H_hot, is_cond=False) if Q_cond.sum() > 0.0 else 0.0
 
     # Determine the key performance metrics of the heat pump
     Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
