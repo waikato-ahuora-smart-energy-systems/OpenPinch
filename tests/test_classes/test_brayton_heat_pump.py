@@ -167,3 +167,14 @@ def test_brayton_cycle_raises_runtime_error_on_result_extraction_failure(monkeyp
             is_recuperated=False,
             refrigerant="AIR",
         )
+
+
+# ===== Merged from test_brayton_heat_pump_extra.py =====
+"""Additional branch coverage tests for Brayton heat pump wrappers."""
+
+from OpenPinch.classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
+
+
+def test_brayton_cycle_states_property_alias():
+    cycle = SimpleBraytonHeatPumpCycle()
+    assert cycle.cycle_states is cycle.states

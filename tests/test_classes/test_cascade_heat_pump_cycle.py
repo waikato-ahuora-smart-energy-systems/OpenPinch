@@ -1,10 +1,13 @@
 """Regression tests for the cascade heat pump cycle classes."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
 pytest.importorskip("CoolProp")
 
+import OpenPinch.classes.cascade_heat_pump as cascade_mod
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.cascade_heat_pump import CascadeHeatPumpCycle
 from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
@@ -258,6 +261,215 @@ def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
 
     last = cycle.subcycles[-1]
     assert np.isclose(last.Q_cool, last.Q_evap, rtol=1e-7, atol=1e-8)
+
+
+def _fake_network_cycle(
+    *,
+    solved=True,
+    refrigerant="R134A",
+    T_evap=20.0,
+    T_cond=80.0,
+    dT_superheat=5.0,
+    dT_subcool=2.0,
+    eta_comp=0.75,
+    dt_ihx_gas_side=5.0,
+    Q_evap=60.0,
+    Q_cond=100.0,
+    Q_cool=55.0,
+    Q_heat=95.0,
+    Q_cas_cool=5.0,
+    Q_cas_heat=6.0,
+    work=40.0,
+    penalty=1.0,
+):
+    return SimpleNamespace(
+        solved=solved,
+        refrigerant=refrigerant,
+        T_evap=T_evap,
+        T_cond=T_cond,
+        dT_superheat=dT_superheat,
+        dT_subcool=dT_subcool,
+        eta_comp=eta_comp,
+        dt_ihx_gas_side=dt_ihx_gas_side,
+        Q_evap=Q_evap,
+        Q_cond=Q_cond,
+        Q_cool=Q_cool,
+        Q_heat=Q_heat,
+        Q_cas_cool=Q_cas_cool,
+        Q_cas_heat=Q_cas_heat,
+        work=work,
+        penalty=penalty,
+    )
+
+
+class _DummyCascadeCycle:
+    solved = True
+    refrigerant = "water"
+    T_evap = 20.0
+    T_cond = 80.0
+    dT_superheat = 5.0
+    dT_subcool = 3.0
+    eta_comp = 0.7
+    dt_ihx_gas_side = 10.0
+    Q_evap = 10.0
+    Q_cas_cool = 2.0
+    Q_cool = 3.0
+    Q_cond = 12.0
+    Q_cas_heat = 4.0
+    Q_heat = 8.0
+    work = 5.0
+    penalty = 0.5
+
+    def solve(self, **kwargs):
+        self.Q_heat = kwargs.get("Q_heat", self.Q_heat)
+        self.Q_cas_cool = kwargs.get("Q_cool", self.Q_cas_cool)
+        return self.work
+
+
+def test_cascade_property_sweep_and_normalization_branches():
+    cycle = CascadeHeatPumpCycle()
+    c1 = _fake_network_cycle()
+    c2 = _fake_network_cycle(T_evap=10.0, T_cond=70.0, work=20.0, Q_evap=30.0, Q_cond=50.0)
+    cycle._subcycles = [c1, c2]
+    cycle._solved = True
+    cycle._dt_cascade_hx = 3.0
+
+    assert cycle.Q_evap == 90.0
+    assert cycle.Q_cas_cool == 10.0
+    assert cycle.Q_cool == 110.0
+    assert cycle.Q_cond == 150.0
+    assert cycle.Q_cas_heat == 12.0
+    assert cycle.Q_heat == 190.0
+    assert cycle.work == 60.0
+    assert cycle.penalty == 2.0
+    assert cycle.COP_h == pytest.approx(cycle.Q_heat / cycle.work)
+    assert cycle.COP_r == pytest.approx(cycle.Q_cool / cycle.work)
+    assert cycle.COP_o == pytest.approx((cycle.Q_heat + cycle.Q_cool) / cycle.work)
+    assert cycle.dt_cascade_hx == 3.0
+    assert cycle.refrigerant.tolist() == ["R134A", "R134A"]
+    assert cycle.T_evap.tolist() == [20.0, 10.0]
+    assert cycle.T_cond.tolist() == [80.0, 70.0]
+    assert cycle.dT_superheat.tolist() == [5.0, 5.0]
+    assert cycle.dT_subcool.tolist() == [2.0, 2.0]
+    assert cycle.eta_comp.tolist() == [0.75, 0.75]
+    assert cycle.dt_ihx_gas_side.tolist() == [5.0, 5.0]
+    assert cycle.num_cycles == 1
+    assert len(cycle.subcycles) == 2
+
+    cycle._solved = False
+    cycle._max_work = 123.0
+    assert cycle.work == 123.0
+    assert cycle.penalty == 0
+
+    cycle._solved = True
+    cycle._subcycles = [_fake_network_cycle(work=0.0), _fake_network_cycle(work=0.0)]
+    with pytest.raises(ZeroDivisionError):
+        _ = cycle.COP_h
+    with pytest.raises(ZeroDivisionError):
+        _ = cycle.COP_r
+    with pytest.raises(ZeroDivisionError):
+        _ = cycle.COP_o
+
+    assert cycle._as_1d_numeric_array(None).shape == (1,)
+    assert cycle._as_1d_numeric_array(np.nan).shape == (1,)
+    with pytest.raises(ValueError):
+        cycle._as_1d_numeric_array(np.array([[1.0, 2.0]]))
+
+    assert cycle._normalize_dT_superheat(np.array([1.0]), 2, 2).shape == (3,)
+    assert cycle._normalize_dT_superheat(np.array([1.0, 2.0]), 2, 2).shape == (3,)
+    with pytest.raises(ValueError):
+        cycle._normalize_dT_superheat(np.array([1.0, 2.0, 3.0, 4.0]), 2, 2)
+
+    assert cycle._normalize_dT_subcool(np.array([1.0]), 2, 2).shape == (3,)
+    assert cycle._normalize_dT_subcool(np.array([1.0, 2.0]), 2, 2).shape == (3,)
+    with pytest.raises(ValueError):
+        cycle._normalize_dT_subcool(np.array([1.0, 2.0, 3.0, 4.0]), 2, 2)
+
+    qh = cycle._normalize_Q_heat(np.array([np.nan, np.nan]), 2, 2)
+    assert qh.tolist() == [1.0, 0.0, 0.0]
+    assert cycle._normalize_Q_heat(None, 2, 2).shape == (3,)
+    with pytest.raises(ValueError):
+        cycle._normalize_Q_heat(np.array([1.0, 2.0, 3.0, 4.0]), 2, 2)
+
+    qcool_none = cycle._normalize_Q_cool(None, 2, 2)
+    assert qcool_none.tolist() == [0.0, 0.0, None]
+    qcool_scalar = cycle._normalize_Q_cool(np.array([3.0]), 2, 2)
+    assert qcool_scalar.tolist() == [3.0, 3.0, 3.0]
+    qcool_last_nan = cycle._normalize_Q_cool(
+        np.array([1.0, 2.0, np.nan], dtype=object), 2, 2
+    )
+    assert qcool_last_nan.tolist() == [1.0, 2.0, None]
+    with pytest.raises(ValueError):
+        cycle._normalize_Q_cool(np.array([None, 1.0, 2.0], dtype=object), 2, 2)
+    with pytest.raises(ValueError):
+        cycle._normalize_Q_cool(np.array([1.0, np.nan, 2.0], dtype=object), 2, 2)
+    with pytest.raises(ValueError):
+        cycle._normalize_Q_cool(np.array([["x"]], dtype=object), 2, 2)
+
+    inf = cycle._validate_T_cond_and_evap(
+        np.array([100.0, 80.0]), np.array([40.0, 20.0])
+    )
+    assert inf >= 0.0
+
+
+def test_cascade_property_arrays_and_unsolved_work_branch():
+    hp = CascadeHeatPumpCycle()
+    hp._subcycles = [_DummyCascadeCycle(), _DummyCascadeCycle()]
+    hp._solved = True
+    hp._dt_cascade_hx = 1.0
+
+    assert hp.Q_evap_arr.shape == (2,)
+    assert hp.Q_cas_cool_arr.shape == (2,)
+    assert hp.Q_cool_arr.shape == (2,)
+    assert hp.Q_cond_arr.shape == (2,)
+    assert hp.Q_cas_heat_arr.shape == (2,)
+    assert hp.Q_heat_arr.shape == (2,)
+    assert hp.work_arr.shape == (2,)
+    assert hp.dtcont == 0.0
+    assert hp.dt_diff_max == 0.5
+
+    hp._solved = False
+    hp._max_work = 123.0
+    assert hp.work == 123.0
+
+
+def test_cascade_normalize_q_cool_and_numeric_conversion_errors():
+    hp = CascadeHeatPumpCycle()
+
+    scalar = hp._normalize_Q_cool(5.0, n_heat=2, n_cool=2)
+    assert scalar.shape == (3,)
+
+    scalar_nan = hp._normalize_Q_cool(np.nan, n_heat=2, n_cool=2)
+    assert scalar_nan.tolist() == [0.0, 0.0, None]
+
+    with pytest.raises(ValueError, match="Incompatible Q_cool input"):
+        hp._normalize_Q_cool([1.0, 2.0, 3.0, 4.0], n_heat=2, n_cool=2)
+
+    with pytest.raises(ValueError, match="Q_cool values must be numeric"):
+        hp._normalize_Q_cool([object(), None, None], n_heat=2, n_cool=2)
+
+    with pytest.raises(ValueError, match="Q_cool values must be numeric"):
+        hp._normalize_Q_cool([0.0, 0.0, object()], n_heat=2, n_cool=2)
+
+    with pytest.raises(ValueError, match="Input must be numeric"):
+        hp._as_1d_numeric_array("bad")
+
+
+def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
+    hp = CascadeHeatPumpCycle()
+    monkeypatch.setattr(hp, "_validate_T_cond_and_evap", lambda T_cond, T_evap: 0.0)
+    monkeypatch.setattr(cascade_mod, "SimpleHeatPumpCycle", _DummyCascadeCycle)
+
+    work = hp.solve(
+        T_evap=np.array([25.0, 15.0]),
+        T_cond=np.array([70.0, 60.0]),
+        refrigerant=["water"],
+        Q_heat=np.array([1.0, 1.0]),
+        Q_cool=None,
+    )
+
+    assert isinstance(work, float)
+    assert hp.solved is True
 
 
 @pytest.mark.parametrize(

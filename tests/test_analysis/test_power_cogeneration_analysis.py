@@ -261,3 +261,7 @@ def test_work_models_and_coeff_setter(monkeypatch):
     pca.Set_Coeff(VarCoef=var_coef)
     assert var_coef[0][0][2] == pytest.approx(1.097)
     assert var_coef[1][1][0] == pytest.approx(-0.463)
+
+
+# ===== Merged from test_power_cogenertion_analysis.py =====
+"""Regression tests for power cogenertion analysis analysis routines."""
