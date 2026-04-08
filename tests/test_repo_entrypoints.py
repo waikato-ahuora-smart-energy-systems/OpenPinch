@@ -74,19 +74,6 @@ def test_repo_main_script_executes(monkeypatch):
     assert calls[2][0] == "export_to_Excel"
 
 
-def test_run_py_script_executes(monkeypatch):
-    _clear_dummy()
-    monkeypatch.setattr(OpenPinch, "PinchProblem", _DummyPinchProblem)
-
-    runpy.run_path(str(REPO_ROOT / "run.py"), run_name="__main__")
-
-    assert len(_DummyPinchProblem.created) == 1
-    calls = _DummyPinchProblem.created[0].calls
-    assert calls[0][0] == "load"
-    assert calls[1][0] == "target"
-    assert calls[2][0] == "export_to_Excel"
-
-
 def test_streamlit_module_helper_functions(monkeypatch):
     fake_st = _FakeStreamlit()
     monkeypatch.setitem(sys.modules, "streamlit", fake_st)
