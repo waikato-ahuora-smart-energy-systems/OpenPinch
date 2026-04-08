@@ -65,7 +65,7 @@ def get_heat_pump_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
+    # zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
     args = _prepare_heat_pump_target_inputs(
         Q_target=Q_target,
         T_vals=T_vals,
@@ -73,7 +73,7 @@ def get_heat_pump_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=True,
+        debug=False,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:

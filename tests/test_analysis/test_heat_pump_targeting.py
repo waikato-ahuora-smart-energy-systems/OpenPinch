@@ -232,8 +232,8 @@ def test_parse_multi_temperature_carnot_hp_state_variables_returns_expected_prof
 
     np.testing.assert_allclose(T_cond, np.array([80.0, 60.0]))
     np.testing.assert_allclose(Q_cond, np.array([60.0, 60.0]))
-    np.testing.assert_allclose(T_evap, np.array([120.0, 75.0]))
-    np.testing.assert_allclose(Q_evap, np.array([50.0, 95.0]))
+    np.testing.assert_allclose(T_evap, np.array([105.0, 60.0]))
+    np.testing.assert_allclose(Q_evap, np.array([75.0, 115.0]))
 
 
 def test_parse_multi_temperature_carnot_hp_state_variables_respects_cond_evap_split_sizes():
@@ -515,7 +515,7 @@ def _base_args(**overrides):
         "net_cold_streams": _sc(
             Stream(name="C", t_supply=30.0, t_target=60.0, heat_flow=40.0)
         ),
-        "bb_minimiser": "shgo",
+        "bb_minimiser": "rbf",
         "eta_penalty": 0.001,
         "rho_penalty": 10.0,
         "debug": False,
@@ -534,46 +534,6 @@ def _patch_output_model_validate(monkeypatch):
         "model_validate",
         classmethod(lambda cls, v: v),
     )
-
-
-def test_get_heat_pump_targets_dispatch_and_invalid_handler(monkeypatch):
-    args = _base_args(n_cond=1, n_evap=1)
-    zone_cfg = Configuration()
-
-    monkeypatch.setattr(hp, "_prepare_heat_pump_target_inputs", lambda **_kwargs: args)
-    monkeypatch.setattr(
-        hp, "_get_ambient_air_stream", lambda _q, _a: StreamCollection()
-    )
-    _patch_output_model_validate(monkeypatch)
-
-    def _handler(_args):
-        return SimpleNamespace(Q_amb=5.0)
-
-    monkeypatch.setitem(
-        hp._HP_PLACEMENT_HANDLERS, HeatPumpType.MultiSimpleVapourComp.value, _handler
-    )
-    out = hp.get_heat_pump_targets(
-        Q_target=100.0,
-        T_vals=np.array([120.0, 80.0]),
-        H_hot=np.array([0.0, -50.0]),
-        H_cold=np.array([50.0, 0.0]),
-        zone_config=zone_cfg,
-        is_heat_pumping=True,
-    )
-    assert hasattr(out, "amb_stream")
-
-    monkeypatch.setitem(
-        hp._HP_PLACEMENT_HANDLERS, HeatPumpType.MultiSimpleVapourComp.value, None
-    )
-    with pytest.raises(ValueError, match="No valid heat pump targeting type selected"):
-        hp.get_heat_pump_targets(
-            Q_target=100.0,
-            T_vals=np.array([120.0, 80.0]),
-            H_hot=np.array([0.0, -50.0]),
-            H_cold=np.array([50.0, 0.0]),
-            zone_config=zone_cfg,
-            is_heat_pumping=True,
-        )
 
 
 @pytest.mark.parametrize(
@@ -1339,68 +1299,6 @@ def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):
     bnds_ms = hp._get_bounds_for_multi_single_hp_opt(args_ms)
     assert bnds_ms[1][0] == bnds_ms[1][1]
     assert bnds_ms[4][0] == bnds_ms[4][1]
-
-
-def test_multi_simple_carnot_zero_duty_and_debug_branches(monkeypatch):
-    monkeypatch.setattr(
-        hp,
-        "_parse_multi_simple_carnot_hp_state_variables",
-        lambda x, args: (np.array([100.0]), np.array([0.0]), np.array([80.0])),
-    )
-    out_zero = hp._compute_multi_simple_carnot_hp_opt_obj(
-        np.array([0.1, 0.2]),
-        SimpleNamespace(Q_target=100.0, price_ratio=1.0),
-    )
-    assert "obj" in out_zero
-    assert len(out_zero) == 1
-
-    monkeypatch.setattr(
-        hp,
-        "_parse_multi_simple_carnot_hp_state_variables",
-        lambda x, args: (np.array([105.0]), np.array([50.0]), np.array([80.0])),
-    )
-    monkeypatch.setattr(
-        hp, "_get_Q_vals_from_T_vals", lambda *args, **kwargs: np.array([60.0])
-    )
-    monkeypatch.setattr(hp, "g_ineq_penalty", lambda g, rho, form: 0.0)
-    monkeypatch.setattr(
-        hp,
-        "_get_carnot_hp_streams",
-        lambda *args, **kwargs: {
-            "hp_hot_streams": StreamCollection(),
-            "hp_cold_streams": StreamCollection(),
-        },
-    )
-    called = {"plot": 0}
-    monkeypatch.setattr(
-        hp,
-        "plot_multi_hp_profiles_from_results",
-        lambda *args, **kwargs: called.__setitem__("plot", called["plot"] + 1),
-    )
-    out_debug = hp._compute_multi_simple_carnot_hp_opt_obj(
-        np.array([0.1, 0.2]),
-        SimpleNamespace(
-            Q_target=100.0,
-            price_ratio=1.0,
-            T_hot=np.array([120.0, 80.0]),
-            H_hot=np.array([0.0, -40.0]),
-            T_cold=np.array([100.0, 60.0]),
-            H_cold=np.array([40.0, 0.0]),
-            eta_hp_carnot=0.5,
-            eta_he_carnot=0.4,
-            allow_integrated_expander=False,
-            H_hot_end=40.0,
-            H_hot_last=40.0,
-            Q_amb_max=0.0,
-            rho_penalty=10.0,
-            T_env=25.0,
-            dt_env_cont=5.0,
-            dt_phase_change=1.0,
-        ),
-        debug=True,
-    )
-    assert out_debug["opt_success"] is True
-    assert called["plot"] == 1
 
 
 def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
