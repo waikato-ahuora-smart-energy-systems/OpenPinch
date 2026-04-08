@@ -16,7 +16,9 @@ def sample_problem():
     """Return sample problem data used by this test module."""
     return {
         "options": {"dt_min": 10},
-        "streams": [{"zone": "Z1", "name": "H1", "supply_T": 150, "target_T": 60, "cp": 2.0}],
+        "streams": [
+            {"zone": "Z1", "name": "H1", "supply_T": 150, "target_T": 60, "cp": 2.0}
+        ],
         "utilities": [{"name": "LP Steam", "T": 150, "cost": 20}],
     }
 
@@ -229,3 +231,166 @@ def test_load_json_normalises_missing_zone_and_name(tmp_path: Path):
     assert [s["zone"] for s in out["streams"]] == ["Zone A", "Zone A", "Zone A"]
     assert [s["name"] for s in out["streams"]] == ["H1", "S1", "S2"]
     assert [u["name"] for u in out["utilities"]] == ["HP Steam"]
+
+
+def test_init_with_problem_filepath_calls_load(monkeypatch, tmp_path: Path):
+    called = {"source": None}
+
+    def fake_load(self, source):
+        called["source"] = source
+        return {}
+
+    monkeypatch.setattr(PinchProblem, "load", fake_load)
+    p = tmp_path / "p.json"
+    p.write_text("{}", encoding="utf-8")
+    PinchProblem(problem_filepath=p, run=False)
+
+    assert called["source"] == p
+
+
+def test_init_run_true_success_calls_export(monkeypatch, tmp_path: Path):
+    called = {"target": 0, "export": None}
+
+    def fake_target(self):
+        called["target"] += 1
+        self._results = {"ok": True}
+        return self._results
+
+    def fake_export(self, results_dir=None):
+        called["export"] = results_dir
+        return Path(results_dir) / "out.xlsx"
+
+    monkeypatch.setattr(PinchProblem, "target", fake_target)
+    monkeypatch.setattr(PinchProblem, "export_to_Excel", fake_export)
+
+    PinchProblem(results_dir=tmp_path, run=True)
+
+    assert called["target"] == 1
+    assert called["export"] == tmp_path
+
+
+def test_init_run_true_wraps_target_exception(monkeypatch):
+    monkeypatch.setattr(
+        PinchProblem,
+        "target",
+        lambda self: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    with pytest.raises(ValueError, match="Targeting analysis failed"):
+        PinchProblem(run=True)
+
+
+def test_load_accepts_target_input_instance(monkeypatch):
+    mod = sys.modules[PinchProblem.__module__]
+
+    class DummyTargetInput:
+        pass
+
+    monkeypatch.setattr(mod, "TargetInput", DummyTargetInput, raising=True)
+    payload = DummyTargetInput()
+    obj = PinchProblem(run=False)
+    out = obj.load(payload)
+    assert out is payload
+
+
+def test_load_json_parse_error_raises_value_error(tmp_path: Path):
+    broken = tmp_path / "broken.json"
+    broken.write_text("{not valid json", encoding="utf-8")
+    obj = PinchProblem(run=False)
+    with pytest.raises(ValueError, match="Failed to parse JSON"):
+        obj.load(broken)
+
+
+def test_target_caches_results_and_master_zone(monkeypatch, sample_problem):
+    mod = sys.modules[PinchProblem.__module__]
+    calls = {"count": 0}
+
+    def fake_service(**kwargs):
+        calls["count"] += 1
+        return {"targets": []}, {"name": "Zone"}
+
+    monkeypatch.setattr(mod, "pinch_analysis_service", fake_service, raising=True)
+    obj = PinchProblem(run=False)
+    obj._problem_data = sample_problem
+
+    out1 = obj.target()
+    out2 = obj.target()
+
+    assert out1 == {"targets": []}
+    assert out2 == {"targets": []}
+    assert obj.master_zone == {"name": "Zone"}
+    assert calls["count"] == 1
+
+
+def test_export_calls_target_when_results_missing(
+    monkeypatch, tmp_path: Path, sample_problem
+):
+    mod = sys.modules[PinchProblem.__module__]
+    called = {"target": 0, "write": 0}
+
+    def fake_target(self):
+        called["target"] += 1
+        self._results = {"ok": 1}
+        self._master_zone = {"zone": 1}
+        return self._results
+
+    def fake_writer(*, target_response, master_zone, out_dir):
+        called["write"] += 1
+        return Path(out_dir) / "export.xlsx"
+
+    monkeypatch.setattr(PinchProblem, "target", fake_target)
+    monkeypatch.setattr(
+        mod, "export_target_summary_to_excel_with_units", fake_writer, raising=True
+    )
+
+    obj = PinchProblem(run=False)
+    obj._problem_data = sample_problem
+    out = obj.export_to_Excel(tmp_path)
+
+    assert called["target"] == 1
+    assert called["write"] == 1
+    assert out == tmp_path / "export.xlsx"
+
+
+def test_problem_data_and_master_zone_properties():
+    obj = PinchProblem(run=False)
+    obj._problem_data = {"a": 1}
+    obj._master_zone = {"z": 1}
+    assert obj.problem_data == {"a": 1}
+    assert obj.master_zone == {"z": 1}
+
+
+def test_render_streamlit_dashboard_builds_graph_payload(monkeypatch):
+    mod = sys.modules[PinchProblem.__module__]
+    captured = {}
+
+    class GraphWithDump:
+        def model_dump(self):
+            return {"x": 1}
+
+    class ResultContainer:
+        graphs = {"g1": GraphWithDump(), "g2": {"y": 2}}
+
+    def fake_render(zone, graph_payload, page_title, value_rounding):
+        captured["zone"] = zone
+        captured["payload"] = graph_payload
+        captured["title"] = page_title
+        captured["rounding"] = value_rounding
+
+    monkeypatch.setattr(mod, "_render_streamlit_dashboard", fake_render, raising=True)
+    obj = PinchProblem(run=False)
+    obj._master_zone = {"name": "root"}
+    obj._results = ResultContainer()
+
+    obj.render_streamlit_dashboard(page_title="Dash", value_rounding=3)
+
+    assert captured["zone"] == {"name": "root"}
+    assert captured["payload"]["g1"] == {"x": 1}
+    assert captured["payload"]["g2"] == {"y": 2}
+    assert captured["title"] == "Dash"
+    assert captured["rounding"] == 3
+
+
+def test_render_streamlit_dashboard_requires_available_zone():
+    obj = PinchProblem(run=False)
+    with pytest.raises(RuntimeError, match="No analysed zone is available"):
+        obj.render_streamlit_dashboard()

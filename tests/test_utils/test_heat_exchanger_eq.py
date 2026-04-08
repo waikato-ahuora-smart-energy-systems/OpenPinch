@@ -10,6 +10,7 @@ from OpenPinch.utils.heat_exchanger import *
 
 """Test cases for the find_LMTD function."""
 
+
 def test_lmtd_typical_counterflow():
     """Basic counter-current case with distinct ΔT1 and ΔT2."""
     T_hot_in, T_hot_out = 150, 50

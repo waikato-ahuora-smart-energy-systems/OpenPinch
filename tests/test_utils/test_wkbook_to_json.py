@@ -265,5 +265,10 @@ def test_validate_stream_data_defaults_name_when_zone_and_name_missing():
 
     out = _validate_stream_data(streams)
 
-    assert [s["zone"] for s in out] == ["Process Zone", "Process Zone", "Zone C", "Zone C"]
+    assert [s["zone"] for s in out] == [
+        "Process Zone",
+        "Process Zone",
+        "Zone C",
+        "Zone C",
+    ]
     assert [s["name"] for s in out] == ["S1", "S2", "H3", "S3"]

@@ -12,9 +12,7 @@ def _rugged_noisy_surface(x, _):
     x = np.asarray(x, dtype=float)
     base = 0.25 * (x[0] + 0.8) ** 2 + 0.18 * (x[1] - 0.25) ** 2
     nonconvex = 0.7 * np.sin(2.8 * x[0]) * np.cos(3.4 * x[1])
-    fuzzy = 0.05 * np.sin(29 * x[0] + 17 * x[1]) + 0.03 * np.cos(
-        31 * x[0] - 13 * x[1]
-    )
+    fuzzy = 0.05 * np.sin(29 * x[0] + 17 * x[1]) + 0.03 * np.cos(31 * x[0] - 13 * x[1])
     return {"obj": float(base + nonconvex + fuzzy)}
 
 

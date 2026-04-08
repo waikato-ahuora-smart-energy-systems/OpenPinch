@@ -10,6 +10,7 @@ from OpenPinch.utils import *
 
 def get_dummy_function():
     """Return a decorated dummy function used by this test module."""
+
     @timing_decorator
     def dummy(x, y):
         time.sleep(0.01)

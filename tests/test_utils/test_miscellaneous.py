@@ -41,7 +41,6 @@ def test_get_value_with_string_raises():
         get_value("100")
 
 
-
 """Test cases for the compute_capital_recovery_factor function."""
 
 
@@ -158,7 +157,9 @@ def test_g_ineq_penalty_square_custom_rho():
 def test_g_ineq_penalty_square_root_smoothing():
     g, eta, rho = -0.2, 0.5, 4.0
     expected = 0.5 * rho * (g + (g**2 + eta**2) ** 0.5)
-    assert g_ineq_penalty(g, eta=eta, rho=rho, form="square_root_smoothing") == pytest.approx(expected)
+    assert g_ineq_penalty(
+        g, eta=eta, rho=rho, form="square_root_smoothing"
+    ) == pytest.approx(expected)
 
 
 def test_g_ineq_penalty_invalid_form():

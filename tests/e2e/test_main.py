@@ -12,7 +12,9 @@ from OpenPinch.lib import *
 
 def get_example_problem_filepaths():
     """Return example problem filepaths used by this test module."""
-    test_data_dir = Path(__file__).resolve().parents[2] / "OpenPinch" / "examples" / "stream_data"
+    test_data_dir = (
+        Path(__file__).resolve().parents[2] / "OpenPinch" / "examples" / "stream_data"
+    )
     return [
         filepath
         for filepath in test_data_dir.iterdir()
@@ -126,40 +128,40 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
     elif 0:
         print(f"Name: {res.name}")
         for z in res.targets:
-                    print("")
-                    print("Name:", z.name, z0.name)
-                    print(
-                        "Qh:",
-                        round(get_value(z.Qh), 2),
-                        sep="\t",
-                    )
-                    print(
-                        "Qc:",
-                        round(get_value(z.Qc), 2),
-                        sep="\t",
-                    )
-                    print(
-                        "Qr:",
-                        round(get_value(z.Qr), 2),
-                        sep="\t",
-                    )
-                    [
-                        print(
-                            z.hot_utilities[i].name + ":",
-                            round(get_value(z.hot_utilities[i].heat_flow), 2),
-                            sep="\t",
-                        )
-                        for i in range(len(z.hot_utilities))
-                    ]
-                    [
-                        print(
-                            z.cold_utilities[i].name + ":",
-                            round(get_value(z.cold_utilities[i].heat_flow), 2),
-                            sep="\t",
-                        )
-                        for i in range(len(z.cold_utilities))
-                    ]
-                    print("")
+            print("")
+            print("Name:", z.name, z0.name)
+            print(
+                "Qh:",
+                round(get_value(z.Qh), 2),
+                sep="\t",
+            )
+            print(
+                "Qc:",
+                round(get_value(z.Qc), 2),
+                sep="\t",
+            )
+            print(
+                "Qr:",
+                round(get_value(z.Qr), 2),
+                sep="\t",
+            )
+            [
+                print(
+                    z.hot_utilities[i].name + ":",
+                    round(get_value(z.hot_utilities[i].heat_flow), 2),
+                    sep="\t",
+                )
+                for i in range(len(z.hot_utilities))
+            ]
+            [
+                print(
+                    z.cold_utilities[i].name + ":",
+                    round(get_value(z.cold_utilities[i].heat_flow), 2),
+                    sep="\t",
+                )
+                for i in range(len(z.cold_utilities))
+            ]
+            print("")
 
     for z in res.targets:
         for z0 in wkb_res.targets:

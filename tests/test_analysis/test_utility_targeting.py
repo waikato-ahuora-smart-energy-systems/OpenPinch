@@ -49,19 +49,19 @@ def test_target_utility(filename):
         is_real_temperatures = False
         z.hot_utilities = _target_utility(
             z.hot_utilities,
-            GHLP_P.col[PT.T.value], 
+            GHLP_P.col[PT.T.value],
             GHLP_P.col[PT.H_NET_COLD.value],
-            hot_pinch_row, 
+            hot_pinch_row,
             cold_pinch_row,
-            is_real_temperatures,            
+            is_real_temperatures,
         )
         z.cold_utilities = _target_utility(
             z.cold_utilities,
-            GHLP_P.col[PT.T.value], 
+            GHLP_P.col[PT.T.value],
             GHLP_P.col[PT.H_NET_HOT.value],
-            hot_pinch_row, 
+            hot_pinch_row,
             cold_pinch_row,
-            is_real_temperatures,            
+            is_real_temperatures,
         )
 
     with open(r_file_path) as json_data:

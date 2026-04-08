@@ -25,6 +25,7 @@ def get_test_filenames():
 
 """Tests for get_GCC_without_pockets."""
 
+
 def make_df(t_vals, h_net_vals) -> ProblemTable:
     """Build df data used by this test module."""
     return ProblemTable(
@@ -70,9 +71,9 @@ def test_get_gcc_without_pockets(
         if valid and h_idx + 1 < c_idx:
             values = pt.loc[h_idx + 1 : c_idx - 1, PT.H_NET_NP.value]
             first_val = values.iloc[0]
-            assert all(
-                abs(val - first_val) < 1e-6 for val in values
-            ), f"Pocket not flattened: found values {list(values)} between pinches."
+            assert all(abs(val - first_val) < 1e-6 for val in values), (
+                f"Pocket not flattened: found values {list(values)} between pinches."
+            )
 
 
 def test_get_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
@@ -98,13 +99,11 @@ def test_get_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
 
 
 def test_get_GCC_needing_utility_combines_columns():
-    pt = ProblemTable(
-        {PT.H_NET_NP.value: [100, 200, 300]}
-    )
+    pt = ProblemTable({PT.H_NET_NP.value: [100, 200, 300]})
 
     result = get_GCC_needing_utility(pt.col[PT.H_NET_NP.value])
 
-    expected = [100, 200, 300] 
+    expected = [100, 200, 300]
     assert (result[PT.H_NET_A.value] == expected).all()
 
 
@@ -117,9 +116,7 @@ def test_get_separated_heat_profiles_categorises_correctly():
         }
     )
 
-    result_cols = get_seperated_gcc_heat_load_profiles(
-        pt.col[PT.H_NET_A.value]
-    )
+    result_cols = get_seperated_gcc_heat_load_profiles(pt.col[PT.H_NET_A.value])
 
     assert PT.H_NET_HOT.value in result_cols
     assert PT.H_NET_COLD.value in result_cols

@@ -49,9 +49,11 @@ def test_get_carnot_COP_returns_expected_value():
     Q_evap = np.array([70.0, 40.0])
     eff = 0.65
 
-    expected = ((150 + 273.15) / (150 - 30) - 1)* eff + 1
+    expected = ((150 + 273.15) / (150 - 30) - 1) * eff + 1
 
-    result = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap, eff=eff)
+    result = _compute_COP_estimate_from_carnot_limit(
+        T_cond, Q_cond, T_evap, Q_evap, eff=eff
+    )
 
     np.testing.assert_allclose(result, expected)
 
@@ -144,16 +146,18 @@ def test_balance_hot_and_cold_heat_loads_handles_excess_hot_source_branch():
     T_cold = np.array([150.0, 120.0, 90.0, 60.0])
     H_cold = np.array([400.0, 200.0, 0.0, 0.0])
 
-    T_hot_out, H_hot_out, _, _, Q_amb_max = _balance_hot_and_cold_heat_loads_with_ambient_air(
-        T_hot=T_hot,
-        H_hot=H_hot,
-        T_cold=T_cold,
-        H_cold=H_cold,
-        dtcont=5.0,
-        T_env=25.0,
-        dT_env_cont=10.0,
-        dt_phase_change=1.0,
-        is_heat_pumping=True,
+    T_hot_out, H_hot_out, _, _, Q_amb_max = (
+        _balance_hot_and_cold_heat_loads_with_ambient_air(
+            T_hot=T_hot,
+            H_hot=H_hot,
+            T_cold=T_cold,
+            H_cold=H_cold,
+            dtcont=5.0,
+            T_env=25.0,
+            dT_env_cont=10.0,
+            dt_phase_change=1.0,
+            is_heat_pumping=True,
+        )
     )
 
     np.testing.assert_allclose(np.abs(H_hot_out).max(), np.abs(H_cold).max())
@@ -165,7 +169,9 @@ def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty():
     T_hp = [150.0, 149.7, 130.0]
     Q_hp = [10.0, 5.0, 20.0]
 
-    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+    T_out, Q_out = _prepare_latent_hp_profile(
+        T_hp, Q_hp, dT_phase_change=1.0, is_hot=True
+    )
 
     np.testing.assert_allclose(T_out, np.array([150.0, 130.0]))
     np.testing.assert_allclose(Q_out, np.array([15.0, 20.0]))
@@ -175,7 +181,9 @@ def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty_consecutivi
     T_hp = [150.0, 149.7, 149.01, 130.0]
     Q_hp = [10.0, 2.0, 3.0, 20.0]
 
-    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+    T_out, Q_out = _prepare_latent_hp_profile(
+        T_hp, Q_hp, dT_phase_change=1.0, is_hot=True
+    )
 
     np.testing.assert_allclose(T_out, np.array([150.0, 130.0]))
     np.testing.assert_allclose(Q_out, np.array([15.0, 20.0]))
@@ -218,7 +226,9 @@ def test_parse_multi_temperature_carnot_hp_state_variables_returns_expected_prof
     )
     x = np.array([0.5, 0.5, 0.25, 0.5])
 
-    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args)
+    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(
+        x, args
+    )
 
     np.testing.assert_allclose(T_cond, np.array([80.0, 60.0]))
     np.testing.assert_allclose(Q_cond, np.array([60.0, 60.0]))
@@ -237,7 +247,9 @@ def test_parse_multi_temperature_carnot_hp_state_variables_respects_cond_evap_sp
     )
     x = np.array([0.4, 0.2, 0.5, 0.8])
 
-    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(x, args)
+    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(
+        x, args
+    )
 
     assert T_cond.shape == (1,)
     assert Q_cond.shape == (1,)
@@ -285,7 +297,9 @@ def test_prepare_latent_hp_profile_merges_cold_segments_with_lower_temperature()
     T_hp = [60.0, 45.0, 30.4, 30.0]
     Q_hp = [12.5, 10.0, 7.5, 5.0]
 
-    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=False)
+    T_out, Q_out = _prepare_latent_hp_profile(
+        T_hp, Q_hp, dT_phase_change=1.0, is_hot=False
+    )
 
     np.testing.assert_allclose(T_out, np.array([60.0, 45.0, 30.0]))
     np.testing.assert_allclose(Q_out, np.array([12.5, 10.0, 12.5]))
@@ -295,17 +309,21 @@ def test_prepare_latent_hp_profile_merges_cold_segments_with_complex_temperature
     T_hp = [31.5, 30.8, 30.4, 30.0]
     Q_hp = [12.5, 10.0, 7.5, 5.0]
 
-    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=False)
+    T_out, Q_out = _prepare_latent_hp_profile(
+        T_hp, Q_hp, dT_phase_change=1.0, is_hot=False
+    )
 
     np.testing.assert_allclose(T_out, np.array([31.5, 30.0]))
-    np.testing.assert_allclose(Q_out, np.array([12.5, 22.5]))    
+    np.testing.assert_allclose(Q_out, np.array([12.5, 22.5]))
 
 
 def test_prepare_latent_hp_profile_keeps_unique_sequences_unchanged():
     T_hp = [180.0, 160.0, 140.0]
     Q_hp = [8.0, 6.0, 4.0]
 
-    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=0.5, is_hot=True)
+    T_out, Q_out = _prepare_latent_hp_profile(
+        T_hp, Q_hp, dT_phase_change=0.5, is_hot=True
+    )
 
     np.testing.assert_allclose(T_out, T_hp)
     np.testing.assert_allclose(Q_out, Q_hp)
@@ -315,7 +333,9 @@ def test_prepare_latent_hp_profile_handles_empty_input():
     T_hp = []
     Q_hp = []
 
-    T_out, Q_out = _prepare_latent_hp_profile(T_hp, Q_hp, dT_phase_change=1.0, is_hot=True)
+    T_out, Q_out = _prepare_latent_hp_profile(
+        T_hp, Q_hp, dT_phase_change=1.0, is_hot=True
+    )
 
     assert len(T_out) == 0
     assert len(Q_out) == 0
@@ -332,7 +352,9 @@ def test_validate_vapour_hp_refrigerant_ls_defaults_to_water_and_matches_length(
 
 
 def test_validate_vapour_hp_refrigerant_ls_preserves_length_when_provided():
-    args = SimpleNamespace(refrigerant_ls=["Water", "Ammonia"], do_refrigerant_sort=True)
+    args = SimpleNamespace(
+        refrigerant_ls=["Water", "Ammonia"], do_refrigerant_sort=True
+    )
     n = 2
     refrigerants = _validate_vapour_hp_refrigerant_ls(n, args)
 
@@ -342,7 +364,9 @@ def test_validate_vapour_hp_refrigerant_ls_preserves_length_when_provided():
 
 
 def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
-    args = SimpleNamespace(refrigerant_ls=["Ammonia", "Water"], do_refrigerant_sort=True)
+    args = SimpleNamespace(
+        refrigerant_ls=["Ammonia", "Water"], do_refrigerant_sort=True
+    )
     n = 4
     refrigerants = _validate_vapour_hp_refrigerant_ls(n, args)
 
@@ -376,7 +400,10 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
 
     assert x0_ls.shape == (1, 10)
     assert len(bnds) == x0_ls.shape[1]
-    assert np.all((x0_ls[0] >= np.array([b[0] for b in bnds])) & (x0_ls[0] <= np.array([b[1] for b in bnds])))
+    assert np.all(
+        (x0_ls[0] >= np.array([b[0] for b in bnds]))
+        & (x0_ls[0] <= np.array([b[1] for b in bnds]))
+    )
 
 
 def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
@@ -404,7 +431,10 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
 
     assert x0_ls.shape == (1, 9)
     assert len(bnds) == x0_ls.shape[1]
-    assert np.all((x0_ls[0] >= np.array([b[0] for b in bnds])) & (x0_ls[0] <= np.array([b[1] for b in bnds])))
+    assert np.all(
+        (x0_ls[0] >= np.array([b[0] for b in bnds]))
+        & (x0_ls[0] <= np.array([b[1] for b in bnds]))
+    )
 
 
 def test_brayton_x0_and_bounds_shapes_are_consistent():
@@ -419,4 +449,7 @@ def test_brayton_x0_and_bounds_shapes_are_consistent():
 
     assert len(x0) == 4
     assert len(bnds) == 4
-    assert np.all((np.array(x0) >= np.array([b[0] for b in bnds])) & (np.array(x0) <= np.array([b[1] for b in bnds])))
+    assert np.all(
+        (np.array(x0) >= np.array([b[0] for b in bnds]))
+        & (np.array(x0) <= np.array([b[1] for b in bnds]))
+    )

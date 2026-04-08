@@ -106,11 +106,21 @@ def test_parallel_aggregates_match_sum_of_stage_results():
         Q_cool=np.array([900.0, 500.0]),
     )
 
-    assert np.isclose(cycle.work, sum(c.work for c in cycle.subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_evap, sum(c.Q_evap for c in cycle.subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_cond, sum(c.Q_cond for c in cycle.subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_heat, sum(c.Q_heat for c in cycle.subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_cool, sum(c.Q_cool for c in cycle.subcycles), rtol=1e-7, atol=1e-8)
+    assert np.isclose(
+        cycle.work, sum(c.work for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_evap, sum(c.Q_evap for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cond, sum(c.Q_cond for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_heat, sum(c.Q_heat for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cool, sum(c.Q_cool for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
 
 
 def test_parallel_build_stream_collection_is_union_of_stage_streams():
@@ -212,5 +222,9 @@ def test_parallel_streams_match_aggregate_heat():
 
     streams = StreamCollection()
     streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
-    assert np.isclose(sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0)
-    assert np.isclose(sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0)
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+    )
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+    )

@@ -51,7 +51,7 @@ def test_cascade_rejects_invalid_temperature_order():
         T_evap=np.array([35.0, 25.0]),
         T_cond=np.array([30.0, 20.0]),
         refrigerant="R134a",
-    )    
+    )
     assert cycle.solved == False
 
 
@@ -60,7 +60,7 @@ def test_cascade_num_cycles_matches_network_definition():
     T_cond = np.array([85.0, 60.0, 45.0])
     Q_heat = np.array([1000.0, 800.0, 200.0])
     T_evap = np.array([20.0, 0.0])
-    Q_cool = np.array([600.0, None])   
+    Q_cool = np.array([600.0, None])
     dt_cascade_hx = 4.0
 
     cycle.solve(
@@ -78,17 +78,24 @@ def test_cascade_num_cycles_matches_network_definition():
     assert cycle.num_cycles == len(T_cond) + len(T_evap) - 1
     assert len(cycle._subcycles) == cycle.num_cycles
 
-    
     streams = StreamCollection()
     for subcycle in cycle.subcycles:
         streams = subcycle.build_stream_collection(include_cond=True, include_evap=True)
-        assert np.isclose(sum([s.heat_flow for s in streams.get_cold_streams()]), subcycle.Q_cool, 0)
-        assert np.isclose(sum([s.heat_flow for s in streams.get_hot_streams()]), subcycle.Q_heat, 0)
+        assert np.isclose(
+            sum([s.heat_flow for s in streams.get_cold_streams()]), subcycle.Q_cool, 0
+        )
+        assert np.isclose(
+            sum([s.heat_flow for s in streams.get_hot_streams()]), subcycle.Q_heat, 0
+        )
 
     streams = StreamCollection()
     streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
-    assert np.isclose(sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0)
-    assert np.isclose(sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0)
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+    )
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+    )
 
 
 def test_each_cascade_stage_matches_simple_heat_pump_solution():
@@ -154,11 +161,21 @@ def test_cascade_aggregates_match_sum_of_stage_results():
         Q_cool=np.array([0.0, 0.0, 900.0]),
     )
 
-    assert np.isclose(cycle.work, sum(c.work for c in cycle._subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_evap, sum(c.Q_evap for c in cycle._subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_cond, sum(c.Q_cond for c in cycle._subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_heat, sum(c.Q_heat for c in cycle._subcycles), rtol=1e-7, atol=1e-8)
-    assert np.isclose(cycle.Q_cool, sum(c.Q_cool for c in cycle._subcycles), rtol=1e-7, atol=1e-8)
+    assert np.isclose(
+        cycle.work, sum(c.work for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_evap, sum(c.Q_evap for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cond, sum(c.Q_cond for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_heat, sum(c.Q_heat for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cool, sum(c.Q_cool for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
 
 
 def test_cascade_build_stream_collection_is_union_of_stage_streams():
@@ -284,4 +301,6 @@ def test_cascade_q_heat_nan_defaults_to_one_for_first_and_zero_elsewhere():
         Q_heat=np.array([np.nan, np.nan]),
         Q_cool=np.array([0.0, 900.0]),
     )
-    assert np.allclose(cycle.Q_heat_arr, np.array([1.0, 0.0, 0.0]), rtol=1e-7, atol=1e-8)
+    assert np.allclose(
+        cycle.Q_heat_arr, np.array([1.0, 0.0, 0.0]), rtol=1e-7, atol=1e-8
+    )

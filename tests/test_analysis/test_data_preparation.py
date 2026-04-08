@@ -2,7 +2,7 @@
 Tests for `prepare_problem` in OpenPinch.
 
 This test suite validates the core functionality and edge behavior of the
-prepare_problem function, which transforms raw stream and utility input 
+prepare_problem function, which transforms raw stream and utility input
 data into structured Zone objects with zones, utilities, and heat integration attributes.
 
 Test Categories:
@@ -40,7 +40,7 @@ Fixtures:
 
 Note:
 -----
-All edge cases aim to test both robustness and realistic behavior. Some tests intentionally include borderline inputs 
+All edge cases aim to test both robustness and realistic behavior. Some tests intentionally include borderline inputs
 (e.g. zero values or mismatched heat flow directions) to verify internal fallbacks or fail-safes.
 
 """
@@ -993,7 +993,9 @@ def test_valid_zone_types(zone_type_str, expected_zone_type):
 
 
 def test_zone_type_defaults_with_depth():
-    root = ZoneTreeSchema(name="Root", type="Zone", children=[ZoneTreeSchema(name="Child", type="Zone")])
+    root = ZoneTreeSchema(
+        name="Root", type="Zone", children=[ZoneTreeSchema(name="Child", type="Zone")]
+    )
     _, child_type = _get_validated_zone_info(root.children[0], depth=1)
     _, grandchild_type = _get_validated_zone_info(
         ZoneTreeSchema(name="Grandchild", type="Zone"), depth=2
@@ -1024,6 +1026,7 @@ from OpenPinch.analysis.data_preparation import _create_nested_zones
 def config():
     # Minimal mock config with required attributes
     """Test helper for config."""
+
     class Config:
         TOP_ZONE_NAME = "MySite"
         TOP_ZONE_IDENTIFIER = ZoneType.S.value
@@ -1051,7 +1054,9 @@ def test_creates_nested_zones_correctly():
     zone_config = Configuration()
     zone_tree = make_zone_tree_schema()
     master_zone = Zone(
-        name=zone_config.TOP_ZONE_NAME, identifier=zone_config.TOP_ZONE_IDENTIFIER, zone_config=zone_config
+        name=zone_config.TOP_ZONE_NAME,
+        identifier=zone_config.TOP_ZONE_IDENTIFIER,
+        zone_config=zone_config,
     )
 
     result = _create_nested_zones(master_zone, zone_tree, zone_config)
@@ -1073,7 +1078,9 @@ def test_creates_nested_zones_correctly():
 def test_empty_zone_tree_returns_parent():
     zone_config = Configuration()
     zone_tree = ZoneTreeSchema(name="MySite", type=ZoneType.S.value, children=None)
-    parent_zone = Zone(name="MySite", identifier=ZoneType.S.value, zone_config=zone_config)
+    parent_zone = Zone(
+        name="MySite", identifier=ZoneType.S.value, zone_config=zone_config
+    )
 
     result = _create_nested_zones(parent_zone, zone_tree, zone_config)
 
