@@ -368,9 +368,11 @@ class VapourCompressionCycle:
         eta_comp: float = 0.7,
         refrigerant: str = "water",
         dt_ihx_gas_side: float = 10.0,
-        Q_heat: float = 1.0,
+        Q_heat: float = None,
         Q_cas_heat: float = 0.0,
         Q_cool: float = None,
+        Q_cas_cool: float = 0.0,
+        is_heat_pump: bool = True,
     ) -> float:
         """
         Solve the heat pump cycle for the provided operating point.
@@ -415,10 +417,19 @@ class VapourCompressionCycle:
         self._T_cond = T_cond
         self._dT_superheat = dT_superheat
         self._dT_subcool = dT_subcool
-        self._Q_cond = Q_heat + Q_cas_heat
-        self._Q_heat = Q_heat
-        self._Q_cas_heat = Q_cas_heat
-        self._Q_cool = Q_cool
+
+        # TODO: Check if this code block could be written more clearly
+        self._Q_heat = np.float64(1.0) if (is_heat_pump == True and Q_heat == None) else Q_heat
+        self._Q_cas_heat = Q_cas_heat if is_heat_pump else None
+        self._Q_cool = np.float64(1.0) if (is_heat_pump == False and Q_cool == None) else Q_cool
+        self._Q_cas_cool = Q_cas_cool if not (is_heat_pump) else None
+
+        if is_heat_pump:
+            self._Q_cond = self._Q_heat + self._Q_cas_heat
+        else:
+            self._Q_evap = self._Q_cool + self._Q_cas_cool
+        # End block
+        
         self._eta_comp = eta_comp
         self._ihx_gas_dt = max(
             min(

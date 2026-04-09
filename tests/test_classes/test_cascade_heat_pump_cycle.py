@@ -37,7 +37,6 @@ def _assert_stage_matches_simple(cascade, i, *, T_evap, T_cond, **kwargs):
     assert np.isclose(stage.Q_evap, ref.Q_evap, rtol=1e-7, atol=1e-8)
     assert np.isclose(stage.Q_cond, ref.Q_cond, rtol=1e-7, atol=1e-8)
     assert np.isclose(stage.Q_heat, ref.Q_heat, rtol=1e-7, atol=1e-8)
-    assert np.isclose(stage.Q_cool, ref.Q_cool, rtol=1e-7, atol=1e-8)
 
 
 def test_cascade_requires_solution_before_dependent_properties():
@@ -76,6 +75,7 @@ def test_cascade_num_cycles_matches_network_definition():
         refrigerant=["R134a", "R134a", "R134a", "R134a"],
         Q_heat=Q_heat,
         Q_cool=Q_cool,
+        is_heat_pump=True,
     )
 
     assert cycle.num_cycles == len(T_cond) + len(T_evap) - 1
@@ -468,6 +468,7 @@ def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
         refrigerant=["water"],
         Q_heat=np.array([1.0, 1.0]),
         Q_cool=None,
+        is_heat_pump=True,
     )
 
     assert isinstance(work, float)

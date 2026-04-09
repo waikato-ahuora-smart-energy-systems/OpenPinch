@@ -92,6 +92,7 @@ def test_each_parallel_stage_matches_simple_heat_pump_solution():
             eta_comp=eta_comp,
             Q_heat=Q_heat[i],
             Q_cool=Q_cool[i],
+            is_heat_pump=True,
         )
 
 
@@ -428,6 +429,7 @@ def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
         refrigerant=["water"],
         Q_heat=np.array([1.0, 2.0]),
         Q_cool=np.array([None, None]),
+        is_heat_pump=True,
     )
 
     assert isinstance(work, float)

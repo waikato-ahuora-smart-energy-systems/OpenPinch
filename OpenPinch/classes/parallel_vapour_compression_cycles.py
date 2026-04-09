@@ -354,6 +354,7 @@ class ParallelVapourCompressionCycles:
         dt_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray | float | None = None,
         Q_cool: np.ndarray | float | None = None,
+        is_heat_pump: bool = True,
     ) -> float:
         """
         Solve a set of parallel simple heat pump cycles.
@@ -436,6 +437,7 @@ class ParallelVapourCompressionCycles:
                 dt_ihx_gas_side=ihx_gas_dt_all[i],
                 Q_heat=Q_heat_all[i],
                 Q_cool=Q_cool_all[i],
+                is_heat_pump=is_heat_pump,
             )
             self._subcycles.append(hp)
 

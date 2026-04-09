@@ -91,13 +91,13 @@ are enabled, while others are better viewed as expert-level helper libraries.
 Heat Pump Targeting API
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Public entry points exposed by ``OpenPinch.analysis.heat_pump_targeting``:
+Public entry points exposed by ``OpenPinch.analysis.heat_pump_and_refrigeration_targeting``:
 
-- :func:`OpenPinch.analysis.heat_pump_targeting.get_heat_pump_targets`
-- :func:`OpenPinch.analysis.heat_pump_targeting.calc_heat_pump_cascade`
-- :func:`OpenPinch.analysis.heat_pump_targeting.plot_multi_hp_profiles_from_results`
+- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.get_heat_pump_and_refrigeration_targets`
+- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.calc_heat_pump_and_refrigeration_cascade`
+- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.plot_multi_hp_profiles_from_results`
 
-.. automodule:: OpenPinch.analysis.heat_pump_targeting
+.. automodule:: OpenPinch.analysis.heat_pump_and_refrigeration_targeting
    :members:
 
 .. automodule:: OpenPinch.analysis.capital_cost_and_area_targeting

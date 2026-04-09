@@ -389,9 +389,10 @@ class CascadeVapourCompressionCycle:
         eta_comp: float = 0.7,
         refrigerant: List[str] | str = "water",
         dt_ihx_gas_side: np.ndarray | float = 10.0,
-        Q_heat: np.ndarray = np.array([1]),
-        Q_cool: np.ndarray | float | None = None,
+        Q_heat: np.ndarray = None,
+        Q_cool: np.ndarray = None,
         dt_cascade_hx: float = 1.0,
+        is_heat_pump: bool = True,
     ) -> float:
         """
         Solve the heat pump cycle for the provided operating point.
@@ -415,8 +416,11 @@ class CascadeVapourCompressionCycle:
         Q_heat : np.ndarray, optional
             Heat delivered to the process [W].
         Q_cool : np.ndarray, optional
-            Cooling delivered to the process [W]; remaining cooling is supplied by
-            a lower cascade cycle in cascade configurations.
+            Cooling delivered to the process [W].
+        dt_cascade_hx : float, optional
+            Temperature difference between condensing and evaporating temperatures in the cascade heat exchanger.
+        is_heat_pump : bool, optional
+            Flag to indicate if the cycle is in heat pump or refrigeration mode. 
 
         Returns
         -------
@@ -425,6 +429,27 @@ class CascadeVapourCompressionCycle:
         """
         self._solved = False
         self._subcycles = []
+        if is_heat_pump:
+            Q_heat = np.asarray(Q_heat if Q_heat is not None else 1.0, dtype=float)
+            if isinstance(Q_cool, list):
+                Q_cool = np.asarray(Q_cool)
+            if isinstance(Q_cool, np.ndarray):
+                if Q_cool[-1] != None:
+                    Q_cool[-1] = np.nan
+                    # raise ValueError("Specification error for cascade vapour compression cycle. Heat pumps must include None as the last element in Q_cool.")
+            else:
+                Q_cool = None                
+        else: # is refrigeration
+            Q_cool = np.asarray(Q_cool if Q_cool is not None else 1.0, dtype=float)
+            if isinstance(Q_heat, list):
+                Q_heat = np.asarray(Q_heat)            
+            if isinstance(Q_heat, np.ndarray):
+                if Q_heat[-1] != None:
+                    Q_heat[-1] = np.nan
+                    # raise ValueError("Specification error for cascade vapour compression cycle. Refrigeration units must include None as the last element in Q_heat.")
+            else:
+                Q_heat = None
+
         self._dt_cascade_hx = dt_cascade_hx
 
         T_cond = np.asarray(T_cond, dtype=float)
@@ -483,6 +508,7 @@ class CascadeVapourCompressionCycle:
                 raise ValueError("dt_ihx_gas_side must match the number of heat pumps.")
 
         Q_cas_heat = 0.0
+        Q_cas_cool = 0.0
         for i in range(self._num_cycles):
             hp = VapourCompressionCycle()
             hp.solve(
@@ -496,9 +522,12 @@ class CascadeVapourCompressionCycle:
                 Q_heat=Q_heat_all[i],
                 Q_cas_heat=Q_cas_heat,
                 Q_cool=Q_cool_all[i],
+                Q_cas_cool=Q_cas_cool,
+                is_heat_pump=is_heat_pump,
             )
             self._subcycles.append(hp)
-            Q_cas_heat = hp.Q_cas_cool
+            Q_cas_heat = hp.Q_cas_cool if is_heat_pump else 0.0
+            Q_cas_cool = 0.0 if is_heat_pump else hp.Q_cas_heat
 
         # Finish analysis
         self._solved = True

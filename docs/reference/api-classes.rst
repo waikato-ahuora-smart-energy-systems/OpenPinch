@@ -58,7 +58,7 @@ Heat Pump Classes
 -----------------
 
 These classes support the heat-pump targeting and cascade-construction
-workflows documented in :mod:`OpenPinch.analysis.heat_pump_targeting`. They are
+workflows documented in :mod:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting`. They are
 primarily useful for advanced users who want to inspect or construct detailed
 cycle configurations directly.
 

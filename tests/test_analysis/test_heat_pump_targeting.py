@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from OpenPinch.utils import *
-from OpenPinch.analysis.heat_pump_targeting import (
+from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
     _balance_hot_and_cold_heat_loads_with_ambient_air,
     _compute_entropic_average_temperature_in_K,
     _compute_COP_estimate_from_carnot_limit,
@@ -24,7 +24,7 @@ from OpenPinch.analysis.heat_pump_targeting import (
     _get_x0_for_brayton_hp_opt,
     _get_bounds_for_brayton_hp_opt,
 )
-from OpenPinch.analysis import heat_pump_targeting as hp_targeting_module
+from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp_targeting_module
 
 
 def get_temperatures():
@@ -464,7 +464,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis import heat_pump_targeting as hp
+from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
@@ -540,7 +540,7 @@ def _patch_output_model_validate(monkeypatch):
     "q_amb",
     [20.0, -20.0, 0.0],
 )
-def test_calc_heat_pump_cascade_branches(monkeypatch, q_amb):
+def test_calc_heat_pump_and_refrigeration_cascade_branches(monkeypatch, q_amb):
     pt = ProblemTable(
         {
             PT.T.value: [120.0, 60.0],
@@ -586,7 +586,7 @@ def test_calc_heat_pump_cascade_branches(monkeypatch, q_amb):
         Q_amb=q_amb,
         amb_stream=amb_stream,
     )
-    out = hp.calc_heat_pump_cascade(
+    out = hp.calc_heat_pump_and_refrigeration_cascade(
         pt, res, is_T_vals_shifted=True, is_process_integration=True
     )
     assert isinstance(out, ProblemTable)
@@ -1089,7 +1089,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from OpenPinch.analysis import heat_pump_targeting as hp
+from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
 from OpenPinch.classes import ProblemTable, Stream, StreamCollection
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import ProblemTableLabel as PT
@@ -1160,7 +1160,7 @@ def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
     cfg = Configuration()
     monkeypatch.setattr(
         hp,
-        "_apply_temperature_shift_for_heat_pump_stream_dtmin_cont",
+        "_apply_temperature_shift_for_hpr_stream_dtmin_cont",
         lambda T_vals, dtmin_hp: (
             np.array([95.0, 85.0, 75.0]),
             np.array([105.0, 95.0, 85.0]),
@@ -1195,7 +1195,7 @@ def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
         "_create_net_hot_and_cold_stream_collections_for_background_profile",
         _fake_bg_streams,
     )
-    out = hp._prepare_heat_pump_target_inputs(
+    out = hp._prepare_hpr_target_inputs(
         Q_target=10.0,
         T_vals=np.array([100.0, 90.0, 80.0]),
         H_hot=np.array([0.0, -5.0, -10.0]),
@@ -1207,7 +1207,7 @@ def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
 
 
 def test_temperature_shift_and_h_column_edge_branches():
-    T_hot, T_cold, dT = hp._apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
+    T_hot, T_cold, dT = hp._apply_temperature_shift_for_hpr_stream_dtmin_cont(
         np.array([100.0, 80.0]), 10.0
     )
     np.testing.assert_allclose(T_hot, np.array([95.0, 75.0]))

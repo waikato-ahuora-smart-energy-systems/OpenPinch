@@ -1,4 +1,4 @@
-"""Heat-pump targeting and cascade-construction utilities for composite curves."""
+"""Heat pump targeting and cascade-construction utilities for composite curves."""
 
 import numpy as np
 from scipy.optimize import minimize
@@ -15,8 +15,8 @@ from ..classes.cascade_vapour_compression_cycle import CascadeVapourCompressionC
 from ..classes.parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
 
 __all__ = [
-    "get_heat_pump_targets",
-    "calc_heat_pump_cascade",
+    "get_heat_pump_and_refrigeration_targets",
+    "calc_heat_pump_and_refrigeration_cascade",
     "plot_multi_hp_profiles_from_results",
 ]
 
@@ -26,7 +26,7 @@ __all__ = [
 #######################################################################################################
 
 
-def get_heat_pump_targets(
+def get_heat_pump_and_refrigeration_targets(
     Q_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
@@ -66,7 +66,7 @@ def get_heat_pump_targets(
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
     # zone_config.HP_TYPE = HeatPumpType.CascadeVapourComp.value
-    args = _prepare_heat_pump_target_inputs(
+    args = _prepare_hpr_target_inputs(
         Q_target=Q_target,
         T_vals=T_vals,
         H_hot=np.abs(H_hot) * -1,
@@ -83,7 +83,7 @@ def get_heat_pump_targets(
     return HeatPumpTargetOutputs.model_validate(res)
 
 
-def calc_heat_pump_cascade(
+def calc_heat_pump_and_refrigeration_cascade(
     pt: ProblemTable,
     res: HeatPumpTargetOutputs,
     is_T_vals_shifted: bool,
@@ -251,7 +251,7 @@ def plot_multi_hp_profiles_from_results(
 #######################################################################################################
 
 
-def _prepare_heat_pump_target_inputs(
+def _prepare_hpr_target_inputs(
     Q_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
@@ -284,7 +284,7 @@ def _prepare_heat_pump_target_inputs(
         Normalised and validated optimisation arguments.
     """
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
-    T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
+    T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
         T_vals, zone_config.DTMIN_HP
     )
     T_cold, H_cold = _get_H_col_till_target_Q(Q_target, T_cold, H_cold)
@@ -353,7 +353,7 @@ def _prepare_heat_pump_target_inputs(
     )
 
 
-def _apply_temperature_shift_for_heat_pump_stream_dtmin_cont(
+def _apply_temperature_shift_for_hpr_stream_dtmin_cont(
     T_vals: np.ndarray,
     dtmin_hp: float,
 ):

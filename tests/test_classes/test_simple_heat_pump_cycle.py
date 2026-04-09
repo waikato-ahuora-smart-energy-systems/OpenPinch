@@ -63,6 +63,7 @@ def test_heat_pump_cycle_case_1():
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=1000,
+        is_heat_pump=True,
     )
 
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
@@ -82,6 +83,7 @@ def test_heat_pump_cycle_case_2():
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=1000,
+        is_heat_pump=True,
     )
 
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
@@ -101,6 +103,7 @@ def test_heat_pump_cycle_case_3():
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=0,
+        is_heat_pump=True,
     )
 
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
@@ -122,6 +125,7 @@ def test_heat_pump_cycle_case_4():
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=1000,
+        is_heat_pump=True,
     )
 
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
@@ -143,6 +147,7 @@ def test_heat_pump_cycle_case_5():
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=1000,
+        is_heat_pump=True,
     )
 
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
@@ -164,6 +169,7 @@ def test_heat_pump_cycle_case_6():
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=1000,
+        is_heat_pump=True,
     )
 
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
@@ -185,6 +191,7 @@ def test_heat_pump_cycle_case_7():
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=1000,
+        is_heat_pump=True,
     )
 
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
@@ -207,6 +214,7 @@ def test_heat_pump_cycle_case_8():
         refrigerant="R601",
         Q_heat=500,
         Q_cas_heat=500,
+        is_heat_pump=True,
     )
     _validate_results(cycle1, T_evap, T_cond, dT_superheat, dT_subcool)
 
@@ -221,6 +229,7 @@ def test_heat_pump_cycle_case_8():
         refrigerant="R601",
         Q_heat=500,
         Q_cas_heat=500,
+        is_heat_pump=True,
     )
     _validate_results(cycle2, T_evap, T_cond, dT_superheat, dT_subcool)
 
@@ -247,6 +256,7 @@ def test_heat_pump_cycle_case_9():
         Q_heat=500,
         Q_cas_heat=500,
         Q_cool=300,
+        is_heat_pump=True,
     )
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
     assert np.isclose(cycle.Q_evap, cycle.Q_cool + cycle.Q_cas_cool, 0.0)
@@ -279,6 +289,7 @@ def test_heat_pump_cycle_case_10():
         Q_heat=0.0,
         Q_cas_heat=900,
         Q_cool=np.nan,
+        is_heat_pump=True,
     )
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
     assert np.isclose(cycle.Q_evap, cycle.Q_cool + cycle.Q_cas_cool, 0.0)

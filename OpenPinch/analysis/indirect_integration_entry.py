@@ -15,8 +15,8 @@ from . import (
     get_process_heat_cascade,
     get_additional_GCCs,
     problem_table_algorithm,
-    get_heat_pump_targets,
-    calc_heat_pump_cascade,
+    get_heat_pump_and_refrigeration_targets,
+    calc_heat_pump_and_refrigeration_cascade,
     get_heat_recovery_target_from_pt,
     set_zonal_targets,
     plot_multi_hp_profiles_from_results,
@@ -122,7 +122,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
             * np.abs(pt.col[PT.H_HOT_UT.value]).max()
         )
         if (
-            _validate_heat_pump_targeting_required(pt, True, zone_config)
+            _validate_heat_pump_and_refrigeration_targeting_required(pt, True, zone_config)
             and Q_target > 0
         ):
             # Create problem table based on inverted utility streams
@@ -134,7 +134,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
             )
             get_additional_GCCs(pt_ut_gen)
             # Perform heat pump targeting on the correct cascades
-            hp_res = get_heat_pump_targets(
+            hp_res = get_heat_pump_and_refrigeration_targets(
                 Q_target=Q_target,
                 T_vals=pt_ut_gen.col[PT.T.value],
                 H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
@@ -144,7 +144,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
             )
             res.update(hp_res)
             # Add the heat pump profile to the general problem table
-            calc_heat_pump_cascade(
+            calc_heat_pump_and_refrigeration_cascade(
                 pt=pt,
                 res=hp_res,
                 is_T_vals_shifted=True,
@@ -363,7 +363,7 @@ def _save_graph_data(
     }
 
 
-def _validate_heat_pump_targeting_required(
+def _validate_heat_pump_and_refrigeration_targeting_required(
     pt: ProblemTable,
     is_heat_pumping: bool,
     zone_config: Configuration,

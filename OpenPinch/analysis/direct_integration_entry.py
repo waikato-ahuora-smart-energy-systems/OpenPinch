@@ -22,8 +22,8 @@ from . import (
     get_capital_cost_targets,
     get_balanced_CC,
     get_additional_GCCs,
-    get_heat_pump_targets,
-    calc_heat_pump_cascade,
+    get_heat_pump_and_refrigeration_targets,
+    calc_heat_pump_and_refrigeration_cascade,
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -79,10 +79,10 @@ def compute_direct_integration_targets(zone: Zone):
             * np.abs(pt.col[PT.H_NET_COLD.value]).max()
         )
         if (
-            _validate_heat_pump_targeting_required(pt, True, zone_config)
+            _validate_heat_pump_and_refrigeration_targeting_required(pt, True, zone_config)
             and Q_target > 0
         ):
-            hp_res = get_heat_pump_targets(
+            hp_res = get_heat_pump_and_refrigeration_targets(
                 Q_target=Q_target,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
@@ -91,7 +91,7 @@ def compute_direct_integration_targets(zone: Zone):
                 is_heat_pumping=True,
             )
             res.update(hp_res)
-            calc_heat_pump_cascade(
+            calc_heat_pump_and_refrigeration_cascade(
                 pt=pt,
                 res=hp_res,
                 is_T_vals_shifted=True,
@@ -373,7 +373,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
     }
 
 
-def _validate_heat_pump_targeting_required(
+def _validate_heat_pump_and_refrigeration_targeting_required(
     pt: ProblemTable,
     is_heat_pumping: bool,
     zone_config: Configuration,
