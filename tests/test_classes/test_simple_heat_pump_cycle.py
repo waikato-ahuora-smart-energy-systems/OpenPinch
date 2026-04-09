@@ -9,12 +9,12 @@ CoolProp = pytest.importorskip("CoolProp")
 from CoolProp.CoolProp import PropsSI
 from CoolProp.Plots.SimpleCycles import StateContainer
 
-from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
+from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 from OpenPinch.lib.enums import *
 
 
 def _validate_results(
-    cycle: SimpleHeatPumpCycle,
+    cycle: VapourCompressionCycle,
     T_evap,
     T_cond,
     dT_superheat,
@@ -24,9 +24,9 @@ def _validate_results(
     cond_streams = cycle.build_stream_collection(include_cond=True)
     evap_streams = cycle.build_stream_collection(include_evap=True)
 
-    assert len(cycle.Hs) == SimpleHeatPumpCycle.STATECOUNT
-    assert len(cycle.Ts) == SimpleHeatPumpCycle.STATECOUNT
-    assert len(cycle.Ps) == SimpleHeatPumpCycle.STATECOUNT
+    assert len(cycle.Hs) == VapourCompressionCycle.STATECOUNT
+    assert len(cycle.Ts) == VapourCompressionCycle.STATECOUNT
+    assert len(cycle.Ps) == VapourCompressionCycle.STATECOUNT
     assert np.isclose(cycle.q_cond - cycle.q_evap - cycle.w_net, 0)
     assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0)
     assert np.isclose(cycle.Q_cond - cycle.Q_heat - cycle.Q_cas_heat, 0)
@@ -53,7 +53,7 @@ def test_heat_pump_cycle_case_1():
     dT_superheat = 5.0  # K superheat
     dT_subcool = 5.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -74,7 +74,7 @@ def test_heat_pump_cycle_case_2():
     dT_superheat = 0.0  # K superheat
     dT_subcool = 0.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -93,7 +93,7 @@ def test_heat_pump_cycle_case_3():
     dT_superheat = 0.0  # K superheat
     dT_subcool = 0.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -112,7 +112,7 @@ def test_heat_pump_cycle_case_4():
     dT_superheat = 5.0  # K superheat
     dT_subcool = 0.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -133,7 +133,7 @@ def test_heat_pump_cycle_case_5():
     dT_superheat = 10.0  # K superheat
     dT_subcool = 10.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -154,7 +154,7 @@ def test_heat_pump_cycle_case_6():
     dT_superheat = 0.0  # K superheat
     dT_subcool = 0.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -175,7 +175,7 @@ def test_heat_pump_cycle_case_7():
     dT_superheat = 10.0  # K superheat
     dT_subcool = 10.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -196,7 +196,7 @@ def test_heat_pump_cycle_case_8():
     dT_superheat = 10.0  # K superheat
     dT_subcool = 10.0  # K subcooling
 
-    cycle1 = SimpleHeatPumpCycle()
+    cycle1 = VapourCompressionCycle()
     cycle1.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -210,7 +210,7 @@ def test_heat_pump_cycle_case_8():
     )
     _validate_results(cycle1, T_evap, T_cond, dT_superheat, dT_subcool)
 
-    cycle2 = SimpleHeatPumpCycle()
+    cycle2 = VapourCompressionCycle()
     cycle2.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -235,7 +235,7 @@ def test_heat_pump_cycle_case_9():
     dT_superheat = 10.0  # K superheat
     dT_subcool = 10.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -267,7 +267,7 @@ def test_heat_pump_cycle_case_10():
     dT_superheat = 5.0  # K superheat
     dT_subcool = 2.0  # K subcooling
 
-    cycle = SimpleHeatPumpCycle()
+    cycle = VapourCompressionCycle()
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -294,14 +294,14 @@ def test_heat_pump_cycle_case_10():
 
 
 # ===== Merged from test_simple_heat_pump_cycle_extra.py =====
-"""Additional branch coverage tests for SimpleHeatPumpCycle."""
+"""Additional branch coverage tests for VapourCompressionCycle."""
 
 import numpy as np
 import pytest
 import CoolProp
 
-from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
-import OpenPinch.classes.simple_heat_pump as shp_mod
+from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+import OpenPinch.classes.vapour_compression_cycle as shp_mod
 
 
 class _DummyState:
@@ -343,7 +343,7 @@ class _CycleStore(dict):
 
 
 def test_simple_cycle_property_getters_and_require_solution():
-    hp = SimpleHeatPumpCycle()
+    hp = VapourCompressionCycle()
     hp._cycle_states = "cycle-states"
     hp._q_cas_cool = 1.0
     hp._q_cool = 2.0
@@ -380,7 +380,7 @@ def test_simple_cycle_property_getters_and_require_solution():
 
 
 def test_validate_solve_inputs_and_get_psat_high_temperature_branch():
-    hp = SimpleHeatPumpCycle()
+    hp = VapourCompressionCycle()
     with pytest.raises(ValueError, match="A fluid must be specified"):
         hp._validate_solve_inputs(refrigerant=None)
 
@@ -392,16 +392,16 @@ def test_validate_solve_inputs_and_get_psat_high_temperature_branch():
 
 
 def test_build_evaporator_profile_subcooled_segment_branch(monkeypatch):
-    hp = SimpleHeatPumpCycle()
+    hp = VapourCompressionCycle()
     hp._solved = True
     hp._state = _DummyState()
     hp._p_crit = 10.0
     hp._dt_diff_max = 0.5
 
     monkeypatch.setattr(
-        SimpleHeatPumpCycle, "Hs", property(lambda self: [0.0, 0.0, 0.0, 1.0, 0.0, 5.0])
+        VapourCompressionCycle, "Hs", property(lambda self: [0.0, 0.0, 0.0, 1.0, 0.0, 5.0])
     )
-    monkeypatch.setattr(SimpleHeatPumpCycle, "Ps", property(lambda self: [1.0]))
+    monkeypatch.setattr(VapourCompressionCycle, "Ps", property(lambda self: [1.0]))
     monkeypatch.setattr(
         shp_mod,
         "get_piecewise_data_points",
@@ -414,7 +414,7 @@ def test_build_evaporator_profile_subcooled_segment_branch(monkeypatch):
 
 
 def test_solve_raises_on_pressure_and_enthalpy_invalid_states(monkeypatch):
-    hp = SimpleHeatPumpCycle()
+    hp = VapourCompressionCycle()
     hp._state = _DummyState()
 
     monkeypatch.setattr(hp, "_validate_solve_inputs", lambda refrigerant=None: True)
@@ -426,7 +426,7 @@ def test_solve_raises_on_pressure_and_enthalpy_invalid_states(monkeypatch):
     ):
         hp.solve(T_evap=20.0, T_cond=40.0, refrigerant="water")
 
-    hp2 = SimpleHeatPumpCycle()
+    hp2 = VapourCompressionCycle()
     hp2._state = _DummyState()
     hp2._cycle_states = _CycleStore()
     monkeypatch.setattr(hp2, "_validate_solve_inputs", lambda refrigerant=None: True)
@@ -466,7 +466,7 @@ def test_solve_raises_on_pressure_and_enthalpy_invalid_states(monkeypatch):
 
 
 # ===== Merged from test_simple_heat_pump_properties_extra.py =====
-"""Extra property/helper branch coverage for ``SimpleHeatPumpCycle``."""
+"""Extra property/helper branch coverage for ``VapourCompressionCycle``."""
 
 
 import pytest
@@ -474,11 +474,11 @@ import pytest
 from CoolProp.Plots.SimpleCycles import StateContainer
 import CoolProp
 
-from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
+from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 
 
 def test_simple_heat_pump_state_and_cycle_state_setters():
-    hp = SimpleHeatPumpCycle()
+    hp = VapourCompressionCycle()
 
     assert hp.system is not None
     hp.state = "HEOS::Water"
@@ -508,7 +508,7 @@ def test_simple_heat_pump_state_and_cycle_state_setters():
 
 
 def test_simple_heat_pump_cop_zero_division_and_misc_helpers(monkeypatch):
-    hp = SimpleHeatPumpCycle()
+    hp = VapourCompressionCycle()
     hp._solved = True
     hp._q_cond = 10.0
     hp._q_evap = 5.0

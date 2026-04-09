@@ -7,10 +7,10 @@ import pytest
 
 pytest.importorskip("CoolProp")
 
-import OpenPinch.classes.cascade_heat_pump as cascade_mod
+import OpenPinch.classes.cascade_vapour_compression_cycle as cascade_mod
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.cascade_heat_pump import CascadeHeatPumpCycle
-from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
+from OpenPinch.classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
+from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 
 
 def _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx):
@@ -29,7 +29,7 @@ def _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx):
 
 def _assert_stage_matches_simple(cascade, i, *, T_evap, T_cond, **kwargs):
     """Assert that stage matches simple for this test module."""
-    ref = SimpleHeatPumpCycle()
+    ref = VapourCompressionCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 
     stage = cascade._subcycles[i]
@@ -41,7 +41,7 @@ def _assert_stage_matches_simple(cascade, i, *, T_evap, T_cond, **kwargs):
 
 
 def test_cascade_requires_solution_before_dependent_properties():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     with pytest.raises(RuntimeError):
         _ = cycle.COP_h
     with pytest.raises(RuntimeError):
@@ -49,7 +49,7 @@ def test_cascade_requires_solution_before_dependent_properties():
 
 
 def test_cascade_rejects_invalid_temperature_order():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([35.0, 25.0]),
         T_cond=np.array([30.0, 20.0]),
@@ -59,7 +59,7 @@ def test_cascade_rejects_invalid_temperature_order():
 
 
 def test_cascade_num_cycles_matches_network_definition():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     T_cond = np.array([85.0, 60.0, 45.0])
     Q_heat = np.array([1000.0, 800.0, 200.0])
     T_evap = np.array([20.0, 0.0])
@@ -102,7 +102,7 @@ def test_cascade_num_cycles_matches_network_definition():
 
 
 def test_each_cascade_stage_matches_simple_heat_pump_solution():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     T_cond = np.array([80.0, 60.0])
     T_evap = np.array([20.0, 0.0])
     dt_cascade_hx = 5.0
@@ -150,7 +150,7 @@ def test_each_cascade_stage_matches_simple_heat_pump_solution():
 
 
 def test_cascade_aggregates_match_sum_of_stage_results():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -182,7 +182,7 @@ def test_cascade_aggregates_match_sum_of_stage_results():
 
 
 def test_cascade_build_stream_collection_is_union_of_stage_streams():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -212,7 +212,7 @@ def test_cascade_build_stream_collection_is_union_of_stage_streams():
     ],
 )
 def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     base = dict(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -232,7 +232,7 @@ def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
 
 def test_cascade_solve_with_defaults_should_work_for_multistage():
     """Regression: multistage solve should work with documented defaults."""
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -245,7 +245,7 @@ def test_cascade_solve_with_defaults_should_work_for_multistage():
 
 def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
     """Only the last stage may be unspecified for Q_cool."""
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -327,7 +327,7 @@ class _DummyCascadeCycle:
 
 
 def test_cascade_property_sweep_and_normalization_branches():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     c1 = _fake_network_cycle()
     c2 = _fake_network_cycle(
         T_evap=10.0, T_cond=70.0, work=20.0, Q_evap=30.0, Q_cond=50.0
@@ -415,7 +415,7 @@ def test_cascade_property_sweep_and_normalization_branches():
 
 
 def test_cascade_property_arrays_and_unsolved_work_branch():
-    hp = CascadeHeatPumpCycle()
+    hp = CascadeVapourCompressionCycle()
     hp._subcycles = [_DummyCascadeCycle(), _DummyCascadeCycle()]
     hp._solved = True
     hp._dt_cascade_hx = 1.0
@@ -436,7 +436,7 @@ def test_cascade_property_arrays_and_unsolved_work_branch():
 
 
 def test_cascade_normalize_q_cool_and_numeric_conversion_errors():
-    hp = CascadeHeatPumpCycle()
+    hp = CascadeVapourCompressionCycle()
 
     scalar = hp._normalize_Q_cool(5.0, n_heat=2, n_cool=2)
     assert scalar.shape == (3,)
@@ -458,9 +458,9 @@ def test_cascade_normalize_q_cool_and_numeric_conversion_errors():
 
 
 def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
-    hp = CascadeHeatPumpCycle()
+    hp = CascadeVapourCompressionCycle()
     monkeypatch.setattr(hp, "_validate_T_cond_and_evap", lambda T_cond, T_evap: 0.0)
-    monkeypatch.setattr(cascade_mod, "SimpleHeatPumpCycle", _DummyCascadeCycle)
+    monkeypatch.setattr(cascade_mod, "VapourCompressionCycle", _DummyCascadeCycle)
 
     work = hp.solve(
         T_evap=np.array([25.0, 15.0]),
@@ -484,7 +484,7 @@ def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
     ],
 )
 def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     with pytest.raises(ValueError):
         cycle.solve(
             T_evap=np.array([20.0, 0.0]),
@@ -502,7 +502,7 @@ def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
 
 def test_cascade_q_heat_nan_defaults_to_one_for_first_and_zero_elsewhere():
     """Q_heat NaN defaults: index 0 -> 1.0, all other indices -> 0.0."""
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),

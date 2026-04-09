@@ -6,13 +6,13 @@ from typing import Optional, List
 import numpy as np
 
 from .stream_collection import StreamCollection
-from .simple_heat_pump import SimpleHeatPumpCycle
+from .vapour_compression_cycle import VapourCompressionCycle
 
 
-__all__ = ["MultiSimpleHeatPumpCycle"]
+__all__ = ["ParallelVapourCompressionCycles"]
 
 
-class MultiSimpleHeatPumpCycle:
+class ParallelVapourCompressionCycles:
     """Parallel set of vapour-compression heat pumps solved independently."""
 
     def __init__(self):
@@ -199,7 +199,7 @@ class MultiSimpleHeatPumpCycle:
         return self._num_cycles
 
     @property
-    def subcycles(self) -> List[SimpleHeatPumpCycle]:
+    def subcycles(self) -> List[VapourCompressionCycle]:
         """Solved simple heat pump subcycles that make up the network."""
         return self._subcycles
 
@@ -425,7 +425,7 @@ class MultiSimpleHeatPumpCycle:
                 raise ValueError("dt_ihx_gas_side must match the number of heat pumps.")
 
         for i in range(self._num_cycles):
-            hp = SimpleHeatPumpCycle()
+            hp = VapourCompressionCycle()
             hp.solve(
                 T_evap=T_evap_all[i],
                 T_cond=T_cond_all[i],

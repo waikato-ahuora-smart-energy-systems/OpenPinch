@@ -7,15 +7,15 @@ import pytest
 
 pytest.importorskip("CoolProp")
 
-import OpenPinch.classes.multi_simple_heat_pump as multi_mod
+import OpenPinch.classes.parallel_vapour_compression_cycles as multi_mod
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.multi_simple_heat_pump import MultiSimpleHeatPumpCycle
-from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
+from OpenPinch.classes.parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
+from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 
 
 def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
     """Assert that stage matches simple for this test module."""
-    ref = SimpleHeatPumpCycle()
+    ref = VapourCompressionCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 
     stage = parallel.subcycles[i]
@@ -27,7 +27,7 @@ def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
 
 
 def test_parallel_requires_solution_before_dependent_properties():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     with pytest.raises(RuntimeError):
         _ = cycle.COP_h
     with pytest.raises(RuntimeError):
@@ -35,7 +35,7 @@ def test_parallel_requires_solution_before_dependent_properties():
 
 
 def test_parallel_rejects_mismatched_temperature_lengths():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     with pytest.raises(ValueError):
         cycle.solve(
             T_evap=np.array([20.0, 0.0]),
@@ -45,7 +45,7 @@ def test_parallel_rejects_mismatched_temperature_lengths():
 
 
 def test_parallel_solve_with_defaults_should_work_for_multiple_units():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -56,7 +56,7 @@ def test_parallel_solve_with_defaults_should_work_for_multiple_units():
 
 
 def test_each_parallel_stage_matches_simple_heat_pump_solution():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     T_cond = np.array([80.0, 60.0])
     T_evap = np.array([20.0, 0.0])
     dT_superheat = np.array([6.0, 4.0])
@@ -96,7 +96,7 @@ def test_each_parallel_stage_matches_simple_heat_pump_solution():
 
 
 def test_parallel_aggregates_match_sum_of_stage_results():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -127,7 +127,7 @@ def test_parallel_aggregates_match_sum_of_stage_results():
 
 
 def test_parallel_build_stream_collection_is_union_of_stage_streams():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -158,7 +158,7 @@ def test_parallel_build_stream_collection_is_union_of_stage_streams():
     ],
 )
 def test_parallel_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     base = dict(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -176,7 +176,7 @@ def test_parallel_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
 
 
 def test_parallel_q_cool_nan_and_none_are_allowed_for_any_cycle():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -194,7 +194,7 @@ def test_parallel_q_cool_nan_and_none_are_allowed_for_any_cycle():
 
 
 def test_parallel_q_heat_nan_defaults_to_one_for_each_stage():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -210,7 +210,7 @@ def test_parallel_q_heat_nan_defaults_to_one_for_each_stage():
 
 
 def test_parallel_streams_match_aggregate_heat():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -297,7 +297,7 @@ class _DummyMultiCycle:
 
 
 def test_multi_simple_property_sweep_and_normalization_branches():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     c1 = _fake_network_cycle()
     c2 = _fake_network_cycle(
         T_evap=15.0, T_cond=75.0, work=30.0, Q_evap=50.0, Q_cond=90.0
@@ -380,7 +380,7 @@ def test_multi_simple_property_sweep_and_normalization_branches():
 
 
 def test_multi_simple_property_arrays_and_helper_error_branches():
-    hp = MultiSimpleHeatPumpCycle()
+    hp = ParallelVapourCompressionCycles()
     hp._subcycles = [_DummyMultiCycle(), _DummyMultiCycle()]
     hp._solved = True
 
@@ -419,8 +419,8 @@ def test_multi_simple_property_arrays_and_helper_error_branches():
 
 
 def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
-    hp = MultiSimpleHeatPumpCycle()
-    monkeypatch.setattr(multi_mod, "SimpleHeatPumpCycle", _DummyMultiCycle)
+    hp = ParallelVapourCompressionCycles()
+    monkeypatch.setattr(multi_mod, "VapourCompressionCycle", _DummyMultiCycle)
 
     work = hp.solve(
         T_evap=np.array([20.0, 15.0]),

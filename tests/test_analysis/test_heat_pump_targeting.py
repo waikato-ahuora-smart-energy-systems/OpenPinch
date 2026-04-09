@@ -769,7 +769,7 @@ def test_compute_cascade_hp_system_performance_unsolved_and_solved(monkeypatch):
         def solve(self, **_kwargs):
             return None
 
-    monkeypatch.setattr(hp, "CascadeHeatPumpCycle", _FakeCascadeUnsolved)
+    monkeypatch.setattr(hp, "CascadeVapourCompressionCycle", _FakeCascadeUnsolved)
     out_unsolved = hp._compute_cascade_hp_system_performance(x, args)
     assert "obj" in out_unsolved
 
@@ -796,7 +796,7 @@ def test_compute_cascade_hp_system_performance_unsolved_and_solved(monkeypatch):
                 )
             )
 
-    monkeypatch.setattr(hp, "CascadeHeatPumpCycle", _FakeCascadeSolved)
+    monkeypatch.setattr(hp, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
     calls = {"plot": 0}
@@ -923,7 +923,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
                 )
             )
 
-    monkeypatch.setattr(hp, "MultiSimpleHeatPumpCycle", _FakeMultiSimple)
+    monkeypatch.setattr(hp, "ParallelVapourCompressionCycles", _FakeMultiSimple)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
     out = hp._compute_multi_simple_hp_system_performance(
@@ -1351,7 +1351,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
                 return _sc(_stream("H", 90.0, 80.0, 30.0, is_process_stream=False))
             return _sc(_stream("C", 50.0, 60.0, 20.0, is_process_stream=False))
 
-    monkeypatch.setattr(hp, "MultiSimpleHeatPumpCycle", _FakeMS)
+    monkeypatch.setattr(hp, "ParallelVapourCompressionCycles", _FakeMS)
     seq = iter(
         [
             ProblemTable({PT.T.value: [100.0, 50.0], PT.H_NET.value: [4.0, -1.0]}),

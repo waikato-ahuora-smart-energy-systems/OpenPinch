@@ -11,8 +11,8 @@ from ..classes.stream import Stream
 from ..classes.stream_collection import StreamCollection
 from ..classes.problem_table import ProblemTable
 from ..classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
-from ..classes.cascade_heat_pump import CascadeHeatPumpCycle
-from ..classes.multi_simple_heat_pump import MultiSimpleHeatPumpCycle
+from ..classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
+from ..classes.parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
 
 __all__ = [
     "get_heat_pump_targets",
@@ -808,7 +808,7 @@ def _compute_cascade_hp_system_performance(
         x, args
     )
 
-    hp = CascadeHeatPumpCycle()
+    hp = CascadeVapourCompressionCycle()
     hp.solve(
         T_evap=T_evap,
         T_cond=T_cond,
@@ -1223,7 +1223,7 @@ def _compute_multi_simple_hp_system_performance(
     if _constrain_min_temperature_lift(x, args) < 0:
         return {"obj": np.inf}
 
-    hp = MultiSimpleHeatPumpCycle()
+    hp = ParallelVapourCompressionCycles()
     hp.solve(
         T_evap=T_evap,
         T_cond=T_cond,

@@ -6,13 +6,13 @@ from typing import Optional, List
 import numpy as np
 
 from .stream_collection import StreamCollection
-from .simple_heat_pump import SimpleHeatPumpCycle
+from .vapour_compression_cycle import VapourCompressionCycle
 
 
-__all__ = ["CascadeHeatPumpCycle"]
+__all__ = ["CascadeVapourCompressionCycle"]
 
 
-class CascadeHeatPumpCycle:
+class CascadeVapourCompressionCycle:
     """Cascade of vapour-compression heat pumps coupled through cascade exchangers."""
 
     def __init__(self):
@@ -208,7 +208,7 @@ class CascadeHeatPumpCycle:
         return self._num_cycles
 
     @property
-    def subcycles(self) -> List[SimpleHeatPumpCycle]:
+    def subcycles(self) -> List[VapourCompressionCycle]:
         """Solved simple heat pump subcycles that make up the cascade."""
         return self._subcycles
 
@@ -484,7 +484,7 @@ class CascadeHeatPumpCycle:
 
         Q_cas_heat = 0.0
         for i in range(self._num_cycles):
-            hp = SimpleHeatPumpCycle()
+            hp = VapourCompressionCycle()
             hp.solve(
                 T_evap=T_evap_all[i],
                 T_cond=T_cond_all[i],

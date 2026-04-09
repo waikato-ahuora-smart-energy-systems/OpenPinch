@@ -13,7 +13,7 @@ from .energy_target import EnergyTarget
 from .value import Value
 from .zone import Zone
 from .pinch_problem import PinchProblem
-from .simple_heat_pump import SimpleHeatPumpCycle
-from .multi_simple_heat_pump import MultiSimpleHeatPumpCycle
+from .vapour_compression_cycle import VapourCompressionCycle
+from .parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
 from .brayton_heat_pump import SimpleBraytonHeatPumpCycle
-from .cascade_heat_pump import CascadeHeatPumpCycle
+from .cascade_vapour_compression_cycle import CascadeVapourCompressionCycle

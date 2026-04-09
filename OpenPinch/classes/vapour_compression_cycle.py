@@ -14,10 +14,10 @@ from .stream_collection import StreamCollection
 from ..utils.stream_linearisation import get_piecewise_data_points
 
 
-__all__ = ["SimpleHeatPumpCycle"]
+__all__ = ["VapourCompressionCycle"]
 
 
-class SimpleHeatPumpCycle:
+class VapourCompressionCycle:
     """Single vapour-compression heat pump cycle with optional internal heat exchange."""
 
     STATECOUNT = 6
@@ -367,7 +367,7 @@ class SimpleHeatPumpCycle:
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
         refrigerant: str = "water",
-        dt_ihx_gas_side: float = 40.0,
+        dt_ihx_gas_side: float = 10.0,
         Q_heat: float = 1.0,
         Q_cas_heat: float = 0.0,
         Q_cool: float = None,
@@ -596,7 +596,7 @@ class SimpleHeatPumpCycle:
 
     def _build_condenser_profile(self) -> np.ndarray:
         """
-        Construct a four-point condenser T-h polyline in the SimpleHeatPumpCycle's unit system.
+        Construct a four-point condenser T-h polyline in the VapourCompressionCycle's unit system.
 
         Returns
         -------
@@ -666,7 +666,7 @@ class SimpleHeatPumpCycle:
 
     def _build_evaporator_profile(self) -> np.ndarray:
         """
-        Construct a three-point evaporator T-h polyline in the SimpleHeatPumpCycle's unit system.
+        Construct a three-point evaporator T-h polyline in the VapourCompressionCycle's unit system.
 
         Returns
         -------
