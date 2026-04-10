@@ -1,11 +1,14 @@
 """Regression tests for costing utility helpers."""
 
 import math
-
 import pytest
-
 from OpenPinch.lib import *
 from OpenPinch.utils import *
+from OpenPinch.utils.costing import (
+    compute_annual_capital_cost,
+    compute_capital_cost,
+    compute_capital_recovery_factor,
+)
 
 
 """Test cases for the compute_capital_recovery_factor function."""
@@ -59,14 +62,6 @@ def test_crf_negative_interest():
 
 # ===== Merged from test_costing_extra.py =====
 """Additional coverage tests for costing helpers."""
-
-import pytest
-
-from OpenPinch.utils.costing import (
-    compute_annual_capital_cost,
-    compute_capital_cost,
-    compute_capital_recovery_factor,
-)
 
 
 def test_compute_capital_cost_matches_formula():

@@ -1,9 +1,9 @@
 """Regression tests for the zone classes."""
 
 import pytest
-
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.classes.zone import Zone
 
 
 @pytest.fixture
@@ -225,8 +225,6 @@ def test_serialize_json_with_area_and_exergy(dummy_tar):
 
 # ===== Merged from test_zone_extra.py =====
 """Additional branch coverage tests for Zone."""
-
-from OpenPinch.classes.zone import Zone
 
 
 def test_zone_active_property_and_duplicate_suffix_increment():

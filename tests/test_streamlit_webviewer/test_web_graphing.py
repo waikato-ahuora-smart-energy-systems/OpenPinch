@@ -1,14 +1,11 @@
 """Tests for Streamlit graphing helpers."""
 
 from __future__ import annotations
-
 from pathlib import Path
 from types import SimpleNamespace
-
 import numpy as np
 import pandas as pd
 import pytest
-
 from OpenPinch.classes.energy_target import EnergyTarget
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
@@ -16,6 +13,8 @@ from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.enums import ArrowHead, ProblemTableLabel as PT
 from OpenPinch.streamlit_webviewer import web_graphing as wg
+import sys
+from OpenPinch.lib.enums import ArrowHead
 
 
 class _CtxExtra:
@@ -322,15 +321,6 @@ def test_render_dashboard_no_targets_issues_warning(monkeypatch):
 
 # ===== Merged from test_web_graphing_extra.py =====
 """Additional branch coverage tests for web graphing."""
-
-
-import sys
-from types import SimpleNamespace
-
-from OpenPinch.classes.energy_target import EnergyTarget
-from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.enums import ArrowHead
-from OpenPinch.streamlit_webviewer import web_graphing as wg
 
 
 class _Ctx:

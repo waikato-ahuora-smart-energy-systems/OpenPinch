@@ -1,10 +1,11 @@
 """Regression tests for csv to json utility helpers."""
 
 from pathlib import Path
-
 import pandas as pd
-
 from OpenPinch.utils.csv_to_json import get_problem_from_csv
+import io
+import json
+from OpenPinch.utils import csv_to_json
 
 
 def _write_stream_csv(path: Path) -> None:
@@ -50,14 +51,6 @@ def test_get_problem_from_csv_normalises_missing_zone_and_name(tmp_path: Path):
 
 # ===== Merged from test_csv_to_json_extra.py =====
 """Additional coverage tests for CSV ingestion helpers."""
-
-import io
-import json
-from pathlib import Path
-
-import pandas as pd
-
-from OpenPinch.utils import csv_to_json
 
 
 def _write_csv(path: Path, rows: list[list]):

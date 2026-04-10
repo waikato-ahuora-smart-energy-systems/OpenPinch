@@ -1,10 +1,8 @@
 """Regression tests for heat pump targeting analysis routines."""
 
 from types import SimpleNamespace
-
 import numpy as np
 import pytest
-
 from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
     _balance_hot_and_cold_heat_loads_with_ambient_air,
@@ -27,6 +25,14 @@ from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
 from OpenPinch.analysis import (
     heat_pump_and_refrigeration_targeting as hp_targeting_module,
 )
+from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
+from OpenPinch.classes.problem_table import ProblemTable
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.lib.config import Configuration
+from OpenPinch.lib.enums import HeatPumpType, ProblemTableLabel as PT
+from OpenPinch.classes import ProblemTable, Stream, StreamCollection
+from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 
 def get_temperatures():
@@ -459,19 +465,6 @@ def test_brayton_x0_and_bounds_shapes_are_consistent():
 
 # ===== Merged from test_heat_pump_targeting_extra.py =====
 """Additional branch coverage tests for heat pump targeting internals."""
-
-
-from types import SimpleNamespace
-
-import numpy as np
-import pytest
-
-from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
-from OpenPinch.classes.problem_table import ProblemTable
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import HeatPumpType, ProblemTableLabel as PT
 
 
 def _sc(*streams):
@@ -1085,16 +1078,6 @@ def test_misc_heat_pump_helpers_and_stream_builders(monkeypatch):
 
 # ===== Merged from test_heat_pump_targeting_branch_gaps.py =====
 """Additional branch-coverage tests for heat pump targeting gaps."""
-
-
-from types import SimpleNamespace
-
-import numpy as np
-
-from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
-from OpenPinch.classes import ProblemTable, Stream, StreamCollection
-from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 
 def _sc(*streams):

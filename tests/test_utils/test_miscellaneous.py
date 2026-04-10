@@ -1,14 +1,15 @@
 """Regression tests for miscellaneous utility helpers."""
 
 import math
-
 import pytest
-
 from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.utils import *
 from OpenPinch.analysis.exergy_targeting import *
+import numpy as np
+from OpenPinch.utils import miscellaneous
+
 
 """Test cases for the get_value function."""
 
@@ -169,11 +170,6 @@ def test_g_ineq_penalty_invalid_form():
 
 # ===== Merged from test_miscellaneous_extra.py =====
 """Additional coverage tests for miscellaneous helpers."""
-
-import numpy as np
-import pytest
-
-from OpenPinch.utils import miscellaneous
 
 
 def test_clean_composite_curve_pops_duplicate_edges():

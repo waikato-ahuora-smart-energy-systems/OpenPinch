@@ -1,11 +1,12 @@
 """Regression tests for input validation utility helpers."""
 
 import pandas as pd
-
 from OpenPinch.utils.input_validation import (
     validate_stream_data,
     validate_utility_data,
 )
+from OpenPinch.utils.input_validation import validate_stream_data, validate_utility_data
+import OpenPinch.utils.input_validation as iv
 
 
 def test_validate_stream_data_none_returns_empty_list():
@@ -120,13 +121,8 @@ def test_validate_utilities_data_dataframe_filters_missing_names():
 # ===== Merged from test_input_validation_extra.py =====
 """Additional edge-branch tests for input validation helpers."""
 
-import pandas as pd
-
-from OpenPinch.utils.input_validation import validate_stream_data, validate_utility_data
-
 
 def test_validate_stream_data_stateful_isna_hits_normalize_label_nan_path(monkeypatch):
-    import OpenPinch.utils.input_validation as iv
 
     real_isna = pd.isna
     calls = {"sentinel": 0}

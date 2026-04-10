@@ -1,15 +1,18 @@
 """End-to-end tests for main."""
 
 from __future__ import annotations
-
 import json
 from pathlib import Path
-
 import pytest
-
 from OpenPinch import *
 from OpenPinch.utils.miscellaneous import get_value
 from OpenPinch.lib import *
+from types import SimpleNamespace
+import OpenPinch.main as main_mod
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.classes.zone import Zone
+from OpenPinch.lib.enums import ZoneType
 
 
 def get_example_problem_filepaths():
@@ -194,17 +197,6 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
 
 # ===== Merged from test_main_helpers.py =====
 """Focused branch coverage tests for ``OpenPinch.main`` helper routines."""
-
-
-from types import SimpleNamespace
-
-import pytest
-
-import OpenPinch.main as main_mod
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.enums import ZoneType
 
 
 class _DummyTarget:

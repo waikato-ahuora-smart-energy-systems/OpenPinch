@@ -2,10 +2,11 @@
 
 import numpy as np
 import pytest
-
 import OpenPinch.utils.blackbox_minimisers as optimiser_module
 from OpenPinch.lib.enums import BB_Minimiser
 from OpenPinch.utils.blackbox_minimisers import multiminima
+import OpenPinch.utils.blackbox_minimisers as bb
+import time
 
 
 def _convex_quadratic(x, _):
@@ -170,12 +171,6 @@ def test_multiminima_rejects_invalid_handle():
 
 # ===== Merged from test_blackbox_minimisers_extra.py =====
 """Additional edge-branch coverage for blackbox minimisers."""
-
-import numpy as np
-import pytest
-
-import OpenPinch.utils.blackbox_minimisers as bb
-from OpenPinch.lib.enums import BB_Minimiser
 
 
 class _FakePool:
@@ -858,12 +853,6 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
 
 
 """Regression tests for optimiser benchmarks utility helpers."""
-
-import time
-
-import numpy as np
-
-from OpenPinch.utils.blackbox_minimisers import multiminima
 
 
 def _rugged_noisy_surface(x, _):

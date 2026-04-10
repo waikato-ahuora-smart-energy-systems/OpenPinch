@@ -1,18 +1,17 @@
 """Regression tests for the cascade heat pump cycle classes."""
 
 from types import SimpleNamespace
-
 import numpy as np
 import pytest
-
-pytest.importorskip("CoolProp")
-
 import OpenPinch.classes.cascade_vapour_compression_cycle as cascade_mod
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.cascade_vapour_compression_cycle import (
     CascadeVapourCompressionCycle,
 )
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+
+
+pytest.importorskip("CoolProp")
 
 
 def _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx):

@@ -1,9 +1,9 @@
 """Regression tests for the value classes."""
 
 import pandas as pd
-
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.classes.value import Value
 
 
 def test_heatflow_value_behavior():
@@ -159,8 +159,6 @@ def test_value_from_valuewithunit():
 
 # ===== Merged from test_value_extra.py =====
 """Additional branch coverage tests for Value."""
-
-from OpenPinch.classes.value import Value
 
 
 def test_value_eq_handles_conversion_errors():

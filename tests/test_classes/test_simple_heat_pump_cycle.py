@@ -1,16 +1,17 @@
 """Regression tests for the simple heat pump cycle classes."""
 
 import math
-
 import numpy as np
 import pytest
-
-CoolProp = pytest.importorskip("CoolProp")
 from CoolProp.CoolProp import PropsSI
 from CoolProp.Plots.SimpleCycles import StateContainer
-
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 from OpenPinch.lib.enums import *
+import CoolProp
+import OpenPinch.classes.vapour_compression_cycle as shp_mod
+
+
+CoolProp = pytest.importorskip("CoolProp")
 
 
 def _validate_results(
@@ -366,13 +367,6 @@ def test_refrigeration_cycle_caps_q_heat_to_available_q_cond():
 # ===== Merged from test_simple_heat_pump_cycle_extra.py =====
 """Additional branch coverage tests for VapourCompressionCycle."""
 
-import numpy as np
-import pytest
-import CoolProp
-
-from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
-import OpenPinch.classes.vapour_compression_cycle as shp_mod
-
 
 class _DummyState:
     def __init__(self):
@@ -539,14 +533,6 @@ def test_solve_raises_on_pressure_and_enthalpy_invalid_states(monkeypatch):
 
 # ===== Merged from test_simple_heat_pump_properties_extra.py =====
 """Extra property/helper branch coverage for ``VapourCompressionCycle``."""
-
-
-import pytest
-
-from CoolProp.Plots.SimpleCycles import StateContainer
-import CoolProp
-
-from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 
 
 def test_simple_heat_pump_state_and_cycle_state_setters():

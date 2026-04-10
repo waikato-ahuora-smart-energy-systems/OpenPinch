@@ -1,12 +1,10 @@
 """Tests for the TESPy-backed Brayton heat pump wrapper."""
 
 from __future__ import annotations
-
 from types import SimpleNamespace
-
 import pytest
-
 from OpenPinch.classes import brayton_heat_pump as br
+from OpenPinch.classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 
 
 class _FakeComponent:
@@ -171,8 +169,6 @@ def test_brayton_cycle_raises_runtime_error_on_result_extraction_failure(monkeyp
 
 # ===== Merged from test_brayton_heat_pump_extra.py =====
 """Additional branch coverage tests for Brayton heat pump wrappers."""
-
-from OpenPinch.classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 
 
 def test_brayton_cycle_states_property_alias():

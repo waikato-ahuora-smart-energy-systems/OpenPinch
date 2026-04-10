@@ -2,10 +2,11 @@
 
 import json
 import os
-
 import numpy as np
-
 from OpenPinch.utils.stream_linearisation import *
+from types import SimpleNamespace
+import pytest
+from OpenPinch.utils import stream_linearisation as sl
 
 
 def import_t_h_data(filename):
@@ -75,13 +76,6 @@ def test_build_curve_pure():
 
 # ===== Merged from test_stream_linearisation_extra.py =====
 """Additional coverage tests for stream linearisation helpers."""
-
-from types import SimpleNamespace
-
-import numpy as np
-import pytest
-
-from OpenPinch.utils import stream_linearisation as sl
 
 
 def test_get_piecewise_linearisation_for_streams_mismatched_lengths():

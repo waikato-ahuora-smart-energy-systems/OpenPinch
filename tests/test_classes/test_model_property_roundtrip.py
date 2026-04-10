@@ -1,12 +1,9 @@
 """Property and edge-branch tests for class-level data models."""
 
 from __future__ import annotations
-
 from pathlib import Path
 from types import SimpleNamespace
-
 import pytest
-
 from OpenPinch.classes.energy_target import EnergyTarget
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
@@ -287,9 +284,6 @@ def test_energy_target_and_zone_property_branches():
 
 # ===== Merged from test_energy_target_extra.py =====
 """Additional branch coverage tests for EnergyTarget properties."""
-
-from OpenPinch.classes.energy_target import EnergyTarget
-from OpenPinch.classes.value import Value
 
 
 def test_energy_target_identifier_parent_active_and_cost_properties():

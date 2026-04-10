@@ -1,18 +1,17 @@
 """Regression tests for the multi simple heat pump cycle classes."""
 
 from types import SimpleNamespace
-
 import numpy as np
 import pytest
-
-pytest.importorskip("CoolProp")
-
 import OpenPinch.classes.parallel_vapour_compression_cycles as multi_mod
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+
+
+pytest.importorskip("CoolProp")
 
 
 def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
