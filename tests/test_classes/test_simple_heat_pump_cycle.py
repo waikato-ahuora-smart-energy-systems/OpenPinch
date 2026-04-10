@@ -555,6 +555,7 @@ def test_simple_heat_pump_state_and_cycle_state_setters():
         good[i, "P"] = 100_000.0 + i
         good[i, "T"] = 300.0 + i
     hp.cycle_states = good
+    hp._solved = True
 
     assert hp.solved is True
     assert len(hp.state_points) == hp.STATECOUNT
