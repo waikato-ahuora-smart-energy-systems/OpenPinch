@@ -342,6 +342,34 @@ class ParallelVapourCompressionCycles:
 
         return arr
 
+    def _normalize_refrigerant(
+        self,
+        refrigerant: List[str] | str,
+        n_cycles: int,
+    ) -> List[str]:
+        if isinstance(refrigerant, list):
+            if len(refrigerant) == n_cycles:
+                return refrigerant
+            if len(refrigerant) == 1:
+                return refrigerant * n_cycles
+            raise ValueError(
+                f"Number of refrigerants must match the number of heat pumps, {n_cycles}."
+            )
+        return [refrigerant] * n_cycles
+
+    def _normalize_dt_ihx_gas_side(
+        self,
+        dt_ihx_gas_side,
+        n_cycles: int,
+    ) -> np.ndarray:
+        if np.isscalar(dt_ihx_gas_side):
+            return np.full(n_cycles, dt_ihx_gas_side, dtype=float)
+
+        arr = np.asarray(dt_ihx_gas_side, dtype=float)
+        if arr.size != n_cycles:
+            raise ValueError("dt_ihx_gas_side must match the number of heat pumps.")
+        return arr
+
     def solve(
         self,
         T_evap: np.ndarray,
@@ -407,25 +435,10 @@ class ParallelVapourCompressionCycles:
         )
         Q_heat_all = self._normalize_Q_heat(Q_heat, self._num_cycles)
         Q_cool_all = self._normalize_Q_cool(Q_cool, self._num_cycles)
-
-        if isinstance(refrigerant, list):
-            if len(refrigerant) == self._num_cycles:
-                refrigerant_all = refrigerant
-            elif len(refrigerant) == 1:
-                refrigerant_all = refrigerant * self._num_cycles
-            else:
-                raise ValueError(
-                    f"Number of refrigerants must match the number of heat pumps, {self._num_cycles}."
-                )
-        else:
-            refrigerant_all = [refrigerant] * self._num_cycles
-
-        if np.isscalar(dt_ihx_gas_side):
-            ihx_gas_dt_all = np.full(self._num_cycles, dt_ihx_gas_side, dtype=float)
-        else:
-            ihx_gas_dt_all = np.asarray(dt_ihx_gas_side, dtype=float)
-            if ihx_gas_dt_all.size != self._num_cycles:
-                raise ValueError("dt_ihx_gas_side must match the number of heat pumps.")
+        refrigerant_all = self._normalize_refrigerant(refrigerant, self._num_cycles)
+        ihx_gas_dt_all = self._normalize_dt_ihx_gas_side(
+            dt_ihx_gas_side, self._num_cycles
+        )
 
         for i in range(self._num_cycles):
             hp = VapourCompressionCycle()
@@ -443,10 +456,7 @@ class ParallelVapourCompressionCycles:
             )
             self._subcycles.append(hp)
 
-        Q_heat_arr = np.array([cycle.Q_heat for cycle in self._subcycles])
-        if np.all(np.isclose(Q_heat_all, Q_heat_arr)):
-            self._solved = True
-
+        self._solved = np.all([cycle.solved for cycle in self._subcycles])
         return sum(cycle.work for cycle in self._subcycles)
 
     def build_stream_collection(

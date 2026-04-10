@@ -245,7 +245,6 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     assert sub_shifted in xls.sheet_names
     assert sub_real in xls.sheet_names
 
-
     wb = openpyxl.load_workbook(out, data_only=True)
     assert wb[master_shifted]["A1"].value == "Master"
     assert wb[sub_shifted]["A1"].value == "Alt:Target"

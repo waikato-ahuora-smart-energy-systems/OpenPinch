@@ -86,7 +86,6 @@ class VapourCompressionCycle:
             raise ValueError(f"Expected exactly {self.STATECOUNT} state points.")
         value.units = self._system
         self._cycle_states = value
-        self._solved = True
 
     @property
     def states(self) -> StateContainer:

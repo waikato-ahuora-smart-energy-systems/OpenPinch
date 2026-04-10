@@ -264,6 +264,105 @@ def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
     assert np.isclose(last.Q_cool, last.Q_evap, rtol=1e-7, atol=1e-8)
 
 
+def test_each_cascade_stage_matches_simple_refrigeration_solution():
+    cycle = CascadeVapourCompressionCycle()
+    T_cond = np.array([80.0, 60.0])
+    T_evap = np.array([20.0, 0.0])
+    dt_cascade_hx = 5.0
+    dT_superheat = np.array([6.0, 4.0, 2.0])
+    dT_subcool = np.array([3.0, 2.0, 1.0])
+    dt_ihx_gas_side = np.array([8.0, 6.0, 4.0])
+    Q_heat = np.array([500.0, 1e9, 50.0])
+    Q_cool = np.array([100.0, 900.0])
+    Q_heat_all = np.array([500.0, 1e9, 0.0])
+    Q_cool_all = np.array([0.0, 100.0, 900.0])
+    refrigerant = ["R134a", "R134a", "R134a"]
+    eta_comp = 0.7
+
+    cycle.solve(
+        T_evap=T_evap,
+        T_cond=T_cond,
+        dt_cascade_hx=dt_cascade_hx,
+        dT_superheat=dT_superheat,
+        dT_subcool=dT_subcool,
+        dt_ihx_gas_side=dt_ihx_gas_side,
+        refrigerant=refrigerant,
+        eta_comp=eta_comp,
+        Q_heat=Q_heat,
+        Q_cool=Q_cool,
+        is_heat_pump=False,
+    )
+
+    T_evap_all, T_cond_all = _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx)
+    for i in range(cycle.num_cycles):
+        _assert_stage_matches_simple(
+            cycle,
+            i,
+            T_evap=T_evap_all[i],
+            T_cond=T_cond_all[i],
+            dT_superheat=dT_superheat[i],
+            dT_subcool=dT_subcool[i],
+            dt_ihx_gas_side=dt_ihx_gas_side[i],
+            refrigerant=refrigerant[i],
+            eta_comp=eta_comp,
+            Q_heat=Q_heat_all[i],
+            Q_cool=Q_cool_all[i],
+            Q_cas_cool=cycle.subcycles[i].Q_cas_cool,
+            is_heat_pump=False,
+        )
+
+    for stage in cycle.subcycles:
+        assert np.isclose(stage.Q_evap, stage.Q_cool + stage.Q_cas_cool, 0.0)
+        assert stage.Q_heat <= stage.Q_cond + 1e-6
+        assert np.isclose(stage.Q_cas_heat, 0.0, 0.0)
+
+    assert np.isclose(cycle.subcycles[0].Q_heat, 0.0, 0.0)
+    assert np.isclose(cycle.subcycles[1].Q_heat, cycle.subcycles[1].Q_cond, 0.0)
+
+
+def test_cascade_refrigeration_streams_and_aggregates_match():
+    cycle = CascadeVapourCompressionCycle()
+    cycle.solve(
+        T_evap=np.array([20.0, 0.0]),
+        T_cond=np.array([80.0, 60.0]),
+        dt_cascade_hx=5.0,
+        dT_superheat=np.array([6.0, 4.0, 2.0]),
+        dT_subcool=np.array([3.0, 2.0, 1.0]),
+        dt_ihx_gas_side=np.array([8.0, 6.0, 4.0]),
+        eta_comp=0.7,
+        refrigerant=["R134a", "R134a", "R134a"],
+        Q_heat=np.array([500.0, 1e9, 50.0]),
+        Q_cool=np.array([100.0, 900.0]),
+        is_heat_pump=False,
+    )
+
+    assert np.isclose(
+        cycle.work, sum(c.work for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_evap, sum(c.Q_evap for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cond, sum(c.Q_cond for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_heat, sum(c.Q_heat for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cool, sum(c.Q_cool for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert cycle.COP_r > 0.0
+
+    streams = StreamCollection()
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+    )
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+    )
+
+
 def _fake_network_cycle(
     *,
     solved=True,
