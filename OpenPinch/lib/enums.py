@@ -61,7 +61,7 @@ class HeatPump(Enum):
     IHX = "Internal Heat Exchanger"
 
 
-class HeatPumpType(str, Enum):
+class HeatPumpAndRefrigerationCycle(str, Enum):
     """Supported heat pump targeting model families."""
 
     MultiTempCarnot = "Multi-temperature Carnot cycles"
@@ -69,6 +69,9 @@ class HeatPumpType(str, Enum):
     Brayton = "Brayton cycle"
     CascadeVapourComp = "Cascade vapour compression cycles"
     MultiSimpleVapourComp = "Multiple simple vapour compression cycles"
+
+
+HPRcycle = HeatPumpAndRefrigerationCycle
 
 
 class HeatFlowUnits(Enum):

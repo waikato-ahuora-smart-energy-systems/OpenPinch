@@ -53,7 +53,9 @@ class Configuration:
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
     DO_PROCESS_HP_TARGETING: bool = False
+    DO_PROCESS_RFRG_TARGETING: bool = False  ### add to the template
     DO_UTILITY_HP_TARGETING: bool = False
+    DO_UTILITY_RFRG_TARGETING: bool = False  ### add to the template
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
     DO_VERTICAL_GCC: bool = False
@@ -61,7 +63,7 @@ class Configuration:
     DO_TURBINE_WORK: bool = False
 
     ### Heat pump targeting parameters ###
-    HP_TYPE: str = HeatPumpType.MultiTempCarnot.value
+    HP_TYPE: str = HPRcycle.MultiTempCarnot.value
     HP_LOAD_FRACTION: float = 1.0
     REFRIGERANTS: List[str] = ["water", "ammonia"]
     DO_REFRIGERANT_SORT: bool = True
@@ -77,7 +79,7 @@ class Configuration:
     DT_HP_IHX: float = 0.0
     DT_CASCADE_HX: float = 0.0
     BB_MINIMISER: str = BB_Minimiser.RBF.value  ### add to the template
-    INITIALISE_SIMULATED_HP: bool = True  ### add to the template
+    INITIALISE_SIMULATED_CYCLE: bool = True  ### add to the template
     ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
 
     ### Cost targeting parameters ###

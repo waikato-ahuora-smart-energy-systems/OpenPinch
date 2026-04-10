@@ -30,7 +30,7 @@ from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import HeatPumpType, ProblemTableLabel as PT
+from OpenPinch.lib.enums import HPRcycle, ProblemTableLabel as PT
 from OpenPinch.classes import ProblemTable, Stream, StreamCollection
 from OpenPinch.lib.enums import ProblemTableLabel as PT
 
@@ -500,7 +500,7 @@ def _base_args(**overrides):
         "eta_he_carnot": 0.4,
         "refrigerant_ls": ["R134A", "R134A", "R134A"],
         "do_refrigerant_sort": False,
-        "initialise_simulated_hp": True,
+        "initialise_simulated_cycle": True,
         "allow_integrated_expander": True,
         "dT_subcool": None,
         "dT_superheat": None,
@@ -525,7 +525,7 @@ def _pt_with_hnet(h0, h1):
 
 def _patch_output_model_validate(monkeypatch):
     monkeypatch.setattr(
-        hp.HeatPumpTargetOutputs,
+        hp.HPRTargetOutputs,
         "model_validate",
         classmethod(lambda cls, v: v),
     )
@@ -576,13 +576,17 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(monkeypatch, q_amb):
         )
 
     res = SimpleNamespace(
-        hp_hot_streams=StreamCollection(),
-        hp_cold_streams=StreamCollection(),
+        hot_streams=StreamCollection(),
+        cold_streams=StreamCollection(),
         Q_amb=q_amb,
         amb_stream=amb_stream,
     )
     out = hp.calc_heat_pump_and_refrigeration_cascade(
-        pt, res, is_T_vals_shifted=True, is_process_integration=True
+        pt,
+        res,
+        is_T_vals_shifted=True,
+        is_process_integration=True,
+        is_heat_pumping=True,
     )
     assert isinstance(out, ProblemTable)
 
@@ -626,7 +630,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
             "Q_ext": 0.0,
             "Q_amb": 0.0,
             "cop": 3.0,
-            "opt_success": True,
+            "success": True,
             "T_cond": np.array([100.0]),
             "Q_cond": np.array([50.0]),
             "T_evap": np.array([60.0]),
@@ -637,17 +641,17 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
         hp,
         "_get_carnot_hp_streams",
         lambda *_args, **_kwargs: {
-            "hp_hot_streams": StreamCollection(),
-            "hp_cold_streams": StreamCollection(),
+            "hot_streams": StreamCollection(),
+            "cold_streams": StreamCollection(),
         },
     )
     out = hp._optimise_multi_temperature_carnot_heat_pump_placement(args)
-    assert out["opt_success"] is True
+    assert out["success"] is True
 
     monkeypatch.setattr(
         hp,
         "_compute_multi_temperature_carnot_hp_opt_obj",
-        lambda x, args, debug=False: {"opt_success": False},
+        lambda x, args, debug=False: {"success": False},
     )
     with pytest.raises(ValueError, match="failed to return an optimal result"):
         hp._optimise_multi_temperature_carnot_heat_pump_placement(args)
@@ -663,12 +667,12 @@ def test_multi_temp_carnot_objective_debug_branch(monkeypatch):
         lambda *a, **k: called.__setitem__("plot", called["plot"] + 1),
     )
     out = hp._compute_multi_temperature_carnot_hp_opt_obj(x, args, debug=True)
-    assert out["opt_success"] is True
+    assert out["success"] is True
     assert called["plot"] == 1
 
 
 def test_cascade_optimiser_and_compute_branches(monkeypatch):
-    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_hp=True)
+    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=True)
     _patch_output_model_validate(monkeypatch)
 
     monkeypatch.setattr(
@@ -701,13 +705,13 @@ def test_cascade_optimiser_and_compute_branches(monkeypatch):
             "Q_ext": 0.0,
             "Q_amb": 0.0,
             "cop": 2.0,
-            "hp_hot_streams": StreamCollection(),
-            "hp_cold_streams": StreamCollection(),
+            "hot_streams": StreamCollection(),
+            "cold_streams": StreamCollection(),
         },
     )
 
     out = hp._optimise_cascade_heat_pump_placement(args)
-    assert out["opt_success"] is True
+    assert out["success"] is True
 
     monkeypatch.setattr(hp, "multiminima", lambda **_kwargs: np.array([]))
     with pytest.raises(ValueError, match="failed"):
@@ -801,12 +805,12 @@ def test_compute_cascade_hp_system_performance_unsolved_and_solved(monkeypatch):
         lambda *a, **k: calls.__setitem__("plot", calls["plot"] + 1),
     )
     out = hp._compute_cascade_hp_system_performance(x, args, debug=True)
-    assert "hp_hot_streams" in out
+    assert "hot_streams" in out
     assert calls["plot"] == 1
 
 
 def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
-    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_hp=True)
+    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=True)
     _patch_output_model_validate(monkeypatch)
 
     monkeypatch.setattr(
@@ -816,12 +820,12 @@ def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
         hp,
         "_get_carnot_hp_streams",
         lambda *_args, **_kwargs: {
-            "hp_hot_streams": StreamCollection(),
-            "hp_cold_streams": StreamCollection(),
+            "hot_streams": StreamCollection(),
+            "cold_streams": StreamCollection(),
         },
     )
     out_carnot = hp._optimise_multi_simple_carnot_heat_pump_placement(args)
-    assert out_carnot["opt_success"] is True
+    assert out_carnot["success"] is True
 
     monkeypatch.setattr(
         hp,
@@ -852,12 +856,12 @@ def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
             "Q_ext": 0.0,
             "Q_amb": 0.0,
             "cop": 2.5,
-            "hp_hot_streams": StreamCollection(),
-            "hp_cold_streams": StreamCollection(),
+            "hot_streams": StreamCollection(),
+            "cold_streams": StreamCollection(),
         },
     )
     out_sim = hp._optimise_multi_simple_heat_pump_placement(args)
-    assert out_sim["opt_success"] is True
+    assert out_sim["success"] is True
 
     monkeypatch.setattr(hp, "multiminima", lambda **_kwargs: np.array([]))
     with pytest.raises(ValueError, match="failed"):
@@ -924,7 +928,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     out = hp._compute_multi_simple_hp_system_performance(
         np.array([0.2] * 10), args, debug=False
     )
-    assert "hp_model" in out
+    assert "model" in out
 
 
 def test_brayton_paths_and_helpers(monkeypatch):
@@ -947,12 +951,12 @@ def test_brayton_paths_and_helpers(monkeypatch):
             "Q_ext": 0.0,
             "Q_amb": 0.0,
             "cop": 2.0,
-            "hp_hot_streams": StreamCollection(),
-            "hp_cold_streams": StreamCollection(),
+            "hot_streams": StreamCollection(),
+            "cold_streams": StreamCollection(),
         },
     )
     out = hp._optimise_brayton_heat_pump_placement(args)
-    assert out["opt_success"] is True
+    assert out["success"] is True
 
     T_co, dT_c, dT_gc, q_h = hp._parse_brayton_hp_state_variables(
         np.array([0.1, 0.2, 0.3, 0.9]), args
@@ -1137,8 +1141,8 @@ def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
         H_hot=np.array([10.0, 0.0]),
         T_cold=np.array([120.0, 80.0]),
         H_cold=np.array([8.0, 0.0]),
-        hp_hot_streams=StreamCollection(),
-        hp_cold_streams=StreamCollection(),
+        hot_streams=StreamCollection(),
+        cold_streams=StreamCollection(),
         title="t",
     )
 

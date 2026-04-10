@@ -24,7 +24,7 @@ DO_ASSITED_HT: bool = False
 DO_TURBINE_WORK: bool = False
 
 ### Heat pump targeting parameters ###
-HP_TYPE: str = HeatPumpType.MultiTempCarnot.value
+HP_TYPE: str = HPRcycle.MultiTempCarnot.value
 HP_LOAD_FRACTION: float = 1.0
 REFRIGERANTS: List[str] = ["water", "ammonia"]
 PRICE_RATIO_ELE_TO_FUEL: float = 1.0

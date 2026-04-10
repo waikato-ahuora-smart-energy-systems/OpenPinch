@@ -116,41 +116,52 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
-    if zone.identifier in [Z.S.value]:
-        Q_target = (
-            min(zone_config.HP_LOAD_FRACTION, 1.0)
-            * np.abs(pt.col[PT.H_HOT_UT.value]).max()
+    if zone.identifier in [
+        Z.S.value,
+    ] and _validate_heat_pump_or_refrigeration_targeting_required(pt, zone_config):
+        # Create problem table based on inverted utility streams
+        pt_ut_gen = get_process_heat_cascade(
+            hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
+            cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
+            zone_config=zone.config,
+            is_shifted=True,
         )
-        if (
-            _validate_heat_pump_and_refrigeration_targeting_required(
-                pt, True, zone_config
-            )
-            and Q_target > 0
-        ):
-            # Create problem table based on inverted utility streams
-            pt_ut_gen = get_process_heat_cascade(
-                hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
-                cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
-                zone_config=zone.config,
-                is_shifted=True,
-            )
-            get_additional_GCCs(pt_ut_gen)
-            # Perform heat pump targeting on the correct cascades
-            hp_res = get_heat_pump_and_refrigeration_targets(
-                Q_target=Q_target,
+        get_additional_GCCs(pt_ut_gen)
+        # Perform heat pump and/or refrigeration targeting on the correct cascades
+        if zone_config.DO_UTILITY_HP_TARGETING:
+            res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
+                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                * np.abs(pt_ut_gen.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt_ut_gen.col[PT.T.value],
                 H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
                 H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
                 zone_config=zone_config,
                 is_heat_pumping=True,
             )
-            res.update(hp_res)
-            # Add the heat pump profile to the general problem table
             calc_heat_pump_and_refrigeration_cascade(
                 pt=pt,
-                res=hp_res,
+                res=res["Heat pump"],
                 is_T_vals_shifted=True,
-                is_process_integration=False,
+                is_process_integration=True,
+                is_heat_pumping=True,
+            )
+
+        if zone_config.DO_UTILITY_RFRG_TARGETING:
+            res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
+                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                * np.abs(pt_ut_gen.col[PT.H_NET_COLD.value]).max(),
+                T_vals=pt_ut_gen.col[PT.T.value],
+                H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
+                H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
+                zone_config=zone_config,
+                is_heat_pumping=False,
+            )
+            calc_heat_pump_and_refrigeration_cascade(
+                pt=pt,
+                res=res["Refrigeration"],
+                is_T_vals_shifted=True,
+                is_process_integration=True,
+                is_heat_pumping=False,
             )
 
     # if zone_config.DO_TURBINE_WORK:
@@ -365,17 +376,24 @@ def _save_graph_data(
     }
 
 
-def _validate_heat_pump_and_refrigeration_targeting_required(
+def _validate_heat_pump_or_refrigeration_targeting_required(
     pt: ProblemTable,
-    is_heat_pumping: bool,
     zone_config: Configuration,
 ) -> bool:
+    is_heat_pumping = zone_config.DO_UTILITY_HP_TARGETING
+    is_refrigeration = zone_config.DO_UTILITY_RFRG_TARGETING
     return (
         False
         if (
-            (zone_config.DO_UTILITY_HP_TARGETING == False)
-            or (pt.col[PT.H_NET_UT.value][0] < tol and is_heat_pumping == True)
-            or (pt.col[PT.H_NET_UT.value][-1] < tol and is_heat_pumping == False)
+            (is_heat_pumping == False and is_refrigeration == False)
+            or (
+                np.abs(pt.col[PT.H_NET_COLD.value]).max() < tol
+                and is_heat_pumping == True
+            )
+            or (
+                np.abs(pt.col[PT.H_NET_HOT.value]).max() < tol
+                and is_refrigeration == True
+            )
             or (zone_config.HP_LOAD_FRACTION < tol)
         )
         else True

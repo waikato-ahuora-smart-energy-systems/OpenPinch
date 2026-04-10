@@ -6,7 +6,6 @@ area-cost calculations, and packaging of outputs into ``EnergyTarget``
 instances.
 """
 
-from operator import attrgetter
 from typing import List, Tuple
 
 from ..classes import *
@@ -73,31 +72,44 @@ def compute_direct_integration_targets(zone: Zone):
         do_vert_cc_calc=zone_config.DO_VERTICAL_GCC,
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
-    if zone.identifier in [Z.P.value]:
-        Q_target = (
-            min(zone_config.HP_LOAD_FRACTION, 1.0)
-            * np.abs(pt.col[PT.H_NET_COLD.value]).max()
-        )
-        if (
-            _validate_heat_pump_and_refrigeration_targeting_required(
-                pt, True, zone_config
-            )
-            and Q_target > 0
-        ):
-            hp_res = get_heat_pump_and_refrigeration_targets(
-                Q_target=Q_target,
+    if zone.identifier in [
+        Z.P.value,
+        Z.U.value,
+    ] and _validate_heat_pump_or_refrigeration_targeting_required(pt, zone_config):
+        if zone_config.DO_PROCESS_HP_TARGETING:
+            res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
+                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                * np.abs(pt.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
                 H_cold=pt.col[PT.H_NET_COLD.value],
                 zone_config=zone_config,
                 is_heat_pumping=True,
             )
-            res.update(hp_res)
             calc_heat_pump_and_refrigeration_cascade(
                 pt=pt,
-                res=hp_res,
+                res=res["Heat pump"],
                 is_T_vals_shifted=True,
                 is_process_integration=True,
+                is_heat_pumping=True,
+            )
+
+        if zone_config.DO_PROCESS_RFRG_TARGETING:
+            res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
+                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                * np.abs(pt.col[PT.H_NET_COLD.value]).max(),
+                T_vals=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_NET_HOT.value],
+                H_cold=pt.col[PT.H_NET_COLD.value],
+                zone_config=zone_config,
+                is_heat_pumping=False,
+            )
+            calc_heat_pump_and_refrigeration_cascade(
+                pt=pt,
+                res=res["Refrigeration"],
+                is_T_vals_shifted=True,
+                is_process_integration=True,
+                is_heat_pumping=False,
             )
 
     get_utility_targets(
@@ -375,22 +387,23 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
     }
 
 
-def _validate_heat_pump_and_refrigeration_targeting_required(
+def _validate_heat_pump_or_refrigeration_targeting_required(
     pt: ProblemTable,
-    is_heat_pumping: bool,
     zone_config: Configuration,
 ) -> bool:
+    is_heat_pumping = zone_config.DO_PROCESS_HP_TARGETING
+    is_refrigeration = zone_config.DO_PROCESS_RFRG_TARGETING
     return (
         False
         if (
-            (zone_config.DO_PROCESS_HP_TARGETING == False)
+            (is_heat_pumping == False and is_refrigeration == False)
             or (
                 np.abs(pt.col[PT.H_NET_COLD.value]).max() < tol
                 and is_heat_pumping == True
             )
             or (
                 np.abs(pt.col[PT.H_NET_HOT.value]).max() < tol
-                and is_heat_pumping == False
+                and is_refrigeration == True
             )
             or (zone_config.HP_LOAD_FRACTION < tol)
         )

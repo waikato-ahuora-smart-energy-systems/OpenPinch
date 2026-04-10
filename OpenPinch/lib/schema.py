@@ -46,8 +46,8 @@ class TempPinch(BaseModel):
     hot_temp: MaybeVU = None
 
 
-class HeatPumpTargetInputs(BaseModel):
-    """Parameter bundle for heat pump optimisation routines."""
+class HPRTargetInputs(BaseModel):
+    """Parameter bundle for heat pump and refrigeration targeting routines."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -80,7 +80,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_he_carnot: float
     refrigerant_ls: List[str]
     do_refrigerant_sort: bool
-    initialise_simulated_hp: bool
+    initialise_simulated_cycle: bool
     allow_integrated_expander: bool
 
     # Optional arguments
@@ -96,8 +96,8 @@ class HeatPumpTargetInputs(BaseModel):
     debug: bool
 
 
-class HeatPumpTargetOutputs(BaseModel):
-    """Normalized output requirement for heat pump targeting routines."""
+class HPRTargetOutputs(BaseModel):
+    """Normalized output requirement for heat pump and refrigeration targeting routines."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -106,16 +106,15 @@ class HeatPumpTargetOutputs(BaseModel):
 
     # --- Common objective / result fields -------------------------
     utility_tot: float
-    work_hp: float | list | np.ndarray
-    work_he: Optional[float | list | np.ndarray] = None
+    net_work: float | list | np.ndarray
     Q_ext: float
     Q_amb: float
     cop: float | list | np.ndarray
     obj: float
-    opt_success: bool
+    success: bool
 
-    hp_hot_streams: Optional["StreamCollection"] = None
-    hp_cold_streams: Optional["StreamCollection"] = None
+    hot_streams: Optional["StreamCollection"] = None
+    cold_streams: Optional["StreamCollection"] = None
     amb_stream: Optional["StreamCollection"] = None
 
     # --- Flattened state fields (union of all children) -----------
@@ -136,7 +135,7 @@ class HeatPumpTargetOutputs(BaseModel):
     Q_heat: Optional[np.ndarray] = None
     Q_cool: Optional[np.ndarray] = None
 
-    hp_model: Optional[Any] = None
+    model: Optional[Any] = None
 
 
 # ---- Targeting results -------------------------------------------------------
