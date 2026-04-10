@@ -24,7 +24,9 @@ from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
     _get_x0_for_brayton_hp_opt,
     _get_bounds_for_brayton_hp_opt,
 )
-from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp_targeting_module
+from OpenPinch.analysis import (
+    heat_pump_and_refrigeration_targeting as hp_targeting_module,
+)
 
 
 def get_temperatures():

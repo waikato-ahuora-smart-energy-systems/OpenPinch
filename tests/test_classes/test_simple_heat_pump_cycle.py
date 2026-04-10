@@ -410,7 +410,9 @@ def test_build_evaporator_profile_subcooled_segment_branch(monkeypatch):
     hp._dt_diff_max = 0.5
 
     monkeypatch.setattr(
-        VapourCompressionCycle, "Hs", property(lambda self: [0.0, 0.0, 0.0, 1.0, 0.0, 5.0])
+        VapourCompressionCycle,
+        "Hs",
+        property(lambda self: [0.0, 0.0, 0.0, 1.0, 0.0, 5.0]),
     )
     monkeypatch.setattr(VapourCompressionCycle, "Ps", property(lambda self: [1.0]))
     monkeypatch.setattr(

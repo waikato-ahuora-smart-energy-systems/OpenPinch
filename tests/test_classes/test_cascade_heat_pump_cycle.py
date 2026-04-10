@@ -9,7 +9,9 @@ pytest.importorskip("CoolProp")
 
 import OpenPinch.classes.cascade_vapour_compression_cycle as cascade_mod
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
+from OpenPinch.classes.cascade_vapour_compression_cycle import (
+    CascadeVapourCompressionCycle,
+)
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 
 

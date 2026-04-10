@@ -9,7 +9,9 @@ pytest.importorskip("CoolProp")
 
 import OpenPinch.classes.parallel_vapour_compression_cycles as multi_mod
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
+from OpenPinch.classes.parallel_vapour_compression_cycles import (
+    ParallelVapourCompressionCycles,
+)
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 
 

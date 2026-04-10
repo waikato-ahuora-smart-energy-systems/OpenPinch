@@ -394,13 +394,17 @@ class VapourCompressionCycle:
         dt_ihx_gas_side : float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : float, optional
-            Heat delivered to the process [W].
+            Heat delivered to the process [W]. Heat pump and cascade configurations only.
         Q_cas_heat : float, optional
             Extra condenser heat transferred to the next cascade cycle [W].
-            Used only for cascade configurations.
+            Used only for cascade heat pump configurations.
         Q_cool : float, optional
-            Cooling delivered to the process [W]; remaining cooling is supplied by
-            a lower cascade cycle in cascade configurations.
+            Cooling delivered to the process [W]. Refrigeration and cascade configurations only.
+        Q_cas_cool : float, optional
+            Extra evaporator cooling transferred to the next cascade cycle [W].
+            Used only for cascade refrigeration configurations.
+        is_heat_pump : bool, optional
+            Flag to indicate if the cycle is in heat pump or refrigeration mode.
 
         Returns
         -------
@@ -418,18 +422,19 @@ class VapourCompressionCycle:
         self._dT_superheat = dT_superheat
         self._dT_subcool = dT_subcool
 
-        # TODO: Check if this code block could be written more clearly
-        self._Q_heat = np.float64(1.0) if (is_heat_pump == True and Q_heat == None) else Q_heat
-        self._Q_cas_heat = Q_cas_heat if is_heat_pump else None
-        self._Q_cool = np.float64(1.0) if (is_heat_pump == False and Q_cool == None) else Q_cool
-        self._Q_cas_cool = Q_cas_cool if not (is_heat_pump) else None
-
         if is_heat_pump:
+            self._Q_heat = np.float64(1.0) if Q_heat is None else Q_heat
+            self._Q_cas_heat = Q_cas_heat if Q_cas_heat is not None else 0.0
+            self._Q_cool = Q_cool
+            self._Q_cas_cool = 0.0
             self._Q_cond = self._Q_heat + self._Q_cas_heat
-        else:
+        else:  # is refrigeration
+            self._Q_heat = Q_heat
+            self._Q_cas_heat = 0.0
+            self._Q_cool = np.float64(1.0) if Q_cool is None else Q_cool
+            self._Q_cas_cool = Q_cas_cool if Q_cas_cool is not None else 0.0
             self._Q_evap = self._Q_cool + self._Q_cas_cool
-        # End block
-        
+
         self._eta_comp = eta_comp
         self._ihx_gas_dt = max(
             min(
@@ -503,13 +508,16 @@ class VapourCompressionCycle:
         )
         self._save_cycle_state(3)
 
-        self._m_dot = self._Q_cond / (
-            self._cycle_states[1, "H"] - self._cycle_states[2, "H"]
-        )
         self._q_evap = self._cycle_states[0, "H"] - self._cycle_states[3, "H"]
-        self._Q_evap = self._m_dot * self._q_evap
         self._q_cond = self._cycle_states[1, "H"] - self._cycle_states[2, "H"]
         self._w_net = self._q_cond - self._q_evap
+        if is_heat_pump:
+            self._m_dot = self._Q_cond / self._q_cond
+            self._Q_evap = self._m_dot * self._q_evap
+        else:  # is refrigeration
+            self._m_dot = self._Q_evap / self._q_evap
+            self._Q_cond = self._m_dot * self._q_cond
+
         self._work = self._m_dot * self._w_net
         self._penalty = self._m_dot * dh_penalty
 
@@ -517,40 +525,63 @@ class VapourCompressionCycle:
         # Condenser side - state 4
         # Evaporator side - state 5
 
-        # 4 - Hot side of cascade heat exchanger outlet (if it exists, Q_cas_heat > 0)
-        h_4 = self._cycle_states[1, "H"]
-        if self._Q_cond > 0:
-            h_4 -= (
-                (self._cycle_states[1, "H"] - self._cycle_states[2, "H"])
-                * self._Q_cas_heat
-                / self._Q_cond
+        if is_heat_pump:
+            # 4 - Hot side of cascade heat exchanger outlet (otherwise state 4 == 1)
+            self._q_cas_heat = (
+                self._Q_cas_heat / self._m_dot if self._m_dot > 0.0 else 0.0
             )
-        self._compute_state_from_pressure_enthalpy(
-            P=self._cycle_states[1, "P"],
-            h=h_4,
-        )
-        self._save_cycle_state(4)
-        self._q_cas_heat = self._cycle_states[1, "H"] - self._cycle_states[4, "H"]
-        self._q_heat = self._cycle_states[4, "H"] - self._cycle_states[2, "H"]
+            self._q_heat = self._q_cond - self._q_cas_heat
+            self._compute_state_from_pressure_enthalpy(
+                P=self._cycle_states[2, "P"],
+                h=self._cycle_states[2, "H"] + self._q_heat,
+            )
+            self._save_cycle_state(4)
 
-        # 5 - Hot side of cascade heat exchanger outlet (if it exists, Q_cas_heat > 0)
-        if self._Q_cool == None or np.isnan(self._Q_cool):
-            self._Q_cool = self._Q_evap
-        elif self._Q_cool > self._Q_evap:
-            self._Q_cool = self._Q_evap
+            # 5 - Hot side of cascade heat exchanger outlet (otherwise state 5 == 3)
+            if self._Q_cool == None or np.isnan(self._Q_cool):
+                self._Q_cool = self._Q_evap
+            elif self._Q_cool > self._Q_evap:
+                self._Q_cool = self._Q_evap
 
-        if self._m_dot > 0:
-            self._q_cool = self._Q_cool / self._m_dot
-        else:
-            self._q_cool = self._cycle_states[0, "H"] - self._cycle_states[3, "H"]
+            self._q_cool = (
+                self._Q_cool / self._m_dot if self._m_dot > 0 else self._q_evap
+            )
 
-        self._compute_state_from_pressure_enthalpy(
-            P=self._cycle_states[3, "P"],
-            h=self._cycle_states[3, "H"] + self._q_cool,
-        )
-        self._save_cycle_state(5)
-        self._q_cas_cool = self._q_evap - self._q_cool
-        self._Q_cas_cool = self._Q_evap - self._Q_cool
+            self._compute_state_from_pressure_enthalpy(
+                P=self._cycle_states[3, "P"],
+                h=self._cycle_states[3, "H"] + self._q_cool,
+            )
+            self._save_cycle_state(5)
+            self._q_cas_cool = self._q_evap - self._q_cool
+            self._Q_cas_cool = self._Q_evap - self._Q_cool
+
+        else:  # is refrigeration
+            # 5 - Hot side of cascade heat exchanger outlet (otherwise state 5 == 3)
+            self._q_cas_cool = (
+                self._Q_cas_cool / self._m_dot if self._m_dot > 0.0 else 0.0
+            )
+            self._q_cool = self._q_cool - self._q_cas_cool
+            self._compute_state_from_pressure_enthalpy(
+                P=self._cycle_states[3, "P"],
+                h=self._cycle_states[3, "H"] + self._q_cool,
+            )
+            self._save_cycle_state(5)
+
+            # 4 - Hot side of cascade heat exchanger outlet (otherwise state 4 == 1)
+            if self._Q_heat == None or np.isnan(self._Q_heat):
+                self._Q_heat = self._Q_cond
+            elif self._Q_heat > self._Q_cond:
+                self._Q_heat = self._Q_cond
+
+            self._q_heat = (
+                self._Q_heat / self._m_dot if self._m_dot > 0 else self._q_cond
+            )
+
+            self._compute_state_from_pressure_enthalpy(
+                P=self._cycle_states[2, "P"],
+                h=self._cycle_states[2, "H"] + self._q_heat,
+            )
+            self._save_cycle_state(4)
 
         # Finish analysis
         self._solved = True

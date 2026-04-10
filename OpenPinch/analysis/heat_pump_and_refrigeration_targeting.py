@@ -960,7 +960,11 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     # Calculate evaporator duty
     Q_evap = Q_cond - work_hp + work_he
-    Q_evap_max = _get_Q_vals_from_T_vals(T_evap, args.T_hot, args.H_hot, is_cond=False) if Q_cond.sum() > 0.0 else 0.0
+    Q_evap_max = (
+        _get_Q_vals_from_T_vals(T_evap, args.T_hot, args.H_hot, is_cond=False)
+        if Q_cond.sum() > 0.0
+        else 0.0
+    )
 
     # Determine the key performance metrics of the heat pump
     Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)

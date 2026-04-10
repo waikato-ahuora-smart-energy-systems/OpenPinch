@@ -379,6 +379,8 @@ class ParallelVapourCompressionCycles:
             Heat delivered to the process [W].
         Q_cool : np.ndarray | float | None, optional
             Cooling delivered to the process [W].
+        is_heat_pump : bool, optional
+            Flag to indicate if the cycle is in heat pump or refrigeration mode.
 
         Returns
         -------

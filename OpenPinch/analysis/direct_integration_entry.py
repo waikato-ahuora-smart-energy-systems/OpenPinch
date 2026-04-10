@@ -79,7 +79,9 @@ def compute_direct_integration_targets(zone: Zone):
             * np.abs(pt.col[PT.H_NET_COLD.value]).max()
         )
         if (
-            _validate_heat_pump_and_refrigeration_targeting_required(pt, True, zone_config)
+            _validate_heat_pump_and_refrigeration_targeting_required(
+                pt, True, zone_config
+            )
             and Q_target > 0
         ):
             hp_res = get_heat_pump_and_refrigeration_targets(

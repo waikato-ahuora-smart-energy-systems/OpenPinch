@@ -122,7 +122,9 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
             * np.abs(pt.col[PT.H_HOT_UT.value]).max()
         )
         if (
-            _validate_heat_pump_and_refrigeration_targeting_required(pt, True, zone_config)
+            _validate_heat_pump_and_refrigeration_targeting_required(
+                pt, True, zone_config
+            )
             and Q_target > 0
         ):
             # Create problem table based on inverted utility streams
