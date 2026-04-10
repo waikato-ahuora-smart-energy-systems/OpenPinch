@@ -304,6 +304,65 @@ def test_heat_pump_cycle_case_10():
     )
 
 
+def test_refrigeration_cycle_uses_q_cool_as_primary_duty():
+    T_evap = -15  # degC, evaporator saturation temperature
+    T_cond = 35  # degC, condenser saturation temperature
+    dT_superheat = 5.0  # K superheat
+    dT_subcool = 5.0  # K subcooling
+
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        T_evap=T_evap,
+        T_cond=T_cond,
+        dT_superheat=dT_superheat,
+        dT_subcool=dT_subcool,
+        dt_ihx_gas_side=5.0,
+        eta_comp=0.75,
+        refrigerant="R134a",
+        Q_cool=1000.0,
+        Q_cas_cool=150.0,
+        Q_heat=np.nan,
+        is_heat_pump=False,
+    )
+
+    assert len(cycle.Hs) == VapourCompressionCycle.STATECOUNT
+    assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0.0)
+    assert np.isclose(cycle.Q_evap, cycle.Q_cool + cycle.Q_cas_cool, 0.0)
+    assert np.isclose(cycle.Q_heat, cycle.Q_cond, 0.0)
+    assert np.isclose(cycle.Q_cas_heat, 0.0, 0.0)
+    assert cycle.COP_r > 0.0
+    assert cycle.COP_h > 1.0
+
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+    )
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+    )
+
+
+def test_refrigeration_cycle_caps_q_heat_to_available_q_cond():
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        T_evap=-10.0,
+        T_cond=30.0,
+        dT_superheat=3.0,
+        dT_subcool=2.0,
+        dt_ihx_gas_side=5.0,
+        eta_comp=0.75,
+        refrigerant="R134a",
+        Q_cool=600.0,
+        Q_cas_cool=0.0,
+        Q_heat=1e9,
+        is_heat_pump=False,
+    )
+
+    assert cycle.Q_heat <= cycle.Q_cond + 1e-6
+    assert np.isclose(cycle.Q_cas_heat, 0.0, 0.0)
+    assert np.isclose(cycle.Q_cond, cycle.Q_heat + cycle.Q_cas_heat, 0.0)
+
+
 # ===== Merged from test_simple_heat_pump_cycle_extra.py =====
 """Additional branch coverage tests for VapourCompressionCycle."""
 

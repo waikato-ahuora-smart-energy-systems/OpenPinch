@@ -560,7 +560,7 @@ class VapourCompressionCycle:
             self._q_cas_cool = (
                 self._Q_cas_cool / self._m_dot if self._m_dot > 0.0 else 0.0
             )
-            self._q_cool = self._q_cool - self._q_cas_cool
+            self._q_cool = self._q_evap - self._q_cas_cool
             self._compute_state_from_pressure_enthalpy(
                 P=self._cycle_states[3, "P"],
                 h=self._cycle_states[3, "H"] + self._q_cool,
