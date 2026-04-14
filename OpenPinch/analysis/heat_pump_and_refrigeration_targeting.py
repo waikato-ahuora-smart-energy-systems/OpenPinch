@@ -65,7 +65,7 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    # zone_config.HP_TYPE = HPRcycle.CascadeVapourComp.value
+    zone_config.HP_TYPE = HPRcycle.MultiTempCarnot.value
     args = _prepare_hpr_target_inputs(
         Q_target=Q_target,
         T_vals=T_vals,
@@ -73,13 +73,13 @@ def get_heat_pump_and_refrigeration_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=False,
+        debug=True,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
     res = handler(args)
-    res.amb_stream = _get_ambient_air_stream(res.Q_amb, args)
+    res.amb_streams = _get_ambient_air_stream(res.Q_amb_hot, res.Q_amb_cold, args)
     return HPRTargetOutputs.model_validate(res)
 
 
@@ -87,7 +87,6 @@ def calc_heat_pump_and_refrigeration_cascade(
     pt: ProblemTable,
     res: HPRTargetOutputs,
     is_T_vals_shifted: bool,
-    is_process_integration: bool,
     is_heat_pumping: bool,
 ) -> ProblemTable:
     """Insert heat pump cascade contributions into a problem table.
@@ -101,10 +100,6 @@ def calc_heat_pump_and_refrigeration_cascade(
         stream collections.
     is_T_vals_shifted : bool
         Whether ``pt`` temperatures are already on the shifted temperature scale.
-    is_process_integration : bool
-        Selects the destination net-cascade column:
-        ``PT.H_NET_HP_PRO`` for direct integration and ``PT.H_NET_HP_UT`` for
-        utility integration.
 
     Returns
     -------
@@ -112,11 +107,11 @@ def calc_heat_pump_and_refrigeration_cascade(
         The same ``pt`` instance, after insertion of HP intervals and update of
         HP- or RFRG-related columns.
     """
-    t_hp = create_problem_table_with_t_int(
+    pt_hp = create_problem_table_with_t_int(
         streams=res.hot_streams + res.cold_streams,
         is_shifted=is_T_vals_shifted,
     )
-    pt.insert_temperature_interval(t_hp[PT.T.value].to_list())
+    pt.insert_temperature_interval(pt_hp[PT.T.value].to_list())
     temp = get_utility_heat_cascade(
         T_int_vals=pt.col[PT.T.value],
         hot_utilities=res.hot_streams,
@@ -124,31 +119,27 @@ def calc_heat_pump_and_refrigeration_cascade(
         is_shifted=is_T_vals_shifted,
     )
     if is_heat_pumping:
-        col_H_net = (
-            PT.H_NET_HP_PRO.value if is_process_integration else PT.H_NET_HP_UT.value
-        )
         pt.update(
             {
-                col_H_net: temp[PT.H_NET_UT.value],
+                PT.H_NET_HP.value: temp[PT.H_NET_UT.value],
                 PT.H_HOT_HP.value: temp[PT.H_HOT_UT.value],
                 PT.H_COLD_HP.value: temp[PT.H_COLD_UT.value],
             }
         )
     else:
-        raise ValueError("Need to implement refrigeration columns in the PT.")
+        pt.update(
+            {
+                PT.H_NET_RFRG.value: temp[PT.H_NET_UT.value],
+                PT.H_HOT_RFRG.value: temp[PT.H_HOT_UT.value],
+                PT.H_COLD_RFRG.value: temp[PT.H_COLD_UT.value],
+            }
+        )
 
     # Calculate ambient air portion for the heat pump cascade
-    hot_streams = StreamCollection()
-    cold_streams = StreamCollection()
-    if res.Q_amb >= tol:
-        hot_streams = res.amb_stream
-    elif res.Q_amb <= -tol:
-        cold_streams = res.amb_stream
-
-    if len(res.amb_stream) > 0:
+    if len(res.amb_streams) > 0:
         pt_air = get_process_heat_cascade(
-            hot_streams=hot_streams,
-            cold_streams=cold_streams,
+            hot_streams=res.amb_streams.get_hot_streams(),
+            cold_streams=res.amb_streams.get_cold_streams(),
             is_shifted=True,
         )
         T_ls_pt = pt[PT.T.value].to_list()
@@ -159,9 +150,9 @@ def calc_heat_pump_and_refrigeration_cascade(
             pt.col[PT.H_NET_A.value] + pt_air.col[PT.H_NET.value]
         )
 
-        if res.Q_amb >= tol:
+        if res.Q_amb_hot > tol:
             pt.col[PT.H_NET_HOT.value] -= pt_air.col[PT.H_NET.value]
-        elif res.Q_amb <= -tol:
+        elif res.Q_amb_cold > tol:
             pt.col[PT.H_NET_COLD.value] += pt_air.col[PT.H_NET.value]
     else:
         pt.col[PT.H_NET_W_AIR.value] = pt.col[PT.H_NET_A.value]
@@ -259,48 +250,31 @@ def _prepare_hpr_target_inputs(
     zone_config: Configuration = Configuration(),
     debug: bool = False,
 ):
-    """Build a validated optimisation-input bundle for heat pump targeting.
-
-    Parameters
-    ----------
-    Q_target : float
-        Target heat pump duty [kW].
-    T_vals : np.ndarray
-        Background temperature grid [degC].
-    H_hot, H_cold : np.ndarray
-        Background hot/cold cascade coordinates aligned to ``T_vals``.
-    is_heat_pumping : bool, default=True
-        Heating/refrigeration mode selection.
-    zone_config : Configuration
-        Configuration source for optimisation settings.
-    debug : bool, default=False
-        Enables optimisation debug plotting and extra diagnostics.
-
-    Returns
-    -------
-    HPRTargetInputs
-        Normalised and validated optimisation arguments.
-    """
+    """Build a validated optimisation-input bundle for heat pump targeting."""
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
-    T_hot, T_cold, dtcont_hp = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
-        T_vals, zone_config.DTMIN_HP
+    T_hot, T_cold = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
+        T_vals, zone_config.DT_CONT_HP
     )
-    T_cold, H_cold = _get_H_col_till_target_Q(Q_target, T_cold, H_cold)
-    T_hot, H_hot, T_cold, H_cold, Q_amb_max = (
-        _balance_hot_and_cold_heat_loads_with_ambient_air(
-            T_hot=T_hot,
-            H_hot=H_hot,
-            T_cold=T_cold,
-            H_cold=H_cold,
-            dtcont=dtcont_hp,
-            T_env=zone_config.T_ENV,
-            dT_env_cont=zone_config.DT_ENV_CONT,
-            dt_phase_change=zone_config.DT_PHASE_CHANGE,
-            is_heat_pumping=is_heat_pumping,
+    if is_heat_pumping:
+        T_cold, H_cold = _get_H_col_till_target_Q(
+            Q_target, T_cold, H_cold, is_cold=True
         )
+    else:
+        T_hot, H_hot = _get_H_col_till_target_Q(Q_target, T_hot, H_hot, is_cold=False)
+
+    T_cold, H_cold, z_amb_cold = _get_clean_load_profile_and_z_amb(
+        T_vals=T_cold,
+        H_vals=H_cold,
+        zone_config=zone_config,
+        is_cold=True,
     )
-    T_hot, H_hot = clean_composite_curve(T_hot, H_hot)
-    T_cold, H_cold = clean_composite_curve(T_cold, H_cold)
+    T_hot, H_hot, z_amb_hot = _get_clean_load_profile_and_z_amb(
+        T_vals=T_hot,
+        H_vals=H_hot,
+        zone_config=zone_config,
+        is_cold=False,
+    )
+
     net_hot_streams, _ = (
         _create_net_hot_and_cold_stream_collections_for_background_profile(
             T_hot, np.abs(H_hot)
@@ -314,7 +288,8 @@ def _prepare_hpr_target_inputs(
 
     return HPRTargetInputs(
         Q_target=Q_target,
-        Q_amb_max=Q_amb_max,
+        z_amb_hot=z_amb_hot,
+        z_amb_cold=z_amb_cold,
         T_hot=T_hot,
         H_hot=H_hot,
         T_cold=T_cold,
@@ -327,7 +302,7 @@ def _prepare_hpr_target_inputs(
         eta_exp=zone_config.ETA_EXP,
         eta_hp_carnot=zone_config.ETA_HP_CARNOT,
         eta_he_carnot=zone_config.ETA_HE_CARNOT,
-        dtcont_hp=zone_config.DTMIN_HP,
+        dtcont_hp=zone_config.DT_CONT_HP,
         dt_hp_ihx=zone_config.DT_HP_IHX,
         dt_cascade_hx=zone_config.DT_CASCADE_HX,
         load_fraction=zone_config.HP_LOAD_FRACTION,
@@ -336,9 +311,8 @@ def _prepare_hpr_target_inputs(
         dt_phase_change=zone_config.DT_PHASE_CHANGE,
         refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
         do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
-        price_ratio=zone_config.PRICE_RATIO_ELE_TO_FUEL
-        if zone_config.PRICE_RATIO_ELE_TO_FUEL > 0.0
-        else 1,
+        power_to_heat_price_ratio=zone_config.PRICE_RATIO_ELE_TO_HEAT,
+        power_to_cold_price_ratio=zone_config.PRICE_RATIO_ELE_TO_COLD,
         max_multi_start=zone_config.MAX_HP_MULTISTART,
         bb_minimiser=zone_config.BB_MINIMISER,
         allow_integrated_expander=zone_config.ALLOW_INTEGRATED_EXPANDER,
@@ -354,143 +328,82 @@ def _prepare_hpr_target_inputs(
 def _apply_temperature_shift_for_hpr_stream_dtmin_cont(
     T_vals: np.ndarray,
     dtmin_hp: float,
-):
+) -> Tuple[np.ndarray, np.ndarray]:
     """Apply HP-specific temperature shifting to a cascade grid."""
-    return T_vals - dtmin_hp * 0.5, T_vals + dtmin_hp * 0.5, dtmin_hp * 0.5
+    return T_vals - dtmin_hp, T_vals + dtmin_hp
 
 
 def _get_H_col_till_target_Q(
-    Q_max: float,
+    Q_target: float,
     T_vals: np.ndarray,
     H_vals: np.ndarray,
     *,
     is_cold: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Trim a cascade profile to a target duty using boundary interpolation.
-
-    Parameters
-    ----------
-    Q_max : float
-        Target absolute duty to retain.
-    T_vals : np.ndarray
-        Temperature coordinates of the profile.
-    H_vals : np.ndarray
-        Heat coordinates of the profile.
-    is_cold : bool, default=True
-        ``True`` trims from the cold-profile side, ``False`` from the hot side.
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray]
-        Trimmed temperature and heat arrays.
-    """
-    if abs(np.abs(H_vals).max() - Q_max) < tol:
+    """Trim a cascade profile to a target duty using boundary interpolation."""
+    if np.abs(H_vals).max() < Q_target:
         return T_vals, H_vals
-    if Q_max <= tol:
-        return (T_vals[-1:], H_vals[-1:]) if is_cold else (T_vals[:1], H_vals[:1])
-    mask = np.where(np.abs(H_vals) >= Q_max, 1.0, 0.0)
-    i_vals = np.flatnonzero(mask)
-    if i_vals.size == 0:
-        return (T_vals[-1:], H_vals[-1:]) if is_cold else (T_vals[:1], H_vals[:1])
+    i_vals = np.flatnonzero(np.where(np.abs(H_vals) >= Q_target, 1.0, 0.0))
     if is_cold:
         i = i_vals[-1]
-        if i >= len(H_vals) - 1:
-            return T_vals[i:], H_vals[i:]
+        if i == T_vals.size - 1:
+            raise ValueError("Target for heat pumping cannot be zero.")
         T_vals[i] = linear_interpolation(
-            Q_max, H_vals[i], H_vals[i + 1], T_vals[i], T_vals[i + 1]
+            Q_target, H_vals[i], H_vals[i + 1], T_vals[i], T_vals[i + 1]
         )
-        H_vals[i] = Q_max
+        H_vals[i] = Q_target
         return T_vals[i:], H_vals[i:]
+
     else:
         i = i_vals[0]
-        if i <= 0:
-            return T_vals[:1], H_vals[:1]
+        if i == 0:
+            raise ValueError("Target for refrigeration cannot be zero.")
         T_vals[i] = linear_interpolation(
-            -Q_max, H_vals[i], H_vals[i - 1], T_vals[i], T_vals[i - 1]
+            -Q_target, H_vals[i], H_vals[i - 1], T_vals[i], T_vals[i - 1]
         )
-        H_vals[i] = -Q_max
+        H_vals[i] = -Q_target
         return T_vals[: i + 1], H_vals[: i + 1]
 
 
-def _balance_hot_and_cold_heat_loads_with_ambient_air(
-    T_hot: np.ndarray,
-    H_hot: np.ndarray,
-    T_cold: np.ndarray,
-    H_cold: np.ndarray,
-    dtcont: float,
-    T_env: float,
-    dT_env_cont: float,
-    dt_phase_change: float,
-    is_heat_pumping: bool,
-):
-    """Balance hot/cold targets with optional ambient-air exchange.
+def _get_z_ambient(
+    T_vals: np.ndarray,
+    T_amb_star: float,
+    is_cold: bool,
+) -> Tuple[np.ndarray, float]:
+    """TODO: update docstring"""
+    if is_cold:
+        return np.where(T_vals > T_amb_star, 1.0, 0.0)
+    else:
+        return np.where(T_vals < T_amb_star, -1.0, 0.0)
 
-    Parameters
-    ----------
-    T_hot, H_hot, T_cold, H_cold : np.ndarray
-        Cascade coordinates for hot and cold profiles.
-    dtcont : float
-        Effective temperature shift used for contact constraints.
-    T_env : float
-        Ambient temperature [degC].
-    dT_env_cont : float
-        Minimum ambient contact temperature difference [K].
-    dt_phase_change : float
-        Representative phase-change temperature span [K].
-    is_heat_pumping : bool
-        ``True`` for heating mode, ``False`` for refrigeration mode.
 
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]
-        Updated ``(T_hot, H_hot, T_cold, H_cold, Q_amb_max)``.
-    """
-    Q_amb_max = 0.0
-    delta_H = np.abs(H_cold).max() - np.abs(H_hot).max()
-    # if np.abs(delta_H) < tol:
-    #     return T_hot, H_hot, T_cold, H_cold, Q_amb_max
+def _get_clean_load_profile_and_z_amb(
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+    zone_config: Configuration,
+    *,
+    is_cold: bool,
+) -> Tuple[np.ndarray, float]:
+    """TODO: update docstring"""
+    sign = 1 if is_cold else -1
+    z_amb = _get_z_ambient(
+        T_vals=T_vals,
+        T_amb_star=zone_config.T_ENV
+        + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign,
+        is_cold=is_cold,
+    )
+    H_vals += z_amb
 
-    if H_hot.max() > tol:
-        H_hot *= -1
+    T_vals, H_vals = clean_composite_curve(T_vals, H_vals)
 
-    if H_cold.min() < -tol:
-        H_cold *= -1
-
-    if is_heat_pumping:
-        if delta_H > tol:
-            # Heat pump with potentially limited sources
-            mask = np.where(
-                T_hot <= (T_env - dT_env_cont - dt_phase_change - dtcont), delta_H, 0.0
-            )
-            H_hot -= mask
-            Q_amb_max = delta_H
-        elif delta_H < -tol:
-            # Heat pump with excess sources -> remove excess
-            T_hot, H_hot = _get_H_col_till_target_Q(
-                np.abs(H_cold).max(),
-                T_hot,
-                H_hot,
-                is_cold=False,
-            )
-
-    # else: # Refrigeration
-    #     if delta_H < -tol:
-    #         # Refrigeration with potentially limited sinks
-    #         mask = np.where(
-    #             T_cold >= (T_env + dT_env_cont + dt_phase_change + dtcont),
-    #             delta_H, 0.0
-    #         )
-    #         H_cold += mask
-    #     elif delta_H > tol:
-    #         # Refrigeration with excess sinks -> remove excess
-    #         T_cold, H_cold = _get_H_col_till_target_Q(
-    #             np.abs(H_hot).max(),
-    #             T_cold,
-    #             H_cold,
-    #             True,
-    #         )
-
-    return T_hot, H_hot, T_cold, H_cold, Q_amb_max
+    z_amb = _get_z_ambient(
+        T_vals=T_vals,
+        T_amb_star=zone_config.T_ENV
+        + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign,
+        is_cold=is_cold,
+    )
+    H_vals -= z_amb
+    return T_vals, H_vals, z_amb
 
 
 #######################################################################################################
@@ -503,10 +416,10 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     args: HPRTargetInputs,
 ) -> HPRTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout."""
-    x0 = [0.0 for _ in range(args.n_cond + args.n_evap)]
-    bnds = [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
+    x0 = [0.0 for _ in range(args.n_cond + args.n_evap + 1)]
+    bnds = [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)] + [(-1.0, 4.0)]
     minima = multiminima(
-        func=_compute_multi_temperature_carnot_hp_opt_obj,
+        func=_compute_multi_temperature_carnot_cycle_obj,
         func_kwargs=args,
         x0_ls=[x0],
         bounds=bnds,
@@ -514,7 +427,7 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     )
     x = minima[0]
 
-    res = _compute_multi_temperature_carnot_hp_opt_obj(x, args, debug=args.debug)
+    res = _compute_multi_temperature_carnot_cycle_obj(x, args, debug=args.debug)
     if res["success"] == False:
         raise ValueError(
             "Multi-temperature Carnot heat pump targeting failed to return an optimal result."
@@ -527,81 +440,99 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     return HPRTargetOutputs.model_validate(res)
 
 
-def _parse_multi_temperature_carnot_hp_state_variables(
+def _parse_multi_temperature_carnot_cycle_state_variables(
     x: np.ndarray,
     args: HPRTargetInputs,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, float, float]:
     """Compile the full list of condenser and evaporator temperature levels."""
-    # Get condensing temperatures and available duties at x
     T_cond = _map_x_to_T(x[: int(args.n_cond)], args.T_cold[0], args.T_cold[-1])
-    Q_cond = _get_Q_vals_from_T_vals(T_cond, args.T_cold, args.H_cold, is_cond=True)
-    # Get evaproating temperatures and available duties at x
-    T_evap = _map_x_to_T(x[int(args.n_cond) :], args.T_hot[-1], args.T_hot[0])
-    Q_evap = _get_Q_vals_from_T_vals(T_evap, args.T_hot, args.H_hot, is_cond=False)
-    return T_cond, Q_cond, T_evap, Q_evap
+    T_evap = _map_x_to_T(x[int(args.n_cond) : -1], args.T_hot[-1], args.T_hot[0])
+    Q_amb_hot = min(args.Q_target * x[-1], 0.0) * -1
+    Q_amb_cold = max(args.Q_target * x[-1], 0.0)
+    return T_cond, T_evap, Q_amb_hot, Q_amb_cold
 
 
-def _compute_multi_temperature_carnot_hp_opt_obj(
+def _compute_multi_temperature_carnot_cycle_obj(
     x: np.ndarray,
     args: HPRTargetInputs,
     *,
     debug: bool = False,
 ) -> dict:
     """Evaluate compressor work for a candidate multi-temperature Carnot HP placement defined by vector `x`."""
-    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(
-        x, args
+    T_cond, T_evap, Q_amb_hot, Q_amb_cold = (
+        _parse_multi_temperature_carnot_cycle_state_variables(x, args)
     )
+
+    H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
+
+    Q_cond = _get_Q_vals_from_T_vals(T_cond, args.T_cold, H_cold_with_amb, is_cond=True)
+    Q_evap = _get_Q_vals_from_T_vals(T_evap, args.T_hot, H_hot_with_amb, is_cond=False)
 
     # Determine the work of the heat pump based on the limiting side
     cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
-    work_hp_from_evap = Q_evap.sum() / (cop - 1)
-    work_hp_from_cond = Q_cond.sum() / cop
-    work_hp = min(work_hp_from_evap, work_hp_from_cond)
+    work_from_evap = Q_evap.sum() / (cop - 1)
+    work_from_cond = Q_cond.sum() / cop
+    work = min(work_from_evap, work_from_cond)
 
     # Scale the side that has excess duty available
-    scale_cond = (
-        min(work_hp_from_evap / work_hp_from_cond, 1)
-        if work_hp_from_cond > 0.0
-        else 0.0
-    )
-    Q_cond *= scale_cond
-    scale_evap = (
-        min(work_hp_from_cond / work_hp_from_evap, 1)
-        if work_hp_from_evap > 0.0
-        else 0.0
-    )
-    Q_evap *= scale_evap
+    Q_cond *= min(work_from_evap / work_from_cond, 1) if work_from_cond > 0.0 else 0.0
+    Q_evap *= min(work_from_cond / work_from_evap, 1) if work_from_evap > 0.0 else 0.0
+
+    # Determine external heating and cooling demand
+    Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - Q_cond.sum(), 0.0)
+    Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - Q_evap.sum(), 0.0)
 
     # Determine the key performance metrics of the heat pump
-    Q_amb = _calc_Q_amb(Q_evap.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
-    g = cop * Q_evap.sum() - (cop - 1) * Q_cond.sum()
-    p = g_ineq_penalty(g, rho=args.rho_penalty, form="square")
-    Q_ext = max(args.Q_target - Q_cond.sum(), 0.0)  # e.g., direct electric heating
-    obj = _calc_obj(work_hp, Q_ext, args.Q_target, args.price_ratio, p)
+    p = (
+        g_ineq_penalty(
+            g=work_from_cond - work_from_evap,
+            rho=args.rho_penalty,
+            form="square",
+        ) +
+        g_ineq_penalty(
+            g=args.Q_target - Q_evap.sum(),
+            rho=args.rho_penalty * 10,
+            form="square",
+        )
+        if not (args.is_heat_pumping)
+        else 0.0
+    )
+
+    obj = _calc_obj(
+        work=work,
+        Q_ext_heat=Q_ext_heat,
+        Q_ext_cold=Q_ext_cold,
+        Q_target=args.Q_target,
+        power_to_heat_price_ratio=args.power_to_heat_price_ratio,
+        power_to_cold_price_ratio=args.power_to_cold_price_ratio,
+        penalty=p,
+    )
 
     if debug:  # If in debug mode, plot the graph immediately
         res = _get_carnot_hp_streams(T_cond, Q_cond, T_evap, Q_evap, args)
         plot_multi_hp_profiles_from_results(
             args.T_hot,
-            args.H_hot,
+            H_hot_with_amb,
             args.T_cold,
-            args.H_cold,
+            H_cold_with_amb,
             res["hot_streams"],
             res["cold_streams"],
-            title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_target):.5f} + {(Q_ext / args.Q_target):.5f} + {(g / args.Q_target):.5f}",
+            title=f"Obj {float(obj):.5f} = {(work / args.Q_target):.5f} + {(Q_ext_heat / args.Q_target):.5f} + {(Q_ext_cold / args.Q_target):.5f} + {(p / args.Q_target):.5f}",
         )
 
     return {
         "obj": obj,
-        "utility_tot": work_hp + Q_ext,
-        "net_work": work_hp,
-        "Q_ext": Q_ext,
+        "utility_tot": work + Q_ext_heat,
+        "net_work": work,
+        "Q_ext": Q_ext_heat,
         "T_cond": T_cond,
         "Q_cond": Q_cond,
         "T_evap": T_evap,
         "Q_evap": Q_evap,
         "cop": cop,
-        "Q_amb": Q_amb,
+        "Q_amb_hot": Q_amb_hot,
+        "Q_amb_cold": Q_amb_cold,
         "success": True,
     }
 
@@ -1780,47 +1711,51 @@ def _build_simulated_hps_streams(
 
 
 def _get_ambient_air_stream(
-    Q_amb: float,
+    Q_amb_hot: float,
+    Q_amb_cold: float,
     args: HPRTargetInputs,
 ) -> StreamCollection:
-    """Build ambient-air source/sink stream representation from ambient duty.
-
-    Parameters
-    ----------
-    Q_amb : float
-        Net ambient duty. Positive indicates ambient as heat source, negative as
-        sink.
-    args : HPRTargetInputs
-        Optimisation input bundle containing ambient settings.
-
-    Returns
-    -------
-    StreamCollection
-        Ambient stream collection or an empty collection when duty is near zero.
-    """
-    if -tol < Q_amb < tol:
-        return StreamCollection()
-    else:
+    """Build ambient-air source/sink stream representation from ambient duty."""
+    if Q_amb_hot > tol:
         return _build_latent_streams(
             T_ls=np.array([args.T_env]),
             dT_phase_change=args.dt_phase_change,
-            Q_ls=np.array([Q_amb]),
+            Q_ls=np.array([Q_amb_hot]),
             dt_cont=args.dt_env_cont,
-            is_hot=True if Q_amb >= -tol else False,
+            is_hot=True,
             is_process_stream=True,
             prefix="AIR",
         )
+    elif Q_amb_cold > tol:
+        return _build_latent_streams(
+            T_ls=np.array([args.T_env]),
+            dT_phase_change=args.dt_phase_change,
+            Q_ls=np.array([Q_amb_cold]),
+            dt_cont=args.dt_env_cont,
+            is_hot=False,
+            is_process_stream=True,
+            prefix="AIR",
+        )
+    else:
+        return StreamCollection()
 
 
 def _calc_obj(
-    work_hp: float,
-    Q_ext: float,
+    work: float,
+    Q_ext_heat: float,
+    Q_ext_cold: float,
     Q_target: float,
-    price_ratio: float = 1.0,
+    power_to_heat_price_ratio: float = 1.0,
+    power_to_cold_price_ratio: float = 0.5,
     penalty: float = 0.0,
 ) -> float:
     """Return the normalized objective value."""
-    return (work_hp + Q_ext / price_ratio + penalty) / Q_target
+    return (
+        work
+        + (Q_ext_heat / power_to_heat_price_ratio)
+        + (Q_ext_cold / power_to_cold_price_ratio)
+        + penalty
+    ) / Q_target
 
 
 def _calc_Q_amb(

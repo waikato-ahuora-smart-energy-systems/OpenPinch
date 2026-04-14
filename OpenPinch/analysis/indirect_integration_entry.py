@@ -19,7 +19,6 @@ from . import (
     calc_heat_pump_and_refrigeration_cascade,
     get_heat_recovery_target_from_pt,
     set_zonal_targets,
-    plot_multi_hp_profiles_from_results,
 )
 
 __all__ = ["compute_indirect_integration_targets"]
@@ -142,7 +141,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 pt=pt,
                 res=res["Heat pump"],
                 is_T_vals_shifted=True,
-                is_process_integration=True,
                 is_heat_pumping=True,
             )
 
@@ -160,7 +158,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
                 pt=pt,
                 res=res["Refrigeration"],
                 is_T_vals_shifted=True,
-                is_process_integration=True,
                 is_heat_pumping=False,
             )
 
@@ -372,7 +369,7 @@ def _save_graph_data(
                 PT.H_COLD_UT.value,
             ]
         ],
-        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP_UT.value]],
+        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]],
     }
 
 

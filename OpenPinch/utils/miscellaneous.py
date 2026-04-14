@@ -114,7 +114,7 @@ def clean_composite_curve(
         x_clean.pop(i)
         y_clean.pop(i)
 
-    return y_clean, x_clean
+    return np.asarray(y_clean), np.asarray(x_clean)
 
 
 def graph_simple_cc_plot(Tc, Hc, Th, Hh):

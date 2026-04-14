@@ -133,8 +133,8 @@ class ProblemTableLabel(Enum):
     H_NET_UT = "H_net_ut"
     H_NET_HOT = "H_hot_net"
     H_NET_COLD = "H_cold_net"
-    H_NET_HP_UT = "H_net_hp_ut"
-    H_NET_HP_PRO = "H_net_hp_pro"
+    H_NET_HP = "H_net_hp"
+    H_NET_RFRG = "H_net_rfrg"
     H_NET_W_AIR = "H_net_with_air"
 
     H_HOT_UT = "H_hot_utility"
@@ -146,8 +146,17 @@ class ProblemTableLabel(Enum):
 
     H_HOT_HP = "H_hot_hp_ut"
     H_COLD_HP = "H_cold_hp_ut"
-    H_NET_HOT_2 = "H_hot_net_utility_after_hp"
-    H_NET_COLD_2 = "H_cold_net_utility_after_hp"
+    H_NET_HOT_AFTR_HP = "H_hot_net_after_hp"
+    H_NET_COLD_AFTR_HP = "H_cold_net_after_hp"
+    H_NET_HOT_UT_AFTR_HP = "H_hot_net_utility_after_hp"
+    H_NET_COLD_UT_AFTR_HP = "H_cold_net_utility_after_hp"    
+
+    H_HOT_RFRG = "H_hot_rfrg_ut"
+    H_COLD_RFRG = "H_cold_rfrg_ut"
+    H_NET_HOT_AFTR_RFRG = "H_hot_net_after_rfrg"
+    H_NET_COLD_AFTR_RFRG = "H_cold_net_after_rfrg"
+    H_NET_HOT_UT_AFTR_RFRG = "H_hot_net_utility_after_rfrg"
+    H_NET_COLD_UT_AFTR_RFRG = "H_cold_net_utility_after_rfrg"  
 
     RCP_HOT = "rCP_hot"
     RCP_COLD = "rCP_cold"

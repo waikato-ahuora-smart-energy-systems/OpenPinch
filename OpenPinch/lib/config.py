@@ -67,22 +67,25 @@ class Configuration:
     HP_LOAD_FRACTION: float = 1.0
     REFRIGERANTS: List[str] = ["water", "ammonia"]
     DO_REFRIGERANT_SORT: bool = True
-    PRICE_RATIO_ELE_TO_FUEL: float = 1.0
+    PRICE_RATIO_ELE_TO_HEAT: float = 1.0  ### add to the template (modified)
+    PRICE_RATIO_ELE_TO_COLD: float = 0.5  ### add to the template
     MAX_HP_MULTISTART: int = 10
     N_COND: int = 3
     N_EVAP: int = 2
     ETA_COMP: float = 0.7
     ETA_EXP: float = 0.7
+    ETA_MOTOR: float = 0.95  ### add to the template (modified)
     ETA_HP_CARNOT: float = 0.5
     ETA_HE_CARNOT: float = 0.5
-    DTMIN_HP: float = 0.0
+    DT_CONT_HP: float = 0.0  ### add to the template (modified)
     DT_HP_IHX: float = 0.0
     DT_CASCADE_HX: float = 0.0
-    BB_MINIMISER: str = BB_Minimiser.RBF.value  ### add to the template
+    BB_MINIMISER: str = BB_Minimiser.CMAES.value  ### add to the template
     INITIALISE_SIMULATED_CYCLE: bool = True  ### add to the template
     ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
 
     ### Cost targeting parameters ###
+    ELE_PRICE: float = 160 #$/MWh   ### add to the template
     UTILITY_PRICE: float = 40
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0

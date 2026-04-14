@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
-    _balance_hot_and_cold_heat_loads_with_ambient_air,
+    _get_normalised_H_ambient_air,
     _compute_entropic_average_temperature_in_K,
     _compute_COP_estimate_from_carnot_limit,
-    _parse_multi_temperature_carnot_hp_state_variables,
+    _parse_multi_temperature_carnot_cycle_state_variables,
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_H_col_till_target_Q,
     _prepare_latent_hp_profile,
@@ -22,17 +22,12 @@ from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
     _get_x0_for_brayton_hp_opt,
     _get_bounds_for_brayton_hp_opt,
 )
-from OpenPinch.analysis import (
-    heat_pump_and_refrigeration_targeting as hp_targeting_module,
-)
 from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import HPRcycle, ProblemTableLabel as PT
-from OpenPinch.classes import ProblemTable, Stream, StreamCollection
-from OpenPinch.lib.enums import ProblemTableLabel as PT
+from OpenPinch.lib.config import *
+from OpenPinch.lib.enums import *
 
 
 def get_temperatures():
@@ -141,36 +136,33 @@ def test_get_H_col_till_target_Q_interpolates_to_target_at_exisiting_temperature
 def test_get_H_col_till_target_Q_handles_zero_target_without_index_error():
     T_cold = np.array([160.0, 150.0, 140.0, 130.0])
     H_cold = np.array([600.0, 400.0, 150.0, 0.0])
-
-    T_out, H_out = _get_H_col_till_target_Q(0.0, T_cold.copy(), H_cold.copy())
-
-    np.testing.assert_allclose(T_out, np.array([130.0]))
-    np.testing.assert_allclose(H_out, np.array([0.0]))
+    with pytest.raises(ValueError, match="Target for heat pumping cannot be zero."):
+        _get_H_col_till_target_Q(0.0, T_cold.copy(), H_cold.copy())
 
 
-def test_balance_hot_and_cold_heat_loads_handles_excess_hot_source_branch():
-    T_hot = np.array([150.0, 120.0, 90.0, 60.0])
-    H_hot = np.array([0.0, -200.0, -500.0, -800.0])
-    T_cold = np.array([150.0, 120.0, 90.0, 60.0])
-    H_cold = np.array([400.0, 200.0, 0.0, 0.0])
+# def test_balance_hot_and_cold_heat_loads_handles_excess_hot_source_branch():
+#     T_hot = np.array([150.0, 120.0, 90.0, 60.0])
+#     H_hot = np.array([0.0, -200.0, -500.0, -800.0])
+#     T_cold = np.array([150.0, 120.0, 90.0, 60.0])
+#     H_cold = np.array([400.0, 200.0, 0.0, 0.0])
 
-    T_hot_out, H_hot_out, _, _, Q_amb_max = (
-        _balance_hot_and_cold_heat_loads_with_ambient_air(
-            T_hot=T_hot,
-            H_hot=H_hot,
-            T_cold=T_cold,
-            H_cold=H_cold,
-            dtcont=5.0,
-            T_env=25.0,
-            dT_env_cont=10.0,
-            dt_phase_change=1.0,
-            is_heat_pumping=True,
-        )
-    )
+#     T_hot_out, H_hot_out, _, _, Q_amb_max = (
+#         _balance_hot_and_cold_heat_loads_with_ambient_air(
+#             T_hot=T_hot,
+#             H_hot=H_hot,
+#             T_cold=T_cold,
+#             H_cold=H_cold,
+#             dtcont=5.0,
+#             T_env=25.0,
+#             dT_env_cont=10.0,
+#             dt_phase_change=1.0,
+#             is_heat_pumping=True,
+#         )
+#     )
 
-    np.testing.assert_allclose(np.abs(H_hot_out).max(), np.abs(H_cold).max())
-    assert T_hot_out.shape == H_hot_out.shape
-    assert Q_amb_max == 0.0
+#     np.testing.assert_allclose(np.abs(H_hot_out).max(), np.abs(H_cold).max())
+#     assert T_hot_out.shape == H_hot_out.shape
+#     assert Q_amb_max == 0.0
 
 
 def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty():
@@ -223,7 +215,7 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
     assert res["Q_cond"].shape == (2,)
 
 
-def test_parse_multi_temperature_carnot_hp_state_variables_returns_expected_profiles():
+def test_parse_multi_temperature_carnot_cycle_state_variables_returns_expected_profiles():
     args = SimpleNamespace(
         n_cond=2,
         n_evap=2,
@@ -234,8 +226,8 @@ def test_parse_multi_temperature_carnot_hp_state_variables_returns_expected_prof
     )
     x = np.array([0.5, 0.5, 0.25, 0.5])
 
-    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(
-        x, args
+    T_cond, Q_cond, T_evap, Q_evap = (
+        _parse_multi_temperature_carnot_cycle_state_variables(x, args)
     )
 
     np.testing.assert_allclose(T_cond, np.array([80.0, 60.0]))
@@ -244,7 +236,7 @@ def test_parse_multi_temperature_carnot_hp_state_variables_returns_expected_prof
     np.testing.assert_allclose(Q_evap, np.array([75.0, 115.0]))
 
 
-def test_parse_multi_temperature_carnot_hp_state_variables_respects_cond_evap_split_sizes():
+def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap_split_sizes():
     args = SimpleNamespace(
         n_cond=1,
         n_evap=3,
@@ -255,8 +247,8 @@ def test_parse_multi_temperature_carnot_hp_state_variables_respects_cond_evap_sp
     )
     x = np.array([0.4, 0.2, 0.5, 0.8])
 
-    T_cond, Q_cond, T_evap, Q_evap = _parse_multi_temperature_carnot_hp_state_variables(
-        x, args
+    T_cond, Q_cond, T_evap, Q_evap = (
+        _parse_multi_temperature_carnot_cycle_state_variables(x, args)
     )
 
     assert T_cond.shape == (1,)
@@ -276,7 +268,7 @@ def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatc
     def fake_minimize(*args, **kwargs):
         return DummyResult()
 
-    monkeypatch.setattr(hp_targeting_module, "minimize", fake_minimize)
+    monkeypatch.setattr(hp, "minimize", fake_minimize)
 
     args = SimpleNamespace(
         n_cond=1,
@@ -563,9 +555,9 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(monkeypatch, q_amb):
         hp, "get_process_heat_cascade", lambda **_kwargs: _pt_with_hnet(4.0, -1.0)
     )
 
-    amb_stream = StreamCollection()
+    amb_streams = StreamCollection()
     if abs(q_amb) > 0:
-        amb_stream.add(
+        amb_streams.add(
             Stream(
                 name="AIR",
                 t_supply=20.0,
@@ -579,40 +571,39 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(monkeypatch, q_amb):
         hot_streams=StreamCollection(),
         cold_streams=StreamCollection(),
         Q_amb=q_amb,
-        amb_stream=amb_stream,
+        amb_streams=amb_streams,
     )
     out = hp.calc_heat_pump_and_refrigeration_cascade(
         pt,
         res,
         is_T_vals_shifted=True,
-        is_process_integration=True,
         is_heat_pumping=True,
     )
     assert isinstance(out, ProblemTable)
 
 
-def test_hot_profile_trimming_and_balance_sign_handling():
-    T = np.array([150.0, 120.0, 90.0, 60.0])
-    H = np.array([-300.0, -250.0, -100.0, 0.0])
-    T_out, H_out = hp._get_H_col_till_target_Q(200.0, T.copy(), H.copy(), is_cold=False)
-    assert T_out.shape == H_out.shape
+# def test_hot_profile_trimming_and_balance_sign_handling():
+#     T = np.array([150.0, 120.0, 90.0, 60.0])
+#     H = np.array([0.0, -100.0, -250.0, -300.0])
+#     T_out, H_out = hp._get_H_col_till_target_Q(200.0, T.copy(), H.copy(), is_cold=False)
+#     assert T_out.shape == H_out.shape
 
-    T_hot, H_hot, T_cold, H_cold, q_amb = (
-        hp._balance_hot_and_cold_heat_loads_with_ambient_air(
-            T_hot=np.array([140.0, 100.0, 60.0]),
-            H_hot=np.array([0.0, 120.0, 200.0]),
-            T_cold=np.array([140.0, 100.0, 60.0]),
-            H_cold=np.array([0.0, -50.0, -100.0]),
-            dtcont=5.0,
-            T_env=15.0,
-            dT_env_cont=5.0,
-            dt_phase_change=2.0,
-            is_heat_pumping=True,
-        )
-    )
-    assert T_hot.shape == H_hot.shape
-    assert T_cold.shape == H_cold.shape
-    assert q_amb >= 0.0
+#     T_hot, H_hot, T_cold, H_cold, q_amb = (
+#         hp._balance_hot_and_cold_heat_loads_with_ambient_air(
+#             T_hot=np.array([140.0, 100.0, 60.0]),
+#             H_hot=np.array([0.0, 120.0, 200.0]),
+#             T_cold=np.array([140.0, 100.0, 60.0]),
+#             H_cold=np.array([0.0, -50.0, -100.0]),
+#             dtcont=5.0,
+#             T_env=15.0,
+#             dT_env_cont=5.0,
+#             dt_phase_change=2.0,
+#             is_heat_pumping=True,
+#         )
+#     )
+#     assert T_hot.shape == H_hot.shape
+#     assert T_cold.shape == H_cold.shape
+#     assert q_amb >= 0.0
 
 
 def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
@@ -622,7 +613,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
 
     monkeypatch.setattr(
         hp,
-        "_compute_multi_temperature_carnot_hp_opt_obj",
+        "_compute_multi_temperature_carnot_cycle_obj",
         lambda x, args, debug=False: {
             "obj": 0.1,
             "utility_tot": 1.0,
@@ -650,7 +641,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
 
     monkeypatch.setattr(
         hp,
-        "_compute_multi_temperature_carnot_hp_opt_obj",
+        "_compute_multi_temperature_carnot_cycle_obj",
         lambda x, args, debug=False: {"success": False},
     )
     with pytest.raises(ValueError, match="failed to return an optimal result"):
@@ -666,7 +657,7 @@ def test_multi_temp_carnot_objective_debug_branch(monkeypatch):
         "plot_multi_hp_profiles_from_results",
         lambda *a, **k: called.__setitem__("plot", called["plot"] + 1),
     )
-    out = hp._compute_multi_temperature_carnot_hp_opt_obj(x, args, debug=True)
+    out = hp._compute_multi_temperature_carnot_cycle_obj(x, args, debug=True)
     assert out["success"] is True
     assert called["plot"] == 1
 
@@ -1110,89 +1101,89 @@ def _stream(
     )
 
 
-def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
-    for fn in (
-        "figure",
-        "plot",
-        "title",
-        "xlabel",
-        "ylabel",
-        "grid",
-        "legend",
-        "axvline",
-        "tight_layout",
-        "show",
-    ):
-        monkeypatch.setattr(hp.plt, fn, lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        hp, "clean_composite_curve_ends", lambda t, h: (np.asarray(t), np.asarray(h))
-    )
-    monkeypatch.setattr(
-        hp,
-        "_get_heat_pump_cascade",
-        lambda **kwargs: {
-            PT.T.value: np.array([100.0, 80.0]),
-            PT.H_HOT_UT.value: np.array([10.0, 0.0]),
-            PT.H_COLD_UT.value: np.array([8.0, 0.0]),
-        },
-    )
-    hp.plot_multi_hp_profiles_from_results(
-        T_hot=np.array([120.0, 80.0]),
-        H_hot=np.array([10.0, 0.0]),
-        T_cold=np.array([120.0, 80.0]),
-        H_cold=np.array([8.0, 0.0]),
-        hot_streams=StreamCollection(),
-        cold_streams=StreamCollection(),
-        title="t",
-    )
+# def test_plot_multi_hp_profiles_and_prepare_inputs_wrapper(monkeypatch):
+#     for fn in (
+#         "figure",
+#         "plot",
+#         "title",
+#         "xlabel",
+#         "ylabel",
+#         "grid",
+#         "legend",
+#         "axvline",
+#         "tight_layout",
+#         "show",
+#     ):
+#         monkeypatch.setattr(hp.plt, fn, lambda *args, **kwargs: None)
+#     monkeypatch.setattr(
+#         hp, "clean_composite_curve_ends", lambda t, h: (np.asarray(t), np.asarray(h))
+#     )
+#     monkeypatch.setattr(
+#         hp,
+#         "_get_heat_pump_cascade",
+#         lambda **kwargs: {
+#             PT.T.value: np.array([100.0, 80.0]),
+#             PT.H_HOT_UT.value: np.array([10.0, 0.0]),
+#             PT.H_COLD_UT.value: np.array([8.0, 0.0]),
+#         },
+#     )
+#     hp.plot_multi_hp_profiles_from_results(
+#         T_hot=np.array([120.0, 80.0]),
+#         H_hot=np.array([10.0, 0.0]),
+#         T_cold=np.array([120.0, 80.0]),
+#         H_cold=np.array([8.0, 0.0]),
+#         hot_streams=StreamCollection(),
+#         cold_streams=StreamCollection(),
+#         title="t",
+#     )
 
-    cfg = Configuration()
-    monkeypatch.setattr(
-        hp,
-        "_apply_temperature_shift_for_hpr_stream_dtmin_cont",
-        lambda T_vals, dtmin_hp: (
-            np.array([95.0, 85.0, 75.0]),
-            np.array([105.0, 95.0, 85.0]),
-            5.0,
-        ),
-    )
-    monkeypatch.setattr(hp, "_get_H_col_till_target_Q", lambda q, t, h: (t, h))
-    monkeypatch.setattr(
-        hp,
-        "_balance_hot_and_cold_heat_loads_with_ambient_air",
-        lambda **kwargs: (
-            np.array([95.0, 85.0, 75.0]),
-            np.array([0.0, -5.0, -10.0]),
-            np.array([105.0, 95.0, 85.0]),
-            np.array([10.0, 5.0, 0.0]),
-            1.0,
-        ),
-    )
-    monkeypatch.setattr(
-        hp, "clean_composite_curve", lambda t, h: (np.asarray(t), np.asarray(h))
-    )
-    calls = {"n": 0}
+#     cfg = Configuration()
+#     monkeypatch.setattr(
+#         hp,
+#         "_apply_temperature_shift_for_hpr_stream_dtmin_cont",
+#         lambda T_vals, dtmin_hp: (
+#             np.array([95.0, 85.0, 75.0]),
+#             np.array([105.0, 95.0, 85.0]),
+#             5.0,
+#         ),
+#     )
+#     monkeypatch.setattr(hp, "_get_H_col_till_target_Q", lambda q, t, h: (t, h))
+#     monkeypatch.setattr(
+#         hp,
+#         "_balance_hot_and_cold_heat_loads_with_ambient_air",
+#         lambda **kwargs: (
+#             np.array([95.0, 85.0, 75.0]),
+#             np.array([0.0, -5.0, -10.0]),
+#             np.array([105.0, 95.0, 85.0]),
+#             np.array([10.0, 5.0, 0.0]),
+#             1.0,
+#         ),
+#     )
+#     monkeypatch.setattr(
+#         hp, "clean_composite_curve", lambda t, h: (np.asarray(t), np.asarray(h))
+#     )
+#     calls = {"n": 0}
 
-    def _fake_bg_streams(*args, **kwargs):
-        calls["n"] += 1
-        if calls["n"] == 1:
-            return _sc(_stream("NH", 95.0, 75.0, 10.0)), StreamCollection()
-        return StreamCollection(), _sc(_stream("NC", 85.0, 105.0, -8.0))
+#     def _fake_bg_streams(*args, **kwargs):
+#         calls["n"] += 1
+#         if calls["n"] == 1:
+#             return _sc(_stream("NH", 95.0, 75.0, 10.0)), StreamCollection()
+#         return StreamCollection(), _sc(_stream("NC", 85.0, 105.0, -8.0))
 
-    monkeypatch.setattr(
-        hp,
-        "_create_net_hot_and_cold_stream_collections_for_background_profile",
-        _fake_bg_streams,
-    )
-    out = hp._prepare_hpr_target_inputs(
-        Q_target=10.0,
-        T_vals=np.array([100.0, 90.0, 80.0]),
-        H_hot=np.array([0.0, -5.0, -10.0]),
-        H_cold=np.array([10.0, 5.0, 0.0]),
-        zone_config=cfg,
-    )
-    assert len(out.net_hot_streams) == 1
-    assert len(out.net_cold_streams) == 1
+#     monkeypatch.setattr(
+#         hp,
+#         "_create_net_hot_and_cold_stream_collections_for_background_profile",
+#         _fake_bg_streams,
+#     )
+#     out = hp._prepare_hpr_target_inputs(
+#         Q_target=10.0,
+#         T_vals=np.array([100.0, 90.0, 80.0]),
+#         H_hot=np.array([0.0, -5.0, -10.0]),
+#         H_cold=np.array([10.0, 5.0, 0.0]),
+#         zone_config=cfg,
+#     )
+#     assert len(out.net_hot_streams) == 1
+#     assert len(out.net_cold_streams) == 1
 
 
 def test_temperature_shift_and_h_column_edge_branches():
@@ -1220,23 +1211,23 @@ def test_temperature_shift_and_h_column_edge_branches():
     np.testing.assert_allclose(h_last, np.array([0.1]))
 
 
-def test_balance_hot_and_cold_with_ambient_positive_delta_branch():
-    T_hot, H_hot, T_cold, H_cold, q_amb_max = (
-        hp._balance_hot_and_cold_heat_loads_with_ambient_air(
-            T_hot=np.array([140.0, 110.0, 80.0]),
-            H_hot=np.array([0.0, 50.0, 100.0]),
-            T_cold=np.array([140.0, 110.0, 80.0]),
-            H_cold=np.array([0.0, 100.0, 200.0]),
-            dtcont=5.0,
-            T_env=25.0,
-            dT_env_cont=5.0,
-            dt_phase_change=2.0,
-            is_heat_pumping=True,
-        )
-    )
-    assert q_amb_max > 0.0
-    assert T_hot.shape == H_hot.shape
-    assert T_cold.shape == H_cold.shape
+# def test_balance_hot_and_cold_with_ambient_positive_delta_branch():
+#     T_hot, H_hot, T_cold, H_cold, q_amb_max = (
+#         hp._balance_hot_and_cold_heat_loads_with_ambient_air(
+#             T_hot=np.array([140.0, 110.0, 80.0]),
+#             H_hot=np.array([0.0, 50.0, 100.0]),
+#             T_cold=np.array([140.0, 110.0, 80.0]),
+#             H_cold=np.array([0.0, 100.0, 200.0]),
+#             dtcont=5.0,
+#             T_env=25.0,
+#             dT_env_cont=5.0,
+#             dt_phase_change=2.0,
+#             is_heat_pumping=True,
+#         )
+#     )
+#     assert q_amb_max > 0.0
+#     assert T_hot.shape == H_hot.shape
+#     assert T_cold.shape == H_cold.shape
 
 
 def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):

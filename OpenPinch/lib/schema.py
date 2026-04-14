@@ -53,7 +53,8 @@ class HPRTargetInputs(BaseModel):
 
     # Calculated based on the case
     Q_target: float
-    Q_amb_max: float
+    z_amb_hot: np.ndarray
+    z_amb_cold: np.ndarray
     dt_range_max: float
 
     # Background process net hot and cold load curves
@@ -71,7 +72,8 @@ class HPRTargetInputs(BaseModel):
     dt_hp_ihx: float
     dt_cascade_hx: float
     dt_phase_change: float
-    price_ratio: float
+    power_to_heat_price_ratio: float
+    power_to_cold_price_ratio: float
     is_heat_pumping: bool
     max_multi_start: int
     T_env: float
@@ -108,14 +110,15 @@ class HPRTargetOutputs(BaseModel):
     utility_tot: float
     net_work: float | list | np.ndarray
     Q_ext: float
-    Q_amb: float
+    Q_amb_hot: float
+    Q_amb_cold: float
     cop: float | list | np.ndarray
     obj: float
     success: bool
 
     hot_streams: Optional["StreamCollection"] = None
     cold_streams: Optional["StreamCollection"] = None
-    amb_stream: Optional["StreamCollection"] = None
+    amb_streams: Optional["StreamCollection"] = None
 
     # --- Flattened state fields (union of all children) -----------
     # Carnot & Simple Vapour Compression
