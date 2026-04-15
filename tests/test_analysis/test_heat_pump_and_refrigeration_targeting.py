@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
-    _get_normalised_H_ambient_air,
     _compute_entropic_average_temperature_in_K,
     _compute_COP_estimate_from_carnot_limit,
     _parse_multi_temperature_carnot_cycle_state_variables,

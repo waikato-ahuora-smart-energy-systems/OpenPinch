@@ -67,8 +67,8 @@ class Configuration:
     HP_LOAD_FRACTION: float = 1.0
     REFRIGERANTS: List[str] = ["water", "ammonia"]
     DO_REFRIGERANT_SORT: bool = True
-    PRICE_RATIO_ELE_TO_HEAT: float = 1.0  ### add to the template (modified)
-    PRICE_RATIO_ELE_TO_COLD: float = 0.5  ### add to the template
+    PRICE_RATIO_HEAT_TO_ELE: float = 1.0  ### add to the template (modified)
+    PRICE_RATIO_COLD_TO_ELE: float = 1.0  ### add to the template (modified)
     MAX_HP_MULTISTART: int = 10
     N_COND: int = 3
     N_EVAP: int = 2
@@ -80,7 +80,7 @@ class Configuration:
     DT_CONT_HP: float = 0.0  ### add to the template (modified)
     DT_HP_IHX: float = 0.0
     DT_CASCADE_HX: float = 0.0
-    BB_MINIMISER: str = BB_Minimiser.CMAES.value  ### add to the template
+    BB_MINIMISER: str = BB_Minimiser.DA.value  ### add to the template
     INITIALISE_SIMULATED_CYCLE: bool = True  ### add to the template
     ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
 

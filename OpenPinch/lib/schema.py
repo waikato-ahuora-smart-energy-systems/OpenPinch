@@ -52,6 +52,7 @@ class HPRTargetInputs(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Calculated based on the case
+    system_type: str
     Q_target: float
     z_amb_hot: np.ndarray
     z_amb_cold: np.ndarray
@@ -72,8 +73,8 @@ class HPRTargetInputs(BaseModel):
     dt_hp_ihx: float
     dt_cascade_hx: float
     dt_phase_change: float
-    power_to_heat_price_ratio: float
-    power_to_cold_price_ratio: float
+    heat_to_power_ratio: float
+    cold_to_power_ratio: float
     is_heat_pumping: bool
     max_multi_start: int
     T_env: float
@@ -84,6 +85,7 @@ class HPRTargetInputs(BaseModel):
     do_refrigerant_sort: bool
     initialise_simulated_cycle: bool
     allow_integrated_expander: bool
+    load_fraction: float
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
@@ -112,7 +114,8 @@ class HPRTargetOutputs(BaseModel):
     Q_ext: float
     Q_amb_hot: float
     Q_amb_cold: float
-    cop: float | list | np.ndarray
+    cop_h: Optional[float | list | np.ndarray] = None
+    eta_he: Optional[float | list | np.ndarray] = None
     obj: float
     success: bool
 
