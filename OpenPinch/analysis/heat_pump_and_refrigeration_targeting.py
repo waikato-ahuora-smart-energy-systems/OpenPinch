@@ -1564,7 +1564,11 @@ def _compute_entropic_average_temperature_in_K(
     T_units: str = "C",
 ):
     """Compute the entropic average temperature."""
+    T = np.asarray(T, dtype=float)
+    Q = np.asarray(Q, dtype=float)
     unit_offset = 273.15 if T_units == "C" else 0
+    if T.size == 0:
+        return unit_offset
     if T.var() < tol:
         return T[0] + unit_offset
     S_tot = (Q / (T + unit_offset)).sum()

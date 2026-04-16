@@ -621,7 +621,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
 
 def test_multi_temp_carnot_objective_debug_branch(monkeypatch):
     args = _base_args(n_cond=1, n_evap=1)
-    x = np.array([0.2, 0.7])
+    x = np.array([0.2, 0.7, 0.0])
     called = {"plot": 0}
     monkeypatch.setattr(
         hp,
