@@ -66,7 +66,7 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HP_TYPE = HPRcycle.MultiTempCarnot.value
+    zone_config.HP_TYPE = HPRcycle.MultiSimpleCarnot.value
     args = _prepare_hpr_target_inputs(
         Q_target=Q_target,
         T_vals=T_vals,
@@ -762,7 +762,7 @@ def _compute_cascade_hp_system_performance(
     )
     if not (hp.solved):
         obj = hp.work / args.Q_target + 1
-        return {"obj": obj}
+        return {"obj": obj, "success": False}
 
     # Build streams based on heat pump profiles
     hot_streams = hp.build_stream_collection(
@@ -798,7 +798,15 @@ def _compute_cascade_hp_system_performance(
         [pt_evap.col[PT.H_NET.value][0], pt_cond.col[PT.H_NET.value][-1], hp.penalty]
     )
     p = g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty, form="square")
-    obj = _calc_obj(work_hp, Q_ext, args.Q_target, args.price_ratio, p)
+    obj = _calc_obj(
+        work=work_hp,
+        Q_ext_heat=Q_ext,
+        Q_ext_cold=0.0,
+        Q_target=args.Q_target,
+        heat_to_power_ratio=args.heat_to_power_ratio,
+        cold_to_power_ratio=args.cold_to_power_ratio,
+        penalty=p,
+    )
 
     if debug:  # for debugging purposes, a quick plot function
         plot_multi_hp_profiles_from_results(
@@ -822,7 +830,8 @@ def _compute_cascade_hp_system_performance(
         "T_evap": T_evap,
         "Q_cool": hp.Q_cool_arr,
         "cop_h": cop,
-        "Q_amb": Q_amb,
+        "Q_amb_hot": Q_amb if args.is_heat_pumping else 0.0,
+        "Q_amb_cold": 0.0 if args.is_heat_pumping else Q_amb,
         "hot_streams": hot_streams,
         "cold_streams": cold_streams,
         "model": hp,
@@ -842,7 +851,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
     res = _optimise_placement_wrapper(
         f_obj=_compute_multi_simple_carnot_hp_opt_obj,
-        x0_ls=[0.0 for _ in range(args.n_cond + args.n_evap)] + [-1.0],
+        x0_ls=[0.0 for _ in range(args.n_cond + args.n_evap + 1)],
         bnds = [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)] + [(-1.0, 4.0)],
         args=args,
     )
@@ -880,59 +889,59 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     Q_cond = _get_Q_vals_from_T_vals(T_cond, args.T_cold, H_cold_with_amb, is_cond=True)
 
-    # Sort and unsort evaporator temperatures and corresponding Q values to ensure correct pairing for work calculation
-    sort_idx = np.argsort(T_evap)[::-1]
-    T_sorted = T_evap[sort_idx]
-    Q_sorted = _get_Q_vals_from_T_vals(T_sorted, args.T_hot, H_hot_with_amb, is_cond=False)
-    unsort_idx = np.argsort(sort_idx)
-    if np.any(T_evap != T_sorted[unsort_idx]):
-        raise ValueError("Sorting of evaporator temperatures failed.")
-    Q_evap = Q_sorted[unsort_idx]
-
     # Determine the scaled work of each heat pump (or heat engine)
     delta_T_lift = T_cond - T_evap
     is_hp = delta_T_lift > 0.0
     is_he = (delta_T_lift < 0.0) & args.allow_integrated_expander
-    work_hp_cond = np.zeros_like(Q_cond)
-    work_hp_evap = np.zeros_like(Q_cond)
+
+    Q_evap = np.zeros_like(Q_cond)
     work_hp = np.zeros_like(Q_cond)
     work_he = np.zeros_like(Q_cond)
+    q_diff = []
+
     if np.any(is_hp):
         cop_hp = (T_evap[is_hp] + 273.15) / delta_T_lift[is_hp] * args.eta_hp_carnot + 1
-        work_hp_cond[is_hp] = Q_cond[is_hp] / cop_hp
-        work_hp_evap[is_hp] = Q_evap[is_hp] / cop_hp
-        is_evap_excess = work_hp_evap > work_hp_cond
-        work_hp[is_hp] = np.where(is_evap_excess, work_hp_cond, work_hp_evap)
-        if np.any(is_hp & ~is_evap_excess):
-            Q_cond[is_hp] = work_hp_evap[is_hp & ~is_evap_excess] * cop_hp
-        if np.any(is_hp & is_evap_excess):
-            Q_evap[is_hp] = work_hp_cond[is_hp & is_evap_excess] * (cop_hp - 1)
+        work_hp[is_hp] = Q_cond[is_hp] / cop_hp
+        Q_evap[is_hp] = Q_cond[is_hp] - work_hp[is_hp]
+
+        # Sort and unsort evaporator temperatures and corresponding Q values to ensure correct pairing for work calculation
+        sort_idx = np.argsort(T_evap)[::-1]
+        Q_allocated = 0.0
+        for idx in sort_idx:
+            Q_available = _get_Q_vals_from_T_vals(np.array([T_evap[idx]]), args.T_hot, H_hot_with_amb, is_cond=False) - Q_allocated
+            if Q_available.sum() > Q_evap[idx]:
+                Q_allocated += Q_evap[idx]
+            elif Q_evap[idx] > 0.0:
+                scale = Q_available.sum() / Q_evap[idx]
+                q_diff.append(Q_evap[idx] - Q_available.sum())
+                Q_evap[idx] *= scale
+                Q_cond[idx] *= scale
+                work_hp[idx] *= scale
+                Q_allocated += Q_available.sum()
+            else:
+                Q_evap[idx] = 0.0
+                Q_cond[idx] = 0.0
+                work_hp[idx] = 0.0
+
     if np.any(is_he):
         eff_he = (delta_T_lift[is_he] / T_cond[is_he]) * args.eta_he_carnot
         work_he[is_he] = Q_cond[is_he] * eff_he
 
     # Calculate evaporator duty
     work = work_hp - work_he
-    # Q_evap = Q_cond - work
-    # Q_evap_max = (
-    #     _get_Q_vals_from_T_vals(T_evap, args.T_hot, H_hot_with_amb, is_cond=False)
-    #     if Q_cond.sum() > 0.0
-    #     else Q_evap
-    # )
     cop = Q_cond.sum() / work_hp.sum() if work_hp.sum() > tol else 0
     eta_he = work_he.sum() / (Q_cond.sum() + 1e-6) if Q_cond.sum() != 0 else 0
 
     # Determine external heating and cooling demand
-    # Qe_tot = np.min([Q_evap, Q_evap_max], axis=0).sum()
     Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - Q_cond.sum(), 0.0)
     Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - Q_evap.sum(), 0.0)    
 
     # Determine the key performance metrics of the heat pump
     p = g_ineq_penalty(
-        g=work_hp_cond - work_hp_evap, 
+        g=q_diff, 
         rho=args.rho_penalty, 
         form="square"
-    ) * 0
+    )
     
     obj = _calc_obj(
         work=work_hp.sum() - work_he.sum(),
@@ -1171,7 +1180,7 @@ def _compute_multi_simple_hp_system_performance(
 
     T_diff = T_cond - dT_subcool - T_evap - args.dtcont_hp
     if T_diff.min() < 0:
-        return {"obj": np.inf}
+        return {"obj": np.inf, "success": False}
 
     hp = ParallelVapourCompressionCycles()
     hp.solve(
@@ -1221,7 +1230,15 @@ def _compute_multi_simple_hp_system_performance(
     Q_ext = pt_cond.col[PT.H_NET.value][
         0
     ]  # Alternative to heat pump, an external heat source
-    obj = _calc_obj(work_hp, Q_ext, args.Q_target, args.price_ratio, p)
+    obj = _calc_obj(
+        work=work_hp,
+        Q_ext_heat=Q_ext,
+        Q_ext_cold=0.0,
+        Q_target=args.Q_target,
+        heat_to_power_ratio=args.heat_to_power_ratio,
+        cold_to_power_ratio=args.cold_to_power_ratio,
+        penalty=p,
+    )
 
     # For debugging purposes, a quick plot function
     if debug:
@@ -1247,7 +1264,8 @@ def _compute_multi_simple_hp_system_performance(
         "dT_superheat": dT_superheat,
         "Q_cool": hp.Q_cool_arr,
         "cop_h": cop,
-        "Q_amb": Q_amb,
+        "Q_amb_hot": Q_amb if args.is_heat_pumping else 0.0,
+        "Q_amb_cold": 0.0 if args.is_heat_pumping else Q_amb,
         "hot_streams": hot_streams,
         "cold_streams": cold_streams,
         "model": hp,
@@ -1348,7 +1366,8 @@ def _compute_brayton_hp_system_performance(
         args=args,
     )
 
-    hot_streams, cold_streams = _build_simulated_hps_streams(hp_list)
+    hot_streams = _build_simulated_hps_streams(hp_list, include_cond=True)
+    cold_streams = _build_simulated_hps_streams(hp_list, include_evap=True)
 
     T_exp_out = hp_list[0].cycle_states[3]["T"]
 
@@ -1373,7 +1392,15 @@ def _compute_brayton_hp_system_performance(
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     COP = (args.Q_target - Q_ext) / (work_hp + 1e-9)
     Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
-    obj = _calc_obj(work_hp, Q_ext, args.Q_target, penalty=c)
+    obj = _calc_obj(
+        work=work_hp,
+        Q_ext_heat=Q_ext,
+        Q_ext_cold=0.0,
+        Q_target=args.Q_target,
+        heat_to_power_ratio=args.heat_to_power_ratio,
+        cold_to_power_ratio=args.cold_to_power_ratio,
+        penalty=c,
+    )
 
     if 0:
         plot_multi_hp_profiles_from_results(
@@ -1404,7 +1431,8 @@ def _compute_brayton_hp_system_performance(
         "dT_comp": np.array(dT_comp),
         "Q_cool": np.array(Q_cool),
         "cop_h": COP,
-        "Q_amb": Q_amb,
+        "Q_amb_hot": Q_amb if args.is_heat_pumping else 0.0,
+        "Q_amb_cold": 0.0 if args.is_heat_pumping else Q_amb,
         "hot_streams": hot_streams,
         "cold_streams": cold_streams,
         "model": hp_list,
@@ -1457,14 +1485,17 @@ def _optimise_placement_wrapper(
         bounds=bnds,
         optimiser_handle=args.bb_minimiser,
     )
-    if local_minima_x.size > 0:
-        res = f_obj(local_minima_x[0], args, debug=args.debug)
-        res["success"] = True
-    else:
-        res["success"] = False
+    if local_minima_x.size == 0:
         raise ValueError(
             f"Heat pump and refrigeration targeting ({args.system_type}) failed to return any local minima."
         )
+
+    res = f_obj(local_minima_x[0], args, debug=args.debug)
+    if not res.get("success", True):
+        raise ValueError(
+            f"Heat pump and refrigeration targeting ({args.system_type}) failed to return an optimal result."
+        )
+    res["success"] = True
     return res
 
 

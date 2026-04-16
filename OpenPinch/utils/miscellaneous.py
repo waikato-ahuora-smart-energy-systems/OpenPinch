@@ -186,13 +186,14 @@ def make_monotonic(h_vals: np.ndarray, side: str, tol: float = 1e-6) -> np.ndarr
 
 
 def g_ineq_penalty(
-    g: float | np.ndarray,
+    g: float | list | np.ndarray,
     *,
     eta: float = 0.01,
     rho: float = 10,
     form: str = "square",
 ) -> np.float64:
     """Return a penalty value for an inequality-constraint residual."""
+    g = np.asarray(g, dtype=float)
     if (
         form.lower() == "square_root_smoothing"
         or form.lower() == "square root smoothing"

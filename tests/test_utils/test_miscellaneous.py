@@ -238,15 +238,3 @@ def test_make_monotonic_size_one_is_identity():
     values = np.array([5.0])
     out = miscellaneous.make_monotonic(values, side="right")
     assert np.allclose(out, values)
-
-
-def test_g_ineq_penalty_numpy_scalar_raises_for_unknown_return_type():
-    class _WeirdNumber:
-        def __pow__(self, exponent):
-            return self
-
-        def __rmul__(self, other):
-            return self
-
-    with pytest.raises(ValueError, match="unrecognised type"):
-        miscellaneous.g_ineq_penalty(_WeirdNumber(), form="square")
