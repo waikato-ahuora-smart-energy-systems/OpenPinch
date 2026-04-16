@@ -597,7 +597,9 @@ def test_predict_bo_gp_l_none_and_solve_failure(monkeypatch):
         "lengthscale": 0.5,
         "signal": 1.0,
     }
-    mu0, var0 = bb_bo._predict_bo_gp(model_none, np.asarray([[0.1], [0.2]], dtype=float))
+    mu0, var0 = bb_bo._predict_bo_gp(
+        model_none, np.asarray([[0.1], [0.2]], dtype=float)
+    )
     assert np.allclose(mu0, [2.0, 2.0])
     assert np.all(var0 > 0)
 
@@ -750,8 +752,7 @@ def test_fit_rbf_surrogate_model_branches(monkeypatch):
     X_small = np.asarray([[0.0]], dtype=float)
     y_small = np.asarray([1.0], dtype=float)
     assert (
-        bb_rbf._fit_rbf_surrogate_model(X_small, y_small, "cubic", 1.0, 1e-8, 1)
-        is None
+        bb_rbf._fit_rbf_surrogate_model(X_small, y_small, "cubic", 1.0, 1e-8, 1) is None
     )
 
     monkeypatch.setattr(

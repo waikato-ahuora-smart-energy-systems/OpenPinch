@@ -40,13 +40,13 @@ INTERPOLATION_KEYS = (
     PT.H_NET_HOT_AFTR_HP.value,
     PT.H_NET_COLD_AFTR_HP.value,
     PT.H_NET_HOT_UT_AFTR_HP.value,
-    PT.H_NET_COLD_UT_AFTR_HP.value,   
+    PT.H_NET_COLD_UT_AFTR_HP.value,
     PT.H_HOT_RFRG.value,
     PT.H_COLD_RFRG.value,
     PT.H_NET_HOT_AFTR_RFRG.value,
     PT.H_NET_COLD_AFTR_RFRG.value,
     PT.H_NET_HOT_UT_AFTR_RFRG.value,
-    PT.H_NET_COLD_UT_AFTR_RFRG.value,    
+    PT.H_NET_COLD_UT_AFTR_RFRG.value,
 )
 HEAT_CAPACITY_PAIRS = (
     (PT.CP_HOT.value, PT.DELTA_H_HOT.value),

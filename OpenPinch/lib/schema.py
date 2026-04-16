@@ -53,7 +53,7 @@ class HPRTargetInputs(BaseModel):
 
     # Calculated based on the case
     system_type: str
-    Q_target: float
+    Q_hpr_target_max: float
     z_amb_hot: np.ndarray
     z_amb_cold: np.ndarray
     dt_range_max: float
@@ -90,8 +90,8 @@ class HPRTargetInputs(BaseModel):
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
     dT_superheat: Optional[np.ndarray] = None
-    net_hot_streams: Optional[StreamCollection] = StreamCollection()
-    net_cold_streams: Optional[StreamCollection] = StreamCollection()
+    bckgrd_hot_streams: Optional[StreamCollection] = StreamCollection()
+    bckgrd_cold_streams: Optional[StreamCollection] = StreamCollection()
     bb_minimiser: Optional[str] = None
     eta_penalty: Optional[float] = 0.01
     rho_penalty: Optional[float] = 10
@@ -119,9 +119,9 @@ class HPRTargetOutputs(BaseModel):
     obj: float
     success: bool
 
-    hot_streams: Optional["StreamCollection"] = None
-    cold_streams: Optional["StreamCollection"] = None
-    amb_streams: Optional["StreamCollection"] = None
+    hot_streams: StreamCollection
+    cold_streams: StreamCollection
+    amb_streams: StreamCollection
 
     # --- Flattened state fields (union of all children) -----------
     # Carnot & Simple Vapour Compression

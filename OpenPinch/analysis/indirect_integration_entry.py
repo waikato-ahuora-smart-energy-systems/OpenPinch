@@ -129,7 +129,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         # Perform heat pump and/or refrigeration targeting on the correct cascades
         if zone_config.DO_UTILITY_HP_TARGETING:
             res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
-                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                Q_hpr_target_max=min(zone_config.HP_LOAD_FRACTION, 1.0)
                 * np.abs(pt_ut_gen.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt_ut_gen.col[PT.T.value],
                 H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
@@ -146,7 +146,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
 
         if zone_config.DO_UTILITY_RFRG_TARGETING:
             res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
-                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                Q_hpr_target_max=min(zone_config.HP_LOAD_FRACTION, 1.0)
                 * np.abs(pt_ut_gen.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt_ut_gen.col[PT.T.value],
                 H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],

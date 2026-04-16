@@ -78,7 +78,7 @@ def compute_direct_integration_targets(zone: Zone):
     ] and _validate_heat_pump_or_refrigeration_targeting_required(pt, zone_config):
         if zone_config.DO_PROCESS_HP_TARGETING:
             res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
-                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                Q_hpr_target_max=min(zone_config.HP_LOAD_FRACTION, 1.0)
                 * np.abs(pt.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
@@ -96,7 +96,7 @@ def compute_direct_integration_targets(zone: Zone):
 
         if zone_config.DO_PROCESS_RFRG_TARGETING:
             res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
-                Q_target=min(zone_config.HP_LOAD_FRACTION, 1.0)
+                Q_hpr_target_max=min(zone_config.HP_LOAD_FRACTION, 1.0)
                 * np.abs(pt.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],

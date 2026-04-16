@@ -149,14 +149,14 @@ class ProblemTableLabel(Enum):
     H_NET_HOT_AFTR_HP = "H_hot_net_after_hp"
     H_NET_COLD_AFTR_HP = "H_cold_net_after_hp"
     H_NET_HOT_UT_AFTR_HP = "H_hot_net_utility_after_hp"
-    H_NET_COLD_UT_AFTR_HP = "H_cold_net_utility_after_hp"    
+    H_NET_COLD_UT_AFTR_HP = "H_cold_net_utility_after_hp"
 
     H_HOT_RFRG = "H_hot_rfrg_ut"
     H_COLD_RFRG = "H_cold_rfrg_ut"
     H_NET_HOT_AFTR_RFRG = "H_hot_net_after_rfrg"
     H_NET_COLD_AFTR_RFRG = "H_cold_net_after_rfrg"
     H_NET_HOT_UT_AFTR_RFRG = "H_hot_net_utility_after_rfrg"
-    H_NET_COLD_UT_AFTR_RFRG = "H_cold_net_utility_after_rfrg"  
+    H_NET_COLD_UT_AFTR_RFRG = "H_cold_net_utility_after_rfrg"
 
     RCP_HOT = "rCP_hot"
     RCP_COLD = "rCP_cold"

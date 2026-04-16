@@ -85,7 +85,7 @@ class Configuration:
     ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
 
     ### Cost targeting parameters ###
-    ELE_PRICE: float = 160 #$/MWh   ### add to the template
+    ELE_PRICE: float = 160  # $/MWh   ### add to the template
     UTILITY_PRICE: float = 40
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0
