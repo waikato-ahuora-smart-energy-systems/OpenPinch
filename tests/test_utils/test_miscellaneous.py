@@ -14,32 +14,211 @@ from OpenPinch.utils import miscellaneous
 """Test cases for the get_value function."""
 
 
-def test_get_value_with_float():
-    assert get_value(3.14) == 3.14
+@pytest.mark.parametrize(
+    ("payload", "zone_name", "expected"),
+    [
+        pytest.param(3.14, None, 3.14, id="float"),
+        pytest.param({"value": 42.0}, None, 42.0, id="flat-dict"),
+        pytest.param(
+            {"zone-a": {"value": 7.5}},
+            "zone-a",
+            7.5,
+            id="zone-name-recurses-into-dict",
+        ),
+        pytest.param(
+            {"zone-a": 11.25, "value": 99.0},
+            "zone-a",
+            11.25,
+            id="zone-name-takes-precedence-over-value",
+        ),
+        pytest.param(
+            {"value": {"value": 1.25}, "units": "kW"},
+            None,
+            1.25,
+            id="dict-recurses-through-value-payload",
+        ),
+        pytest.param(
+            ValueWithUnit(value=99.9, units="kW"),
+            None,
+            99.9,
+            id="value-with-unit",
+        ),
+        pytest.param(
+            {"value": 4.0, "multiplier": 2.5},
+            None,
+            10.0,
+            id="multiplier-operator",
+        ),
+        pytest.param(
+            {"value": 4.0, "multiply": 2.5},
+            None,
+            10.0,
+            id="multiply-alias",
+        ),
+        pytest.param({"value": 4.0, "add": 2.5}, None, 6.5, id="add-operator"),
+        pytest.param(
+            {"value": 4.0, "subtract": 2.5},
+            None,
+            1.5,
+            id="subtract-operator",
+        ),
+        pytest.param(
+            {"value": 9.0, "divide": 3.0},
+            None,
+            3.0,
+            id="divide-operator",
+        ),
+        pytest.param(
+            {"value": 0.0, "divide": 3.0},
+            None,
+            0.0,
+            id="divide-zero-numerator",
+        ),
+        pytest.param({"value": 3.0, "power": 2.0}, None, 9.0, id="power-operator"),
+        pytest.param(
+            {"value": 100.0, "log": 10.0},
+            None,
+            2.0,
+            id="log-with-explicit-base",
+        ),
+        pytest.param(
+            {"value": np.e**2, "log": {"base": "ignored"}},
+            None,
+            2.0,
+            id="log-defaults-to-e-for-non-float-base",
+        ),
+        pytest.param(
+            {"value": -10.0, "log": 10.0},
+            None,
+            0.0,
+            id="log-non-positive-input",
+        ),
+        pytest.param({"value": 3.0, "exp": 2.0}, None, 8.0, id="exp-operator"),
+        pytest.param(
+            {"value": -1.0, "exp": 2.0},
+            None,
+            0.0,
+            id="exp-non-positive-input",
+        ),
+        pytest.param({"value": -4.0, "abs": True}, None, 4.0, id="abs-operator"),
+        pytest.param(
+            {"value": ValueWithUnit(value=8.0, units="kW"), "add": 2.0},
+            None,
+            10.0,
+            id="operator-with-valuewithunit-base",
+        ),
+        pytest.param(
+            {"value": {"value": 8.0}, "divide": {"value": 2.0}},
+            None,
+            4.0,
+            id="nested-operator-payloads",
+        ),
+        pytest.param(
+            {"zone-a": {"value": 2.0, "power": 3.0}},
+            "zone-a",
+            8.0,
+            id="zone-name-with-operator-payload",
+        ),
+        pytest.param(
+            {"units": "kW"},
+            None,
+            12.5,
+            id="val2-fallback",
+        ),
+    ],
+)
+def test_get_value_supported_inputs(payload, zone_name, expected):
+    kwargs = {"zone_name": zone_name}
+    if payload == {"units": "kW"}:
+        kwargs["val2"] = 12.5
+    assert get_value(payload, **kwargs) == pytest.approx(expected)
 
 
-def test_get_value_with_dict():
-    assert get_value({"value": 42}) == 42
+def test_get_value_does_not_mutate_payload():
+    payload = {"value": 8.0, "add": 2.0}
+
+    result = get_value(payload)
+
+    assert result == pytest.approx(10.0)
+    assert payload == {"value": 8.0, "add": 2.0}
 
 
-def test_get_value_with_missing_dict_key():
-    with pytest.raises(KeyError):
-        get_value({"not_value": 10})
+def test_get_value_val2_fallback_does_not_mutate_payload():
+    payload = {"units": "kW"}
+
+    result = get_value(payload, val2=12.5)
+
+    assert result == pytest.approx(12.5)
+    assert payload == {"units": "kW"}
 
 
-def test_get_value_with_valuewithunit():
-    vwu = ValueWithUnit(value=99.9, units="kW")
-    assert get_value(vwu) == 99.9
+def test_get_value_none_raises_type_error():
+    with pytest.raises(TypeError, match="Unsupported type"):
+        get_value(None)
 
 
-def test_get_value_with_int_raises():
-    with pytest.raises(TypeError):
-        get_value(5)  # Int is not accepted
+def test_get_value_dict_none_value_raises_type_error():
+    with pytest.raises(TypeError, match="Unsupported type"):
+        get_value({"value": None})
 
 
-def test_get_value_with_string_raises():
-    with pytest.raises(TypeError):
-        get_value("100")
+def test_get_value_zone_name_none_value_raises_type_error():
+    with pytest.raises(TypeError, match="Unsupported type"):
+        get_value({"zone-a": None}, zone_name="zone-a")
+
+
+@pytest.mark.parametrize(
+    ("payload", "zone_name", "val2", "error_type", "match"),
+    [
+        pytest.param(
+            {"not_value": 10.0},
+            None,
+            None,
+            KeyError,
+            "value",
+            id="missing-value-key",
+        ),
+        pytest.param(
+            {"other-zone": 10.0},
+            "zone-a",
+            None,
+            KeyError,
+            "value",
+            id="missing-zone-key-and-value",
+        ),
+        pytest.param(
+            {"value": "100", "units": "kW"},
+            None,
+            None,
+            TypeError,
+            "Unsupported type",
+            id="dict-value-with-invalid-type",
+        ),
+        pytest.param(
+            {"value": 10.0, "add": "2"},
+            None,
+            None,
+            TypeError,
+            "Unsupported type",
+            id="operator-with-invalid-type",
+        ),
+        pytest.param(
+            {"units": "kW"},
+            None,
+            "12.5",
+            TypeError,
+            "Unsupported type",
+            id="val2-invalid-type",
+        ),
+        pytest.param(5, None, None, TypeError, "Unsupported type", id="int"),
+        pytest.param("100", None, None, TypeError, "Unsupported type", id="string"),
+        pytest.param(None, None, None, TypeError, "Unsupported type", id="none"),
+        pytest.param([1.0], None, None, TypeError, "Unsupported type", id="list"),
+    ],
+)
+def test_get_value_invalid_inputs(payload, zone_name, val2, error_type, match):
+    with pytest.raises(error_type, match=match):
+        get_value(payload, val2=val2, zone_name=zone_name)
 
 
 """Test cases for the compute_capital_recovery_factor function."""

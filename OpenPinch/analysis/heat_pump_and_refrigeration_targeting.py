@@ -16,6 +16,7 @@ from ..classes.cascade_vapour_compression_cycle import CascadeVapourCompressionC
 from ..classes.parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
 
 __all__ = [
+    "validate_heat_pump_or_refrigeration_targeting_required",
     "get_heat_pump_and_refrigeration_targets",
     "calc_heat_pump_and_refrigeration_cascade",
     "plot_multi_hp_profiles_from_results",
@@ -27,8 +28,25 @@ __all__ = [
 #######################################################################################################
 
 
+def validate_heat_pump_or_refrigeration_targeting_required(
+    pt: ProblemTable,
+    hpr_load: dict | float,
+    is_heat_pumping: bool,
+    is_refrigeration: bool,
+    zone_name: str,
+) -> float:
+    """Determine whether heat pump or refrigeration targeting is warranted based on the process cascade profiles and user settings."""
+    if is_heat_pumping == True:
+        Q_max = np.abs(pt.col[PT.H_NET_COLD.value]).max()
+    elif is_refrigeration == True:
+        Q_max = np.abs(pt.col[PT.H_NET_HOT.value]).max()
+    else:
+        return 0.0
+    return get_value(hpr_load, val2=Q_max, zone_name=zone_name)
+
+
 def get_heat_pump_and_refrigeration_targets(
-    Q_hpr_target_max: float,
+    Q_hpr_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
@@ -66,15 +84,15 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    # zone_config.HP_TYPE = HPRcycle.MultiSimpleCarnot.value
+    zone_config.HP_TYPE = HPRcycle.MultiSimpleCarnot.value
     args = _construct_HPRTargetInputs(
-        Q_hpr_target_max=Q_hpr_target_max,
+        Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
         H_hot=np.abs(H_hot) * -1,
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=False,
+        debug=True,
     )
     # Select the appropriate targeting handler based on the specified heat pump targeting approach
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
@@ -246,7 +264,7 @@ def plot_multi_hp_profiles_from_results(
 
 
 def _construct_HPRTargetInputs(
-    Q_hpr_target_max: float,
+    Q_hpr_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
@@ -260,10 +278,11 @@ def _construct_HPRTargetInputs(
     T_hot, T_cold = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
         T_vals, zone_config.DT_CONT_HP
     )
+
     for T_arr, H_arr, is_cold in [(T_hot, H_hot, False), (T_cold, H_cold, True)]:
         if (is_cold and is_heat_pumping) or (not (is_cold) and not (is_heat_pumping)):
             T_arr, H_arr = _get_reduced_bckgrd_cascade_till_Q_target(
-                Q_hpr_target_max, T_arr, H_arr, is_cold=is_cold
+                Q_hpr_target, T_arr, H_arr, is_cold=is_cold
             )
         T_arr, H_arr, z_amb_arr = _get_simplified_bckgrd_cascade_and_z_amb(
             T_vals=T_arr,
@@ -276,45 +295,45 @@ def _construct_HPRTargetInputs(
             T_cold, H_cold, z_amb_cold, s_cold = T_arr, H_arr, z_amb_arr, s
         else:
             T_hot, H_hot, z_amb_hot, s_hot = T_arr, H_arr, z_amb_arr, s
-
-    return HPRTargetInputs(
-        system_type=zone_config.HP_TYPE,
-        Q_hpr_target_max=Q_hpr_target_max,
-        T_hot=T_hot,
-        H_hot=H_hot,
-        z_amb_hot=z_amb_hot,
-        T_cold=T_cold,
-        H_cold=H_cold,
-        z_amb_cold=z_amb_cold,
-        dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
-        is_heat_pumping=bool(is_heat_pumping),
-        n_cond=zone_config.N_COND,
-        n_evap=zone_config.N_EVAP,
-        eta_comp=zone_config.ETA_COMP,
-        eta_exp=zone_config.ETA_EXP,
-        eta_hp_carnot=zone_config.ETA_HP_CARNOT,
-        eta_he_carnot=zone_config.ETA_HE_CARNOT,
-        dtcont_hp=zone_config.DT_CONT_HP,
-        dt_hp_ihx=zone_config.DT_HP_IHX,
-        dt_cascade_hx=zone_config.DT_CASCADE_HX,
-        load_fraction=zone_config.HP_LOAD_FRACTION,
-        T_env=zone_config.T_ENV,
-        dt_env_cont=zone_config.DT_ENV_CONT,
-        dt_phase_change=zone_config.DT_PHASE_CHANGE,
-        refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
-        do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
-        heat_to_power_ratio=zone_config.PRICE_RATIO_HEAT_TO_ELE,
-        cold_to_power_ratio=zone_config.PRICE_RATIO_COLD_TO_ELE,
-        max_multi_start=zone_config.MAX_HP_MULTISTART,
-        bb_minimiser=zone_config.BB_MINIMISER,
-        allow_integrated_expander=zone_config.ALLOW_INTEGRATED_EXPANDER,
-        eta_penalty=0.001,
-        rho_penalty=10,
-        bckgrd_hot_streams=s_hot,
-        bckgrd_cold_streams=s_cold,
-        debug=debug,
-        initialise_simulated_cycle=zone_config.INITIALISE_SIMULATED_CYCLE,
-    )
+    inputs = {
+        "Q_hpr_target": Q_hpr_target,
+        "T_hot": T_hot,
+        "H_hot": H_hot,
+        "z_amb_hot": z_amb_hot,
+        "T_cold": T_cold,
+        "H_cold": H_cold,
+        "z_amb_cold": z_amb_cold,
+        "dt_range_max": max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
+        "is_heat_pumping": bool(is_heat_pumping),
+        "eta_penalty": 0.001,
+        "rho_penalty": 10,
+        "bckgrd_hot_streams": s_hot,
+        "bckgrd_cold_streams": s_cold,
+        "debug": debug,
+        "system_type": zone_config.HP_TYPE,
+        "n_cond": zone_config.N_COND,
+        "n_evap": zone_config.N_EVAP,
+        "eta_comp": zone_config.ETA_COMP,
+        "eta_exp": zone_config.ETA_EXP,
+        "eta_hp_carnot": zone_config.ETA_HP_CARNOT,
+        "eta_he_carnot": zone_config.ETA_HE_CARNOT,
+        "dtcont_hp": zone_config.DT_CONT_HP,
+        "dt_hp_ihx": zone_config.DT_HP_IHX,
+        "dt_cascade_hx": zone_config.DT_CASCADE_HX,
+        "load_fraction": zone_config.HP_LOAD_FRACTION,
+        "T_env": zone_config.T_ENV,
+        "dt_env_cont": zone_config.DT_ENV_CONT,
+        "dt_phase_change": zone_config.DT_PHASE_CHANGE,
+        "refrigerant_ls": [r.strip().upper() for r in zone_config.REFRIGERANTS],
+        "do_refrigerant_sort": zone_config.DO_REFRIGERANT_SORT,
+        "heat_to_power_ratio": zone_config.PRICE_RATIO_HEAT_TO_ELE,
+        "cold_to_power_ratio": zone_config.PRICE_RATIO_COLD_TO_ELE,
+        "max_multi_start": zone_config.MAX_HP_MULTISTART,
+        "bb_minimiser": zone_config.BB_MINIMISER,
+        "allow_integrated_expander": zone_config.ALLOW_INTEGRATED_EXPANDER,
+        "initialise_simulated_cycle": zone_config.INITIALISE_SIMULATED_CYCLE,
+    }
+    return HPRTargetInputs(**inputs)
 
 
 def _apply_temperature_shift_for_hpr_stream_dtmin_cont(

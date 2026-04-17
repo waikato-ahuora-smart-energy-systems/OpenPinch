@@ -15,6 +15,7 @@ from . import (
     get_process_heat_cascade,
     get_additional_GCCs,
     problem_table_algorithm,
+    validate_heat_pump_or_refrigeration_targeting_required,
     get_heat_pump_and_refrigeration_targets,
     calc_heat_pump_and_refrigeration_cascade,
     get_heat_recovery_target_from_pt,
@@ -115,9 +116,21 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
-    if zone.identifier in [
-        Z.S.value,
-    ] and _validate_heat_pump_or_refrigeration_targeting_required(pt, zone_config):
+    # Determine if heat pump or refrigeration targeting is warranted based on the utility cascade profiles and user settings
+    hpr_target_load = validate_heat_pump_or_refrigeration_targeting_required(
+        pt,
+        hpr_load=zone_config.HP_LOAD_FRACTION,
+        is_heat_pumping=zone_config.DO_UTILITY_HP_TARGETING,
+        is_refrigeration=zone_config.DO_UTILITY_RFRG_TARGETING,
+        zone_name=zone.name,
+    )
+    if (
+        zone.identifier
+        in [
+            Z.S.value,
+        ]
+        and hpr_target_load > tol
+    ):
         # Create problem table based on inverted utility streams
         pt_ut_gen = get_process_heat_cascade(
             hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
@@ -129,8 +142,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         # Perform heat pump and/or refrigeration targeting on the correct cascades
         if zone_config.DO_UTILITY_HP_TARGETING:
             res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target_max=min(zone_config.HP_LOAD_FRACTION, 1.0)
-                * np.abs(pt_ut_gen.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt_ut_gen.col[PT.T.value],
                 H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
                 H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
@@ -146,8 +157,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
 
         if zone_config.DO_UTILITY_RFRG_TARGETING:
             res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target_max=min(zone_config.HP_LOAD_FRACTION, 1.0)
-                * np.abs(pt_ut_gen.col[PT.H_NET_COLD.value]).max(),
                 T_vals=pt_ut_gen.col[PT.T.value],
                 H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
                 H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
@@ -371,27 +380,3 @@ def _save_graph_data(
         ],
         GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]],
     }
-
-
-def _validate_heat_pump_or_refrigeration_targeting_required(
-    pt: ProblemTable,
-    zone_config: Configuration,
-) -> bool:
-    is_heat_pumping = zone_config.DO_UTILITY_HP_TARGETING
-    is_refrigeration = zone_config.DO_UTILITY_RFRG_TARGETING
-    return (
-        False
-        if (
-            (is_heat_pumping == False and is_refrigeration == False)
-            or (
-                np.abs(pt.col[PT.H_NET_COLD.value]).max() < tol
-                and is_heat_pumping == True
-            )
-            or (
-                np.abs(pt.col[PT.H_NET_HOT.value]).max() < tol
-                and is_refrigeration == True
-            )
-            or (zone_config.HP_LOAD_FRACTION < tol)
-        )
-        else True
-    )

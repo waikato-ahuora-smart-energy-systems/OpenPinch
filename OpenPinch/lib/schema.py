@@ -52,8 +52,8 @@ class HPRTargetInputs(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Calculated based on the case
-    system_type: str
-    Q_hpr_target_max: float
+    hpr_type: str
+    Q_hpr_target: float
     z_amb_hot: np.ndarray
     z_amb_cold: np.ndarray
     dt_range_max: float
