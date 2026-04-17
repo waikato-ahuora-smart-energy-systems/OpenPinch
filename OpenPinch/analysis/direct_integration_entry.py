@@ -74,24 +74,16 @@ def compute_direct_integration_targets(zone: Zone):
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
 
-    # Determine if heat pump or refrigeration targeting is warranted based on the process cascade profiles and user settings
-    hpr_target_load = validate_heat_pump_or_refrigeration_targeting_required(
-        pt,
-        hpr_load=zone_config.HP_LOAD_VALUE,
-        is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
-        is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
-        zone_name=zone.name,
-    )
-    if (
-        zone.identifier
-        in [
-            Z.P.value,
-            Z.U.value,
-        ]
-        and hpr_target_load > tol
-    ):
-        if zone_config.DO_PROCESS_HP_TARGETING:
+    if zone.identifier == Z.P.value and (zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING):
+        hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
+            pt,
+            hpr_load=zone_config.HP_LOAD_VALUE,
+            is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
+            zone_name=zone.name,
+        )
+        if hp_target_load > tol:
             res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
+                Q_hpr_target=hp_target_load,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
                 H_cold=pt.col[PT.H_NET_COLD.value],
@@ -105,8 +97,15 @@ def compute_direct_integration_targets(zone: Zone):
                 is_heat_pumping=True,
             )
 
-        if zone_config.DO_PROCESS_RFRG_TARGETING:
+        r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
+            pt,
+            hpr_load=zone_config.HP_LOAD_VALUE,
+            is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
+            zone_name=zone.name,
+        )
+        if r_target_load > tol:
             res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
+                Q_hpr_target=r_target_load,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
                 H_cold=pt.col[PT.H_NET_COLD.value],

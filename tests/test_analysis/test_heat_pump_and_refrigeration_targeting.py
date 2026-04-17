@@ -98,10 +98,10 @@ def test_map_x_to_T_output_is_monotonically_descending():
 def test_get_reduced_bckgrd_cascade_till_Q_target_returns_full_profile_when_target_matches_peak():
     T_cold = np.array([160.0, 150.0, 140.0, 130.0])
     H_cold = np.array([600.0, 450.0, 200.0, 0.0])
-    Q_hpr_target_max = np.abs(H_cold).max()
+    Q_hpr_target = np.abs(H_cold).max()
 
     T_out, H_out = _get_reduced_bckgrd_cascade_till_Q_target(
-        Q_hpr_target_max, T_cold.copy(), H_cold.copy()
+        Q_hpr_target, T_cold.copy(), H_cold.copy()
     )
 
     np.testing.assert_allclose(T_out, T_cold)
@@ -111,14 +111,14 @@ def test_get_reduced_bckgrd_cascade_till_Q_target_returns_full_profile_when_targ
 def test_get_reduced_bckgrd_cascade_till_Q_target_interpolates_to_target():
     T_cold = np.array([160.0, 150.0, 140.0, 130.0])
     H_cold = np.array([600.0, 400.0, 150.0, 0.0])
-    Q_hpr_target_max = 250.0
+    Q_hpr_target = 250.0
 
     T_out, H_out = _get_reduced_bckgrd_cascade_till_Q_target(
-        Q_hpr_target_max, T_cold.copy(), H_cold.copy()
+        Q_hpr_target, T_cold.copy(), H_cold.copy()
     )
 
     np.testing.assert_allclose(T_out[0], 144.0)
-    np.testing.assert_allclose(H_out[0], Q_hpr_target_max)
+    np.testing.assert_allclose(H_out[0], Q_hpr_target)
     np.testing.assert_allclose(T_out[1:], np.array([140.0, 130.0]))
     np.testing.assert_allclose(H_out[1:], np.array([150.0, 0.0]))
 
@@ -126,14 +126,14 @@ def test_get_reduced_bckgrd_cascade_till_Q_target_interpolates_to_target():
 def test_get_reduced_bckgrd_cascade_till_Q_target_interpolates_to_target_at_exisiting_temperature():
     T_cold = np.array([160.0, 150.0, 140.0, 130.0])
     H_cold = np.array([600.0, 400.0, 150.0, 0.0])
-    Q_hpr_target_max = 150.0
+    Q_hpr_target = 150.0
 
     T_out, H_out = _get_reduced_bckgrd_cascade_till_Q_target(
-        Q_hpr_target_max, T_cold.copy(), H_cold.copy()
+        Q_hpr_target, T_cold.copy(), H_cold.copy()
     )
 
     np.testing.assert_allclose(T_out[0], 140.0)
-    np.testing.assert_allclose(H_out[0], Q_hpr_target_max)
+    np.testing.assert_allclose(H_out[0], Q_hpr_target)
     np.testing.assert_allclose(T_out[:], np.array([140.0, 130.0]))
     np.testing.assert_allclose(H_out[:], np.array([150.0, 0.0]))
 
@@ -182,7 +182,7 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         dt_range_max=80.0,
         eta_hp_carnot=0.5,
         eta_he_carnot=0.5,
-        Q_hpr_target_max=300.0,
+        Q_hpr_target=300.0,
         Q_amb_max=0.0,
         heat_to_power_ratio=1.0,
         cold_to_power_ratio=0.0,
@@ -202,7 +202,7 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_returns_expected_p
     args = SimpleNamespace(
         n_cond=2,
         n_evap=2,
-        Q_hpr_target_max=300.0,
+        Q_hpr_target=300.0,
         T_cold=np.array([120.0, 80.0, 40.0]),
         H_cold=np.array([300.0, 120.0, 0.0]),
         T_hot=np.array([150.0, 90.0, 30.0]),
@@ -224,7 +224,7 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap
     args = SimpleNamespace(
         n_cond=1,
         n_evap=3,
-        Q_hpr_target_max=300.0,
+        Q_hpr_target=300.0,
         T_cold=np.array([120.0, 80.0, 40.0]),
         H_cold=np.array([300.0, 120.0, 0.0]),
         T_hot=np.array([150.0, 90.0, 30.0]),
@@ -262,7 +262,7 @@ def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatc
         T_hot=np.array([100.0, 70.0, 30.0]),
         H_hot=np.array([0.0, -80.0, -160.0]),
         dt_range_max=90.0,
-        Q_hpr_target_max=200.0,
+        Q_hpr_target=200.0,
         eta_comp=0.75,
         eta_exp=0.75,
         dt_phase_change=1.0,
@@ -370,7 +370,7 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
         n_evap=2,
         dt_range_max=130.0,
         dt_phase_change=1.0,
-        Q_hpr_target_max=1000.0,
+        Q_hpr_target=1000.0,
         refrigerant_ls=["R134A", "R134A"],
     )
 
@@ -400,7 +400,7 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
         n_evap=2,
         dt_range_max=130.0,
         dt_phase_change=1.0,
-        Q_hpr_target_max=1000.0,
+        Q_hpr_target=1000.0,
         refrigerant_ls=["R134A", "R134A", "R134A"],
     )
     init = SimpleNamespace(
@@ -449,7 +449,7 @@ def _sc(*streams):
 def _base_args(**overrides):
     args = {
         "system_type": HPRcycle.MultiTempCarnot.value,
-        "Q_hpr_target_max": 200.0,
+        "Q_hpr_target": 200.0,
         "Q_amb_max": 20.0,
         "dt_range_max": 110.0,
         "T_hot": np.array([140.0, 90.0, 40.0]),
@@ -1114,7 +1114,7 @@ def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):
         dt_range_max=10.0,
         T_cold=np.array([50.0, 45.0]),
         T_hot=np.array([40.0, 35.0]),
-        Q_hpr_target_max=100.0,
+        Q_hpr_target=100.0,
         refrigerant_ls=["R134A", "R134A"],
     )
     init_res = SimpleNamespace(
@@ -1143,7 +1143,7 @@ def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):
         dt_range_max=10.0,
         T_cold=np.array([50.0, 45.0]),
         T_hot=np.array([40.0, 35.0]),
-        Q_hpr_target_max=100.0,
+        Q_hpr_target=100.0,
         refrigerant_ls=["R134A"],
     )
     x0_ms = hp._get_x0_for_multi_single_hp_opt(
@@ -1174,7 +1174,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
         dt_hp_ihx=1.0,
         bckgrd_hot_streams=StreamCollection(),
         bckgrd_cold_streams=StreamCollection(),
-        Q_hpr_target_max=40.0,
+        Q_hpr_target=40.0,
         Q_amb_max=0.0,
         eta_penalty=0.001,
         rho_penalty=10.0,
@@ -1265,7 +1265,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
     out_b = hp._compute_brayton_hp_system_performance(
         np.array([0.1, 0.2, 0.3, 0.8]),
         SimpleNamespace(
-            Q_hpr_target_max=40.0,
+            Q_hpr_target=40.0,
             H_hot=np.array([0.0, -20.0]),
             bckgrd_hot_streams=StreamCollection(),
             bckgrd_cold_streams=StreamCollection(),
