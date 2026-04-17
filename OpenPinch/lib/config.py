@@ -64,7 +64,7 @@ class Configuration:
 
     ### Heat pump targeting parameters ###
     HP_TYPE: str = HPRcycle.MultiTempCarnot.value
-    HP_LOAD_FRACTION: float = 1.0
+    HP_LOAD_VALUE: float = 1.0
     REFRIGERANTS: List[str] = ["water", "ammonia"]
     DO_REFRIGERANT_SORT: bool = True
     PRICE_RATIO_HEAT_TO_ELE: float = 1.0  ### add to the template (modified)

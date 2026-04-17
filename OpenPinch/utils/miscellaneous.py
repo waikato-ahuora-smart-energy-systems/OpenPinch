@@ -14,12 +14,16 @@ def key_name(zone_name: str, target_type: str = TargetType.DI.value):
 
 
 def get_value(
-    val: Union[float, dict, ValueWithUnit],
-    val2: float = None,
+    val: Union[float, int, str, dict, ValueWithUnit, None],
+    val2: Union[float, int, str, None] = None,
     zone_name: str = None,
 ) -> float:
-    """Extract a numeric value from raw floats, dict payloads, or :class:`ValueWithUnit`."""
-    if isinstance(val, float | int):
+    """Extract a numeric value from supported scalars, dict payloads, or :class:`ValueWithUnit`."""
+    if isinstance(val, bool):
+        raise TypeError(
+            f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
+        )
+    elif isinstance(val, float | int):
         return float(val)
     elif isinstance(val, dict):
         if zone_name in val:
@@ -77,7 +81,7 @@ def get_value(
         return get_value(val2, zone_name=zone_name)
     else:
         raise TypeError(
-            f"Unsupported type: {type(val)}. Expected float, dict, or ValueWithUnit."
+            f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
         )
 
 

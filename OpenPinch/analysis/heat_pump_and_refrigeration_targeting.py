@@ -35,14 +35,44 @@ def validate_heat_pump_or_refrigeration_targeting_required(
     is_refrigeration: bool,
     zone_name: str,
 ) -> float:
-    """Determine whether heat pump or refrigeration targeting is warranted based on the process cascade profiles and user settings."""
+    """Return the requested heat-pump or refrigeration load capped by feasibility.
+
+    Parameters
+    ----------
+    pt : ProblemTable
+        Problem table containing the background process cascade used to derive
+        the maximum recoverable heating or cooling duty.
+    hpr_load : dict | float
+        User-specified target load. A scalar applies globally, while a
+        dictionary is resolved per zone via ``zone_name``.
+    is_heat_pumping : bool
+        Whether heat-pump targeting is enabled for the zone. When ``True``, the
+        available duty is limited by the largest magnitude cold-side cascade
+        deficit.
+    is_refrigeration : bool
+        Whether refrigeration targeting is enabled for the zone. When ``True``,
+        the available duty is limited by the largest magnitude hot-side cascade
+        surplus.
+    zone_name : str
+        Name of the active zone used when resolving zone-specific load values.
+
+    Returns
+    -------
+    float
+        Requested target load clipped to the maximum duty supported by the
+        cascade profiles. Returns ``0.0`` when neither targeting mode is
+        enabled.
+    """
     if is_heat_pumping == True:
         Q_max = np.abs(pt.col[PT.H_NET_COLD.value]).max()
     elif is_refrigeration == True:
         Q_max = np.abs(pt.col[PT.H_NET_HOT.value]).max()
     else:
         return 0.0
-    return get_value(hpr_load, val2=Q_max, zone_name=zone_name)
+    return min(
+        get_value(hpr_load, val2=Q_max, zone_name=zone_name),
+        Q_max,
+    )
 
 
 def get_heat_pump_and_refrigeration_targets(
@@ -320,7 +350,7 @@ def _construct_HPRTargetInputs(
         "dtcont_hp": zone_config.DT_CONT_HP,
         "dt_hp_ihx": zone_config.DT_HP_IHX,
         "dt_cascade_hx": zone_config.DT_CASCADE_HX,
-        "load_fraction": zone_config.HP_LOAD_FRACTION,
+        "load_fraction": zone_config.HP_LOAD_VALUE,
         "T_env": zone_config.T_ENV,
         "dt_env_cont": zone_config.DT_ENV_CONT,
         "dt_phase_change": zone_config.DT_PHASE_CHANGE,

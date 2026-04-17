@@ -77,7 +77,7 @@ def compute_direct_integration_targets(zone: Zone):
     # Determine if heat pump or refrigeration targeting is warranted based on the process cascade profiles and user settings
     hpr_target_load = validate_heat_pump_or_refrigeration_targeting_required(
         pt,
-        hpr_load=zone_config.HP_LOAD_FRACTION,
+        hpr_load=zone_config.HP_LOAD_VALUE,
         is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
         is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
         zone_name=zone.name,

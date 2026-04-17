@@ -15,24 +15,36 @@ from OpenPinch.utils import miscellaneous
 
 
 @pytest.mark.parametrize(
-    ("payload", "zone_name", "expected"),
+    ("payload", "zone_name", "val2", "expected"),
     [
-        pytest.param(3.14, None, 3.14, id="float"),
-        pytest.param({"value": 42.0}, None, 42.0, id="flat-dict"),
+        pytest.param(3.14, None, None, 3.14, id="float"),
+        pytest.param(5, None, None, 5.0, id="int"),
+        pytest.param("100", None, None, 100.0, id="numeric-string"),
+        pytest.param({"value": 42.0}, None, None, 42.0, id="flat-dict"),
+        pytest.param(
+            {"value": "42.0"},
+            None,
+            None,
+            42.0,
+            id="dict-numeric-string",
+        ),
         pytest.param(
             {"zone-a": {"value": 7.5}},
             "zone-a",
+            None,
             7.5,
             id="zone-name-recurses-into-dict",
         ),
         pytest.param(
             {"zone-a": 11.25, "value": 99.0},
             "zone-a",
+            None,
             11.25,
             id="zone-name-takes-precedence-over-value",
         ),
         pytest.param(
             {"value": {"value": 1.25}, "units": "kW"},
+            None,
             None,
             1.25,
             id="dict-recurses-through-value-payload",
@@ -40,11 +52,13 @@ from OpenPinch.utils import miscellaneous
         pytest.param(
             ValueWithUnit(value=99.9, units="kW"),
             None,
+            None,
             99.9,
             id="value-with-unit",
         ),
         pytest.param(
             {"value": 4.0, "multiplier": 2.5},
+            None,
             None,
             10.0,
             id="multiplier-operator",
@@ -52,12 +66,14 @@ from OpenPinch.utils import miscellaneous
         pytest.param(
             {"value": 4.0, "multiply": 2.5},
             None,
+            None,
             10.0,
             id="multiply-alias",
         ),
-        pytest.param({"value": 4.0, "add": 2.5}, None, 6.5, id="add-operator"),
+        pytest.param({"value": 4.0, "add": 2.5}, None, None, 6.5, id="add-operator"),
         pytest.param(
             {"value": 4.0, "subtract": 2.5},
+            None,
             None,
             1.5,
             id="subtract-operator",
@@ -65,18 +81,27 @@ from OpenPinch.utils import miscellaneous
         pytest.param(
             {"value": 9.0, "divide": 3.0},
             None,
+            None,
             3.0,
             id="divide-operator",
         ),
         pytest.param(
             {"value": 0.0, "divide": 3.0},
             None,
+            None,
             0.0,
             id="divide-zero-numerator",
         ),
-        pytest.param({"value": 3.0, "power": 2.0}, None, 9.0, id="power-operator"),
+        pytest.param(
+            {"value": 3.0, "power": 2.0},
+            None,
+            None,
+            9.0,
+            id="power-operator",
+        ),
         pytest.param(
             {"value": 100.0, "log": 10.0},
+            None,
             None,
             2.0,
             id="log-with-explicit-base",
@@ -84,31 +109,49 @@ from OpenPinch.utils import miscellaneous
         pytest.param(
             {"value": np.e**2, "log": {"base": "ignored"}},
             None,
+            None,
             2.0,
             id="log-defaults-to-e-for-non-float-base",
         ),
         pytest.param(
             {"value": -10.0, "log": 10.0},
             None,
+            None,
             0.0,
             id="log-non-positive-input",
         ),
-        pytest.param({"value": 3.0, "exp": 2.0}, None, 8.0, id="exp-operator"),
+        pytest.param({"value": 3.0, "exp": 2.0}, None, None, 8.0, id="exp-operator"),
         pytest.param(
             {"value": -1.0, "exp": 2.0},
+            None,
             None,
             0.0,
             id="exp-non-positive-input",
         ),
-        pytest.param({"value": -4.0, "abs": True}, None, 4.0, id="abs-operator"),
+        pytest.param(
+            {"value": -4.0, "abs": True},
+            None,
+            None,
+            4.0,
+            id="abs-operator",
+        ),
         pytest.param(
             {"value": ValueWithUnit(value=8.0, units="kW"), "add": 2.0},
+            None,
             None,
             10.0,
             id="operator-with-valuewithunit-base",
         ),
         pytest.param(
+            {"value": 10.0, "add": "2"},
+            None,
+            None,
+            12.0,
+            id="operator-with-numeric-string",
+        ),
+        pytest.param(
             {"value": {"value": 8.0}, "divide": {"value": 2.0}},
+            None,
             None,
             4.0,
             id="nested-operator-payloads",
@@ -116,6 +159,7 @@ from OpenPinch.utils import miscellaneous
         pytest.param(
             {"zone-a": {"value": 2.0, "power": 3.0}},
             "zone-a",
+            None,
             8.0,
             id="zone-name-with-operator-payload",
         ),
@@ -123,15 +167,20 @@ from OpenPinch.utils import miscellaneous
             {"units": "kW"},
             None,
             12.5,
+            12.5,
             id="val2-fallback",
+        ),
+        pytest.param(
+            {"units": "kW"},
+            None,
+            "12.5",
+            12.5,
+            id="val2-numeric-string-fallback",
         ),
     ],
 )
-def test_get_value_supported_inputs(payload, zone_name, expected):
-    kwargs = {"zone_name": zone_name}
-    if payload == {"units": "kW"}:
-        kwargs["val2"] = 12.5
-    assert get_value(payload, **kwargs) == pytest.approx(expected)
+def test_get_value_supported_inputs(payload, zone_name, val2, expected):
+    assert get_value(payload, zone_name=zone_name, val2=val2) == pytest.approx(expected)
 
 
 def test_get_value_does_not_mutate_payload():
@@ -187,31 +236,46 @@ def test_get_value_zone_name_none_value_raises_type_error():
             id="missing-zone-key-and-value",
         ),
         pytest.param(
-            {"value": "100", "units": "kW"},
+            {"value": "abc", "units": "kW"},
             None,
             None,
             TypeError,
-            "Unsupported type",
-            id="dict-value-with-invalid-type",
+            "Unsupported string value",
+            id="dict-value-with-invalid-string",
         ),
         pytest.param(
-            {"value": 10.0, "add": "2"},
+            {"value": 10.0, "add": "two"},
             None,
             None,
             TypeError,
-            "Unsupported type",
-            id="operator-with-invalid-type",
+            "Unsupported string value",
+            id="operator-with-invalid-string",
         ),
         pytest.param(
             {"units": "kW"},
             None,
-            "12.5",
+            "twelve point five",
+            TypeError,
+            "Unsupported string value",
+            id="val2-invalid-string",
+        ),
+        pytest.param(True, None, None, TypeError, "Unsupported type", id="bool"),
+        pytest.param(
+            {"value": True},
+            None,
+            None,
             TypeError,
             "Unsupported type",
-            id="val2-invalid-type",
+            id="dict-bool",
         ),
-        pytest.param(5, None, None, TypeError, "Unsupported type", id="int"),
-        pytest.param("100", None, None, TypeError, "Unsupported type", id="string"),
+        pytest.param(
+            {"zone-a": True},
+            "zone-a",
+            None,
+            TypeError,
+            "Unsupported type",
+            id="zone-bool",
+        ),
         pytest.param(None, None, None, TypeError, "Unsupported type", id="none"),
         pytest.param([1.0], None, None, TypeError, "Unsupported type", id="list"),
     ],
