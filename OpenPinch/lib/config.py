@@ -80,7 +80,7 @@ class Configuration:
     DT_CONT_HP: float = 0.0  ### add to the template (modified)
     DT_HP_IHX: float = 0.0
     DT_CASCADE_HX: float = 0.0
-    BB_MINIMISER: str = BB_Minimiser.DA.value  ### add to the template
+    BB_MINIMISER: str = BB_Minimiser.CMAES.value  ### add to the template
     INITIALISE_SIMULATED_CYCLE: bool = True  ### add to the template
     ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
 

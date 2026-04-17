@@ -403,14 +403,15 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
         Q_hpr_target_max=1000.0,
         refrigerant_ls=["R134A", "R134A", "R134A"],
     )
-
-    T_cond = np.array([120.0, 90.0])
-    T_evap = np.array([50.0, 20.0])
-    Q_heat = np.array([600.0, 400.0])
-    Q_cool = np.array([500.0, 400.0])
+    init = SimpleNamespace(
+        T_cond=np.array([120.0, 90.0]),
+        T_evap=np.array([50.0, 20.0]),
+        Q_cond=np.array([600.0, 400.0]),
+        Q_evap=np.array([500.0, 400.0]),
+    )
 
     bnds = _get_bounds_for_cascade_hp_opt(args)
-    x0_ls = _get_x0_for_cascade_hp_opt(T_cond, Q_heat, T_evap, Q_cool, args, bnds)
+    x0_ls = _get_x0_for_cascade_hp_opt(init_res=init, args=args, bnds=bnds)
 
     assert x0_ls.shape == (1, 9)
     assert len(bnds) == x0_ls.shape[1]
@@ -564,8 +565,8 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
     )
 
     res = SimpleNamespace(
-        hot_streams=StreamCollection(),
-        cold_streams=StreamCollection(),
+        hpr_hot_streams=StreamCollection(),
+        hpr_cold_streams=StreamCollection(),
         Q_amb_hot=q_amb_hot,
         Q_amb_cold=q_amb_cold,
         amb_streams=hp._get_ambient_air_stream(q_amb_hot, q_amb_cold, _base_args()),
@@ -690,11 +691,14 @@ def test_cascade_optimiser_and_compute_branches(monkeypatch):
 def test_cascade_x0_bounds_and_parse(monkeypatch):
     args = _base_args(n_cond=2, n_evap=2)
     bnds = [(0.0, 0.2)] * 9
-    x0 = hp._get_x0_for_cascade_hp_opt(
+    init_res = SimpleNamespace(
         T_cond=np.array([120.0, 90.0]),
-        Q_heat=np.array([120.0, 80.0]),
+        Q_cond=np.array([120.0, 80.0]),
         T_evap=np.array([70.0, 50.0]),
-        Q_cool=np.array([90.0, 60.0]),
+        Q_evap=np.array([90.0, 60.0]),
+    )
+    x0 = hp._get_x0_for_cascade_hp_opt(
+        init_res=init_res,
         args=args,
         bnds=bnds,
     )
@@ -703,10 +707,7 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
 
     with pytest.raises(ValueError, match="Bounds size must match x0 size"):
         hp._get_x0_for_cascade_hp_opt(
-            T_cond=np.array([120.0, 90.0]),
-            Q_heat=np.array([120.0, 80.0]),
-            T_evap=np.array([70.0, 50.0]),
-            Q_cool=np.array([90.0, 60.0]),
+            init_res=init_res,
             args=args,
             bnds=[(0.0, 1.0)],
         )
@@ -774,7 +775,7 @@ def test_compute_cascade_hp_system_performance_unsolved_and_solved(monkeypatch):
         lambda *a, **k: calls.__setitem__("plot", calls["plot"] + 1),
     )
     out = hp._compute_cascade_hp_system_performance(x, args, debug=True)
-    assert "hot_streams" in out
+    assert "hpr_hot_streams" in out
     assert calls["plot"] == 1
 
 
@@ -1116,11 +1117,14 @@ def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):
         Q_hpr_target_max=100.0,
         refrigerant_ls=["R134A", "R134A"],
     )
-    x0 = hp._get_x0_for_cascade_hp_opt(
+    init_res = SimpleNamespace(
         T_cond=np.array([46.0]),
-        Q_heat=np.array([70.0]),
+        Q_cond=np.array([70.0]),
         T_evap=np.array([36.0]),
-        Q_cool=np.array([65.0]),
+        Q_evap=np.array([65.0]),
+    )
+    x0 = hp._get_x0_for_cascade_hp_opt(
+        init_res=init_res,
         args=args_cascade,
         bnds=[(0.0, 1.0)] * 4,
     )

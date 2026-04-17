@@ -119,8 +119,8 @@ class HPRTargetOutputs(BaseModel):
     obj: float
     success: bool
 
-    hot_streams: StreamCollection
-    cold_streams: StreamCollection
+    hpr_hot_streams: StreamCollection
+    hpr_cold_streams: StreamCollection
     amb_streams: StreamCollection
 
     # --- Flattened state fields (union of all children) -----------

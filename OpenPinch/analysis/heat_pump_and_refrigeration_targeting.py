@@ -1,4 +1,4 @@
-"""Heat pump targeting and cascade-construction utilities for composite curves."""
+"""Heat pump targeting and cascade construction utilities for composite curves."""
 
 from typing import Callable
 import numpy as np
@@ -66,7 +66,7 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HP_TYPE = HPRcycle.MultiTempCarnot.value
+    # zone_config.HP_TYPE = HPRcycle.MultiSimpleCarnot.value
     args = _construct_HPRTargetInputs(
         Q_hpr_target_max=Q_hpr_target_max,
         T_vals=T_vals,
@@ -74,13 +74,14 @@ def get_heat_pump_and_refrigeration_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=True,
+        debug=False,
     )
     # Select the appropriate targeting handler based on the specified heat pump targeting approach
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
-    return handler(args)
+    res = handler(args)
+    return HPRTargetOutputs.model_validate(res)
 
 
 def calc_heat_pump_and_refrigeration_cascade(
@@ -108,14 +109,14 @@ def calc_heat_pump_and_refrigeration_cascade(
         HP- or RFRG-related columns.
     """
     pt_hp = create_problem_table_with_t_int(
-        streams=res.hot_streams + res.cold_streams,
+        streams=res.hpr_hot_streams + res.hpr_cold_streams,
         is_shifted=is_T_vals_shifted,
     )
     pt.insert_temperature_interval(pt_hp[PT.T.value].to_list())
     temp = get_utility_heat_cascade(
         T_int_vals=pt.col[PT.T.value],
-        hot_utilities=res.hot_streams,
-        cold_utilities=res.cold_streams,
+        hot_utilities=res.hpr_hot_streams,
+        cold_utilities=res.hpr_cold_streams,
         is_shifted=is_T_vals_shifted,
     )
     if is_heat_pumping:
@@ -168,8 +169,8 @@ def plot_multi_hp_profiles_from_results(
     H_hot: np.ndarray = None,
     T_cold: np.ndarray = None,
     H_cold: np.ndarray = None,
-    hot_streams: StreamCollection = None,
-    cold_streams: StreamCollection = None,
+    hpr_hot_streams: StreamCollection = None,
+    hpr_cold_streams: StreamCollection = None,
     title: str = None,
 ) -> None:
     """Plot source/sink composites together with HP condenser/evaporator profiles.
@@ -206,18 +207,19 @@ def plot_multi_hp_profiles_from_results(
         T_cold, H_cold = clean_composite_curve_ends(T_cold, H_cold)
         plt.plot(H_cold, T_cold, label="Source", linewidth=2, color="blue")
 
-    if hot_streams is not None and cold_streams is not None:
+    if hpr_hot_streams is not None and hpr_cold_streams is not None:
         T_hpr_arr, H_hpr_hot, H_hpr_cold = _get_hpr_cascade(
-            hot_streams, cold_streams
+            hpr_hot_streams, hpr_cold_streams
         )
-        T_hpr_hot, H_hpr_hot = clean_composite_curve_ends(
-            T_hpr_arr, H_hpr_hot
-        )
-        T_hpr_cold, H_hpr_cold = clean_composite_curve_ends(
-            T_hpr_arr, H_hpr_cold
-        )
+        T_hpr_hot, H_hpr_hot = clean_composite_curve_ends(T_hpr_arr, H_hpr_hot)
+        T_hpr_cold, H_hpr_cold = clean_composite_curve_ends(T_hpr_arr, H_hpr_cold)
         plt.plot(
-            H_hpr_hot, T_hpr_hot, "--", color="darkred", linewidth=1.8, label="Condenser"
+            H_hpr_hot,
+            T_hpr_hot,
+            "--",
+            color="darkred",
+            linewidth=1.8,
+            label="Condenser",
         )
         plt.plot(
             H_hpr_cold,
@@ -447,12 +449,19 @@ def _optimise_multi_temperature_carnot_heat_pump_placement(
     args: HPRTargetInputs,
 ) -> HPRTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout."""
-    res = _optimise_hpr_placement_wrapper(
+    # Prepare the initial guess and bounds
+    x0_ls = [0.0 for _ in range(args.n_cond + args.n_evap + 1)]
+    bnds = [(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)] + [(-1.0, 10.0)]
+
+    # Solve the placement problem
+    res = _solve_hpr_placement(
         f_obj=_compute_multi_temperature_carnot_cycle_obj,
-        x0_ls=[0.0 for _ in range(args.n_cond + args.n_evap + 1)],
-        bnds=[(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)] + [(-1.0, 10.0)],
+        x0_ls=x0_ls,
+        bnds=bnds,
         args=args,
     )
+
+    # Post-process the results
     res.update(
         _get_carnot_hpr_cycle_streams(
             res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args
@@ -467,7 +476,9 @@ def _parse_multi_temperature_carnot_cycle_state_variables(
 ) -> Tuple[np.ndarray, np.ndarray, float, float]:
     """Compile the full list of condenser and evaporator temperature levels and ambient source/sink."""
     T_cond = _map_x_arr_to_T_arr(x[: int(args.n_cond)], args.T_cold[0], args.T_cold[-1])
-    T_evap = _map_x_arr_to_T_arr(x[int(args.n_cond) : -1], args.T_hot[-1], args.T_hot[0])
+    T_evap = _map_x_arr_to_T_arr(
+        x[int(args.n_cond) : -1], args.T_hot[-1], args.T_hot[0]
+    )
     Q_amb_hot = min(args.Q_hpr_target_max * x[-1], 0.0) * -1
     Q_amb_cold = max(args.Q_hpr_target_max * x[-1], 0.0)
     return T_cond, T_evap, Q_amb_hot, Q_amb_cold
@@ -541,8 +552,8 @@ def _compute_multi_temperature_carnot_cycle_obj(
             H_hot_with_amb,
             args.T_cold,
             H_cold_with_amb,
-            res["hot_streams"],
-            res["cold_streams"],
+            res["hpr_hot_streams"],
+            res["hpr_cold_streams"],
             title=f"Obj {float(obj):.5f} = {(work / args.Q_hpr_target_max):.5f} + {(Q_ext_heat / args.Q_hpr_target_max):.5f} + {(Q_ext_cold / args.Q_hpr_target_max):.5f} + {(p / args.Q_hpr_target_max):.5f}",
         )
 
@@ -581,22 +592,20 @@ def _optimise_cascade_heat_pump_placement(
     # Validate specific inputs related to this approach
     args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
 
-    # Prepare and run the optimisation
+    # Prepare the initial guess and bounds
     bnds = _get_bounds_for_cascade_hp_opt(args)
 
     x0 = (
         _get_x0_for_cascade_hp_opt(
-            T_cond=init_res.T_cond,
-            Q_heat=init_res.Q_cond,
-            T_evap=init_res.T_evap,
-            Q_cool=init_res.Q_evap,
+            init_res=init_res,
             args=args,
             bnds=bnds,
         )
         if args.initialise_simulated_cycle
         else None
     )
-    res = _optimise_hpr_placement_wrapper(
+    # Solve the placement problem
+    res = _solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_performance,
         x0_ls=x0,
         bnds=bnds,
@@ -606,14 +615,16 @@ def _optimise_cascade_heat_pump_placement(
 
 
 def _get_x0_for_cascade_hp_opt(
-    T_cond: np.ndarray,
-    Q_heat: np.ndarray,
-    T_evap: np.ndarray,
-    Q_cool: np.ndarray,
+    init_res: HPRTargetOutputs,
     args: HPRTargetInputs,
     bnds: list,
 ) -> np.ndarray:
     """Build initial guess vectors for the cascade condenser/evaporator optimization."""
+    T_cond = init_res.T_cond
+    Q_heat = init_res.Q_cond
+    T_evap = init_res.T_evap
+    Q_cool = init_res.Q_evap
+
     x_sc_bnds = [
         np.float64(args.dt_phase_change / args.dt_range_max),
         np.float64((args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max),
@@ -651,44 +662,46 @@ def _get_bounds_for_cascade_hp_opt(
     args: HPRTargetInputs,
 ) -> list:
     """Build bounds for the cascade condenser/evaporator optimization."""
-    x_cond_bnds = []
-    x_evap_bnds = []
-    for i, refrigerant in enumerate(args.refrigerant_ls):
-        T_min, T_max = (
-            PropsSI("Tmin", refrigerant) - 273.15,
-            PropsSI("Tmax", refrigerant) - 273.15,
-        )
-        if i + 1 <= args.n_cond:
-            T_cond_bnds = np.array(
-                (
-                    min(args.T_cold[0], T_max - 1),
-                    max(args.T_cold[-1] + args.dt_phase_change, T_min + 1),
-                )
-            )
-            if T_cond_bnds[1] > T_cond_bnds[0]:
-                T_cond_bnds[0] = T_cond_bnds[1]
-            x_cond_bnds += [
-                (
-                    (args.T_cold[0] - T_cond_bnds[0]) / args.dt_range_max,
-                    (args.T_cold[0] - T_cond_bnds[1]) / args.dt_range_max,
-                )
-            ]
+    ref_temp_limits = {}
 
-        if i + 1 >= args.n_cond:
-            T_evap_bnds = np.array(
-                (
-                    max(args.T_hot[-1], T_min + 1),
-                    min(args.T_hot[0] - args.dt_phase_change, T_max - 1),
-                )
+    def _get_ref_temp_limits(refrigerant: str) -> tuple[float, float]:
+        limits = ref_temp_limits.get(refrigerant)
+        if limits is None:
+            limits = (
+                PropsSI("Tmin", refrigerant) - 273.15,
+                PropsSI("Tmax", refrigerant) - 273.15,
             )
-            if T_evap_bnds[0] > T_evap_bnds[1]:
-                T_evap_bnds[1] = T_evap_bnds[0]
-            x_evap_bnds += [
-                (
-                    (T_evap_bnds[0] - args.T_hot[-1]) / args.dt_range_max,
-                    (T_evap_bnds[1] - args.T_hot[-1]) / args.dt_range_max,
-                )
-            ]
+            ref_temp_limits[refrigerant] = limits
+        return limits
+
+    def _get_cond_bounds(refrigerant: str) -> tuple[float, float]:
+        T_min, T_max = _get_ref_temp_limits(refrigerant)
+        T_lo = max(args.T_cold[-1] + args.dt_phase_change, T_min + 1)
+        T_hi = max(min(args.T_cold[0], T_max - 1), T_lo)
+        return (
+            (args.T_cold[0] - T_hi) / args.dt_range_max,
+            (args.T_cold[0] - T_lo) / args.dt_range_max,
+        )
+
+    def _get_evap_bounds(refrigerant: str) -> tuple[float, float]:
+        T_min, T_max = _get_ref_temp_limits(refrigerant)
+        T_lo = max(args.T_hot[-1], T_min + 1)
+        T_hi = max(min(args.T_hot[0] - args.dt_phase_change, T_max - 1), T_lo)
+        return (
+            (T_lo - args.T_hot[-1]) / args.dt_range_max,
+            (T_hi - args.T_hot[-1]) / args.dt_range_max,
+        )
+
+    x_cond_bnds = [
+        _get_cond_bounds(refrigerant)
+        for refrigerant in args.refrigerant_ls[: args.n_cond]
+    ]
+    x_evap_bnds = [
+        _get_evap_bounds(refrigerant)
+        for refrigerant in args.refrigerant_ls[
+            args.n_cond - 1 : args.n_cond - 1 + args.n_evap
+        ]
+    ]
 
     x_sc_bnds = (
         np.float64(args.dt_phase_change / args.dt_range_max),
@@ -700,21 +713,14 @@ def _get_bounds_for_cascade_hp_opt(
     y_heat_bnds = (0.0, 1.0)
     y_cool_bnds = (0.0, 1.0)
 
-    bnds = []
-
-    def _build_bounds(count, limits):
-        if isinstance(limits, list):
-            bnds.extend(limits[:count])
-        else:
-            bnds.extend([limits] * count)
-
-    _build_bounds(args.n_cond, x_cond_bnds)
-    _build_bounds(args.n_cond, x_sc_bnds)
-    _build_bounds(args.n_cond, y_heat_bnds)
-    _build_bounds(args.n_evap, x_evap_bnds)
-
+    bnds = (
+        x_cond_bnds
+        + [x_sc_bnds] * args.n_cond
+        + [y_heat_bnds] * args.n_cond
+        + x_evap_bnds
+    )
     if args.n_evap > 1:
-        _build_bounds(args.n_evap - 1, y_cool_bnds)
+        bnds += [y_cool_bnds] * (args.n_evap - 1)
 
     return bnds
 
@@ -766,12 +772,12 @@ def _compute_cascade_hp_system_performance(
         return {"obj": obj, "success": False}
 
     # Build streams based on heat pump profiles
-    hot_streams = hp.build_stream_collection(
+    hpr_hot_streams = hp.build_stream_collection(
         include_cond=True,
         is_process_stream=False,
         dtcont=args.dtcont_hp,
     )
-    cold_streams = hp.build_stream_collection(
+    hpr_cold_streams = hp.build_stream_collection(
         include_evap=True,
         is_process_stream=False,
         dtcont=args.dtcont_hp,
@@ -779,13 +785,13 @@ def _compute_cascade_hp_system_performance(
 
     # Determine the heat cascade
     pt_cond = get_process_heat_cascade(
-        hot_streams=hot_streams,
+        hot_streams=hpr_hot_streams,
         cold_streams=args.bckgrd_cold_streams,
         is_shifted=True,
     )
     pt_evap = get_process_heat_cascade(
         hot_streams=args.bckgrd_hot_streams,
-        cold_streams=cold_streams,
+        cold_streams=hpr_cold_streams,
         is_shifted=True,
     )
 
@@ -815,8 +821,8 @@ def _compute_cascade_hp_system_performance(
             args.H_hot,
             args.T_cold,
             args.H_cold,
-            hot_streams,
-            cold_streams,
+            hpr_hot_streams,
+            hpr_cold_streams,
             title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hpr_target_max):.5f} + {(Q_ext / args.Q_hpr_target_max):.5f} + {(g.sum() / args.Q_hpr_target_max):.5f}",
         )
 
@@ -833,8 +839,8 @@ def _compute_cascade_hp_system_performance(
         "cop_h": cop,
         "Q_amb_hot": Q_amb if args.is_heat_pumping else 0.0,
         "Q_amb_cold": 0.0 if args.is_heat_pumping else Q_amb,
-        "hot_streams": hot_streams,
-        "cold_streams": cold_streams,
+        "hpr_hot_streams": hpr_hot_streams,
+        "hpr_cold_streams": hpr_cold_streams,
         "model": hp,
     }
 
@@ -850,7 +856,7 @@ def _optimise_multi_simple_carnot_heat_pump_placement(
 ) -> HPRTargetOutputs:
     """Compute baseline condenser/evaporator temperature levels and duties for a multiple simple heat pumps layout."""
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
-    res = _optimise_hpr_placement_wrapper(
+    res = _solve_hpr_placement(
         f_obj=_compute_multi_simple_carnot_hp_opt_obj,
         x0_ls=[0.0 for _ in range(args.n_cond + args.n_evap + 1)],
         bnds=[(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)] + [(-1.0, 4.0)],
@@ -968,8 +974,8 @@ def _compute_multi_simple_carnot_hp_opt_obj(
             H_hot_with_amb,
             args.T_cold,
             H_cold_with_amb,
-            res["hot_streams"],
-            res["cold_streams"],
+            res["hpr_hot_streams"],
+            res["hpr_cold_streams"],
             title=f"Obj {float(obj):.5f} = {(work.sum() / args.Q_hpr_target_max):.5f} + {(Q_ext_heat / args.Q_hpr_target_max):.5f} + {(Q_ext_cold / args.Q_hpr_target_max):.5f} + {(p / args.Q_hpr_target_max):.5f}",
         )
 
@@ -1022,7 +1028,7 @@ def _optimise_multi_simple_heat_pump_placement(
         if args.initialise_simulated_cycle
         else None
     )
-    res = _optimise_hpr_placement_wrapper(
+    res = _solve_hpr_placement(
         f_obj=_compute_multi_simple_hp_system_performance,
         x0_ls=x0,
         bnds=bnds,
@@ -1203,12 +1209,12 @@ def _compute_multi_simple_hp_system_performance(
     )
 
     # Build streams based on heat pump profiles
-    hot_streams = hp.build_stream_collection(
+    hpr_hot_streams = hp.build_stream_collection(
         include_cond=True,
         is_process_stream=False,
         dtcont=args.dtcont_hp,
     )
-    cold_streams = hp.build_stream_collection(
+    hpr_cold_streams = hp.build_stream_collection(
         include_evap=True,
         is_process_stream=False,
         dtcont=args.dtcont_hp,
@@ -1216,13 +1222,13 @@ def _compute_multi_simple_hp_system_performance(
 
     # Determine the heat cascade
     pt_cond = get_process_heat_cascade(
-        hot_streams=hot_streams,
+        hot_streams=hpr_hot_streams,
         cold_streams=args.bckgrd_cold_streams,
         is_shifted=True,
     )
     pt_evap = get_process_heat_cascade(
         hot_streams=args.bckgrd_hot_streams,
-        cold_streams=cold_streams,
+        cold_streams=hpr_cold_streams,
         is_shifted=True,
     )
 
@@ -1255,8 +1261,8 @@ def _compute_multi_simple_hp_system_performance(
             args.H_hot,
             args.T_cold,
             args.H_cold,
-            hot_streams,
-            cold_streams,
+            hpr_hot_streams,
+            hpr_cold_streams,
             title=f"Obj {float(obj):.5f} = {(work_hp / args.Q_hpr_target_max):.5f} + {(Q_ext / args.Q_hpr_target_max):.5f} + {(g.sum() / args.Q_hpr_target_max):.5f}",
         )
 
@@ -1274,8 +1280,8 @@ def _compute_multi_simple_hp_system_performance(
         "cop_h": cop,
         "Q_amb_hot": Q_amb if args.is_heat_pumping else 0.0,
         "Q_amb_cold": 0.0 if args.is_heat_pumping else Q_amb,
-        "hot_streams": hot_streams,
-        "cold_streams": cold_streams,
+        "hpr_hot_streams": hpr_hot_streams,
+        "hpr_cold_streams": hpr_cold_streams,
         "model": hp,
     }
 
@@ -1314,8 +1320,8 @@ def _optimise_brayton_heat_pump_placement(
                 args.H_hot,
                 args.T_cold,
                 args.H_cold,
-                res["hot_streams"],
-                res["cold_streams"],
+                res["hpr_hot_streams"],
+                res["hpr_cold_streams"],
             )
     else:
         raise ValueError(f"Brayton heat pump targeting failed: {opt.message}")
@@ -1374,19 +1380,19 @@ def _compute_brayton_hp_system_performance(
         args=args,
     )
 
-    hot_streams = _build_simulated_hpr_streams(hp_list, include_cond=True)
-    cold_streams = _build_simulated_hpr_streams(hp_list, include_evap=True)
+    hpr_hot_streams = _build_simulated_hpr_streams(hp_list, include_cond=True)
+    hpr_cold_streams = _build_simulated_hpr_streams(hp_list, include_evap=True)
 
     T_exp_out = hp_list[0].cycle_states[3]["T"]
 
     pt_gas_cooler = get_process_heat_cascade(
-        hot_streams=hot_streams,
+        hot_streams=hpr_hot_streams,
         cold_streams=args.bckgrd_cold_streams,
         is_shifted=True,
     )
     pt_gas_heater = get_process_heat_cascade(
         hot_streams=args.bckgrd_hot_streams,
-        cold_streams=cold_streams,
+        cold_streams=hpr_cold_streams,
         is_shifted=True,
     )
 
@@ -1422,8 +1428,8 @@ def _compute_brayton_hp_system_performance(
             args.H_hot,
             args.T_cold,
             args.H_cold,
-            hot_streams,
-            cold_streams,
+            hpr_hot_streams,
+            hpr_cold_streams,
             title=f"T_hi {T_comp_out} -> {float(obj), float(c / args.Q_hpr_target_max)}",
         )
 
@@ -1441,8 +1447,8 @@ def _compute_brayton_hp_system_performance(
         "cop_h": COP,
         "Q_amb_hot": Q_amb if args.is_heat_pumping else 0.0,
         "Q_amb_cold": 0.0 if args.is_heat_pumping else Q_amb,
-        "hot_streams": hot_streams,
-        "cold_streams": cold_streams,
+        "hpr_hot_streams": hpr_hot_streams,
+        "hpr_cold_streams": hpr_cold_streams,
         "model": hp_list,
     }
 
@@ -1478,13 +1484,13 @@ def _create_brayton_hp_list(
 #######################################################################################################
 
 
-def _optimise_hpr_placement_wrapper(
+def _solve_hpr_placement(
     f_obj: Callable,
     x0_ls: list | float,
     bnds: list,
     args: HPRTargetInputs,
 ) -> dict:
-    """Compute baseline condenser/evaporator temperature levels and duties for a single multi-temperature heat pump layout."""
+    """Solve a heat pump/refrigeration placement problem and return the best result."""
     x0_ls = np.asarray(x0_ls, dtype=np.float64)
     if len(x0_ls.shape) == 1:
         x0_ls = [x0_ls]
@@ -1718,10 +1724,10 @@ def _get_carnot_hpr_cycle_streams(
 ) -> dict:
     """Build condenser and evaporator stream collections from Carnot outputs."""
     return {
-        "hot_streams": _build_latent_streams(
+        "hpr_hot_streams": _build_latent_streams(
             T_cond, args.dt_phase_change, Q_cond, is_hot=True
         ),
-        "cold_streams": _build_latent_streams(
+        "hpr_cold_streams": _build_latent_streams(
             T_evap, args.dt_phase_change, Q_evap, is_hot=False
         ),
     }

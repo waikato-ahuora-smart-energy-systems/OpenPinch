@@ -90,7 +90,6 @@ def compute_direct_integration_targets(zone: Zone):
                 pt=pt,
                 res=res["Heat pump"],
                 is_T_vals_shifted=True,
-                is_process_integration=True,
                 is_heat_pumping=True,
             )
 
@@ -108,7 +107,6 @@ def compute_direct_integration_targets(zone: Zone):
                 pt=pt,
                 res=res["Refrigeration"],
                 is_T_vals_shifted=True,
-                is_process_integration=True,
                 is_heat_pumping=False,
             )
 
