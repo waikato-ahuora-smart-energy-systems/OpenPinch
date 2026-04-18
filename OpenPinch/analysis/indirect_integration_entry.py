@@ -129,9 +129,9 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         # Perform heat pump and/or refrigeration targeting on the correct cascades
         hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
             pt,
-            hpr_load=zone_config.HP_LOAD_VALUE,
             is_heat_pumping=zone_config.DO_UTILITY_HP_TARGETING,
             zone_name=zone.name,
+            zone_config=zone_config,
         )
         if hp_target_load > tol:
             res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
@@ -151,9 +151,9 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
 
         r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
             pt,
-            hpr_load=zone_config.HP_LOAD_VALUE,
             is_refrigeration=zone_config.DO_UTILITY_RFRG_TARGETING,
             zone_name=zone.name,
+            zone_config=zone_config,
         )
         if r_target_load > tol:
             res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(

@@ -77,9 +77,9 @@ def compute_direct_integration_targets(zone: Zone):
     if zone.identifier == Z.P.value and (zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING):
         hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
             pt,
-            hpr_load=zone_config.HP_LOAD_VALUE,
             is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
             zone_name=zone.name,
+            zone_config=zone_config,
         )
         if hp_target_load > tol:
             res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
@@ -99,9 +99,9 @@ def compute_direct_integration_targets(zone: Zone):
 
         r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
             pt,
-            hpr_load=zone_config.HP_LOAD_VALUE,
             is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
             zone_name=zone.name,
+            zone_config=zone_config,
         )
         if r_target_load > tol:
             res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(

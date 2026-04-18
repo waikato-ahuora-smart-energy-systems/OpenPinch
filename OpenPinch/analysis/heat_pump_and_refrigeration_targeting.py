@@ -1,5 +1,6 @@
 """Heat pump targeting and cascade construction utilities for composite curves."""
 
+from ast import literal_eval
 from typing import Callable
 import numpy as np
 from scipy.optimize import minimize
@@ -30,10 +31,11 @@ __all__ = [
 
 def validate_heat_pump_or_refrigeration_targeting_required(
     pt: ProblemTable,
-    hpr_load: dict | float = 0.0,
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
     zone_name: str = None,
+    zone_config: dict = Configuration(),
+    r: dict | float | int = None,
 ) -> float:
     """Return the requested heat-pump or refrigeration load capped by feasibility.
 
@@ -69,10 +71,28 @@ def validate_heat_pump_or_refrigeration_targeting_required(
         Q_max = np.abs(pt.col[PT.H_NET_HOT.value]).max()
     else:
         return 0.0
-    return min(
-        get_value(hpr_load, val2=Q_max, zone_name=zone_name),
-        Q_max,
-    )
+    
+    Q = Q_max
+    hpr_load = zone_config.HPR_LOAD_VALUE if r is None else r
+    if isinstance(hpr_load, float | int):
+        Q = Q_max * hpr_load
+    elif isinstance(hpr_load, dict):
+        Q = min(
+            get_value(hpr_load, val2=Q_max, zone_name=zone_name),
+            Q_max,
+        )
+    elif isinstance(hpr_load, str):
+        hpr_load = literal_eval(hpr_load.strip())
+        if isinstance(hpr_load, float | int | dict):
+            Q = validate_heat_pump_or_refrigeration_targeting_required(
+                pt=pt, 
+                is_heat_pumping=is_heat_pumping,
+                is_refrigeration=is_refrigeration,
+                zone_name=zone_name,
+                zone_config=zone_config,
+                r= hpr_load,
+            )
+    return Q
 
 
 def get_heat_pump_and_refrigeration_targets(
@@ -112,9 +132,15 @@ def get_heat_pump_and_refrigeration_targets(
     Raises
     ------
     ValueError
-        If ``zone_config.HP_TYPE`` does not map to a supported optimiser.
+        If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HP_TYPE = HPRcycle.MultiSimpleCarnot.value
+    zone_config.HPR_TYPE = HPRcycle.MultiSimpleCarnot.value
+    plot_multi_hp_profiles_from_results(
+        T_hot=T_vals,
+        H_hot=H_hot,
+        T_cold=T_vals,
+        H_cold=H_cold,
+    )
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -124,8 +150,14 @@ def get_heat_pump_and_refrigeration_targets(
         zone_config=zone_config,
         debug=True,
     )
+    plot_multi_hp_profiles_from_results(
+        T_hot=args.T_hot,
+        H_hot=args.H_hot,
+        T_cold=args.T_cold,
+        H_cold=args.H_cold,
+    )    
     # Select the appropriate targeting handler based on the specified heat pump targeting approach
-    handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HP_TYPE)
+    handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
     res = handler(args)
@@ -302,7 +334,7 @@ def _construct_HPRTargetInputs(
     is_heat_pumping: bool = True,
     zone_config: Configuration = Configuration(),
     debug: bool = False,
-):
+) -> HPRTargetInputs:
     """Build a validated optimisation-input bundle for heat pump targeting."""
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
     T_hot, T_cold = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
@@ -340,17 +372,16 @@ def _construct_HPRTargetInputs(
         "bckgrd_hot_streams": s_hot,
         "bckgrd_cold_streams": s_cold,
         "debug": debug,
-        "hpr_type": zone_config.HP_TYPE,
+        "hpr_type": zone_config.HPR_TYPE,
         "n_cond": zone_config.N_COND,
         "n_evap": zone_config.N_EVAP,
         "eta_comp": zone_config.ETA_COMP,
         "eta_exp": zone_config.ETA_EXP,
-        "eta_hp_carnot": zone_config.ETA_HP_CARNOT,
+        "eta_hp_carnot": zone_config.ETA_HPR_CARNOT,
         "eta_he_carnot": zone_config.ETA_HE_CARNOT,
         "dtcont_hp": zone_config.DT_CONT_HP,
-        "dt_hp_ihx": zone_config.DT_HP_IHX,
-        "dt_cascade_hx": zone_config.DT_CASCADE_HX,
-        "load_fraction": zone_config.HP_LOAD_VALUE,
+        "dt_hp_ihx": zone_config.DT_HPR_IHX,
+        "dt_cascade_hx": zone_config.DT_HPR_CASCADE_HX,
         "T_env": zone_config.T_ENV,
         "dt_env_cont": zone_config.DT_ENV_CONT,
         "dt_phase_change": zone_config.DT_PHASE_CHANGE,
