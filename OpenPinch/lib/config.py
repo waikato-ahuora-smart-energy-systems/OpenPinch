@@ -87,26 +87,26 @@ class Configuration:
 
     ### Cost targeting parameters ###
     ELE_PRICE: float = 200  # $/MWh   ### add to the template
-    UTILITY_PRICE: float = 100  # $/MWh 
+    UTILITY_PRICE: float = 100  # $/MWh
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0
     VARIABLE_COST: float = 10000
     COST_EXP: float = 0.6
     DISCOUNT_RATE: float = 0.07
-    SERV_LIFE: float = 20 # years
+    SERV_LIFE: float = 20  # years
 
     ### OLD CONFIG -- TODO: Review ###
 
-    # T_TURBINE_BOX: float = 450
-    # P_TURBINE_BOX: float = 90
-    # MIN_EFF: float = 0.1
-    # ELECTRICITY_PRICE: float = 100
-    # LOAD: float = 1
-    # MOTOR_MECH_EFF: float = 1
-    # COMBOBOX: str = "Medina-Flores et al. (2010)"
-    # ABOVE_PINCH_CHECKBOX: bool = False
-    # BELOW_PINCH_CHECKBOX: bool = False
-    # CONDESATE_FLASH_CORRECTION: bool = False
+    T_TURBINE_BOX: float = 450
+    P_TURBINE_BOX: float = 90
+    MIN_EFF: float = 0.1
+    ELECTRICITY_PRICE: float = 100
+    LOAD: float = 1
+    MECH_EFF: float = 1
+    COMBOBOX: str = TurbineModel.MEDINA_FLORES.value
+    ABOVE_PINCH_CHECKBOX: bool = False
+    BELOW_PINCH_CHECKBOX: bool = False
+    CONDESATE_FLASH_CORRECTION: bool = False
 
     # HHT_OPTION: bool = True
     # VHT_OPTION: bool = False

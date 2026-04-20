@@ -17,3 +17,4 @@ from .vapour_compression_cycle import VapourCompressionCycle
 from .parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
 from .brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from .cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
+from .multi_stage_steam_turbine import MultiStageSteamTurbine

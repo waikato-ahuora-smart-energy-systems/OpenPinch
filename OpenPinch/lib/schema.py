@@ -178,6 +178,55 @@ class TargetResults(BaseModel):
     exergy_des_min: MaybeVU = None
 
 
+class TurbineStageResult(BaseModel):
+    """Detailed result for one solved turbine stage."""
+
+    stage: int
+    source_index: int
+    stage_type: str
+    temperature: float
+    process_duty: float
+    pressure_in: float
+    pressure_out: float
+    mass_flow_in: float
+    mass_flow_extracted: float
+    mass_flow_out: float
+    enthalpy_in: float
+    enthalpy_out: float
+    condensate_enthalpy: float
+    saturation_enthalpy: float
+    dh_isentropic: float
+    work_actual: float
+    work_isentropic: float
+    isentropic_efficiency: float
+    turbine_model: str
+
+
+class TurbineSolveResult(BaseModel):
+    """Validated output for a multi-stage turbine targeting solve."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str
+    turbine_model: str
+    load_frac: float
+    mech_eff: float
+    min_eff: float
+    flash_correction: bool
+    total_work: float
+    total_isentropic_work: float
+    overall_efficiency: float
+    total_process_duty: float
+    steam_mass_flow_in: Optional[float] = None
+    inlet_pressure: Optional[float] = None
+    inlet_temperature: Optional[float] = None
+    sink_pressure: Optional[float] = None
+    sink_temperature: Optional[float] = None
+    stage_temperatures: List[float] = Field(default_factory=list)
+    stage_heat_flows: List[float] = Field(default_factory=list)
+    stages: List[TurbineStageResult] = Field(default_factory=list)
+
+
 # ---- Graphing primitives -----------------------------------------------------
 class DataPoint(BaseModel):
     """Coordinate used to construct composite curves and other plots."""
