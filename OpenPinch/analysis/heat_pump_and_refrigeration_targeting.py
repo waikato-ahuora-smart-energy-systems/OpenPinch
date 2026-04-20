@@ -135,12 +135,6 @@ def get_heat_pump_and_refrigeration_targets(
         If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
     zone_config.HPR_TYPE = HPRcycle.MultiSimpleCarnot.value
-    plot_multi_hp_profiles_from_results(
-        T_hot=T_vals,
-        H_hot=H_hot,
-        T_cold=T_vals,
-        H_cold=H_cold,
-    )
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -150,17 +144,11 @@ def get_heat_pump_and_refrigeration_targets(
         zone_config=zone_config,
         debug=True,
     )
-    plot_multi_hp_profiles_from_results(
-        T_hot=args.T_hot,
-        H_hot=args.H_hot,
-        T_cold=args.T_cold,
-        H_cold=args.H_cold,
-    )    
     # Select the appropriate targeting handler based on the specified heat pump targeting approach
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
-    res = handler(args)
+    res = handler(args)            
     return HPRTargetOutputs.model_validate(res)
 
 
@@ -465,10 +453,11 @@ def _get_simplified_bckgrd_cascade_and_z_amb(
 ) -> Tuple[np.ndarray, float]:
     """Clean a background cascade load profile and return the ambient-load indicator."""
     sign = 1 if is_cold else -1
+    T_amb_star = zone_config.T_ENV + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign
+    T_vals, H_vals = _add_T_amb_interval(T_vals, H_vals, T_amb_star, zone_config.DT_PHASE_CHANGE, is_cold)
     z_amb = _get_z_ambient(
         T_vals=T_vals,
-        T_amb_star=zone_config.T_ENV
-        + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign,
+        T_amb_star=T_amb_star,
         is_cold=is_cold,
     )
     H_vals += z_amb
@@ -487,6 +476,24 @@ def _get_simplified_bckgrd_cascade_and_z_amb(
         T_vals, H_vals, z_amb, dt_margin=10.0
     )
     return T_vals, H_vals, z_amb
+
+
+def _add_T_amb_interval(
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+    T_amb: float,
+    dt_phase_change: float,
+    is_cold: bool,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Add an ambient temperature interval to a background cascade profile."""   
+    H_label = PT.H_NET_COLD.value if is_cold else PT.H_NET_HOT.value
+    pt = ProblemTable({
+        PT.T.value: T_vals,
+        H_label: H_vals,
+    })
+    T_amb_ls = [T_amb, T_amb + dt_phase_change] if is_cold else [T_amb, T_amb - dt_phase_change]  
+    pt.insert_temperature_interval(T_amb_ls)
+    return pt.col[PT.T.value], pt.col[H_label]
 
 
 def _extend_profile_with_temperature_margin(
@@ -973,11 +980,12 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     """Evaluate compressor work for a candidate multiple single Carnot HP placement defined by vector `x`."""
     T_cond, T_evap, Q_amb_hot, Q_amb_cold = (
         _parse_multi_simple_carnot_hp_state_variables(x, args)
-    )
-
+    ) 
+    # Adjust the background profiles to account for ambient heat exchange
     H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot 
 
+    # Calculate the target heat for each condenser temperature level from the background profiles
     Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond, args.T_cold, H_cold_with_amb, is_cond=True
     )
@@ -1037,6 +1045,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     # Determine the key performance metrics of the heat pump
     p = g_ineq_penalty(g=q_diff, rho=args.rho_penalty, form="square")
 
+    # Calculate the objective function value
     obj = _calc_obj(
         work=work_hp.sum() - work_he.sum(),
         Q_ext_heat=Q_ext_heat,

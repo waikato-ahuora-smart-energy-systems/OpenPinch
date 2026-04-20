@@ -45,7 +45,6 @@ def get_process_heat_cascade(
     pt = create_problem_table_with_t_int(
         streams=all_streams,
         is_shifted=is_shifted,
-        zone_config=zone_config,
     )
     # Perform the heat cascade of the problem table
     problem_table_algorithm(
@@ -98,44 +97,15 @@ def get_utility_heat_cascade(
 
 
 def create_problem_table_with_t_int(
-    streams: StreamCollection | StreamCollection = [],
+    streams: StreamCollection = StreamCollection(),
     is_shifted: bool = True,
-    zone_config: Configuration = None,
-) -> Tuple[ProblemTable, ProblemTable]:
-    """Returns ordered T and T* intervals for given streams and utilities."""
-
+) -> ProblemTable:
+    """Return a problem table populated with ordered unique temperature intervals."""
     T_vals = [
         t
         for s in streams
         for t in ((s.t_min_star, s.t_max_star) if is_shifted else (s.t_min, s.t_max))
     ]
-
-    if isinstance(zone_config, Configuration):
-        if zone_config.DO_TURBINE_WORK:
-            T_vals.extend(
-                [
-                    zone_config.T_TURBINE_BOX,
-                    Tsat_p(zone_config.P_TURBINE_BOX),
-                ]
-            )
-
-        if zone_config.DO_EXERGY_TARGETING:
-            T_vals.append(zone_config.T_ENV)
-
-        if zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_UTILITY_HP_TARGETING:
-            T_vals.append(zone_config.T_ENV - zone_config.DT_ENV_CONT)
-            T_vals.append(
-                zone_config.T_ENV
-                - zone_config.DT_ENV_CONT
-                - zone_config.DT_PHASE_CHANGE
-            )
-            T_vals.append(zone_config.T_ENV + zone_config.DT_ENV_CONT)
-            T_vals.append(
-                zone_config.T_ENV
-                + zone_config.DT_ENV_CONT
-                + zone_config.DT_PHASE_CHANGE
-            )
-
     dp = int(-math.log10(tol))
     T_vals = np.array(T_vals).round(dp)
     return ProblemTable({PT.T.value: sorted(set(T_vals), reverse=True)})

@@ -1057,8 +1057,8 @@ def test_returns_correct_intervals_basic():
     cold = [make_stream("C1", 100, 200, 10)]
     T_star: ProblemTable
     T: ProblemTable
-    T_star = create_problem_table_with_t_int(hot + cold, True)
-    T = create_problem_table_with_t_int(hot + cold, False)
+    T_star = create_problem_table_with_t_int(streams=hot + cold, is_shifted=True)
+    T = create_problem_table_with_t_int(streams=hot + cold, is_shifted=False)
 
     assert PT.T.value in T_star.columns
     assert PT.T.value in T.columns
@@ -1071,25 +1071,22 @@ def test_includes_utilities():
     cu = [make_stream("CU", 30, 70, 10)]
     T_star: ProblemTable
     T: ProblemTable
-    T_star = create_problem_table_with_t_int(hu + cu, True)
-    T = create_problem_table_with_t_int(hu + cu, False)
+    T_star = create_problem_table_with_t_int(streams=hu + cu, is_shifted=True)
+    T = create_problem_table_with_t_int(streams=hu + cu, is_shifted=False)
 
     assert T_star[PT.T.value].to_list() == [540, 490, 80, 40]
     assert T[PT.T.value].to_list() == [550, 500, 70, 30]
 
 
-def test_includes_turbine_config():
-    zone_config = Configuration()
-    zone_config.DO_TURBINE_WORK = True
-    zone_config.T_TURBINE_BOX = 200
-    zone_config.P_TURBINE_BOX = 5  # pressure in bar
-    zone_config.DO_EXERGY_TARGETING = True
+def test_deduplicates_shared_interval_boundaries():
+    streams = [
+        make_stream("H1", 400, 300, 10),
+        make_stream("H2", 300, 200, 10),
+    ]
 
-    T_star: ProblemTable
-    T_star = create_problem_table_with_t_int(zone_config=zone_config)
+    pt = create_problem_table_with_t_int(streams=streams, is_shifted=True)
 
-    assert zone_config.T_TURBINE_BOX in T_star[PT.T.value].to_list()
-    assert zone_config.T_ENV in T_star[PT.T.value].to_list()
+    assert pt[PT.T.value].to_list() == [390, 290, 190]
 
 
 def test_empty_inputs():

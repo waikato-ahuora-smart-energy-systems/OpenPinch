@@ -85,7 +85,6 @@ class HPRTargetInputs(BaseModel):
     do_refrigerant_sort: bool
     initialise_simulated_cycle: bool
     allow_integrated_expander: bool
-    load_fraction: float
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
