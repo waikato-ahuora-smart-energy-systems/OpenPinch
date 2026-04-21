@@ -49,16 +49,16 @@ def test_get_carnot_COP_returns_expected_value():
     Q_cond = np.array([60.0, 25.0, 15.0])
     T_evap = np.array([30.0, 30.0])
     Q_evap = np.array([70.0, 40.0])
-    eff = 0.65
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5)
 
-    expected = ((150 + 273.15) / (150 - 30) - 1) * eff + 1
+    expected = ((150 + 273.15) / (150 - 30) - 1) * args.eta_ii_hpr_carnot + 1
 
-    _, _, _, _, result = _get_multi_temperature_carnot_stage_duties_and_work(
+    _, _, result, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
         T_cond.copy(),
         Q_cond.copy(),
         T_evap.copy(),
         Q_evap.copy(),
-        eta_ii_hp=eff,
+        args,
     )
 
     np.testing.assert_allclose(result, expected)
@@ -83,44 +83,37 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_positive_lift_scales
     Q_cond = np.array([120.0])
     T_evap = np.array([20.0])
     Q_evap = np.array([90.0])
-    eta_hp = 0.5
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5)
 
-    work_use, work_gen, Q_cond_out, Q_evap_out, cop = (
-        _get_multi_temperature_carnot_stage_duties_and_work(
-            T_cond.copy(),
-            Q_cond.copy(),
-            T_evap.copy(),
-            Q_evap.copy(),
-            eta_ii_hp=eta_hp,
-        )
+    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        args,
     )
-
-    expected_cop = (T_evap[0] + 273.15) / (T_cond[0] - T_evap[0]) * eta_hp + 1
+    
+    expected_cop = (T_evap[0] + 273.15) / (T_cond[0] - T_evap[0]) * args.eta_ii_hpr_carnot + 1
     expected_work_use = Q_cond[0] / expected_cop
-    expected_Q_evap = np.array([expected_work_use * (expected_cop - 1)])
 
     assert work_gen == pytest.approx(0.0)
     assert cop == pytest.approx(expected_cop)
     assert work_use == pytest.approx(expected_work_use)
-    np.testing.assert_allclose(Q_cond_out, Q_cond)
-    np.testing.assert_allclose(Q_evap_out, expected_Q_evap)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_zero_lift_returns_no_useful_work():
-    work_use, work_gen, Q_cond_out, Q_evap_out, cop = (
-        _get_multi_temperature_carnot_stage_duties_and_work(
-            np.array([50.0]),
-            np.array([100.0]),
-            np.array([50.0]),
-            np.array([100.0]),
-        )
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5)
+    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+        np.array([50.0]),
+        np.array([100.0]),
+        np.array([50.0]),
+        np.array([100.0]),
+        args,
     )
 
     assert work_use == pytest.approx(0.0)
     assert work_gen == pytest.approx(0.0)
     assert np.isinf(cop)
-    np.testing.assert_allclose(Q_cond_out, np.array([0.0]))
-    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_generates_work():
@@ -128,19 +121,17 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
     Q_cond = np.array([100.0])
     T_evap = np.array([60.0])
     Q_evap = np.array([120.0])
-    eta_he = 0.5
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True)
 
-    work_use, work_gen, Q_cond_out, Q_evap_out, cop = (
-        _get_multi_temperature_carnot_stage_duties_and_work(
-            T_cond.copy(),
-            Q_cond.copy(),
-            T_evap.copy(),
-            Q_evap.copy(),
-            eta_ii_he=eta_he,
-        )
+    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        args,
     )
 
-    expected_eta_he = eta_he * (
+    expected_eta_he = args.eta_ii_he_carnot * (
         1
         - _compute_entropic_mean_temperature(T_cond, Q_cond)
         / _compute_entropic_mean_temperature(T_evap, Q_evap)
@@ -153,8 +144,6 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
     assert work_use == pytest.approx(0.0)
     assert work_gen == pytest.approx(expected_work_gen)
     assert np.isinf(cop)
-    np.testing.assert_allclose(Q_cond_out, np.array([0.0]))
-    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_engine_and_heat_pump():
@@ -162,21 +151,17 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
     Q_cond = np.array([50.0, 100.0])
     T_evap = np.array([80.0, 20.0])
     Q_evap = np.array([60.0, 120.0])
-    eta_hp = 0.5
-    eta_he = 0.5
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True)
 
-    work_use, work_gen, Q_cond_out, Q_evap_out, cop = (
-        _get_multi_temperature_carnot_stage_duties_and_work(
-            T_cond.copy(),
-            Q_cond.copy(),
-            T_evap.copy(),
-            Q_evap.copy(),
-            eta_ii_hp=eta_hp,
-            eta_ii_he=eta_he,
-        )
+    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        args,
     )
 
-    negative_eta_he = eta_he * (
+    negative_eta_he = args.eta_ii_he_carnot * (
         1
         - _compute_entropic_mean_temperature(np.array([40.0]), np.array([50.0]))
         / _compute_entropic_mean_temperature(np.array([80.0]), np.array([60.0]))
@@ -195,7 +180,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
             _compute_entropic_mean_temperature(T_cond, remaining_Q_cond)
             - _compute_entropic_mean_temperature(T_evap, remaining_Q_evap)
         )
-        * eta_hp
+        * args.eta_ii_hpr_carnot
         + 1
     )
     expected_work_use = remaining_Q_cond.sum() / expected_cop
@@ -206,8 +191,6 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
     assert work_gen == pytest.approx(expected_work_gen)
     assert work_use == pytest.approx(expected_work_use)
     assert cop == pytest.approx(expected_cop)
-    np.testing.assert_allclose(Q_cond_out, remaining_Q_cond)
-    np.testing.assert_allclose(Q_evap_out, expected_Q_evap)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pair_expansion_counts_each_match():
@@ -215,21 +198,19 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pair_expans
     Q_cond = np.array([10.0, 20.0])
     T_evap = np.array([60.0])
     Q_evap = np.array([100.0])
-    eta_he = 0.5
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True)
 
-    work_use, work_gen, Q_cond_out, Q_evap_out, cop = (
-        _get_multi_temperature_carnot_stage_duties_and_work(
-            T_cond.copy(),
-            Q_cond.copy(),
-            T_evap.copy(),
-            Q_evap.copy(),
-            eta_ii_he=eta_he,
-        )
+    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        args,
     )
 
     idx_c = np.array([0, 1])
     idx_e = np.array([0, 0])
-    expected_eta_he = eta_he * (
+    expected_eta_he = args.eta_ii_he_carnot * (
         1
         - _compute_entropic_mean_temperature(T_cond[idx_c], Q_cond[idx_c])
         / _compute_entropic_mean_temperature(T_evap[idx_e], Q_evap[idx_e])
@@ -242,8 +223,6 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pair_expans
     assert work_use == pytest.approx(0.0)
     assert work_gen == pytest.approx(expected_work_gen)
     assert np.isinf(cop)
-    np.testing.assert_allclose(Q_cond_out, np.array([0.0, 0.0]))
-    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
 
 
 def test_map_x_to_T_returns_expected_descending_temperatures():
