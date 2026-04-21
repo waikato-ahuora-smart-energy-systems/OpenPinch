@@ -117,7 +117,9 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
     # Determine if heat pump or refrigeration targeting is warranted based on the utility cascade profiles and user settings
-    if zone.identifier == Z.S.value and (zone_config.DO_UTILITY_HP_TARGETING or zone_config.DO_UTILITY_RFRG_TARGETING):
+    if zone.identifier == Z.S.value and (
+        zone_config.DO_UTILITY_HP_TARGETING or zone_config.DO_UTILITY_RFRG_TARGETING
+    ):
         # Create problem table based on inverted utility streams
         pt_ut_gen = get_process_heat_cascade(
             hot_streams=cold_utilities.get_hot_streams(invert_utility=True),

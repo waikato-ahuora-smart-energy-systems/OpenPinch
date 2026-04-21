@@ -6,7 +6,7 @@ import pytest
 from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
     _compute_entropic_mean_temperature,
-    _compute_COP_estimate_from_carnot_limit,
+    _estimate_multi_t_carnot_cycle_perf,
     _parse_multi_temperature_carnot_cycle_state_variables,
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_reduced_bckgrd_cascade_till_Q_target,
@@ -53,8 +53,12 @@ def test_get_carnot_COP_returns_expected_value():
 
     expected = ((150 + 273.15) / (150 - 30) - 1) * eff + 1
 
-    result = _compute_COP_estimate_from_carnot_limit(
-        T_cond, Q_cond, T_evap, Q_evap, eff=eff
+    _, _, _, _, result = _estimate_multi_t_carnot_cycle_perf(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        eta_ii_hp=eff,
     )
 
     np.testing.assert_allclose(result, expected)
@@ -72,6 +76,164 @@ def test_compute_entropic_average_temperature_in_K_zero_net_duty_uses_arithmetic
     Q = np.zeros_like(T)
     result = _compute_entropic_mean_temperature(T, Q)
     np.testing.assert_allclose(result, T.mean() + 273.15)
+
+
+def test_estimate_multi_t_carnot_cycle_perf_positive_lift_scales_evaporator_side():
+    T_cond = np.array([80.0])
+    Q_cond = np.array([120.0])
+    T_evap = np.array([20.0])
+    Q_evap = np.array([90.0])
+    eta_hp = 0.5
+
+    work_use, work_gen, Q_cond_out, Q_evap_out, cop = _estimate_multi_t_carnot_cycle_perf(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        eta_ii_hp=eta_hp,
+    )
+
+    expected_cop = (T_evap[0] + 273.15) / (T_cond[0] - T_evap[0]) * eta_hp + 1
+    expected_work_use = Q_cond[0] / expected_cop
+    expected_Q_evap = np.array([expected_work_use * (expected_cop - 1)])
+
+    assert work_gen == pytest.approx(0.0)
+    assert cop == pytest.approx(expected_cop)
+    assert work_use == pytest.approx(expected_work_use)
+    np.testing.assert_allclose(Q_cond_out, Q_cond)
+    np.testing.assert_allclose(Q_evap_out, expected_Q_evap)
+
+
+def test_estimate_multi_t_carnot_cycle_perf_zero_lift_returns_no_useful_work():
+    work_use, work_gen, Q_cond_out, Q_evap_out, cop = _estimate_multi_t_carnot_cycle_perf(
+        np.array([50.0]),
+        np.array([100.0]),
+        np.array([50.0]),
+        np.array([100.0]),
+    )
+
+    assert work_use == pytest.approx(0.0)
+    assert work_gen == pytest.approx(0.0)
+    assert np.isinf(cop)
+    np.testing.assert_allclose(Q_cond_out, np.array([0.0]))
+    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
+
+
+def test_estimate_multi_t_carnot_cycle_perf_negative_lift_generates_work():
+    T_cond = np.array([30.0])
+    Q_cond = np.array([100.0])
+    T_evap = np.array([60.0])
+    Q_evap = np.array([120.0])
+    eta_he = 0.5
+
+    work_use, work_gen, Q_cond_out, Q_evap_out, cop = _estimate_multi_t_carnot_cycle_perf(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        eta_ii_he=eta_he,
+    )
+
+    expected_eta_he = eta_he * (
+        1
+        - _compute_entropic_mean_temperature(T_cond, Q_cond)
+        / _compute_entropic_mean_temperature(T_evap, Q_evap)
+    )
+    expected_work_gen = min(
+        Q_evap.sum() * expected_eta_he,
+        Q_cond.sum() * expected_eta_he / (1 - expected_eta_he),
+    )
+
+    assert work_use == pytest.approx(0.0)
+    assert work_gen == pytest.approx(expected_work_gen)
+    assert np.isinf(cop)
+    np.testing.assert_allclose(Q_cond_out, np.array([0.0]))
+    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
+
+
+def test_estimate_multi_t_carnot_cycle_perf_mixed_lift_combines_engine_and_heat_pump():
+    T_cond = np.array([40.0, 90.0])
+    Q_cond = np.array([50.0, 100.0])
+    T_evap = np.array([80.0, 20.0])
+    Q_evap = np.array([60.0, 120.0])
+    eta_hp = 0.5
+    eta_he = 0.5
+
+    work_use, work_gen, Q_cond_out, Q_evap_out, cop = _estimate_multi_t_carnot_cycle_perf(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        eta_ii_hp=eta_hp,
+        eta_ii_he=eta_he,
+    )
+
+    negative_eta_he = eta_he * (
+        1
+        - _compute_entropic_mean_temperature(np.array([40.0]), np.array([50.0]))
+        / _compute_entropic_mean_temperature(np.array([80.0]), np.array([60.0]))
+    )
+    expected_work_gen = min(
+        60.0 * negative_eta_he,
+        50.0 * negative_eta_he / (1 - negative_eta_he),
+    )
+    remaining_Q_cond = np.array([0.0, 100.0])
+    remaining_Q_evap = np.array(
+        [60.0 * (1 - expected_work_gen / (60.0 * negative_eta_he)), 120.0]
+    )
+    expected_cop = (
+        _compute_entropic_mean_temperature(T_evap, remaining_Q_evap)
+        / (
+            _compute_entropic_mean_temperature(T_cond, remaining_Q_cond)
+            - _compute_entropic_mean_temperature(T_evap, remaining_Q_evap)
+        )
+        * eta_hp
+        + 1
+    )
+    expected_work_use = remaining_Q_cond.sum() / expected_cop
+    expected_Q_evap = remaining_Q_evap * (
+        expected_work_use / (remaining_Q_evap.sum() / (expected_cop - 1))
+    )
+
+    assert work_gen == pytest.approx(expected_work_gen)
+    assert work_use == pytest.approx(expected_work_use)
+    assert cop == pytest.approx(expected_cop)
+    np.testing.assert_allclose(Q_cond_out, remaining_Q_cond)
+    np.testing.assert_allclose(Q_evap_out, expected_Q_evap)
+
+
+def test_estimate_multi_t_carnot_cycle_perf_negative_pair_expansion_counts_each_match():
+    T_cond = np.array([30.0, 50.0])
+    Q_cond = np.array([10.0, 20.0])
+    T_evap = np.array([60.0])
+    Q_evap = np.array([100.0])
+    eta_he = 0.5
+
+    work_use, work_gen, Q_cond_out, Q_evap_out, cop = _estimate_multi_t_carnot_cycle_perf(
+        T_cond.copy(),
+        Q_cond.copy(),
+        T_evap.copy(),
+        Q_evap.copy(),
+        eta_ii_he=eta_he,
+    )
+
+    idx_c = np.array([0, 1])
+    idx_e = np.array([0, 0])
+    expected_eta_he = eta_he * (
+        1
+        - _compute_entropic_mean_temperature(T_cond[idx_c], Q_cond[idx_c])
+        / _compute_entropic_mean_temperature(T_evap[idx_e], Q_evap[idx_e])
+    )
+    expected_work_gen = min(
+        Q_evap[idx_e].sum() * expected_eta_he,
+        Q_cond[idx_c].sum() * expected_eta_he / (1 - expected_eta_he),
+    )
+
+    assert work_use == pytest.approx(0.0)
+    assert work_gen == pytest.approx(expected_work_gen)
+    assert np.isinf(cop)
+    np.testing.assert_allclose(Q_cond_out, np.array([0.0, 0.0]))
+    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
 
 
 def test_map_x_to_T_returns_expected_descending_temperatures():
@@ -180,8 +342,8 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         z_amb_hot=np.zeros(3),
         z_amb_cold=np.zeros(3),
         dt_range_max=80.0,
-        eta_hp_carnot=0.5,
-        eta_he_carnot=0.5,
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.5,
         Q_hpr_target=300.0,
         Q_amb_max=0.0,
         heat_to_power_ratio=1.0,
@@ -473,8 +635,8 @@ def _base_args(**overrides):
         "max_multi_start": 2,
         "T_env": 20.0,
         "dt_env_cont": 5.0,
-        "eta_hp_carnot": 0.6,
-        "eta_he_carnot": 0.4,
+        "eta_ii_hpr_carnot": 0.6,
+        "eta_ii_he_carnot": 0.4,
         "refrigerant_ls": ["R134A", "R134A", "R134A"],
         "do_refrigerant_sort": False,
         "initialise_simulated_cycle": True,
@@ -666,7 +828,7 @@ def test_cascade_optimiser_and_compute_branches(monkeypatch):
     monkeypatch.setattr(hp, "multiminima", lambda **_kwargs: np.array([[0.5] * 9]))
     monkeypatch.setattr(
         hp,
-        "_compute_cascade_hp_system_performance",
+        "_compute_cascade_hp_system_obj",
         lambda x, args, debug=False: {
             "obj": 0.2,
             "utility_tot": 1.0,
@@ -718,18 +880,38 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
     b = hp._get_bounds_for_cascade_hp_opt(args)
     assert len(b) == 9
 
-    T_cond, dT_sc, Q_heat, T_evap, Q_cool = hp._parse_cascade_hp_state_variables(
-        np.array([0.1] * 9), args
-    )
+    (
+        T_cond,
+        dT_sc,
+        Q_heat,
+        T_evap,
+        Q_cool,
+        Q_amb_hot,
+        Q_amb_cold,
+    ) = hp._parse_cascade_hp_state_variables(np.array([0.1] * 9), args)
     assert T_cond.shape == (2,)
     assert dT_sc.shape == (2,)
+    assert Q_heat.shape == (2,)
     assert T_evap.shape == (2,)
-    assert Q_cool.shape[0] == 2
+    assert np.isnan(np.asarray(Q_cool).item())
+    assert Q_amb_hot == pytest.approx(0.0)
+    assert Q_amb_cold == pytest.approx(0.1 * args.Q_hpr_target)
 
 
-def test_compute_cascade_hp_system_performance_unsolved_and_solved(monkeypatch):
+def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     args = _base_args(n_cond=2, n_evap=2)
     x = np.array([0.2] * 9)
+    monkeypatch.setattr(
+        hp,
+        "_parse_cascade_hp_state_variables",
+        lambda _x, _args: (
+            np.array([110.0, 90.0]),
+            np.array([5.0, 5.0]),
+            np.array([120.0, 80.0]),
+            np.array([70.0, 50.0]),
+            np.array([50.0, np.nan]),
+        ),
+    )
 
     class _FakeCascadeUnsolved:
         solved = False
@@ -739,7 +921,7 @@ def test_compute_cascade_hp_system_performance_unsolved_and_solved(monkeypatch):
             return None
 
     monkeypatch.setattr(hp, "CascadeVapourCompressionCycle", _FakeCascadeUnsolved)
-    out_unsolved = hp._compute_cascade_hp_system_performance(x, args)
+    out_unsolved = hp._compute_cascade_hp_system_obj(x, args)
     assert "obj" in out_unsolved
 
     class _FakeCascadeSolved:
@@ -774,7 +956,7 @@ def test_compute_cascade_hp_system_performance_unsolved_and_solved(monkeypatch):
         "plot_multi_hp_profiles_from_results",
         lambda *a, **k: calls.__setitem__("plot", calls["plot"] + 1),
     )
-    out = hp._compute_cascade_hp_system_performance(x, args, debug=True)
+    out = hp._compute_cascade_hp_system_obj(x, args, debug=True)
     assert "hpr_hot_streams" in out
     assert calls["plot"] == 1
 
@@ -818,7 +1000,7 @@ def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
     monkeypatch.setattr(hp, "multiminima", lambda **_kwargs: np.array([[0.2] * 10]))
     monkeypatch.setattr(
         hp,
-        "_compute_multi_simple_hp_system_performance",
+        "_compute_multi_simple_hp_system_obj",
         lambda x, args, debug=False: {
             "obj": 0.1,
             "utility_tot": 1.0,
@@ -867,7 +1049,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     assert len(b) == 10
 
     x_bad = np.array([0.9] * 10)
-    out_bad = hp._compute_multi_simple_hp_system_performance(x_bad, args)
+    out_bad = hp._compute_multi_simple_hp_system_obj(x_bad, args)
     assert np.isinf(out_bad["obj"])
 
     class _FakeMultiSimple:
@@ -895,7 +1077,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     monkeypatch.setattr(hp, "ParallelVapourCompressionCycles", _FakeMultiSimple)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
-    out = hp._compute_multi_simple_hp_system_performance(
+    out = hp._compute_multi_simple_hp_system_obj(
         np.array([0.2] * 10), args, debug=False
     )
     assert "model" in out
@@ -913,7 +1095,7 @@ def test_brayton_paths_and_helpers(monkeypatch):
     monkeypatch.setattr(hp, "minimize", lambda **_kwargs: _OptRes())
     monkeypatch.setattr(
         hp,
-        "_compute_brayton_hp_system_performance",
+        "_compute_brayton_hp_system_obj",
         lambda x, args: {
             "obj": 0.1,
             "utility_tot": 1.0,
@@ -975,7 +1157,7 @@ def test_brayton_paths_and_helpers(monkeypatch):
     )
     seq = iter([_pt_with_hnet(8.0, -1.0), _pt_with_hnet(7.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
-    out_perf = hp._compute_brayton_hp_system_performance(
+    out_perf = hp._compute_brayton_hp_system_obj(
         np.array([0.1, 0.2, 0.3, 0.9]), args
     )
     assert "cop_h" in out_perf
@@ -1225,7 +1407,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
         "plot_multi_hp_profiles_from_results",
         lambda *args, **kwargs: called.__setitem__("plot", called["plot"] + 1),
     )
-    out = hp._compute_multi_simple_hp_system_performance(
+    out = hp._compute_multi_simple_hp_system_obj(
         np.array([0.2] * 5), args, debug=True
     )
     assert out["cop_h"] > 0.0
@@ -1262,7 +1444,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
     )
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **kwargs: next(seq2))
 
-    out_b = hp._compute_brayton_hp_system_performance(
+    out_b = hp._compute_brayton_hp_system_obj(
         np.array([0.1, 0.2, 0.3, 0.8]),
         SimpleNamespace(
             Q_hpr_target=40.0,

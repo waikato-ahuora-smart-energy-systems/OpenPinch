@@ -76,8 +76,8 @@ class Configuration:
     ETA_COMP: float = 0.7
     ETA_EXP: float = 0.7
     ETA_MOTOR: float = 0.95  ### add to the template (modified)
-    ETA_HPR_CARNOT: float = 0.5  ### add to the template (modified)
-    ETA_HE_CARNOT: float = 0.5
+    ETA_II_HPR_CARNOT: float = 0.5  ### add to the template (modified)
+    ETA_II_HE_CARNOT: float = 0.5  ### add to the template (modified)
     DT_CONT_HP: float = 0.0  ### add to the template (modified)
     DT_HPR_IHX: float = 0.0  ### add to the template (modified)
     DT_HPR_CASCADE_HX: float = 0.0  ### add to the template (modified)

@@ -79,8 +79,8 @@ class HPRTargetInputs(BaseModel):
     max_multi_start: int
     T_env: float
     dt_env_cont: float
-    eta_hp_carnot: float
-    eta_he_carnot: float
+    eta_ii_hpr_carnot: float
+    eta_ii_he_carnot: float
     refrigerant_ls: List[str]
     do_refrigerant_sort: bool
     initialise_simulated_cycle: bool
@@ -110,6 +110,8 @@ class HPRTargetOutputs(BaseModel):
     # --- Common objective / result fields -------------------------
     utility_tot: float
     net_work: float | list | np.ndarray
+    work_use: Optional[float | list | np.ndarray] = None
+    work_gen: Optional[float | list | np.ndarray] = None
     Q_ext: float
     Q_amb_hot: float
     Q_amb_cold: float

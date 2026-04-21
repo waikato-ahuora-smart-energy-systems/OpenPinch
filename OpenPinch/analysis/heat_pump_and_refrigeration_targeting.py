@@ -71,7 +71,7 @@ def validate_heat_pump_or_refrigeration_targeting_required(
         Q_max = np.abs(pt.col[PT.H_NET_HOT.value]).max()
     else:
         return 0.0
-    
+
     Q = Q_max
     hpr_load = zone_config.HPR_LOAD_VALUE if r is None else r
     if isinstance(hpr_load, float | int):
@@ -85,12 +85,12 @@ def validate_heat_pump_or_refrigeration_targeting_required(
         hpr_load = literal_eval(hpr_load.strip())
         if isinstance(hpr_load, float | int | dict):
             Q = validate_heat_pump_or_refrigeration_targeting_required(
-                pt=pt, 
+                pt=pt,
                 is_heat_pumping=is_heat_pumping,
                 is_refrigeration=is_refrigeration,
                 zone_name=zone_name,
                 zone_config=zone_config,
-                r= hpr_load,
+                r=hpr_load,
             )
     return Q
 
@@ -134,7 +134,7 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HPR_TYPE = HPRcycle.MultiSimpleCarnot.value
+    zone_config.HPR_TYPE = HPRcycle.MultiSimpleVapourComp.value
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -148,7 +148,7 @@ def get_heat_pump_and_refrigeration_targets(
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
-    res = handler(args)            
+    res = handler(args)
     return HPRTargetOutputs.model_validate(res)
 
 
@@ -365,8 +365,8 @@ def _construct_HPRTargetInputs(
         "n_evap": zone_config.N_EVAP,
         "eta_comp": zone_config.ETA_COMP,
         "eta_exp": zone_config.ETA_EXP,
-        "eta_hp_carnot": zone_config.ETA_HPR_CARNOT,
-        "eta_he_carnot": zone_config.ETA_HE_CARNOT,
+        "eta_ii_hpr_carnot": zone_config.ETA_II_HPR_CARNOT,
+        "eta_ii_he_carnot": zone_config.ETA_II_HE_CARNOT,
         "dtcont_hp": zone_config.DT_CONT_HP,
         "dt_hp_ihx": zone_config.DT_HPR_IHX,
         "dt_cascade_hx": zone_config.DT_HPR_CASCADE_HX,
@@ -405,11 +405,7 @@ def _get_reduced_bckgrd_cascade_till_Q_target(
         if H_vals[0] < Q_hpr_target:
             return T_vals, H_vals
 
-        i = (
-            H_vals.size
-            - np.searchsorted(H_vals[::-1], Q_hpr_target, side="left")
-            - 1
-        )
+        i = H_vals.size - np.searchsorted(H_vals[::-1], Q_hpr_target, side="left") - 1
         if i == T_vals.size - 1:
             raise ValueError("Target for heat pumping cannot be zero.")
         T_vals[i] = linear_interpolation(
@@ -453,8 +449,12 @@ def _get_simplified_bckgrd_cascade_and_z_amb(
 ) -> Tuple[np.ndarray, float]:
     """Clean a background cascade load profile and return the ambient-load indicator."""
     sign = 1 if is_cold else -1
-    T_amb_star = zone_config.T_ENV + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign
-    T_vals, H_vals = _add_T_amb_interval(T_vals, H_vals, T_amb_star, zone_config.DT_PHASE_CHANGE, is_cold)
+    T_amb_star = (
+        zone_config.T_ENV + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign
+    )
+    T_vals, H_vals = _add_T_amb_interval(
+        T_vals, H_vals, T_amb_star, zone_config.DT_PHASE_CHANGE, is_cold
+    )
     z_amb = _get_z_ambient(
         T_vals=T_vals,
         T_amb_star=T_amb_star,
@@ -485,13 +485,19 @@ def _add_T_amb_interval(
     dt_phase_change: float,
     is_cold: bool,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Add an ambient temperature interval to a background cascade profile."""   
+    """Add an ambient temperature interval to a background cascade profile."""
     H_label = PT.H_NET_COLD.value if is_cold else PT.H_NET_HOT.value
-    pt = ProblemTable({
-        PT.T.value: T_vals,
-        H_label: H_vals,
-    })
-    T_amb_ls = [T_amb, T_amb + dt_phase_change] if is_cold else [T_amb, T_amb - dt_phase_change]  
+    pt = ProblemTable(
+        {
+            PT.T.value: T_vals,
+            H_label: H_vals,
+        }
+    )
+    T_amb_ls = (
+        [T_amb, T_amb + dt_phase_change]
+        if is_cold
+        else [T_amb, T_amb - dt_phase_change]
+    )
     pt.insert_temperature_interval(T_amb_ls)
     return pt.col[PT.T.value], pt.col[H_label]
 
@@ -571,6 +577,55 @@ def _parse_multi_temperature_carnot_cycle_state_variables(
     return T_cond, T_evap, Q_amb_hot, Q_amb_cold
 
 
+def _estimate_multi_t_carnot_cycle_perf(
+    T_cond: np.ndarray,
+    Q_cond: np.ndarray,
+    T_evap: np.ndarray,
+    Q_evap: np.ndarray,
+    *,
+    eta_ii_hp: float = 0.5,
+    eta_ii_he: float = 0.5,
+) -> Tuple[float, float, np.ndarray, np.ndarray, float]:
+    """Estimate COP by scaling the Carnot limit using entropic mean temperatures."""
+    work_gen = 0.0
+    is_negative_lift = (
+        (np.subtract.outer(T_cond, T_evap) < 0.0)
+        & (Q_cond[:, np.newaxis] > 0.0)
+        & (Q_evap > 0.0)
+    )
+    if np.any(is_negative_lift):
+        idx_c, idx_e = np.nonzero(is_negative_lift)
+        T_h = _compute_entropic_mean_temperature(T_evap[idx_e], Q_evap[idx_e])
+        T_l = _compute_entropic_mean_temperature(T_cond[idx_c], Q_cond[idx_c])
+        eta_he = eta_ii_he * (1 - T_l / T_h) if T_h > tol else 0.0
+        work_gen_from_evap = Q_evap[idx_e].sum() * eta_he
+        work_gen_from_cond = Q_cond[idx_c].sum() * eta_he / (1 - eta_he)
+        if work_gen_from_evap <= tol or work_gen_from_cond <= tol:
+            scale_c = min(Q_evap[idx_e].sum() / Q_cond[idx_c].sum(), 1)
+            scale_e = min(Q_cond[idx_c].sum() / Q_evap[idx_e].sum(), 1)
+        else:
+            # Scale the side that has excess duty available
+            scale_c = min(work_gen_from_evap / work_gen_from_cond, 1)
+            scale_e = min(work_gen_from_cond / work_gen_from_evap, 1)
+            work_gen = min(work_gen_from_evap, work_gen_from_cond)
+        Q_cond[idx_c] *= 1 - scale_c
+        Q_evap[idx_e] *= 1 - scale_e
+
+    T_h = _compute_entropic_mean_temperature(T_cond, Q_cond)
+    T_l = _compute_entropic_mean_temperature(T_evap, Q_evap)
+    cop = T_l / (T_h - T_l) * eta_ii_hp + 1 if (T_h - T_l) > 0.0 else np.inf
+
+    # Determine the work of the heat pump based on the limiting side
+    work_from_evap = Q_evap.sum() / (cop - 1)
+    work_from_cond = Q_cond.sum() / cop
+    work_use = min(work_from_evap, work_from_cond)
+
+    # Scale the side that has excess duty available
+    Q_cond *= min(work_from_evap / work_from_cond, 1) if work_from_cond > 0.0 else 0.0
+    Q_evap *= min(work_from_cond / work_from_evap, 1) if work_from_evap > 0.0 else 0.0
+    return work_use, work_gen, Q_cond, Q_evap, cop
+
+
 def _compute_multi_temperature_carnot_cycle_obj(
     x: np.ndarray,
     args: HPRTargetInputs,
@@ -592,15 +647,15 @@ def _compute_multi_temperature_carnot_cycle_obj(
         T_evap, args.T_hot, H_hot_with_amb, is_cond=False
     )
 
-    # Determine the work of the heat pump based on the limiting side
-    cop = _compute_COP_estimate_from_carnot_limit(T_cond, Q_cond, T_evap, Q_evap)
-    work_from_evap = Q_evap.sum() / (cop - 1)
-    work_from_cond = Q_cond.sum() / cop
-    work = min(work_from_evap, work_from_cond)
-
-    # Scale the side that has excess duty available
-    Q_cond *= min(work_from_evap / work_from_cond, 1) if work_from_cond > 0.0 else 0.0
-    Q_evap *= min(work_from_cond / work_from_evap, 1) if work_from_evap > 0.0 else 0.0
+    work_use, work_gen, Q_cond, Q_evap, cop = _estimate_multi_t_carnot_cycle_perf(
+        T_cond,
+        Q_cond,
+        T_evap,
+        Q_evap,
+        eta_ii_hp=args.eta_ii_hpr_carnot,
+        eta_ii_he=args.eta_ii_he_carnot,
+    )
+    work = work_use - work_gen
 
     # Determine external heating and cooling demand
     Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - Q_cond.sum(), 0.0)
@@ -609,11 +664,6 @@ def _compute_multi_temperature_carnot_cycle_obj(
     # Determine the key performance metrics of the heat pump
     p = (
         g_ineq_penalty(
-            g=work_from_cond - work_from_evap,
-            rho=args.rho_penalty,
-            form="square",
-        )
-        + g_ineq_penalty(
             g=args.Q_hpr_target - Q_evap.sum(),
             rho=args.rho_penalty * 10,
             form="square",
@@ -623,7 +673,7 @@ def _compute_multi_temperature_carnot_cycle_obj(
     )
 
     obj = _calc_obj(
-        work=work,
+        work=work_use - work_gen,
         Q_ext_heat=Q_ext_heat,
         Q_ext_cold=Q_ext_cold,
         Q_hpr_target=args.Q_hpr_target,
@@ -643,11 +693,14 @@ def _compute_multi_temperature_carnot_cycle_obj(
             res["hpr_cold_streams"],
             title=f"Obj {float(obj):.5f} = {(work / args.Q_hpr_target):.5f} + {(Q_ext_heat / args.Q_hpr_target):.5f} + {(Q_ext_cold / args.Q_hpr_target):.5f} + {(p / args.Q_hpr_target):.5f}",
         )
+        pass
 
     return {
         "obj": obj,
         "utility_tot": work + Q_ext_heat + Q_ext_cold,
         "net_work": work,
+        "work_use": work_use,
+        "work_gen": work_gen,
         "Q_ext": Q_ext_heat + Q_ext_cold,
         "T_cond": T_cond,
         "Q_cond": Q_cond,
@@ -693,7 +746,7 @@ def _optimise_cascade_heat_pump_placement(
     )
     # Solve the placement problem
     res = _solve_hpr_placement(
-        f_obj=_compute_cascade_hp_system_performance,
+        f_obj=_compute_cascade_hp_system_obj,
         x0_ls=x0,
         bnds=bnds,
         args=args,
@@ -824,14 +877,16 @@ def _parse_cascade_hp_state_variables(
     T_evap = np.array(
         x[3 * n0 : 3 * n0 + n1] * args.dt_range_max + args.T_hot[-1], dtype=np.float64
     )
-    temp = np.array(x[3 * n0 + n1 :] * args.Q_hpr_target, dtype=np.float64)
+    temp = np.array(x[3 * n0 + n1 : -1] * args.Q_hpr_target, dtype=np.float64)
     Q_cool = (
         np.concatenate([temp.tolist(), [np.nan]]) if temp.size > 0 else np.array(np.nan)
     )
-    return T_cond, dT_subcool, Q_heat, T_evap, Q_cool
+    Q_amb_hot = min(args.Q_hpr_target * x[-1], 0.0) * -1
+    Q_amb_cold = max(args.Q_hpr_target * x[-1], 0.0)    
+    return T_cond, dT_subcool, Q_heat, T_evap, Q_cool, Q_amb_hot, Q_amb_cold
 
 
-def _compute_cascade_hp_system_performance(
+def _compute_cascade_hp_system_obj(
     x: np.ndarray,
     args: HPRTargetInputs,
     *,
@@ -980,10 +1035,10 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     """Evaluate compressor work for a candidate multiple single Carnot HP placement defined by vector `x`."""
     T_cond, T_evap, Q_amb_hot, Q_amb_cold = (
         _parse_multi_simple_carnot_hp_state_variables(x, args)
-    ) 
+    )
     # Adjust the background profiles to account for ambient heat exchange
     H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot 
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
 
     # Calculate the target heat for each condenser temperature level from the background profiles
     Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
@@ -1001,7 +1056,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     q_diff = []
 
     if np.any(is_hp):
-        cop_hp = (T_evap[is_hp] + 273.15) / delta_T_lift[is_hp] * args.eta_hp_carnot + 1
+        cop_hp = (T_evap[is_hp] + 273.15) / delta_T_lift[is_hp] * args.eta_ii_hpr_carnot + 1
         work_hp[is_hp] = Q_cond[is_hp] / cop_hp
         Q_evap[is_hp] = Q_cond[is_hp] - work_hp[is_hp]
 
@@ -1030,7 +1085,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
                 work_hp[idx] = 0.0
 
     if np.any(is_he):
-        eff_he = (delta_T_lift[is_he] / T_cond[is_he]) * args.eta_he_carnot
+        eff_he = (delta_T_lift[is_he] / T_cond[is_he]) * args.eta_ii_he_carnot
         work_he[is_he] = Q_cond[is_he] * eff_he
 
     # Calculate evaporator duty
@@ -1118,7 +1173,7 @@ def _optimise_multi_simple_heat_pump_placement(
         else None
     )
     res = _solve_hpr_placement(
-        f_obj=_compute_multi_simple_hp_system_performance,
+        f_obj=_compute_multi_simple_hp_system_obj,
         x0_ls=x0,
         bnds=bnds,
         args=args,
@@ -1271,7 +1326,7 @@ def _parse_multi_simple_hp_state_temperatures(
     return T_cond, dT_subcool, Q_cond, T_evap, dT_superheat
 
 
-def _compute_multi_simple_hp_system_performance(
+def _compute_multi_simple_hp_system_obj(
     x: np.ndarray,
     args: HPRTargetInputs,
     debug: bool = False,
@@ -1391,7 +1446,7 @@ def _optimise_brayton_heat_pump_placement(
     x0 = _get_x0_for_brayton_hp_opt(args)
     bnds = _get_bounds_for_brayton_hp_opt(args)
     opt = minimize(
-        fun=lambda x: _compute_brayton_hp_system_performance(x, args)["obj"],
+        fun=lambda x: _compute_brayton_hp_system_obj(x, args)["obj"],
         x0=x0,
         method="SLSQP",
         bounds=bnds,
@@ -1401,7 +1456,7 @@ def _optimise_brayton_heat_pump_placement(
 
     res = None
     if opt.success:
-        res = _compute_brayton_hp_system_performance(opt.x, args)
+        res = _compute_brayton_hp_system_obj(opt.x, args)
         res["success"] = opt.success
         if 0:
             plot_multi_hp_profiles_from_results(
@@ -1455,7 +1510,33 @@ def _parse_brayton_hp_state_variables(
     return [T_comp_out], [dT_comp], [dT_gc], [Q_heat]
 
 
-def _compute_brayton_hp_system_performance(
+def _create_brayton_hp_list(
+    T_comp_out: np.ndarray,
+    dT_gc: np.ndarray,
+    Q_gc: np.ndarray,
+    dT_comp: np.ndarray,
+    args: HPRTargetInputs,
+) -> List[SimpleBraytonHeatPumpCycle]:
+    """Instantiate SimpleBrytonHeatPumpCycle objects."""
+    hp_list = []
+    n_hp = args.n_cond
+    for i in range(n_hp):
+        hp = SimpleBraytonHeatPumpCycle()
+        hp.solve(
+            T_comp_out=T_comp_out[i],
+            T_comp_in=T_comp_out[i] - dT_comp[i],
+            dT_gc=dT_gc[i],
+            Q_heat=Q_gc[i],
+            eta_comp=args.eta_comp,
+            eta_exp=args.eta_exp,
+            is_recuperated=False,
+            refrigerant=args.refrigerant_ls[0],
+        )
+        hp_list.append(hp)
+    return hp_list
+
+
+def _compute_brayton_hp_system_obj(
     x: np.ndarray, args: HPRTargetInputs
 ) -> float:
     """Objective: minimize total compressor work for multi-HP configuration."""
@@ -1540,32 +1621,6 @@ def _compute_brayton_hp_system_performance(
         "hpr_cold_streams": hpr_cold_streams,
         "model": hp_list,
     }
-
-
-def _create_brayton_hp_list(
-    T_comp_out: np.ndarray,
-    dT_gc: np.ndarray,
-    Q_gc: np.ndarray,
-    dT_comp: np.ndarray,
-    args: HPRTargetInputs,
-) -> List[SimpleBraytonHeatPumpCycle]:
-    """Instantiate SimpleBrytonHeatPumpCycle objects."""
-    hp_list = []
-    n_hp = args.n_cond
-    for i in range(n_hp):
-        hp = SimpleBraytonHeatPumpCycle()
-        hp.solve(
-            T_comp_out=T_comp_out[i],
-            T_comp_in=T_comp_out[i] - dT_comp[i],
-            dT_gc=dT_gc[i],
-            Q_heat=Q_gc[i],
-            eta_comp=args.eta_comp,
-            eta_exp=args.eta_exp,
-            is_recuperated=False,
-            refrigerant=args.refrigerant_ls[0],
-        )
-        hp_list.append(hp)
-    return hp_list
 
 
 #######################################################################################################
@@ -1679,26 +1734,6 @@ def _compute_entropic_mean_temperature(
         return T_arr[0] + unit_offset
     S_tot = (Q_arr / (T_arr + unit_offset)).sum()
     return Q_arr.sum() / S_tot if S_tot > 0 else (T_arr.mean() + unit_offset)
-
-
-def _compute_COP_estimate_from_carnot_limit(
-    T_cond: np.ndarray,
-    Q_cond: np.ndarray,
-    T_evap: np.ndarray,
-    Q_evap: np.ndarray,
-    *,
-    eff: float = 0.5,
-    min_dt_lift: float = 0.1,
-):
-    """Estimate COP by scaling the Carnot limit using entropic mean temperatures."""
-    T_h = _compute_entropic_mean_temperature(T_cond, Q_cond)
-    T_l = _compute_entropic_mean_temperature(T_evap, Q_evap)
-    cop = (
-        T_l / (T_h - T_l) * eff + 1
-        if (T_h - T_l) > min_dt_lift
-        else T_l / min_dt_lift * eff + 1
-    )
-    return cop
 
 
 def _map_x_arr_to_T_arr(

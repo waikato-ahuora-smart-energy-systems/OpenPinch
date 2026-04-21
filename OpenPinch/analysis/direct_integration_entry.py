@@ -74,7 +74,9 @@ def compute_direct_integration_targets(zone: Zone):
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
 
-    if zone.identifier == Z.P.value and (zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING):
+    if zone.identifier == Z.P.value and (
+        zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING
+    ):
         hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
             pt,
             is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
