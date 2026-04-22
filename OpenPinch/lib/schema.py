@@ -111,9 +111,9 @@ class HPRTargetOutputs(BaseModel):
 
     # --- Common objective / result fields -------------------------
     utility_tot: float
-    net_work: float | list | np.ndarray
-    work_hpr: Optional[float | list | np.ndarray] = None
-    work_he: Optional[float | list | np.ndarray] = None
+    w_net: float | list | np.ndarray
+    w_hpr: Optional[float | list | np.ndarray] = None
+    w_he: Optional[float | list | np.ndarray] = None
     heat_ex: Optional[float | list | np.ndarray] = None
     Q_ext: float
     Q_amb_hot: float
