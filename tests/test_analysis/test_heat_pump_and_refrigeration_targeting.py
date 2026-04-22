@@ -6,9 +6,11 @@ import pytest
 from OpenPinch.utils import *
 from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
     _compute_entropic_mean_temperature,
+    _get_multi_simple_carnot_stage_duties_and_work,
     _get_multi_temperature_carnot_stage_duties_and_work,
     _parse_multi_temperature_carnot_cycle_state_variables,
     _compute_multi_simple_carnot_hp_opt_obj,
+    _get_Q_vals_at_T_hpr_from_bckgrd_profile,
     _get_reduced_bckgrd_cascade_till_Q_target,
     _get_carnot_hpr_cycle_cascade_profile,
     _map_x_arr_to_T_arr,
@@ -44,24 +46,60 @@ def get_hot_cc():
     return np.array([0.0, 0.0, 0.0, 0.0, -400.0, -400.0, -800.0])
 
 
-def test_get_carnot_COP_returns_expected_value():
-    T_cond = np.array([150.0, 150.0, 150.0])
-    Q_cond = np.array([60.0, 25.0, 15.0])
-    T_evap = np.array([30.0, 30.0])
-    Q_evap = np.array([70.0, 40.0])
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.0)
+def _build_multi_temperature_profiles(
+    T_cond, Q_cond, T_evap, Q_evap, *, eta_hp=0.5, eta_he=0.0
+):
+    """Build background profiles that recreate the requested stage duties."""
+    T_cond = np.asarray(T_cond, dtype=float)
+    Q_cond = np.asarray(Q_cond, dtype=float)
+    T_evap = np.asarray(T_evap, dtype=float)
+    Q_evap = np.asarray(Q_evap, dtype=float)
 
-    expected = ((150 + 273.15) / (150 - 30) - 1) * args.eta_ii_hpr_carnot + 1
+    T_cold = np.concatenate((T_cond, np.array([T_cond[-1] - 40.0])))
+    H_cold = np.concatenate((np.flip(np.cumsum(np.flip(Q_cond))), np.array([0.0])))
+    T_hot = np.concatenate((np.array([T_evap[0] + 40.0]), T_evap))
+    H_hot = np.concatenate((np.array([0.0]), -np.cumsum(Q_evap)))
+    args = SimpleNamespace(
+        T_cold=T_cold,
+        T_hot=T_hot,
+        eta_ii_hpr_carnot=eta_hp,
+        eta_ii_he_carnot=eta_he,
+    )
+    return args, H_hot, H_cold
 
-    _, _, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
-        T_cond.copy(),
-        Q_cond.copy(),
-        T_evap.copy(),
-        Q_evap.copy(),
-        args,
+
+def test_get_multi_temperature_carnot_stage_duties_and_work_returns_entropic_mean_cop():
+    T_cond = np.array([150.0, 120.0])
+    Q_cond = np.array([60.0, 40.0])
+    T_evap = np.array([60.0, 30.0])
+    Q_evap = np.array([80.0, 40.0])
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
+    )
+
+    work_hpr, _, _, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
+    )
+
+    expected = (
+        _compute_entropic_mean_temperature(T_evap, Q_evap)
+        / (
+            _compute_entropic_mean_temperature(T_cond, Q_cond)
+            - _compute_entropic_mean_temperature(T_evap, Q_evap)
+        )
+        * args.eta_ii_hpr_carnot
+        + 1.0
     )
 
     np.testing.assert_allclose(cop, expected)
+    assert Q_cond_out.sum() == pytest.approx(work_hpr * expected)
+    assert Q_evap_out.sum() == pytest.approx(Q_cond_out.sum() - work_hpr)
 
 
 def test_compute_entropic_average_temperature_in_K_constant_temperature():
@@ -80,42 +118,62 @@ def test_compute_entropic_average_temperature_in_K_zero_net_duty_uses_arithmetic
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_positive_lift_scales_evaporator_side():
     T_cond = np.array([80.0])
-    Q_cond = np.array([120.0])
+    Q_cond = np.array([200.0])
     T_evap = np.array([20.0])
     Q_evap = np.array([90.0])
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.0)
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
+    )
 
-    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
-        T_cond.copy(),
-        Q_cond.copy(),
-        T_evap.copy(),
-        Q_evap.copy(),
-        args,
+    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
     )
 
     expected_cop = (T_evap[0] + 273.15) / (
         T_cond[0] - T_evap[0]
     ) * args.eta_ii_hpr_carnot + 1
-    expected_work_use = Q_cond[0] / expected_cop
+    expected_work_use = Q_evap[0] / (expected_cop - 1.0)
+    expected_Q_cond = Q_evap[0] + expected_work_use
 
     assert work_he == pytest.approx(0.0)
+    assert heat_ex == pytest.approx(0.0)
     assert cop == pytest.approx(expected_cop)
     assert work_hpr == pytest.approx(expected_work_use)
+    np.testing.assert_allclose(Q_cond_out, np.array([expected_Q_cond]))
+    np.testing.assert_allclose(Q_evap_out, Q_evap)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_zero_lift_returns_no_useful_work():
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.0)
-    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
-        np.array([50.0]),
-        np.array([100.0]),
-        np.array([50.0]),
-        np.array([100.0]),
-        args,
+    T_cond = np.array([50.0])
+    Q_cond = np.array([100.0])
+    T_evap = np.array([50.0])
+    Q_evap = np.array([100.0])
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
+    )
+
+    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
     )
 
     assert work_hpr == pytest.approx(0.0)
     assert work_he == pytest.approx(0.0)
+    assert heat_ex == pytest.approx(100.0)
     assert cop == pytest.approx(1.0)
+    np.testing.assert_allclose(Q_cond_out, Q_cond)
+    np.testing.assert_allclose(Q_evap_out, Q_evap)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_generates_work():
@@ -123,16 +181,18 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
     Q_cond = np.array([100.0])
     T_evap = np.array([60.0])
     Q_evap = np.array([120.0])
-    args = SimpleNamespace(
-        eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.5
     )
 
-    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
-        T_cond.copy(),
-        Q_cond.copy(),
-        T_evap.copy(),
-        Q_evap.copy(),
-        args,
+    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
     )
 
     expected_eta_he = args.eta_ii_he_carnot * (
@@ -140,31 +200,35 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
         - _compute_entropic_mean_temperature(T_cond, Q_cond)
         / _compute_entropic_mean_temperature(T_evap, Q_evap)
     )
-    expected_work_gen = min(
-        Q_evap.sum() * expected_eta_he,
-        Q_cond.sum() * expected_eta_he / (1 - expected_eta_he),
-    )
+    expected_Q_evap = min(Q_evap.sum(), Q_cond.sum() / (1.0 - expected_eta_he))
+    expected_work_gen = expected_Q_evap * expected_eta_he
+    expected_Q_cond = expected_Q_evap - expected_work_gen
 
     assert work_hpr == pytest.approx(0.0)
     assert work_he == pytest.approx(expected_work_gen)
+    assert heat_ex == pytest.approx(0.0)
     assert cop == pytest.approx(1.0)
+    np.testing.assert_allclose(Q_cond_out, np.array([expected_Q_cond]))
+    np.testing.assert_allclose(Q_evap_out, np.array([expected_Q_evap]))
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_engine_and_heat_pump():
-    T_cond = np.array([40.0, 90.0])
-    Q_cond = np.array([50.0, 100.0])
+    T_cond = np.array([90.0, 40.0])
+    Q_cond = np.array([100.0, 50.0])
     T_evap = np.array([80.0, 20.0])
     Q_evap = np.array([60.0, 120.0])
-    args = SimpleNamespace(
-        eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.5
     )
-    
-    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
-        T_cond.copy(),
-        Q_cond.copy(),
-        T_evap.copy(),
-        Q_evap.copy(),
-        args,
+
+    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
     )
 
     negative_eta_he = args.eta_ii_he_carnot * (
@@ -172,14 +236,10 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
         - _compute_entropic_mean_temperature(np.array([40.0]), np.array([50.0]))
         / _compute_entropic_mean_temperature(np.array([80.0]), np.array([60.0]))
     )
-    expected_work_gen = min(
-        60.0 * negative_eta_he,
-        50.0 * negative_eta_he / (1 - negative_eta_he),
-    )
-    remaining_Q_cond = np.array([0.0, 100.0])
-    remaining_Q_evap = np.array(
-        [60.0 * (1 - expected_work_gen / (60.0 * negative_eta_he)), 120.0]
-    )
+    expected_Qe_he = min(60.0, 50.0 / (1.0 - negative_eta_he))
+    expected_work_gen = expected_Qe_he * negative_eta_he
+    remaining_Q_cond = np.array([100.0, 0.0])
+    remaining_Q_evap = np.array([60.0 - expected_Qe_he, 120.0])
     expected_cop = (
         _compute_entropic_mean_temperature(T_evap, remaining_Q_evap)
         / (
@@ -189,48 +249,177 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
         * args.eta_ii_hpr_carnot
         + 1
     )
-    expected_work_use = remaining_Q_cond.sum() / expected_cop
-    expected_Q_evap = remaining_Q_evap * (
-        expected_work_use / (remaining_Q_evap.sum() / (expected_cop - 1))
+    expected_Qe_hp = min(
+        remaining_Q_evap.sum(),
+        remaining_Q_cond.sum() * (expected_cop - 1.0) / expected_cop,
     )
+    expected_work_use = expected_Qe_hp / (expected_cop - 1.0)
 
     assert work_he == pytest.approx(expected_work_gen)
     assert work_hpr == pytest.approx(expected_work_use)
+    assert heat_ex == pytest.approx(0.0)
     assert cop == pytest.approx(expected_cop)
+    assert Q_cond_out.sum() == pytest.approx(Q_cond.sum())
+    assert Q_evap_out.sum() == pytest.approx(expected_Qe_he + expected_Qe_hp)
 
 
-def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pair_expansion_counts_each_match():
-    T_cond = np.array([30.0, 50.0])
+def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pool_counts_each_evaporator_once():
+    T_cond = np.array([50.0, 30.0])
     Q_cond = np.array([10.0, 20.0])
     T_evap = np.array([60.0])
     Q_evap = np.array([100.0])
-    args = SimpleNamespace(
-        eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.5
     )
 
-    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
-        T_cond.copy(),
-        Q_cond.copy(),
-        T_evap.copy(),
-        Q_evap.copy(),
-        args,
+    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
     )
 
-    idx_c = np.array([0, 1])
-    idx_e = np.array([0, 0])
     expected_eta_he = args.eta_ii_he_carnot * (
         1
-        - _compute_entropic_mean_temperature(T_cond[idx_c], Q_cond[idx_c])
-        / _compute_entropic_mean_temperature(T_evap[idx_e], Q_evap[idx_e])
+        - _compute_entropic_mean_temperature(T_cond, Q_cond)
+        / _compute_entropic_mean_temperature(T_evap, Q_evap)
     )
-    expected_work_gen = min(
-        Q_evap[idx_e].sum() * expected_eta_he,
-        Q_cond[idx_c].sum() * expected_eta_he / (1 - expected_eta_he),
-    )
+    expected_Q_evap = min(Q_evap.sum(), Q_cond.sum() / (1.0 - expected_eta_he))
+    expected_work_gen = expected_Q_evap * expected_eta_he
 
     assert work_hpr == pytest.approx(0.0)
     assert work_he == pytest.approx(expected_work_gen)
+    assert heat_ex == pytest.approx(0.0)
     assert cop == pytest.approx(1.0)
+    assert Q_cond_out.sum() == pytest.approx(Q_cond.sum())
+    assert Q_evap_out.sum() == pytest.approx(expected_Q_evap)
+
+
+def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_without_engine_becomes_heat_exchange():
+    T_cond = np.array([30.0])
+    Q_cond = np.array([100.0])
+    T_evap = np.array([60.0])
+    Q_evap = np.array([120.0])
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
+    )
+
+    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
+    )
+
+    assert work_hpr == pytest.approx(0.0)
+    assert work_he == pytest.approx(0.0)
+    assert heat_ex == pytest.approx(100.0)
+    assert cop == pytest.approx(1.0)
+    np.testing.assert_allclose(Q_cond_out, Q_cond)
+    np.testing.assert_allclose(Q_evap_out, np.array([100.0]))
+
+
+def test_get_multi_temperature_carnot_stage_duties_and_work_zero_hp_efficiency_returns_no_positive_lift_transfer():
+    T_cond = np.array([80.0])
+    Q_cond = np.array([120.0])
+    T_evap = np.array([20.0])
+    Q_evap = np.array([200.0])
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.0, eta_he=0.0
+    )
+
+    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+        _get_multi_temperature_carnot_stage_duties_and_work(
+            T_cond.copy(),
+            T_evap.copy(),
+            H_hot.copy(),
+            H_cold.copy(),
+            args,
+        )
+    )
+
+    assert work_hpr == pytest.approx(0.0)
+    assert work_he == pytest.approx(0.0)
+    assert heat_ex == pytest.approx(0.0)
+    assert cop == pytest.approx(1.0)
+    np.testing.assert_allclose(Q_cond_out, np.array([0.0]))
+    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
+
+
+def test_get_multi_simple_carnot_stage_duties_and_work_positive_lift_uses_absolute_temperatures():
+    args = SimpleNamespace(
+        T_hot=np.array([120.0, 20.0]),
+        T_cold=np.array([80.0, 40.0]),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.0,
+    )
+
+    work_hpr, work_he, heat_ex, Q_cond, Q_evap, _ = (
+        _get_multi_simple_carnot_stage_duties_and_work(
+            T_cond=np.array([80.0]),
+            T_evap=np.array([20.0]),
+            H_hot_with_amb=np.array([0.0, -200.0]),
+            H_cold_with_amb=np.array([120.0, 0.0]),
+            args=args,
+        )
+    )
+
+    expected_cop = (20.0 + 273.15) / (80.0 - 20.0) * args.eta_ii_hpr_carnot + 1.0
+    expected_work = 120.0 / expected_cop
+    expected_Q_evap = 120.0 - expected_work
+
+    np.testing.assert_allclose(Q_cond, np.array([120.0]))
+    np.testing.assert_allclose(Q_evap, np.array([expected_Q_evap]))
+    np.testing.assert_allclose(work_hpr, np.array([expected_work]))
+    np.testing.assert_allclose(work_he, np.array([0.0]))
+    assert heat_ex == pytest.approx(0.0)
+
+
+def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across_modes():
+    args = SimpleNamespace(
+        T_hot=np.array([120.0, 80.0, 40.0]),
+        T_cold=np.array([100.0, 70.0, 40.0]),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.5,
+    )
+    T_cond = np.array([100.0, 70.0])
+    T_evap = np.array([100.0, 110.0])
+    H_hot = np.array([0.0, -120.0, -200.0])
+    H_cold = np.array([300.0, 150.0, 0.0])
+
+    work_hpr, work_he, heat_ex, Q_cond, Q_evap, _ = (
+        _get_multi_simple_carnot_stage_duties_and_work(
+            T_cond=T_cond,
+            T_evap=T_evap,
+            H_hot_with_amb=H_hot,
+            H_cold_with_amb=H_cold,
+            args=args,
+        )
+    )
+
+    available_he = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        np.array([110.0]), args.T_hot, H_hot, is_cond=False
+    )[0]
+    available_total = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        np.array([100.0]), args.T_hot, H_hot, is_cond=False
+    )[0]
+    expected_eta_he = args.eta_ii_he_carnot * (1.0 - (70.0 + 273.15) / (110.0 + 273.15))
+    expected_Qc_he = available_he * (1.0 - expected_eta_he)
+    expected_w_he = available_he - expected_Qc_he
+    expected_Q_hx = available_total - available_he
+
+    np.testing.assert_allclose(Q_evap, np.array([expected_Q_hx, available_he]))
+    np.testing.assert_allclose(Q_cond, np.array([expected_Q_hx, expected_Qc_he]))
+    np.testing.assert_allclose(work_hpr, np.array([0.0, 0.0]))
+    np.testing.assert_allclose(work_he, np.array([0.0, expected_w_he]))
+    assert heat_ex == pytest.approx(expected_Q_hx)
+    assert Q_evap.sum() == pytest.approx(available_total)
 
 
 def test_map_x_to_T_returns_expected_descending_temperatures():
@@ -918,6 +1107,8 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
             np.array([120.0, 80.0]),
             np.array([70.0, 50.0]),
             np.array([50.0, np.nan]),
+            0.0,
+            0.0,
         ),
     )
 
@@ -958,6 +1149,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     monkeypatch.setattr(hp, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
+    monkeypatch.setattr(hp, "_get_ambient_air_stream", lambda **_kwargs: StreamCollection())
     calls = {"plot": 0}
     monkeypatch.setattr(
         hp,
@@ -1096,19 +1288,25 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
         hp,
         "_parse_multi_simple_hp_state_temperatures",
         lambda x, _args: (
-            np.array([100.0, 90.0]),
-            np.array([10.0, 10.0]),
-            np.array([120.0, 80.0]),
-            np.array([90.0, 80.0]),
-            np.array([5.0, 5.0]),
-        )
-        if x[0] > 0.5
-        else (
-            np.array([120.0, 100.0]),
-            np.array([5.0, 5.0]),
-            np.array([120.0, 80.0]),
-            np.array([70.0, 50.0]),
-            np.array([2.0, 2.0]),
+            (
+                np.array([100.0, 90.0]),
+                np.array([10.0, 10.0]),
+                np.array([120.0, 80.0]),
+                np.array([90.0, 80.0]),
+                np.array([5.0, 5.0]),
+                0.0,
+                0.0,
+            )
+            if x[0] > 0.5
+            else (
+                np.array([120.0, 100.0]),
+                np.array([5.0, 5.0]),
+                np.array([120.0, 80.0]),
+                np.array([70.0, 50.0]),
+                np.array([2.0, 2.0]),
+                0.0,
+                0.0,
+            )
         ),
     )
 
@@ -1141,6 +1339,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     monkeypatch.setattr(hp, "ParallelVapourCompressionCycles", _FakeMultiSimple)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
+    monkeypatch.setattr(hp, "_get_ambient_air_stream", lambda **_kwargs: StreamCollection())
     out = hp._compute_multi_simple_hp_system_obj(
         np.array([0.2] * 10), args, debug=False
     )
@@ -1436,6 +1635,8 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
             np.array([30.0]),
             np.array([60.0]),
             np.array([1.0]),
+            0.0,
+            0.0,
         ),
     )
 
@@ -1463,6 +1664,7 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
         ]
     )
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **kwargs: next(seq))
+    monkeypatch.setattr(hp, "_get_ambient_air_stream", lambda **_kwargs: StreamCollection())
     called = {"plot": 0}
     monkeypatch.setattr(
         hp,
