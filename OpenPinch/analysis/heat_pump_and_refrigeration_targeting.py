@@ -134,7 +134,7 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
-    # zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
+    zone_config.HPR_TYPE = HPRcycle.MultiSimpleCarnot.value
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -142,7 +142,7 @@ def get_heat_pump_and_refrigeration_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=False,
+        debug=True,
     )
     # Select the appropriate targeting handler based on the specified heat pump targeting approach
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
@@ -581,12 +581,19 @@ def _parse_multi_temperature_carnot_cycle_state_variables(
 
 def _get_multi_temperature_carnot_stage_duties_and_work(
     T_cond: np.ndarray,
-    Q_cond: np.ndarray,
     T_evap: np.ndarray,
-    Q_evap: np.ndarray,
+    H_hot_with_amb: np.ndarray,
+    H_cold_with_amb: np.ndarray,
     args: HPRTargetInputs,
 ) -> Tuple[float, float, float, float, np.ndarray, np.ndarray]:
     """Estimate COP by scaling the Carnot limit using entropic mean temperatures."""
+    Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        T_cond, args.T_cold, H_cold_with_amb, is_cond=True
+    )
+    Q_evap = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        T_evap, args.T_hot, H_hot_with_amb, is_cond=False
+    )    
+
     Qc_he = np.zeros_like(Q_cond)
     Qe_he = np.zeros_like(Q_evap)
     Qc_hx = np.zeros_like(Q_cond)
@@ -596,7 +603,7 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     w_he = 0.0
     w_hpr = 0.0
     cop = 1.0
-    
+
     T_diff = np.subtract.outer(T_cond, T_evap)
     is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
     if np.any(is_he):
@@ -678,19 +685,12 @@ def _compute_multi_temperature_carnot_cycle_obj(
     H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
     H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
 
-    Q_cond_arr = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
-        T_cond, args.T_cold, H_cold_with_amb, is_cond=True
-    )
-    Q_evap_arr = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
-        T_evap, args.T_hot, H_hot_with_amb, is_cond=False
-    )
-
     w_hpr, w_he, heat_ex, cop, Q_cond, Q_evap = _get_multi_temperature_carnot_stage_duties_and_work(
-        T_cond,
-        Q_cond_arr,
-        T_evap,
-        Q_evap_arr,
-        args,
+        T_cond=T_cond,
+        T_evap=T_evap,
+        H_hot_with_amb=H_hot_with_amb,
+        H_cold_with_amb=H_cold_with_amb,
+        args=args,
     )
     work = w_hpr - w_he
 
@@ -1068,18 +1068,21 @@ def _parse_multi_simple_carnot_hp_state_variables(
 def _get_multi_simple_carnot_stage_duties_and_work(
     T_cond: np.ndarray,
     T_evap: np.ndarray,
-    Q_cond: np.ndarray,
     H_hot_with_amb: np.ndarray,
+    H_cold_with_amb: np.ndarray,
     args: HPRTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list]:
     """Scale stage duties and work to the available source-side profile."""
+    Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        T_cond, args.T_cold, H_cold_with_amb, is_cond=True
+    )    
+
     Qc_he = np.zeros_like(Q_cond)
     Qe_he = np.zeros_like(Q_cond)
     Qc_hx = np.zeros_like(Q_cond)
     Qe_hx = np.zeros_like(Q_cond)
     Qc_hpr = np.zeros_like(Q_cond)
     Qe_hpr = np.zeros_like(Q_cond)
-
     w_hpr = np.zeros_like(Q_cond)
     w_he = np.zeros_like(Q_cond)
     q_diff = [0.0]
@@ -1213,17 +1216,13 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
     H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
 
-    # Calculate the target heat for each condenser temperature level from the background profiles
-    Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
-        T_cond, args.T_cold, H_cold_with_amb, is_cond=True
-    )
-
+    # Calculate the target heat for each condenser/evaporator temperature pair from the background profiles
     w_hpr, w_he, heat_ex, Q_cond, Q_evap, q_diff = (
         _get_multi_simple_carnot_stage_duties_and_work(
             T_cond=T_cond,
             T_evap=T_evap,
-            Q_cond=Q_cond,
             H_hot_with_amb=H_hot_with_amb,
+            H_cold_with_amb=H_cold_with_amb,
             args=args,
         )
     )
