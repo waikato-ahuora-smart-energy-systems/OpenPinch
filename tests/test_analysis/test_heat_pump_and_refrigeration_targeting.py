@@ -49,11 +49,11 @@ def test_get_carnot_COP_returns_expected_value():
     Q_cond = np.array([60.0, 25.0, 15.0])
     T_evap = np.array([30.0, 30.0])
     Q_evap = np.array([70.0, 40.0])
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5)
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.0)
 
     expected = ((150 + 273.15) / (150 - 30) - 1) * args.eta_ii_hpr_carnot + 1
 
-    _, _, result, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+    _, _, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
         T_cond.copy(),
         Q_cond.copy(),
         T_evap.copy(),
@@ -61,7 +61,7 @@ def test_get_carnot_COP_returns_expected_value():
         args,
     )
 
-    np.testing.assert_allclose(result, expected)
+    np.testing.assert_allclose(cop, expected)
 
 
 def test_compute_entropic_average_temperature_in_K_constant_temperature():
@@ -83,27 +83,29 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_positive_lift_scales
     Q_cond = np.array([120.0])
     T_evap = np.array([20.0])
     Q_evap = np.array([90.0])
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5)
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.0)
 
-    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
         T_cond.copy(),
         Q_cond.copy(),
         T_evap.copy(),
         Q_evap.copy(),
         args,
     )
-    
-    expected_cop = (T_evap[0] + 273.15) / (T_cond[0] - T_evap[0]) * args.eta_ii_hpr_carnot + 1
+
+    expected_cop = (T_evap[0] + 273.15) / (
+        T_cond[0] - T_evap[0]
+    ) * args.eta_ii_hpr_carnot + 1
     expected_work_use = Q_cond[0] / expected_cop
 
-    assert work_gen == pytest.approx(0.0)
+    assert work_he == pytest.approx(0.0)
     assert cop == pytest.approx(expected_cop)
-    assert work_use == pytest.approx(expected_work_use)
+    assert work_hpr == pytest.approx(expected_work_use)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_zero_lift_returns_no_useful_work():
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5)
-    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.0)
+    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
         np.array([50.0]),
         np.array([100.0]),
         np.array([50.0]),
@@ -111,9 +113,9 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_zero_lift_returns_no
         args,
     )
 
-    assert work_use == pytest.approx(0.0)
-    assert work_gen == pytest.approx(0.0)
-    assert np.isinf(cop)
+    assert work_hpr == pytest.approx(0.0)
+    assert work_he == pytest.approx(0.0)
+    assert cop == pytest.approx(1.0)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_generates_work():
@@ -121,9 +123,11 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
     Q_cond = np.array([100.0])
     T_evap = np.array([60.0])
     Q_evap = np.array([120.0])
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True)
+    args = SimpleNamespace(
+        eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True
+    )
 
-    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
         T_cond.copy(),
         Q_cond.copy(),
         T_evap.copy(),
@@ -141,9 +145,9 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
         Q_cond.sum() * expected_eta_he / (1 - expected_eta_he),
     )
 
-    assert work_use == pytest.approx(0.0)
-    assert work_gen == pytest.approx(expected_work_gen)
-    assert np.isinf(cop)
+    assert work_hpr == pytest.approx(0.0)
+    assert work_he == pytest.approx(expected_work_gen)
+    assert cop == pytest.approx(1.0)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_engine_and_heat_pump():
@@ -151,9 +155,11 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
     Q_cond = np.array([50.0, 100.0])
     T_evap = np.array([80.0, 20.0])
     Q_evap = np.array([60.0, 120.0])
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True)
-
-    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+    args = SimpleNamespace(
+        eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True
+    )
+    
+    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
         T_cond.copy(),
         Q_cond.copy(),
         T_evap.copy(),
@@ -188,8 +194,8 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
         expected_work_use / (remaining_Q_evap.sum() / (expected_cop - 1))
     )
 
-    assert work_gen == pytest.approx(expected_work_gen)
-    assert work_use == pytest.approx(expected_work_use)
+    assert work_he == pytest.approx(expected_work_gen)
+    assert work_hpr == pytest.approx(expected_work_use)
     assert cop == pytest.approx(expected_cop)
 
 
@@ -198,9 +204,11 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pair_expans
     Q_cond = np.array([10.0, 20.0])
     T_evap = np.array([60.0])
     Q_evap = np.array([100.0])
-    args = SimpleNamespace(eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True)
+    args = SimpleNamespace(
+        eta_ii_hpr_carnot=0.5, eta_ii_he_carnot=0.5, allow_integrated_expander=True
+    )
 
-    work_use, work_gen, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
+    work_hpr, work_he, _, cop, _, _ = _get_multi_temperature_carnot_stage_duties_and_work(
         T_cond.copy(),
         Q_cond.copy(),
         T_evap.copy(),
@@ -220,9 +228,9 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pair_expans
         Q_cond[idx_c].sum() * expected_eta_he / (1 - expected_eta_he),
     )
 
-    assert work_use == pytest.approx(0.0)
-    assert work_gen == pytest.approx(expected_work_gen)
-    assert np.isinf(cop)
+    assert work_hpr == pytest.approx(0.0)
+    assert work_he == pytest.approx(expected_work_gen)
+    assert cop == pytest.approx(1.0)
 
 
 def test_map_x_to_T_returns_expected_descending_temperatures():
@@ -320,7 +328,9 @@ def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty_consecutivi
     np.testing.assert_allclose(Q_out, np.array([15.0, 20.0]))
 
 
-def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambiguous_truth():
+def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambiguous_truth(
+    monkeypatch,
+):
     args = SimpleNamespace(
         n_cond=2,
         n_evap=2,
@@ -334,6 +344,8 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         eta_ii_hpr_carnot=0.5,
         eta_ii_he_carnot=0.5,
         Q_hpr_target=300.0,
+        Q_heat_max=300.0,
+        Q_cool_max=260.0,
         Q_amb_max=0.0,
         heat_to_power_ratio=1.0,
         cold_to_power_ratio=0.0,
@@ -341,6 +353,7 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         allow_integrated_expander=False,
     )
     x = np.array([0.0, 0.0, 0.25, 0.25, 0.0])
+    monkeypatch.setattr(hp, "g_ineq_penalty", lambda *args, **kwargs: 0.0)
 
     res = _compute_multi_simple_carnot_hp_opt_obj(x, args)
 
@@ -354,6 +367,8 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_returns_expected_p
         n_cond=2,
         n_evap=2,
         Q_hpr_target=300.0,
+        Q_heat_max=300.0,
+        Q_cool_max=280.0,
         T_cold=np.array([120.0, 80.0, 40.0]),
         H_cold=np.array([300.0, 120.0, 0.0]),
         T_hot=np.array([150.0, 90.0, 30.0]),
@@ -376,6 +391,8 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap
         n_cond=1,
         n_evap=3,
         Q_hpr_target=300.0,
+        Q_heat_max=300.0,
+        Q_cool_max=280.0,
         T_cold=np.array([120.0, 80.0, 40.0]),
         H_cold=np.array([300.0, 120.0, 0.0]),
         T_hot=np.array([150.0, 90.0, 30.0]),
@@ -644,6 +661,8 @@ def _base_args(**overrides):
         "debug": False,
     }
     args.update(overrides)
+    args.setdefault("Q_heat_max", float(args["H_cold"][0]))
+    args.setdefault("Q_cool_max", float(-args["H_hot"][-1]))
     return SimpleNamespace(**args)
 
 
@@ -955,14 +974,29 @@ def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
     _patch_output_model_validate(monkeypatch)
 
     monkeypatch.setattr(
-        hp, "multiminima", lambda **_kwargs: np.array([[0.4, 0.4, 0.5, 0.5, 0.0]])
-    )
-    monkeypatch.setattr(
         hp,
         "_get_carnot_hpr_cycle_streams",
         lambda *_args, **_kwargs: {
             "hot_streams": StreamCollection(),
             "cold_streams": StreamCollection(),
+        },
+    )
+    monkeypatch.setattr(
+        hp,
+        "_solve_hpr_placement",
+        lambda **_kwargs: {
+            "obj": 0.1,
+            "utility_tot": 1.0,
+            "net_work": np.array([1.0, 2.0]),
+            "Q_ext": 0.0,
+            "Q_amb_hot": 0.0,
+            "Q_amb_cold": 0.0,
+            "cop_h": 2.5,
+            "T_cond": np.array([120.0, 100.0]),
+            "Q_cond": np.array([120.0, 80.0]),
+            "T_evap": np.array([70.0, 50.0]),
+            "Q_evap": np.array([90.0, 60.0]),
+            "success": True,
         },
     )
     out_carnot = hp._optimise_multi_simple_carnot_heat_pump_placement(args)
@@ -986,11 +1020,10 @@ def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
     monkeypatch.setattr(
         hp, "_get_x0_for_multi_single_hp_opt", lambda **_kwargs: np.array([[0.2] * 10])
     )
-    monkeypatch.setattr(hp, "multiminima", lambda **_kwargs: np.array([[0.2] * 10]))
     monkeypatch.setattr(
         hp,
-        "_compute_multi_simple_hp_system_obj",
-        lambda x, args, debug=False: {
+        "_solve_hpr_placement",
+        lambda **_kwargs: {
             "obj": 0.1,
             "utility_tot": 1.0,
             "net_work": np.array([1.0, 2.0]),
@@ -998,14 +1031,19 @@ def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
             "Q_amb_hot": 0.0,
             "Q_amb_cold": 0.0,
             "cop_h": 2.5,
-            "hot_streams": StreamCollection(),
-            "cold_streams": StreamCollection(),
+            "hpr_hot_streams": StreamCollection(),
+            "hpr_cold_streams": StreamCollection(),
+            "success": True,
         },
     )
     out_sim = hp._optimise_multi_simple_heat_pump_placement(args)
     assert out_sim["success"] is True
 
-    monkeypatch.setattr(hp, "multiminima", lambda **_kwargs: np.array([]))
+    monkeypatch.setattr(
+        hp,
+        "_solve_hpr_placement",
+        lambda **_kwargs: (_ for _ in ()).throw(ValueError("failed")),
+    )
     with pytest.raises(ValueError, match="failed"):
         hp._optimise_multi_simple_heat_pump_placement(args)
 
@@ -1036,6 +1074,43 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     )
     b = hp._get_bounds_for_multi_single_hp_opt(args)
     assert len(b) == 10
+
+    (
+        T_cond,
+        dT_subcool,
+        Q_cond,
+        T_evap,
+        dT_superheat,
+        Q_amb_hot,
+        Q_amb_cold,
+    ) = hp._parse_multi_simple_hp_state_temperatures(np.array([0.1] * 10), args)
+    assert T_cond.shape == (2,)
+    assert dT_subcool.shape == (2,)
+    assert Q_cond.shape == (2,)
+    assert T_evap.shape == (2,)
+    assert dT_superheat.shape == (2,)
+    assert Q_amb_hot == pytest.approx(0.0)
+    assert Q_amb_cold == pytest.approx(0.1 * max(args.Q_heat_max, args.Q_cool_max))
+
+    monkeypatch.setattr(
+        hp,
+        "_parse_multi_simple_hp_state_temperatures",
+        lambda x, _args: (
+            np.array([100.0, 90.0]),
+            np.array([10.0, 10.0]),
+            np.array([120.0, 80.0]),
+            np.array([90.0, 80.0]),
+            np.array([5.0, 5.0]),
+        )
+        if x[0] > 0.5
+        else (
+            np.array([120.0, 100.0]),
+            np.array([5.0, 5.0]),
+            np.array([120.0, 80.0]),
+            np.array([70.0, 50.0]),
+            np.array([2.0, 2.0]),
+        ),
+    )
 
     x_bad = np.array([0.9] * 10)
     out_bad = hp._compute_multi_simple_hp_system_obj(x_bad, args)
