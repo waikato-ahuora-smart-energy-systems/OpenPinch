@@ -135,6 +135,7 @@ def get_heat_pump_and_refrigeration_targets(
         If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
     zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
+    # zone_config.BB_MINIMISER = BB_Minimiser.DA.value
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -211,10 +212,9 @@ def calc_heat_pump_and_refrigeration_cascade(
             cold_streams=res.amb_streams.get_cold_streams(),
             is_shifted=True,
         )
-        T_ls_pt = pt[PT.T.value].to_list()
-        T_ls_pt_air = pt_air[PT.T.value].to_list()
-        pt_air.insert_temperature_interval(T_ls_pt)
-        pt.insert_temperature_interval(T_ls_pt_air)
+        T_ls = pt[PT.T.value].to_list() + pt_air[PT.T.value].to_list()
+        pt_air.insert_temperature_interval(T_ls)
+        pt.insert_temperature_interval(T_ls)
         pt.col[PT.H_NET_W_AIR.value] = (
             pt.col[PT.H_NET_A.value] + pt_air.col[PT.H_NET.value]
         )
@@ -347,6 +347,8 @@ def _construct_HPRTargetInputs(
             T_hot, H_hot, z_amb_hot, s_hot = T_arr, H_arr, z_amb_arr, s
     inputs = {
         "Q_hpr_target": Q_hpr_target,
+        "Q_heat_max": H_cold[0],
+        "Q_cool_max": -H_hot[-1],
         "T_hot": T_hot,
         "H_hot": H_hot,
         "z_amb_hot": z_amb_hot,
@@ -366,7 +368,7 @@ def _construct_HPRTargetInputs(
         "eta_comp": zone_config.ETA_COMP,
         "eta_exp": zone_config.ETA_EXP,
         "eta_ii_hpr_carnot": zone_config.ETA_II_HPR_CARNOT,
-        "eta_ii_he_carnot": zone_config.ETA_II_HE_CARNOT,
+        "eta_ii_he_carnot": zone_config.ETA_II_HE_CARNOT if zone_config.ALLOW_INTEGRATED_EXPANDER else 0.0,
         "dtcont_hp": zone_config.DT_CONT_HP,
         "dt_hp_ihx": zone_config.DT_HPR_IHX,
         "dt_cascade_hx": zone_config.DT_HPR_CASCADE_HX,
@@ -572,8 +574,9 @@ def _parse_multi_temperature_carnot_cycle_state_variables(
     T_evap = _map_x_arr_to_T_arr(
         x[int(args.n_cond) : -1], args.T_hot[-1], args.T_hot[0]
     )
-    Q_amb_hot = min(args.Q_hpr_target * x[-1], 0.0) * -1
-    Q_amb_cold = max(args.Q_hpr_target * x[-1], 0.0)
+    scale = max(args.Q_heat_max, args.Q_cool_max)
+    Q_amb_hot = min(scale * x[-1], 0.0) * -1
+    Q_amb_cold = max(scale * x[-1], 0.0)
     return T_cond, T_evap, Q_amb_hot, Q_amb_cold
 
 
@@ -583,50 +586,83 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     T_evap: np.ndarray,
     Q_evap: np.ndarray,
     args: HPRTargetInputs,
-) -> Tuple[float, float, np.ndarray, np.ndarray, float]:
+) -> Tuple[float, float, float, float, np.ndarray, np.ndarray]:
     """Estimate COP by scaling the Carnot limit using entropic mean temperatures."""
     Qc_he = np.zeros_like(Q_cond)
     Qe_he = np.zeros_like(Q_evap)
+    Qc_hx = np.zeros_like(Q_cond)
+    Qe_hx = np.zeros_like(Q_evap)
+    Qc_hp = np.zeros_like(Q_cond)
+    Qe_hp = np.zeros_like(Q_evap)
     work_he = 0.0
-    is_negative_lift = (
-        (np.subtract.outer(T_cond, T_evap) < 0.0)
-        & (Q_cond[:, np.newaxis] > 0.0)
-        & (Q_evap > 0.0)
-    )
-    if np.any(is_negative_lift):
-        
-        idx_c, idx_e = np.nonzero(is_negative_lift)
-        T_h_he = _compute_entropic_mean_temperature(T_evap[idx_e], Q_evap[idx_e])
-        T_l_he = _compute_entropic_mean_temperature(T_cond[idx_c], Q_cond[idx_c])
-        eta_he = _calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
-        work_he_from_evap = Q_evap[idx_e].sum() * eta_he
-        work_he_from_cond = Q_cond[idx_c].sum() * eta_he / (1 - eta_he)
-        if work_he_from_evap <= tol or work_he_from_cond <= tol or not(args.allow_integrated_expander):
-            scale_c = min(Q_evap[idx_e].sum() / Q_cond[idx_c].sum(), 1)
-            scale_e = min(Q_cond[idx_c].sum() / Q_evap[idx_e].sum(), 1)
+    work_hpr = 0.0
+    cop = 1.0
+    
+    T_diff = np.subtract.outer(T_cond, T_evap)
+    is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
+    if np.any(is_he):
+        idx_c, idx_e = np.nonzero(is_he)    
+        idx_c = np.unique(idx_c)
+        idx_e = np.unique(idx_e)            
+        Qc = Q_cond[idx_c]
+        Qe = Q_evap[idx_e]
+        if Qc.sum() > 0.0 and Qe.sum() > 0.0:
+            T_h_he = _compute_entropic_mean_temperature(T_evap[idx_e], Qe)
+            T_l_he = _compute_entropic_mean_temperature(T_cond[idx_c], Qc)
+            eta_he = _calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
+            work_he = min(Qe.sum() * eta_he, Qc.sum() * eta_he / (1 - eta_he))
+            scale_c = min((Qe.sum() - work_he.sum()) / Qc.sum(), 1.0)
+            scale_e = min((Qc.sum() + work_he.sum()) / Qe.sum(), 1.0)
         else:
-            # Scale the side that has excess duty available
-            scale_c = min(work_he_from_evap / work_he_from_cond, 1)
-            scale_e = min(work_he_from_cond / work_he_from_evap, 1)
-            work_he = min(work_he_from_evap, work_he_from_cond)
-        Qc_he[idx_c] = Q_cond[idx_c] * scale_c
-        Qe_he[idx_e] = Q_evap[idx_e] * scale_e
-        Q_cond[idx_c] -= Qc_he[idx_c]
-        Q_evap[idx_e] -= Qe_he[idx_e]
+            scale_c = 0.0
+            scale_e = 0.0
+        Qc_he[idx_c] = Qc * scale_c
+        Qe_he[idx_e] = Qe * scale_e
 
-    T_h = _compute_entropic_mean_temperature(T_cond, Q_cond)
-    T_l = _compute_entropic_mean_temperature(T_evap, Q_evap)
-    cop = _calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
+    is_hx = ((T_diff > -tol) | (args.eta_ii_he_carnot < tol)) & (T_diff < tol)
+    if np.any(is_hx):
+        idx_c, idx_e = np.nonzero(is_hx)   
+        idx_c = np.unique(idx_c)
+        idx_e = np.unique(idx_e)             
+        Qc = Q_cond[idx_c] - Qc_he[idx_c]
+        Qe = Q_evap[idx_e] - Qe_he[idx_e]
+        if Qc.sum() > 0.0 and Qe.sum() > 0.0:
+            scale_c = min(Qe.sum() / Qc.sum(), 1)
+            scale_e = min(Qc.sum() / Qe.sum(), 1)
+        else:
+            scale_c = 0.0
+            scale_e = 0.0
+        Qc_hx[idx_c] = Qc * scale_c
+        Qe_hx[idx_e] = Qe * scale_e  
 
-    # Determine the work of the heat pump based on the limiting side
-    work_from_evap = Q_evap.sum() / (cop - 1)
-    work_from_cond = Q_cond.sum() / cop
-    work_hpr = min(work_from_evap, work_from_cond)
+    is_hp = (T_diff >= tol)
+    if np.any(is_hp):
+        idx_c, idx_e = np.nonzero(is_hp)
+        idx_c = np.unique(idx_c)
+        idx_e = np.unique(idx_e)
+        Qc = Q_cond[idx_c] - (Qc_he[idx_c] + Qc_hx[idx_c])
+        Qe = Q_evap[idx_e] - (Qe_he[idx_e] + Qe_hx[idx_e])
+        if Qc.sum() > 0.0 and Qe.sum() > 0.0:
+            T_h = _compute_entropic_mean_temperature(T_cond[idx_c], Qc)
+            T_l = _compute_entropic_mean_temperature(T_evap[idx_e], Qe)
+            cop = _calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
+            work_hpr = min(Qe.sum() / (cop - 1), Qc.sum() / cop) if cop >= 1.0 else 0.0
+            scale_c = min((Qe.sum() + work_hpr) / Qc.sum(), 1)
+            scale_e = min((Qc.sum() - work_hpr) / Qe.sum(), 1)
+        else:
+            scale_c = 0.0
+            scale_e = 0.0        
+        Qc_hp[idx_c] = Qc * scale_c
+        Qe_hp[idx_e] = Qe * scale_e
 
-    # Scale the side that has excess duty available
-    Qc_hp = Q_cond * min(work_from_evap / work_from_cond, 1) if work_from_cond > 0.0 else 0.0
-    Qe_hp = Q_evap * min(work_from_cond / work_from_evap, 1) if work_from_evap > 0.0 else 0.0
-    return work_hpr, work_he, cop, (Qc_hp + Qc_he), (Qe_hp + Qe_he)
+    Q_cond = Qc_hp + Qc_he + Qc_hx
+    Q_evap = Qe_hp + Qe_he + Qe_hx
+    heat_ex = Qc_hx.sum()
+
+    if not(np.isclose(Q_cond.sum() + work_he, Q_evap.sum() + work_hpr, atol=tol)):
+        raise ValueError("Energy balance not satisfied in multi-temperature Carnot cycle calculation.")
+
+    return work_hpr, work_he, heat_ex, cop, Q_cond, Q_evap
 
 
 def _compute_multi_temperature_carnot_cycle_obj(
@@ -635,7 +671,7 @@ def _compute_multi_temperature_carnot_cycle_obj(
     *,
     debug: bool = False,
 ) -> dict:
-    """Evaluate compressor work for a candidate multi-temperature Carnot HP placement defined by vector `x`."""
+    """Evaluate compressor work for a candidate multi-temperature Carnot HP placement defined by vector `x`."""    
     T_cond, T_evap, Q_amb_hot, Q_amb_cold = (
         _parse_multi_temperature_carnot_cycle_state_variables(x, args)
     )
@@ -643,18 +679,18 @@ def _compute_multi_temperature_carnot_cycle_obj(
     H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
     H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
 
-    Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+    Q_cond_arr = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond, args.T_cold, H_cold_with_amb, is_cond=True
     )
-    Q_evap = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+    Q_evap_arr = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_evap, args.T_hot, H_hot_with_amb, is_cond=False
     )
 
-    work_hpr, work_he, cop, Q_cond, Q_evap = _get_multi_temperature_carnot_stage_duties_and_work(
+    work_hpr, work_he, heat_ex, cop, Q_cond, Q_evap = _get_multi_temperature_carnot_stage_duties_and_work(
         T_cond,
-        Q_cond,
+        Q_cond_arr,
         T_evap,
-        Q_evap,
+        Q_evap_arr,
         args,
     )
     work = work_hpr - work_he
@@ -666,8 +702,8 @@ def _compute_multi_temperature_carnot_cycle_obj(
     # Determine the objective
     p = (
         g_ineq_penalty(
-            g=args.Q_hpr_target - Q_evap.sum(),
-            rho=args.rho_penalty * 10,
+            g=Q_ext_cold,
+            rho=args.rho_penalty,
             form="square",
         )
         if not (args.is_heat_pumping)
@@ -702,6 +738,7 @@ def _compute_multi_temperature_carnot_cycle_obj(
         "net_work": work,
         "work_hpr": work_hpr,
         "work_he": work_he,
+        "heat_ex": heat_ex,
         "Q_ext": Q_ext_heat + Q_ext_cold,
         "T_cond": T_cond,
         "Q_cond": Q_cond,
@@ -874,16 +911,17 @@ def _parse_cascade_hp_state_variables(
     n0, n1 = args.n_cond, args.n_evap
     T_cond = np.array(args.T_cold[0] - x[:n0] * args.dt_range_max, dtype=np.float64)
     dT_subcool = np.array(x[n0 : 2 * n0] * args.dt_range_max, dtype=np.float64)
-    Q_heat = np.array(x[2 * n0 : 3 * n0] * args.Q_hpr_target, dtype=np.float64)
+    Q_heat = np.array(x[2 * n0 : 3 * n0] * args.Q_heat_max, dtype=np.float64)
     T_evap = np.array(
         x[3 * n0 : 3 * n0 + n1] * args.dt_range_max + args.T_hot[-1], dtype=np.float64
     )
-    temp = np.array(x[3 * n0 + n1 : -1] * args.Q_hpr_target, dtype=np.float64)
+    temp = np.array(x[3 * n0 + n1 : -1] * args.Q_cool_max, dtype=np.float64)
     Q_cool = (
         np.concatenate([temp.tolist(), [np.nan]]) if temp.size > 0 else np.array(np.nan)
     )
-    Q_amb_hot = min(args.Q_hpr_target * x[-1], 0.0) * -1
-    Q_amb_cold = max(args.Q_hpr_target * x[-1], 0.0)
+    scale = max(args.Q_heat_max, args.Q_cool_max)
+    Q_amb_hot = min(scale * x[-1], 0.0) * -1
+    Q_amb_cold = max(scale * x[-1], 0.0)
     return T_cond, dT_subcool, Q_heat, T_evap, Q_cool, Q_amb_hot, Q_amb_cold
 
 
@@ -1022,8 +1060,9 @@ def _parse_multi_simple_carnot_hp_state_variables(
     T_evap = args.T_hot[-1] - np.array(x[args.n_cond : -1]) * (
         args.T_hot[-1] - args.T_hot[0]
     )
-    Q_amb_hot = min(args.Q_hpr_target * x[-1], 0.0) * -1
-    Q_amb_cold = max(args.Q_hpr_target * x[-1], 0.0)
+    scale = max(args.Q_heat_max, args.Q_cool_max)
+    Q_amb_hot = min(scale * x[-1], 0.0) * -1
+    Q_amb_cold = max(scale * x[-1], 0.0)
     return T_cond, T_evap, Q_amb_hot, Q_amb_cold
 
 
@@ -1036,14 +1075,15 @@ def _get_multi_simple_carnot_stage_duties_and_work(
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list]:
     """Scale stage duties and work to the available source-side profile."""
     delta_T_lift = T_cond - T_evap
-    is_hp = delta_T_lift > 0.0
-    is_he = (delta_T_lift < 0.0) & args.allow_integrated_expander
+    is_hp = delta_T_lift >= tol
+    is_he = delta_T_lift <= -tol
+    is_hx = (-tol < delta_T_lift) & (delta_T_lift < tol)
 
     Q_cond = Q_cond.copy()
     Q_evap = np.zeros_like(Q_cond)
     work_hp = np.zeros_like(Q_cond)
     work_he = np.zeros_like(Q_cond)
-    q_diff = []
+    q_diff = [0.0]
 
     if np.any(is_hp):
         cop_hp = _calc_carnot_heat_pump_cop(
@@ -1051,59 +1091,76 @@ def _get_multi_simple_carnot_stage_duties_and_work(
         )
         work_hp[is_hp] = Q_cond[is_hp] / cop_hp
         Q_evap[is_hp] = Q_cond[is_hp] - work_hp[is_hp]
-
-        sort_idx = np.argsort(T_evap[is_hp])[::-1]
-        Q_allocated = 0.0
-        for idx in sort_idx:
-            Q_available = (
-                _get_Q_vals_at_T_hpr_from_bckgrd_profile(
-                    np.array([T_evap[idx]]), args.T_hot, H_hot_with_amb, is_cond=False
-                )[0]
-                - Q_allocated
+        Q_available = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                T_evap[is_hp], args.T_hot, H_hot_with_amb, is_cond=False
             )
-            if Q_available > Q_evap[idx]:
-                Q_allocated += Q_evap[idx]
-            elif Q_evap[idx] > 0.0:
-                scale = Q_available / Q_evap[idx]
-                q_diff.append(Q_evap[idx] - Q_available)
-                Q_evap[idx] *= scale
-                Q_cond[idx] *= scale
-                work_hp[idx] *= scale
-                Q_allocated += Q_available
-            else:
-                Q_evap[idx] = 0.0
-                Q_cond[idx] = 0.0
-                work_hp[idx] = 0.0
+        q_diff.append(Q_evap[is_hp] - Q_available)
+
+        # sort_idx = np.argsort(T_evap[is_hp])[::-1]
+        # Q_allocated = 0.0
+        # for idx in sort_idx:
+        #     Q_available = (
+        #         _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        #             np.array([T_evap[idx]]), args.T_hot, H_hot_with_amb, is_cond=False
+        #         )[0]
+        #         - Q_allocated
+        #     )
+        #     if Q_available > Q_evap[idx]:
+        #         Q_allocated += Q_evap[idx]
+        #     elif Q_evap[idx] > 0.0:
+        #         scale = Q_available / Q_evap[idx]
+        #         q_diff.append(Q_evap[idx] - Q_available)
+        #         Q_evap[idx] *= scale
+        #         Q_cond[idx] *= scale
+        #         work_hp[idx] *= scale
+        #         Q_allocated += Q_available
+        #     else:
+        #         Q_evap[idx] = 0.0
+        #         Q_cond[idx] = 0.0
+        #         work_hp[idx] = 0.0
 
     if np.any(is_he):
+        eta_ii_he_carnot = args.eta_ii_he_carnot if args.allow_integrated_expander else 0.0
         eff_he = _calc_carnot_heat_engine_eta(
-            T_evap[is_he], T_cond[is_he], args.eta_ii_he_carnot
+            T_evap[is_he], T_cond[is_he], eta_ii_he_carnot
         )
         work_he[is_he] = Q_cond[is_he] * eff_he / (1 - eff_he)
         Q_evap[is_he] = Q_cond[is_he] + work_he[is_he]
+        Q_available = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+            T_evap[is_he], args.T_hot, H_hot_with_amb, is_cond=False
+        )
 
-        sort_idx = np.argsort(T_evap[is_he])[::-1]
-        Q_allocated = 0.0
-        for idx in sort_idx:
-            Q_available = (
-                _get_Q_vals_at_T_hpr_from_bckgrd_profile(
-                    np.array([T_evap[idx]]), args.T_hot, H_hot_with_amb, is_cond=False
-                )[0]
-                - Q_allocated
+        q_diff.append(Q_evap[is_he] - Q_available)
+        
+        # sort_idx = np.argsort(T_evap[is_he])[::-1]
+        # Q_allocated = 0.0
+        # for idx in sort_idx:
+        #     Q_available = (
+        #         _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        #             np.array([T_evap[idx]]), args.T_hot, H_hot_with_amb, is_cond=False
+        #         )[0]
+        #         - Q_allocated
+        #     )
+        #     if Q_available > Q_evap[idx]:
+        #         Q_allocated += Q_evap[idx]
+        #     elif Q_evap[idx] > 0.0:
+        #         scale = Q_available / Q_evap[idx]
+        #         q_diff.append(Q_evap[idx] - Q_available)
+        #         Q_evap[idx] *= scale
+        #         Q_cond[idx] *= scale
+        #         work_he[idx] *= scale
+        #         Q_allocated += Q_available
+        #     else:
+        #         Q_evap[idx] = 0.0
+        #         Q_cond[idx] = 0.0
+        #         work_he[idx] = 0.0
+
+    if np.any(is_hx):
+        Q_evap[is_hx] = Q_cond[is_hx]
+        Q_available = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                T_evap[is_hx], args.T_hot, H_hot_with_amb, is_cond=False
             )
-            if Q_available > Q_evap[idx]:
-                Q_allocated += Q_evap[idx]
-            elif Q_evap[idx] > 0.0:
-                scale = Q_available / Q_evap[idx]
-                q_diff.append(Q_evap[idx] - Q_available)
-                Q_evap[idx] *= scale
-                Q_cond[idx] *= scale
-                work_he[idx] *= scale
-                Q_allocated += Q_available
-            else:
-                Q_evap[idx] = 0.0
-                Q_cond[idx] = 0.0
-                work_he[idx] = 0.0
+        q_diff.append(Q_evap[is_hx] - Q_available)
 
     return Q_cond, Q_evap, work_hp, work_he, q_diff
 
@@ -1368,12 +1425,15 @@ def _parse_multi_simple_hp_state_temperatures(
     n = args.n_cond
     T_cond = np.array(args.T_cold[0] - x[:n] * args.dt_range_max, dtype=np.float64)
     dT_subcool = np.array(x[n : 2 * n] * args.dt_range_max, dtype=np.float64)
-    Q_cond = np.array(x[2 * n : 3 * n] * args.Q_hpr_target, dtype=np.float64)
+    Q_cond = np.array(x[2 * n : 3 * n] * args.Q_heat_max, dtype=np.float64)
     T_evap = np.array(
         x[3 * n : 4 * n] * args.dt_range_max + args.T_hot[-1], dtype=np.float64
     )
     dT_superheat = np.array(x[4 * n :] * args.dt_range_max, dtype=np.float64)
-    return T_cond, dT_subcool, Q_cond, T_evap, dT_superheat
+    scale = max(args.Q_heat_max, args.Q_cool_max)
+    Q_amb_hot = min(scale * x[-1], 0.0) * -1
+    Q_amb_cold = max(scale * x[-1], 0.0)    
+    return T_cond, dT_subcool, Q_cond, T_evap, dT_superheat, Q_amb_hot, Q_amb_cold
 
 
 def _compute_multi_simple_hp_system_obj(

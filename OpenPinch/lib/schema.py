@@ -54,6 +54,8 @@ class HPRTargetInputs(BaseModel):
     # Calculated based on the case
     hpr_type: str
     Q_hpr_target: float
+    Q_heat_max: float
+    Q_cool_max: float
     z_amb_hot: np.ndarray
     z_amb_cold: np.ndarray
     dt_range_max: float
@@ -112,6 +114,7 @@ class HPRTargetOutputs(BaseModel):
     net_work: float | list | np.ndarray
     work_hpr: Optional[float | list | np.ndarray] = None
     work_he: Optional[float | list | np.ndarray] = None
+    heat_ex: Optional[float | list | np.ndarray] = None
     Q_ext: float
     Q_amb_hot: float
     Q_amb_cold: float
