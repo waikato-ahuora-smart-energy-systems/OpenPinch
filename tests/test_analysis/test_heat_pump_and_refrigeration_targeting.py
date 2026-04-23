@@ -1149,7 +1149,6 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     monkeypatch.setattr(hp, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
-    monkeypatch.setattr(hp, "_get_ambient_air_stream", lambda **_kwargs: StreamCollection())
     calls = {"plot": 0}
     monkeypatch.setattr(
         hp,
@@ -1158,6 +1157,10 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     )
     out = hp._compute_cascade_hp_system_obj(x, args, debug=True)
     assert "hpr_hot_streams" in out
+    assert out["Q_ext"] == pytest.approx(5.0)
+    assert out["utility_tot"] == pytest.approx(45.0)
+    assert out["w_net"] == pytest.approx(40.0)
+    assert out["cop_h"] == pytest.approx(5.0)
     assert calls["plot"] == 1
 
 
@@ -1339,11 +1342,14 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     monkeypatch.setattr(hp, "ParallelVapourCompressionCycles", _FakeMultiSimple)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
-    monkeypatch.setattr(hp, "_get_ambient_air_stream", lambda **_kwargs: StreamCollection())
     out = hp._compute_multi_simple_hp_system_obj(
         np.array([0.2] * 10), args, debug=False
     )
     assert "model" in out
+    assert out["Q_ext"] == pytest.approx(11.0)
+    assert out["utility_tot"] == pytest.approx(41.0)
+    assert out["w_net"] == pytest.approx(30.0)
+    assert out["cop_h"] == pytest.approx(200.0 / 30.0)
 
 
 def test_brayton_paths_and_helpers(monkeypatch):
@@ -1664,7 +1670,6 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
         ]
     )
     monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **kwargs: next(seq))
-    monkeypatch.setattr(hp, "_get_ambient_air_stream", lambda **_kwargs: StreamCollection())
     called = {"plot": 0}
     monkeypatch.setattr(
         hp,
@@ -1672,6 +1677,10 @@ def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
         lambda *args, **kwargs: called.__setitem__("plot", called["plot"] + 1),
     )
     out = hp._compute_multi_simple_hp_system_obj(np.array([0.2] * 5), args, debug=True)
+    assert out["Q_ext"] == pytest.approx(7.0)
+    assert out["utility_tot"] == pytest.approx(17.0)
+    assert out["w_net"] == pytest.approx(10.0)
+    assert out["cop_h"] == pytest.approx(3.0)
     assert out["cop_h"] > 0.0
     assert called["plot"] == 1
 

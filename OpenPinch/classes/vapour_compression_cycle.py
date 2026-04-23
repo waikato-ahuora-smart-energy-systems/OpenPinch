@@ -485,7 +485,7 @@ class VapourCompressionCycle:
         )  # Find the limit to subcooling the condensate
         self._compute_state_from_pressure_temperature(
             P=P_hi,
-            T=T_cond - dT_subcool,
+            T=min(T_cond, self._t_crit - 0.1) - dT_subcool,
             phase=0,
         )
         h_cond_out_tar = self._state.hmass()
