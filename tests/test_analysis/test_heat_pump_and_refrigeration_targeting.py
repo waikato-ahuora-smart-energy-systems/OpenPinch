@@ -78,7 +78,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_returns_entropic_mea
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
     )
 
-    work_hpr, _, _, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -87,6 +87,10 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_returns_entropic_mea
             args,
         )
     )
+    cop = cycle_results["cop"]
+    Q_cond_out = cycle_results["Qc"]
+    Q_evap_out = cycle_results["Qe"]
+    work_hpr = cycle_results["w_hpr"]
 
     expected = (
         _compute_entropic_mean_temperature(T_evap, Q_evap)
@@ -126,7 +130,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_positive_lift_scales
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
     )
 
-    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -142,12 +146,12 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_positive_lift_scales
     expected_work_use = Q_evap[0] / (expected_cop - 1.0)
     expected_Q_cond = Q_evap[0] + expected_work_use
 
-    assert work_he == pytest.approx(0.0)
-    assert heat_ex == pytest.approx(0.0)
-    assert cop == pytest.approx(expected_cop)
-    assert work_hpr == pytest.approx(expected_work_use)
-    np.testing.assert_allclose(Q_cond_out, np.array([expected_Q_cond]))
-    np.testing.assert_allclose(Q_evap_out, Q_evap)
+    assert cycle_results["w_he"] == pytest.approx(0.0)
+    assert cycle_results["heat_ex"] == pytest.approx(0.0)
+    assert cycle_results["cop"] == pytest.approx(expected_cop)
+    assert cycle_results["w_hpr"] == pytest.approx(expected_work_use)
+    np.testing.assert_allclose(cycle_results["Qc"], np.array([expected_Q_cond]))
+    np.testing.assert_allclose(cycle_results["Qe"], Q_evap)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_zero_lift_returns_no_useful_work():
@@ -159,7 +163,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_zero_lift_returns_no
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
     )
 
-    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -169,12 +173,12 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_zero_lift_returns_no
         )
     )
 
-    assert work_hpr == pytest.approx(0.0)
-    assert work_he == pytest.approx(0.0)
-    assert heat_ex == pytest.approx(100.0)
-    assert cop == pytest.approx(1.0)
-    np.testing.assert_allclose(Q_cond_out, Q_cond)
-    np.testing.assert_allclose(Q_evap_out, Q_evap)
+    assert cycle_results["w_hpr"] == pytest.approx(0.0)
+    assert cycle_results["w_he"] == pytest.approx(0.0)
+    assert cycle_results["heat_ex"] == pytest.approx(100.0)
+    assert cycle_results["cop"] == pytest.approx(1.0)
+    np.testing.assert_allclose(cycle_results["Qc"], Q_cond)
+    np.testing.assert_allclose(cycle_results["Qe"], Q_evap)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_generates_work():
@@ -186,7 +190,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.5
     )
 
-    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -205,12 +209,12 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
     expected_work_gen = expected_Q_evap * expected_eta_he
     expected_Q_cond = expected_Q_evap - expected_work_gen
 
-    assert work_hpr == pytest.approx(0.0)
-    assert work_he == pytest.approx(expected_work_gen)
-    assert heat_ex == pytest.approx(0.0)
-    assert cop == pytest.approx(1.0)
-    np.testing.assert_allclose(Q_cond_out, np.array([expected_Q_cond]))
-    np.testing.assert_allclose(Q_evap_out, np.array([expected_Q_evap]))
+    assert cycle_results["w_hpr"] == pytest.approx(0.0)
+    assert cycle_results["w_he"] == pytest.approx(expected_work_gen)
+    assert cycle_results["heat_ex"] == pytest.approx(0.0)
+    assert cycle_results["cop"] == pytest.approx(1.0)
+    np.testing.assert_allclose(cycle_results["Qc"], np.array([expected_Q_cond]))
+    np.testing.assert_allclose(cycle_results["Qe"], np.array([expected_Q_evap]))
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_engine_and_heat_pump():
@@ -222,7 +226,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.5
     )
 
-    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -256,12 +260,12 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
     )
     expected_work_use = expected_Qe_hp / (expected_cop - 1.0)
 
-    assert work_he == pytest.approx(expected_work_gen)
-    assert work_hpr == pytest.approx(expected_work_use)
-    assert heat_ex == pytest.approx(0.0)
-    assert cop == pytest.approx(expected_cop)
-    assert Q_cond_out.sum() == pytest.approx(Q_cond.sum())
-    assert Q_evap_out.sum() == pytest.approx(expected_Qe_he + expected_Qe_hp)
+    assert cycle_results["w_he"] == pytest.approx(expected_work_gen)
+    assert cycle_results["w_hpr"] == pytest.approx(expected_work_use)
+    assert cycle_results["heat_ex"] == pytest.approx(0.0)
+    assert cycle_results["cop"] == pytest.approx(expected_cop)
+    assert cycle_results["Qc"].sum() == pytest.approx(Q_cond.sum())
+    assert cycle_results["Qe"].sum() == pytest.approx(expected_Qe_he + expected_Qe_hp)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pool_counts_each_evaporator_once():
@@ -273,7 +277,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pool_counts
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.5
     )
 
-    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -291,12 +295,12 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pool_counts
     expected_Q_evap = min(Q_evap.sum(), Q_cond.sum() / (1.0 - expected_eta_he))
     expected_work_gen = expected_Q_evap * expected_eta_he
 
-    assert work_hpr == pytest.approx(0.0)
-    assert work_he == pytest.approx(expected_work_gen)
-    assert heat_ex == pytest.approx(0.0)
-    assert cop == pytest.approx(1.0)
-    assert Q_cond_out.sum() == pytest.approx(Q_cond.sum())
-    assert Q_evap_out.sum() == pytest.approx(expected_Q_evap)
+    assert cycle_results["w_hpr"] == pytest.approx(0.0)
+    assert cycle_results["w_he"] == pytest.approx(expected_work_gen)
+    assert cycle_results["heat_ex"] == pytest.approx(0.0)
+    assert cycle_results["cop"] == pytest.approx(1.0)
+    assert cycle_results["Qc"].sum() == pytest.approx(Q_cond.sum())
+    assert cycle_results["Qe"].sum() == pytest.approx(expected_Q_evap)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_without_engine_becomes_heat_exchange():
@@ -308,7 +312,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_withou
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
     )
 
-    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -318,12 +322,12 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_withou
         )
     )
 
-    assert work_hpr == pytest.approx(0.0)
-    assert work_he == pytest.approx(0.0)
-    assert heat_ex == pytest.approx(100.0)
-    assert cop == pytest.approx(1.0)
-    np.testing.assert_allclose(Q_cond_out, Q_cond)
-    np.testing.assert_allclose(Q_evap_out, np.array([100.0]))
+    assert cycle_results["w_hpr"] == pytest.approx(0.0)
+    assert cycle_results["w_he"] == pytest.approx(0.0)
+    assert cycle_results["heat_ex"] == pytest.approx(100.0)
+    assert cycle_results["cop"] == pytest.approx(1.0)
+    np.testing.assert_allclose(cycle_results["Qc"], Q_cond)
+    np.testing.assert_allclose(cycle_results["Qe"], np.array([100.0]))
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_zero_hp_efficiency_returns_no_positive_lift_transfer():
@@ -335,7 +339,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_zero_hp_efficiency_r
         T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.0, eta_he=0.0
     )
 
-    work_hpr, work_he, heat_ex, cop, Q_cond_out, Q_evap_out = (
+    cycle_results = (
         _get_multi_temperature_carnot_stage_duties_and_work(
             T_cond.copy(),
             T_evap.copy(),
@@ -345,12 +349,12 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_zero_hp_efficiency_r
         )
     )
 
-    assert work_hpr == pytest.approx(0.0)
-    assert work_he == pytest.approx(0.0)
-    assert heat_ex == pytest.approx(0.0)
-    assert cop == pytest.approx(1.0)
-    np.testing.assert_allclose(Q_cond_out, np.array([0.0]))
-    np.testing.assert_allclose(Q_evap_out, np.array([0.0]))
+    assert cycle_results["w_hpr"] == pytest.approx(0.0)
+    assert cycle_results["w_he"] == pytest.approx(0.0)
+    assert cycle_results["heat_ex"] == pytest.approx(0.0)
+    assert cycle_results["cop"] == pytest.approx(1.0)
+    np.testing.assert_allclose(cycle_results["Qc"], np.array([0.0]))
+    np.testing.assert_allclose(cycle_results["Qe"], np.array([0.0]))
 
 
 def test_get_multi_simple_carnot_stage_duties_and_work_positive_lift_uses_absolute_temperatures():
@@ -361,7 +365,7 @@ def test_get_multi_simple_carnot_stage_duties_and_work_positive_lift_uses_absolu
         eta_ii_he_carnot=0.0,
     )
 
-    work_hpr, work_he, heat_ex, Q_cond, Q_evap, _ = (
+    cycle_results = (
         _get_multi_simple_carnot_stage_duties_and_work(
             T_cond=np.array([80.0]),
             T_evap=np.array([20.0]),
@@ -375,11 +379,11 @@ def test_get_multi_simple_carnot_stage_duties_and_work_positive_lift_uses_absolu
     expected_work = 120.0 / expected_cop
     expected_Q_evap = 120.0 - expected_work
 
-    np.testing.assert_allclose(Q_cond, np.array([120.0]))
-    np.testing.assert_allclose(Q_evap, np.array([expected_Q_evap]))
-    np.testing.assert_allclose(work_hpr, np.array([expected_work]))
-    np.testing.assert_allclose(work_he, np.array([0.0]))
-    assert heat_ex == pytest.approx(0.0)
+    np.testing.assert_allclose(cycle_results["Qc"], np.array([120.0]))
+    np.testing.assert_allclose(cycle_results["Qe"], np.array([expected_Q_evap]))
+    np.testing.assert_allclose(cycle_results["w_hpr"], np.array([expected_work]))
+    np.testing.assert_allclose(cycle_results["w_he"], np.array([0.0]))
+    assert cycle_results["heat_ex"] == pytest.approx(0.0)
 
 
 def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across_modes():
@@ -394,7 +398,7 @@ def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across
     H_hot = np.array([0.0, -120.0, -200.0])
     H_cold = np.array([300.0, 150.0, 0.0])
 
-    work_hpr, work_he, heat_ex, Q_cond, Q_evap, _ = (
+    cycle_results = (
         _get_multi_simple_carnot_stage_duties_and_work(
             T_cond=T_cond,
             T_evap=T_evap,
@@ -415,12 +419,12 @@ def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across
     expected_w_he = available_he - expected_Qc_he
     expected_Q_hx = available_total - available_he
 
-    np.testing.assert_allclose(Q_evap, np.array([expected_Q_hx, available_he]))
-    np.testing.assert_allclose(Q_cond, np.array([expected_Q_hx, expected_Qc_he]))
-    np.testing.assert_allclose(work_hpr, np.array([0.0, 0.0]))
-    np.testing.assert_allclose(work_he, np.array([0.0, expected_w_he]))
-    assert heat_ex == pytest.approx(expected_Q_hx)
-    assert Q_evap.sum() == pytest.approx(available_total)
+    np.testing.assert_allclose(cycle_results["Qe"], np.array([expected_Q_hx, available_he]))
+    np.testing.assert_allclose(cycle_results["Qc"], np.array([expected_Q_hx, expected_Qc_he]))
+    np.testing.assert_allclose(cycle_results["w_hpr"], np.array([0.0, 0.0]))
+    np.testing.assert_allclose(cycle_results["w_he"], np.array([0.0, expected_w_he]))
+    assert cycle_results["heat_ex"] == pytest.approx(expected_Q_hx)
+    assert cycle_results["Qe"].sum() == pytest.approx(available_total)
 
 
 def test_map_x_to_T_returns_expected_descending_temperatures():

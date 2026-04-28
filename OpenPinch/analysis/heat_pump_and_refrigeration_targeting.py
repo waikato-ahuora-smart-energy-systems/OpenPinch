@@ -134,7 +134,9 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HPR_TYPE = HPRcycle.CascadeVapourComp.value
+    zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
+    zone_config.N_COND = 2
+    zone_config.N_EVAP = 2
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -618,7 +620,7 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     H_hot_with_amb: np.ndarray,
     H_cold_with_amb: np.ndarray,
     args: HPRTargetInputs,
-) -> Tuple[float, float, float, float, np.ndarray, np.ndarray]:
+) -> dict:
     """Estimate COP by scaling the Carnot limit using entropic mean temperatures."""
     Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond, args.T_cold, H_cold_with_amb, is_cond=True
@@ -708,7 +710,14 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
             "Energy balance not satisfied in multi-temperature Carnot cycle calculation."
         )
 
-    return w_hpr, w_he, heat_ex, cop, Qc, Qe
+    return {
+        "w_hpr": w_hpr,
+        "w_he": w_he,
+        "heat_ex": heat_ex,
+        "cop": cop,
+        "Qc": Qc,
+        "Qe": Qe
+    }
 
 
 def _compute_multi_temperature_carnot_cycle_obj(
@@ -723,20 +732,19 @@ def _compute_multi_temperature_carnot_cycle_obj(
     H_cold_with_amb = args.H_cold + args.z_amb_cold * state_vars["Q_amb_cold"]
     H_hot_with_amb = args.H_hot + args.z_amb_hot * state_vars["Q_amb_hot"]
 
-    w_hpr, w_he, heat_ex, cop, Q_cond, Q_evap = (
-        _get_multi_temperature_carnot_stage_duties_and_work(
-            T_cond=state_vars["T_cond"],
-            T_evap=state_vars["T_evap"],
-            H_hot_with_amb=H_hot_with_amb,
-            H_cold_with_amb=H_cold_with_amb,
-            args=args,
-        )
+    cycle_results = _get_multi_temperature_carnot_stage_duties_and_work(
+        T_cond=state_vars["T_cond"],
+        T_evap=state_vars["T_evap"],
+        H_hot_with_amb=H_hot_with_amb,
+        H_cold_with_amb=H_cold_with_amb,
+        args=args,
     )
-    work = w_hpr - w_he
+
+    work = cycle_results["w_hpr"] - cycle_results["w_he"]
 
     # Determine external heating and cooling demand
-    Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - Q_cond.sum(), 0.0)
-    Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - Q_evap.sum(), 0.0)
+    Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - cycle_results["Qc"].sum(), 0.0)
+    Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - cycle_results["Qe"].sum(), 0.0)
 
     # Determine the objective
     p = (
@@ -749,7 +757,7 @@ def _compute_multi_temperature_carnot_cycle_obj(
         else 0.0
     )
     obj = _calc_obj(
-        work=w_hpr - w_he,
+        work=cycle_results["w_hpr"] - cycle_results["w_he"],
         Q_ext_heat=Q_ext_heat,
         Q_ext_cold=Q_ext_cold,
         Q_hpr_target=args.Q_hpr_target,
@@ -759,7 +767,7 @@ def _compute_multi_temperature_carnot_cycle_obj(
     )
 
     if debug:  # If in debug mode, plot the graph immediately
-        res = _get_carnot_hpr_cycle_streams(state_vars["T_cond"], Q_cond, state_vars["T_evap"], Q_evap, args)
+        res = _get_carnot_hpr_cycle_streams(state_vars["T_cond"], cycle_results["Qc"], state_vars["T_evap"], cycle_results["Qe"], args)
         plot_multi_hp_profiles_from_results(
             args.T_hot,
             H_hot_with_amb,
@@ -775,15 +783,15 @@ def _compute_multi_temperature_carnot_cycle_obj(
         "obj": obj,
         "utility_tot": work + Q_ext_heat + Q_ext_cold,
         "w_net": work,
-        "w_hpr": w_hpr,
-        "w_he": w_he,
-        "heat_ex": heat_ex,
+        "w_hpr": cycle_results["w_hpr"],
+        "w_he": cycle_results["w_he"],
+        "heat_ex": cycle_results["heat_ex"],
         "Q_ext": Q_ext_heat + Q_ext_cold,
         "T_cond": state_vars["T_cond"],
-        "Q_cond": Q_cond,
+        "Q_cond": cycle_results["Qc"],
         "T_evap": state_vars["T_evap"],
-        "Q_evap": Q_evap,
-        "cop_h": cop,
+        "Q_evap": cycle_results["Qe"],
+        "cop_h": cycle_results["cop"],
         "Q_amb_hot": state_vars["Q_amb_hot"],
         "Q_amb_cold": state_vars["Q_amb_cold"],
         "success": True,
@@ -1037,7 +1045,12 @@ def _parse_multi_simple_carnot_hp_state_variables(
     scale = max(args.Q_heat_max, args.Q_cool_max)
     Q_amb_hot = min(scale * x[-1], 0.0) * -1
     Q_amb_cold = max(scale * x[-1], 0.0)
-    return T_cond, T_evap, Q_amb_hot, Q_amb_cold
+    return {
+        "T_cond": T_cond,
+        "T_evap": T_evap,
+        "Q_amb_hot": Q_amb_hot,
+        "Q_amb_cold": Q_amb_cold,
+    }
 
 
 def _get_multi_simple_carnot_stage_duties_and_work(
@@ -1136,7 +1149,14 @@ def _get_multi_simple_carnot_stage_duties_and_work(
             "Energy balance not satisfied in multiple simple Carnot cycle calculation."
         )
 
-    return w_hpr, w_he, heat_ex, Qc, Qe, q_diff
+    return {
+        "w_hpr": w_hpr,
+        "w_he": w_he,
+        "heat_ex": heat_ex,
+        "Qc": Qc,
+        "Qe": Qe,
+        "q_diff": q_diff
+    }
 
 
 def _compute_multi_simple_carnot_hp_opt_obj(
@@ -1146,35 +1166,33 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     debug: bool = False,
 ) -> dict:
     """Evaluate compressor work for a candidate multiple single Carnot HP placement defined by vector `x`."""
-    T_cond, T_evap, Q_amb_hot, Q_amb_cold = (
+    state_vars = (
         _parse_multi_simple_carnot_hp_state_variables(x, args)
     )
     # Adjust the background profiles to account for ambient heat exchange
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
+    H_cold_with_amb = args.H_cold + args.z_amb_cold * state_vars["Q_amb_cold"]
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * state_vars["Q_amb_hot"]
 
     # Calculate the target heat for each condenser/evaporator temperature pair from the background profiles
-    w_hpr, w_he, heat_ex, Q_cond, Q_evap, q_diff = (
-        _get_multi_simple_carnot_stage_duties_and_work(
-            T_cond=T_cond,
-            T_evap=T_evap,
-            H_hot_with_amb=H_hot_with_amb,
-            H_cold_with_amb=H_cold_with_amb,
-            args=args,
-        )
+    cycle_results = _get_multi_simple_carnot_stage_duties_and_work(
+        T_cond=state_vars["T_cond"],
+        T_evap=state_vars["T_evap"],
+        H_hot_with_amb=H_hot_with_amb,
+        H_cold_with_amb=H_cold_with_amb,
+        args=args,
     )
 
     # Calculate evaporator duty
-    work = w_hpr.sum() - w_he.sum()
-    cop = Q_cond.sum() / w_hpr.sum() if w_hpr.sum() > tol else 0
-    eta_he = w_he.sum() / (Q_cond.sum() + 1e-6) if Q_cond.sum() != 0 else 0
+    work = cycle_results["w_hpr"].sum() - cycle_results["w_he"].sum()
+    cop = cycle_results["Qc"].sum() / cycle_results["w_hpr"].sum() if cycle_results["w_hpr"].sum() > tol else 0
+    eta_he = cycle_results["w_he"].sum() / (cycle_results["Qc"].sum() + 1e-6) if cycle_results["Qc"].sum() != 0 else 0
 
     # Determine external heating and cooling demand
-    Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - Q_cond.sum(), 0.0)
-    Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - Q_evap.sum(), 0.0)
+    Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - cycle_results["Qc"].sum(), 0.0)
+    Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - cycle_results["Qe"].sum(), 0.0)
 
     # Determine the key performance metrics of the heat pump
-    p = g_ineq_penalty(g=q_diff, rho=args.rho_penalty, form="square")
+    p = g_ineq_penalty(g=cycle_results["q_diff"], rho=args.rho_penalty, form="square")
 
     # Calculate the objective function value
     obj = _calc_obj(
@@ -1188,7 +1206,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     )
 
     if debug:  # If in debug mode, plot the graph immediately
-        res = _get_carnot_hpr_cycle_streams(T_cond, Q_cond, T_evap, Q_evap, args)
+        res = _get_carnot_hpr_cycle_streams(state_vars["T_cond"], cycle_results["Qc"], state_vars["T_evap"], cycle_results["Qe"], args)
         plot_multi_hp_profiles_from_results(
             args.T_hot,
             H_hot_with_amb,
@@ -1204,18 +1222,18 @@ def _compute_multi_simple_carnot_hp_opt_obj(
         "obj": obj,
         "utility_tot": work.sum() + Q_ext_heat,
         "w_net": work,
-        "w_hpr": w_hpr,
-        "w_he": w_he,
-        "heat_ex": heat_ex,
+        "w_hpr": cycle_results["w_hpr"],
+        "w_he": cycle_results["w_he"],
+        "heat_ex": cycle_results["heat_ex"],
         "Q_ext": Q_ext_heat + Q_ext_cold,
-        "T_cond": T_cond,
-        "Q_cond": Q_cond,
-        "T_evap": T_evap,
-        "Q_evap": Q_evap,
+        "T_cond": state_vars["T_cond"],
+        "Q_cond": cycle_results["Qc"],
+        "T_evap": state_vars["T_evap"],
+        "Q_evap": cycle_results["Qe"],
         "cop_h": cop,
         "eta_he": eta_he,
-        "Q_amb_hot": Q_amb_hot,
-        "Q_amb_cold": Q_amb_cold,
+        "Q_amb_hot": state_vars["Q_amb_hot"],
+        "Q_amb_cold": state_vars["Q_amb_cold"],
         "success": True,
     }
 
