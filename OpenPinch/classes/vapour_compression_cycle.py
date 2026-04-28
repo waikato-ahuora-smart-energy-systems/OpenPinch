@@ -53,7 +53,7 @@ class VapourCompressionCycle:
         self._m_dot: Optional[float] = None
         self._work: Optional[float] = None
         self._penalty: Optional[float] = None
-        self._refrigerant: Optional[str] = None
+        self._refrigerant: Optional[str] = "water"
         self._T_evap: Optional[float] = None
         self._T_cond: Optional[float] = None
 
@@ -290,11 +290,12 @@ class VapourCompressionCycle:
         T: float,
         Q: float = 1.0,
     ):
+        s = process_fluid_state(self._refrigerant)
         if T > self._t_crit - 1:
-            self._state.update(CoolProp.DmassT_INPUTS, self._d_crit, T)
+            s.update(CoolProp.DmassT_INPUTS, self._d_crit, T)
         else:
-            self._state.update(CoolProp.QT_INPUTS, Q, T)
-        return self._state.p()
+            s.update(CoolProp.QT_INPUTS, Q, T)
+        return s.p()
 
     def _compute_state_from_pressure_temperature(
         self,
@@ -303,38 +304,42 @@ class VapourCompressionCycle:
         *,
         phase: str = 1.0,
     ) -> CoolProp.AbstractState:
+        s = process_fluid_state(self._refrigerant)
         try:
-            self._state.update(CoolProp.PT_INPUTS, P, T)
+            s.update(CoolProp.PT_INPUTS, P, T)
         except:
-            self._state.update(
+            s.update(
                 CoolProp.PQ_INPUTS, P, phase
             )  # Close to saturated liquid/vapour
-        return self._state
+        return s
 
     def _compute_state_from_pressure_quality(
         self,
         P: float,
         Q: float,
     ) -> CoolProp.AbstractState:
-        self._state.update(CoolProp.PQ_INPUTS, P, Q)
-        return self._state
+        s = process_fluid_state(self._refrigerant)
+        s.update(CoolProp.PQ_INPUTS, P, Q)
+        return s
 
     def _compute_compressor_outlet_state(
         self, h_in: float, s_in: float, P_out: float
     ) -> CoolProp.AbstractState:
-        self._state.update(CoolProp.PSmass_INPUTS, P_out, s_in)
-        h_out_isentropic = self._state.hmass()
+        s = process_fluid_state(self._refrigerant)
+        s.update(CoolProp.PSmass_INPUTS, P_out, s_in)
+        h_out_isentropic = s.hmass()
         h_out = h_in + (h_out_isentropic - h_in) / self._eta_comp
-        self._state.update(CoolProp.HmassP_INPUTS, h_out, P_out)
-        return self._state
+        s.update(CoolProp.HmassP_INPUTS, h_out, P_out)
+        return s
 
     def _compute_state_from_pressure_enthalpy(
         self,
         P: float,
         h: float,
     ):
-        self._state.update(CoolProp.HmassP_INPUTS, h, P)
-        return self._state
+        s = process_fluid_state(self._refrigerant)
+        s.update(CoolProp.HmassP_INPUTS, h, P)
+        return s
 
     def _convert_C_to_K(
         self,
@@ -350,12 +355,13 @@ class VapourCompressionCycle:
 
     def _save_cycle_state(
         self,
+        state: CoolProp.AbstractState,
         i: int,
     ):
-        self._cycle_states[i, "H"] = float(self._state.hmass())
-        self._cycle_states[i, "S"] = float(self._state.smass())
-        self._cycle_states[i, "P"] = float(self._state.p())
-        self._cycle_states[i, "T"] = float(self._state.T())
+        self._cycle_states[i, "H"] = float(state.hmass())
+        self._cycle_states[i, "S"] = float(state.smass())
+        self._cycle_states[i, "P"] = float(state.p())
+        self._cycle_states[i, "T"] = float(state.T())
 
     def solve(
         self,
@@ -411,15 +417,16 @@ class VapourCompressionCycle:
             Compressor power requirement for the solved operating point [W].
         """
         self._solved = False
-        self._validate_solve_inputs(
-            refrigerant=refrigerant,
-        )
+        self._validate_solve_inputs(refrigerant)
 
         self._refrigerant = refrigerant
         self._T_evap = T_evap
         self._T_cond = T_cond
-        self._dT_superheat = dT_superheat
-        self._dT_subcool = dT_subcool
+
+        y = min((T_cond - T_evap - self._dtcont * 2) / (dT_subcool + dT_superheat), 1.0) if dT_subcool + dT_superheat > 0 else 1.0
+
+        self._dT_superheat = dT_superheat * y
+        self._dT_subcool = dT_subcool * y
 
         if is_heat_pump:
             self._Q_heat = np.float64(1.0) if Q_heat is None else Q_heat
@@ -438,77 +445,72 @@ class VapourCompressionCycle:
         self._ihx_gas_dt = max(
             min(
                 dt_ihx_gas_side,
-                T_cond - T_evap - dT_subcool - dT_superheat - self._dtcont * 2,
+                T_cond - T_evap - self._dT_subcool - self._dT_superheat - self._dtcont * 2,
             ),
             0.0,
         )
 
-        T_evap = self._convert_C_to_K(T_evap)
-        T_cond = self._convert_C_to_K(T_cond)
-        P_lo = self._get_P_sat_from_T(T_evap)
-        P_hi = self._get_P_sat_from_T(T_cond)
+        T_evap_K = self._convert_C_to_K(T_evap)
+        T_cond_K = self._convert_C_to_K(T_cond)
+        P_lo = self._get_P_sat_from_T(T_evap_K)
+        P_hi = self._get_P_sat_from_T(T_cond_K)
 
         if P_lo > P_hi:
             raise ValueError("Evaporator pressure must be below condenser pressure.")
 
         """Solve a basic four-state cycle given inlet/outlet temperatures and pressures."""
         # 0 - Evaporator outlet / IHX inlet
-        self._compute_state_from_pressure_temperature(
+        state0 = self._compute_state_from_pressure_temperature(
             P=P_lo,
-            T=T_evap + dT_superheat,
+            T=T_evap_K + self._dT_superheat,
             phase=1,
         )
-        self._save_cycle_state(0)
-        hc_ihx_in = self._state.hmass()
+        self._save_cycle_state(state0, 0)
+        h_ihx_in = state0.hmass()
 
         # IHX outlet / compressor inlet
-        self._compute_state_from_pressure_temperature(
-            P=P_lo,
-            T=T_evap + dT_superheat + self._ihx_gas_dt,
-            phase=1,
-        )
-        dh_ihx = self._state.hmass() - hc_ihx_in
+        T_ihx_out = T_evap_K + self._dT_superheat + self._ihx_gas_dt
+        h_ihx_out = self._compute_state_from_pressure_temperature(
+            P=P_lo, T=T_ihx_out, phase=1,
+        ).hmass()
+        dh_ihx = h_ihx_out - h_ihx_in
 
         # 1 - Compressor discharge (real)
-        self._compute_compressor_outlet_state(
-            h_in=self._state.hmass(), s_in=self._state.smass(), P_out=P_hi
+        state1 = self._compute_compressor_outlet_state(
+            h_in=h_ihx_out, s_in=state0.smass(), P_out=P_hi
         )
-        self._save_cycle_state(1)
+        self._save_cycle_state(state1, 1)
 
         # 2 - Condenser outlet / IHX inlet (source)
-        self._compute_state_from_pressure_quality(
-            P=P_lo,
-            Q=0,
-        )
-        h_cond_out_min = (
-            self._state.hmass() + dh_ihx
-        )  # Find the limit to subcooling the condensate
-        self._compute_state_from_pressure_temperature(
-            P=P_hi,
-            T=min(T_cond, self._t_crit - 0.1) - dT_subcool,
-            phase=0,
-        )
-        h_cond_out_tar = self._state.hmass()
-        self._compute_state_from_pressure_enthalpy(
-            P=P_hi, h=max(h_cond_out_min, h_cond_out_tar)
+        h_cond_sat_liq = self._compute_state_from_pressure_quality(
+            P=P_lo, Q=0,
+        ).hmass()
+        h_cond_out_min = h_cond_sat_liq + dh_ihx  # Find the limit to subcooling the condensate
+        T_cond_out_tar = min(T_cond_K, self._t_crit - 0.1) - self._dT_subcool
+        h_cond_out_tar = self._compute_state_from_pressure_temperature(
+            P=P_hi, T=T_cond_out_tar, phase=0,
+        ).hmass()
+        h_cond_out = max(h_cond_out_min, h_cond_out_tar)
+        state2 = self._compute_state_from_pressure_enthalpy(
+            P=P_hi, h=h_cond_out,
         )
         dh_penalty = max(h_cond_out_min - h_cond_out_tar, 0.0)
-        self._dT_subcool = T_cond - self._state.T()
-        self._save_cycle_state(2)
+        self._dT_subcool = T_cond_K - state2.T()
+        self._save_cycle_state(state2, 2)
+
         if self._cycle_states[1, "H"] <= self._cycle_states[2, "H"]:
             raise ValueError(
                 "Condenser cannot have a negative or zero enthalpy change."
             )
 
         # 3 - Expansion valve outlet / evaporator inlet
-        self._compute_state_from_pressure_enthalpy(
-            P=P_lo,
-            h=self._state.hmass() - dh_ihx,
+        state3 = self._compute_state_from_pressure_enthalpy(
+            P=P_lo, h=state2.hmass() - dh_ihx,
         )
-        self._save_cycle_state(3)
+        self._save_cycle_state(state3, 3)
 
-        self._q_evap = self._cycle_states[0, "H"] - self._cycle_states[3, "H"]
-        self._q_cond = self._cycle_states[1, "H"] - self._cycle_states[2, "H"]
+        self._q_evap = state0.hmass() - state3.hmass()
+        self._q_cond = state1.hmass() - state2.hmass()
         self._w_net = self._q_cond - self._q_evap
         if is_heat_pump:
             self._m_dot = self._Q_cond / self._q_cond
@@ -526,15 +528,12 @@ class VapourCompressionCycle:
 
         if is_heat_pump:
             # 4 - Hot side of cascade heat exchanger outlet (otherwise state 4 == 1)
-            self._q_cas_heat = (
-                self._Q_cas_heat / self._m_dot if self._m_dot > 0.0 else 0.0
-            )
+            self._q_cas_heat = self._Q_cas_heat / self._m_dot if self._m_dot > 0.0 else 0.0
             self._q_heat = self._q_cond - self._q_cas_heat
-            self._compute_state_from_pressure_enthalpy(
-                P=self._cycle_states[2, "P"],
-                h=self._cycle_states[2, "H"] + self._q_heat,
+            state4 = self._compute_state_from_pressure_enthalpy(
+                P=state2.p(), h=state2.hmass() + self._q_heat,
             )
-            self._save_cycle_state(4)
+            self._save_cycle_state(state4, 4)
 
             # 5 - Hot side of cascade heat exchanger outlet (otherwise state 5 == 3)
             if self._Q_cool == None or np.isnan(self._Q_cool):
@@ -542,45 +541,34 @@ class VapourCompressionCycle:
             elif self._Q_cool > self._Q_evap:
                 self._Q_cool = self._Q_evap
 
-            self._q_cool = (
-                self._Q_cool / self._m_dot if self._m_dot > 0 else self._q_evap
-            )
+            self._q_cool = self._Q_cool / self._m_dot if self._m_dot > 0 else self._q_evap
 
-            self._compute_state_from_pressure_enthalpy(
-                P=self._cycle_states[3, "P"],
-                h=self._cycle_states[3, "H"] + self._q_cool,
+            state5 = self._compute_state_from_pressure_enthalpy(
+                P=state3.p(), h=state3.hmass() + self._q_cool,
             )
-            self._save_cycle_state(5)
+            self._save_cycle_state(state5, 5)
             self._q_cas_cool = self._q_evap - self._q_cool
             self._Q_cas_cool = self._Q_evap - self._Q_cool
 
         else:  # is refrigeration
             # 5 - Hot side of cascade heat exchanger outlet (otherwise state 5 == 3)
-            self._q_cas_cool = (
-                self._Q_cas_cool / self._m_dot if self._m_dot > 0.0 else 0.0
-            )
+            self._q_cas_cool = self._Q_cas_cool / self._m_dot if self._m_dot > 0.0 else 0.0
             self._q_cool = self._q_evap - self._q_cas_cool
-            self._compute_state_from_pressure_enthalpy(
-                P=self._cycle_states[3, "P"],
-                h=self._cycle_states[3, "H"] + self._q_cool,
+            state5 = self._compute_state_from_pressure_enthalpy(
+                P=state3.p(), h=state3.hmass() + self._q_cool,
             )
-            self._save_cycle_state(5)
+            self._save_cycle_state(state5, 5)
 
             # 4 - Hot side of cascade heat exchanger outlet (otherwise state 4 == 1)
             if self._Q_heat == None or np.isnan(self._Q_heat):
                 self._Q_heat = self._Q_cond
             elif self._Q_heat > self._Q_cond:
                 self._Q_heat = self._Q_cond
-
-            self._q_heat = (
-                self._Q_heat / self._m_dot if self._m_dot > 0 else self._q_cond
+            self._q_heat = self._Q_heat / self._m_dot if self._m_dot > 0 else self._q_cond
+            state4 = self._compute_state_from_pressure_enthalpy(
+                P=state2.p(), h=state2.hmass() + self._q_heat,
             )
-
-            self._compute_state_from_pressure_enthalpy(
-                P=self._cycle_states[2, "P"],
-                h=self._cycle_states[2, "H"] + self._q_heat,
-            )
-            self._save_cycle_state(4)
+            self._save_cycle_state(state4, 4)
 
         # Finish analysis
         self._solved = True

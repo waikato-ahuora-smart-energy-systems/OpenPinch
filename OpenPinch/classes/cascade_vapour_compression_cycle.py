@@ -379,15 +379,15 @@ class CascadeVapourCompressionCycle:
             + np.min([(T_evap - np.roll(T_evap, 1))[:-1].sum(), 0.0])
         ) * -1
 
-    def _normalize_secondary_process_duty(self, duty):
-        if isinstance(duty, list):
-            duty = np.asarray(duty)
-        if isinstance(duty, np.ndarray):
-            if duty[-1] is not None:
-                duty = duty.copy()
-                duty[-1] = np.nan
-            return duty
-        return None
+    def _normalize_secondary_process_duty(self, duty = None) -> np.ndarray | None:
+        if duty is None:
+            return None
+        duty_arr = np.asarray(duty)
+        if duty_arr.size == 1:
+            return duty_arr
+        if duty_arr[-1] is not None:
+            duty_arr[-1] = np.nan
+        return duty_arr
 
     def _prepare_process_duty_inputs(
         self,

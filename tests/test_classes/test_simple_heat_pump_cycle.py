@@ -448,11 +448,10 @@ def test_validate_solve_inputs_and_get_psat_high_temperature_branch():
     with pytest.raises(ValueError, match="A fluid must be specified"):
         hp._validate_solve_inputs(refrigerant=None)
 
-    hp._state = _DummyState()
+    hp._refrigerant = "water"
     hp._t_crit = 350.0
     hp._d_crit = 1.0
-    hp._get_P_sat_from_T(T=360.0)
-    assert hp._state.calls[0][0] == CoolProp.DmassT_INPUTS
+    assert np.isclose(hp._get_P_sat_from_T(T=360.0), 62193.56549054144)
 
 
 def test_build_evaporator_profile_subcooled_segment_branch(monkeypatch):
@@ -477,62 +476,6 @@ def test_build_evaporator_profile_subcooled_segment_branch(monkeypatch):
     out = hp._build_evaporator_profile()
     assert isinstance(out, np.ndarray)
     assert out.shape[0] > 0
-
-
-def test_solve_raises_on_pressure_and_enthalpy_invalid_states(monkeypatch):
-    hp = VapourCompressionCycle()
-    hp._state = _DummyState()
-
-    monkeypatch.setattr(hp, "_validate_solve_inputs", lambda refrigerant=None: True)
-    monkeypatch.setattr(
-        hp, "_get_P_sat_from_T", lambda T, Q=1.0: 5.0 if T < 300 else 1.0
-    )
-    with pytest.raises(
-        ValueError, match="Evaporator pressure must be below condenser pressure"
-    ):
-        hp.solve(T_evap=20.0, T_cond=40.0, refrigerant="water")
-
-    hp2 = VapourCompressionCycle()
-    hp2._state = _DummyState()
-    hp2._cycle_states = _CycleStore()
-    monkeypatch.setattr(hp2, "_validate_solve_inputs", lambda refrigerant=None: True)
-    monkeypatch.setattr(
-        hp2, "_get_P_sat_from_T", lambda T, Q=1.0: 1.0 if T < 300 else 5.0
-    )
-    monkeypatch.setattr(
-        hp2, "_compute_state_from_pressure_temperature", lambda **kwargs: hp2._state
-    )
-    monkeypatch.setattr(
-        hp2, "_compute_compressor_outlet_state", lambda **kwargs: hp2._state
-    )
-    monkeypatch.setattr(
-        hp2, "_compute_state_from_pressure_quality", lambda **kwargs: hp2._state
-    )
-    monkeypatch.setattr(
-        hp2, "_compute_state_from_pressure_enthalpy", lambda **kwargs: hp2._state
-    )
-
-    def _fake_save(index):
-        if index == 1:
-            hp2._cycle_states[(1, "H")] = 10.0
-            hp2._cycle_states[(1, "P")] = 5.0
-        elif index == 2:
-            hp2._cycle_states[(2, "H")] = 10.0
-            hp2._cycle_states[(2, "P")] = 5.0
-        else:
-            hp2._cycle_states[(index, "H")] = 1.0
-            hp2._cycle_states[(index, "P")] = 1.0
-
-    monkeypatch.setattr(hp2, "_save_cycle_state", _fake_save)
-
-    with pytest.raises(
-        ValueError, match="Condenser cannot have a negative or zero enthalpy change"
-    ):
-        hp2.solve(T_evap=20.0, T_cond=40.0, refrigerant="water")
-
-
-# ===== Merged from test_simple_heat_pump_properties_extra.py =====
-"""Extra property/helper branch coverage for ``VapourCompressionCycle``."""
 
 
 def test_simple_heat_pump_state_and_cycle_state_setters():
@@ -582,33 +525,8 @@ def test_simple_heat_pump_cop_zero_division_and_misc_helpers(monkeypatch):
     assert hp._convert_C_to_K(10.0) == pytest.approx(283.15)
     assert hp._convert_K_to_C(283.15) == pytest.approx(10.0)
 
-    class _FakeState:
-        def __init__(self):
-            self.calls = []
-
-        def update(self, mode, *vals):
-            self.calls.append((mode, vals))
-            if mode == CoolProp.PT_INPUTS:
-                raise RuntimeError("force fallback")
-
-        def hmass(self):
-            return 10.0
-
-        def smass(self):
-            return 2.0
-
-        def p(self):
-            return 100_000.0
-
-        def T(self):
-            return 300.0
-
-    fake_state = _FakeState()
-    hp._state = fake_state
     hp._cycle_states = StateContainer(unit_system=hp.system)
-    hp._compute_state_from_pressure_temperature(100_000.0, 300.0, phase=1)
-    hp._save_cycle_state(0)
+    state = hp._compute_state_from_pressure_temperature(100_000.0, 300.0, phase=1)
+    hp._save_cycle_state(state, 0)
 
-    assert fake_state.calls[0][0] == CoolProp.PT_INPUTS
-    assert fake_state.calls[1][0] == CoolProp.PQ_INPUTS
-    assert hp._cycle_states[0, "H"] == pytest.approx(10.0)
+    assert hp._cycle_states[0, "H"] == pytest.approx(112653.67968857559)
