@@ -639,55 +639,27 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     w_hpr = 0.0
     cop = 1.0
 
-    T_diff = np.subtract.outer(T_cond, T_evap)
-
-    # Negative lift: pooled heat-engine mode.
-    is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
-    if np.any(is_he):
-        idx_c_he, idx_e_he = np.nonzero(is_he)
-        idx_c_he = np.unique(idx_c_he)
-        idx_e_he = np.unique(idx_e_he)
-        Qc_pool = np.maximum(Q_cond[idx_c_he], 0.0)
-        Qe_pool = np.maximum(Q_evap[idx_e_he], 0.0)
-        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            T_h_he = _compute_entropic_mean_temperature(T_evap[idx_e_he], Qe_pool)
-            T_l_he = _compute_entropic_mean_temperature(T_cond[idx_c_he], Qc_pool)
-            eta_he = _calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
-            if eta_he > tol:
-                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() / max(1.0 - eta_he, tol))
-                w_he = Qe_used * eta_he
-                Qc_used = Qe_used - w_he
-                Qc_he[idx_c_he] = Qc_pool * (Qc_used / Qc_pool.sum())
-                Qe_he[idx_e_he] = Qe_pool * (Qe_used / Qe_pool.sum())
-
-    # Near-zero lift: direct heat exchange with any source/sink left after HE.
-    is_hx = ((T_diff > -tol) | (args.eta_ii_he_carnot < tol)) & (T_diff < tol)
-    if np.any(is_hx):
-        idx_c_hx, idx_e_hx = np.nonzero(is_hx)
-        idx_c_hx = np.unique(idx_c_hx)
-        idx_e_hx = np.unique(idx_e_hx)
+    def _get_idx_and_Q_available(
+        is_on: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        idx_c, idx_e = np.nonzero(is_on)
+        idx_c = np.unique(idx_c)
+        idx_e = np.unique(idx_e)
         used_cond = Qc_he + Qc_hx + Qc_hpr
-        used_evap = Qe_he + Qe_hx + Qe_hpr
-        Qc_pool = np.maximum(Q_cond[idx_c_hx] - used_cond[idx_c_hx], 0.0)
-        Qe_pool = np.maximum(Q_evap[idx_e_hx] - used_evap[idx_e_hx], 0.0)
-        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            Q_transfer = min(Qc_pool.sum(), Qe_pool.sum())
-            Qc_hx[idx_c_hx] = Qc_pool * (Q_transfer / Qc_pool.sum())
-            Qe_hx[idx_e_hx] = Qe_pool * (Q_transfer / Qe_pool.sum())
+        used_evap = Qe_he + Qe_hx + Qe_hpr        
+        Qc_pool = np.maximum(Q_cond[idx_c] - used_cond[idx_c], 0.0)
+        Qe_pool = np.maximum(Q_evap[idx_e] - used_evap[idx_e], 0.0)
+        return idx_c, idx_e, Qc_pool, Qe_pool
+
+    T_diff = np.subtract.outer(T_cond, T_evap)
 
     # Positive lift: pooled heat-pump mode with the remaining duties.
     is_hp = T_diff >= tol
     if np.any(is_hp):
-        idx_c_hp, idx_e_hp = np.nonzero(is_hp)
-        idx_c_hp = np.unique(idx_c_hp)
-        idx_e_hp = np.unique(idx_e_hp)
-        used_cond = Qc_he + Qc_hx + Qc_hpr
-        used_evap = Qe_he + Qe_hx + Qe_hpr
-        Qc_pool = np.maximum(Q_cond[idx_c_hp] - used_cond[idx_c_hp], 0.0)
-        Qe_pool = np.maximum(Q_evap[idx_e_hp] - used_evap[idx_e_hp], 0.0)
+        i_c, i_e, Qc_pool, Qe_pool = _get_idx_and_Q_available(is_hp)
         if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            T_h = _compute_entropic_mean_temperature(T_cond[idx_c_hp], Qc_pool)
-            T_l = _compute_entropic_mean_temperature(T_evap[idx_e_hp], Qe_pool)
+            T_h = _compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
+            T_l = _compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
             cop = _calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
             if cop > 1.0 + tol:
                 Qe_used = min(
@@ -696,10 +668,34 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
                 )
                 w_hpr = Qe_used / (cop - 1.0)
                 Qc_used = Qe_used + w_hpr
-                Qc_hpr[idx_c_hp] = Qc_pool * (Qc_used / Qc_pool.sum())
-                Qe_hpr[idx_e_hp] = Qe_pool * (Qe_used / Qe_pool.sum())
+                Qc_hpr[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
+                Qe_hpr[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
             else:
                 cop = 1.0
+
+    # Negative lift: pooled heat-engine mode.
+    is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
+    if np.any(is_he):
+        i_c, i_e, Qc_pool, Qe_pool = _get_idx_and_Q_available(is_he)
+        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
+            T_h_he = _compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
+            T_l_he = _compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
+            eta_he = _calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
+            if eta_he > tol:
+                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() / max(1.0 - eta_he, tol))
+                w_he = Qe_used * eta_he
+                Qc_used = Qe_used - w_he
+                Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
+                Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
+
+    # Near-zero lift: direct heat exchange with any source/sink left after HE.
+    is_hx = ((T_diff > -tol) | (args.eta_ii_he_carnot < tol)) & (T_diff < tol)
+    if np.any(is_hx):
+        i_c, i_e, Qc_pool, Qe_pool = _get_idx_and_Q_available(is_hx)
+        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
+            Q_transfer = min(Qc_pool.sum(), Qe_pool.sum())
+            Qc_hx[i_c] = Qc_pool * (Q_transfer / Qc_pool.sum())
+            Qe_hx[i_e] = Qe_pool * (Q_transfer / Qe_pool.sum())
 
     Qc = Qc_he + Qc_hx + Qc_hpr
     Qe = Qe_he + Qe_hx + Qe_hpr
