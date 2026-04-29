@@ -19,7 +19,7 @@ dependencies=[
   "matplotlib",
   "tespy",
 ]
-version = "0.1.13"
+version = "0.1.14"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
