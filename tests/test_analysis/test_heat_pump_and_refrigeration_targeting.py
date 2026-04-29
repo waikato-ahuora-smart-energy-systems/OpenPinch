@@ -236,36 +236,27 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_mixed_lift_combines_
         )
     )
 
-    negative_eta_he = args.eta_ii_he_carnot * (
-        1
-        - _compute_entropic_mean_temperature(np.array([40.0]), np.array([50.0]))
-        / _compute_entropic_mean_temperature(np.array([80.0]), np.array([60.0]))
-    )
-    expected_Qe_he = min(60.0, 50.0 / (1.0 - negative_eta_he))
-    expected_work_gen = expected_Qe_he * negative_eta_he
-    remaining_Q_cond = np.array([100.0, 0.0])
-    remaining_Q_evap = np.array([60.0 - expected_Qe_he, 120.0])
     expected_cop = (
-        _compute_entropic_mean_temperature(T_evap, remaining_Q_evap)
+        _compute_entropic_mean_temperature(T_evap, Q_evap)
         / (
-            _compute_entropic_mean_temperature(T_cond, remaining_Q_cond)
-            - _compute_entropic_mean_temperature(T_evap, remaining_Q_evap)
+            _compute_entropic_mean_temperature(T_cond, Q_cond)
+            - _compute_entropic_mean_temperature(T_evap, Q_evap)
         )
         * args.eta_ii_hpr_carnot
         + 1
     )
     expected_Qe_hp = min(
-        remaining_Q_evap.sum(),
-        remaining_Q_cond.sum() * (expected_cop - 1.0) / expected_cop,
+        Q_evap.sum(),
+        Q_cond.sum() * (expected_cop - 1.0) / expected_cop,
     )
     expected_work_use = expected_Qe_hp / (expected_cop - 1.0)
 
-    assert cycle_results["w_he"] == pytest.approx(expected_work_gen)
+    assert cycle_results["Qc"].sum() == pytest.approx(Q_cond.sum())
+    assert cycle_results["Qe"].sum() == pytest.approx(expected_Qe_hp)
+    assert cycle_results["cop"] == pytest.approx(expected_cop)
+    assert cycle_results["w_he"] == pytest.approx(0.0)
     assert cycle_results["w_hpr"] == pytest.approx(expected_work_use)
     assert cycle_results["heat_ex"] == pytest.approx(0.0)
-    assert cycle_results["cop"] == pytest.approx(expected_cop)
-    assert cycle_results["Qc"].sum() == pytest.approx(Q_cond.sum())
-    assert cycle_results["Qe"].sum() == pytest.approx(expected_Qe_he + expected_Qe_hp)
 
 
 def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pool_counts_each_evaporator_once():

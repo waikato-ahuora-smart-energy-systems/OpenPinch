@@ -25,9 +25,8 @@ authors = [
 ]
 description = "An advanced pinch analysis and total site integration toolkit"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 classifiers = [
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
@@ -52,11 +51,11 @@ dev = [
 
 [tool.black]
 line-length = 88
-target-version = ["py311"]
+target-version = ["py314"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]

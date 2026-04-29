@@ -1075,6 +1075,27 @@ def _get_multi_simple_carnot_stage_duties_and_work(
     T_cond_abs = T_cond + 273.15
     T_evap_abs = T_evap + 273.15
 
+    # def _get_idx_and_Q_available(
+    #     is_on: np.ndarray,
+    # ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    #     idx_c, idx_e = np.nonzero(is_on)
+    #     idx_c = np.unique(idx_c)
+    #     idx_e = np.unique(idx_e)
+    #     used_cond = Qc_he + Qc_hx + Qc_hpr
+    #     used_evap = Qe_he + Qe_hx + Qe_hpr        
+    #     Qc_pool = np.maximum(Q_cond[idx_c] - used_cond[idx_c], 0.0)
+    #     Qe_pool = np.maximum(Q_evap[idx_e] - used_evap[idx_e], 0.0)
+    #     return idx_c, idx_e, Qc_pool, Qe_pool    
+
+    is_hp = T_diff >= tol
+    if np.any(is_hp):
+        cop_hp = _calc_carnot_heat_pump_cop(
+            T_cond_abs[is_hp], T_evap_abs[is_hp], args.eta_ii_hpr_carnot
+        )
+        Qc_hpr[is_hp] = Q_cond[is_hp]
+        w_hpr[is_hp] = Qc_hpr[is_hp] / cop_hp
+        Qe_hpr[is_hp] = Qc_hpr[is_hp] - w_hpr[is_hp]
+        
     is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
     if np.any(is_he):
         eff_he = _calc_carnot_heat_engine_eta(
@@ -1088,15 +1109,6 @@ def _get_multi_simple_carnot_stage_duties_and_work(
     if np.any(is_hx):
         Qc_hx[is_hx] = Q_cond[is_hx]
         Qe_hx[is_hx] = Qc_hx[is_hx]
-
-    is_hp = T_diff >= tol
-    if np.any(is_hp):
-        cop_hp = _calc_carnot_heat_pump_cop(
-            T_cond_abs[is_hp], T_evap_abs[is_hp], args.eta_ii_hpr_carnot
-        )
-        Qc_hpr[is_hp] = Q_cond[is_hp]
-        w_hpr[is_hp] = Qc_hpr[is_hp] / cop_hp
-        Qe_hpr[is_hp] = Qc_hpr[is_hp] - w_hpr[is_hp]
 
     sort_idx = np.argsort(-T_evap, kind="stable")
     Q_allocated = 0.0
