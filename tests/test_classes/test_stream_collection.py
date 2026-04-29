@@ -1,14 +1,15 @@
 """Regression tests for the stream collection classes."""
 
 import pytest
-
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-
-"""Tests for StreamCollection."""
-
 import csv
 from uuid import uuid4
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
+
+
+"""Tests for StreamCollection."""
 
 
 @pytest.fixture
@@ -337,9 +338,6 @@ def test_export_to_csv(sample_streams):
 
 # ===== Merged from test_stream_collection_extra.py =====
 """Additional branch coverage tests for StreamCollection."""
-
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.stream_collection import StreamCollection
 
 
 def test_stream_collection_get_index_and_getitem_by_name():

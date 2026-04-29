@@ -1,16 +1,17 @@
 """Regression tests for the cascade heat pump cycle classes."""
 
 from types import SimpleNamespace
-
 import numpy as np
 import pytest
+import OpenPinch.classes.cascade_vapour_compression_cycle as cascade_mod
+from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.classes.cascade_vapour_compression_cycle import (
+    CascadeVapourCompressionCycle,
+)
+from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+
 
 pytest.importorskip("CoolProp")
-
-import OpenPinch.classes.cascade_heat_pump as cascade_mod
-from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.cascade_heat_pump import CascadeHeatPumpCycle
-from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
 
 
 def _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx):
@@ -29,7 +30,7 @@ def _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx):
 
 def _assert_stage_matches_simple(cascade, i, *, T_evap, T_cond, **kwargs):
     """Assert that stage matches simple for this test module."""
-    ref = SimpleHeatPumpCycle()
+    ref = VapourCompressionCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 
     stage = cascade._subcycles[i]
@@ -37,11 +38,10 @@ def _assert_stage_matches_simple(cascade, i, *, T_evap, T_cond, **kwargs):
     assert np.isclose(stage.Q_evap, ref.Q_evap, rtol=1e-7, atol=1e-8)
     assert np.isclose(stage.Q_cond, ref.Q_cond, rtol=1e-7, atol=1e-8)
     assert np.isclose(stage.Q_heat, ref.Q_heat, rtol=1e-7, atol=1e-8)
-    assert np.isclose(stage.Q_cool, ref.Q_cool, rtol=1e-7, atol=1e-8)
 
 
 def test_cascade_requires_solution_before_dependent_properties():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     with pytest.raises(RuntimeError):
         _ = cycle.COP_h
     with pytest.raises(RuntimeError):
@@ -49,7 +49,7 @@ def test_cascade_requires_solution_before_dependent_properties():
 
 
 def test_cascade_rejects_invalid_temperature_order():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([35.0, 25.0]),
         T_cond=np.array([30.0, 20.0]),
@@ -59,7 +59,7 @@ def test_cascade_rejects_invalid_temperature_order():
 
 
 def test_cascade_num_cycles_matches_network_definition():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     T_cond = np.array([85.0, 60.0, 45.0])
     Q_heat = np.array([1000.0, 800.0, 200.0])
     T_evap = np.array([20.0, 0.0])
@@ -76,6 +76,7 @@ def test_cascade_num_cycles_matches_network_definition():
         refrigerant=["R134a", "R134a", "R134a", "R134a"],
         Q_heat=Q_heat,
         Q_cool=Q_cool,
+        is_heat_pump=True,
     )
 
     assert cycle.num_cycles == len(T_cond) + len(T_evap) - 1
@@ -102,7 +103,7 @@ def test_cascade_num_cycles_matches_network_definition():
 
 
 def test_each_cascade_stage_matches_simple_heat_pump_solution():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     T_cond = np.array([80.0, 60.0])
     T_evap = np.array([20.0, 0.0])
     dt_cascade_hx = 5.0
@@ -150,7 +151,7 @@ def test_each_cascade_stage_matches_simple_heat_pump_solution():
 
 
 def test_cascade_aggregates_match_sum_of_stage_results():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -182,7 +183,7 @@ def test_cascade_aggregates_match_sum_of_stage_results():
 
 
 def test_cascade_build_stream_collection_is_union_of_stage_streams():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -212,7 +213,7 @@ def test_cascade_build_stream_collection_is_union_of_stage_streams():
     ],
 )
 def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     base = dict(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -232,7 +233,7 @@ def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
 
 def test_cascade_solve_with_defaults_should_work_for_multistage():
     """Regression: multistage solve should work with documented defaults."""
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -245,7 +246,7 @@ def test_cascade_solve_with_defaults_should_work_for_multistage():
 
 def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
     """Only the last stage may be unspecified for Q_cool."""
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -261,6 +262,105 @@ def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
 
     last = cycle.subcycles[-1]
     assert np.isclose(last.Q_cool, last.Q_evap, rtol=1e-7, atol=1e-8)
+
+
+def test_each_cascade_stage_matches_simple_refrigeration_solution():
+    cycle = CascadeVapourCompressionCycle()
+    T_cond = np.array([80.0, 60.0])
+    T_evap = np.array([20.0, 0.0])
+    dt_cascade_hx = 5.0
+    dT_superheat = np.array([6.0, 4.0, 2.0])
+    dT_subcool = np.array([3.0, 2.0, 1.0])
+    dt_ihx_gas_side = np.array([8.0, 6.0, 4.0])
+    Q_heat = np.array([500.0, 1e9, 50.0])
+    Q_cool = np.array([100.0, 900.0])
+    Q_heat_all = np.array([500.0, 1e9, 0.0])
+    Q_cool_all = np.array([0.0, 100.0, 900.0])
+    refrigerant = ["R134a", "R134a", "R134a"]
+    eta_comp = 0.7
+
+    cycle.solve(
+        T_evap=T_evap,
+        T_cond=T_cond,
+        dt_cascade_hx=dt_cascade_hx,
+        dT_superheat=dT_superheat,
+        dT_subcool=dT_subcool,
+        dt_ihx_gas_side=dt_ihx_gas_side,
+        refrigerant=refrigerant,
+        eta_comp=eta_comp,
+        Q_heat=Q_heat,
+        Q_cool=Q_cool,
+        is_heat_pump=False,
+    )
+
+    T_evap_all, T_cond_all = _cascade_stage_temperatures(T_evap, T_cond, dt_cascade_hx)
+    for i in range(cycle.num_cycles):
+        _assert_stage_matches_simple(
+            cycle,
+            i,
+            T_evap=T_evap_all[i],
+            T_cond=T_cond_all[i],
+            dT_superheat=dT_superheat[i],
+            dT_subcool=dT_subcool[i],
+            dt_ihx_gas_side=dt_ihx_gas_side[i],
+            refrigerant=refrigerant[i],
+            eta_comp=eta_comp,
+            Q_heat=Q_heat_all[i],
+            Q_cool=Q_cool_all[i],
+            Q_cas_cool=cycle.subcycles[i].Q_cas_cool,
+            is_heat_pump=False,
+        )
+
+    for stage in cycle.subcycles:
+        assert np.isclose(stage.Q_evap, stage.Q_cool + stage.Q_cas_cool, 0.0)
+        assert stage.Q_heat <= stage.Q_cond + 1e-6
+        assert np.isclose(stage.Q_cas_heat, 0.0, 0.0)
+
+    assert np.isclose(cycle.subcycles[0].Q_heat, 0.0, 0.0)
+    assert np.isclose(cycle.subcycles[1].Q_heat, cycle.subcycles[1].Q_cond, 0.0)
+
+
+def test_cascade_refrigeration_streams_and_aggregates_match():
+    cycle = CascadeVapourCompressionCycle()
+    cycle.solve(
+        T_evap=np.array([20.0, 0.0]),
+        T_cond=np.array([80.0, 60.0]),
+        dt_cascade_hx=5.0,
+        dT_superheat=np.array([6.0, 4.0, 2.0]),
+        dT_subcool=np.array([3.0, 2.0, 1.0]),
+        dt_ihx_gas_side=np.array([8.0, 6.0, 4.0]),
+        eta_comp=0.7,
+        refrigerant=["R134a", "R134a", "R134a"],
+        Q_heat=np.array([500.0, 1e9, 50.0]),
+        Q_cool=np.array([100.0, 900.0]),
+        is_heat_pump=False,
+    )
+
+    assert np.isclose(
+        cycle.work, sum(c.work for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_evap, sum(c.Q_evap for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cond, sum(c.Q_cond for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_heat, sum(c.Q_heat for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cool, sum(c.Q_cool for c in cycle._subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert cycle.COP_r > 0.0
+
+    streams = StreamCollection()
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+    )
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+    )
 
 
 def _fake_network_cycle(
@@ -327,7 +427,7 @@ class _DummyCascadeCycle:
 
 
 def test_cascade_property_sweep_and_normalization_branches():
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     c1 = _fake_network_cycle()
     c2 = _fake_network_cycle(
         T_evap=10.0, T_cond=70.0, work=20.0, Q_evap=30.0, Q_cond=50.0
@@ -415,7 +515,7 @@ def test_cascade_property_sweep_and_normalization_branches():
 
 
 def test_cascade_property_arrays_and_unsolved_work_branch():
-    hp = CascadeHeatPumpCycle()
+    hp = CascadeVapourCompressionCycle()
     hp._subcycles = [_DummyCascadeCycle(), _DummyCascadeCycle()]
     hp._solved = True
     hp._dt_cascade_hx = 1.0
@@ -436,7 +536,7 @@ def test_cascade_property_arrays_and_unsolved_work_branch():
 
 
 def test_cascade_normalize_q_cool_and_numeric_conversion_errors():
-    hp = CascadeHeatPumpCycle()
+    hp = CascadeVapourCompressionCycle()
 
     scalar = hp._normalize_Q_cool(5.0, n_heat=2, n_cool=2)
     assert scalar.shape == (3,)
@@ -458,9 +558,9 @@ def test_cascade_normalize_q_cool_and_numeric_conversion_errors():
 
 
 def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
-    hp = CascadeHeatPumpCycle()
+    hp = CascadeVapourCompressionCycle()
     monkeypatch.setattr(hp, "_validate_T_cond_and_evap", lambda T_cond, T_evap: 0.0)
-    monkeypatch.setattr(cascade_mod, "SimpleHeatPumpCycle", _DummyCascadeCycle)
+    monkeypatch.setattr(cascade_mod, "VapourCompressionCycle", _DummyCascadeCycle)
 
     work = hp.solve(
         T_evap=np.array([25.0, 15.0]),
@@ -468,6 +568,7 @@ def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
         refrigerant=["water"],
         Q_heat=np.array([1.0, 1.0]),
         Q_cool=None,
+        is_heat_pump=True,
     )
 
     assert isinstance(work, float)
@@ -484,7 +585,7 @@ def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
     ],
 )
 def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     with pytest.raises(ValueError):
         cycle.solve(
             T_evap=np.array([20.0, 0.0]),
@@ -502,7 +603,7 @@ def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
 
 def test_cascade_q_heat_nan_defaults_to_one_for_first_and_zero_elsewhere():
     """Q_heat NaN defaults: index 0 -> 1.0, all other indices -> 0.0."""
-    cycle = CascadeHeatPumpCycle()
+    cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),

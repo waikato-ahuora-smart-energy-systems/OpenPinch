@@ -1,11 +1,11 @@
 """Regression tests for heat exchanger eq utility helpers."""
 
 import math
-
 import pytest
-
 from OpenPinch.lib import *
 from OpenPinch.utils.heat_exchanger import *
+import OpenPinch.utils.heat_exchanger as hx
+from OpenPinch.lib.enums import HeatExchangerTypes as HX
 
 
 """Test cases for the find_LMTD function."""
@@ -157,13 +157,6 @@ def test_HX_NTU_Numerical():
 
 # ===== Merged from test_heat_exchanger_extra.py =====
 """Additional coverage tests for heat-exchanger helpers."""
-
-import math
-
-import pytest
-
-import OpenPinch.utils.heat_exchanger as hx
-from OpenPinch.lib.enums import HeatExchangerTypes as HX
 
 
 def test_compute_lmtd_from_dts_rejects_non_positive_values():

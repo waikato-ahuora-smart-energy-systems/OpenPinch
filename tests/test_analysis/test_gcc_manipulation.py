@@ -1,16 +1,15 @@
 """Regression tests for gcc manipulation analysis routines."""
 
 import os
-
 import pandas as pd, numpy as np
 import pytest
-
 from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.analysis.gcc_manipulation import *
+
 
 """Tests for gcc manipulation"""
-from OpenPinch.analysis.gcc_manipulation import *
 
 
 def get_test_filenames():

@@ -1,6 +1,7 @@
 """Regression tests for water properties utility helpers."""
 
 from OpenPinch.utils.water_properties import *
+from OpenPinch.utils import water_properties as wp
 
 
 def test_unit_conversions():
@@ -31,8 +32,6 @@ def test_thermo_functions():
 
 # ===== Merged from test_water_properties_extra.py =====
 """Additional coverage tests for water property conversion edge cases."""
-
-from OpenPinch.utils import water_properties as wp
 
 
 def test_none_inputs_default_to_zero_for_unit_conversions():

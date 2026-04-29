@@ -3,10 +3,8 @@
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-
 import pandas as pd
 import pytest
-
 from OpenPinch.utils.export import (
     _autosize_columns,
     _safe_name,
@@ -15,6 +13,11 @@ from OpenPinch.utils.export import (
 )
 from OpenPinch.classes import EnergyTarget, ProblemTable, Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
+import OpenPinch.utils.export as export_mod
+import openpyxl
+from openpyxl import Workbook
+from OpenPinch.classes import EnergyTarget, Zone
+
 
 # --------------------------------------------------------------------------------------
 # Fixtures & tiny helpers
@@ -115,7 +118,6 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
             return datetime.strptime(*a, **kw)
 
     # Patch the datetime reference inside the export module
-    import OpenPinch.utils.export as export_mod
 
     monkeypatch.setattr(export_mod, "datetime", _FixedDT, raising=True)
 
@@ -243,8 +245,6 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     assert sub_shifted in xls.sheet_names
     assert sub_real in xls.sheet_names
 
-    import openpyxl
-
     wb = openpyxl.load_workbook(out, data_only=True)
     assert wb[master_shifted]["A1"].value == "Master"
     assert wb[sub_shifted]["A1"].value == "Alt:Target"
@@ -317,7 +317,6 @@ def test_autosize_columns_sets_reasonable_widths(tmp_path: Path):
     )
 
     # Create a worksheet via openpyxl (used under the hood by pandas writer)
-    from openpyxl import Workbook
 
     wb = Workbook()
     ws = wb.active
@@ -342,14 +341,6 @@ def test_autosize_columns_sets_reasonable_widths(tmp_path: Path):
 
 # ===== Merged from test_export_extra.py =====
 """Additional branch coverage tests for export helpers."""
-
-from pathlib import Path
-
-import pandas as pd
-import pytest
-
-import OpenPinch.utils.export as export_mod
-from OpenPinch.classes import EnergyTarget, Zone
 
 
 def test_write_problem_tables_skips_empty_dataframes(monkeypatch, tmp_path: Path):

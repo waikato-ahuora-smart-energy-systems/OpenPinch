@@ -1,9 +1,10 @@
 """Regression tests for the stream classes."""
 
 import pytest
-
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.classes.stream import Stream
+from OpenPinch.lib.enums import StreamType
 
 
 class DummyStream(Stream):
@@ -137,11 +138,6 @@ def test_zero_heat_flow_isothermal_stream_initialises_without_error():
 
 # ===== Merged from test_stream_extra.py =====
 """Additional branch coverage tests for Stream."""
-
-import pytest
-
-from OpenPinch.classes.stream import Stream
-from OpenPinch.lib.enums import StreamType
 
 
 def test_stream_pressure_and_enthalpy_property_getters():

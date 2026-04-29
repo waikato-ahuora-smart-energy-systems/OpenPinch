@@ -15,11 +15,11 @@ from . import (
     get_process_heat_cascade,
     get_additional_GCCs,
     problem_table_algorithm,
-    get_heat_pump_targets,
-    calc_heat_pump_cascade,
+    validate_heat_pump_or_refrigeration_targeting_required,
+    get_heat_pump_and_refrigeration_targets,
+    calc_heat_pump_and_refrigeration_cascade,
     get_heat_recovery_target_from_pt,
     set_zonal_targets,
-    plot_multi_hp_profiles_from_results,
 )
 
 __all__ = ["compute_indirect_integration_targets"]
@@ -116,39 +116,61 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
-    if zone.identifier in [Z.S.value]:
-        Q_target = (
-            min(zone_config.HP_LOAD_FRACTION, 1.0)
-            * np.abs(pt.col[PT.H_HOT_UT.value]).max()
+    # Determine if heat pump or refrigeration targeting is warranted based on the utility cascade profiles and user settings
+    if zone.identifier == Z.S.value and (
+        zone_config.DO_UTILITY_HP_TARGETING or zone_config.DO_UTILITY_RFRG_TARGETING
+    ):
+        # Create problem table based on inverted utility streams
+        pt_ut_gen = get_process_heat_cascade(
+            hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
+            cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
+            zone_config=zone.config,
+            is_shifted=True,
         )
-        if (
-            _validate_heat_pump_targeting_required(pt, True, zone_config)
-            and Q_target > 0
-        ):
-            # Create problem table based on inverted utility streams
-            pt_ut_gen = get_process_heat_cascade(
-                hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
-                cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
-                zone_config=zone.config,
-                is_shifted=True,
-            )
-            get_additional_GCCs(pt_ut_gen)
-            # Perform heat pump targeting on the correct cascades
-            hp_res = get_heat_pump_targets(
-                Q_target=Q_target,
+        get_additional_GCCs(pt_ut_gen)
+        # Perform heat pump and/or refrigeration targeting on the correct cascades
+        hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
+            pt,
+            is_heat_pumping=zone_config.DO_UTILITY_HP_TARGETING,
+            zone_name=zone.name,
+            zone_config=zone_config,
+        )
+        if hp_target_load > tol:
+            res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
+                Q_hpr_target=hp_target_load,
                 T_vals=pt_ut_gen.col[PT.T.value],
                 H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
                 H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
                 zone_config=zone_config,
                 is_heat_pumping=True,
             )
-            res.update(hp_res)
-            # Add the heat pump profile to the general problem table
-            calc_heat_pump_cascade(
+            calc_heat_pump_and_refrigeration_cascade(
                 pt=pt,
-                res=hp_res,
+                res=res["Heat pump"],
                 is_T_vals_shifted=True,
-                is_process_integration=False,
+                is_heat_pumping=True,
+            )
+
+        r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
+            pt,
+            is_refrigeration=zone_config.DO_UTILITY_RFRG_TARGETING,
+            zone_name=zone.name,
+            zone_config=zone_config,
+        )
+        if r_target_load > tol:
+            res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
+                Q_hpr_target=r_target_load,
+                T_vals=pt_ut_gen.col[PT.T.value],
+                H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
+                H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
+                zone_config=zone_config,
+                is_heat_pumping=False,
+            )
+            calc_heat_pump_and_refrigeration_cascade(
+                pt=pt,
+                res=res["Refrigeration"],
+                is_T_vals_shifted=True,
+                is_heat_pumping=False,
             )
 
     # if zone_config.DO_TURBINE_WORK:
@@ -359,22 +381,5 @@ def _save_graph_data(
                 PT.H_COLD_UT.value,
             ]
         ],
-        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP_UT.value]],
+        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]],
     }
-
-
-def _validate_heat_pump_targeting_required(
-    pt: ProblemTable,
-    is_heat_pumping: bool,
-    zone_config: Configuration,
-) -> bool:
-    return (
-        False
-        if (
-            (zone_config.DO_UTILITY_HP_TARGETING == False)
-            or (pt.col[PT.H_NET_UT.value][0] < tol and is_heat_pumping == True)
-            or (pt.col[PT.H_NET_UT.value][-1] < tol and is_heat_pumping == False)
-            or (zone_config.HP_LOAD_FRACTION < tol)
-        )
-        else True
-    )

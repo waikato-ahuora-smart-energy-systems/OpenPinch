@@ -53,54 +53,60 @@ class Configuration:
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
     DO_PROCESS_HP_TARGETING: bool = False
+    DO_PROCESS_RFRG_TARGETING: bool = False  ### add to the template
     DO_UTILITY_HP_TARGETING: bool = False
+    DO_UTILITY_RFRG_TARGETING: bool = False  ### add to the template
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
     DO_VERTICAL_GCC: bool = False
     DO_ASSITED_HT: bool = False
     DO_TURBINE_WORK: bool = False
 
-    ### Heat pump targeting parameters ###
-    HP_TYPE: str = HeatPumpType.MultiTempCarnot.value
-    HP_LOAD_FRACTION: float = 1.0
+    ### Heat pump and refrigeration targeting parameters ###
+    HPR_TYPE: str = HPRcycle.MultiTempCarnot.value  ### add to the template (modified)
+    HPR_LOAD_VALUE: float | str | dict = 1.0  ### add to the template (modified)
+    HPR_LOAD_VALUE_TYPE: str = "fraction"  ### add to the template (modified)
     REFRIGERANTS: List[str] = ["water", "ammonia"]
     DO_REFRIGERANT_SORT: bool = True
-    PRICE_RATIO_ELE_TO_FUEL: float = 1.0
+    PRICE_RATIO_HEAT_TO_ELE: float = 1.0  ### add to the template (modified)
+    PRICE_RATIO_COLD_TO_ELE: float = 1.0  ### add to the template (modified)
     MAX_HP_MULTISTART: int = 10
     N_COND: int = 3
     N_EVAP: int = 2
     ETA_COMP: float = 0.7
     ETA_EXP: float = 0.7
-    ETA_HP_CARNOT: float = 0.5
-    ETA_HE_CARNOT: float = 0.5
-    DTMIN_HP: float = 0.0
-    DT_HP_IHX: float = 0.0
-    DT_CASCADE_HX: float = 0.0
-    BB_MINIMISER: str = BB_Minimiser.RBF.value  ### add to the template
-    INITIALISE_SIMULATED_HP: bool = True  ### add to the template
+    ETA_MOTOR: float = 0.95  ### add to the template (modified)
+    ETA_II_HPR_CARNOT: float = 0.5  ### add to the template (modified)
+    ETA_II_HE_CARNOT: float = 0.5  ### add to the template (modified)
+    DT_CONT_HP: float = 0.0  ### add to the template (modified)
+    DT_HPR_IHX: float = 0.0  ### add to the template (modified)
+    DT_HPR_CASCADE_HX: float = 0.0  ### add to the template (modified)
+    BB_MINIMISER: str = BB_Minimiser.CMAES.value  ### add to the template
+    INITIALISE_SIMULATED_CYCLE: bool = True  ### add to the template
     ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
 
     ### Cost targeting parameters ###
-    UTILITY_PRICE: float = 40
+    ELE_PRICE: float = 200  # $/MWh   ### add to the template
+    UTILITY_PRICE: float = 100  # $/MWh
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0
     VARIABLE_COST: float = 10000
     COST_EXP: float = 0.6
     DISCOUNT_RATE: float = 0.07
-    SERV_LIFE: float = 20
+    SERV_LIFE: float = 20  # years
 
     ### OLD CONFIG -- TODO: Review ###
 
-    # T_TURBINE_BOX: float = 450
-    # P_TURBINE_BOX: float = 90
-    # MIN_EFF: float = 0.1
-    # ELECTRICITY_PRICE: float = 100
-    # LOAD: float = 1
-    # MOTOR_MECH_EFF: float = 1
-    # COMBOBOX: str = "Medina-Flores et al. (2010)"
-    # ABOVE_PINCH_CHECKBOX: bool = False
-    # BELOW_PINCH_CHECKBOX: bool = False
-    # CONDESATE_FLASH_CORRECTION: bool = False
+    T_TURBINE_BOX: float = 450
+    P_TURBINE_BOX: float = 90
+    MIN_EFF: float = 0.1
+    ELECTRICITY_PRICE: float = 100
+    LOAD: float = 1
+    MECH_EFF: float = 1
+    COMBOBOX: str = TurbineModel.MEDINA_FLORES.value
+    ABOVE_PINCH_CHECKBOX: bool = False
+    BELOW_PINCH_CHECKBOX: bool = False
+    CONDESATE_FLASH_CORRECTION: bool = False
 
     # HHT_OPTION: bool = True
     # VHT_OPTION: bool = False

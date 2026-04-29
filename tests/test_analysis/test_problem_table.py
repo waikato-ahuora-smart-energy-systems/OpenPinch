@@ -5,9 +5,23 @@ import pandas as pd
 import pytest
 from pathlib import Path
 import uuid
-
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.analysis.problem_table_analysis import (
+    _sum_mcp_between_temperature_boundaries,
+)
+from OpenPinch.analysis.problem_table_analysis import problem_table_algorithm
+from OpenPinch.analysis.problem_table_analysis import (
+    _insert_temperature_interval_into_pt_at_constant_h,
+)
+from OpenPinch.analysis.problem_table_analysis import set_zonal_targets
+from OpenPinch.analysis.problem_table_analysis import (
+    get_process_heat_cascade,
+    get_heat_recovery_target_from_pt,
+    set_zonal_targets,
+)
+from OpenPinch.analysis.problem_table_analysis import _shift_pt_to_set_heat_recovery
+from OpenPinch.analysis.problem_table_analysis import create_problem_table_with_t_int
 
 
 # Core helper function
@@ -45,9 +59,6 @@ def _make_problem_table_for_interval_tests():
 
 
 """Tests for the _sum_mcp_between_temperature_boundaries function."""
-from OpenPinch.analysis.problem_table_analysis import (
-    _sum_mcp_between_temperature_boundaries,
-)
 
 
 def test_no_overlap_streams_are_skipped():
@@ -129,7 +140,6 @@ def test_empty_stream_lists_returns_zero():
 
 
 """Tests for problem_table_algorithm function."""
-from OpenPinch.analysis.problem_table_analysis import problem_table_algorithm
 
 
 def make_simple_problem_table():
@@ -430,9 +440,6 @@ def test_shift_heat_cascade_with_str_col():
 
 
 """Test cases for the _insert_temperature_interval_into_pt_at_constant_h function."""
-from OpenPinch.analysis.problem_table_analysis import (
-    _insert_temperature_interval_into_pt_at_constant_h,
-)
 
 
 def test_insert_constant_h_projection_hcc_to_ccc():
@@ -867,7 +874,6 @@ def test_insert_constant_h_projection_hcc_to_ccc():
 
 
 """Tests for set_zonal_targets function"""
-from OpenPinch.analysis.problem_table_analysis import set_zonal_targets
 
 # --- Fixtures & Helpers ---
 
@@ -984,11 +990,6 @@ def test_single_row_problem_table():
 
 
 """Test get_process_heat_cascade"""
-from OpenPinch.analysis.problem_table_analysis import (
-    get_process_heat_cascade,
-    get_heat_recovery_target_from_pt,
-    set_zonal_targets,
-)
 
 
 def test_problem_table_algorithm_executes():
@@ -1024,7 +1025,6 @@ def test_problem_table_algorithm_executes():
 
 
 """Test _shift_pt_to_set_heat_recovery"""
-from OpenPinch.analysis.problem_table_analysis import _shift_pt_to_set_heat_recovery
 
 
 def test_correct_pt_composite_curves_shifts_columns():
@@ -1038,7 +1038,6 @@ def test_correct_pt_composite_curves_shifts_columns():
 
 
 """Tests for the create_problem_table_with_t_int function."""
-from OpenPinch.analysis.problem_table_analysis import create_problem_table_with_t_int
 
 
 def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
@@ -1058,8 +1057,8 @@ def test_returns_correct_intervals_basic():
     cold = [make_stream("C1", 100, 200, 10)]
     T_star: ProblemTable
     T: ProblemTable
-    T_star = create_problem_table_with_t_int(hot + cold, True)
-    T = create_problem_table_with_t_int(hot + cold, False)
+    T_star = create_problem_table_with_t_int(streams=hot + cold, is_shifted=True)
+    T = create_problem_table_with_t_int(streams=hot + cold, is_shifted=False)
 
     assert PT.T.value in T_star.columns
     assert PT.T.value in T.columns
@@ -1072,25 +1071,22 @@ def test_includes_utilities():
     cu = [make_stream("CU", 30, 70, 10)]
     T_star: ProblemTable
     T: ProblemTable
-    T_star = create_problem_table_with_t_int(hu + cu, True)
-    T = create_problem_table_with_t_int(hu + cu, False)
+    T_star = create_problem_table_with_t_int(streams=hu + cu, is_shifted=True)
+    T = create_problem_table_with_t_int(streams=hu + cu, is_shifted=False)
 
     assert T_star[PT.T.value].to_list() == [540, 490, 80, 40]
     assert T[PT.T.value].to_list() == [550, 500, 70, 30]
 
 
-def test_includes_turbine_config():
-    zone_config = Configuration()
-    zone_config.DO_TURBINE_WORK = True
-    zone_config.T_TURBINE_BOX = 200
-    zone_config.P_TURBINE_BOX = 5  # pressure in bar
-    zone_config.DO_EXERGY_TARGETING = True
+def test_deduplicates_shared_interval_boundaries():
+    streams = [
+        make_stream("H1", 400, 300, 10),
+        make_stream("H2", 300, 200, 10),
+    ]
 
-    T_star: ProblemTable
-    T_star = create_problem_table_with_t_int(zone_config=zone_config)
+    pt = create_problem_table_with_t_int(streams=streams, is_shifted=True)
 
-    assert zone_config.T_TURBINE_BOX in T_star[PT.T.value].to_list()
-    assert zone_config.T_ENV in T_star[PT.T.value].to_list()
+    assert pt[PT.T.value].to_list() == [390, 290, 190]
 
 
 def test_empty_inputs():

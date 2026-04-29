@@ -13,17 +13,75 @@ def key_name(zone_name: str, target_type: str = TargetType.DI.value):
     return f"{zone_name}/{target_type}"
 
 
-def get_value(val: Union[float, dict, ValueWithUnit]) -> float:
-    """Extract a numeric value from raw floats, dict payloads, or :class:`ValueWithUnit`."""
-    if isinstance(val, float):
-        return val
+def get_value(
+    val: Union[float, int, str, dict, ValueWithUnit, None],
+    val2: Union[float, int, str, None] = None,
+    zone_name: str = None,
+) -> float:
+    """Extract a numeric value from supported scalars, dict payloads, or :class:`ValueWithUnit`."""
+    if isinstance(val, bool):
+        raise TypeError(
+            f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
+        )
+    elif isinstance(val, float | int):
+        return float(val)
     elif isinstance(val, dict):
-        return val["value"]
+        if zone_name in val:
+            return get_value(val[zone_name], val2=val2)
+
+        payload = val.copy()
+        if "value" not in payload:
+            if val2 is None:
+                raise KeyError("value")
+            payload["value"] = val2
+
+        if len(payload) > 2:
+            raise ValueError(
+                "Invalid payload: more than one operation specified. Payload must contain only 'value' and at most one of 'multiplier', 'multiply', 'add', 'subtract', 'divide', 'power', 'log', 'exp', 'abs', 'min', or 'max'."
+            )
+
+        value = get_value(payload["value"])
+
+        if "multiplier" in payload:
+            return value * get_value(payload["multiplier"])
+        elif "multiply" in payload:
+            return value * get_value(payload["multiply"])
+        elif "add" in payload:
+            return value + get_value(payload["add"])
+        elif "subtract" in payload:
+            return value - get_value(payload["subtract"])
+        elif "divide" in payload:
+            return value / get_value(payload["divide"]) if value != 0 else 0.0
+        elif "power" in payload:
+            return value ** get_value(payload["power"])
+        elif "log" in payload:
+            base = payload["log"] if isinstance(payload["log"], float) else np.e
+            return np.log(value) / np.log(base) if value > 0 else 0.0
+        elif "exp" in payload:
+            base = payload["exp"] if isinstance(payload["exp"], float) else np.e
+            return base**value if value > 0 else 0.0
+        elif "abs" in payload:
+            return abs(value)
+        elif "min" in payload:
+            return min(value, get_value(payload["min"]))
+        elif "max" in payload:
+            return max(value, get_value(payload["max"]))
+        else:
+            return value
     elif isinstance(val, ValueWithUnit):
         return val.value
+    elif isinstance(val, str):
+        try:
+            return float(val)
+        except ValueError:
+            raise TypeError(
+                f"Unsupported string value: {val}. String must be convertible to float."
+            )
+    elif val is None and val2 is not None:
+        return get_value(val2, zone_name=zone_name)
     else:
         raise TypeError(
-            f"Unsupported type: {type(val)}. Expected float, dict, or ValueWithUnit."
+            f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
         )
 
 
@@ -114,7 +172,7 @@ def clean_composite_curve(
         x_clean.pop(i)
         y_clean.pop(i)
 
-    return y_clean, x_clean
+    return np.asarray(y_clean), np.asarray(x_clean)
 
 
 def graph_simple_cc_plot(Tc, Hc, Th, Hh):
@@ -186,13 +244,14 @@ def make_monotonic(h_vals: np.ndarray, side: str, tol: float = 1e-6) -> np.ndarr
 
 
 def g_ineq_penalty(
-    g: float | np.ndarray,
+    g: float | list | np.ndarray,
     *,
     eta: float = 0.01,
     rho: float = 10,
     form: str = "square",
 ) -> np.float64:
     """Return a penalty value for an inequality-constraint residual."""
+    g = np.asarray(g, dtype=float)
     if (
         form.lower() == "square_root_smoothing"
         or form.lower() == "square root smoothing"

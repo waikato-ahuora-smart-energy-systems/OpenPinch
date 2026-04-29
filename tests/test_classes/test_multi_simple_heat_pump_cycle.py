@@ -1,21 +1,22 @@
 """Regression tests for the multi simple heat pump cycle classes."""
 
 from types import SimpleNamespace
-
 import numpy as np
 import pytest
+import OpenPinch.classes.parallel_vapour_compression_cycles as multi_mod
+from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.classes.parallel_vapour_compression_cycles import (
+    ParallelVapourCompressionCycles,
+)
+from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+
 
 pytest.importorskip("CoolProp")
-
-import OpenPinch.classes.multi_simple_heat_pump as multi_mod
-from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.multi_simple_heat_pump import MultiSimpleHeatPumpCycle
-from OpenPinch.classes.simple_heat_pump import SimpleHeatPumpCycle
 
 
 def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
     """Assert that stage matches simple for this test module."""
-    ref = SimpleHeatPumpCycle()
+    ref = VapourCompressionCycle()
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 
     stage = parallel.subcycles[i]
@@ -27,7 +28,7 @@ def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
 
 
 def test_parallel_requires_solution_before_dependent_properties():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     with pytest.raises(RuntimeError):
         _ = cycle.COP_h
     with pytest.raises(RuntimeError):
@@ -35,7 +36,7 @@ def test_parallel_requires_solution_before_dependent_properties():
 
 
 def test_parallel_rejects_mismatched_temperature_lengths():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     with pytest.raises(ValueError):
         cycle.solve(
             T_evap=np.array([20.0, 0.0]),
@@ -45,7 +46,7 @@ def test_parallel_rejects_mismatched_temperature_lengths():
 
 
 def test_parallel_solve_with_defaults_should_work_for_multiple_units():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -56,7 +57,7 @@ def test_parallel_solve_with_defaults_should_work_for_multiple_units():
 
 
 def test_each_parallel_stage_matches_simple_heat_pump_solution():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     T_cond = np.array([80.0, 60.0])
     T_evap = np.array([20.0, 0.0])
     dT_superheat = np.array([6.0, 4.0])
@@ -92,11 +93,12 @@ def test_each_parallel_stage_matches_simple_heat_pump_solution():
             eta_comp=eta_comp,
             Q_heat=Q_heat[i],
             Q_cool=Q_cool[i],
+            is_heat_pump=True,
         )
 
 
 def test_parallel_aggregates_match_sum_of_stage_results():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -127,7 +129,7 @@ def test_parallel_aggregates_match_sum_of_stage_results():
 
 
 def test_parallel_build_stream_collection_is_union_of_stage_streams():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -158,7 +160,7 @@ def test_parallel_build_stream_collection_is_union_of_stage_streams():
     ],
 )
 def test_parallel_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     base = dict(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -176,7 +178,7 @@ def test_parallel_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
 
 
 def test_parallel_q_cool_nan_and_none_are_allowed_for_any_cycle():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -194,7 +196,7 @@ def test_parallel_q_cool_nan_and_none_are_allowed_for_any_cycle():
 
 
 def test_parallel_q_heat_nan_defaults_to_one_for_each_stage():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -210,7 +212,7 @@ def test_parallel_q_heat_nan_defaults_to_one_for_each_stage():
 
 
 def test_parallel_streams_match_aggregate_heat():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
@@ -222,6 +224,98 @@ def test_parallel_streams_match_aggregate_heat():
         Q_heat=np.array([1200.0, 700.0]),
         Q_cool=np.array([900.0, 500.0]),
     )
+
+    streams = StreamCollection()
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+    )
+    assert np.isclose(
+        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+    )
+
+
+def test_each_parallel_stage_matches_simple_refrigeration_solution():
+    cycle = ParallelVapourCompressionCycles()
+    T_cond = np.array([35.0, 30.0])
+    T_evap = np.array([-10.0, -15.0])
+    dT_superheat = np.array([4.0, 3.0])
+    dT_subcool = np.array([2.0, 1.0])
+    dt_ihx_gas_side = np.array([5.0, 4.0])
+    Q_heat = np.array([500.0, 1e9])
+    Q_cool = np.array([600.0, 400.0])
+    refrigerant = ["R134a", "R134a"]
+    eta_comp = 0.75
+
+    cycle.solve(
+        T_evap=T_evap,
+        T_cond=T_cond,
+        dT_superheat=dT_superheat,
+        dT_subcool=dT_subcool,
+        dt_ihx_gas_side=dt_ihx_gas_side,
+        refrigerant=refrigerant,
+        eta_comp=eta_comp,
+        Q_heat=Q_heat,
+        Q_cool=Q_cool,
+        is_heat_pump=False,
+    )
+
+    for i in range(cycle.num_cycles):
+        _assert_stage_matches_simple(
+            cycle,
+            i,
+            T_evap=T_evap[i],
+            T_cond=T_cond[i],
+            dT_superheat=dT_superheat[i],
+            dT_subcool=dT_subcool[i],
+            dt_ihx_gas_side=dt_ihx_gas_side[i],
+            refrigerant=refrigerant[i],
+            eta_comp=eta_comp,
+            Q_heat=Q_heat[i],
+            Q_cool=Q_cool[i],
+            is_heat_pump=False,
+        )
+
+    for stage in cycle.subcycles:
+        assert np.isclose(stage.Q_evap, stage.Q_cool + stage.Q_cas_cool, 0.0)
+        assert stage.Q_heat <= stage.Q_cond + 1e-6
+
+    assert np.isclose(cycle.subcycles[0].Q_heat, 500.0, 0.0)
+    assert np.isclose(cycle.subcycles[1].Q_heat, cycle.subcycles[1].Q_cond, 0.0)
+    assert np.isclose(cycle.subcycles[1].Q_cas_heat, 0.0, 0.0)
+
+
+def test_parallel_refrigeration_streams_and_aggregates_match():
+    cycle = ParallelVapourCompressionCycles()
+    cycle.solve(
+        T_evap=np.array([-10.0, -15.0]),
+        T_cond=np.array([35.0, 30.0]),
+        dT_superheat=np.array([4.0, 3.0]),
+        dT_subcool=np.array([2.0, 1.0]),
+        dt_ihx_gas_side=np.array([5.0, 4.0]),
+        eta_comp=0.75,
+        refrigerant=["R134a", "R134a"],
+        Q_heat=np.array([500.0, 1e9]),
+        Q_cool=np.array([600.0, 400.0]),
+        is_heat_pump=False,
+    )
+
+    assert np.isclose(
+        cycle.work, sum(c.work for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_evap, sum(c.Q_evap for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cond, sum(c.Q_cond for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_heat, sum(c.Q_heat for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert np.isclose(
+        cycle.Q_cool, sum(c.Q_cool for c in cycle.subcycles), rtol=1e-7, atol=1e-8
+    )
+    assert cycle.COP_r > 0.0
 
     streams = StreamCollection()
     streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
@@ -297,7 +391,7 @@ class _DummyMultiCycle:
 
 
 def test_multi_simple_property_sweep_and_normalization_branches():
-    cycle = MultiSimpleHeatPumpCycle()
+    cycle = ParallelVapourCompressionCycles()
     c1 = _fake_network_cycle()
     c2 = _fake_network_cycle(
         T_evap=15.0, T_cond=75.0, work=30.0, Q_evap=50.0, Q_cond=90.0
@@ -380,7 +474,7 @@ def test_multi_simple_property_sweep_and_normalization_branches():
 
 
 def test_multi_simple_property_arrays_and_helper_error_branches():
-    hp = MultiSimpleHeatPumpCycle()
+    hp = ParallelVapourCompressionCycles()
     hp._subcycles = [_DummyMultiCycle(), _DummyMultiCycle()]
     hp._solved = True
 
@@ -419,8 +513,8 @@ def test_multi_simple_property_arrays_and_helper_error_branches():
 
 
 def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
-    hp = MultiSimpleHeatPumpCycle()
-    monkeypatch.setattr(multi_mod, "SimpleHeatPumpCycle", _DummyMultiCycle)
+    hp = ParallelVapourCompressionCycles()
+    monkeypatch.setattr(multi_mod, "VapourCompressionCycle", _DummyMultiCycle)
 
     work = hp.solve(
         T_evap=np.array([20.0, 15.0]),
@@ -428,7 +522,8 @@ def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
         refrigerant=["water"],
         Q_heat=np.array([1.0, 2.0]),
         Q_cool=np.array([None, None]),
+        is_heat_pump=True,
     )
 
     assert isinstance(work, float)
-    assert hp.solved is True
+    assert hp.solved == True

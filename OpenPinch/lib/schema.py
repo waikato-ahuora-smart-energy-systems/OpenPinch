@@ -46,14 +46,18 @@ class TempPinch(BaseModel):
     hot_temp: MaybeVU = None
 
 
-class HeatPumpTargetInputs(BaseModel):
-    """Parameter bundle for heat pump optimisation routines."""
+class HPRTargetInputs(BaseModel):
+    """Parameter bundle for heat pump and refrigeration targeting routines."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Calculated based on the case
-    Q_target: float
-    Q_amb_max: float
+    hpr_type: str
+    Q_hpr_target: float
+    Q_heat_max: float
+    Q_cool_max: float
+    z_amb_hot: np.ndarray
+    z_amb_cold: np.ndarray
     dt_range_max: float
 
     # Background process net hot and cold load curves
@@ -71,23 +75,24 @@ class HeatPumpTargetInputs(BaseModel):
     dt_hp_ihx: float
     dt_cascade_hx: float
     dt_phase_change: float
-    price_ratio: float
+    heat_to_power_ratio: float
+    cold_to_power_ratio: float
     is_heat_pumping: bool
     max_multi_start: int
     T_env: float
     dt_env_cont: float
-    eta_hp_carnot: float
-    eta_he_carnot: float
+    eta_ii_hpr_carnot: float
+    eta_ii_he_carnot: float
     refrigerant_ls: List[str]
     do_refrigerant_sort: bool
-    initialise_simulated_hp: bool
+    initialise_simulated_cycle: bool
     allow_integrated_expander: bool
 
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
     dT_superheat: Optional[np.ndarray] = None
-    net_hot_streams: Optional[StreamCollection] = StreamCollection()
-    net_cold_streams: Optional[StreamCollection] = StreamCollection()
+    bckgrd_hot_streams: Optional[StreamCollection] = StreamCollection()
+    bckgrd_cold_streams: Optional[StreamCollection] = StreamCollection()
     bb_minimiser: Optional[str] = None
     eta_penalty: Optional[float] = 0.01
     rho_penalty: Optional[float] = 10
@@ -96,8 +101,8 @@ class HeatPumpTargetInputs(BaseModel):
     debug: bool
 
 
-class HeatPumpTargetOutputs(BaseModel):
-    """Normalized output requirement for heat pump targeting routines."""
+class HPRTargetOutputs(BaseModel):
+    """Normalized output requirement for heat pump and refrigeration targeting routines."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -106,17 +111,21 @@ class HeatPumpTargetOutputs(BaseModel):
 
     # --- Common objective / result fields -------------------------
     utility_tot: float
-    work_hp: float | list | np.ndarray
-    work_he: Optional[float | list | np.ndarray] = None
+    w_net: float | list | np.ndarray
+    w_hpr: Optional[float | list | np.ndarray] = None
+    w_he: Optional[float | list | np.ndarray] = None
+    heat_ex: Optional[float | list | np.ndarray] = None
     Q_ext: float
-    Q_amb: float
-    cop: float | list | np.ndarray
+    Q_amb_hot: float
+    Q_amb_cold: float
+    cop_h: Optional[float | list | np.ndarray] = None
+    eta_he: Optional[float | list | np.ndarray] = None
     obj: float
-    opt_success: bool
+    success: bool
 
-    hp_hot_streams: Optional["StreamCollection"] = None
-    hp_cold_streams: Optional["StreamCollection"] = None
-    amb_stream: Optional["StreamCollection"] = None
+    hpr_hot_streams: StreamCollection
+    hpr_cold_streams: StreamCollection
+    amb_streams: StreamCollection
 
     # --- Flattened state fields (union of all children) -----------
     # Carnot & Simple Vapour Compression
@@ -136,7 +145,7 @@ class HeatPumpTargetOutputs(BaseModel):
     Q_heat: Optional[np.ndarray] = None
     Q_cool: Optional[np.ndarray] = None
 
-    hp_model: Optional[Any] = None
+    model: Optional[Any] = None
 
 
 # ---- Targeting results -------------------------------------------------------
@@ -172,6 +181,55 @@ class TargetResults(BaseModel):
     ETE: Optional[float] = None
     exergy_req_min: MaybeVU = None
     exergy_des_min: MaybeVU = None
+
+
+class TurbineStageResult(BaseModel):
+    """Detailed result for one solved turbine stage."""
+
+    stage: int
+    source_index: int
+    stage_type: str
+    temperature: float
+    process_duty: float
+    pressure_in: float
+    pressure_out: float
+    mass_flow_in: float
+    mass_flow_extracted: float
+    mass_flow_out: float
+    enthalpy_in: float
+    enthalpy_out: float
+    condensate_enthalpy: float
+    saturation_enthalpy: float
+    dh_isentropic: float
+    work_actual: float
+    work_isentropic: float
+    isentropic_efficiency: float
+    turbine_model: str
+
+
+class TurbineSolveResult(BaseModel):
+    """Validated output for a multi-stage turbine targeting solve."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str
+    turbine_model: str
+    load_frac: float
+    mech_eff: float
+    min_eff: float
+    flash_correction: bool
+    total_work: float
+    total_isentropic_work: float
+    overall_efficiency: float
+    total_process_duty: float
+    steam_mass_flow_in: Optional[float] = None
+    inlet_pressure: Optional[float] = None
+    inlet_temperature: Optional[float] = None
+    sink_pressure: Optional[float] = None
+    sink_temperature: Optional[float] = None
+    stage_temperatures: List[float] = Field(default_factory=list)
+    stage_heat_flows: List[float] = Field(default_factory=list)
+    stages: List[TurbineStageResult] = Field(default_factory=list)
 
 
 # ---- Graphing primitives -----------------------------------------------------

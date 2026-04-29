@@ -6,7 +6,6 @@ area-cost calculations, and packaging of outputs into ``EnergyTarget``
 instances.
 """
 
-from operator import attrgetter
 from typing import List, Tuple
 
 from ..classes import *
@@ -22,8 +21,9 @@ from . import (
     get_capital_cost_targets,
     get_balanced_CC,
     get_additional_GCCs,
-    get_heat_pump_targets,
-    calc_heat_pump_cascade,
+    validate_heat_pump_or_refrigeration_targeting_required,
+    get_heat_pump_and_refrigeration_targets,
+    calc_heat_pump_and_refrigeration_cascade,
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -73,29 +73,52 @@ def compute_direct_integration_targets(zone: Zone):
         do_vert_cc_calc=zone_config.DO_VERTICAL_GCC,
         do_assisted_ht_calc=zone_config.DO_ASSITED_HT,
     )
-    if zone.identifier in [Z.P.value]:
-        Q_target = (
-            min(zone_config.HP_LOAD_FRACTION, 1.0)
-            * np.abs(pt.col[PT.H_NET_COLD.value]).max()
+
+    if zone.identifier == Z.P.value and (
+        zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING
+    ):
+        hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
+            pt,
+            is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
+            zone_name=zone.name,
+            zone_config=zone_config,
         )
-        if (
-            _validate_heat_pump_targeting_required(pt, True, zone_config)
-            and Q_target > 0
-        ):
-            hp_res = get_heat_pump_targets(
-                Q_target=Q_target,
+        if hp_target_load > tol:
+            res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
+                Q_hpr_target=hp_target_load,
                 T_vals=pt.col[PT.T.value],
                 H_hot=pt.col[PT.H_NET_HOT.value],
                 H_cold=pt.col[PT.H_NET_COLD.value],
                 zone_config=zone_config,
                 is_heat_pumping=True,
             )
-            res.update(hp_res)
-            calc_heat_pump_cascade(
+            calc_heat_pump_and_refrigeration_cascade(
                 pt=pt,
-                res=hp_res,
+                res=res["Heat pump"],
                 is_T_vals_shifted=True,
-                is_process_integration=True,
+                is_heat_pumping=True,
+            )
+
+        r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
+            pt,
+            is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
+            zone_name=zone.name,
+            zone_config=zone_config,
+        )
+        if r_target_load > tol:
+            res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
+                Q_hpr_target=r_target_load,
+                T_vals=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_NET_HOT.value],
+                H_cold=pt.col[PT.H_NET_COLD.value],
+                zone_config=zone_config,
+                is_heat_pumping=False,
+            )
+            calc_heat_pump_and_refrigeration_cascade(
+                pt=pt,
+                res=res["Refrigeration"],
+                is_T_vals_shifted=True,
+                is_heat_pumping=False,
             )
 
     get_utility_targets(
@@ -369,28 +392,5 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
                 PT.H_COLD_UT.value,
             ]
         ],
-        GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP_PRO.value]],
+        GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]],
     }
-
-
-def _validate_heat_pump_targeting_required(
-    pt: ProblemTable,
-    is_heat_pumping: bool,
-    zone_config: Configuration,
-) -> bool:
-    return (
-        False
-        if (
-            (zone_config.DO_PROCESS_HP_TARGETING == False)
-            or (
-                np.abs(pt.col[PT.H_NET_COLD.value]).max() < tol
-                and is_heat_pumping == True
-            )
-            or (
-                np.abs(pt.col[PT.H_NET_HOT.value]).max() < tol
-                and is_heat_pumping == False
-            )
-            or (zone_config.HP_LOAD_FRACTION < tol)
-        )
-        else True
-    )

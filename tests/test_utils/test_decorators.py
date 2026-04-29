@@ -3,9 +3,9 @@
 import logging
 import re
 import time
-
 from OpenPinch.lib import *
 from OpenPinch.utils import *
+from OpenPinch.utils import decorators
 
 
 def get_dummy_function():
@@ -49,10 +49,6 @@ def test_timing_decorator_logging_output(monkeypatch, caplog):
 
 # ===== Merged from test_decorators_extra.py =====
 """Additional coverage tests for decorator helpers."""
-
-import logging
-
-from OpenPinch.utils import decorators
 
 
 class _ClosedStream:

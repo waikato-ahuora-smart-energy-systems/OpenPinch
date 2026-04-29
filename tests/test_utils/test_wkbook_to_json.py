@@ -1,15 +1,15 @@
 """Regression tests for wkbook to json utility helpers."""
 
 from pathlib import Path
-
 import pandas as pd
 import pytest
-
 from OpenPinch.utils.wkbook_to_json import (
     _validate_stream_data,
     get_problem_from_excel,
     get_results_from_excel,
 )
+import numpy as np
+from OpenPinch.utils import wkbook_to_json
 
 
 def _write_test_workbook(path: Path):
@@ -276,13 +276,6 @@ def test_validate_stream_data_defaults_name_when_zone_and_name_missing():
 
 # ===== Merged from test_wkbook_to_json_extra.py =====
 """Additional coverage tests for workbook-to-JSON helpers."""
-
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-
-from OpenPinch.utils import wkbook_to_json
 
 
 def test_get_problem_from_excel_writes_json(tmp_path: Path):

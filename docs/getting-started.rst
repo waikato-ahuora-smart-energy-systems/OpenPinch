@@ -7,7 +7,7 @@ invoke the analysis engine.
 Requirements
 ------------
 
-- Python 3.11 or newer (3.12 is fully supported)
+- Python 3.11 or newer (3.14 is fully supported)
 - ``numpy``, ``pandas``, and other dependencies listed in ``pyproject.toml``
 - Optional: Microsoft Excel if you plan to export results to workbooks
 

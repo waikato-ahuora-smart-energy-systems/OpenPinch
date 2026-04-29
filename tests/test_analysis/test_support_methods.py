@@ -31,13 +31,13 @@ def test_get_value_with_valuewithunit():
 
 
 def test_get_value_with_int_raises():
-    with pytest.raises(TypeError):
-        get_value(5)  # Int is not accepted
+    assert get_value(5) == 5.0  # Int should be converted to float
 
 
 def test_get_value_with_string_raises():
-    with pytest.raises(TypeError):
-        get_value("100")
+    assert (
+        get_value("100") == 100.0
+    )  # String that can be converted to float should work
 
 
 """Test cases for the compute_capital_recovery_factor function."""

@@ -1,8 +1,10 @@
 """Targeted edge-path tests for ProblemTable equality internals."""
 
 import numpy as np
-
 from OpenPinch.classes.problem_table import ProblemTable
+import pandas as pd
+import pytest
+from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 
 class _FakeArray:
@@ -43,13 +45,6 @@ def test_equals_object_nan_and_numeric_mismatch_branch():
 
 # ===== Merged from test_problem_table_extra.py =====
 """Additional edge-branch coverage for ProblemTable."""
-
-import numpy as np
-import pandas as pd
-import pytest
-
-from OpenPinch.classes.problem_table import ProblemTable
-from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 
 def _default_table() -> ProblemTable:
