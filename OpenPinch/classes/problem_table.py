@@ -865,7 +865,7 @@ class ProblemTable:
 
     def update(
         self,
-        updates: Mapping[Union[str, ProblemTableLabel], Sequence[float]],
+        updates: dict,
     ) -> "ProblemTable":
         """Assign column values in-place using a mapping of ``column -> iterable``."""
         if not updates:
