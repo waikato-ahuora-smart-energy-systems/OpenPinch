@@ -807,8 +807,7 @@ def _optimise_cascade_heat_pump_placement(
     num_stages = int(args.n_cond + args.n_evap - 1)
 
     # Use as initialisation
-    if args.initialise_simulated_cycle:
-        init_res = _optimise_multi_temperature_carnot_heat_pump_placement(args)
+    init_res = _optimise_multi_temperature_carnot_heat_pump_placement(args) if args.initialise_simulated_cycle else None
 
     # Validate specific inputs related to this approach
     args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
@@ -816,7 +815,7 @@ def _optimise_cascade_heat_pump_placement(
     # Solve the placement problem
     res = _solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_obj,
-        x0_ls=_get_x0_for_cascade_hp_opt(init_res, args) if args.initialise_simulated_cycle else None,
+        x0_ls=_get_x0_for_cascade_hp_opt(init_res, args),
         bnds=_get_bounds_for_cascade_hp_opt(args),
         args=args,
     )
@@ -828,6 +827,9 @@ def _get_x0_for_cascade_hp_opt(
     args: HPRTargetInputs,
 ) -> np.ndarray:
     """Build initial guess vectors for the cascade condenser/evaporator optimization."""
+    if init_res is None:
+        return None
+
     n_cool = max(int(args.n_evap) - 1, 0)
     Q_cool_ex = args.Q_cool_max + init_res.Q_amb_hot
     Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
@@ -838,8 +840,9 @@ def _get_x0_for_cascade_hp_opt(
     x_subcool = [0.0] * int(args.n_cond)
     x_heat = _map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
     x_cool = _map_Q_arr_to_x_arr(init_res.Q_evap[: n_cool], Q_cool_ex).tolist()
+    x_ihx = [0.0] * (int(args.n_cond) + int(args.n_evap) - 1)
     return np.asarray(
-        [x_amb] + x_cond + x_evap + x_subcool + x_heat + x_cool,
+        [x_amb] + x_cond + x_evap + x_subcool + x_heat + x_cool + x_ihx,
         dtype=np.float64,
     )
 
@@ -851,6 +854,7 @@ def _get_bounds_for_cascade_hp_opt(
     n_cond = n_heat = int(args.n_cond)
     n_evap = int(args.n_evap)
     n_cool = n_evap - 1
+    n_units = n_cond + n_evap - 1
     return (
         [(-1.0, 10.0)]          # Ambient source/sink bounds
         + [(0.0, 1.0)] * n_cond # Condenser temperature bounds
@@ -858,6 +862,7 @@ def _get_bounds_for_cascade_hp_opt(
         + [(0.0, 1.0)] * n_cond # Subcooling bounds
         + [(0.0, 1.0)] * n_heat # Heating duty bounds
         + [(0.0, 1.0)] * n_cool # Cooling duty bounds
+        + [(0.0, 1.0)] * n_units # Internal heat exchanger duty bounds
     )
 
 
@@ -877,6 +882,8 @@ def _parse_cascade_hp_state_variables(
     x_heat = x[c: d]
     e = d + int(args.n_evap) - 1
     x_cool = x[d: e]
+    f = e + (int(args.n_cond) + int(args.n_evap) - 1)
+    x_ihx = x[e: f]
 
     Q_amb_hot, Q_amb_cold = _map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
     T_cond = _map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
@@ -886,6 +893,9 @@ def _parse_cascade_hp_state_variables(
     Q_cool = _append_unspecified_final_cascade_cooling_duty(
         x_cool * (args.Q_cool_max + Q_amb_cold)
     )
+    T_cond_all = np.sort(np.concatenate([T_cond - dT_subcool, T_evap[:-1]]))[::-1]
+    T_evap_all = np.sort(np.concatenate([(T_cond - dT_subcool)[1:], T_evap]))[::-1]
+    dT_ihx_gas_side = _map_x_arr_to_DT_arr(x_ihx, T_cond_all, T_evap_all)
     return {
         "T_cond": T_cond,
         "dT_subcool": dT_subcool,
@@ -893,7 +903,8 @@ def _parse_cascade_hp_state_variables(
         "T_evap": T_evap,
         "Q_cool": Q_cool,
         "Q_amb_hot": Q_amb_hot,
-        "Q_amb_cold": Q_amb_cold
+        "Q_amb_cold": Q_amb_cold,
+        "dT_ihx_gas_side": dT_ihx_gas_side,
     }
 
 
@@ -914,9 +925,9 @@ def _compute_cascade_hp_system_obj(
         Q_heat=state_vars["Q_heat"],
         Q_cool=state_vars["Q_cool"],
         dT_subcool=state_vars["dT_subcool"],
+        dT_ihx_gas_side=state_vars["dT_ihx_gas_side"],
         eta_comp=args.eta_comp,
-        refrigerant=args.refrigerant_ls,
-        dt_ihx_gas_side=args.dt_hp_ihx,
+        refrigerant=args.refrigerant_ls,        
         dt_cascade_hx=args.dt_cascade_hx,
     )
     if not (hp.solved):
@@ -1259,161 +1270,57 @@ def _optimise_multi_simple_heat_pump_placement(
     num_stages = args.n_cond = args.n_evap = int(max(args.n_cond, args.n_evap))
 
     # Use as initialisation
-    if args.initialise_simulated_cycle:
-        init_res = _optimise_multi_simple_carnot_heat_pump_placement(args)
+    init_res = _optimise_multi_simple_carnot_heat_pump_placement(args) if args.initialise_simulated_cycle else None
 
     # Validate specific inputs related to this approach
     args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
 
-    # Prepare and run the optimisation
-    bnds = _get_bounds_for_multi_single_hp_opt(args)
-    x0 = (
-        _get_x0_for_multi_single_hp_opt(
-            T_cond=init_res.T_cond,
-            Q_cond=init_res.Q_cond,
-            T_evap=init_res.T_evap,
-            args=args,
-            bnds=bnds,
-        )
-        if args.initialise_simulated_cycle
-        else None
-    )
+    # Run the optimisation
     res = _solve_hpr_placement(
         f_obj=_compute_multi_simple_hp_system_obj,
-        x0_ls=x0,
-        bnds=bnds,
+        x0_ls=_get_x0_for_multi_single_hp_opt(init_res, args),
+        bnds=_get_bounds_for_multi_single_hp_opt(args),
         args=args,
     )
     return HPRTargetOutputs.model_validate(res)
 
 
 def _get_x0_for_multi_single_hp_opt(
-    T_cond: np.ndarray,
-    Q_cond: np.ndarray,
-    T_evap: np.ndarray,
+    init_res: HPRTargetOutputs,
     args: HPRTargetInputs,
-    bnds: list,
 ) -> np.ndarray:
     """Build initial guesses for the multi single-HP condenser/evaporator optimization."""
-    x_sc_bnds = [
-        np.float64(args.dt_phase_change / args.dt_range_max),
-        np.float64((args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max),
-    ]
-    x_sh_bnds = [
-        np.float64(args.dt_phase_change / args.dt_range_max),
-        np.float64((args.T_hot[0] - args.T_hot[-1]) / args.dt_range_max),
-    ]
+    if init_res is None:
+        return None
+    
+    Q_cool_ex = args.Q_cool_max + init_res.Q_amb_hot
+    Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
 
-    if x_sc_bnds[0] > x_sc_bnds[1]:
-        x_sc_bnds[1] = x_sc_bnds[0]
-
-    if x_sh_bnds[0] > x_sh_bnds[1]:
-        x_sh_bnds[1] = x_sh_bnds[0]
-
-    x_cond = (args.T_cold[0] - T_cond) / args.dt_range_max
-    x_sc = np.array(
-        [args.dt_phase_change / args.dt_range_max for _ in range(len(T_cond))]
+    x_amb = _map_Q_amb_to_x(init_res.Q_amb_hot, init_res.Q_amb_cold, max(Q_heat_ex, Q_cool_ex))
+    x_cond = _map_T_arr_to_x_arr(init_res.T_cond, args.T_cold[0], args.T_cold[-1]).tolist()
+    x_evap = ((init_res.T_evap - args.T_hot[-1]) / (args.T_hot[0] - args.T_hot[-1])).tolist()
+    x_subcool = [0.0] * int(args.n_cond)
+    x_heat = _map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
+    x_ihx = [0.0] * int(args.n_cond)
+    return np.asarray(
+        [x_amb] + x_cond + x_evap + x_subcool + x_heat + x_ihx,
+        dtype=np.float64,
     )
-    y_cond = Q_cond / args.Q_hpr_target
-
-    x_evap = (T_evap - args.T_hot[-1]) / args.dt_range_max
-    x_sh = np.array(
-        [args.dt_phase_change / args.dt_range_max for _ in range(len(T_evap))]
-    )
-
-    x_ls = []
-    for candidate in [x_cond, x_sc, y_cond, x_evap, x_sh]:
-        x_ls.extend(candidate[:])
-
-    x0 = np.array(x_ls)
-
-    if x0.size != len(bnds):
-        raise ValueError(
-            "Bounds size must match x0 size for multiple single HP optimisation."
-        )
-
-    for i in range(x0.size):
-        if not (bnds[i][0] <= x0[i] <= bnds[i][1]):
-            x0[i] = bnds[i][1] if i * 2 < x0.size else bnds[i][0]
-
-    return np.asarray([x0])
 
 
 def _get_bounds_for_multi_single_hp_opt(
     args: HPRTargetInputs,
 ) -> list:
     """Build bounds for the multi single-HP condenser/evaporator optimization."""
-    x_cond_bnds = []
-    x_evap_bnds = []
-    for i, refrigerant in enumerate(args.refrigerant_ls):
-        T_min, T_max = (
-            PropsSI("Tmin", refrigerant) - 273.15,
-            PropsSI("Tmax", refrigerant) - 273.15,
-        )
-        if i == args.n_cond:
-            break
-
-        T_cond_bnds = np.array(
-            (
-                min(args.T_cold[0], T_max - 1),
-                max(args.T_cold[-1] + args.dt_phase_change, T_min + 1),
-            )
-        )
-        if T_cond_bnds[1] > T_cond_bnds[0]:
-            T_cond_bnds[0] = T_cond_bnds[1]
-        x_cond_bnds += [
-            (
-                (args.T_cold[0] - T_cond_bnds[0]) / args.dt_range_max,
-                (args.T_cold[0] - T_cond_bnds[1]) / args.dt_range_max,
-            )
-        ]
-
-        T_evap_bnds = np.array(
-            (
-                max(args.T_hot[-1], T_min + 1),
-                min(args.T_hot[0] - args.dt_phase_change, T_max - 1),
-            )
-        )
-        if T_evap_bnds[0] > T_evap_bnds[1]:
-            T_evap_bnds[1] = T_evap_bnds[0]
-        x_evap_bnds += [
-            (
-                (T_evap_bnds[0] - args.T_hot[-1]) / args.dt_range_max,
-                (T_evap_bnds[1] - args.T_hot[-1]) / args.dt_range_max,
-            )
-        ]
-
-    x_sc_bnds = (
-        np.float64(args.dt_phase_change / args.dt_range_max),
-        np.float64((args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max),
+    n_units = int(args.n_cond)
+    return (
+        [(-1.0, 10.0)]           # Ambient source/sink bounds
+        + [(0.0, 1.0)] * n_units # Condenser temperature bounds
+        + [(0.0, 1.0)] * n_units # Evaporator temperature bounds
+        + [(0.0, 1.0)] * n_units # Subcooling bounds
+        + [(0.0, 1.0)] * n_units # Heating duty bounds
+        + [(0.0, 1.0)] * n_units # Internal heat exchanger duty bounds
     )
-    x_sh_bnds = (
-        np.float64(args.dt_phase_change / args.dt_range_max),
-        np.float64((args.T_hot[0] - args.T_hot[-1]) / args.dt_range_max),
-    )
-
-    if x_sc_bnds[0] > x_sc_bnds[1]:
-        x_sc_bnds = (x_sc_bnds[0], x_sc_bnds[0])
-    if x_sh_bnds[0] > x_sh_bnds[1]:
-        x_sh_bnds = (x_sh_bnds[0], x_sh_bnds[0])
-
-    y_cond_bnds = (0.0, 1.0)
-
-    bnds = []
-
-    def _build_bounds(count, limits):
-        if isinstance(limits, list):
-            bnds.extend(limits[:count])
-        else:
-            bnds.extend([limits] * count)
-
-    _build_bounds(args.n_cond, x_cond_bnds)
-    _build_bounds(args.n_cond, x_sc_bnds)
-    _build_bounds(args.n_cond, y_cond_bnds)
-    _build_bounds(args.n_cond, x_evap_bnds)
-    _build_bounds(args.n_cond, x_sh_bnds)
-
-    return bnds
 
 
 def _parse_multi_simple_hp_state_temperatures(
@@ -1421,25 +1328,33 @@ def _parse_multi_simple_hp_state_temperatures(
     args: HPRTargetInputs,
 ) -> Tuple[np.ndarray]:
     """Extract HP variables from optimization vector x."""
-    n = args.n_cond
-    T_cond = np.array(args.T_cold[0] - x[:n] * args.dt_range_max, dtype=np.float64)
-    dT_subcool = np.array(x[n : 2 * n] * args.dt_range_max, dtype=np.float64)
-    Q_cond = np.array(x[2 * n : 3 * n] * args.Q_heat_max, dtype=np.float64)
-    T_evap = np.array(
-        x[3 * n : 4 * n] * args.dt_range_max + args.T_hot[-1], dtype=np.float64
-    )
-    dT_superheat = np.array(x[4 * n : -1] * args.dt_range_max, dtype=np.float64)
-    scale = max(args.Q_heat_max, args.Q_cool_max)
-    Q_amb_hot = min(scale * x[-1], 0.0) * -1
-    Q_amb_cold = max(scale * x[-1], 0.0)
+    n = int(args.n_cond)
+    x_amb = x[0]
+    a = 1 + n
+    x_cond = x[1: a]
+    b = a + n
+    x_evap = x[a: b]
+    c = b + n
+    x_subcool = x[b: c]
+    d = c + n
+    x_heat = x[c: d]    
+    e = d + n    
+    x_ihx = x[d: e]
+
+    Q_amb_hot, Q_amb_cold = _map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
+    T_cond = _map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
+    T_evap = np.array(x_evap * (args.T_hot[0] - args.T_hot[-1]) + args.T_hot[-1], dtype=np.float64)
+    dT_subcool = _map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
+    Q_cond = _map_x_arr_to_Q_arr(x_heat, args.Q_heat_max + Q_amb_cold)
+    dT_ihx_gas_side = _map_x_arr_to_DT_arr(x_ihx, T_cond, T_evap)
     return {
         "T_cond": T_cond,
         "dT_subcool": dT_subcool,
         "Q_heat": Q_cond,
         "T_evap": T_evap,
-        "dT_superheat": dT_superheat,
         "Q_amb_hot": Q_amb_hot,
-        "Q_amb_cold": Q_amb_cold
+        "Q_amb_cold": Q_amb_cold,
+        "dT_ihx_gas_side": dT_ihx_gas_side,
     }
 
 
@@ -1464,11 +1379,10 @@ def _compute_multi_simple_hp_system_obj(
     hp.solve(
         T_evap=state_vars["T_evap"],
         T_cond=state_vars["T_cond"],
-        dT_superheat=state_vars["dT_superheat"],
         dT_subcool=state_vars["dT_subcool"],
         eta_comp=args.eta_comp,
         refrigerant=args.refrigerant_ls,
-        dt_ihx_gas_side=args.dt_hp_ihx,
+        dT_ihx_gas_side=state_vars["dT_ihx_gas_side"],
         Q_heat=state_vars["Q_heat"],
     )
 

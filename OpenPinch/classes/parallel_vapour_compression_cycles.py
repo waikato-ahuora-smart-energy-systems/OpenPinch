@@ -188,10 +188,10 @@ class ParallelVapourCompressionCycles:
         return np.array([cycle.eta_comp for cycle in self._subcycles])
 
     @property
-    def dt_ihx_gas_side(self) -> np.ndarray:
+    def dT_ihx_gas_side(self) -> np.ndarray:
         """Internal heat exchanger gas-side delta-T for each subcycle."""
         self._require_solution()
-        return np.array([cycle.dt_ihx_gas_side for cycle in self._subcycles])
+        return np.array([cycle.dT_ihx_gas_side for cycle in self._subcycles])
 
     @property
     def num_cycles(self) -> int:
@@ -357,17 +357,17 @@ class ParallelVapourCompressionCycles:
             )
         return [refrigerant] * n_cycles
 
-    def _normalize_dt_ihx_gas_side(
+    def _normalize_dT_ihx_gas_side(
         self,
-        dt_ihx_gas_side,
+        dT_ihx_gas_side,
         n_cycles: int,
     ) -> np.ndarray:
-        if np.isscalar(dt_ihx_gas_side):
-            return np.full(n_cycles, dt_ihx_gas_side, dtype=float)
+        if np.isscalar(dT_ihx_gas_side):
+            return np.full(n_cycles, dT_ihx_gas_side, dtype=float)
 
-        arr = np.asarray(dt_ihx_gas_side, dtype=float)
+        arr = np.asarray(dT_ihx_gas_side, dtype=float)
         if arr.size != n_cycles:
-            raise ValueError("dt_ihx_gas_side must match the number of heat pumps.")
+            raise ValueError("dT_ihx_gas_side must match the number of heat pumps.")
         return arr
 
     def solve(
@@ -379,7 +379,7 @@ class ParallelVapourCompressionCycles:
         dT_subcool: np.ndarray = 0.0,
         eta_comp: float = 0.7,
         refrigerant: List[str] | str = "water",
-        dt_ihx_gas_side: np.ndarray | float = 10.0,
+        dT_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray | float | None = None,
         Q_cool: np.ndarray | float | None = None,
         is_heat_pump: bool = True,
@@ -401,7 +401,7 @@ class ParallelVapourCompressionCycles:
             Isentropic efficiency of the compressor [-].
         refrigerant : List[str] | str, optional
             Cycle refrigerants; one per heat pump or a scalar value.
-        dt_ihx_gas_side : np.ndarray | float, optional
+        dT_ihx_gas_side : np.ndarray | float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : np.ndarray | float | None, optional
             Heat delivered to the process [W].
@@ -436,8 +436,8 @@ class ParallelVapourCompressionCycles:
         Q_heat_all = self._normalize_Q_heat(Q_heat, self._num_cycles)
         Q_cool_all = self._normalize_Q_cool(Q_cool, self._num_cycles)
         refrigerant_all = self._normalize_refrigerant(refrigerant, self._num_cycles)
-        ihx_gas_dt_all = self._normalize_dt_ihx_gas_side(
-            dt_ihx_gas_side, self._num_cycles
+        ihx_gas_dt_all = self._normalize_dT_ihx_gas_side(
+            dT_ihx_gas_side, self._num_cycles
         )
 
         for i in range(self._num_cycles):
@@ -449,7 +449,7 @@ class ParallelVapourCompressionCycles:
                 dT_subcool=dT_subcool_all[i],
                 eta_comp=eta_comp,
                 refrigerant=refrigerant_all[i],
-                dt_ihx_gas_side=ihx_gas_dt_all[i],
+                dT_ihx_gas_side=ihx_gas_dt_all[i],
                 Q_heat=Q_heat_all[i],
                 Q_cool=Q_cool_all[i],
                 is_heat_pump=is_heat_pump,

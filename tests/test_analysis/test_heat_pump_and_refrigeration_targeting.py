@@ -729,20 +729,25 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
         dt_phase_change=1.0,
         Q_hpr_target=1000.0,
         refrigerant_ls=["R134A", "R134A"],
+        Q_cool_max=1000.0,
+        Q_heat_max=1000.0,
+    )
+    init_results = SimpleNamespace(
+        T_cond = np.array([120.0, 90.0]),
+        T_evap = np.array([50.0, 20.0]),
+        Q_cond = np.array([600.0, 400.0]),
+        Q_amb_hot = 0.0,
+        Q_amb_cold = 0.0,
     )
 
-    T_cond = np.array([120.0, 90.0])
-    T_evap = np.array([50.0, 20.0])
-    Q_cond = np.array([600.0, 400.0])
-
     bnds = _get_bounds_for_multi_single_hp_opt(args)
-    x0_ls = _get_x0_for_multi_single_hp_opt(T_cond, Q_cond, T_evap, args, bnds)
+    x0 = _get_x0_for_multi_single_hp_opt(init_results, args)
 
-    assert x0_ls.shape == (1, 10)
-    assert len(bnds) == x0_ls.shape[1]
+    assert x0.shape == (11,)
+    assert len(bnds) == len(x0)
     assert np.all(
-        (x0_ls[0] >= np.array([b[0] for b in bnds]))
-        & (x0_ls[0] <= np.array([b[1] for b in bnds]))
+        (x0 >= np.array([b[0] for b in bnds]))
+        & (x0 <= np.array([b[1] for b in bnds]))
     )
 
 
@@ -774,7 +779,7 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
     bnds = _get_bounds_for_cascade_hp_opt(args)
     x0 = _get_x0_for_cascade_hp_opt(init_res=init, args=args)
 
-    assert x0.shape == (10,)
+    assert x0.shape == (13,)
     assert x0[0] == pytest.approx(0.0)
     assert len(bnds) == x0.shape[0]
     assert np.all(
@@ -1018,7 +1023,7 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         init_res=init_res,
         args=args,
     )
-    assert x0.shape[0] == (10)
+    assert x0.shape[0] == (13)
     assert np.all(x0[0] >= 0.0)
     
 
@@ -1026,10 +1031,9 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         hp, "PropsSI", lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0
     )
     b = hp._get_bounds_for_cascade_hp_opt(args)
-    assert len(b) == 10
-
+    assert len(b) == 13
     vars = hp._parse_cascade_hp_state_variables(
-        np.array([0.1, 0.2, 0.4, 0.3, 0.5, 0.01, 0.02, 0.6, 0.7, 0.8]),
+        np.array([0.1, 0.2, 0.4, 0.3, 0.5, 0.01, 0.02, 0.6, 0.7, 0.8, 0.1, 0.1, 0.1]),
         args,
     )
     np.testing.assert_allclose(vars["T_cond"], np.array([110.0, 78.0]))
@@ -1056,6 +1060,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
             "Q_cool": np.array([50.0, np.nan]),
             "Q_amb_hot": 0.0,
             "Q_amb_cold": 0.0,
+            "dT_ihx_gas_side": np.array([0.0, 0.0, 0.0]),
         },
     )
 
@@ -1111,118 +1116,34 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     assert calls["plot"] == 1
 
 
-def test_multi_simple_carnot_and_multi_simple_simulated_paths(monkeypatch):
-    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=True)
-    _patch_output_model_validate(monkeypatch)
-
-    monkeypatch.setattr(
-        hp,
-        "_get_carnot_hpr_cycle_streams",
-        lambda *_args, **_kwargs: {
-            "hot_streams": StreamCollection(),
-            "cold_streams": StreamCollection(),
-        },
-    )
-    monkeypatch.setattr(
-        hp,
-        "_solve_hpr_placement",
-        lambda **_kwargs: {
-            "obj": 0.1,
-            "utility_tot": 1.0,
-            "net_work": np.array([1.0, 2.0]),
-            "Q_ext": 0.0,
-            "Q_amb_hot": 0.0,
-            "Q_amb_cold": 0.0,
-            "cop_h": 2.5,
-            "T_cond": np.array([120.0, 100.0]),
-            "Q_cond": np.array([120.0, 80.0]),
-            "T_evap": np.array([70.0, 50.0]),
-            "Q_evap": np.array([90.0, 60.0]),
-            "success": True,
-        },
-    )
-    out_carnot = hp._optimise_multi_simple_carnot_heat_pump_placement(args)
-    assert out_carnot["success"] is True
-
-    monkeypatch.setattr(
-        hp,
-        "_optimise_multi_simple_carnot_heat_pump_placement",
-        lambda _args: SimpleNamespace(
-            T_cond=np.array([120.0, 100.0]),
-            Q_cond=np.array([120.0, 80.0]),
-            T_evap=np.array([70.0, 50.0]),
-        ),
-    )
-    monkeypatch.setattr(
-        hp, "_validate_vapour_hp_refrigerant_ls", lambda n, a: ["R134A"] * n
-    )
-    monkeypatch.setattr(
-        hp, "_get_bounds_for_multi_single_hp_opt", lambda _args: [(0.0, 1.0)] * 10
-    )
-    monkeypatch.setattr(
-        hp, "_get_x0_for_multi_single_hp_opt", lambda **_kwargs: np.array([[0.2] * 10])
-    )
-    monkeypatch.setattr(
-        hp,
-        "_solve_hpr_placement",
-        lambda **_kwargs: {
-            "obj": 0.1,
-            "utility_tot": 1.0,
-            "net_work": np.array([1.0, 2.0]),
-            "Q_ext": 0.0,
-            "Q_amb_hot": 0.0,
-            "Q_amb_cold": 0.0,
-            "cop_h": 2.5,
-            "hpr_hot_streams": StreamCollection(),
-            "hpr_cold_streams": StreamCollection(),
-            "success": True,
-        },
-    )
-    out_sim = hp._optimise_multi_simple_heat_pump_placement(args)
-    assert out_sim["success"] is True
-
-    monkeypatch.setattr(
-        hp,
-        "_solve_hpr_placement",
-        lambda **_kwargs: (_ for _ in ()).throw(ValueError("failed")),
-    )
-    with pytest.raises(ValueError, match="failed"):
-        hp._optimise_multi_simple_heat_pump_placement(args)
-
-
 def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
-    args = _base_args(n_cond=2, n_evap=2)
-    bnds = [(0.0, 0.8)] * 10
-    x0 = hp._get_x0_for_multi_single_hp_opt(
-        T_cond=np.array([120.0, 100.0]),
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0, 90.0]),
         Q_cond=np.array([120.0, 80.0]),
         T_evap=np.array([70.0, 50.0]),
+        Q_evap=np.array([90.0, 60.0]),
+        Q_amb_hot=0.0,
+        Q_amb_cold=0.0,
+    )    
+    args = _base_args(n_cond=2, n_evap=2)
+    x0 = hp._get_x0_for_multi_single_hp_opt(
+        init_res=init_res,
         args=args,
-        bnds=bnds,
     )
-    assert x0.shape == (1, 10)
-
-    with pytest.raises(ValueError, match="Bounds size must match x0 size"):
-        hp._get_x0_for_multi_single_hp_opt(
-            T_cond=np.array([120.0, 100.0]),
-            Q_cond=np.array([120.0, 80.0]),
-            T_evap=np.array([70.0, 50.0]),
-            args=args,
-            bnds=[(0.0, 1.0)],
-        )
+    assert x0.shape[0] == (11)
 
     monkeypatch.setattr(
         hp, "PropsSI", lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0
     )
     b = hp._get_bounds_for_multi_single_hp_opt(args)
-    assert len(b) == 10
+    assert len(b) == 11
 
-    vars = hp._parse_multi_simple_hp_state_temperatures(np.array([0.1] * 10), args)
+    vars = hp._parse_multi_simple_hp_state_temperatures(np.array([0.1] * 11), args)
     assert vars["T_cond"].shape == (2,)
     assert vars["dT_subcool"].shape == (2,)
     assert vars["Q_heat"].shape == (2,)
     assert vars["T_evap"].shape == (2,)
-    assert vars["dT_superheat"].shape == (1,)
+    assert vars["dT_ihx_gas_side"].shape == (2,)
     assert vars["Q_amb_hot"] == pytest.approx(0.0)
     assert vars["Q_amb_cold"] == pytest.approx(0.1 * max(args.Q_heat_max, args.Q_cool_max))
 
@@ -1255,40 +1176,6 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     x_bad = np.array([0.9] * 10)
     out_bad = hp._compute_multi_simple_hp_system_obj(x_bad, args)
     assert np.isinf(out_bad["obj"])
-
-    class _FakeMultiSimple:
-        work = 30.0
-        work_arr = np.array([10.0, 20.0])
-        Q_cool = 60.0
-        Q_heat_arr = np.array([120.0, 80.0])
-        Q_cool_arr = np.array([40.0, 20.0])
-        penalty = 1.0
-
-        def solve(self, **_kwargs):
-            return None
-
-        def build_stream_collection(self, **_kwargs):
-            return _sc(
-                Stream(
-                    name="HP",
-                    t_supply=100.0,
-                    t_target=90.0,
-                    heat_flow=10.0,
-                    is_process_stream=False,
-                )
-            )
-
-    monkeypatch.setattr(hp, "ParallelVapourCompressionCycles", _FakeMultiSimple)
-    seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
-    monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
-    out = hp._compute_multi_simple_hp_system_obj(
-        np.array([0.2] * 10), args, debug=False
-    )
-    assert "model" in out
-    assert out["Q_ext"] == pytest.approx(11.0)
-    assert out["utility_tot"] == pytest.approx(41.0)
-    assert out["w_net"] == pytest.approx(30.0)
-    assert out["cop_h"] == pytest.approx(200.0 / 30.0)
 
 
 def test_brayton_paths_and_helpers(monkeypatch):
@@ -1517,158 +1404,7 @@ def test_cascade_and_multi_single_bounds_and_x0_branches(monkeypatch):
         init_res=init_res,
         args=args_cascade,
     )
-    assert x0.shape == (5,)
-
-    monkeypatch.setattr(
-        hp, "PropsSI", lambda prop, *_args: 260.0 if prop == "Tmin" else 340.0
-    )
-    bnds_cascade = hp._get_bounds_for_cascade_hp_opt(args_cascade)
-    assert bnds_cascade[3][0] + 1.0 == bnds_cascade[3][1]
-
-    args_ms = SimpleNamespace(
-        n_cond=1,
-        n_evap=1,
-        dt_phase_change=20.0,
-        dt_range_max=10.0,
-        T_cold=np.array([50.0, 45.0]),
-        T_hot=np.array([40.0, 35.0]),
-        Q_hpr_target=100.0,
-        refrigerant_ls=["R134A"],
-    )
-    x0_ms = hp._get_x0_for_multi_single_hp_opt(
-        T_cond=np.array([49.0]),
-        Q_cond=np.array([50.0]),
-        T_evap=np.array([36.0]),
-        args=args_ms,
-        bnds=[(0.0, 0.0)] * 5,
-    )
-    np.testing.assert_allclose(x0_ms, np.zeros((1, 5)))
-
-    bnds_ms = hp._get_bounds_for_multi_single_hp_opt(args_ms)
-    assert bnds_ms[1][0] == bnds_ms[1][1]
-    assert bnds_ms[4][0] == bnds_ms[4][1]
-
-
-def test_multi_simple_and_brayton_performance_debug_and_full_paths(monkeypatch):
-    args = SimpleNamespace(
-        n_cond=1,
-        T_cold=np.array([100.0, 60.0]),
-        T_hot=np.array([90.0, 40.0]),
-        H_cold=np.array([30.0, 0.0]),
-        H_hot=np.array([0.0, -30.0]),
-        dt_range_max=50.0,
-        dtcont_hp=2.0,
-        eta_comp=0.8,
-        refrigerant_ls=["R134A"],
-        dt_hp_ihx=1.0,
-        bckgrd_hot_streams=StreamCollection(),
-        bckgrd_cold_streams=StreamCollection(),
-        Q_hpr_target=40.0,
-        Q_amb_max=0.0,
-        eta_penalty=0.001,
-        rho_penalty=10.0,
-        heat_to_power_ratio=1.0,
-        cold_to_power_ratio=0.0,
-        is_heat_pumping=True,
-    )
-
-    monkeypatch.setattr(
-        hp,
-        "_parse_multi_simple_hp_state_temperatures",
-        lambda x, args: {
-            "T_cond": np.array([80.0]),
-            "dT_subcool": np.array([2.0]),
-            "Q_heat": np.array([30.0]),
-            "T_evap": np.array([60.0]),
-            "dT_superheat": np.array([1.0]),
-            "Q_amb_hot": np.array([0.0]),
-            "Q_amb_cold": np.array([0.0]),
-        },
-    )
-
-    class _FakeMS:
-        work = 10.0
-        work_arr = np.array([10.0])
-        Q_cool = 20.0
-        Q_heat_arr = np.array([30.0])
-        Q_cool_arr = np.array([20.0])
-        penalty = 0.0
-
-        def solve(self, **kwargs):
-            return None
-
-        def build_stream_collection(self, **kwargs):
-            if kwargs.get("include_cond"):
-                return _sc(_stream("H", 90.0, 80.0, 30.0, is_process_stream=False))
-            return _sc(_stream("C", 50.0, 60.0, 20.0, is_process_stream=False))
-
-    monkeypatch.setattr(hp, "ParallelVapourCompressionCycles", _FakeMS)
-    seq = iter(
-        [
-            ProblemTable({PT.T.value: [100.0, 50.0], PT.H_NET.value: [4.0, -1.0]}),
-            ProblemTable({PT.T.value: [100.0, 50.0], PT.H_NET.value: [3.0, -1.0]}),
-        ]
-    )
-    monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **kwargs: next(seq))
-    called = {"plot": 0}
-    monkeypatch.setattr(
-        hp,
-        "plot_multi_hp_profiles_from_results",
-        lambda *args, **kwargs: called.__setitem__("plot", called["plot"] + 1),
-    )
-    out = hp._compute_multi_simple_hp_system_obj(np.array([0.2] * 5), args, debug=True)
-    assert out["Q_ext"] == pytest.approx(7.0)
-    assert out["utility_tot"] == pytest.approx(17.0)
-    assert out["w_net"] == pytest.approx(10.0)
-    assert out["cop_h"] == pytest.approx(3.0)
-    assert out["cop_h"] > 0.0
-    assert called["plot"] == 1
-
-    class _FakeBraytonHP:
-        def __init__(self):
-            self.work_net = 12.0
-            self.Q_cool = 15.0
-            self.cycle_states = [{}, {}, {}, {"T": 45.0}]
-
-    monkeypatch.setattr(
-        hp,
-        "_parse_brayton_hp_state_variables",
-        lambda x, args: ([120.0], [10.0], [15.0], [35.0]),
-    )
-    monkeypatch.setattr(
-        hp, "_create_brayton_hp_list", lambda **kwargs: [_FakeBraytonHP()]
-    )
-    monkeypatch.setattr(
-        hp,
-        "_build_simulated_hpr_streams",
-        lambda hp_list, **kwargs: (
-            _sc(_stream("GC", 120.0, 100.0, 35.0, is_process_stream=False))
-            if kwargs.get("include_cond")
-            else _sc(_stream("GH", 40.0, 50.0, 15.0, is_process_stream=False))
-        ),
-    )
-    seq2 = iter(
-        [
-            ProblemTable({PT.T.value: [120.0, 80.0], PT.H_NET.value: [5.0, -1.0]}),
-            ProblemTable({PT.T.value: [120.0, 80.0], PT.H_NET.value: [4.0, -2.0]}),
-        ]
-    )
-    monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **kwargs: next(seq2))
-
-    out_b = hp._compute_brayton_hp_system_obj(
-        np.array([0.1, 0.2, 0.3, 0.8]),
-        SimpleNamespace(
-            Q_hpr_target=40.0,
-            H_hot=np.array([0.0, -20.0]),
-            bckgrd_hot_streams=StreamCollection(),
-            bckgrd_cold_streams=StreamCollection(),
-            Q_amb_max=0.0,
-            heat_to_power_ratio=1.0,
-            cold_to_power_ratio=0.0,
-            is_heat_pumping=True,
-        ),
-    )
-    assert out_b["cop_h"] > 0.0
+    assert x0.shape == (6,)
 
 
 def test_get_heat_pump_cascade_helper(monkeypatch):

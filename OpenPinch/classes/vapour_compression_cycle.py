@@ -285,7 +285,7 @@ class VapourCompressionCycle:
         return self._eta_comp
 
     @property
-    def dt_ihx_gas_side(self) -> float:
+    def dT_ihx_gas_side(self) -> float:
         """Gas-side temperature change across the internal heat exchanger."""
         return self._ihx_gas_dt
 
@@ -396,7 +396,7 @@ class VapourCompressionCycle:
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
         refrigerant: str = "water",
-        dt_ihx_gas_side: float = 10.0,
+        dT_ihx_gas_side: float = 10.0,
         Q_heat: float = None,
         Q_cas_heat: float = 0.0,
         Q_cool: float = None,
@@ -420,7 +420,7 @@ class VapourCompressionCycle:
             Isentropic efficiency of the compressor [-].
         refrigerant : str, optional
             Cycle refrigerant; supports multi-component fluids.
-        dt_ihx_gas_side : float, optional
+        dT_ihx_gas_side : float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : float, optional
             Heat delivered to the process [W]. Heat pump and cascade configurations only.
@@ -467,7 +467,7 @@ class VapourCompressionCycle:
         self._eta_comp = eta_comp
         self._ihx_gas_dt = max(
             min(
-                dt_ihx_gas_side,
+                dT_ihx_gas_side,
                 self._T_cond - self._T_evap - self._dT_subcool - self._dT_superheat - self._dtcont * 2,
             ),
             0.0,
@@ -490,10 +490,10 @@ class VapourCompressionCycle:
         self._save_cycle_state(state0, 0)
         h_ihx_in = state0.hmass()
 
-        if dt_ihx_gas_side > self._ihx_gas_dt:
+        if dT_ihx_gas_side > self._ihx_gas_dt:
             # Penalise insufficient superheat in internal heat exchange
             h0_tar = self._compute_state_from_pressure_temperature(
-                P=P_lo, T=self._T_evap_sat_vap + dt_ihx_gas_side, phase=1,
+                P=P_lo, T=self._T_evap_sat_vap + dT_ihx_gas_side, phase=1,
             ).hmass()
             self._penalty.append(h0_tar - h_ihx_in)
 
