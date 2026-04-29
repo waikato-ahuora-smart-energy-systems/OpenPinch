@@ -34,7 +34,7 @@ def validate_heat_pump_or_refrigeration_targeting_required(
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
     zone_name: str = None,
-    zone_config: dict = Configuration(),
+    zone_config: Configuration = Configuration(),
     r: dict | float | int = None,
 ) -> float:
     """Return the requested heat-pump or refrigeration load capped by feasibility.
@@ -134,9 +134,9 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
-    zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
-    zone_config.N_COND = 2
-    zone_config.N_EVAP = 2
+    # zone_config.HPR_TYPE = HPRcycle.MultiSimpleCarnot.value
+    # zone_config.N_COND = 2
+    # zone_config.N_EVAP = 2
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -144,7 +144,7 @@ def get_heat_pump_and_refrigeration_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=True,
+        debug=False,
     )
     # Select the appropriate targeting handler based on the specified heat pump targeting approach
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
