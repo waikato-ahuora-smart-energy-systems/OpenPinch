@@ -114,7 +114,7 @@ class HPRTargetOutputs(BaseModel):
     w_net: float | list | np.ndarray
     w_hpr: Optional[float | list | np.ndarray] = None
     w_he: Optional[float | list | np.ndarray] = None
-    heat_ex: Optional[float | list | np.ndarray] = None
+    heat_recovery: Optional[float | list | np.ndarray] = None
     Q_ext: float
     Q_amb_hot: float
     Q_amb_cold: float

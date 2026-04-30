@@ -134,9 +134,9 @@ def get_heat_pump_and_refrigeration_targets(
     ValueError
         If ``zone_config.HPR_TYPE`` does not map to a supported optimiser.
     """
-    # zone_config.HPR_TYPE = HPRcycle.MultiSimpleCarnot.value
-    # zone_config.N_COND = 2
-    # zone_config.N_EVAP = 2
+    zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
+    zone_config.N_COND = 2
+    zone_config.N_EVAP = 2
     args = _construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -144,7 +144,7 @@ def get_heat_pump_and_refrigeration_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=False,
+        debug=True,
     )
     # Select the appropriate targeting handler based on the specified heat pump targeting approach
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
@@ -183,7 +183,7 @@ def calc_heat_pump_and_refrigeration_cascade(
         is_shifted=is_T_vals_shifted,
     )
     pt.insert_temperature_interval(pt_hp[PT.T.value].to_list())
-    temp = get_utility_heat_cascade(
+    pt_hpr = get_utility_heat_cascade(
         T_int_vals=pt.col[PT.T.value],
         hot_utilities=res.hpr_hot_streams,
         cold_utilities=res.hpr_cold_streams,
@@ -192,17 +192,17 @@ def calc_heat_pump_and_refrigeration_cascade(
     if is_heat_pumping:
         pt.update(
             {
-                PT.H_NET_HP.value: temp[PT.H_NET_UT.value],
-                PT.H_HOT_HP.value: temp[PT.H_HOT_UT.value],
-                PT.H_COLD_HP.value: temp[PT.H_COLD_UT.value],
+                PT.H_NET_HP.value: pt_hpr[PT.H_NET_UT.value],
+                PT.H_HOT_HP.value: pt_hpr[PT.H_HOT_UT.value],
+                PT.H_COLD_HP.value: pt_hpr[PT.H_COLD_UT.value],
             }
         )
     else:  # is refrigeration
         pt.update(
             {
-                PT.H_NET_RFRG.value: temp[PT.H_NET_UT.value],
-                PT.H_HOT_RFRG.value: temp[PT.H_HOT_UT.value],
-                PT.H_COLD_RFRG.value: temp[PT.H_COLD_UT.value],
+                PT.H_NET_RFRG.value: pt_hpr[PT.H_NET_UT.value],
+                PT.H_HOT_RFRG.value: pt_hpr[PT.H_HOT_UT.value],
+                PT.H_COLD_RFRG.value: pt_hpr[PT.H_COLD_UT.value],
             }
         )
 
@@ -614,6 +614,15 @@ def _parse_multi_temperature_carnot_cycle_state_variables(
     }
 
 
+def _get_unique_idx_mtc(
+    is_on: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    i_c, i_e = np.nonzero(is_on)
+    i_c = np.unique(i_c)
+    i_e = np.unique(i_e)
+    return i_c, i_e
+ 
+
 def _get_multi_temperature_carnot_stage_duties_and_work(
     T_cond: np.ndarray,
     T_evap: np.ndarray,
@@ -639,24 +648,44 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     w_hpr = 0.0
     cop = 1.0
 
-    def _get_idx_and_Q_available(
+    def _get_available_pool(
         is_on: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        idx_c, idx_e = np.nonzero(is_on)
-        idx_c = np.unique(idx_c)
-        idx_e = np.unique(idx_e)
-        used_cond = Qc_he + Qc_hx + Qc_hpr
-        used_evap = Qe_he + Qe_hx + Qe_hpr        
-        Qc_pool = np.maximum(Q_cond[idx_c] - used_cond[idx_c], 0.0)
-        Qe_pool = np.maximum(Q_evap[idx_e] - used_evap[idx_e], 0.0)
-        return idx_c, idx_e, Qc_pool, Qe_pool
+        i_c, i_e = _get_unique_idx_mtc(is_on)
+        Qc_pool = np.maximum((Q_cond - (Qc_he + Qc_hx + Qc_hpr))[i_c], 0.0)
+        Qe_pool = np.maximum((Q_evap - (Qe_he + Qe_hx + Qe_hpr))[i_e], 0.0)
+        return i_c, i_e, Qc_pool, Qe_pool
 
     T_diff = np.subtract.outer(T_cond, T_evap)
 
+    # Negative lift: pooled heat-engine mode.
+    is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
+    if np.any(is_he):
+        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_he)
+        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
+            T_h_he = _compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
+            T_l_he = _compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
+            eta_he = _calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
+            if eta_he > tol:
+                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() / max(1.0 - eta_he, tol))
+                w_he = Qe_used * eta_he
+                Qc_used = Qe_used - w_he
+                Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
+                Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
+
+    # Near-zero lift: direct heat exchange with any source/sink left after HE.
+    is_hx = ((T_diff > -tol) | (args.eta_ii_he_carnot < tol)) & (T_diff < tol)
+    if np.any(is_hx):
+        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_hx)
+        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
+            Q_transfer = min(Qc_pool.sum(), Qe_pool.sum())
+            Qc_hx[i_c] = Qc_pool * (Q_transfer / Qc_pool.sum())
+            Qe_hx[i_e] = Qe_pool * (Q_transfer / Qe_pool.sum())
+
     # Positive lift: pooled heat-pump mode with the remaining duties.
-    is_hp = T_diff >= tol
+    is_hp = (T_diff >= tol)
     if np.any(is_hp):
-        i_c, i_e, Qc_pool, Qe_pool = _get_idx_and_Q_available(is_hp)
+        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_hp)
         if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
             T_h = _compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
             T_l = _compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
@@ -673,33 +702,9 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
             else:
                 cop = 1.0
 
-    # Negative lift: pooled heat-engine mode.
-    is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
-    if np.any(is_he):
-        i_c, i_e, Qc_pool, Qe_pool = _get_idx_and_Q_available(is_he)
-        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            T_h_he = _compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
-            T_l_he = _compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
-            eta_he = _calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
-            if eta_he > tol:
-                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() / max(1.0 - eta_he, tol))
-                w_he = Qe_used * eta_he
-                Qc_used = Qe_used - w_he
-                Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
-                Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
-
-    # Near-zero lift: direct heat exchange with any source/sink left after HE.
-    is_hx = ((T_diff > -tol) | (args.eta_ii_he_carnot < tol)) & (T_diff < tol)
-    if np.any(is_hx):
-        i_c, i_e, Qc_pool, Qe_pool = _get_idx_and_Q_available(is_hx)
-        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            Q_transfer = min(Qc_pool.sum(), Qe_pool.sum())
-            Qc_hx[i_c] = Qc_pool * (Q_transfer / Qc_pool.sum())
-            Qe_hx[i_e] = Qe_pool * (Q_transfer / Qe_pool.sum())
-
     Qc = Qc_he + Qc_hx + Qc_hpr
     Qe = Qe_he + Qe_hx + Qe_hpr
-    heat_ex = Qc_hx.sum()
+    heat_recovery = Qc_hx.sum()
 
     if not np.isclose(Qc.sum() + w_he, Qe.sum() + w_hpr, atol=tol):
         raise ValueError(
@@ -709,7 +714,7 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     return {
         "w_hpr": w_hpr,
         "w_he": w_he,
-        "heat_ex": heat_ex,
+        "heat_recovery": heat_recovery,
         "cop": cop,
         "Qc": Qc,
         "Qe": Qe
@@ -753,14 +758,14 @@ def _compute_multi_temperature_carnot_cycle_obj(
         else 0.0
     )
     obj = _calc_obj(
-        work=cycle_results["w_hpr"] - cycle_results["w_he"],
+        work=work,
         Q_ext_heat=Q_ext_heat,
         Q_ext_cold=Q_ext_cold,
         Q_hpr_target=args.Q_hpr_target,
         heat_to_power_ratio=args.heat_to_power_ratio,
         cold_to_power_ratio=args.cold_to_power_ratio,
         penalty=p,
-    )
+    )      
 
     if debug:  # If in debug mode, plot the graph immediately
         res = _get_carnot_hpr_cycle_streams(state_vars["T_cond"], cycle_results["Qc"], state_vars["T_evap"], cycle_results["Qe"], args)
@@ -781,7 +786,7 @@ def _compute_multi_temperature_carnot_cycle_obj(
         "w_net": work,
         "w_hpr": cycle_results["w_hpr"],
         "w_he": cycle_results["w_he"],
-        "heat_ex": cycle_results["heat_ex"],
+        "heat_recovery": cycle_results["heat_recovery"],
         "Q_ext": Q_ext_heat + Q_ext_cold,
         "T_cond": state_vars["T_cond"],
         "Q_cond": cycle_results["Qc"],
@@ -1089,14 +1094,14 @@ def _get_multi_simple_carnot_stage_duties_and_work(
     # def _get_idx_and_Q_available(
     #     is_on: np.ndarray,
     # ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    #     idx_c, idx_e = np.nonzero(is_on)
-    #     idx_c = np.unique(idx_c)
-    #     idx_e = np.unique(idx_e)
+    #     i_c, i_e = np.nonzero(is_on)
+    #     i_c = np.unique(i_c)
+    #     i_e = np.unique(i_e)
     #     used_cond = Qc_he + Qc_hx + Qc_hpr
     #     used_evap = Qe_he + Qe_hx + Qe_hpr        
-    #     Qc_pool = np.maximum(Q_cond[idx_c] - used_cond[idx_c], 0.0)
-    #     Qe_pool = np.maximum(Q_evap[idx_e] - used_evap[idx_e], 0.0)
-    #     return idx_c, idx_e, Qc_pool, Qe_pool    
+    #     Qc_pool = np.maximum(Q_cond[i_c] - used_cond[i_c], 0.0)
+    #     Qe_pool = np.maximum(Q_evap[i_e] - used_evap[i_e], 0.0)
+    #     return i_c, i_e, Qc_pool, Qe_pool    
 
     is_hp = T_diff >= tol
     if np.any(is_hp):
@@ -1161,7 +1166,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
 
     Qc = Qc_he + Qc_hx + Qc_hpr
     Qe = Qe_he + Qe_hx + Qe_hpr
-    heat_ex = Qc_hx.sum()
+    heat_recovery = Qc_hx.sum()
 
     if not (np.isclose(Qc.sum() + w_he.sum(), Qe.sum() + w_hpr.sum(), atol=tol)):
         raise ValueError(
@@ -1171,7 +1176,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
     return {
         "w_hpr": w_hpr,
         "w_he": w_he,
-        "heat_ex": heat_ex,
+        "heat_recovery": heat_recovery,
         "Qc": Qc,
         "Qe": Qe,
         "q_diff": q_diff
@@ -1243,7 +1248,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
         "w_net": work,
         "w_hpr": cycle_results["w_hpr"],
         "w_he": cycle_results["w_he"],
-        "heat_ex": cycle_results["heat_ex"],
+        "heat_recovery": cycle_results["heat_recovery"],
         "Q_ext": Q_ext_heat + Q_ext_cold,
         "T_cond": state_vars["T_cond"],
         "Q_cond": cycle_results["Qc"],

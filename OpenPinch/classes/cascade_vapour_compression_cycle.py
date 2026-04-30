@@ -11,6 +11,7 @@ from .vapour_compression_cycle import VapourCompressionCycle
 
 __all__ = ["CascadeVapourCompressionCycle"]
 
+# TODO: Implement cascade for refrigerant mixtures, not just pure fluids.
 
 class CascadeVapourCompressionCycle:
     """Cascade of vapour-compression heat pumps coupled through cascade exchangers."""

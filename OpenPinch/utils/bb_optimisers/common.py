@@ -120,7 +120,7 @@ def _polish_candidates(
     )
 
     n_tasks = len(basin_reps_idx)
-    n_workers = min(n_tasks, max(1, os.cpu_count() or 1))
+    n_workers = min(n_tasks, max(1, os.cpu_count()))
 
     if n_workers == 1:
         results = list(map(worker_fn, basin_reps_idx))
