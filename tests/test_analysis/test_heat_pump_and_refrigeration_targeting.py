@@ -25,6 +25,21 @@ from OpenPinch.analysis.heat_pump_and_refrigeration_targeting import (
     _get_bounds_for_brayton_hp_opt,
 )
 from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
+from OpenPinch.analysis.heat_pump_and_refrigeration import brayton as hp_brayton
+from OpenPinch.analysis.heat_pump_and_refrigeration import (
+    cascade_vapour_compression as hp_cascade,
+)
+from OpenPinch.analysis.heat_pump_and_refrigeration import (
+    multi_simple_carnot as hp_multi_simple_carnot,
+)
+from OpenPinch.analysis.heat_pump_and_refrigeration import (
+    multi_simple_vapour_compression as hp_multi_simple_vapour,
+)
+from OpenPinch.analysis.heat_pump_and_refrigeration import (
+    multi_temperature_carnot as hp_multi_temp_carnot,
+)
+from OpenPinch.analysis.heat_pump_and_refrigeration import preprocessing as hp_pre
+from OpenPinch.analysis.heat_pump_and_refrigeration import shared as hp_shared
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
@@ -500,7 +515,9 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         allow_integrated_expander=False,
     )
     x = np.array([0.0, 0.0, 0.25, 0.25, 0.0])
-    monkeypatch.setattr(hp, "g_ineq_penalty", lambda *args, **kwargs: 0.0)
+    monkeypatch.setattr(
+        hp_multi_simple_carnot, "g_ineq_penalty", lambda *args, **kwargs: 0.0
+    )
 
     res = _compute_multi_simple_carnot_hp_opt_obj(x, args)
 
@@ -566,7 +583,7 @@ def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatc
     def fake_minimize(*args, **kwargs):
         return DummyResult()
 
-    monkeypatch.setattr(hp, "minimize", fake_minimize)
+    monkeypatch.setattr(hp_brayton, "minimize", fake_minimize)
 
     args = SimpleNamespace(
         n_cond=1,
@@ -913,10 +930,10 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
 def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
     args = _base_args(n_cond=1, n_evap=1)
     _patch_output_model_validate(monkeypatch)
-    monkeypatch.setattr(hp, "multiminima", lambda **_kwargs: np.array([[0.2, 0.6]]))
+    monkeypatch.setattr(hp_shared, "multiminima", lambda **_kwargs: np.array([[0.2, 0.6]]))
 
     monkeypatch.setattr(
-        hp,
+        hp_multi_temp_carnot,
         "_compute_multi_temperature_carnot_cycle_obj",
         lambda x, args, debug=False: {
             "obj": 0.1,
@@ -934,7 +951,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        hp,
+        hp_multi_temp_carnot,
         "_get_carnot_hpr_cycle_streams",
         lambda *_args, **_kwargs: {
             "hot_streams": StreamCollection(),
@@ -945,7 +962,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
     assert out["success"] is True
 
     monkeypatch.setattr(
-        hp,
+        hp_multi_temp_carnot,
         "_compute_multi_temperature_carnot_cycle_obj",
         lambda x, args, debug=False: {"success": False},
     )
@@ -958,7 +975,7 @@ def test_multi_temp_carnot_objective_debug_branch(monkeypatch):
     x = np.array([0.2, 0.7, 0.0])
     called = {"plot": 0}
     monkeypatch.setattr(
-        hp,
+        hp_multi_temp_carnot,
         "plot_multi_hp_profiles_from_results",
         lambda *a, **k: called.__setitem__("plot", called["plot"] + 1),
     )
@@ -1008,7 +1025,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     args = _base_args(n_cond=2, n_evap=2)
     x = np.array([0.2] * 9)
     monkeypatch.setattr(
-        hp,
+        hp_cascade,
         "_parse_cascade_hp_state_variables",
         lambda _x, _args: {
             "T_cond": np.array([110.0, 90.0]),
@@ -1029,7 +1046,9 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
         def solve(self, **_kwargs):
             return None
 
-    monkeypatch.setattr(hp, "CascadeVapourCompressionCycle", _FakeCascadeUnsolved)
+    monkeypatch.setattr(
+        hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeUnsolved
+    )
     out_unsolved = hp._compute_cascade_hp_system_obj(x, args)
     assert "obj" in out_unsolved
 
@@ -1056,12 +1075,14 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
                 )
             )
 
-    monkeypatch.setattr(hp, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
+    monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
-    monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
+    monkeypatch.setattr(
+        hp_cascade, "get_process_heat_cascade", lambda **_kwargs: next(seq)
+    )
     calls = {"plot": 0}
     monkeypatch.setattr(
-        hp,
+        hp_cascade,
         "plot_multi_hp_profiles_from_results",
         lambda *a, **k: calls.__setitem__("plot", calls["plot"] + 1),
     )
@@ -1106,7 +1127,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     assert vars["Q_amb_cold"] == pytest.approx(0.1 * max(args.Q_heat_max, args.Q_cool_max))
 
     monkeypatch.setattr(
-        hp,
+        hp_multi_simple_vapour,
         "_parse_multi_simple_hp_state_temperatures",
         lambda x, _args: (
             {
@@ -1145,9 +1166,9 @@ def test_brayton_paths_and_helpers(monkeypatch):
         x = np.array([0.1, 0.2, 0.3, 0.9])
         message = "ok"
 
-    monkeypatch.setattr(hp, "minimize", lambda **_kwargs: _OptRes())
+    monkeypatch.setattr(hp_brayton, "minimize", lambda **_kwargs: _OptRes())
     monkeypatch.setattr(
-        hp,
+        hp_brayton,
         "_compute_brayton_hp_system_obj",
         lambda x, args: {
             "obj": 0.1,
@@ -1178,7 +1199,7 @@ def test_brayton_paths_and_helpers(monkeypatch):
         def solve(self, **_kwargs):
             return None
 
-    monkeypatch.setattr(hp, "SimpleBraytonHeatPumpCycle", _FakeBraytonCycle)
+    monkeypatch.setattr(hp_brayton, "SimpleBraytonHeatPumpCycle", _FakeBraytonCycle)
     hp_list = hp._create_brayton_hp_list(
         T_comp_out=np.array([120.0]),
         dT_gc=np.array([20.0]),
@@ -1194,9 +1215,11 @@ def test_brayton_paths_and_helpers(monkeypatch):
             self.Q_cool = 35.0
             self.cycle_states = [{}, {}, {}, {"T": 42.0}]
 
-    monkeypatch.setattr(hp, "_create_brayton_hp_list", lambda **_kwargs: [_FakeHPObj()])
     monkeypatch.setattr(
-        hp,
+        hp_brayton, "_create_brayton_hp_list", lambda **_kwargs: [_FakeHPObj()]
+    )
+    monkeypatch.setattr(
+        hp_brayton,
         "_build_simulated_hpr_streams",
         lambda hp_list, **_kwargs: _sc(
             Stream(
@@ -1209,7 +1232,9 @@ def test_brayton_paths_and_helpers(monkeypatch):
         ),
     )
     seq = iter([_pt_with_hnet(8.0, -1.0), _pt_with_hnet(7.0, -2.0)])
-    monkeypatch.setattr(hp, "get_process_heat_cascade", lambda **_kwargs: next(seq))
+    monkeypatch.setattr(
+        hp_brayton, "get_process_heat_cascade", lambda **_kwargs: next(seq)
+    )
     out_perf = hp._compute_brayton_hp_system_obj(np.array([0.1, 0.2, 0.3, 0.9]), args)
     assert "cop_h" in out_perf
 
@@ -1370,7 +1395,7 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
     cold = _sc(_stream("C", 70.0, 80.0, 5.0, is_process_stream=False))
 
     monkeypatch.setattr(
-        hp,
+        hp_shared,
         "create_problem_table_with_t_int",
         lambda streams, is_shifted: ProblemTable(
             {
@@ -1381,7 +1406,7 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        hp,
+        hp_shared,
         "get_utility_heat_cascade",
         lambda *args, **kwargs: {
             PT.H_HOT_UT.value: np.array([5.0, 0.0]),

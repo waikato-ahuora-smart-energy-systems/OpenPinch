@@ -1,0 +1,252 @@
+"""Multi-temperature Carnot HP targeting."""
+
+from typing import Tuple
+
+import numpy as np
+
+from ...lib.schema import HPRTargetInputs, HPRTargetOutputs
+from ...utils.decorators import timing_decorator
+
+from .encoding import _map_x_arr_to_T_arr, _map_x_to_Q_amb
+from .shared import (
+    _calc_carnot_heat_engine_eta,
+    _calc_carnot_heat_pump_cop,
+    _calc_obj,
+    _compute_entropic_mean_temperature,
+    _get_Q_vals_at_T_hpr_from_bckgrd_profile,
+    _get_carnot_hpr_cycle_streams,
+    _solve_hpr_placement,
+    g_ineq_penalty,
+    plot_multi_hp_profiles_from_results,
+    tol,
+)
+
+
+__all__ = [
+    "_optimise_multi_temperature_carnot_heat_pump_placement",
+    "_get_x0_for_multi_temperature_carnot_hp_opt",
+    "_get_bounds_for_multi_temperature_carnot_hp_opt",
+    "_parse_multi_temperature_carnot_cycle_state_variables",
+    "_get_multi_temperature_carnot_stage_duties_and_work",
+    "_compute_multi_temperature_carnot_cycle_obj",
+]
+
+
+@timing_decorator
+def _optimise_multi_temperature_carnot_heat_pump_placement(
+    args: HPRTargetInputs,
+) -> HPRTargetOutputs:
+    res = _solve_hpr_placement(
+        f_obj=_compute_multi_temperature_carnot_cycle_obj,
+        x0_ls=_get_x0_for_multi_temperature_carnot_hp_opt(args),
+        bnds=_get_bounds_for_multi_temperature_carnot_hp_opt(args),
+        args=args,
+    )
+    res.update(
+        _get_carnot_hpr_cycle_streams(
+            res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args
+        )
+    )
+    return HPRTargetOutputs.model_validate(res)
+
+
+def _get_x0_for_multi_temperature_carnot_hp_opt(args: HPRTargetInputs) -> list:
+    n_cond, n_evap = int(args.n_cond), int(args.n_evap)
+    return [0.0] + [0.0] * n_cond + [0.0] * n_evap
+
+
+def _get_bounds_for_multi_temperature_carnot_hp_opt(args: HPRTargetInputs) -> list:
+    n_cond, n_evap = int(args.n_cond), int(args.n_evap)
+    return [(-1.0, 10.0)] + [(0.0, 1.0)] * n_cond + [(0.0, 1.0)] * n_evap
+
+
+def _parse_multi_temperature_carnot_cycle_state_variables(
+    x: np.ndarray,
+    args: HPRTargetInputs,
+) -> dict:
+    x_amb = x[0]
+    a = 1 + int(args.n_cond)
+    x_cond = x[1:a]
+    b = a + int(args.n_evap)
+    x_evap = x[a:b]
+
+    Q_amb_hot, Q_amb_cold = _map_x_to_Q_amb(
+        x_amb, max(args.Q_heat_max, args.Q_cool_max)
+    )
+    T_cond = _map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
+    T_evap = _map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
+    return {
+        "T_cond": T_cond,
+        "T_evap": T_evap,
+        "Q_amb_hot": Q_amb_hot,
+        "Q_amb_cold": Q_amb_cold,
+    }
+
+
+def _get_unique_idx_mtc(is_on: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    i_c, i_e = np.nonzero(is_on)
+    return np.unique(i_c), np.unique(i_e)
+
+
+def _get_multi_temperature_carnot_stage_duties_and_work(
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    H_hot_with_amb: np.ndarray,
+    H_cold_with_amb: np.ndarray,
+    args: HPRTargetInputs,
+) -> dict:
+    Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        T_cond, args.T_cold, H_cold_with_amb, is_cond=True
+    )
+    Q_evap = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        T_evap, args.T_hot, H_hot_with_amb, is_cond=False
+    )
+
+    Qc_he = np.zeros_like(Q_cond)
+    Qe_he = np.zeros_like(Q_evap)
+    Qc_hx = np.zeros_like(Q_cond)
+    Qe_hx = np.zeros_like(Q_evap)
+    Qc_hpr = np.zeros_like(Q_cond)
+    Qe_hpr = np.zeros_like(Q_evap)
+    w_he = 0.0
+    w_hpr = 0.0
+    cop = 1.0
+
+    def _get_available_pool(is_on: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        i_c, i_e = _get_unique_idx_mtc(is_on)
+        Qc_pool = np.maximum((Q_cond - (Qc_he + Qc_hx + Qc_hpr))[i_c], 0.0)
+        Qe_pool = np.maximum((Q_evap - (Qe_he + Qe_hx + Qe_hpr))[i_e], 0.0)
+        return i_c, i_e, Qc_pool, Qe_pool
+
+    T_diff = np.subtract.outer(T_cond, T_evap)
+
+    is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
+    if np.any(is_he):
+        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_he)
+        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
+            T_h_he = _compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
+            T_l_he = _compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
+            eta_he = _calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
+            if eta_he > tol:
+                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() / max(1.0 - eta_he, tol))
+                w_he = Qe_used * eta_he
+                Qc_used = Qe_used - w_he
+                Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
+                Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
+
+    is_hx = ((T_diff > -tol) | (args.eta_ii_he_carnot < tol)) & (T_diff < tol)
+    if np.any(is_hx):
+        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_hx)
+        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
+            Q_transfer = min(Qc_pool.sum(), Qe_pool.sum())
+            Qc_hx[i_c] = Qc_pool * (Q_transfer / Qc_pool.sum())
+            Qe_hx[i_e] = Qe_pool * (Q_transfer / Qe_pool.sum())
+
+    is_hp = T_diff >= tol
+    if np.any(is_hp):
+        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_hp)
+        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
+            T_h = _compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
+            T_l = _compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
+            cop = _calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
+            if cop > 1.0 + tol:
+                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() * (cop - 1.0) / cop)
+                w_hpr = Qe_used / (cop - 1.0)
+                Qc_used = Qe_used + w_hpr
+                Qc_hpr[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
+                Qe_hpr[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
+            else:
+                cop = 1.0
+
+    Qc = Qc_he + Qc_hx + Qc_hpr
+    Qe = Qe_he + Qe_hx + Qe_hpr
+    heat_recovery = Qc_hx.sum()
+
+    if not np.isclose(Qc.sum() + w_he, Qe.sum() + w_hpr, atol=tol):
+        raise ValueError(
+            "Energy balance not satisfied in multi-temperature Carnot cycle calculation."
+        )
+
+    return {
+        "w_hpr": w_hpr,
+        "w_he": w_he,
+        "heat_recovery": heat_recovery,
+        "cop": cop,
+        "Qc": Qc,
+        "Qe": Qe,
+    }
+
+
+def _compute_multi_temperature_carnot_cycle_obj(
+    x: np.ndarray,
+    args: HPRTargetInputs,
+    *,
+    debug: bool = False,
+) -> dict:
+    state_vars = _parse_multi_temperature_carnot_cycle_state_variables(x, args)
+
+    H_cold_with_amb = args.H_cold + args.z_amb_cold * state_vars["Q_amb_cold"]
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * state_vars["Q_amb_hot"]
+
+    cycle_results = _get_multi_temperature_carnot_stage_duties_and_work(
+        T_cond=state_vars["T_cond"],
+        T_evap=state_vars["T_evap"],
+        H_hot_with_amb=H_hot_with_amb,
+        H_cold_with_amb=H_cold_with_amb,
+        args=args,
+    )
+
+    work = cycle_results["w_hpr"] - cycle_results["w_he"]
+    Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - cycle_results["Qc"].sum(), 0.0)
+    Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - cycle_results["Qe"].sum(), 0.0)
+
+    p = (
+        g_ineq_penalty(g=Q_ext_cold, rho=args.rho_penalty, form="square")
+        if not args.is_heat_pumping
+        else 0.0
+    )
+    obj = _calc_obj(
+        work=work,
+        Q_ext_heat=Q_ext_heat,
+        Q_ext_cold=Q_ext_cold,
+        Q_hpr_target=args.Q_hpr_target,
+        heat_to_power_ratio=args.heat_to_power_ratio,
+        cold_to_power_ratio=args.cold_to_power_ratio,
+        penalty=p,
+    )
+
+    if debug:
+        res = _get_carnot_hpr_cycle_streams(
+            state_vars["T_cond"],
+            cycle_results["Qc"],
+            state_vars["T_evap"],
+            cycle_results["Qe"],
+            args,
+        )
+        plot_multi_hp_profiles_from_results(
+            args.T_hot,
+            H_hot_with_amb,
+            args.T_cold,
+            H_cold_with_amb,
+            res["hpr_hot_streams"],
+            res["hpr_cold_streams"],
+            title=f"Obj {float(obj):.5f} = {(work / args.Q_hpr_target):.5f} + {(Q_ext_heat / args.Q_hpr_target):.5f} + {(Q_ext_cold / args.Q_hpr_target):.5f} + {(p / args.Q_hpr_target):.5f}",
+        )
+
+    return {
+        "obj": obj,
+        "utility_tot": work + Q_ext_heat + Q_ext_cold,
+        "w_net": work,
+        "w_hpr": cycle_results["w_hpr"],
+        "w_he": cycle_results["w_he"],
+        "heat_recovery": cycle_results["heat_recovery"],
+        "Q_ext": Q_ext_heat + Q_ext_cold,
+        "T_cond": state_vars["T_cond"],
+        "Q_cond": cycle_results["Qc"],
+        "T_evap": state_vars["T_evap"],
+        "Q_evap": cycle_results["Qe"],
+        "cop_h": cycle_results["cop"],
+        "Q_amb_hot": state_vars["Q_amb_hot"],
+        "Q_amb_cold": state_vars["Q_amb_cold"],
+        "success": True,
+    }

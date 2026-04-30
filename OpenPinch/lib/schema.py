@@ -7,15 +7,14 @@ graph structures, and specialist analysis helper payloads.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import StreamType, TurbineOptionsPropKeys
+from ..classes.stream_collection import StreamCollection
 
-if TYPE_CHECKING:
-    from ..classes.stream_collection import StreamCollection
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
