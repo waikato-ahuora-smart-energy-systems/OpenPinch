@@ -1,6 +1,16 @@
 [build-system]
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+  "/examples/**",
+  "/tests/fixtures/workbooks/**",
+  "**/__pycache__/**",
+  "**/.DS_Store",
+  "**/*.py[cod]",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["OpenPinch"]
 [project]
