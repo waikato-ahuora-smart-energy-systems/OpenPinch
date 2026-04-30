@@ -1,9 +1,11 @@
 """Generate piecewise-linear approximations for non-linear thermodynamic streams."""
 
+from typing import List
+
 import numpy as np
 from scipy.optimize import NonlinearConstraint, minimize
 
-from ..lib import *
+from ..lib.schema import NonLinearStream
 
 __all__ = ["get_piecewise_linearisation_for_streams", "get_piecewise_data_points"]
 

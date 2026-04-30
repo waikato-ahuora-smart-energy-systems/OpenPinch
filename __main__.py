@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from OpenPinch import *
+from OpenPinch import PinchProblem
 
 if __name__ == "__main__":
     problem_path = Path("enter path to the source problem file(s)")

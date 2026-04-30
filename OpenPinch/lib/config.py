@@ -7,12 +7,9 @@ advanced routines such as heat pump and cost targeting.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import List
 
-from .enums import *
-
-if TYPE_CHECKING:
-    from .schema import *
+from .enums import BB_Minimiser, HPRcycle, TurbineModel, ZoneType
 
 # TODO: This file needs a refactor once the purpose of it is well defined.
 # At present, the config includes many options corresponding to the Excel
@@ -23,6 +20,15 @@ tol: float = 1e-6
 T_CRIT: float = 373.9  # C
 ACTIVATE_TIMING = False
 LOG_TIMING = False
+
+__all__ = [
+    "ACTIVATE_TIMING",
+    "C_to_K",
+    "Configuration",
+    "LOG_TIMING",
+    "T_CRIT",
+    "tol",
+]
 
 
 class Configuration:

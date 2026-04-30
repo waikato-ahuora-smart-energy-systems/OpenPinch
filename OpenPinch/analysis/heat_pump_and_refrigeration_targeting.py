@@ -1,9 +1,12 @@
 """Heat pump targeting and cascade construction utilities for composite curves."""
 
 from ast import literal_eval
-from typing import Callable
+from typing import Callable, Tuple
+
 import numpy as np
+from CoolProp.CoolProp import PropsSI
 from scipy.optimize import minimize
+
 from ..lib import *
 from ..utils import *
 from .problem_table_analysis import *

@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from ..classes import Zone
     from ..lib import TargetOutput
 
+__all__ = ["export_target_summary_to_excel_with_units"]
+
 #######################################################################################################
 # Public API
 #######################################################################################################

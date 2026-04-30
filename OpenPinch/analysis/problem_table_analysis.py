@@ -5,6 +5,7 @@ interval problem table, cascade shifting logic, and helper routines used when
 deriving zonal targets and plotting data for composite curves.
 """
 
+import math
 from typing import Dict, Tuple
 
 import numpy as np

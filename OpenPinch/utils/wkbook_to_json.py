@@ -4,6 +4,11 @@ import json
 import pandas as pd
 from .input_validation import validate_stream_data, validate_utility_data
 
+__all__ = [
+    "get_problem_from_excel",
+    "get_results_from_excel",
+]
+
 #######################################################################################################
 # Public API
 #######################################################################################################

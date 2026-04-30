@@ -1,11 +1,16 @@
 """Unit-aware scalar wrapper powered by Pint quantities."""
 
-from pint import UnitRegistry
+from typing import Any
 
-from ..lib.schema import ValueWithUnit
+from pint import UnitRegistry
 
 ureg = UnitRegistry()
 Q_ = ureg.Quantity
+
+
+def _is_value_with_unit(data: Any) -> bool:
+    """Return ``True`` for objects that look like ``ValueWithUnit`` instances."""
+    return hasattr(data, "value") and hasattr(data, "units")
 
 
 class Value:
@@ -15,7 +20,7 @@ class Value:
         """Create a unit-aware value from a raw number or :class:`ValueWithUnit`."""
         if data is None:
             self._quantity = Q_(0)
-        elif isinstance(data, ValueWithUnit):
+        elif _is_value_with_unit(data):
             self._quantity = Q_(data.value, data.units)
             try:
                 self._quantity.to(unit)
@@ -122,11 +127,3 @@ class Value:
         """Instantiate from a ``{"value", "unit"}`` mapping."""
         return cls(data["value"], data.get("unit"))
 
-
-# @pd.api.extensions.register_series_accessor("as_value")
-# class ValueAccessor:
-#     def __init__(self, series):
-#         self.series = series
-
-#     def to(self, unit):
-#         return self.series.apply(lambda v: v.to(unit))

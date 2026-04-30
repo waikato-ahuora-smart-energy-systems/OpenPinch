@@ -1,11 +1,29 @@
 """Shared numerical helpers."""
 
-from typing import Union, Tuple
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.optimize import dual_annealing, minimize
+from typing import TYPE_CHECKING, Any, Tuple, Union
 
-from ..lib import *
+import matplotlib.pyplot as plt
+import numpy as np
+
+from ..lib.config import tol
+from ..lib.enums import TargetType
+
+if TYPE_CHECKING:
+    from ..lib.schema import ValueWithUnit
+
+__all__ = [
+    "clean_composite_curve",
+    "clean_composite_curve_ends",
+    "delta_vals",
+    "delta_with_zero_at_start",
+    "g_ineq_penalty",
+    "get_value",
+    "graph_simple_cc_plot",
+    "interp_with_plateaus",
+    "key_name",
+    "linear_interpolation",
+    "make_monotonic",
+]
 
 
 def key_name(zone_name: str, target_type: str = TargetType.DI.value):
@@ -14,7 +32,7 @@ def key_name(zone_name: str, target_type: str = TargetType.DI.value):
 
 
 def get_value(
-    val: Union[float, int, str, dict, ValueWithUnit, None],
+    val: Union[float, int, str, dict, "ValueWithUnit", None],
     val2: Union[float, int, str, None] = None,
     zone_name: str = None,
 ) -> float:
@@ -68,7 +86,7 @@ def get_value(
             return max(value, get_value(payload["max"]))
         else:
             return value
-    elif isinstance(val, ValueWithUnit):
+    elif _is_value_with_unit(val):
         return val.value
     elif isinstance(val, str):
         try:
@@ -83,6 +101,11 @@ def get_value(
         raise TypeError(
             f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
         )
+
+
+def _is_value_with_unit(val: Any) -> bool:
+    """Return ``True`` for objects that look like ``ValueWithUnit`` containers."""
+    return hasattr(val, "value") and hasattr(val, "units")
 
 
 def linear_interpolation(

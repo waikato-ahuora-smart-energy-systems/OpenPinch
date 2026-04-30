@@ -11,14 +11,16 @@ from typing import Tuple
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from . import (
-    get_process_heat_cascade,
-    get_additional_GCCs,
-    problem_table_algorithm,
-    validate_heat_pump_or_refrigeration_targeting_required,
-    get_heat_pump_and_refrigeration_targets,
+from .gcc_manipulation import get_additional_GCCs
+from .heat_pump_and_refrigeration_targeting import (
     calc_heat_pump_and_refrigeration_cascade,
+    get_heat_pump_and_refrigeration_targets,
+    validate_heat_pump_or_refrigeration_targeting_required,
+)
+from .problem_table_analysis import (
     get_heat_recovery_target_from_pt,
+    get_process_heat_cascade,
+    problem_table_algorithm,
     set_zonal_targets,
 )
 

@@ -11,20 +11,24 @@ from typing import List, Tuple
 from ..classes import *
 from ..lib import *
 from ..utils import *
-from . import (
-    get_process_heat_cascade,
-    get_heat_recovery_target_from_pt,
-    set_zonal_targets,
-    get_utility_targets,
+from .capital_cost_and_area_targeting import (
     get_area_targets,
-    get_min_number_hx,
-    get_capital_cost_targets,
     get_balanced_CC,
-    get_additional_GCCs,
-    validate_heat_pump_or_refrigeration_targeting_required,
-    get_heat_pump_and_refrigeration_targets,
-    calc_heat_pump_and_refrigeration_cascade,
+    get_capital_cost_targets,
+    get_min_number_hx,
 )
+from .gcc_manipulation import get_additional_GCCs
+from .heat_pump_and_refrigeration_targeting import (
+    calc_heat_pump_and_refrigeration_cascade,
+    get_heat_pump_and_refrigeration_targets,
+    validate_heat_pump_or_refrigeration_targeting_required,
+)
+from .problem_table_analysis import (
+    get_heat_recovery_target_from_pt,
+    get_process_heat_cascade,
+    set_zonal_targets,
+)
+from .utility_targeting import get_utility_targets
 
 __all__ = ["compute_direct_integration_targets"]
 

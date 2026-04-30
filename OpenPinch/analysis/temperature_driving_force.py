@@ -1,5 +1,7 @@
 """Temperature-driving-force calculations for composite-curve analysis."""
 
+import math
+
 import numpy as np
 
 from ..classes import *
