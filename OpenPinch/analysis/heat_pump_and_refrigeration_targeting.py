@@ -78,9 +78,9 @@ def get_heat_pump_and_refrigeration_targets(
     zone_config: Configuration,
     is_heat_pumping: bool,
 ) -> HPRTargetOutputs:
-    zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
-    zone_config.N_COND = 2
-    zone_config.N_EVAP = 2
+    # zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
+    # zone_config.N_COND = 2
+    # zone_config.N_EVAP = 2
     args = construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -88,7 +88,7 @@ def get_heat_pump_and_refrigeration_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
-        debug=True,
+        debug=False,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:

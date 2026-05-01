@@ -2,6 +2,7 @@
 
 import json
 import pandas as pd
+from pandas.errors import EmptyDataError
 from .input_validation import validate_stream_data, validate_utility_data
 
 __all__ = [
@@ -24,13 +25,18 @@ def get_problem_from_excel(excel_file, output_json=None):
     - Row 3 onward: data rows
     """
 
-    streams_data = _parse_sheet_with_units(excel_file, sheet_name="Stream Data")
-    streams_data = validate_stream_data(streams_data)
+    try:
+        streams_data = _parse_sheet_with_units(excel_file, sheet_name="Stream Data")
+        streams_data = validate_stream_data(streams_data)
 
-    utilities_data = _parse_sheet_with_units(excel_file, sheet_name="Utility Data")
-    utilities_data = validate_utility_data(utilities_data)
+        utilities_data = _parse_sheet_with_units(excel_file, sheet_name="Utility Data")
+        utilities_data = validate_utility_data(utilities_data)
 
-    options_data = _parse_options_sheet(excel_file, sheet_name="Options")
+        options_data = _parse_options_sheet(excel_file, sheet_name="Options")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Workbook file not found: {exc.filename}") from exc
+    except (ValueError, EmptyDataError) as exc:
+        raise ValueError(f"Failed to read workbook problem inputs: {exc}") from exc
 
     # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
     output_dict = {
@@ -50,13 +56,18 @@ def get_problem_from_excel(excel_file, output_json=None):
 
 def get_results_from_excel(excel_file, output_json, project_name):
     """Read workbook summary results and return structured target JSON."""
-    results_data = _parse_sheet_with_units(
-        excel_file,
-        sheet_name="Summary",
-        row_units=2,
-        row_data=4,
-        project_name=project_name,
-    )
+    try:
+        results_data = _parse_sheet_with_units(
+            excel_file,
+            sheet_name="Summary",
+            row_units=2,
+            row_data=4,
+            project_name=project_name,
+        )
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Workbook file not found: {exc.filename}") from exc
+    except (ValueError, EmptyDataError) as exc:
+        raise ValueError(f"Failed to read workbook summary inputs: {exc}") from exc
 
     # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
     output_dict = {
@@ -142,7 +153,22 @@ def _parse_sheet_with_units(
     Read key/value options from `sheet_name` and return them as a dictionary.
     """
     # Read the entire sheet as-is (no header)
-    df_full = pd.read_excel(excel_file, sheet_name=sheet_name, header=None)
+    with pd.ExcelFile(excel_file) as xls:
+        if sheet_name not in xls.sheet_names:
+            available = ", ".join(xls.sheet_names)
+            raise ValueError(
+                f"Workbook is missing required sheet '{sheet_name}'. "
+                f"Available sheets: {available or '<none>'}."
+            )
+        df_full = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+    if df_full.empty:
+        raise ValueError(f"Worksheet '{sheet_name}' is empty.")
+    min_required_rows = max(row_units, row_data) + 1
+    if len(df_full.index) < min_required_rows:
+        raise ValueError(
+            f"Worksheet '{sheet_name}' must include at least {min_required_rows} rows "
+            "(names, units, and data rows)."
+        )
 
     # Get the column names and units from the first two rows
     col_names, col_units = _get_column_names_and_units(df_full, sheet_name, row_units)

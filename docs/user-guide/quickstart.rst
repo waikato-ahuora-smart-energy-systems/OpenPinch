@@ -1,20 +1,99 @@
 Quickstart Workflow
 ===================
 
-This walkthrough shows how to describe a simple process, run the targeting
-workflow, and inspect the results programmatically.
+This walkthrough shows the main Python workflow for OpenPinch: load a case,
+run the analysis, inspect the summary, and export graphs and Excel results.
 
-Step 1. Describe Your Streams and Utilities
--------------------------------------------
+Step 1. Load A Known-Good Sample
+--------------------------------
 
-Targeting requires structured descriptions of hot/cold process streams and
-candidate utilities.  The schema objects exported from
-:mod:`OpenPinch.lib.schema` validate data before execution.
+The packaged sample cases are the fastest way to verify that your environment
+is working.
 
 .. code-block:: python
 
-   from OpenPinch.lib.schema import StreamSchema, UtilitySchema, TargetInput
+   from pathlib import Path
+
+   from OpenPinch import PinchProblem
+   from OpenPinch.resources import copy_sample_case
+
+   case_path = copy_sample_case("basic_pinch.json", Path("basic_pinch.json"))
+   problem = PinchProblem(problem_filepath=case_path)
+
+Step 2. Run The Analysis
+------------------------
+
+Use :meth:`OpenPinch.classes.pinch_problem.PinchProblem.run` to execute the
+full targeting workflow.
+
+.. code-block:: python
+
+   result = problem.run()
+   result.name
+
+Step 3. Inspect The Summary
+---------------------------
+
+For quick inspection, use the compact summary table:
+
+.. code-block:: python
+
+   summary = problem.summary_frame()
+   print(summary)
+
+If you need the wide export-style table with value/unit columns:
+
+.. code-block:: python
+
+   detailed_summary = problem.summary_frame(detailed=True)
+
+Step 4. Generate Graphs
+-----------------------
+
+Build Plotly figures directly from the solved result set:
+
+.. code-block:: python
+
+   gcc = problem.plot_grand_composite_curve()
+   cc = problem.plot_composite_curve()
+
+You can also export HTML graph files for later review:
+
+.. code-block:: python
+
+   written = problem.export_graphs("graphs", graph_type="gcc")
+   print(written)
+
+Step 5. Export Results
+----------------------
+
+To write the solved targets to an Excel workbook:
+
+.. code-block:: python
+
+   workbook_path = problem.export_excel("results")
+   print(workbook_path)
+
+Step 6. Launch The Dashboard
+----------------------------
+
+If you want an interactive dashboard after solving:
+
+.. code-block:: python
+
+   problem.show_dashboard()
+
+Programmatic Payload Workflow
+-----------------------------
+
+If you prefer to construct a case directly in code, use the schema models and
+service layer:
+
+.. code-block:: python
+
+   from OpenPinch import pinch_analysis_service
    from OpenPinch.lib.enums import StreamType
+   from OpenPinch.lib.schema import StreamSchema, TargetInput, UtilitySchema
 
    streams = [
        StreamSchema(
@@ -51,39 +130,29 @@ candidate utilities.  The schema objects exported from
    ]
 
    payload = TargetInput(streams=streams, utilities=utilities)
+   result = pinch_analysis_service(payload, project_name="Example")
 
-Step 2. Run the Service
------------------------
+Notebook Workflow
+-----------------
 
-Use :func:`OpenPinch.pinch_analysis_service` to run the pipeline end-to-end.  The
-service accepts dictionaries, Pydantic models, or dataclass-like objects and
-returns :class:`OpenPinch.lib.schema.TargetOutput`.
+OpenPinch also ships with a packaged notebook series for distinct workflows.
+Copy them into your working directory with:
 
-.. code-block:: python
+.. code-block:: bash
 
-   from OpenPinch import pinch_analysis_service
+   openpinch notebook -o notebooks
 
-   result = pinch_analysis_service(payload)
-   for target in result.targets:
-       print(target.name, target.Qh, target.Qc)
+The notebook series includes:
 
-Step 3. Persist or Post-process
--------------------------------
-
-For convenience you can wrap the pipeline in :class:`OpenPinch.PinchProblem`.
-It handles loading from JSON/Excel/CSV bundles and exporting the results to a
-format compatible with the legacy Excel workbook.
-
-.. code-block:: python
-
-   from OpenPinch import PinchProblem
-
-   problem = PinchProblem(problem_filepath="sample_problem.json", run=True)
-   problem.export("results/")
+- ``01_basic_pinch_analysis.ipynb``
+- ``02_graphs_and_interpretation.ipynb``
+- ``03_zonal_analysis.ipynb``
+- ``04_heat_pump_workflow.ipynb``
+- ``05_batch_comparison.ipynb``
 
 Next Steps
 ----------
 
-- Explore :mod:`OpenPinch.analysis` for lower-level building blocks.
-- Use the schema models under :mod:`OpenPinch.lib.schema` to validate larger data sets.
-- Continue to :doc:`../reference/index` for the API reference.
+- Use :doc:`../reference/api-core` for the supported API surface.
+- Use ``openpinch run`` and ``openpinch graph`` for CLI-driven workflows.
+- Use the notebook series as the main learning path for distinct outputs.

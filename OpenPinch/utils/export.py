@@ -196,7 +196,9 @@ def _compose_output_path(project_name: str, out_dir: str) -> Path:
     project = _safe_name(project_name)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{project}_{timestamp}.xlsx"
-    return Path(out_dir) / filename
+    output_dir = Path(out_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir / filename
 
 
 def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> None:

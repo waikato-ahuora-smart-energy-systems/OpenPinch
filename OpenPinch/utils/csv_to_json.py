@@ -4,6 +4,7 @@ import json
 from typing import IO, Union
 
 import pandas as pd
+from pandas.errors import EmptyDataError, ParserError
 
 from .wkbook_to_json import (
     _get_column_names_and_units,
@@ -55,22 +56,27 @@ def get_problem_from_csv(
     dict
         Dictionary containing ``streams``, ``utilities``, and ``options`` keys.
     """
-    streams_data = _parse_csv_with_units(
-        streams_csv,
-        kind="Stream Data",
-        row_units=row_units,
-        row_data=row_data,
-        encoding=encoding,
-    )
-    streams_data = validate_stream_data(streams_data)
-    utilities_data = _parse_csv_with_units(
-        utilities_csv,
-        kind="Utility Data",
-        row_units=row_units,
-        row_data=row_data,
-        encoding=encoding,
-    )
-    utilities_data = validate_utility_data(utilities_data)
+    try:
+        streams_data = _parse_csv_with_units(
+            streams_csv,
+            kind="Stream Data",
+            row_units=row_units,
+            row_data=row_data,
+            encoding=encoding,
+        )
+        streams_data = validate_stream_data(streams_data)
+        utilities_data = _parse_csv_with_units(
+            utilities_csv,
+            kind="Utility Data",
+            row_units=row_units,
+            row_data=row_data,
+            encoding=encoding,
+        )
+        utilities_data = validate_utility_data(utilities_data)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"CSV input file not found: {exc.filename}") from exc
+    except (EmptyDataError, ParserError, UnicodeDecodeError, ValueError) as exc:
+        raise ValueError(f"Failed to read CSV problem inputs: {exc}") from exc
     options_data = dict()
 
     output_dict = {
@@ -124,14 +130,19 @@ def get_results_from_csv(
     dict
         Dictionary containing a ``targets`` key.
     """
-    results_data = _parse_csv_with_units(
-        summary_csv,
-        kind="Summary",
-        row_units=row_units,
-        row_data=row_data,
-        project_name=project_name,
-        encoding=encoding,
-    )
+    try:
+        results_data = _parse_csv_with_units(
+            summary_csv,
+            kind="Summary",
+            row_units=row_units,
+            row_data=row_data,
+            project_name=project_name,
+            encoding=encoding,
+        )
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"CSV summary file not found: {exc.filename}") from exc
+    except (EmptyDataError, ParserError, UnicodeDecodeError, ValueError) as exc:
+        raise ValueError(f"Failed to read CSV summary input: {exc}") from exc
 
     output_dict = {
         "targets": results_data,
@@ -166,6 +177,14 @@ def _parse_csv_with_units(
     """
     # Read as-is (no header row); keep object dtype so mixed cells don't get mangled.
     df_full = pd.read_csv(csv_file, header=None, encoding=encoding, dtype=object)
+    if df_full.empty:
+        raise ValueError(f"{kind} CSV is empty.")
+    min_required_rows = max(row_units, row_data) + 1
+    if len(df_full.index) < min_required_rows:
+        raise ValueError(
+            f"{kind} CSV must include at least {min_required_rows} rows "
+            "(names, units, and data rows)."
+        )
 
     # Build column names & units using your existing logic keyed by 'kind'
     col_names, col_units = _get_column_names_and_units(

@@ -30,17 +30,25 @@ def test_wheel_excludes_repo_only_assets(tmp_path):
     with ZipFile(wheel_path) as wheel:
         names = wheel.namelist()
 
-    forbidden_fragments = [
-        "streamlit_app.py",
+    assert "OpenPinch/__init__.py" in names
+    assert "__init__.py" not in names
+
+    forbidden_prefixes = [
         "examples/",
         "tests/",
         "Excel_Version/",
-        "__init__.py",
+    ]
+    forbidden_fragments = [
+        "streamlit_app.py",
     ]
 
+    for prefix in forbidden_prefixes:
+        assert not any(name.startswith(prefix) for name in names), prefix
     for fragment in forbidden_fragments:
-        if fragment == "__init__.py":
-            assert "OpenPinch/__init__.py" in names
-            assert "__init__.py" not in names
-            continue
         assert not any(fragment in name for name in names), fragment
+
+    assert any(name.endswith("OpenPinch/data/sample_cases/basic_pinch.json") for name in names)
+    assert any(
+        name.endswith("OpenPinch/data/notebooks/01_basic_pinch_analysis.ipynb")
+        for name in names
+    )

@@ -1,64 +1,87 @@
 # OpenPinch
 
-OpenPinch is an open-source toolkit for advanced Pinch Analysis and Total Site Integration. 
+OpenPinch is an open-source toolkit for advanced Pinch Analysis and Total Site Integration. It supports direct and indirect heat integration targeting, multi-utility studies, graph generation, Excel-based workflows, and programmatic analysis in Python.
 
-## History
+## Install
 
-OpenPinch started in 2011 as Excel Workbook with macros. Since its inception, the workbook was developed in multiple directions, including Total Site Heat Integration, multiple utility targeting, retrofit targeting, cogeneration targeting, and more. The latest version of the Excel Workbook is free-to-use and available in the "Excel Version" folder on the OpenPinch github repository. 
-
-In 2021, a Python implementation of OpenPinch began, bringing the capabilities of the long-running Excel workbook into a modern Python API. The goal is to provide a sound basis for research, development and application. It is also freely available for integrating with other software tools and projects, and embeding results 
-into wider optimisation workflows.
-
-## Citation
-
-In publications and forks, please cite and link the foundational open-access article and this github repository. 
-
-Timothy Gordon Walmsley, 2026. OpenPinch: An Open-Source Python Library for Advanced Pinch Analysis and Total Site Integration. Process Integration and Optimization for Sustainability. https://doi.org/10.1007/s41660-026-00729-6
-
-## Highlights
-
-- Multi-scale targeting: unit operation, process, site, community, and regional zones
-- Direct heat integration targeting and indirect heat integration targeting (via the utility system)
-- Multiple utility targeting (isothermal and non-isothermal)
-- Grand composite curve (GCC) manipulation and visualisation helpers
-- Excel template for importing data 
-- Visualisation via a Streamlit web application
-- Pydantic schema models for validated programmatic workflows
-
-## Installation
-
-Install the latest published release from PyPI:
+Install the published package from PyPI:
 
 ```bash
 python -m pip install openpinch
 ```
 
-Run an analysis from the command line with:
+OpenPinch currently requires Python `>=3.14`.
+
+## First Run
+
+Copy a known-good sample case and run it:
 
 ```bash
-openpinch path/to/problem.xlsb --output results
+openpinch sample -o basic_pinch.json
+openpinch run basic_pinch.json --graph-output graphs -o results
 ```
 
-## Quickstart
+That command sequence will:
 
-The high-level service accepts Excel data input via the template format. Copy and edit the Excel template (identical to the OpenPinch Excel Workbook) to input stream and utility data. 
+- print a compact terminal summary
+- export an Excel workbook to `results/`
+- export HTML graph files to `graphs/`
+
+Validate an input file without running the full analysis:
+
+```bash
+openpinch validate basic_pinch.json
+```
+
+Export graphs only:
+
+```bash
+openpinch graph basic_pinch.json --graph-type gcc -o graphs
+```
+
+## Notebook Workflow
+
+OpenPinch ships with a notebook series for distinct outputs and workflows. Copy them into your working directory with:
+
+```bash
+openpinch notebook -o notebooks
+```
+
+The packaged notebook series currently includes:
+
+- `01_basic_pinch_analysis.ipynb`
+- `02_graphs_and_interpretation.ipynb`
+- `03_zonal_analysis.ipynb`
+- `04_heat_pump_workflow.ipynb`
+- `05_batch_comparison.ipynb`
+
+These notebooks are intended to be the main learning path for new users.
+
+## Python Workflow
+
+For script and notebook usage, the main front door is `PinchProblem`.
 
 ```python
 from pathlib import Path
+
 from OpenPinch import PinchProblem
 
-pp = PinchProblem()
-pp.load(Path("[location]/[filname].xlsb"))
-pp.target()
-pp.export_to_Excel(Path("results"))
+problem = PinchProblem(problem_filepath=Path("basic_pinch.json"))
+problem.run()
+
+summary = problem.summary_frame()
+print(summary)
+
+problem.export_excel("results")
+problem.export_graphs("graphs", graph_type="gcc")
 ```
 
-Alteratively, one can define each individual stream following the defined schema. 
+You can also build a payload directly from the validated schema models:
 
 ```python
-from OpenPinch import PinchProblem
-from OpenPinch.lib.schema import TargetInput, StreamSchema, UtilitySchema
+from OpenPinch import pinch_analysis_service
 from OpenPinch.lib.enums import StreamType
+from OpenPinch.lib.schema import StreamSchema, TargetInput, UtilitySchema
 
 streams = [
     StreamSchema(
@@ -94,43 +117,56 @@ utilities = [
     )
 ]
 
-input_data = TargetInput(streams=streams, utilities=utilities)
-
-pp = PinchProblem()
-pp.load(input_data)
-pp.target()
-pp.export_to_Excel(Path("results"))
+payload = TargetInput(streams=streams, utilities=utilities)
+result = pinch_analysis_service(payload, project_name="Example")
 ```
 
-## Visualisation through Streamlit
+## Graphing and Dashboard
 
-A Streamlit app provides a simple way to explore OpenPinch analysis results.
-For an installed package, use the `PinchProblem.render_streamlit_dashboard()`
-helper after running the analysis.
+For graph generation in Python:
 
-The repository also includes a `streamlit_app.py` demo launcher, but that file
-is source-checkout-only and is not shipped in the wheel. The bundled demo
-workbook lives under the top-level `examples/` directory.
+```python
+figure = problem.plot_grand_composite_curve()
+figure.show()
+```
 
-Run the repo demo with:
+To launch the Streamlit dashboard after solving:
 
-``streamlit run streamlit_app.py``
+```python
+problem.show_dashboard()
+```
 
-The dashboard implementation itself lives in
-``OpenPinch/streamlit_webviewer/web_graphing.py``.
+## Highlights
+
+- Multi-scale targeting for unit operation, process, site, community, and regional studies
+- Direct heat integration and indirect integration through utility systems
+- Multiple utility targeting, including non-isothermal utilities
+- Composite-curve and grand-composite-curve graph generation
+- Excel workbook import and Excel summary export
+- Packaged sample cases and notebook workflows
+- Pydantic schema models for validated programmatic usage
 
 ## Documentation
 
-Full documentation (getting started, guides, and API reference) is available:
+Full documentation is available at:
 
 https://openpinch.readthedocs.io/en/latest/
 
-Please note: the reference guide, like the repository, is under development. Errors are likely due the research nature of the project. 
+The documentation is organized around install, sample workflows, notebooks, graphing, and the public API.
+
+## History
+
+OpenPinch started in 2011 as an Excel workbook with macros. Since then it has expanded into Total Site Heat Integration, multiple utility targeting, retrofit targeting, cogeneration targeting, and related workflows. The Python implementation began in 2021 to bring those capabilities into a scriptable and testable package interface.
+
+## Citation
+
+In publications and forks, please cite and link the foundational article and this repository.
+
+Timothy Gordon Walmsley, 2026. OpenPinch: An Open-Source Python Library for Advanced Pinch Analysis and Total Site Integration. Process Integration and Optimization for Sustainability. https://doi.org/10.1007/s41660-026-00729-6
 
 ## Testing
 
-Install the project in editable mode along with any optional test dependencies,
-then run the test suite with:
+To run the test suite locally:
 
 ```bash
 python -m pip install -e .
@@ -141,17 +177,16 @@ pytest
 
 Founder: Dr Tim Walmsley, University of Waikato
 
-
 Stephen Burroughs, Benjamin Lincoln, Alex Geary, Harrison Whiting, Khang Tran, Roger Padullés, Jasper Walden
 
 ## Contributing
 
-Issues and pull requests are welcome! Please open a discussion if you have questions about data formats or feature ideas. When submitting code, aim for:
+Issues and pull requests are welcome. When submitting code, aim for:
 
-- Typed interfaces and clear docstring
-- Small methods with singular purpose
-- Pytests covering new behaviour
-- Updated documentation where relevant
+- typed interfaces and clear docstrings
+- small methods with singular purpose
+- pytest coverage for new user-facing behaviour
+- updated docs and notebooks where relevant
 
 ## License
 
