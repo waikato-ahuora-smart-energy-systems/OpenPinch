@@ -240,31 +240,6 @@ def calc_carnot_heat_engine_eta(
     return eta.item() if eta.ndim == 0 else eta
 
 
-def _append_unspecified_final_cascade_cooling_duty(Q_cool: np.ndarray) -> np.ndarray:
-    if Q_cool.size == 0:
-        return np.array(np.nan)
-    return np.concatenate([Q_cool, np.array([np.nan])])
-
-
-def _get_hpr_cascade(
-    hot_streams: StreamCollection,
-    cold_streams: StreamCollection,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    pt = create_problem_table_with_t_int(
-        streams=hot_streams + cold_streams,
-        is_shifted=False,
-    )
-    pt.update(
-        get_utility_heat_cascade(
-            pt.col[PT.T.value],
-            hot_streams,
-            cold_streams,
-            is_shifted=False,
-        )
-    )
-    return pt.col[PT.T.value], pt.col[PT.H_HOT_UT.value], pt.col[PT.H_COLD_UT.value]
-
-
 def validate_vapour_hp_refrigerant_ls(
     num_stages: int,
     args: HPRTargetInputs,
@@ -289,35 +264,6 @@ def validate_vapour_hp_refrigerant_ls(
     return ["water" for _ in range(num_stages)]
 
 
-def _get_carnot_hpr_cycle_cascade_profile(
-    T_hpr: list,
-    Q_hpr: list,
-    dT_phase_change: float,
-    is_hot: bool,
-    i: int = None,
-) -> Tuple[np.ndarray, np.ndarray]:
-    inc = 1 if is_hot else -1
-    if i is None:
-        i = 0 if is_hot else len(T_hpr)
-
-    i_range = range(i, len(T_hpr) - 1) if is_hot else reversed(range(1, i))
-    for i in i_range:
-        if abs(T_hpr[i] - T_hpr[i + inc]) < dT_phase_change:
-            T_hpr.pop(i + inc)
-            Q_hpr[i] += Q_hpr[i + inc]
-            Q_hpr.pop(i + inc)
-            T_hpr, Q_hpr = _get_carnot_hpr_cycle_cascade_profile(
-                T_hpr,
-                Q_hpr,
-                dT_phase_change,
-                is_hot,
-                i,
-            )
-            break
-
-    return T_hpr, Q_hpr
-
-
 def get_carnot_hpr_cycle_streams(
     T_cond: np.ndarray,
     Q_cond: np.ndarray,
@@ -333,36 +279,6 @@ def get_carnot_hpr_cycle_streams(
             T_evap, args.dt_phase_change, Q_evap, is_hot=False
         ),
     }
-
-
-def _build_latent_streams(
-    T_ls: np.ndarray,
-    dT_phase_change: float,
-    Q_ls: np.ndarray,
-    *,
-    dt_cont: float = 0.0,
-    is_hot: bool = True,
-    is_process_stream: bool = False,
-    prefix: str = "HP",
-) -> StreamCollection:
-    if len(T_ls) > 1:
-        T_ls, Q_ls = _get_carnot_hpr_cycle_cascade_profile(
-            T_ls.tolist(), Q_ls.tolist(), dT_phase_change, is_hot
-        )
-
-    sc = StreamCollection()
-    for i in range(len(Q_ls)):
-        sc.add(
-            Stream(
-                name=f"{prefix}_H{i + 1}" if is_hot else f"{prefix}_C{i + 1}",
-                t_supply=T_ls[i] if is_hot else T_ls[i] - dT_phase_change,
-                t_target=T_ls[i] - dT_phase_change if is_hot else T_ls[i],
-                heat_flow=Q_ls[i],
-                dt_cont=dt_cont,
-                is_process_stream=is_process_stream,
-            )
-        )
-    return sc
 
 
 def get_ambient_air_stream(
@@ -409,4 +325,96 @@ def calc_hpr_obj(
         + (Q_ext_cold * cold_to_power_ratio)
         + penalty
     ) / Q_hpr_target
+
+
+#######################################################################################################
+# Helper Functions
+#######################################################################################################
+
+
+def _build_latent_streams(
+    T_ls: np.ndarray,
+    dT_phase_change: float,
+    Q_ls: np.ndarray,
+    *,
+    dt_cont: float = 0.0,
+    is_hot: bool = True,
+    is_process_stream: bool = False,
+    prefix: str = "HP",
+) -> StreamCollection:
+    if len(T_ls) > 1:
+        T_ls, Q_ls = _get_carnot_hpr_cycle_cascade_profile(
+            T_ls.tolist(), Q_ls.tolist(), dT_phase_change, is_hot
+        )
+
+    sc = StreamCollection()
+    for i in range(len(Q_ls)):
+        sc.add(
+            Stream(
+                name=f"{prefix}_H{i + 1}" if is_hot else f"{prefix}_C{i + 1}",
+                t_supply=T_ls[i] if is_hot else T_ls[i] - dT_phase_change,
+                t_target=T_ls[i] - dT_phase_change if is_hot else T_ls[i],
+                heat_flow=Q_ls[i],
+                dt_cont=dt_cont,
+                is_process_stream=is_process_stream,
+            )
+        )
+    return sc
+
+
+def _get_carnot_hpr_cycle_cascade_profile(
+    T_hpr: list,
+    Q_hpr: list,
+    dT_phase_change: float,
+    is_hot: bool,
+    i: int = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    inc = 1 if is_hot else -1
+    if i is None:
+        i = 0 if is_hot else len(T_hpr)
+
+    i_range = range(i, len(T_hpr) - 1) if is_hot else reversed(range(1, i))
+    for i in i_range:
+        if abs(T_hpr[i] - T_hpr[i + inc]) < dT_phase_change:
+            T_hpr.pop(i + inc)
+            Q_hpr[i] += Q_hpr[i + inc]
+            Q_hpr.pop(i + inc)
+            T_hpr, Q_hpr = _get_carnot_hpr_cycle_cascade_profile(
+                T_hpr,
+                Q_hpr,
+                dT_phase_change,
+                is_hot,
+                i,
+            )
+            break
+
+    return T_hpr, Q_hpr
+
+
+def _append_unspecified_final_cascade_cooling_duty(
+    Q_cool: np.ndarray
+) -> np.ndarray:
+    if Q_cool.size == 0:
+        return np.array(np.nan)
+    return np.concatenate([Q_cool, np.array([np.nan])])
+
+
+def _get_hpr_cascade(
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    pt = create_problem_table_with_t_int(
+        streams=hot_streams + cold_streams,
+        is_shifted=False,
+    )
+    pt.update(
+        get_utility_heat_cascade(
+            pt.col[PT.T.value],
+            hot_streams,
+            cold_streams,
+            is_shifted=False,
+        )
+    )
+    return pt.col[PT.T.value], pt.col[PT.H_HOT_UT.value], pt.col[PT.H_COLD_UT.value]
+
 

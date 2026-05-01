@@ -16,9 +16,7 @@ from .encoding import (
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
 )
-from .multi_temperature_carnot import (
-    optimise_multi_temperature_carnot_heat_pump_placement,
-)
+from .multi_temperature_carnot import optimise_multi_temperature_carnot_heat_pump_placement
 from .shared import (
     _append_unspecified_final_cascade_cooling_duty,
     calc_hpr_obj,
@@ -96,7 +94,9 @@ def _get_x0_for_cascade_hp_opt(
     )
 
 
-def _get_bounds_for_cascade_hp_opt(args: HPRTargetInputs) -> list:
+def _get_bounds_for_cascade_hp_opt(
+    args: HPRTargetInputs
+) -> list:
     n_cond = n_heat = int(args.n_cond)
     n_evap = int(args.n_evap)
     n_cool = n_evap - 1

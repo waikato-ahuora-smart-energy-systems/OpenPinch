@@ -5,7 +5,6 @@ from typing import Tuple
 import numpy as np
 
 from ...classes.problem_table import ProblemTable
-from ...classes.stream_collection import StreamCollection
 from ...lib.config import Configuration
 from ...lib.enums import PT
 from ...lib.schema import HPRTargetInputs
