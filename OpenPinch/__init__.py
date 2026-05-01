@@ -1,22 +1,16 @@
-"""OpenPinch public API surface.
+"""OpenPinch public API."""
 
-The package exposes a small set of high-level helpers for running Pinch Analysis
-and working with the structured results.  Detailed configuration and schema
-objects are re-exported from :mod:`OpenPinch.lib` for convenience so downstream
-code can construct validated inputs.
-"""
+import warnings as _warnings
 
-import warnings
+from .classes.pinch_problem import PinchProblem
+from .lib import *  # noqa: F401,F403
+from .main import extract_results, get_targets, get_visualise, pinch_analysis_service
+from .utils.stream_linearisation import get_piecewise_linearisation_for_streams
 
-# Python 3.14 emits SyntaxWarning for legacy escape sequences in CoolProp docstrings.
-# Keep warnings visible elsewhere, but silence this known third-party noise.
-warnings.filterwarnings(
+_warnings.filterwarnings(
     "ignore",
     category=SyntaxWarning,
     module=r"^CoolProp\.Plots\.SimpleCycles(Expansion|Compression)$",
 )
 
-from .classes import PinchProblem
-from .lib import *
-from .main import pinch_analysis_service, get_targets, get_visualise, extract_results
-from .utils.stream_linearisation import get_piecewise_linearisation_for_streams
+__all__ = [name for name in globals() if not name.startswith("_")]

@@ -13,7 +13,6 @@ import pandas as pd
 
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
-from ..utils import *
 
 PT = ProblemTableLabel
 INTERPOLATION_KEYS = (

@@ -8,9 +8,15 @@ instances.
 
 from typing import List, Tuple
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
+import numpy as np
+
+from ..classes.stream import Stream
+from ..classes.stream_collection import StreamCollection
+from ..classes.problem_table import ProblemTable
+from ..classes.zone import Zone
+from ..lib.config import Configuration, tol
+from ..lib.enums import GT, PT, StreamType, TargetType, Z
+from ..utils.miscellaneous import delta_vals
 from .capital_cost_and_area_targeting import (
     get_area_targets,
     get_balanced_CC,
@@ -18,11 +24,6 @@ from .capital_cost_and_area_targeting import (
     get_min_number_hx,
 )
 from .gcc_manipulation import get_additional_GCCs
-from .heat_pump_and_refrigeration_targeting import (
-    calc_heat_pump_and_refrigeration_cascade,
-    get_heat_pump_and_refrigeration_targets,
-    validate_heat_pump_or_refrigeration_targeting_required,
-)
 from .problem_table_analysis import (
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
@@ -56,14 +57,14 @@ def compute_direct_integration_targets(zone: Zone):
         hot_streams=hot_streams,
         cold_streams=cold_streams,
         all_streams=all_streams,
-        zone_config=config,
+        zone_config=zone_config,
         is_shifted=True,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=hot_streams,
         cold_streams=cold_streams,
         all_streams=all_streams,
-        zone_config=config,
+        zone_config=zone_config,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
@@ -81,6 +82,12 @@ def compute_direct_integration_targets(zone: Zone):
     if zone.identifier == Z.P.value and (
         zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING
     ):
+        from .heat_pump_and_refrigeration_targeting import (
+            calc_heat_pump_and_refrigeration_cascade,
+            get_heat_pump_and_refrigeration_targets,
+            validate_heat_pump_or_refrigeration_targeting_required,
+        )
+
         hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
             pt,
             is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,

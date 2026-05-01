@@ -7,10 +7,10 @@ from pathlib import Path
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
 
-from ..lib.enums import *
+from ..lib.enums import StreamType
 
 if TYPE_CHECKING:
-    from ..classes import Stream
+    from .stream import Stream
 
 
 def _sort_by_attr(attr: str, stream: object):

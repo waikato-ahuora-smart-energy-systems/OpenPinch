@@ -2,8 +2,8 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from ..lib.config import *
-from ..lib.enums import *
+from ..lib.config import Configuration
+from ..lib.enums import ZoneType
 from .stream_collection import StreamCollection
 from .energy_target import EnergyTarget
 

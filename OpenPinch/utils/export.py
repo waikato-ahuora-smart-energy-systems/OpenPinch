@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
 import pandas as pd
 
 if TYPE_CHECKING:
-    from ..classes import Zone
-    from ..lib import TargetOutput
+    from ..classes.zone import Zone
+    from ..lib.schema import TargetOutput
 
 __all__ = ["export_target_summary_to_excel_with_units"]
 

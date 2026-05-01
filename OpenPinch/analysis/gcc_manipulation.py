@@ -1,12 +1,13 @@
 """Determine various forms of the grand composite curve."""
 
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
+from ..classes.problem_table import ProblemTable
+from ..lib.config import tol
+from ..lib.enums import PT
+from ..utils.miscellaneous import delta_with_zero_at_start, linear_interpolation
 
 
 __all__ = [

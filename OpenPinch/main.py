@@ -12,9 +12,12 @@ from .analysis.data_preparation import prepare_problem
 from .analysis.direct_integration_entry import compute_direct_integration_targets
 from .analysis.graph_data import get_output_graph_data, visualise_graphs
 from .analysis.indirect_integration_entry import compute_indirect_integration_targets
-from .classes import EnergyTarget, Stream, StreamCollection, Zone
-from .lib import TargetInput, TargetOutput, ZoneType
-from .lib.enums import Z
+from .classes.energy_target import EnergyTarget
+from .classes.stream import Stream
+from .classes.stream_collection import StreamCollection
+from .classes.zone import Zone
+from .lib.enums import Z, ZoneType
+from .lib.schema import TargetInput, TargetOutput
 from .utils.decorators import timing_decorator
 
 __all__ = ["pinch_analysis_service", "get_targets", "get_visualise", "extract_results"]

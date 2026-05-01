@@ -6,11 +6,18 @@ utility balances after feasible inter-zone heat recovery.
 """
 
 from copy import deepcopy
-from typing import Tuple
+from typing import Dict, Tuple
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
+import numpy as np
+
+from ..classes.energy_target import EnergyTarget
+from ..classes.problem_table import ProblemTable
+from ..classes.stream import Stream
+from ..classes.stream_collection import StreamCollection
+from ..classes.zone import Zone
+from ..lib.config import Configuration, tol
+from ..lib.enums import GT, PT, TargetType, Z
+from ..utils.miscellaneous import key_name
 from .gcc_manipulation import get_additional_GCCs
 from .heat_pump_and_refrigeration_targeting import (
     calc_heat_pump_and_refrigeration_cascade,

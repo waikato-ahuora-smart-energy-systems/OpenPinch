@@ -104,14 +104,19 @@ pp.export_to_Excel(Path("results"))
 
 ## Visualisation through Streamlit
 
-A Streamlit app provides a simple way to explore OpenPinch analysis results. In `streamlit_app.py`, a user can define the path to the stream and utility data for the problem. The bundled demo workbook now lives under the top-level `examples/` directory.
+A Streamlit app provides a simple way to explore OpenPinch analysis results.
+For an installed package, use the `PinchProblem.render_streamlit_dashboard()`
+helper after running the analysis.
 
-Run with 
+The repository also includes a `streamlit_app.py` demo launcher, but that file
+is source-checkout-only and is not shipped in the wheel. The bundled demo
+workbook lives under the top-level `examples/` directory.
 
-``streamlit run streamlit_app.py`` 
+Run the repo demo with:
 
-to load a case and launch the interactive dashboard defined in
+``streamlit run streamlit_app.py``
 
+The dashboard implementation itself lives in
 ``OpenPinch/streamlit_webviewer/web_graphing.py``.
 
 ## Documentation

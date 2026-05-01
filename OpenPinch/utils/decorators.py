@@ -6,7 +6,7 @@ from collections import defaultdict
 from functools import wraps
 from time import perf_counter as timer
 
-from ..lib import config
+import OpenPinch.lib.config as config
 
 logger = logging.getLogger(__name__)
 _LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"

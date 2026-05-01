@@ -13,11 +13,21 @@ import math
 from io import BytesIO
 from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tuple
 
-import plotly.graph_objects as go
 import pandas as pd
 import openpyxl as xl_writer
 
-from ..classes import EnergyTarget, ProblemTable, Zone, Stream
+try:
+    import plotly.graph_objects as go
+except ImportError as exc:  # pragma: no cover - optional dependency guard
+    go = None
+    _PLOTLY_IMPORT_ERROR = exc
+else:
+    _PLOTLY_IMPORT_ERROR = None
+
+from ..classes.energy_target import EnergyTarget
+from ..classes.problem_table import ProblemTable
+from ..classes.stream import Stream
+from ..classes.zone import Zone
 from ..lib.enums import ArrowHead, LineColour
 from ..analysis.graph_data import get_output_graph_data
 
@@ -38,6 +48,15 @@ _SEGMENT_COLOUR_MAP: Dict[int, str] = {
     LineColour.Other.value: "#7f7f7f",  # neutral grey
     LineColour.Black.value: "#111111",
 }
+
+
+def _require_plotly():
+    if _PLOTLY_IMPORT_ERROR is None:
+        return go
+    raise ImportError(
+        "Plotly is required for graph rendering. "
+        "Reinstall OpenPinch or install it directly with 'pip install plotly'."
+    ) from _PLOTLY_IMPORT_ERROR
 
 
 @dataclass(slots=True)
@@ -100,7 +119,7 @@ def render_streamlit_dashboard(
     except ImportError as exc:  # pragma: no cover - streamlit dependency guard
         raise ImportError(
             "Streamlit is required for 'render_streamlit_dashboard'. "
-            "Install it with 'pip install streamlit'."
+            "Reinstall OpenPinch or install it directly with 'pip install streamlit'."
         ) from exc
 
     st.set_page_config(
@@ -326,7 +345,8 @@ def _build_download(
 
 def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
     """Create a Plotly figure for the provided graph payload."""
-    fig = go.Figure()
+    plotly_go = _require_plotly()
+    fig = plotly_go.Figure()
     legend_seen: Dict[str, bool] = {}
     for segment in graph.get("segments", []):
         traces, arrow_annotation = _segment_trace(segment, graph, legend_seen)
@@ -363,7 +383,8 @@ def _segment_trace(
         elif arrow == ArrowHead.END.value:
             arrow = ArrowHead.START.value
 
-    line_trace = go.Scatter(
+    plotly_go = _require_plotly()
+    line_trace = plotly_go.Scatter(
         x=x_vals,
         y=y_vals,
         mode="lines",

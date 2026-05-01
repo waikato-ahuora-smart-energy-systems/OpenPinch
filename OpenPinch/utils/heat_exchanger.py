@@ -3,7 +3,7 @@
 import math
 import numpy as np
 
-from ..lib import HeatExchangerTypes as HX
+from ..lib.enums import HeatExchangerTypes as HX
 
 __all__ = [
     "CalcAreaUE",

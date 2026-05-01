@@ -10,9 +10,12 @@ import copy
 from collections import defaultdict
 from typing import List, Optional, Tuple
 
-from ..classes import Stream, StreamCollection, Zone
-from ..lib import *
-from ..utils import *
+from ..classes.stream import Stream
+from ..classes.stream_collection import StreamCollection
+from ..classes.zone import Zone
+from ..lib.config import Configuration
+from ..lib.enums import StreamLoc, StreamType, ZoneType
+from ..lib.schema import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ..utils.miscellaneous import get_value
 
 __all__ = ["prepare_problem"]

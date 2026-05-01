@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import runpy
 import sys
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -57,8 +58,12 @@ def _clear_dummy():
 
 
 def test_root_init_script_executes():
-    namespace = runpy.run_path(str(REPO_ROOT / "__init__.py"))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        namespace = runpy.run_path(str(REPO_ROOT / "__init__.py"))
+
     assert "PinchProblem" in namespace
+    assert any(item.category is DeprecationWarning for item in caught)
 
 
 def test_repo_main_script_executes(monkeypatch):

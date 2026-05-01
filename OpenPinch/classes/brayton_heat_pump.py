@@ -11,14 +11,29 @@ from typing import Optional, Sequence
 
 import numpy as np
 
-# TESPy imports
-from tespy.networks import Network
-from tespy.components import CycleCloser, Compressor, Turbine, SimpleHeatExchanger
-from tespy.connections import Connection
+try:
+    from tespy.networks import Network
+    from tespy.components import CycleCloser, Compressor, Turbine, SimpleHeatExchanger
+    from tespy.connections import Connection
+except ImportError as exc:  # pragma: no cover - optional dependency guard
+    Network = None
+    CycleCloser = Compressor = Turbine = SimpleHeatExchanger = Connection = None
+    _TESPY_IMPORT_ERROR = exc
+else:
+    _TESPY_IMPORT_ERROR = None
 
 # Local stream API used by the simple heat pump
 from .stream import Stream
 from .stream_collection import StreamCollection
+
+
+def _require_tespy() -> None:
+    if _TESPY_IMPORT_ERROR is None:
+        return
+    raise ImportError(
+        "TESPy is required for Brayton-cycle tooling. "
+        "Install it with 'pip install openpinch[cycles]'."
+    ) from _TESPY_IMPORT_ERROR
 
 
 class SimpleBraytonHeatPumpCycle:
@@ -43,6 +58,8 @@ class SimpleBraytonHeatPumpCycle:
 
     def __init__(self):
         """Initialize an unsolved Brayton heat pump cycle container."""
+        _require_tespy()
+
         # Keep minimal unit-system compatibility surface (not using CoolProp
         # unit dicts here); the simple heat pump used a PropertyDict. For
         # compatibility we accept the same constructor signature.
