@@ -66,12 +66,14 @@ To copy the packaged notebooks into your working directory:
    openpinch notebook -o notebooks
 
 The notebook series is organized around distinct workflows, including basic
-pinch analysis, graph interpretation, zonal analysis, heat-pump workflows, and
+pinch analysis, graph interpretation, zonal analysis, heat-pump targeting, and
 batch comparison.
 
 Next Steps
 ----------
 
 - Continue to :doc:`user-guide/quickstart` for the Python workflow.
+- Use :doc:`user-guide/interpreting-results` to understand the summary metrics,
+  graphs, and heat-pump integration workflow.
 - Use ``openpinch graph`` to export specific graph types directly from the CLI.
 - Explore :doc:`reference/index` for the public API and architectural reference.

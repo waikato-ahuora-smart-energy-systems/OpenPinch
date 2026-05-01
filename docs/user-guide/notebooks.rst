@@ -45,8 +45,20 @@ For new users, the best learning path is:
 1. ``01_basic_pinch_analysis.ipynb`` to learn the solve-and-summarize flow
 2. ``02_graphs_and_interpretation.ipynb`` to understand graph outputs
 3. ``03_zonal_analysis.ipynb`` if your work involves nested zones or total-site studies
-4. ``04_heat_pump_workflow.ipynb`` for cycle-oriented heat-pump outputs
+4. ``04_heat_pump_workflow.ipynb`` for heat-pump targeting and integration
 5. ``05_batch_comparison.ipynb`` for comparing multiple cases programmatically
+
+Interpretation Focus
+--------------------
+
+The notebook series is not only about running the solver. It is also intended
+to show users how to read the outputs:
+
+- summary metrics such as hot utility, cold utility, heat recovery, and pinch temperatures
+- graph outputs such as composite curves, shifted curves, grand composite curves, and total-site profiles
+- workflow-specific decisions such as whether a heat-pump integration scenario is displacing the right utilities
+
+For a consolidated written guide, see :doc:`interpreting-results`.
 
 Design Intent
 -------------

@@ -37,3 +37,18 @@ def test_packaged_notebooks_execute_smoke(
     notebook_path = copy_notebook(notebook_name, tmp_path / notebook_name)
     monkeypatch.chdir(tmp_path)
     _execute_notebook(notebook_path)
+
+
+def test_heat_pump_notebook_focuses_on_integration_workflow(
+    tmp_path: Path,
+):
+    notebook_path = copy_notebook(
+        "04_heat_pump_workflow.ipynb",
+        tmp_path / "04_heat_pump_workflow.ipynb",
+    )
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    combined_source = "\n".join(
+        "".join(cell.get("source", [])) for cell in notebook["cells"]
+    )
+    assert "candidate heat-pump integration scenario" in combined_source
+    assert "VapourCompressionCycle" not in combined_source

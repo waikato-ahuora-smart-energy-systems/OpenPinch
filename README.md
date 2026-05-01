@@ -57,6 +57,24 @@ The packaged notebook series currently includes:
 
 These notebooks are intended to be the main learning path for new users.
 
+## Interpreting Results
+
+Start with the compact summary:
+
+- `Hot Utility Target` is the minimum external heating demand for the case.
+- `Cold Utility Target` is the minimum external cooling demand.
+- `Heat Recovery` is the internal heat recovery achieved by the targeting result.
+- `Hot Pinch` and `Cold Pinch` identify the constrained temperature region that limits further direct recovery.
+
+For graph-based interpretation:
+
+- composite curves show overall source and sink overlap
+- shifted composite curves show the effect of the minimum approach temperature
+- grand composite curves are the main view for utility selection and heat-pump opportunity identification
+- total-site graphs are the right level for comparing zonal interactions and utility-system effects
+
+The packaged `04_heat_pump_workflow.ipynb` notebook focuses on heat-pump targeting and integration. It compares a base case against an integrated heat-pump scenario and treats cycle performance as supporting context rather than the main result.
+
 ## Python Workflow
 
 For script and notebook usage, the main front door is `PinchProblem`.

@@ -47,6 +47,13 @@ If you need the wide export-style table with value/unit columns:
 
    detailed_summary = problem.summary_frame(detailed=True)
 
+Read the compact summary in this order:
+
+- start with ``Plant/Direct Integration`` or the main process row
+- check ``Hot Utility Target`` and ``Cold Utility Target`` first
+- then check ``Heat Recovery`` to see how much thermal duty is recovered internally
+- use the pinch temperatures to identify the constrained temperature region
+
 Step 4. Generate Graphs
 -----------------------
 
@@ -63,6 +70,9 @@ You can also export HTML graph files for later review:
 
    written = problem.export_graphs("graphs", graph_type="gcc")
    print(written)
+
+The grand composite curve is usually the first graph to inspect when you are
+deciding between utility levels or considering heat-pump integration.
 
 Step 5. Export Results
 ----------------------
@@ -154,5 +164,6 @@ Next Steps
 ----------
 
 - Use :doc:`../reference/api-core` for the supported API surface.
+- Use :doc:`interpreting-results` for output-reading guidance.
 - Use ``openpinch run`` and ``openpinch graph`` for CLI-driven workflows.
 - Use the notebook series as the main learning path for distinct outputs.

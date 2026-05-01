@@ -10,6 +10,9 @@ README = REPO_ROOT / "README.md"
 GETTING_STARTED = REPO_ROOT / "docs" / "getting-started.rst"
 QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
 NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
+INTERPRETING_RESULTS = (
+    REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
+)
 
 
 def _read(path: Path) -> str:
@@ -32,6 +35,7 @@ def test_docs_highlight_current_pinchproblem_methods():
             _read(GETTING_STARTED),
             _read(QUICKSTART),
             _read(NOTEBOOKS),
+            _read(INTERPRETING_RESULTS),
         ]
     )
     assert "run()" in combined
@@ -47,7 +51,21 @@ def test_docs_do_not_reference_stale_workflow_names():
             _read(README),
             _read(GETTING_STARTED),
             _read(QUICKSTART),
+            _read(NOTEBOOKS),
         ]
     )
     assert "problem.export(" not in combined
     assert "Python 3.11 or newer" not in combined
+
+
+def test_docs_highlight_interpretation_and_heat_pump_integration():
+    combined = "\n".join(
+        [
+            _read(README),
+            _read(QUICKSTART),
+            _read(NOTEBOOKS),
+            _read(INTERPRETING_RESULTS),
+        ]
+    )
+    assert "Interpreting Results" in combined
+    assert "heat-pump targeting and integration" in combined
