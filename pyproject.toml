@@ -11,6 +11,17 @@ exclude = [
   "**/*.py[cod]",
 ]
 
+[tool.hatch.build.targets.sdist]
+include = [
+  "/LICENSE",
+  "/README.md",
+  "/pyproject.toml",
+  "/OpenPinch",
+]
+exclude = [
+  "/.gitignore",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["OpenPinch"]
 [project]
@@ -46,6 +57,9 @@ license-files = ["LICEN[CS]E*"]
 [project.urls]
 Homepage = "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch"
 Issues = "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/issues"
+
+[project.scripts]
+openpinch = "OpenPinch.__main__:main"
 
 [project.optional-dependencies]
 dev = [

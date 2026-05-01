@@ -64,14 +64,20 @@ def test_root_init_script_executes():
 def test_repo_main_script_executes(monkeypatch):
     _clear_dummy()
     monkeypatch.setattr(OpenPinch, "PinchProblem", _DummyPinchProblem)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["python", "examples/stream_data/p_illustrative.json", "-o", "results"],
+    )
 
-    runpy.run_path(str(REPO_ROOT / "__main__.py"), run_name="__main__")
+    with pytest.raises(SystemExit, match="0"):
+        runpy.run_path(str(REPO_ROOT / "__main__.py"), run_name="__main__")
 
     assert len(_DummyPinchProblem.created) == 1
     calls = _DummyPinchProblem.created[0].calls
-    assert calls[0][0] == "load"
+    assert calls[0] == ("load", "examples/stream_data/p_illustrative.json")
     assert calls[1][0] == "target"
-    assert calls[2][0] == "export_to_Excel"
+    assert calls[2] == ("export_to_Excel", "results")
 
 
 def test_streamlit_module_helper_functions(monkeypatch):

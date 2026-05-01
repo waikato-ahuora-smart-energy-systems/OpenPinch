@@ -33,6 +33,12 @@ Install the latest published release from PyPI:
 python -m pip install openpinch
 ```
 
+Run an analysis from the command line with:
+
+```bash
+openpinch path/to/problem.xlsb --output results
+```
+
 ## Quickstart
 
 The high-level service accepts Excel data input via the template format. Copy and edit the Excel template (identical to the OpenPinch Excel Workbook) to input stream and utility data. 
@@ -107,8 +113,6 @@ Run with
 to load a case and launch the interactive dashboard defined in
 
 ``OpenPinch/streamlit_webviewer/web_graphing.py``.
-
-"""
 
 ## Documentation
 
