@@ -625,7 +625,9 @@ def test_compare_to_builds_delta_table(monkeypatch):
     base_problem = PinchProblem(run=False)
     other_problem = PinchProblem(run=False)
 
-    monkeypatch.setattr(base_problem, "summary_frame", lambda detailed=False: base_frame)
+    monkeypatch.setattr(
+        base_problem, "summary_frame", lambda detailed=False: base_frame
+    )
     monkeypatch.setattr(
         other_problem,
         "summary_frame",

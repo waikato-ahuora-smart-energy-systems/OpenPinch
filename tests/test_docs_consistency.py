@@ -11,9 +11,7 @@ GETTING_STARTED = REPO_ROOT / "docs" / "getting-started.rst"
 QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
 NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
 HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
-INTERPRETING_RESULTS = (
-    REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
-)
+INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
 
 
 def _read(path: Path) -> str:

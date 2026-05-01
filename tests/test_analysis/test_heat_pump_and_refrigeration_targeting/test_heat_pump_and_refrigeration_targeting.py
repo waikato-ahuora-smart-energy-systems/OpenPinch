@@ -5,6 +5,7 @@ import pytest
 
 from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
 from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
+from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.enums import PT
@@ -87,3 +88,38 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
     np.testing.assert_allclose(out.col[PT.H_NET_HOT.value], expected_hot)
     np.testing.assert_allclose(out.col[PT.H_NET_COLD.value], expected_cold)
     np.testing.assert_allclose(out.col[PT.H_NET_W_AIR.value], expected_w_air)
+
+
+def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
+    shown = {"called": False}
+    monkeypatch.setattr(
+        hp_shared.go.Figure,
+        "show",
+        lambda self: shown.__setitem__("called", True),
+    )
+
+    hot_streams = StreamCollection()
+    hot_streams.add(
+        Stream(name="HP_H1", t_supply=110.0, t_target=100.0, heat_flow=20.0)
+    )
+    cold_streams = StreamCollection()
+    cold_streams.add(Stream(name="HP_C1", t_supply=70.0, t_target=80.0, heat_flow=15.0))
+
+    figure = hp_shared.plot_multi_hp_profiles_from_results(
+        T_hot=np.array([120.0, 100.0]),
+        H_hot=np.array([0.0, 20.0]),
+        T_cold=np.array([80.0, 60.0]),
+        H_cold=np.array([0.0, 15.0]),
+        hpr_hot_streams=hot_streams,
+        hpr_cold_streams=cold_streams,
+        title="HP Profile",
+    )
+
+    assert shown["called"] is True
+    assert figure.layout.title.text == "HP Profile"
+    assert [trace.name for trace in figure.data] == [
+        "Sink",
+        "Source",
+        "Condenser",
+        "Evaporator",
+    ]

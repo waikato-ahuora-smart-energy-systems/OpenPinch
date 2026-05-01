@@ -69,11 +69,8 @@ napoleon_use_rtype = True
 
 autodoc_mock_imports = [
     "CoolProp",
-    "coolprop",
-    "matplotlib",
-    # "numpy",
+    "numpy",
     "openpyxl",
-    # "pandas",
     "pint",
     "plotly",
     "pyxlsb",

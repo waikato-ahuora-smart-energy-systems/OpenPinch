@@ -2,8 +2,8 @@
 
 from typing import TYPE_CHECKING, Any, Tuple, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 
 from ..lib.config import tol
 from ..lib.enums import TargetType
@@ -24,6 +24,24 @@ __all__ = [
     "linear_interpolation",
     "make_monotonic",
 ]
+
+
+class _PlotlyShowProxy:
+    """Compatibility shim preserving the historical ``plt.show()`` test hook."""
+
+    def __init__(self) -> None:
+        self._current_figure: go.Figure | None = None
+
+    def set_current_figure(self, figure: go.Figure) -> None:
+        self._current_figure = figure
+
+    def show(self) -> None:
+        if self._current_figure is None:
+            raise RuntimeError("No current figure is available to show.")
+        self._current_figure.show()
+
+
+plt = _PlotlyShowProxy()
 
 
 def key_name(zone_name: str, target_type: str = TargetType.DI.value):
@@ -199,17 +217,35 @@ def clean_composite_curve(
 
 
 def graph_simple_cc_plot(Tc, Hc, Th, Hh):
-    """Render a quick Matplotlib plot of hot/cold composite curves for debugging."""
-    fig, ax = plt.subplots()
-    ax.plot(Hc, Tc, label="Cold composite")
-    ax.plot(Hh, Th, label="Hot composite")
-    ax.set_ylabel("Temperature")
-    ax.set_xlabel("Enthalpy")
-    ax.set_title("Balanced Composite Curves")
-    ax.legend()
-    ax.grid(alpha=0.3)
-    fig.tight_layout()
+    """Render a quick Plotly plot of hot/cold composite curves for debugging."""
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=Hc,
+            y=Tc,
+            mode="lines",
+            name="Cold composite",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=Hh,
+            y=Th,
+            mode="lines",
+            name="Hot composite",
+        )
+    )
+    fig.update_layout(
+        title="Balanced Composite Curves",
+        xaxis_title="Enthalpy",
+        yaxis_title="Temperature",
+        template="plotly_white",
+    )
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)")
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)")
+    plt.set_current_figure(fig)
     plt.show()
+    return fig
 
 
 def interp_with_plateaus(

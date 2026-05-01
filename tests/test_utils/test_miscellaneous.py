@@ -448,13 +448,16 @@ def test_graph_simple_cc_plot_executes_show(monkeypatch):
         "show",
         lambda: shown.__setitem__("called", True),
     )
-    miscellaneous.graph_simple_cc_plot(
+    figure = miscellaneous.graph_simple_cc_plot(
         Tc=[40, 30],
         Hc=[0, 10],
         Th=[120, 110],
         Hh=[0, 12],
     )
     assert shown["called"] is True
+    assert len(figure.data) == 2
+    assert figure.data[0].name == "Cold composite"
+    assert figure.data[1].name == "Hot composite"
 
 
 def test_interp_with_plateaus_invalid_side():

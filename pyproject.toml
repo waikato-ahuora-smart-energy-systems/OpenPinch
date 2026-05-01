@@ -37,7 +37,6 @@ dependencies=[
   "scipy",
   "streamlit",
   "plotly",
-  "matplotlib",
   "tespy",
 ]
 version = "0.1.14"

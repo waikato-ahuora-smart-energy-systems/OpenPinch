@@ -2,8 +2,8 @@
 
 from typing import Callable, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 from CoolProp.CoolProp import PropsSI
 
 from ...classes.stream import Stream
@@ -56,16 +56,32 @@ def plot_multi_hp_profiles_from_results(
     hpr_hot_streams: StreamCollection = None,
     hpr_cold_streams: StreamCollection = None,
     title: str = None,
-) -> None:
-    plt.figure(figsize=(7, 5))
+) -> go.Figure:
+    fig = go.Figure()
 
     if T_hot is not None and H_hot is not None:
         T_hot, H_hot = clean_composite_curve_ends(T_hot, H_hot)
-        plt.plot(H_hot, T_hot, label="Sink", linewidth=2, color="red")
+        fig.add_trace(
+            go.Scatter(
+                x=H_hot,
+                y=T_hot,
+                mode="lines",
+                name="Sink",
+                line={"color": "red", "width": 2},
+            )
+        )
 
     if T_cold is not None and H_cold is not None:
         T_cold, H_cold = clean_composite_curve_ends(T_cold, H_cold)
-        plt.plot(H_cold, T_cold, label="Source", linewidth=2, color="blue")
+        fig.add_trace(
+            go.Scatter(
+                x=H_cold,
+                y=T_cold,
+                mode="lines",
+                name="Source",
+                line={"color": "blue", "width": 2},
+            )
+        )
 
     if hpr_hot_streams is not None and hpr_cold_streams is not None:
         T_hpr_arr, H_hpr_hot, H_hpr_cold = _get_hpr_cascade(
@@ -73,31 +89,36 @@ def plot_multi_hp_profiles_from_results(
         )
         T_hpr_hot, H_hpr_hot = clean_composite_curve_ends(T_hpr_arr, H_hpr_hot)
         T_hpr_cold, H_hpr_cold = clean_composite_curve_ends(T_hpr_arr, H_hpr_cold)
-        plt.plot(
-            H_hpr_hot,
-            T_hpr_hot,
-            "--",
-            color="darkred",
-            linewidth=1.8,
-            label="Condenser",
+        fig.add_trace(
+            go.Scatter(
+                x=H_hpr_hot,
+                y=T_hpr_hot,
+                mode="lines",
+                name="Condenser",
+                line={"color": "darkred", "width": 1.8, "dash": "dash"},
+            )
         )
-        plt.plot(
-            H_hpr_cold,
-            T_hpr_cold,
-            "--",
-            color="darkblue",
-            linewidth=1.8,
-            label="Evaporator",
+        fig.add_trace(
+            go.Scatter(
+                x=H_hpr_cold,
+                y=T_hpr_cold,
+                mode="lines",
+                name="Evaporator",
+                line={"color": "darkblue", "width": 1.8, "dash": "dash"},
+            )
         )
 
-    plt.title(title)
-    plt.xlabel("Heat Flow / kW")
-    plt.ylabel("Temperature / degC")
-    plt.grid(True, linestyle="--", alpha=0.6)
-    plt.legend()
-    plt.axvline(0.0, color="black", linewidth=2)
-    plt.tight_layout()
-    plt.show()
+    fig.update_layout(
+        title=title,
+        xaxis_title="Heat Flow / kW",
+        yaxis_title="Temperature / degC",
+        template="plotly_white",
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.2)", zeroline=True)
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.2)")
+    fig.add_vline(x=0.0, line_color="black", line_width=2)
+    fig.show()
+    return fig
 
 
 def solve_hpr_placement(

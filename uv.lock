@@ -500,7 +500,6 @@ version = "0.1.14"
 source = { editable = "." }
 dependencies = [
     { name = "coolprop" },
-    { name = "matplotlib" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -529,7 +528,6 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.9" },
     { name = "coolprop" },
-    { name = "matplotlib" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },

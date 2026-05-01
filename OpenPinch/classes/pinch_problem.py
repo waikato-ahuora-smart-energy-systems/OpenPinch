@@ -522,8 +522,8 @@ class PinchProblem:
         scenario_label: str = "Integrated heat-pump scenario",
     ) -> HeatPumpIntegrationEvaluation:
         """Solve and compare a candidate integrated heat-pump scenario."""
-        validated_scenario, integrated_problem = self.build_heat_pump_integration_problem(
-            scenario
+        validated_scenario, integrated_problem = (
+            self.build_heat_pump_integration_problem(scenario)
         )
         comparison_frame = self.compare_to(
             integrated_problem,
@@ -786,9 +786,7 @@ def _locate_summary_row(
         if not suffix_match.empty:
             return suffix_match.iloc[0]
 
-        raise KeyError(
-            f"Target {target_name!r} was not found in the summary output."
-        )
+        raise KeyError(f"Target {target_name!r} was not found in the summary output.")
 
     preferred_targets = [
         "Plant/Direct Integration",
