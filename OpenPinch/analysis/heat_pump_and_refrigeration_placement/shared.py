@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from CoolProp.CoolProp import PropsSI
 
-from ...classes.problem_table import ProblemTable
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...lib.config import tol
@@ -27,22 +26,20 @@ from ..problem_table_analysis import (
 
 __all__ = [
     "PropsSI",
-    "_solve_hpr_placement",
-    "_create_stream_collection_of_background_profile",
-    "_get_Q_vals_at_T_hpr_from_bckgrd_profile",
-    "_compute_entropic_mean_temperature",
-    "_calc_carnot_heat_pump_cop",
-    "_calc_carnot_heat_engine_eta",
+    "solve_hpr_placement",
+    "create_stream_collection_of_background_profile",
+    "get_Q_vals_at_T_hpr_from_bckgrd_profile",
+    "compute_entropic_mean_temperature",
+    "calc_carnot_heat_pump_cop",
+    "calc_carnot_heat_engine_eta",
     "_append_unspecified_final_cascade_cooling_duty",
     "_get_hpr_cascade",
-    "_validate_vapour_hp_refrigerant_ls",
+    "validate_vapour_hp_refrigerant_ls",
     "_get_carnot_hpr_cycle_cascade_profile",
-    "_get_carnot_hpr_cycle_streams",
+    "get_carnot_hpr_cycle_streams",
     "_build_latent_streams",
-    "_build_simulated_hpr_streams",
-    "_get_ambient_air_stream",
-    "_calc_obj",
-    "_calc_Q_amb",
+    "get_ambient_air_stream",
+    "calc_hpr_obj",
     "plot_multi_hp_profiles_from_results",
     "get_process_heat_cascade",
     "get_utility_heat_cascade",
@@ -103,7 +100,7 @@ def plot_multi_hp_profiles_from_results(
     plt.show()
 
 
-def _solve_hpr_placement(
+def solve_hpr_placement(
     f_obj: Callable,
     x0_ls: list | float,
     bnds: list,
@@ -134,13 +131,13 @@ def _solve_hpr_placement(
             f"Heat pump and refrigeration targeting ({args.system_type}) failed to return an optimal result."
         )
     res["success"] = True
-    res["amb_streams"] = _get_ambient_air_stream(
+    res["amb_streams"] = get_ambient_air_stream(
         res["Q_amb_hot"], res["Q_amb_cold"], args
     )
     return res
 
 
-def _create_stream_collection_of_background_profile(
+def create_stream_collection_of_background_profile(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
 ) -> StreamCollection:
@@ -174,7 +171,7 @@ def _create_stream_collection_of_background_profile(
     return s
 
 
-def _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+def get_Q_vals_at_T_hpr_from_bckgrd_profile(
     T_hpr: np.ndarray,
     T_vals: np.ndarray,
     H_vals: np.ndarray,
@@ -194,7 +191,7 @@ def _get_Q_vals_at_T_hpr_from_bckgrd_profile(
     return np.where(Q_hx > 0.0, Q_hx, 0.0)
 
 
-def _compute_entropic_mean_temperature(
+def compute_entropic_mean_temperature(
     T_arr: np.ndarray | list,
     Q_arr: np.ndarray | list,
     *,
@@ -209,7 +206,7 @@ def _compute_entropic_mean_temperature(
     return Q_arr.sum() / S_tot if S_tot > 0 else (T_arr.mean() + unit_offset)
 
 
-def _calc_carnot_heat_pump_cop(
+def calc_carnot_heat_pump_cop(
     T_h: float | np.ndarray,
     T_l: float | np.ndarray,
     eta_ii: float,
@@ -226,7 +223,7 @@ def _calc_carnot_heat_pump_cop(
     return cop.item() if cop.ndim == 0 else cop
 
 
-def _calc_carnot_heat_engine_eta(
+def calc_carnot_heat_engine_eta(
     T_h: float | np.ndarray,
     T_l: float | np.ndarray,
     eta_ii: float,
@@ -268,7 +265,7 @@ def _get_hpr_cascade(
     return pt.col[PT.T.value], pt.col[PT.H_HOT_UT.value], pt.col[PT.H_COLD_UT.value]
 
 
-def _validate_vapour_hp_refrigerant_ls(
+def validate_vapour_hp_refrigerant_ls(
     num_stages: int,
     args: HPRTargetInputs,
 ) -> list:
@@ -321,7 +318,7 @@ def _get_carnot_hpr_cycle_cascade_profile(
     return T_hpr, Q_hpr
 
 
-def _get_carnot_hpr_cycle_streams(
+def get_carnot_hpr_cycle_streams(
     T_cond: np.ndarray,
     Q_cond: np.ndarray,
     T_evap: np.ndarray,
@@ -368,28 +365,7 @@ def _build_latent_streams(
     return sc
 
 
-def _build_simulated_hpr_streams(
-    hp_list,
-    *,
-    is_process_stream: bool = False,
-    include_cond: bool = False,
-    include_evap: bool = False,
-    dtcont_hp: float = 0.0,
-) -> StreamCollection:
-    hp_streams = StreamCollection()
-    for hp in hp_list:
-        hp_streams.add_many(
-            hp.build_stream_collection(
-                include_cond=include_cond,
-                include_evap=include_evap,
-                is_process_stream=is_process_stream,
-                dtcont=dtcont_hp,
-            )
-        )
-    return hp_streams
-
-
-def _get_ambient_air_stream(
+def get_ambient_air_stream(
     Q_amb_hot: float = 0.0,
     Q_amb_cold: float = 0.0,
     args: HPRTargetInputs = None,
@@ -418,7 +394,7 @@ def _get_ambient_air_stream(
     return sc
 
 
-def _calc_obj(
+def calc_hpr_obj(
     work: float,
     Q_ext_heat: float,
     Q_ext_cold: float,
@@ -433,12 +409,4 @@ def _calc_obj(
         + (Q_ext_cold * cold_to_power_ratio)
         + penalty
     ) / Q_hpr_target
-
-
-def _calc_Q_amb(
-    Q_evap_total: float,
-    H_hot_limit: float,
-    Q_amb_max: float,
-) -> float:
-    return max(Q_evap_total - (H_hot_limit - Q_amb_max), 0.0)
 

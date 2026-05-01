@@ -3,16 +3,16 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration import (
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import (
     multi_temperature_carnot as hp_multi_temp_carnot,
 )
-from OpenPinch.analysis.heat_pump_and_refrigeration import shared as hp_shared
-from OpenPinch.analysis.heat_pump_and_refrigeration.multi_temperature_carnot import (
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement.multi_temperature_carnot import (
     _get_multi_temperature_carnot_stage_duties_and_work,
     _parse_multi_temperature_carnot_cycle_state_variables,
 )
-from OpenPinch.analysis.heat_pump_and_refrigeration.shared import (
-    _compute_entropic_mean_temperature,
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement.shared import (
+    compute_entropic_mean_temperature,
 )
 from OpenPinch.classes.stream_collection import StreamCollection
 
@@ -41,10 +41,10 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_returns_entropic_mea
     )
 
     expected = (
-        _compute_entropic_mean_temperature(T_evap, Q_evap)
+        compute_entropic_mean_temperature(T_evap, Q_evap)
         / (
-            _compute_entropic_mean_temperature(T_cond, Q_cond)
-            - _compute_entropic_mean_temperature(T_evap, Q_evap)
+            compute_entropic_mean_temperature(T_cond, Q_cond)
+            - compute_entropic_mean_temperature(T_evap, Q_evap)
         )
         * args.eta_ii_hpr_carnot
         + 1.0
@@ -134,8 +134,8 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
 
     expected_eta_he = args.eta_ii_he_carnot * (
         1
-        - _compute_entropic_mean_temperature(T_cond, Q_cond)
-        / _compute_entropic_mean_temperature(T_evap, Q_evap)
+        - compute_entropic_mean_temperature(T_cond, Q_cond)
+        / compute_entropic_mean_temperature(T_evap, Q_evap)
     )
     expected_Q_evap = min(Q_evap.sum(), Q_cond.sum() / (1.0 - expected_eta_he))
     expected_work_gen = expected_Q_evap * expected_eta_he
@@ -168,8 +168,8 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pool_counts
 
     expected_eta_he = args.eta_ii_he_carnot * (
         1
-        - _compute_entropic_mean_temperature(T_cond, Q_cond)
-        / _compute_entropic_mean_temperature(T_evap, Q_evap)
+        - compute_entropic_mean_temperature(T_cond, Q_cond)
+        / compute_entropic_mean_temperature(T_evap, Q_evap)
     )
     expected_Q_evap = min(Q_evap.sum(), Q_cond.sum() / (1.0 - expected_eta_he))
     expected_work_gen = expected_Q_evap * expected_eta_he
@@ -303,14 +303,14 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
     )
     monkeypatch.setattr(
         hp_multi_temp_carnot,
-        "_get_carnot_hpr_cycle_streams",
+        "get_carnot_hpr_cycle_streams",
         lambda *_args, **_kwargs: {
             "hpr_hot_streams": StreamCollection(),
             "hpr_cold_streams": StreamCollection(),
         },
     )
 
-    out = hp_multi_temp_carnot._optimise_multi_temperature_carnot_heat_pump_placement(
+    out = hp_multi_temp_carnot.optimise_multi_temperature_carnot_heat_pump_placement(
         args
     )
     assert out["success"] is True
@@ -321,7 +321,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
         lambda x, args, debug=False: {"success": False},
     )
     with pytest.raises(ValueError, match="failed to return an optimal result"):
-        hp_multi_temp_carnot._optimise_multi_temperature_carnot_heat_pump_placement(
+        hp_multi_temp_carnot.optimise_multi_temperature_carnot_heat_pump_placement(
             args
         )
 

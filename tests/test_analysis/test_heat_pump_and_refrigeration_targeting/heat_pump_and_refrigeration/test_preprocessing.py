@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration import preprocessing as hp_pre
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import preprocessing as hp_pre
 
 
 def test_get_reduced_bckgrd_cascade_till_Q_target_returns_full_profile_when_target_matches_peak():

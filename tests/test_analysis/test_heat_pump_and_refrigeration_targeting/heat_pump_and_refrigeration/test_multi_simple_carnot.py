@@ -2,15 +2,15 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from OpenPinch.analysis.heat_pump_and_refrigeration import (
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import (
     multi_simple_carnot as hp_multi_simple_carnot,
 )
-from OpenPinch.analysis.heat_pump_and_refrigeration.multi_simple_carnot import (
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement.multi_simple_carnot import (
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_multi_simple_carnot_stage_duties_and_work,
 )
-from OpenPinch.analysis.heat_pump_and_refrigeration.shared import (
-    _get_Q_vals_at_T_hpr_from_bckgrd_profile,
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement.shared import (
+    get_Q_vals_at_T_hpr_from_bckgrd_profile,
 )
 
 
@@ -61,10 +61,10 @@ def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across
         args=args,
     )
 
-    available_he = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+    available_he = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         np.array([110.0]), args.T_hot, H_hot, is_cond=False
     )[0]
-    available_total = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+    available_total = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         np.array([100.0]), args.T_hot, H_hot, is_cond=False
     )[0]
     expected_eta_he = args.eta_ii_he_carnot * (

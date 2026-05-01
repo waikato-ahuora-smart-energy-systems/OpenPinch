@@ -11,21 +11,20 @@ from ...lib.enums import PT
 from ...lib.schema import HPRTargetInputs
 from ...utils.miscellaneous import clean_composite_curve, linear_interpolation
 
-from .shared import _create_stream_collection_of_background_profile
+from .shared import create_stream_collection_of_background_profile
 
 
 __all__ = [
-    "_construct_HPRTargetInputs",
-    "_apply_temperature_shift_for_hpr_stream_dtmin_cont",
-    "_get_reduced_bckgrd_cascade_till_Q_target",
-    "_get_z_ambient",
-    "_get_simplified_bckgrd_cascade_and_z_amb",
-    "_add_T_amb_interval",
-    "_extend_profile_with_temperature_margin",
+    "construct_HPRTargetInputs"
 ]
 
 
-def _construct_HPRTargetInputs(
+#######################################################################################################
+# Public API
+#######################################################################################################
+
+
+def construct_HPRTargetInputs(
     Q_hpr_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
@@ -51,7 +50,7 @@ def _construct_HPRTargetInputs(
             zone_config=zone_config,
             is_cold=is_cold,
         )
-        s = _create_stream_collection_of_background_profile(T_arr, H_arr)
+        s = create_stream_collection_of_background_profile(T_arr, H_arr)
         if is_cold:
             T_cold, H_cold, z_amb_cold, s_cold = T_arr, H_arr, z_amb_arr, s
         else:
@@ -99,6 +98,11 @@ def _construct_HPRTargetInputs(
         "initialise_simulated_cycle": zone_config.INITIALISE_SIMULATED_CYCLE,
     }
     return HPRTargetInputs(**inputs)
+
+
+#######################################################################################################
+# Helper Functions
+#######################################################################################################
 
 
 def _apply_temperature_shift_for_hpr_stream_dtmin_cont(

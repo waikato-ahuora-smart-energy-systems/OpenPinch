@@ -6,18 +6,18 @@ import numpy as np
 
 
 __all__ = [
-    "_map_x_arr_to_T_arr",
-    "_map_T_arr_to_x_arr",
-    "_map_x_arr_to_DT_arr",
-    "_map_DT_arr_to_x_arr",
-    "_map_x_arr_to_Q_arr",
-    "_map_Q_arr_to_x_arr",
-    "_map_x_to_Q_amb",
-    "_map_Q_amb_to_x",
+    "map_x_arr_to_T_arr",
+    "map_T_arr_to_x_arr",
+    "map_x_arr_to_DT_arr",
+    "map_DT_arr_to_x_arr",
+    "map_x_arr_to_Q_arr",
+    "map_Q_arr_to_x_arr",
+    "map_x_to_Q_amb",
+    "map_Q_amb_to_x",
 ]
 
 
-def _map_x_arr_to_T_arr(
+def map_x_arr_to_T_arr(
     x: np.ndarray,
     T_0: float,
     T_1: float,
@@ -29,7 +29,7 @@ def _map_x_arr_to_T_arr(
     return np.sort(np.array(temp).flatten())[::-1]
 
 
-def _map_T_arr_to_x_arr(
+def map_T_arr_to_x_arr(
     T_arr: np.ndarray,
     T_0: float,
     T_1: float,
@@ -41,7 +41,7 @@ def _map_T_arr_to_x_arr(
     return np.array(temp)
 
 
-def _map_x_arr_to_DT_arr(
+def map_x_arr_to_DT_arr(
     x: np.ndarray,
     T_arr: np.ndarray,
     T_last: float,
@@ -49,7 +49,7 @@ def _map_x_arr_to_DT_arr(
     return x * np.abs(T_arr - T_last)
 
 
-def _map_DT_arr_to_x_arr(
+def map_DT_arr_to_x_arr(
     DT_arr: np.ndarray,
     T_arr: np.ndarray,
     T_last: float,
@@ -61,21 +61,21 @@ def _map_DT_arr_to_x_arr(
     )
 
 
-def _map_x_arr_to_Q_arr(
+def map_x_arr_to_Q_arr(
     x: np.ndarray,
     Q_max: float,
 ) -> np.ndarray:
     return x * Q_max
 
 
-def _map_Q_arr_to_x_arr(
+def map_Q_arr_to_x_arr(
     Q_arr: np.ndarray,
     Q_max: float,
 ) -> np.ndarray:
     return np.where(Q_max != 0, Q_arr / Q_max, 0.0)
 
 
-def _map_x_to_Q_amb(
+def map_x_to_Q_amb(
     x: float,
     scale: float,
 ) -> Tuple[float, float]:
@@ -84,7 +84,7 @@ def _map_x_to_Q_amb(
     return Q_amb_hot, Q_amb_cold
 
 
-def _map_Q_amb_to_x(
+def map_Q_amb_to_x(
     Q_amb_hot: float,
     Q_amb_cold: float,
     scale: float,

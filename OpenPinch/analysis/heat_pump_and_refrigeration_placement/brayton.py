@@ -5,32 +5,30 @@ from typing import List, Tuple
 import numpy as np
 from scipy.optimize import minimize
 
+from ...classes.stream_collection import StreamCollection
 from ...classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ...lib.enums import PT
 from ...lib.schema import HPRTargetInputs, HPRTargetOutputs
 from ...utils.decorators import timing_decorator
 
 from .shared import (
-    _build_simulated_hpr_streams,
-    _calc_Q_amb,
-    _calc_obj,
+    calc_hpr_obj,
     get_process_heat_cascade,
 )
 
 
 __all__ = [
-    "_optimise_brayton_heat_pump_placement",
-    "_get_x0_for_brayton_hp_opt",
-    "_get_bounds_for_brayton_hp_opt",
-    "_parse_brayton_hp_state_variables",
-    "_create_brayton_hp_list",
-    "_compute_brayton_hp_system_obj",
-    "minimize",
+    "optimise_brayton_heat_pump_placement",
 ]
 
 
+#######################################################################################################
+# Public API
+#######################################################################################################
+
+
 @timing_decorator
-def _optimise_brayton_heat_pump_placement(
+def optimise_brayton_heat_pump_placement(
     args: HPRTargetInputs,
 ) -> HPRTargetOutputs:
     args.n_cond = args.n_evap = 1
@@ -60,6 +58,11 @@ def _get_x0_for_brayton_hp_opt(args: HPRTargetInputs) -> list:
         abs(args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max,
         1.0,
     ]
+
+
+#######################################################################################################
+# Helper Functions
+#######################################################################################################
 
 
 def _get_bounds_for_brayton_hp_opt(args: HPRTargetInputs) -> list:
@@ -145,7 +148,7 @@ def _compute_brayton_hp_system_obj(
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     cop = (args.Q_hpr_target - Q_ext) / (w_hpr + 1e-9)
     Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
-    obj = _calc_obj(
+    obj = calc_hpr_obj(
         work=w_hpr,
         Q_ext_heat=Q_ext,
         Q_ext_cold=0.0,
@@ -174,3 +177,34 @@ def _compute_brayton_hp_system_obj(
         "model": hp_list,
     }
 
+
+
+
+def _build_simulated_hpr_streams(
+    hp_list,
+    *,
+    is_process_stream: bool = False,
+    include_cond: bool = False,
+    include_evap: bool = False,
+    dtcont_hp: float = 0.0,
+) -> StreamCollection:
+    hp_streams = StreamCollection()
+    for hp in hp_list:
+        hp_streams.add_many(
+            hp.build_stream_collection(
+                include_cond=include_cond,
+                include_evap=include_evap,
+                is_process_stream=is_process_stream,
+                dtcont=dtcont_hp,
+            )
+        )
+    return hp_streams
+
+
+
+def _calc_Q_amb(
+    Q_evap_total: float,
+    H_hot_limit: float,
+    Q_amb_max: float,
+) -> float:
+    return max(Q_evap_total - (H_hot_limit - Q_amb_max), 0.0)

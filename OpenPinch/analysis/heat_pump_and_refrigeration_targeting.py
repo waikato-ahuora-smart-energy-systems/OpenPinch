@@ -9,13 +9,13 @@ from ..lib.config import Configuration, tol
 from ..lib.enums import HPRcycle, PT
 from ..lib.schema import HPRTargetOutputs
 from ..utils.miscellaneous import get_value
-from .heat_pump_and_refrigeration.brayton import _optimise_brayton_heat_pump_placement
-from .heat_pump_and_refrigeration.cascade_vapour_compression import _optimise_cascade_heat_pump_placement
-from .heat_pump_and_refrigeration.multi_simple_carnot import _optimise_multi_simple_carnot_heat_pump_placement
-from .heat_pump_and_refrigeration.multi_simple_vapour_compression import _optimise_multi_simple_heat_pump_placement
-from .heat_pump_and_refrigeration.multi_temperature_carnot import _optimise_multi_temperature_carnot_heat_pump_placement
-from .heat_pump_and_refrigeration.preprocessing import _construct_HPRTargetInputs
-from .heat_pump_and_refrigeration.shared import (
+from .heat_pump_and_refrigeration_placement.brayton import optimise_brayton_heat_pump_placement
+from .heat_pump_and_refrigeration_placement.cascade_vapour_compression import optimise_cascade_heat_pump_placement
+from .heat_pump_and_refrigeration_placement.multi_simple_carnot import optimise_multi_simple_carnot_heat_pump_placement
+from .heat_pump_and_refrigeration_placement.multi_simple_vapour_compression import optimise_multi_simple_heat_pump_placement
+from .heat_pump_and_refrigeration_placement.multi_temperature_carnot import optimise_multi_temperature_carnot_heat_pump_placement
+from .heat_pump_and_refrigeration_placement.preprocessing import construct_HPRTargetInputs
+from .heat_pump_and_refrigeration_placement.shared import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
     plot_multi_hp_profiles_from_results,
@@ -28,6 +28,11 @@ __all__ = [
     "calc_heat_pump_and_refrigeration_cascade",
     "plot_multi_hp_profiles_from_results",
 ]
+
+
+#######################################################################################################
+# Public API
+#######################################################################################################
 
 
 def validate_heat_pump_or_refrigeration_targeting_required(
@@ -76,7 +81,7 @@ def get_heat_pump_and_refrigeration_targets(
     zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
     zone_config.N_COND = 2
     zone_config.N_EVAP = 2
-    args = _construct_HPRTargetInputs(
+    args = construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
         H_hot=np.abs(H_hot) * -1,
@@ -147,10 +152,10 @@ def calc_heat_pump_and_refrigeration_cascade(
 
 
 _HP_PLACEMENT_HANDLERS = {
-    HPRcycle.Brayton.value: _optimise_brayton_heat_pump_placement,
-    HPRcycle.MultiTempCarnot.value: _optimise_multi_temperature_carnot_heat_pump_placement,
-    HPRcycle.MultiSimpleVapourComp.value: _optimise_multi_simple_heat_pump_placement,
-    HPRcycle.CascadeVapourComp.value: _optimise_cascade_heat_pump_placement,
-    HPRcycle.MultiSimpleCarnot.value: _optimise_multi_simple_carnot_heat_pump_placement,
+    HPRcycle.Brayton.value: optimise_brayton_heat_pump_placement,
+    HPRcycle.MultiTempCarnot.value: optimise_multi_temperature_carnot_heat_pump_placement,
+    HPRcycle.MultiSimpleVapourComp.value: optimise_multi_simple_heat_pump_placement,
+    HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
+    HPRcycle.MultiSimpleCarnot.value: optimise_multi_simple_carnot_heat_pump_placement,
 }
 

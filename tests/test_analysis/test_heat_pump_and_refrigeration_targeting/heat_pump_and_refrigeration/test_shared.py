@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration import shared as hp_shared
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement.brayton import _build_simulated_hpr_streams
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.enums import PT
@@ -12,7 +13,7 @@ from ..helpers import _base_args, _sc, _stream
 
 
 def test_compute_entropic_average_temperature_in_K_constant_temperature():
-    result = hp_shared._compute_entropic_mean_temperature(
+    result = hp_shared.compute_entropic_mean_temperature(
         np.array([60.0, 60.0, 60.0]),
         np.array([100.0, 150.0, 200.0]),
     )
@@ -20,7 +21,7 @@ def test_compute_entropic_average_temperature_in_K_constant_temperature():
 
 
 def test_compute_entropic_average_temperature_in_K_zero_net_duty_uses_arithmetic_mean():
-    result = hp_shared._compute_entropic_mean_temperature(
+    result = hp_shared.compute_entropic_mean_temperature(
         np.array([40.0, 60.0, 80.0]),
         np.zeros(3),
     )
@@ -85,14 +86,14 @@ def test_prepare_latent_hp_profile_handles_empty_input():
 
 
 def test_validate_vapour_hp_refrigerant_ls_defaults_to_water_and_matches_length():
-    refrigerants = hp_shared._validate_vapour_hp_refrigerant_ls(
+    refrigerants = hp_shared.validate_vapour_hp_refrigerant_ls(
         3, SimpleNamespace(refrigerant_ls=[])
     )
     assert refrigerants == ["water", "water", "water"]
 
 
 def test_validate_vapour_hp_refrigerant_ls_preserves_length_when_provided():
-    refrigerants = hp_shared._validate_vapour_hp_refrigerant_ls(
+    refrigerants = hp_shared.validate_vapour_hp_refrigerant_ls(
         2,
         SimpleNamespace(refrigerant_ls=["Water", "Ammonia"], do_refrigerant_sort=True),
     )
@@ -101,7 +102,7 @@ def test_validate_vapour_hp_refrigerant_ls_preserves_length_when_provided():
 
 
 def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
-    refrigerants = hp_shared._validate_vapour_hp_refrigerant_ls(
+    refrigerants = hp_shared.validate_vapour_hp_refrigerant_ls(
         4,
         SimpleNamespace(refrigerant_ls=["Ammonia", "Water"], do_refrigerant_sort=True),
     )
@@ -111,23 +112,23 @@ def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
 
 def test_misc_heat_pump_helpers_and_stream_builders():
     with pytest.raises(ValueError, match="Infeasible temperature interval"):
-        hp_shared._create_stream_collection_of_background_profile(
+        hp_shared.create_stream_collection_of_background_profile(
             T_vals=np.array([100.0, 100.0]),
             H_vals=np.array([0.0, 10.0]),
         )
 
-    hot = hp_shared._create_stream_collection_of_background_profile(
+    hot = hp_shared.create_stream_collection_of_background_profile(
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_vals=np.array([0.0, -30.0, 20.0]),
     )
-    cold = hp_shared._create_stream_collection_of_background_profile(
+    cold = hp_shared.create_stream_collection_of_background_profile(
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_vals=np.array([0.0, 30.0, -20.0]),
     )
     assert isinstance(hot, StreamCollection)
     assert isinstance(cold, StreamCollection)
 
-    q_vals = hp_shared._get_Q_vals_at_T_hpr_from_bckgrd_profile(
+    q_vals = hp_shared.get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_hpr=np.array([100.0, 60.0]),
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_vals=np.array([100.0, 50.0, 0.0]),
@@ -135,12 +136,12 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     )
     assert q_vals.shape == (2,)
 
-    t_avg = hp_shared._compute_entropic_mean_temperature(
+    t_avg = hp_shared.compute_entropic_mean_temperature(
         np.array([300.0, 310.0]), np.array([10.0, 5.0]), input_T_units="K"
     )
     assert t_avg > 0.0
 
-    refs = hp_shared._validate_vapour_hp_refrigerant_ls(
+    refs = hp_shared.validate_vapour_hp_refrigerant_ls(
         1, _base_args(refrigerant_ls=["R134A", "R600"], do_refrigerant_sort=False)
     )
     assert refs == ["R134A"]
@@ -154,28 +155,16 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     )
     assert len(streams) >= 2
 
-    class _FakeCycle:
-        def build_stream_collection(self, **kwargs):
-            return _sc(
-                _stream("C", 90.0, 70.0, 10.0, is_process_stream=False)
-            )
-
-    agg = hp_shared._build_simulated_hpr_streams(
-        [_FakeCycle()], include_cond=True, include_evap=True, dtcont_hp=5.0
-    )
-    assert len(agg) >= 1
-
-    amb0 = hp_shared._get_ambient_air_stream(0.0, 0.0, _base_args())
-    amb_pos = hp_shared._get_ambient_air_stream(10.0, 0.0, _base_args())
-    amb_neg = hp_shared._get_ambient_air_stream(0.0, 10.0, _base_args())
+    amb0 = hp_shared.get_ambient_air_stream(0.0, 0.0, _base_args())
+    amb_pos = hp_shared.get_ambient_air_stream(10.0, 0.0, _base_args())
+    amb_neg = hp_shared.get_ambient_air_stream(0.0, 10.0, _base_args())
     assert len(amb0) == 0
     assert len(amb_pos) == 1
     assert len(amb_neg) == 1
 
-    assert hp_shared._calc_obj(
+    assert hp_shared.calc_hpr_obj(
         10.0, 5.0, 0.0, 100.0, heat_to_power_ratio=2.0, penalty=1.0
     ) == pytest.approx(0.21)
-    assert hp_shared._calc_Q_amb(50.0, 30.0, 5.0) == pytest.approx(25.0)
 
 
 def test_get_heat_pump_cascade_helper(monkeypatch):

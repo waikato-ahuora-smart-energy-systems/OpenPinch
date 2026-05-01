@@ -7,14 +7,14 @@ import numpy as np
 from ...lib.schema import HPRTargetInputs, HPRTargetOutputs
 from ...utils.decorators import timing_decorator
 
-from .encoding import _map_x_arr_to_T_arr
+from .encoding import map_x_arr_to_T_arr
 from .shared import (
-    _calc_carnot_heat_engine_eta,
-    _calc_carnot_heat_pump_cop,
-    _calc_obj,
-    _get_Q_vals_at_T_hpr_from_bckgrd_profile,
-    _get_carnot_hpr_cycle_streams,
-    _solve_hpr_placement,
+    calc_carnot_heat_engine_eta,
+    calc_carnot_heat_pump_cop,
+    calc_hpr_obj,
+    get_Q_vals_at_T_hpr_from_bckgrd_profile,
+    get_carnot_hpr_cycle_streams,
+    solve_hpr_placement,
     g_ineq_penalty,
     plot_multi_hp_profiles_from_results,
     tol,
@@ -22,37 +22,44 @@ from .shared import (
 
 
 __all__ = [
-    "_optimise_multi_simple_carnot_heat_pump_placement",
-    "_parse_multi_simple_carnot_hp_state_variables",
-    "_get_multi_simple_carnot_stage_duties_and_work",
-    "_compute_multi_simple_carnot_hp_opt_obj",
+    "optimise_multi_simple_carnot_heat_pump_placement",
 ]
 
 
+#######################################################################################################
+# Public API
+#######################################################################################################
+
+
 @timing_decorator
-def _optimise_multi_simple_carnot_heat_pump_placement(
+def optimise_multi_simple_carnot_heat_pump_placement(
     args: HPRTargetInputs,
 ) -> HPRTargetOutputs:
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
-    res = _solve_hpr_placement(
+    res = solve_hpr_placement(
         f_obj=_compute_multi_simple_carnot_hp_opt_obj,
         x0_ls=[0.0 for _ in range(args.n_cond + args.n_evap + 1)],
         bnds=[(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)] + [(-1.0, 4.0)],
         args=args,
     )
     res.update(
-        _get_carnot_hpr_cycle_streams(
+        get_carnot_hpr_cycle_streams(
             res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args
         )
     )
     return HPRTargetOutputs.model_validate(res)
 
 
+#######################################################################################################
+# Helper Functions
+#######################################################################################################
+
+
 def _parse_multi_simple_carnot_hp_state_variables(
     x: np.ndarray,
     args: HPRTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    T_cond = _map_x_arr_to_T_arr(x[: args.n_cond], args.T_cold[0], args.T_cold[-1])
+    T_cond = map_x_arr_to_T_arr(x[: args.n_cond], args.T_cold[0], args.T_cold[-1])
     T_evap = args.T_hot[-1] - np.array(x[args.n_cond : -1]) * (
         args.T_hot[-1] - args.T_hot[0]
     )
@@ -74,7 +81,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
     H_cold_with_amb: np.ndarray,
     args: HPRTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray, np.ndarray, list]:
-    Q_cond = _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+    Q_cond = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond, args.T_cold, H_cold_with_amb, is_cond=True
     )
 
@@ -94,7 +101,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
 
     is_hp = T_diff >= tol
     if np.any(is_hp):
-        cop_hp = _calc_carnot_heat_pump_cop(
+        cop_hp = calc_carnot_heat_pump_cop(
             T_cond_abs[is_hp], T_evap_abs[is_hp], args.eta_ii_hpr_carnot
         )
         Qc_hpr[is_hp] = Q_cond[is_hp]
@@ -103,7 +110,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
 
     is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
     if np.any(is_he):
-        eff_he = _calc_carnot_heat_engine_eta(
+        eff_he = calc_carnot_heat_engine_eta(
             T_evap_abs[is_he], T_cond_abs[is_he], args.eta_ii_he_carnot
         )
         Qc_he[is_he] = Q_cond[is_he]
@@ -131,7 +138,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
             continue
 
         Q_available = (
-            _get_Q_vals_at_T_hpr_from_bckgrd_profile(
+            get_Q_vals_at_T_hpr_from_bckgrd_profile(
                 np.array([T_evap[i]]), args.T_hot, H_hot_with_amb, is_cond=False
             )[0]
             - Q_allocated
@@ -206,7 +213,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - cycle_results["Qe"].sum(), 0.0)
     p = g_ineq_penalty(g=cycle_results["q_diff"], rho=args.rho_penalty, form="square")
 
-    obj = _calc_obj(
+    obj = calc_hpr_obj(
         work=work,
         Q_ext_heat=Q_ext_heat,
         Q_ext_cold=Q_ext_cold,
@@ -217,7 +224,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
     )
 
     if debug:
-        res = _get_carnot_hpr_cycle_streams(
+        res = get_carnot_hpr_cycle_streams(
             state_vars["T_cond"],
             cycle_results["Qc"],
             state_vars["T_evap"],

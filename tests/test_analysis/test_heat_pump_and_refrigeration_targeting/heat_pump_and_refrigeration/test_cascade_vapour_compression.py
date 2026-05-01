@@ -3,10 +3,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration import (
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import (
     cascade_vapour_compression as hp_cascade,
 )
-from OpenPinch.analysis.heat_pump_and_refrigeration import shared as hp_shared
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
 
 from ..helpers import _base_args, _pt_with_hnet, _sc, _stream
 

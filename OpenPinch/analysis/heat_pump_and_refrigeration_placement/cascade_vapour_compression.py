@@ -8,21 +8,21 @@ from ...lib.schema import HPRTargetInputs, HPRTargetOutputs
 from ...utils.decorators import timing_decorator
 
 from .encoding import (
-    _map_Q_amb_to_x,
-    _map_Q_arr_to_x_arr,
-    _map_T_arr_to_x_arr,
-    _map_x_arr_to_DT_arr,
-    _map_x_arr_to_Q_arr,
-    _map_x_arr_to_T_arr,
-    _map_x_to_Q_amb,
+    map_Q_amb_to_x,
+    map_Q_arr_to_x_arr,
+    map_T_arr_to_x_arr,
+    map_x_arr_to_DT_arr,
+    map_x_arr_to_Q_arr,
+    map_x_arr_to_T_arr,
+    map_x_to_Q_amb,
 )
 from .multi_temperature_carnot import (
-    _optimise_multi_temperature_carnot_heat_pump_placement,
+    optimise_multi_temperature_carnot_heat_pump_placement,
 )
 from .shared import (
     _append_unspecified_final_cascade_cooling_duty,
-    _calc_obj,
-    _get_ambient_air_stream,
+    calc_hpr_obj,
+    get_ambient_air_stream,
     get_process_heat_cascade,
     g_ineq_penalty,
     plot_multi_hp_profiles_from_results,
@@ -30,34 +30,40 @@ from .shared import (
 
 
 __all__ = [
-    "_optimise_cascade_heat_pump_placement",
-    "_get_x0_for_cascade_hp_opt",
-    "_get_bounds_for_cascade_hp_opt",
-    "_parse_cascade_hp_state_variables",
-    "_compute_cascade_hp_system_obj",
+    "optimise_cascade_heat_pump_placement",
 ]
 
 
+#######################################################################################################
+# Public API
+#######################################################################################################
+
+
 @timing_decorator
-def _optimise_cascade_heat_pump_placement(
+def optimise_cascade_heat_pump_placement(
     args: HPRTargetInputs,
 ) -> HPRTargetOutputs:
     num_stages = int(args.n_cond + args.n_evap - 1)
     init_res = (
-        _optimise_multi_temperature_carnot_heat_pump_placement(args)
+        optimise_multi_temperature_carnot_heat_pump_placement(args)
         if args.initialise_simulated_cycle
         else None
     )
-    from .shared import _validate_vapour_hp_refrigerant_ls, _solve_hpr_placement
+    from .shared import validate_vapour_hp_refrigerant_ls, solve_hpr_placement
 
-    args.refrigerant_ls = _validate_vapour_hp_refrigerant_ls(num_stages, args)
-    res = _solve_hpr_placement(
+    args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(num_stages, args)
+    res = solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_obj,
         x0_ls=_get_x0_for_cascade_hp_opt(init_res, args),
         bnds=_get_bounds_for_cascade_hp_opt(args),
         args=args,
     )
     return HPRTargetOutputs.model_validate(res)
+
+
+#######################################################################################################
+# Helper Functions
+#######################################################################################################
 
 
 def _get_x0_for_cascade_hp_opt(
@@ -71,18 +77,18 @@ def _get_x0_for_cascade_hp_opt(
     Q_cool_ex = args.Q_cool_max + init_res.Q_amb_hot
     Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
 
-    x_amb = _map_Q_amb_to_x(
+    x_amb = map_Q_amb_to_x(
         init_res.Q_amb_hot, init_res.Q_amb_cold, max(Q_heat_ex, Q_cool_ex)
     )
-    x_cond = _map_T_arr_to_x_arr(
+    x_cond = map_T_arr_to_x_arr(
         init_res.T_cond, args.T_cold[0], args.T_cold[-1]
     ).tolist()
-    x_evap = _map_T_arr_to_x_arr(
+    x_evap = map_T_arr_to_x_arr(
         init_res.T_evap, args.T_hot[-1], args.T_hot[0]
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
-    x_heat = _map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
-    x_cool = _map_Q_arr_to_x_arr(init_res.Q_evap[:n_cool], Q_cool_ex).tolist()
+    x_heat = map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
+    x_cool = map_Q_arr_to_x_arr(init_res.Q_evap[:n_cool], Q_cool_ex).tolist()
     x_ihx = [0.0] * (int(args.n_cond) + int(args.n_evap) - 1)
     return np.asarray(
         [x_amb] + x_cond + x_evap + x_subcool + x_heat + x_cool + x_ihx,
@@ -124,19 +130,19 @@ def _parse_cascade_hp_state_variables(
     f = e + (int(args.n_cond) + int(args.n_evap) - 1)
     x_ihx = x[e:f]
 
-    Q_amb_hot, Q_amb_cold = _map_x_to_Q_amb(
+    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
         x_amb, max(args.Q_heat_max, args.Q_cool_max)
     )
-    T_cond = _map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
-    T_evap = _map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
-    dT_subcool = _map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
-    Q_heat = _map_x_arr_to_Q_arr(x_heat, args.Q_heat_max + Q_amb_hot)
+    T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
+    T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
+    dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
+    Q_heat = map_x_arr_to_Q_arr(x_heat, args.Q_heat_max + Q_amb_hot)
     Q_cool = _append_unspecified_final_cascade_cooling_duty(
         x_cool * (args.Q_cool_max + Q_amb_cold)
     )
     T_cond_all = np.sort(np.concatenate([T_cond - dT_subcool, T_evap[:-1]]))[::-1]
     T_evap_all = np.sort(np.concatenate([(T_cond - dT_subcool)[1:], T_evap]))[::-1]
-    dT_ihx_gas_side = _map_x_arr_to_DT_arr(x_ihx, T_cond_all, T_evap_all)
+    dT_ihx_gas_side = map_x_arr_to_DT_arr(x_ihx, T_cond_all, T_evap_all)
     return {
         "T_cond": T_cond,
         "dT_subcool": dT_subcool,
@@ -189,12 +195,12 @@ def _compute_cascade_hp_system_obj(
     pt_cond = get_process_heat_cascade(
         hot_streams=hpr_hot_streams,
         cold_streams=args.bckgrd_cold_streams
-        + _get_ambient_air_stream(Q_amb_cold=state_vars["Q_amb_cold"], args=args),
+        + get_ambient_air_stream(Q_amb_cold=state_vars["Q_amb_cold"], args=args),
         is_shifted=True,
     )
     pt_evap = get_process_heat_cascade(
         hot_streams=args.bckgrd_hot_streams
-        + _get_ambient_air_stream(Q_amb_hot=state_vars["Q_amb_hot"], args=args),
+        + get_ambient_air_stream(Q_amb_hot=state_vars["Q_amb_hot"], args=args),
         cold_streams=hpr_cold_streams,
         is_shifted=True,
     )
@@ -207,7 +213,7 @@ def _compute_cascade_hp_system_obj(
     g = [pt_cond.col[PT.H_NET.value][-1], pt_evap.col[PT.H_NET.value][0], hp.penalty]
     p = g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty, form="square")
 
-    obj = _calc_obj(
+    obj = calc_hpr_obj(
         work=w_hpr,
         Q_ext_heat=Q_ext_heat,
         Q_ext_cold=Q_ext_cold,

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
-from OpenPinch.analysis.heat_pump_and_refrigeration import shared as hp_shared
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.enums import PT
@@ -73,7 +73,7 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
         hpr_cold_streams=StreamCollection(),
         Q_amb_hot=q_amb_hot,
         Q_amb_cold=q_amb_cold,
-        amb_streams=hp_shared._get_ambient_air_stream(
+        amb_streams=hp_shared.get_ambient_air_stream(
             q_amb_hot, q_amb_cold, _base_args()
         ),
     )

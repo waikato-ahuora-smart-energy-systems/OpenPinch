@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration import brayton as hp_brayton
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import brayton as hp_brayton
 from OpenPinch.classes.stream_collection import StreamCollection
 
 from ..helpers import _base_args, _patch_output_model_validate, _pt_with_hnet, _sc, _stream
@@ -36,7 +36,7 @@ def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatc
     )
 
     with pytest.raises(ValueError, match="Brayton heat pump targeting failed"):
-        hp_brayton._optimise_brayton_heat_pump_placement(args)
+        hp_brayton.optimise_brayton_heat_pump_placement(args)
 
 
 def test_brayton_x0_and_bounds_shapes_are_consistent():
@@ -82,7 +82,7 @@ def test_brayton_paths_and_helpers(monkeypatch):
             "cold_streams": StreamCollection(),
         },
     )
-    out = hp_brayton._optimise_brayton_heat_pump_placement(args)
+    out = hp_brayton.optimise_brayton_heat_pump_placement(args)
     assert out["success"] is True
 
     T_co, dT_c, dT_gc, q_h = hp_brayton._parse_brayton_hp_state_variables(
