@@ -48,7 +48,7 @@ def validate_heat_pump_or_refrigeration_targeting_required(
     elif is_refrigeration:
         Q_max = np.abs(pt.col[PT.H_NET_HOT.value]).max()
     else:
-        raise ValueError("Must be heat pumping or refrigeration.")
+        return 0
 
     Q = Q_max
     hpr_load = zone_config.HPR_LOAD_VALUE if r is None else r
