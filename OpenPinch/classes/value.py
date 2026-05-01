@@ -126,4 +126,3 @@ class Value:
     def from_dict(cls, data):
         """Instantiate from a ``{"value", "unit"}`` mapping."""
         return cls(data["value"], data.get("unit"))
-

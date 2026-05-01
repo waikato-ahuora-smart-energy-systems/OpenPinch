@@ -13,9 +13,7 @@ from ...utils.miscellaneous import clean_composite_curve, linear_interpolation
 from .shared import create_stream_collection_of_background_profile
 
 
-__all__ = [
-    "construct_HPRTargetInputs"
-]
+__all__ = ["construct_HPRTargetInputs"]
 
 
 #######################################################################################################
@@ -162,9 +160,9 @@ def _get_simplified_bckgrd_cascade_and_z_amb(
     is_cold: bool,
 ) -> Tuple[np.ndarray, float]:
     sign = 1 if is_cold else -1
-    T_amb_star = zone_config.T_ENV + (
-        zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP
-    ) * sign
+    T_amb_star = (
+        zone_config.T_ENV + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign
+    )
     T_vals, H_vals = _add_T_amb_interval(
         T_vals, H_vals, T_amb_star, zone_config.DT_PHASE_CHANGE, is_cold
     )
@@ -231,4 +229,3 @@ def _extend_profile_with_temperature_margin(
     z_ext[1:-1] = z_amb
     z_ext[-1] = z_amb[-1]
     return T_ext, H_ext, z_ext
-

@@ -40,8 +40,7 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
     assert x0.shape == (11,)
     assert len(bnds) == len(x0)
     assert np.all(
-        (x0 >= np.array([b[0] for b in bnds]))
-        & (x0 <= np.array([b[1] for b in bnds]))
+        (x0 >= np.array([b[0] for b in bnds])) & (x0 <= np.array([b[1] for b in bnds]))
     )
 
 

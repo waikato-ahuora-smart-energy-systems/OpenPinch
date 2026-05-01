@@ -288,10 +288,7 @@ class PinchProblem:
                 zone_tree=payload.zone_tree,
             )
         except Exception as exc:
-            raise ValueError(
-                "Problem structure validation failed: "
-                f"{exc}"
-            ) from exc
+            raise ValueError(f"Problem structure validation failed: {exc}") from exc
         return payload
 
     def summary_frame(self, *, detailed: bool = False) -> pd.DataFrame:
@@ -730,8 +727,16 @@ def _lookup_record_context(
     return {"index": record_index, "section": section}
 
 
-def _describe_record(section: str, record_index: int, record_context: dict[str, Any]) -> str:
-    label = "Stream" if section == "streams" else "Utility" if section == "utilities" else section
+def _describe_record(
+    section: str, record_index: int, record_context: dict[str, Any]
+) -> str:
+    label = (
+        "Stream"
+        if section == "streams"
+        else "Utility"
+        if section == "utilities"
+        else section
+    )
     name = record_context.get("name")
     row = record_context.get("row")
     sheet = record_context.get("sheet")
@@ -784,7 +789,12 @@ def _validate_problem_semantics(
         utility_type = str(utility.type)
         t_supply = _maybe_get_value(utility.t_supply)
         t_target = _maybe_get_value(utility.t_target)
-        if utility_type == "Hot" and t_supply is not None and t_target is not None and t_supply < t_target:
+        if (
+            utility_type == "Hot"
+            and t_supply is not None
+            and t_target is not None
+            and t_supply < t_target
+        ):
             issues.append(
                 _format_semantic_issue(
                     "utilities",
@@ -793,7 +803,12 @@ def _validate_problem_semantics(
                     "field 't_supply/t_target' - hot utilities must have t_supply >= t_target.",
                 )
             )
-        if utility_type == "Cold" and t_supply is not None and t_target is not None and t_supply > t_target:
+        if (
+            utility_type == "Cold"
+            and t_supply is not None
+            and t_target is not None
+            and t_supply > t_target
+        ):
             issues.append(
                 _format_semantic_issue(
                     "utilities",

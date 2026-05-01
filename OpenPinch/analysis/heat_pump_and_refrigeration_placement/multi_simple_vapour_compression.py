@@ -2,7 +2,9 @@
 
 import numpy as np
 
-from ...classes.parallel_vapour_compression_cycles import ParallelVapourCompressionCycles
+from ...classes.parallel_vapour_compression_cycles import (
+    ParallelVapourCompressionCycles,
+)
 from ...lib.enums import PT
 from ...lib.schema import HPRTargetInputs, HPRTargetOutputs
 from ...utils.decorators import timing_decorator
@@ -120,9 +122,7 @@ def _parse_multi_simple_hp_state_temperatures(
     e = d + n
     x_ihx = x[d:e]
 
-    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
-        x_amb, max(args.Q_heat_max, args.Q_cool_max)
-    )
+    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
     T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
     T_evap = np.array(
         x_evap * (args.T_hot[0] - args.T_hot[-1]) + args.T_hot[-1],
@@ -158,8 +158,12 @@ def _compute_multi_simple_hp_system_obj(
     if T_diff.min() < 0:
         return {"obj": np.inf, "success": False}
 
-    H_hot_with_amb = args.H_hot + getattr(args, "z_amb_hot", 0.0) * state_vars["Q_amb_hot"]
-    H_cold_with_amb = args.H_cold + getattr(args, "z_amb_cold", 0.0) * state_vars["Q_amb_cold"]
+    H_hot_with_amb = (
+        args.H_hot + getattr(args, "z_amb_hot", 0.0) * state_vars["Q_amb_hot"]
+    )
+    H_cold_with_amb = (
+        args.H_cold + getattr(args, "z_amb_cold", 0.0) * state_vars["Q_amb_cold"]
+    )
 
     hp = ParallelVapourCompressionCycles()
     hp.solve(
@@ -249,4 +253,3 @@ def _compute_multi_simple_hp_system_obj(
         "hpr_cold_streams": hpr_cold_streams,
         "model": hp,
     }
-

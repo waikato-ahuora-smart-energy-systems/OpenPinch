@@ -51,9 +51,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_returns_entropic_mea
     )
 
     np.testing.assert_allclose(cycle_results["cop"], expected)
-    assert cycle_results["Qc"].sum() == pytest.approx(
-        cycle_results["w_hpr"] * expected
-    )
+    assert cycle_results["Qc"].sum() == pytest.approx(cycle_results["w_hpr"] * expected)
     assert cycle_results["Qe"].sum() == pytest.approx(
         cycle_results["Qc"].sum() - cycle_results["w_hpr"]
     )
@@ -282,7 +280,9 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap
 def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
     args = _base_args(n_cond=1, n_evap=1)
     _patch_output_model_validate(monkeypatch)
-    monkeypatch.setattr(hp_shared, "multiminima", lambda **_kwargs: np.array([[0.2, 0.6]]))
+    monkeypatch.setattr(
+        hp_shared, "multiminima", lambda **_kwargs: np.array([[0.2, 0.6]])
+    )
     monkeypatch.setattr(
         hp_multi_temp_carnot,
         "_compute_multi_temperature_carnot_cycle_obj",
@@ -321,9 +321,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
         lambda x, args, debug=False: {"success": False},
     )
     with pytest.raises(ValueError, match="failed to return an optimal result"):
-        hp_multi_temp_carnot.optimise_multi_temperature_carnot_heat_pump_placement(
-            args
-        )
+        hp_multi_temp_carnot.optimise_multi_temperature_carnot_heat_pump_placement(args)
 
 
 def test_multi_temp_carnot_objective_debug_branch(monkeypatch):

@@ -67,9 +67,7 @@ def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across
     available_total = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         np.array([100.0]), args.T_hot, H_hot, is_cond=False
     )[0]
-    expected_eta_he = args.eta_ii_he_carnot * (
-        1.0 - (70.0 + 273.15) / (110.0 + 273.15)
-    )
+    expected_eta_he = args.eta_ii_he_carnot * (1.0 - (70.0 + 273.15) / (110.0 + 273.15))
     expected_Qc_he = available_he * (1.0 - expected_eta_he)
     expected_w_he = available_he - expected_Qc_he
     expected_Q_hx = available_total - available_he

@@ -391,9 +391,7 @@ def _get_carnot_hpr_cycle_cascade_profile(
     return T_hpr, Q_hpr
 
 
-def _append_unspecified_final_cascade_cooling_duty(
-    Q_cool: np.ndarray
-) -> np.ndarray:
+def _append_unspecified_final_cascade_cooling_duty(Q_cool: np.ndarray) -> np.ndarray:
     if Q_cool.size == 0:
         return np.array(np.nan)
     return np.concatenate([Q_cool, np.array([np.nan])])
@@ -416,5 +414,3 @@ def _get_hpr_cascade(
         )
     )
     return pt.col[PT.T.value], pt.col[PT.H_HOT_UT.value], pt.col[PT.H_COLD_UT.value]
-
-

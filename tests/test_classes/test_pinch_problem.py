@@ -418,7 +418,9 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
         "model_validate",
         classmethod(lambda cls, value: DummyPayload()),
     )
-    monkeypatch.setattr(mod, "_validate_problem_semantics", lambda payload, context: None)
+    monkeypatch.setattr(
+        mod, "_validate_problem_semantics", lambda payload, context: None
+    )
 
     def fake_prepare_problem(**kwargs):
         calls["kwargs"] = kwargs
@@ -501,7 +503,9 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
         (),
         {
             "graphs": {
-                "Plant": type("GraphSet", (), {"model_dump": lambda self: {"graphs": []}})()
+                "Plant": type(
+                    "GraphSet", (), {"model_dump": lambda self: {"graphs": []}}
+                )()
             }
         },
     )()

@@ -16,7 +16,9 @@ from .encoding import (
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
 )
-from .multi_temperature_carnot import optimise_multi_temperature_carnot_heat_pump_placement
+from .multi_temperature_carnot import (
+    optimise_multi_temperature_carnot_heat_pump_placement,
+)
 from .shared import (
     _append_unspecified_final_cascade_cooling_duty,
     calc_hpr_obj,
@@ -81,9 +83,7 @@ def _get_x0_for_cascade_hp_opt(
     x_cond = map_T_arr_to_x_arr(
         init_res.T_cond, args.T_cold[0], args.T_cold[-1]
     ).tolist()
-    x_evap = map_T_arr_to_x_arr(
-        init_res.T_evap, args.T_hot[-1], args.T_hot[0]
-    ).tolist()
+    x_evap = map_T_arr_to_x_arr(init_res.T_evap, args.T_hot[-1], args.T_hot[0]).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     x_heat = map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
     x_cool = map_Q_arr_to_x_arr(init_res.Q_evap[:n_cool], Q_cool_ex).tolist()
@@ -94,9 +94,7 @@ def _get_x0_for_cascade_hp_opt(
     )
 
 
-def _get_bounds_for_cascade_hp_opt(
-    args: HPRTargetInputs
-) -> list:
+def _get_bounds_for_cascade_hp_opt(args: HPRTargetInputs) -> list:
     n_cond = n_heat = int(args.n_cond)
     n_evap = int(args.n_evap)
     n_cool = n_evap - 1
@@ -130,9 +128,7 @@ def _parse_cascade_hp_state_variables(
     f = e + (int(args.n_cond) + int(args.n_evap) - 1)
     x_ihx = x[e:f]
 
-    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
-        x_amb, max(args.Q_heat_max, args.Q_cool_max)
-    )
+    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
     T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])

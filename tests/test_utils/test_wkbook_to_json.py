@@ -512,11 +512,11 @@ def test_get_problem_from_excel_reports_missing_sheet(tmp_path: Path):
                 [None, None, "degC", "degC", "kW", "K", "kW/mK", None, None],
                 ["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5, "IN", 1],
             ]
-        ).to_excel(
-            writer, sheet_name="Stream Data", header=None, index=False
-        )
+        ).to_excel(writer, sheet_name="Stream Data", header=None, index=False)
 
-    with pytest.raises(ValueError, match="Workbook is missing required sheet 'Utility Data'"):
+    with pytest.raises(
+        ValueError, match="Workbook is missing required sheet 'Utility Data'"
+    ):
         wkbook_to_json.get_problem_from_excel(xlsx)
 
 

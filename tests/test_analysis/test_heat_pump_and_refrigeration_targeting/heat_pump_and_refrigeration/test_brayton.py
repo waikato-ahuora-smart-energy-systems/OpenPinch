@@ -3,10 +3,18 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration_placement import brayton as hp_brayton
+from OpenPinch.analysis.heat_pump_and_refrigeration_placement import (
+    brayton as hp_brayton,
+)
 from OpenPinch.classes.stream_collection import StreamCollection
 
-from ..helpers import _base_args, _patch_output_model_validate, _pt_with_hnet, _sc, _stream
+from ..helpers import (
+    _base_args,
+    _patch_output_model_validate,
+    _pt_with_hnet,
+    _sc,
+    _stream,
+)
 
 
 def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatch):

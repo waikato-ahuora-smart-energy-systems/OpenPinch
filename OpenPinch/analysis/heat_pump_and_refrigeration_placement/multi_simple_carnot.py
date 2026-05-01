@@ -259,4 +259,3 @@ def _compute_multi_simple_carnot_hp_opt_obj(
         "Q_amb_cold": state_vars["Q_amb_cold"],
         "success": True,
     }
-

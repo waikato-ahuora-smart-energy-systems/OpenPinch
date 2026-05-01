@@ -47,7 +47,9 @@ def test_wheel_excludes_repo_only_assets(tmp_path):
     for fragment in forbidden_fragments:
         assert not any(fragment in name for name in names), fragment
 
-    assert any(name.endswith("OpenPinch/data/sample_cases/basic_pinch.json") for name in names)
+    assert any(
+        name.endswith("OpenPinch/data/sample_cases/basic_pinch.json") for name in names
+    )
     assert any(
         name.endswith("OpenPinch/data/notebooks/01_basic_pinch_analysis.ipynb")
         for name in names

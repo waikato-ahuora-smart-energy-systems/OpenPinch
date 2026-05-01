@@ -13,6 +13,7 @@ __all__ = ["CascadeVapourCompressionCycle"]
 
 # TODO: Implement cascade for refrigerant mixtures, not just pure fluids.
 
+
 class CascadeVapourCompressionCycle:
     """Cascade of vapour-compression heat pumps coupled through cascade exchangers."""
 
@@ -380,7 +381,7 @@ class CascadeVapourCompressionCycle:
             + np.min([(T_evap - np.roll(T_evap, 1))[:-1].sum(), 0.0])
         ) * -1
 
-    def _normalize_secondary_process_duty(self, duty = None) -> np.ndarray | None:
+    def _normalize_secondary_process_duty(self, duty=None) -> np.ndarray | None:
         if duty is None:
             return None
         duty_arr = np.asarray(duty)
@@ -472,8 +473,12 @@ class CascadeVapourCompressionCycle:
             self._max_work *= inf + 1
             return self._max_work
 
-        T_cond_all = np.sort(np.concatenate([T_cond, T_evap[:-1] + self._dt_cascade_hx]))[::-1]
-        T_evap_all = np.sort(np.concatenate([T_cond[1:] - self._dt_cascade_hx, T_evap]))[::-1]
+        T_cond_all = np.sort(
+            np.concatenate([T_cond, T_evap[:-1] + self._dt_cascade_hx])
+        )[::-1]
+        T_evap_all = np.sort(
+            np.concatenate([T_cond[1:] - self._dt_cascade_hx, T_evap])
+        )[::-1]
 
         self._num_cycles = T_evap_all.size
         n_heat = T_cond.size

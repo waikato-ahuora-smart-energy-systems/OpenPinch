@@ -128,7 +128,7 @@ def _polish_candidates(
         try:
             with ProcessPoolExecutor(max_workers=n_workers) as pool:
                 results = list(pool.map(worker_fn, basin_reps_idx))
-        except (PermissionError, OSError, BrokenProcessPool):
+        except PermissionError, OSError, BrokenProcessPool:
             results = list(map(worker_fn, basin_reps_idx))
 
     polished_x = np.asarray([x for x, _ in results], dtype=float)
@@ -153,7 +153,7 @@ def _collect_candidates_in_parallel(
         try:
             with pool_executor_cls(max_workers=n_jobs_eff) as pool:
                 run_results = list(pool.map(run_fn, range(n_runs)))
-        except (PermissionError, OSError, broken_pool_exc):
+        except PermissionError, OSError, broken_pool_exc:
             run_results = map(run_fn, range(n_runs))
 
     for run_minima_x, run_minima_f in run_results:

@@ -71,7 +71,9 @@ def test_sample_and_notebook_commands_copy_packaged_assets(tmp_path: Path):
     sample_out = tmp_path / "sample.json"
     notebook_dir = tmp_path / "notebooks"
 
-    assert cli.main(["sample", "--name", "basic_pinch.json", "-o", str(sample_out)]) == 0
+    assert (
+        cli.main(["sample", "--name", "basic_pinch.json", "-o", str(sample_out)]) == 0
+    )
     assert sample_out.exists()
 
     assert cli.main(["notebook", "-o", str(notebook_dir)]) == 0

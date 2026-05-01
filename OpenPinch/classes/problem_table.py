@@ -261,7 +261,7 @@ class ProblemTable:
             try:
                 cast_left = col_left.astype(float)
                 cast_right = col_right.astype(float)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
             else:
                 if not np.allclose(

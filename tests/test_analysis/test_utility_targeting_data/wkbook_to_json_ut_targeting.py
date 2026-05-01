@@ -357,8 +357,7 @@ def get_results_from_excel(excel_file, output_json):
 
 # Set the file path to the workbook fixture directory
 filepath_load = (
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    + "/fixtures/workbooks"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + "/fixtures/workbooks"
 )
 filepath_save = os.path.dirname(__file__) + "/new"
 

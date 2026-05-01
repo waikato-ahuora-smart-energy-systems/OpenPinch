@@ -178,8 +178,6 @@ def _compute_brayton_hp_system_obj(
     }
 
 
-
-
 def _build_simulated_hpr_streams(
     hp_list,
     *,
@@ -199,7 +197,6 @@ def _build_simulated_hpr_streams(
             )
         )
     return hp_streams
-
 
 
 def _calc_Q_amb(

@@ -75,9 +75,7 @@ def _parse_multi_temperature_carnot_cycle_state_variables(
     b = a + int(args.n_evap)
     x_evap = x[a:b]
 
-    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
-        x_amb, max(args.Q_heat_max, args.Q_cool_max)
-    )
+    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
     T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     return {
@@ -117,7 +115,9 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     w_hpr = 0.0
     cop = 1.0
 
-    def _get_available_pool(is_on: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _get_available_pool(
+        is_on: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         i_c, i_e = _get_unique_idx_mtc(is_on)
         Qc_pool = np.maximum((Q_cond - (Qc_he + Qc_hx + Qc_hpr))[i_c], 0.0)
         Qe_pool = np.maximum((Q_evap - (Qe_he + Qe_hx + Qe_hpr))[i_e], 0.0)

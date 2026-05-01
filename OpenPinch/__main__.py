@@ -197,7 +197,11 @@ def _run_command(problem_cls, args: argparse.Namespace) -> int:
         print(f"Wrote Excel summary to {output_path}")
 
     if args.json_output is not None:
-        payload = problem.results.model_dump() if hasattr(problem.results, "model_dump") else problem.results
+        payload = (
+            problem.results.model_dump()
+            if hasattr(problem.results, "model_dump")
+            else problem.results
+        )
         args.json_output.parent.mkdir(parents=True, exist_ok=True)
         args.json_output.write_text(
             json.dumps(payload, indent=2, default=str),

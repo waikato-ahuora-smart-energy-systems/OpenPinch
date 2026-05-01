@@ -90,4 +90,3 @@ def map_Q_amb_to_x(
     scale: float,
 ) -> float:
     return (Q_amb_cold - Q_amb_hot) / scale
-

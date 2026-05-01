@@ -31,7 +31,9 @@ def test_packaged_notebook_series_is_present():
 
 
 @pytest.mark.parametrize("notebook_name", list_notebooks())
-def test_packaged_notebooks_execute_smoke(tmp_path: Path, monkeypatch, notebook_name: str):
+def test_packaged_notebooks_execute_smoke(
+    tmp_path: Path, monkeypatch, notebook_name: str
+):
     notebook_path = copy_notebook(notebook_name, tmp_path / notebook_name)
     monkeypatch.chdir(tmp_path)
     _execute_notebook(notebook_path)

@@ -9,12 +9,24 @@ from ..lib.config import Configuration, tol
 from ..lib.enums import HPRcycle, PT
 from ..lib.schema import HPRTargetOutputs
 from ..utils.miscellaneous import get_value
-from .heat_pump_and_refrigeration_placement.brayton import optimise_brayton_heat_pump_placement
-from .heat_pump_and_refrigeration_placement.cascade_vapour_compression import optimise_cascade_heat_pump_placement
-from .heat_pump_and_refrigeration_placement.multi_simple_carnot import optimise_multi_simple_carnot_heat_pump_placement
-from .heat_pump_and_refrigeration_placement.multi_simple_vapour_compression import optimise_multi_simple_heat_pump_placement
-from .heat_pump_and_refrigeration_placement.multi_temperature_carnot import optimise_multi_temperature_carnot_heat_pump_placement
-from .heat_pump_and_refrigeration_placement.preprocessing import construct_HPRTargetInputs
+from .heat_pump_and_refrigeration_placement.brayton import (
+    optimise_brayton_heat_pump_placement,
+)
+from .heat_pump_and_refrigeration_placement.cascade_vapour_compression import (
+    optimise_cascade_heat_pump_placement,
+)
+from .heat_pump_and_refrigeration_placement.multi_simple_carnot import (
+    optimise_multi_simple_carnot_heat_pump_placement,
+)
+from .heat_pump_and_refrigeration_placement.multi_simple_vapour_compression import (
+    optimise_multi_simple_heat_pump_placement,
+)
+from .heat_pump_and_refrigeration_placement.multi_temperature_carnot import (
+    optimise_multi_temperature_carnot_heat_pump_placement,
+)
+from .heat_pump_and_refrigeration_placement.preprocessing import (
+    construct_HPRTargetInputs,
+)
 from .heat_pump_and_refrigeration_placement.shared import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
@@ -139,7 +151,9 @@ def calc_heat_pump_and_refrigeration_cascade(
         T_ls = pt[PT.T.value].to_list() + pt_air[PT.T.value].to_list()
         pt_air.insert_temperature_interval(T_ls)
         pt.insert_temperature_interval(T_ls)
-        pt.col[PT.H_NET_W_AIR.value] = pt.col[PT.H_NET_A.value] + pt_air.col[PT.H_NET.value]
+        pt.col[PT.H_NET_W_AIR.value] = (
+            pt.col[PT.H_NET_A.value] + pt_air.col[PT.H_NET.value]
+        )
 
         if res.Q_amb_hot > tol:
             pt.col[PT.H_NET_HOT.value] -= pt_air.col[PT.H_NET.value]
@@ -158,4 +172,3 @@ _HP_PLACEMENT_HANDLERS = {
     HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
     HPRcycle.MultiSimpleCarnot.value: optimise_multi_simple_carnot_heat_pump_placement,
 }
-

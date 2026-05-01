@@ -252,7 +252,11 @@ class VapourCompressionCycle:
     def T_evap_sat_vap(self) -> Optional[float]:
         """Saturated vapour temperature at evaporating pressure in degrees Celsius."""
         if self.temperature_unit == "C":
-            return self._T_evap_sat_vap - 273.15 if self._T_evap_sat_vap is not None else None
+            return (
+                self._T_evap_sat_vap - 273.15
+                if self._T_evap_sat_vap is not None
+                else None
+            )
         return self._T_evap_sat_vap
 
     @property
@@ -266,7 +270,11 @@ class VapourCompressionCycle:
     def T_cond_sat_liq(self) -> Optional[float]:
         """Saturated liquid temperature at condensing pressure in degrees Celsius."""
         if self.temperature_unit == "C":
-            return self._T_cond_sat_liq - 273.15 if self._T_cond_sat_liq is not None else None
+            return (
+                self._T_cond_sat_liq - 273.15
+                if self._T_cond_sat_liq is not None
+                else None
+            )
         return self._T_cond_sat_liq
 
     @property
@@ -332,9 +340,7 @@ class VapourCompressionCycle:
         try:
             s.update(CoolProp.PT_INPUTS, P, T)
         except:
-            s.update(
-                CoolProp.PQ_INPUTS, P, phase
-            )  # Close to saturated liquid/vapour
+            s.update(CoolProp.PQ_INPUTS, P, phase)  # Close to saturated liquid/vapour
         return s
 
     def _compute_state_from_pressure_quality(
@@ -468,7 +474,11 @@ class VapourCompressionCycle:
         self._ihx_gas_dt = max(
             min(
                 dT_ihx_gas_side,
-                self._T_cond - self._T_evap - self._dT_subcool - self._dT_superheat - self._dtcont * 2,
+                self._T_cond
+                - self._T_evap
+                - self._dT_subcool
+                - self._dT_superheat
+                - self._dtcont * 2,
             ),
             0.0,
         )
@@ -493,13 +503,17 @@ class VapourCompressionCycle:
         if dT_ihx_gas_side > self._ihx_gas_dt:
             # Penalise insufficient superheat in internal heat exchange
             h0_tar = self._compute_state_from_pressure_temperature(
-                P=P_lo, T=self._T_evap_sat_vap + dT_ihx_gas_side, phase=1,
+                P=P_lo,
+                T=self._T_evap_sat_vap + dT_ihx_gas_side,
+                phase=1,
             ).hmass()
             self._penalty.append(h0_tar - h_ihx_in)
 
         # IHX outlet / compressor inlet
         h_ihx_out = self._compute_state_from_pressure_temperature(
-            P=P_lo, T=self._T_evap_sat_vap + self._dT_superheat + self._ihx_gas_dt, phase=1,
+            P=P_lo,
+            T=self._T_evap_sat_vap + self._dT_superheat + self._ihx_gas_dt,
+            phase=1,
         ).hmass()
         dh_ihx = h_ihx_out - h_ihx_in
 
@@ -511,23 +525,33 @@ class VapourCompressionCycle:
 
         """self._penalty.append(
             max(self._compute_state_from_pressure_quality(P_hi, 0.0).hmass() - state1.hmass(), 0.0) # Penalise wet compression
-        )  """      
+        )  """
 
         # 2 - Condenser outlet / IHX inlet (source)
-        h_cond_out_min = self._compute_state_from_pressure_quality(
-            P=P_lo, Q=0,
-        ).hmass() + dh_ihx  # Find the limit to subcooling of the suction gas
+        h_cond_out_min = (
+            self._compute_state_from_pressure_quality(
+                P=P_lo,
+                Q=0,
+            ).hmass()
+            + dh_ihx
+        )  # Find the limit to subcooling of the suction gas
         self._T_cond_sat_liq = self._compute_state_from_pressure_quality(
-            P=P_hi, Q=0,
-        ).T()  # Saturated liquid temperature at the condenser pressure        
+            P=P_hi,
+            Q=0,
+        ).T()  # Saturated liquid temperature at the condenser pressure
         h_cond_out_tar = self._compute_state_from_pressure_temperature(
-            P=P_hi, T=min(self._T_cond_sat_liq, self._t_crit - 0.1) - self._dT_subcool, phase=0,
+            P=P_hi,
+            T=min(self._T_cond_sat_liq, self._t_crit - 0.1) - self._dT_subcool,
+            phase=0,
         ).hmass()
         h_cond_out = max(h_cond_out_min, h_cond_out_tar)
         state2 = self._compute_state_from_pressure_enthalpy(
-            P=P_hi, h=h_cond_out,
+            P=P_hi,
+            h=h_cond_out,
         )
-        self._dT_subcool = self._T_cond_sat_liq - state2.T() # Actual subcooling possible
+        self._dT_subcool = (
+            self._T_cond_sat_liq - state2.T()
+        )  # Actual subcooling possible
         self._save_cycle_state(state2, 2)
 
         if h_cond_out_min > h_cond_out_tar:
@@ -541,7 +565,8 @@ class VapourCompressionCycle:
 
         # 3 - Expansion valve outlet / evaporator inlet
         state3 = self._compute_state_from_pressure_enthalpy(
-            P=P_lo, h=state2.hmass() - dh_ihx,
+            P=P_lo,
+            h=state2.hmass() - dh_ihx,
         )
         self._save_cycle_state(state3, 3)
 
@@ -562,10 +587,13 @@ class VapourCompressionCycle:
         # Evaporator side - state 5
         if is_heat_pump:
             # 4 - Hot side of cascade heat exchanger outlet (otherwise state 4 == 1)
-            self._q_cas_heat = self._Q_cas_heat / self._m_dot if self._m_dot > 0.0 else 0.0
+            self._q_cas_heat = (
+                self._Q_cas_heat / self._m_dot if self._m_dot > 0.0 else 0.0
+            )
             self._q_heat = self._q_cond - self._q_cas_heat
             state4 = self._compute_state_from_pressure_enthalpy(
-                P=state2.p(), h=state2.hmass() + self._q_heat,
+                P=state2.p(),
+                h=state2.hmass() + self._q_heat,
             )
             self._save_cycle_state(state4, 4)
 
@@ -575,10 +603,13 @@ class VapourCompressionCycle:
             elif self._Q_cool > self._Q_evap:
                 self._Q_cool = self._Q_evap
 
-            self._q_cool = self._Q_cool / self._m_dot if self._m_dot > 0 else self._q_evap
+            self._q_cool = (
+                self._Q_cool / self._m_dot if self._m_dot > 0 else self._q_evap
+            )
 
             state5 = self._compute_state_from_pressure_enthalpy(
-                P=state3.p(), h=state3.hmass() + self._q_cool,
+                P=state3.p(),
+                h=state3.hmass() + self._q_cool,
             )
             self._save_cycle_state(state5, 5)
             self._q_cas_cool = self._q_evap - self._q_cool
@@ -586,10 +617,13 @@ class VapourCompressionCycle:
 
         else:  # is refrigeration
             # 5 - Hot side of cascade heat exchanger outlet (otherwise state 5 == 3)
-            self._q_cas_cool = self._Q_cas_cool / self._m_dot if self._m_dot > 0.0 else 0.0
+            self._q_cas_cool = (
+                self._Q_cas_cool / self._m_dot if self._m_dot > 0.0 else 0.0
+            )
             self._q_cool = self._q_evap - self._q_cas_cool
             state5 = self._compute_state_from_pressure_enthalpy(
-                P=state3.p(), h=state3.hmass() + self._q_cool,
+                P=state3.p(),
+                h=state3.hmass() + self._q_cool,
             )
             self._save_cycle_state(state5, 5)
 
@@ -598,9 +632,12 @@ class VapourCompressionCycle:
                 self._Q_heat = self._Q_cond
             elif self._Q_heat > self._Q_cond:
                 self._Q_heat = self._Q_cond
-            self._q_heat = self._Q_heat / self._m_dot if self._m_dot > 0 else self._q_cond
+            self._q_heat = (
+                self._Q_heat / self._m_dot if self._m_dot > 0 else self._q_cond
+            )
             state4 = self._compute_state_from_pressure_enthalpy(
-                P=state2.p(), h=state2.hmass() + self._q_heat,
+                P=state2.p(),
+                h=state2.hmass() + self._q_heat,
             )
             self._save_cycle_state(state4, 4)
 

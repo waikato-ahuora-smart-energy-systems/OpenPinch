@@ -210,7 +210,7 @@ def _run_bo_single(
                 xi=xi,
                 best_u=best_u,
             )
-        except (np.linalg.LinAlgError, ValueError, FloatingPointError):
+        except np.linalg.LinAlgError, ValueError, FloatingPointError:
             u_next = rng.uniform(0.0, 1.0, size=n_dim)
 
         if X_arr.size > 0:
