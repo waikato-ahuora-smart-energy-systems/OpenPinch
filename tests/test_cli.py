@@ -44,6 +44,46 @@ def test_run_command_writes_summary_excel_json_and_graphs(tmp_path: Path, capsys
     assert any(excel_dir.glob("*.xlsx"))
 
 
+def test_heat_pump_command_writes_comparison_and_optional_outputs(
+    tmp_path: Path, capsys
+):
+    case_path = copy_sample_case(
+        "heat_pump_targeting.json",
+        tmp_path / "heat_pump_targeting.json",
+    )
+    json_path = tmp_path / "heat_pump_comparison.json"
+    graph_dir = tmp_path / "graphs"
+
+    assert (
+        cli.main(
+            [
+                "heat-pump",
+                str(case_path),
+                "--condenser-temperature",
+                "170",
+                "--condenser-duty",
+                "500",
+                "--evaporator-temperature",
+                "90",
+                "--evaporator-duty",
+                "400",
+                "--json-output",
+                str(json_path),
+                "--graph-output",
+                str(graph_dir),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    assert "Approx. HP Power Input" in captured.out
+    assert payload["hot_utility_target_delta"] < 0
+    assert payload["cold_utility_target_delta"] < 0
+    assert any(graph_dir.glob("*.html"))
+
+
 def test_graph_command_filters_and_exports_html(tmp_path: Path):
     case_path = copy_sample_case("basic_pinch.json", tmp_path / "basic_pinch.json")
     graph_dir = tmp_path / "graphs"
@@ -75,6 +115,21 @@ def test_sample_and_notebook_commands_copy_packaged_assets(tmp_path: Path):
         cli.main(["sample", "--name", "basic_pinch.json", "-o", str(sample_out)]) == 0
     )
     assert sample_out.exists()
+
+    heat_pump_sample = tmp_path / "heat_pump_targeting.json"
+    assert (
+        cli.main(
+            [
+                "sample",
+                "--name",
+                "heat_pump_targeting.json",
+                "-o",
+                str(heat_pump_sample),
+            ]
+        )
+        == 0
+    )
+    assert heat_pump_sample.exists()
 
     assert cli.main(["notebook", "-o", str(notebook_dir)]) == 0
     copied = sorted(path.name for path in notebook_dir.glob("*.ipynb"))

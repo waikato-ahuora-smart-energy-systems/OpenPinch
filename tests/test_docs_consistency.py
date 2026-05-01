@@ -10,6 +10,7 @@ README = REPO_ROOT / "README.md"
 GETTING_STARTED = REPO_ROOT / "docs" / "getting-started.rst"
 QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
 NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
+HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
 INTERPRETING_RESULTS = (
     REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
 )
@@ -24,6 +25,7 @@ def test_readme_highlights_current_cli_workflow():
     assert "openpinch sample" in text
     assert "openpinch run" in text
     assert "openpinch graph" in text
+    assert "openpinch heat-pump" in text
     assert "openpinch validate" in text
     assert "openpinch notebook" in text
 
@@ -35,6 +37,7 @@ def test_docs_highlight_current_pinchproblem_methods():
             _read(GETTING_STARTED),
             _read(QUICKSTART),
             _read(NOTEBOOKS),
+            _read(HEAT_PUMP_TARGETING),
             _read(INTERPRETING_RESULTS),
         ]
     )
@@ -43,6 +46,7 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "export_excel" in combined
     assert "show_dashboard()" in combined
     assert "plot_grand_composite_curve" in combined
+    assert "evaluate_heat_pump_integration" in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():
@@ -64,8 +68,10 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
             _read(README),
             _read(QUICKSTART),
             _read(NOTEBOOKS),
+            _read(HEAT_PUMP_TARGETING),
             _read(INTERPRETING_RESULTS),
         ]
     )
     assert "Interpreting Results" in combined
     assert "heat-pump targeting and integration" in combined
+    assert "heat_pump_targeting.json" in combined

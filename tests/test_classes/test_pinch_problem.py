@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from OpenPinch.classes.pinch_problem import PinchProblem
+from OpenPinch.resources import copy_sample_case
 
 
 @pytest.fixture
@@ -594,6 +595,73 @@ def test_export_excel_and_show_dashboard_aliases(monkeypatch, tmp_path: Path):
     assert obj.export_excel(tmp_path) == tmp_path / "alias.xlsx"
     obj.show_dashboard(page_title="Demo")
     assert captured["page_title"] == "Demo"
+
+
+def test_compare_to_builds_delta_table(monkeypatch):
+    base_frame = __import__("pandas").DataFrame(
+        [
+            {
+                "Target": "Plant/Direct Integration",
+                "Hot Utility Target": 750.0,
+                "Cold Utility Target": 1000.0,
+                "Heat Recovery": 5150.0,
+                "Hot Pinch": None,
+                "Cold Pinch": 145.0,
+            }
+        ]
+    )
+    other_frame = __import__("pandas").DataFrame(
+        [
+            {
+                "Target": "Plant/Direct Integration",
+                "Hot Utility Target": 500.0,
+                "Cold Utility Target": 850.0,
+                "Heat Recovery": 5800.0,
+                "Hot Pinch": None,
+                "Cold Pinch": 170.0,
+            }
+        ]
+    )
+    base_problem = PinchProblem(run=False)
+    other_problem = PinchProblem(run=False)
+
+    monkeypatch.setattr(base_problem, "summary_frame", lambda detailed=False: base_frame)
+    monkeypatch.setattr(
+        other_problem,
+        "summary_frame",
+        lambda detailed=False: other_frame,
+    )
+
+    comparison = base_problem.compare_to(other_problem)
+
+    assert comparison.loc["Base case", "Hot Utility Target"] == 750.0
+    assert comparison.loc["Scenario", "Cold Utility Target"] == 850.0
+    assert comparison.loc["Change", "Heat Recovery"] == 650.0
+
+
+def test_evaluate_heat_pump_integration_uses_packaged_sample(tmp_path: Path):
+    case_path = copy_sample_case(
+        "heat_pump_targeting.json",
+        tmp_path / "heat_pump_targeting.json",
+    )
+    problem = PinchProblem(problem_filepath=case_path)
+
+    evaluation = problem.evaluate_heat_pump_integration(
+        {
+            "zone": "Plant",
+            "condenser_temperature": 170.0,
+            "condenser_duty": 500.0,
+            "evaporator_temperature": 90.0,
+            "evaporator_duty": 400.0,
+        },
+        target_name="Plant/Direct Integration",
+    )
+
+    assert evaluation.comparison.target == "Plant/Direct Integration"
+    assert evaluation.comparison.hot_utility_target_delta < 0
+    assert evaluation.comparison.cold_utility_target_delta < 0
+    assert evaluation.comparison.approximate_power_input == 100.0
+    assert "Approx. HP Power Input" in evaluation.comparison_frame.columns
 
 
 def test_validate_formats_schema_errors_with_stream_context(tmp_path: Path):

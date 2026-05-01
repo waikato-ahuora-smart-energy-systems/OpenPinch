@@ -65,6 +65,7 @@ The packaged user workflow is now organized around:
 
    getting-started
    user-guide/quickstart
+   user-guide/heat-pump-targeting
    user-guide/interpreting-results
    user-guide/notebooks
    reference/index

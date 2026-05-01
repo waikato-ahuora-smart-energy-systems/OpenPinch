@@ -51,6 +51,10 @@ def test_wheel_excludes_repo_only_assets(tmp_path):
         name.endswith("OpenPinch/data/sample_cases/basic_pinch.json") for name in names
     )
     assert any(
+        name.endswith("OpenPinch/data/sample_cases/heat_pump_targeting.json")
+        for name in names
+    )
+    assert any(
         name.endswith("OpenPinch/data/notebooks/01_basic_pinch_analysis.ipynb")
         for name in names
     )

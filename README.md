@@ -39,6 +39,17 @@ Export graphs only:
 openpinch graph basic_pinch.json --graph-type gcc -o graphs
 ```
 
+Run the packaged heat-pump targeting sample and compare an integrated scenario:
+
+```bash
+openpinch sample --name heat_pump_targeting.json -o heat_pump_targeting.json
+openpinch heat-pump heat_pump_targeting.json \
+  --condenser-temperature 170 \
+  --condenser-duty 500 \
+  --evaporator-temperature 90 \
+  --evaporator-duty 400
+```
+
 ## Notebook Workflow
 
 OpenPinch ships with a notebook series for distinct outputs and workflows. Copy them into your working directory with:
@@ -74,6 +85,8 @@ For graph-based interpretation:
 - total-site graphs are the right level for comparing zonal interactions and utility-system effects
 
 The packaged `04_heat_pump_workflow.ipynb` notebook focuses on heat-pump targeting and integration. It compares a base case against an integrated heat-pump scenario and treats cycle performance as supporting context rather than the main result.
+
+For a dedicated written walkthrough, see `docs/user-guide/heat-pump-targeting.rst` in the source tree or the matching Read the Docs page.
 
 ## Python Workflow
 

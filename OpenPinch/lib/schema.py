@@ -281,6 +281,36 @@ class TargetOutput(BaseModel):
     graphs: Optional[Dict[str, GraphSet]] = None
 
 
+# ---- Heat-pump integration helpers ------------------------------------------
+class HeatPumpIntegrationScenario(BaseModel):
+    """User-facing definition of a candidate integrated heat-pump scenario."""
+
+    zone: str = "Plant"
+    condenser_temperature: float
+    condenser_duty: float
+    evaporator_temperature: float
+    evaporator_duty: float
+    dt_phase_change: float = 0.1
+    dt_cont: float = 0.0
+    htc: float = 1.0
+    condenser_name: str = "HP Condenser"
+    evaporator_name: str = "HP Evaporator"
+
+
+class HeatPumpIntegrationComparison(BaseModel):
+    """Compact before/after comparison for a heat-pump integration scenario."""
+
+    target: str
+    base_case_name: str
+    scenario_case_name: str
+    hot_utility_target_delta: float
+    cold_utility_target_delta: float
+    heat_recovery_delta: float
+    hot_pinch_delta: Optional[float] = None
+    cold_pinch_delta: Optional[float] = None
+    approximate_power_input: float
+
+
 # ---- Stream & Utility definitions -------------------------------------------
 class StreamSchema(BaseModel):
     """Process stream definition supplied to the targeting service."""

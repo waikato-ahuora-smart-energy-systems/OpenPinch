@@ -6,6 +6,7 @@ launching the Streamlit dashboard.
 """
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
@@ -15,7 +16,12 @@ from pydantic import ValidationError
 
 from ..analysis.graph_data import get_output_graph_data
 from ..lib.enums import GT
-from ..lib.schema import TargetInput, TargetOutput
+from ..lib.schema import (
+    HeatPumpIntegrationComparison,
+    HeatPumpIntegrationScenario,
+    TargetInput,
+    TargetOutput,
+)
 from ..utils.csv_to_json import get_problem_from_csv
 from ..utils.export import _build_summary_dataframe
 from ..utils.export import export_target_summary_to_excel_with_units
@@ -59,6 +65,16 @@ _GRAPH_TYPE_ALIASES = {
     "sugcc": GT.SUGCC.value,
     "site utility grand composite curve": GT.SUGCC.value,
 }
+
+
+@dataclass
+class HeatPumpIntegrationEvaluation:
+    """Container returned by :meth:`PinchProblem.evaluate_heat_pump_integration`."""
+
+    scenario: HeatPumpIntegrationScenario
+    comparison: HeatPumpIntegrationComparison
+    comparison_frame: pd.DataFrame
+    integrated_problem: "PinchProblem"
 
 
 @dataclass
@@ -433,6 +449,125 @@ class PinchProblem:
         """Alias for :meth:`export_to_Excel` with a conventional snake_case name."""
         return self.export_to_Excel(results_dir)
 
+    def compare_to(
+        self,
+        other_problem: "PinchProblem",
+        *,
+        target_name: Optional[str] = None,
+        base_label: str = "Base case",
+        other_label: str = "Scenario",
+    ) -> pd.DataFrame:
+        """Compare the compact summaries of two solved problems."""
+        base_frame = self.summary_frame()
+        other_frame = other_problem.summary_frame()
+
+        base_row = _locate_summary_row(base_frame, target_name=target_name)
+        other_row = _locate_summary_row(
+            other_frame,
+            target_name=target_name or str(base_row["Target"]),
+        )
+
+        columns = [
+            "Hot Utility Target",
+            "Cold Utility Target",
+            "Heat Recovery",
+            "Hot Pinch",
+            "Cold Pinch",
+        ]
+        comparison = pd.DataFrame(
+            [
+                pd.Series({col: base_row.get(col) for col in columns}, name=base_label),
+                pd.Series(
+                    {col: other_row.get(col) for col in columns},
+                    name=other_label,
+                ),
+            ]
+        )
+        comparison.loc["Change"] = (
+            comparison.loc[other_label] - comparison.loc[base_label]
+        )
+        comparison.insert(0, "Target", str(base_row["Target"]))
+        comparison.loc["Change", "Target"] = str(base_row["Target"])
+        return comparison
+
+    def build_heat_pump_integration_problem(
+        self,
+        scenario: HeatPumpIntegrationScenario | dict[str, Any],
+    ) -> tuple[HeatPumpIntegrationScenario, "PinchProblem"]:
+        """Build a new :class:`PinchProblem` with an integrated heat-pump scenario."""
+        if self._problem_data is None:
+            raise RuntimeError("No input loaded. Call load(...) first.")
+
+        validated_scenario = HeatPumpIntegrationScenario.model_validate(scenario)
+        base_problem_data = self.to_problem_json()
+        scenario_data = deepcopy(
+            base_problem_data.model_dump()
+            if hasattr(base_problem_data, "model_dump")
+            else base_problem_data
+        )
+        scenario_data.setdefault("streams", []).extend(
+            _build_heat_pump_stream_payloads(validated_scenario)
+        )
+
+        integrated_problem = PinchProblem.from_json(scenario_data)
+        integrated_problem._project_name = f"{self._project_name}_with_hp"
+        return validated_scenario, integrated_problem
+
+    def evaluate_heat_pump_integration(
+        self,
+        scenario: HeatPumpIntegrationScenario | dict[str, Any],
+        *,
+        target_name: Optional[str] = None,
+        base_label: str = "Base case",
+        scenario_label: str = "Integrated heat-pump scenario",
+    ) -> HeatPumpIntegrationEvaluation:
+        """Solve and compare a candidate integrated heat-pump scenario."""
+        validated_scenario, integrated_problem = self.build_heat_pump_integration_problem(
+            scenario
+        )
+        comparison_frame = self.compare_to(
+            integrated_problem,
+            target_name=target_name,
+            base_label=base_label,
+            other_label=scenario_label,
+        )
+
+        approximate_power_input = (
+            validated_scenario.condenser_duty - validated_scenario.evaporator_duty
+        )
+        comparison_frame["Approx. HP Power Input"] = [
+            None,
+            approximate_power_input,
+            None,
+        ]
+
+        target_value = str(comparison_frame.loc[base_label, "Target"])
+        comparison_summary = HeatPumpIntegrationComparison(
+            target=target_value,
+            base_case_name=self._project_name,
+            scenario_case_name=integrated_problem._project_name,
+            hot_utility_target_delta=float(
+                comparison_frame.loc["Change", "Hot Utility Target"]
+            ),
+            cold_utility_target_delta=float(
+                comparison_frame.loc["Change", "Cold Utility Target"]
+            ),
+            heat_recovery_delta=float(comparison_frame.loc["Change", "Heat Recovery"]),
+            hot_pinch_delta=_coerce_optional_float(
+                comparison_frame.loc["Change", "Hot Pinch"]
+            ),
+            cold_pinch_delta=_coerce_optional_float(
+                comparison_frame.loc["Change", "Cold Pinch"]
+            ),
+            approximate_power_input=float(approximate_power_input),
+        )
+        return HeatPumpIntegrationEvaluation(
+            scenario=validated_scenario,
+            comparison=comparison_summary,
+            comparison_frame=comparison_frame,
+            integrated_problem=integrated_problem,
+        )
+
     @property
     def problem_filepath(self) -> Optional[Path]:
         """Return the filepath of the problem that was loaded or supplied."""
@@ -474,6 +609,11 @@ class PinchProblem:
             obj._problem_data["utilities"] = validate_utility_data(
                 obj._problem_data["utilities"]
             )
+        obj._input_source_kind = "in_memory"
+        obj._validation_context = _build_validation_context(
+            obj._problem_data,
+            source_kind=obj._input_source_kind,
+        )
         return obj
 
     def to_problem_json(self) -> JsonDict:
@@ -625,6 +765,80 @@ def _format_utility(name: str, heat_flow) -> str:
     if value is None:
         return f"{name}: n/a"
     return f"{name}: {value:.2f}"
+
+
+def _locate_summary_row(
+    frame: pd.DataFrame,
+    *,
+    target_name: Optional[str] = None,
+) -> pd.Series:
+    if "Target" not in frame.columns or frame.empty:
+        raise ValueError("Summary frame is empty or missing the 'Target' column.")
+
+    targets = frame["Target"].astype(str)
+    if target_name is not None:
+        exact_match = frame.loc[targets == str(target_name)]
+        if not exact_match.empty:
+            return exact_match.iloc[0]
+
+        suffix = str(target_name).split("/", 1)[-1]
+        suffix_match = frame.loc[targets.str.endswith(suffix)]
+        if not suffix_match.empty:
+            return suffix_match.iloc[0]
+
+        raise KeyError(
+            f"Target {target_name!r} was not found in the summary output."
+        )
+
+    preferred_targets = [
+        "Plant/Direct Integration",
+    ]
+    for preferred in preferred_targets:
+        preferred_match = frame.loc[targets == preferred]
+        if not preferred_match.empty:
+            return preferred_match.iloc[0]
+
+    direct_match = frame.loc[targets.str.endswith("/Direct Integration")]
+    if not direct_match.empty:
+        return direct_match.iloc[0]
+    return frame.iloc[0]
+
+
+def _build_heat_pump_stream_payloads(
+    scenario: HeatPumpIntegrationScenario,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "zone": scenario.zone,
+            "name": scenario.condenser_name,
+            "t_supply": {"value": scenario.condenser_temperature, "units": "degC"},
+            "t_target": {
+                "value": scenario.condenser_temperature - scenario.dt_phase_change,
+                "units": "degC",
+            },
+            "heat_flow": {"value": scenario.condenser_duty, "units": "kW"},
+            "dt_cont": {"value": scenario.dt_cont, "units": "degC"},
+            "htc": {"value": scenario.htc, "units": "kW/m^2/degC"},
+        },
+        {
+            "zone": scenario.zone,
+            "name": scenario.evaporator_name,
+            "t_supply": {
+                "value": scenario.evaporator_temperature - scenario.dt_phase_change,
+                "units": "degC",
+            },
+            "t_target": {"value": scenario.evaporator_temperature, "units": "degC"},
+            "heat_flow": {"value": scenario.evaporator_duty, "units": "kW"},
+            "dt_cont": {"value": scenario.dt_cont, "units": "degC"},
+            "htc": {"value": scenario.htc, "units": "kW/m^2/degC"},
+        },
+    ]
+
+
+def _coerce_optional_float(value: Any) -> Optional[float]:
+    if value is None or pd.isna(value):
+        return None
+    return float(value)
 
 
 def _build_validation_context(

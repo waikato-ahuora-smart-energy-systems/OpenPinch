@@ -59,6 +59,7 @@ to show users how to read the outputs:
 - workflow-specific decisions such as whether a heat-pump integration scenario is displacing the right utilities
 
 For a consolidated written guide, see :doc:`interpreting-results`.
+For the dedicated helper-backed workflow, see :doc:`heat-pump-targeting`.
 
 Design Intent
 -------------

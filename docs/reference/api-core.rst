@@ -111,6 +111,8 @@ The main user-facing methods are:
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.summary_frame`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_composite_curve`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_grand_composite_curve`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.compare_to`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_graphs`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_excel`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.show_dashboard`

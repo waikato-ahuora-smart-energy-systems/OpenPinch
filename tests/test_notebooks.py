@@ -51,4 +51,6 @@ def test_heat_pump_notebook_focuses_on_integration_workflow(
         "".join(cell.get("source", [])) for cell in notebook["cells"]
     )
     assert "candidate heat-pump integration scenario" in combined_source
+    assert "evaluate_heat_pump_integration" in combined_source
+    assert "heat_pump_targeting.json" in combined_source
     assert "VapourCompressionCycle" not in combined_source

@@ -160,10 +160,41 @@ The notebook series includes:
 - ``04_heat_pump_workflow.ipynb``
 - ``05_batch_comparison.ipynb``
 
+Advanced Heat-Pump Workflow
+---------------------------
+
+For a dedicated integrated heat-pump workflow, use the packaged helper and
+sample case:
+
+.. code-block:: python
+
+   from pathlib import Path
+
+   from OpenPinch import PinchProblem
+   from OpenPinch.resources import copy_sample_case
+
+   case_path = copy_sample_case(
+       "heat_pump_targeting.json",
+       Path("heat_pump_targeting.json"),
+   )
+   problem = PinchProblem(problem_filepath=case_path)
+   evaluation = problem.evaluate_heat_pump_integration(
+       {
+           "zone": "Plant",
+           "condenser_temperature": 170.0,
+           "condenser_duty": 500.0,
+           "evaporator_temperature": 90.0,
+           "evaporator_duty": 400.0,
+       },
+       target_name="Plant/Direct Integration",
+   )
+   print(evaluation.comparison_frame)
+
 Next Steps
 ----------
 
 - Use :doc:`../reference/api-core` for the supported API surface.
 - Use :doc:`interpreting-results` for output-reading guidance.
+- Use :doc:`heat-pump-targeting` for the dedicated heat-pump workflow.
 - Use ``openpinch run`` and ``openpinch graph`` for CLI-driven workflows.
 - Use the notebook series as the main learning path for distinct outputs.

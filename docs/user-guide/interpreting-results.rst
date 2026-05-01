@@ -97,6 +97,8 @@ comparison:
 3. compare utility targets and heat recovery
 4. compare the before-and-after grand composite curves
 
+For the concrete helper API and packaged sample, see :doc:`heat-pump-targeting`.
+
 Comparing Zones And Cases
 -------------------------
 

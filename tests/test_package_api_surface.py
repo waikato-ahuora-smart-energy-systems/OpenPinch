@@ -12,6 +12,8 @@ import OpenPinch.utils
 EXPECTED_EXPORTS = {
     "OpenPinch": {
         "Configuration",
+        "HeatPumpIntegrationComparison",
+        "HeatPumpIntegrationScenario",
         "PinchProblem",
         "StreamCollection",
         "StreamSchema",
@@ -34,6 +36,8 @@ EXPECTED_EXPORTS = {
         "Graph",
         "GraphSet",
         "HeatUtility",
+        "HeatPumpIntegrationComparison",
+        "HeatPumpIntegrationScenario",
         "StreamCollection",
         "StreamSchema",
         "TargetInput",
