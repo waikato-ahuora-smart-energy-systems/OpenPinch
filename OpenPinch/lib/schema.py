@@ -133,6 +133,8 @@ class HPRTargetOutputs(BaseModel):
     T_evap: Optional[np.ndarray] = None
     Q_cond: Optional[np.ndarray] = None
     Q_evap: Optional[np.ndarray] = None
+    Q_cond_he: Optional[np.ndarray] = None
+    Q_evap_he: Optional[np.ndarray] = None
 
     # Simple Vapour Compression only
     dT_subcool: Optional[np.ndarray] = None

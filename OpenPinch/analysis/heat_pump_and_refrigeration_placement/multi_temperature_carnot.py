@@ -252,8 +252,12 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
         "w_he": w_he,
         "heat_recovery": Qc_he,
         "cop": cop,
-        "Qc": Qc_he + Qc_hpr,
-        "Qe": Qe_he + Qe_hpr,
+        "Qc": Qc_hpr + Qc_he,
+        "Qe": Qe_hpr + Qe_he,
+        "Qc_hpr": Qc_hpr,
+        "Qe_hpr": Qe_hpr,
+        "Qc_he": Qc_he,
+        "Qe_he": Qe_he,
     }
 
 
@@ -277,8 +281,18 @@ def _compute_multi_temperature_carnot_cycle_obj(
     )
 
     work = cycle_results["w_hpr"] - cycle_results["w_he"]
-    Q_ext_heat = max(np.abs(H_cold_with_amb[0]) - cycle_results["Qc"].sum(), 0.0)
-    Q_ext_cold = max(np.abs(H_hot_with_amb[-1]) - cycle_results["Qe"].sum(), 0.0)
+    Q_ext_heat = max(
+        np.abs(H_cold_with_amb[0])
+        - cycle_results["Qc_hpr"].sum()
+        - cycle_results["Qc_he"].sum(),
+        0.0,
+    )
+    Q_ext_cold = max(
+        np.abs(H_hot_with_amb[-1])
+        - cycle_results["Qe_hpr"].sum()
+        - cycle_results["Qe_he"].sum(),
+        0.0,
+    )
 
     p = (
         g_ineq_penalty(g=Q_ext_cold, rho=args.rho_penalty, form="square")
@@ -298,9 +312,9 @@ def _compute_multi_temperature_carnot_cycle_obj(
     if debug:
         res = get_carnot_hpr_cycle_streams(
             state_vars["T_cond"],
-            cycle_results["Qc"],
+            cycle_results["Qc_hpr"] + cycle_results["Qc_he"],
             state_vars["T_evap"],
-            cycle_results["Qe"],
+            cycle_results["Qe_hpr"] + cycle_results["Qe_he"],
             args,
         )
         plot_multi_hp_profiles_from_results(
@@ -322,9 +336,11 @@ def _compute_multi_temperature_carnot_cycle_obj(
         "heat_recovery": cycle_results["heat_recovery"],
         "Q_ext": Q_ext_heat + Q_ext_cold,
         "T_cond": state_vars["T_cond"],
-        "Q_cond": cycle_results["Qc"],
+        "Q_cond": cycle_results["Qc_hpr"],
+        "Q_cond_he": cycle_results["Qc_he"],
         "T_evap": state_vars["T_evap"],
-        "Q_evap": cycle_results["Qe"],
+        "Q_evap": cycle_results["Qe_hpr"],
+        "Q_evap_he": cycle_results["Qe_he"],
         "cop_h": cycle_results["cop"],
         "Q_amb_hot": state_vars["Q_amb_hot"],
         "Q_amb_cold": state_vars["Q_amb_cold"],
