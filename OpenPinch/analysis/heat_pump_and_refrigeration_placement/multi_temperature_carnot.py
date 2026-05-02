@@ -3,6 +3,7 @@
 from typing import Tuple
 
 import numpy as np
+from scipy.optimize import minimize_scalar
 
 from ...lib.schema import HPRTargetInputs, HPRTargetOutputs
 from ...utils.decorators import timing_decorator
@@ -55,12 +56,16 @@ def optimise_multi_temperature_carnot_heat_pump_placement(
 #######################################################################################################
 
 
-def _get_x0_for_multi_temperature_carnot_hp_opt(args: HPRTargetInputs) -> list:
+def _get_x0_for_multi_temperature_carnot_hp_opt(
+    args: HPRTargetInputs,
+) -> list:
     n_cond, n_evap = int(args.n_cond), int(args.n_evap)
     return [0.0] + [0.0] * n_cond + [0.0] * n_evap
 
 
-def _get_bounds_for_multi_temperature_carnot_hp_opt(args: HPRTargetInputs) -> list:
+def _get_bounds_for_multi_temperature_carnot_hp_opt(
+    args: HPRTargetInputs,
+) -> list:
     n_cond, n_evap = int(args.n_cond), int(args.n_evap)
     return [(-1.0, 10.0)] + [(0.0, 1.0)] * n_cond + [(0.0, 1.0)] * n_evap
 
@@ -91,6 +96,84 @@ def _get_unique_idx_mtc(is_on: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return np.unique(i_c), np.unique(i_e)
 
 
+def _get_heat_engine_and_recovery_duty(
+    is_on: np.ndarray,
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    Qc_pool: np.ndarray,
+    Qe_pool: np.ndarray,
+    args: HPRTargetInputs,
+) -> Tuple[np.ndarray, np.ndarray]:
+    Qc_he = np.zeros_like(Qc_pool)
+    Qe_he = np.zeros_like(Qe_pool)
+    if np.any(is_on):  # Heat engine or heat recovery
+        i_c, i_e = _get_unique_idx_mtc(is_on)
+        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
+        if Qc_pool_sum * Qe_pool_sum > tol:
+            if 1 > args.eta_ii_he_carnot > 0:
+                T_h = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
+                T_l = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool[i_c])
+                eta_he = calc_carnot_heat_engine_eta(T_h, T_l, args.eta_ii_he_carnot)
+                Qe_used = min(Qe_pool_sum, Qc_pool_sum / max(1.0 - eta_he, tol))
+                Qc_used = Qe_used * (1 - eta_he)
+            else:
+                Qe_used = Qc_used = min(Qe_pool_sum, Qc_pool_sum)
+
+            Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
+            Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
+    return Qc_he, Qe_he
+
+
+def _get_heat_pump_duty(
+    is_on: np.ndarray,
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    Qc_pool: np.ndarray,
+    Qe_pool: np.ndarray,
+    args: HPRTargetInputs,
+) -> Tuple[np.ndarray, np.ndarray]:
+    Qc_hpr = np.zeros_like(Qc_pool)
+    Qe_hpr = np.zeros_like(Qe_pool)
+    if np.any(is_on):  # Heat pump
+        i_c, i_e = _get_unique_idx_mtc(is_on)
+        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
+        if (Qc_pool_sum * Qe_pool_sum > tol) and (1 > args.eta_ii_hpr_carnot >= 0):
+            T_h = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool[i_c])
+            T_l = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
+            if T_h > T_l and args.eta_ii_hpr_carnot > 0.0:
+                cop = calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
+                Qe_used = min(Qe_pool_sum, Qc_pool_sum * (cop - 1.0) / cop)
+                w_hpr = Qe_used / (cop - 1.0)
+                Qc_used = Qe_used + w_hpr
+                Qc_hpr[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
+                Qe_hpr[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
+    return Qc_hpr, Qe_hpr
+
+
+def _opt_wrapper_for_heat_pump(
+    x: np.float64,
+    is_on: np.ndarray,
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    Q_cond: np.ndarray,
+    Q_evap: np.ndarray,
+    Qc_he: np.ndarray,
+    Qe_he: np.ndarray,
+    args: HPRTargetInputs,
+) -> Tuple[np.ndarray, np.ndarray]:
+    Qc_hpr, Qe_hpr = _get_heat_pump_duty(
+        is_on=is_on,
+        T_cond=T_cond,
+        T_evap=T_evap,
+        Qc_pool=Q_cond - Qc_he * x,
+        Qe_pool=Q_evap - Qe_he * x,
+        args=args,
+    )
+    w_he = (Qe_he.sum() - Qc_he.sum()) * x
+    w_hpr = Qc_hpr.sum() - Qe_hpr.sum()
+    return w_hpr - w_he
+
+
 def _get_multi_temperature_carnot_stage_duties_and_work(
     T_cond: np.ndarray,
     T_evap: np.ndarray,
@@ -105,56 +188,60 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
         T_evap, args.T_hot, H_hot_with_amb, is_cond=False
     )
 
-    Qc_he = np.zeros_like(Q_cond)
-    Qe_he = np.zeros_like(Q_evap)
-    Qc_hpr = np.zeros_like(Q_cond)
-    Qe_hpr = np.zeros_like(Q_evap)
-    w_he = 0.0
-    w_hpr = 0.0
     cop = 1.0
 
     T_diff = np.subtract.outer(T_cond, T_evap)
+    is_hp = T_diff > tol
 
-    is_hp = (T_diff > tol)
-    if np.any(~is_hp): # Heat engine or heat recovery
-        i_c, i_e = _get_unique_idx_mtc(~is_hp)
-        Qc_pool, Qe_pool = Q_cond, Q_evap
-        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
-        if (Qc_pool_sum * Qe_pool_sum > tol):
-            if 1 > args.eta_ii_he_carnot > 0:
-                T_h = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
-                T_l = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool[i_c])
-                eta_he = calc_carnot_heat_engine_eta(T_h, T_l, args.eta_ii_he_carnot)
-                Qe_used = min(Qe_pool_sum, Qc_pool_sum / max(1.0 - eta_he, tol))
-                w_he = (Qe_used * eta_he)
-                Qc_used = Qe_used - w_he
-            else:
-                Qe_used = Qc_used = min(Qe_pool_sum, Qc_pool_sum)
-            
-            Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
-            Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
+    Qc_he, Qe_he = _get_heat_engine_and_recovery_duty(
+        is_on=~is_hp,
+        T_cond=T_cond,
+        T_evap=T_evap,
+        Qc_pool=Q_cond,
+        Qe_pool=Q_evap,
+        args=args,
+    )
 
-    if np.any(is_hp): # Heat pump
-        i_c, i_e = _get_unique_idx_mtc(is_hp)
-        Qc_pool = Q_cond - Qc_he
-        Qe_pool = Q_evap - Qe_he       
-        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
-        if (Qc_pool_sum * Qe_pool_sum > tol) and (1 > args.eta_ii_hpr_carnot >= 0):
-            T_h = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool[i_c])
-            T_l = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
-            if T_h > T_l and args.eta_ii_hpr_carnot > 0.0:
-                cop = calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
-                Qe_used = min(Qe_pool_sum, Qc_pool_sum * (cop - 1.0) / cop)
-                w_hpr = Qe_used / (cop - 1.0)
-                Qc_used = Qe_used + w_hpr
-                Qc_hpr[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
-                Qe_hpr[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
+    if np.any(~is_hp):
+        fun = lambda x: _opt_wrapper_for_heat_pump(
+            x=x,
+            is_on=is_hp,
+            T_cond=T_cond,
+            T_evap=T_evap,
+            Q_cond=Q_cond,
+            Q_evap=Q_evap,
+            Qc_he=Qc_he,
+            Qe_he=Qe_he,
+            args=args,
+        )
+        res = minimize_scalar(
+            fun=fun,
+            bounds=(0, 1),
+            # method='brent',
+        )
+        Qc_he *= res.x
+        Qe_he *= res.x
 
-    Qc = Qc_he + Qc_hpr
-    Qe = Qe_he + Qe_hpr
-    heat_recovery = Qc_he.sum()
+    Qc_hpr, Qe_hpr = _get_heat_pump_duty(
+        is_on=is_hp,
+        T_cond=T_cond,
+        T_evap=T_evap,
+        Qc_pool=Q_cond - Qc_he,
+        Qe_pool=Q_evap - Qe_he,
+        args=args,
+    )
 
-    if not np.isclose(Qc.sum() + w_he, Qe.sum() + w_hpr, atol=tol):
+    w_he = Qe_he.sum() - Qc_he.sum()
+    w_hpr = Qc_hpr.sum() - Qe_hpr.sum()
+    cop = np.where(
+        w_hpr > 0,
+        Qc_hpr.sum() / w_hpr,
+        1.0,
+    ).item()
+
+    if not np.isclose(
+        Qc_he.sum() + Qc_hpr.sum() + w_he, Qe_he.sum() + Qe_hpr.sum() + w_hpr, atol=tol
+    ):
         raise ValueError(
             "Energy balance not satisfied in multi-temperature Carnot cycle calculation."
         )
@@ -162,10 +249,10 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     return {
         "w_hpr": w_hpr,
         "w_he": w_he,
-        "heat_recovery": heat_recovery,
+        "heat_recovery": Qc_he,
         "cop": cop,
-        "Qc": Qc,
-        "Qe": Qe,
+        "Qc": Qc_he + Qc_hpr,
+        "Qe": Qe_he + Qe_hpr,
     }
 
 

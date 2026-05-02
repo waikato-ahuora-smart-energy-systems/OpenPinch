@@ -23,11 +23,12 @@
                 // "tests/test_classes/test_cascade_heat_pump_cycle.py",
                 // "tests/test_utils/test_optimiser_handles.py",
                 // "tests/test_utils/test_export.py",
-                "tests/test_analysis/test_heat_pump_and_refrigeration_targeting.py",
+                // "tests/test_analysis/test_heat_pump_and_refrigeration_targeting.py",
                 // "tests/test_classes/test_stream_collection.py",
                 // "tests/test_classes/test_multi_simple_heat_pump_cycle.py"
                 // "tests/test_utils/test_miscellaneous.py",
                 // "tests/test_analysis/test_support_methods.py",
+                "tests/test_analysis/test_heat_pump_and_refrigeration_targeting/heat_pump_and_refrigeration/test_multi_temperature_carnot.py",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
