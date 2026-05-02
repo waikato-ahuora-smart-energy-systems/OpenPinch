@@ -233,11 +233,12 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
 
     w_he = Qe_he.sum() - Qc_he.sum()
     w_hpr = Qc_hpr.sum() - Qe_hpr.sum()
-    cop = np.where(
-        w_hpr > 0,
-        Qc_hpr.sum() / w_hpr,
-        1.0,
-    ).item()
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cop = np.where(
+            w_hpr > 0,
+            Qc_hpr.sum() / w_hpr,
+            1.0,
+        ).item()
 
     if not np.isclose(
         Qc_he.sum() + Qc_hpr.sum() + w_he, Qe_he.sum() + Qe_hpr.sum() + w_hpr, atol=tol
