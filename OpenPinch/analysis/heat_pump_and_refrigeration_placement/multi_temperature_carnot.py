@@ -108,7 +108,7 @@ def _get_heat_engine_and_recovery_duty(
     Qe_he = np.zeros_like(Qe_pool)
     if np.any(is_on):  # Heat engine or heat recovery
         i_c, i_e = _get_unique_idx_mtc(is_on)
-        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
+        Qc_pool_sum, Qe_pool_sum = Qc_pool[i_c].sum(), Qe_pool[i_e].sum()
         if Qc_pool_sum * Qe_pool_sum > tol:
             if 1 > args.eta_ii_he_carnot > 0:
                 T_h = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
@@ -119,8 +119,9 @@ def _get_heat_engine_and_recovery_duty(
             else:
                 Qe_used = Qc_used = min(Qe_pool_sum, Qc_pool_sum)
 
-            Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
-            Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
+            Qc_he[i_c] = Qc_pool[i_c] * (Qc_used / Qc_pool_sum)
+            Qe_he[i_e] = Qe_pool[i_e] * (Qe_used / Qe_pool_sum)
+    
     return Qc_he, Qe_he
 
 
@@ -136,7 +137,7 @@ def _get_heat_pump_duty(
     Qe_hpr = np.zeros_like(Qe_pool)
     if np.any(is_on):  # Heat pump
         i_c, i_e = _get_unique_idx_mtc(is_on)
-        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
+        Qc_pool_sum, Qe_pool_sum = Qc_pool[i_c].sum(), Qe_pool[i_e].sum()
         if (Qc_pool_sum * Qe_pool_sum > tol) and (1 > args.eta_ii_hpr_carnot >= 0):
             T_h = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool[i_c])
             T_l = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
@@ -145,8 +146,9 @@ def _get_heat_pump_duty(
                 Qe_used = min(Qe_pool_sum, Qc_pool_sum * (cop - 1.0) / cop)
                 w_hpr = Qe_used / (cop - 1.0)
                 Qc_used = Qe_used + w_hpr
-                Qc_hpr[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
-                Qe_hpr[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
+                Qc_hpr[i_c] = Qc_pool[i_c] * (Qc_used / Qc_pool_sum)
+                Qe_hpr[i_e] = Qe_pool[i_e] * (Qe_used / Qe_pool_sum)
+
     return Qc_hpr, Qe_hpr
 
 
@@ -326,6 +328,7 @@ def _compute_multi_temperature_carnot_cycle_obj(
             res["hpr_cold_streams"],
             title=f"Obj {float(obj):.5f} = {(work / args.Q_hpr_target):.5f} + {(Q_ext_heat / args.Q_hpr_target):.5f} + {(Q_ext_cold / args.Q_hpr_target):.5f} + {(p / args.Q_hpr_target):.5f}",
         )
+        pass
 
     return {
         "obj": obj,
