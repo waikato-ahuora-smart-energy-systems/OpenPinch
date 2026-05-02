@@ -141,7 +141,7 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_lift_genera
 
     assert cycle_results["w_hpr"] == pytest.approx(0.0)
     assert cycle_results["w_he"] == pytest.approx(expected_work_gen)
-    assert cycle_results["heat_recovery"] == pytest.approx(0.0)
+    assert cycle_results["heat_recovery"] == pytest.approx(expected_Q_cond)
     assert cycle_results["cop"] == pytest.approx(1.0)
     np.testing.assert_allclose(cycle_results["Qc"], np.array([expected_Q_cond]))
     np.testing.assert_allclose(cycle_results["Qe"], np.array([expected_Q_evap]))
@@ -171,10 +171,11 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_negative_pool_counts
     )
     expected_Q_evap = min(Q_evap.sum(), Q_cond.sum() / (1.0 - expected_eta_he))
     expected_work_gen = expected_Q_evap * expected_eta_he
+    expected_Q_cond = expected_Q_evap - expected_work_gen
 
     assert cycle_results["w_hpr"] == pytest.approx(0.0)
     assert cycle_results["w_he"] == pytest.approx(expected_work_gen)
-    assert cycle_results["heat_recovery"] == pytest.approx(0.0)
+    assert cycle_results["heat_recovery"] == pytest.approx(expected_Q_cond)
     assert cycle_results["cop"] == pytest.approx(1.0)
     assert cycle_results["Qc"].sum() == pytest.approx(Q_cond.sum())
     assert cycle_results["Qe"].sum() == pytest.approx(expected_Q_evap)

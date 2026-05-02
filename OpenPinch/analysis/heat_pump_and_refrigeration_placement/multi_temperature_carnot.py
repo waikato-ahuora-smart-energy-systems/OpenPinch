@@ -107,65 +107,52 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
 
     Qc_he = np.zeros_like(Q_cond)
     Qe_he = np.zeros_like(Q_evap)
-    Qc_hx = np.zeros_like(Q_cond)
-    Qe_hx = np.zeros_like(Q_evap)
     Qc_hpr = np.zeros_like(Q_cond)
     Qe_hpr = np.zeros_like(Q_evap)
     w_he = 0.0
     w_hpr = 0.0
     cop = 1.0
 
-    def _get_available_pool(
-        is_on: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        i_c, i_e = _get_unique_idx_mtc(is_on)
-        Qc_pool = np.maximum((Q_cond - (Qc_he + Qc_hx + Qc_hpr))[i_c], 0.0)
-        Qe_pool = np.maximum((Q_evap - (Qe_he + Qe_hx + Qe_hpr))[i_e], 0.0)
-        return i_c, i_e, Qc_pool, Qe_pool
-
     T_diff = np.subtract.outer(T_cond, T_evap)
 
-    is_he = (T_diff <= -tol) & (args.eta_ii_he_carnot >= tol)
-    if np.any(is_he):
-        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_he)
-        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            T_h_he = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
-            T_l_he = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
-            eta_he = calc_carnot_heat_engine_eta(T_h_he, T_l_he, args.eta_ii_he_carnot)
-            if eta_he > tol:
-                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() / max(1.0 - eta_he, tol))
-                w_he = Qe_used * eta_he
+    is_hp = (T_diff > tol)
+    if np.any(~is_hp): # Heat engine or heat recovery
+        i_c, i_e = _get_unique_idx_mtc(~is_hp)
+        Qc_pool, Qe_pool = Q_cond, Q_evap
+        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
+        if (Qc_pool_sum * Qe_pool_sum > tol):
+            if 1 > args.eta_ii_he_carnot > 0:
+                T_h = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
+                T_l = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool[i_c])
+                eta_he = calc_carnot_heat_engine_eta(T_h, T_l, args.eta_ii_he_carnot)
+                Qe_used = min(Qe_pool_sum, Qc_pool_sum / max(1.0 - eta_he, tol))
+                w_he = (Qe_used * eta_he)
                 Qc_used = Qe_used - w_he
-                Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
-                Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
+            else:
+                Qe_used = Qc_used = min(Qe_pool_sum, Qc_pool_sum)
+            
+            Qc_he[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
+            Qe_he[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
 
-    is_hx = ((T_diff > -tol) | (args.eta_ii_he_carnot < tol)) & (T_diff < tol)
-    if np.any(is_hx):
-        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_hx)
-        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            Q_transfer = min(Qc_pool.sum(), Qe_pool.sum())
-            Qc_hx[i_c] = Qc_pool * (Q_transfer / Qc_pool.sum())
-            Qe_hx[i_e] = Qe_pool * (Q_transfer / Qe_pool.sum())
-
-    is_hp = T_diff >= tol
-    if np.any(is_hp):
-        i_c, i_e, Qc_pool, Qe_pool = _get_available_pool(is_hp)
-        if Qc_pool.sum() > tol and Qe_pool.sum() > tol:
-            T_h = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool)
-            T_l = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool)
-            cop = calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
-            if cop > 1.0 + tol:
-                Qe_used = min(Qe_pool.sum(), Qc_pool.sum() * (cop - 1.0) / cop)
+    if np.any(is_hp): # Heat pump
+        i_c, i_e = _get_unique_idx_mtc(is_hp)
+        Qc_pool = Q_cond - Qc_he
+        Qe_pool = Q_evap - Qe_he       
+        Qc_pool_sum, Qe_pool_sum = Qc_pool.sum(), Qe_pool.sum()
+        if (Qc_pool_sum * Qe_pool_sum > tol) and (1 > args.eta_ii_hpr_carnot >= 0):
+            T_h = compute_entropic_mean_temperature(T_cond[i_c], Qc_pool[i_c])
+            T_l = compute_entropic_mean_temperature(T_evap[i_e], Qe_pool[i_e])
+            if T_h > T_l and args.eta_ii_hpr_carnot > 0.0:
+                cop = calc_carnot_heat_pump_cop(T_h, T_l, args.eta_ii_hpr_carnot)
+                Qe_used = min(Qe_pool_sum, Qc_pool_sum * (cop - 1.0) / cop)
                 w_hpr = Qe_used / (cop - 1.0)
                 Qc_used = Qe_used + w_hpr
-                Qc_hpr[i_c] = Qc_pool * (Qc_used / Qc_pool.sum())
-                Qe_hpr[i_e] = Qe_pool * (Qe_used / Qe_pool.sum())
-            else:
-                cop = 1.0
+                Qc_hpr[i_c] = Qc_pool * (Qc_used / Qc_pool_sum)
+                Qe_hpr[i_e] = Qe_pool * (Qe_used / Qe_pool_sum)
 
-    Qc = Qc_he + Qc_hx + Qc_hpr
-    Qe = Qe_he + Qe_hx + Qe_hpr
-    heat_recovery = Qc_hx.sum()
+    Qc = Qc_he + Qc_hpr
+    Qe = Qe_he + Qe_hpr
+    heat_recovery = Qc_he.sum()
 
     if not np.isclose(Qc.sum() + w_he, Qe.sum() + w_hpr, atol=tol):
         raise ValueError(

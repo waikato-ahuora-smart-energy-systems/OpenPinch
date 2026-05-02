@@ -238,7 +238,7 @@ def calc_carnot_heat_pump_cop(
     with np.errstate(divide="ignore", invalid="ignore"):
         cop = np.where(
             delta_T > 0.0,
-            T_l_arr / delta_T * eta_ii + 1.0,
+            (T_l_arr / delta_T) * eta_ii + 1.0,
             np.inf,
         )
     return cop.item() if cop.ndim == 0 else cop
@@ -251,13 +251,11 @@ def calc_carnot_heat_engine_eta(
 ) -> float | np.ndarray:
     T_h_arr = np.asarray(T_h, dtype=float)
     T_l_arr = np.asarray(T_l, dtype=float)
-    delta_T = T_h_arr - T_l_arr
-    with np.errstate(divide="ignore", invalid="ignore"):
-        eta = np.where(
-            delta_T > 0.0,
-            delta_T / T_h_arr * eta_ii,
-            np.inf,
-        )
+    eta = np.where(
+        T_h_arr > T_l_arr,
+        (1 - T_l_arr / T_h_arr) * eta_ii,
+        0.0,
+    )
     return eta.item() if eta.ndim == 0 else eta
 
 
