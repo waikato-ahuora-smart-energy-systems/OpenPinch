@@ -11,20 +11,34 @@ import pytest
 
 
 def test_wheel_excludes_repo_only_assets(tmp_path):
+    pytest.importorskip("build")
+    pytest.importorskip("hatchling")
 
     repo_root = Path(__file__).resolve().parents[1]
     out_dir = tmp_path / "dist"
     out_dir.mkdir()
 
     proc = subprocess.run(
-        [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)],
+        [
+            sys.executable,
+            "-m",
+            "build",
+            "--wheel",
+            "--no-isolation",
+            "--outdir",
+            str(out_dir),
+        ],
         cwd=repo_root,
         capture_output=True,
         text=True,
     )
     assert proc.returncode == 0, proc.stderr
 
-    wheel_path = next(out_dir.glob("*.whl"))
+    wheel_paths = sorted(out_dir.glob("*.whl"))
+    assert wheel_paths, (
+        f"no wheel created in {out_dir}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+    )
+    wheel_path = wheel_paths[0]
 
     with ZipFile(wheel_path) as wheel:
         names = wheel.namelist()

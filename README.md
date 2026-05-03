@@ -200,7 +200,7 @@ Timothy Gordon Walmsley, 2026. OpenPinch: An Open-Source Python Library for Adva
 To run the test suite locally:
 
 ```bash
-python -m pip install -e .
+python -m pip install -e . pytest build "hatchling>=1.26"
 pytest
 ```
 

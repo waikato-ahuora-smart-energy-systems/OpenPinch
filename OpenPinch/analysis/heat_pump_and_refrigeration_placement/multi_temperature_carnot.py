@@ -121,7 +121,7 @@ def _get_heat_engine_and_recovery_duty(
 
             Qc_he[i_c] = Qc_pool[i_c] * (Qc_used / Qc_pool_sum)
             Qe_he[i_e] = Qe_pool[i_e] * (Qe_used / Qe_pool_sum)
-    
+
     return Qc_he, Qe_he
 
 
