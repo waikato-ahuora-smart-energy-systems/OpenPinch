@@ -11,7 +11,6 @@ import pytest
 
 
 def test_wheel_excludes_repo_only_assets(tmp_path):
-    pytest.importorskip("build")
 
     repo_root = Path(__file__).resolve().parents[1]
     out_dir = tmp_path / "dist"
