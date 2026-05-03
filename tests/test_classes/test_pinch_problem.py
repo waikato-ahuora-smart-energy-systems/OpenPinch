@@ -478,7 +478,7 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     monkeypatch.setattr(PinchProblem, "run", lambda self: results)
     monkeypatch.setattr(
         sys.modules[PinchProblem.__module__],
-        "_build_summary_dataframe",
+        "build_summary_dataframe",
         lambda targets: __import__("pandas").DataFrame([{"Target": targets[0].name}]),
         raising=True,
     )

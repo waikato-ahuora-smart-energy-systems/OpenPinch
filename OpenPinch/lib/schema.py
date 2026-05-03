@@ -7,10 +7,10 @@ graph structures, and specialist analysis helper payloads.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .enums import StreamType, TurbineOptionsPropKeys
 from ..classes.stream_collection import StreamCollection
@@ -319,14 +319,11 @@ class StreamSchema(BaseModel):
 
     zone: str
     name: str
-
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
     heat_flow: ScalarOrVU
-
     dt_cont: ScalarOrVU
     htc: ScalarOrVU
-
     active: bool = True
 
 
@@ -335,17 +332,13 @@ class UtilitySchema(BaseModel):
 
     name: str
     type: StreamType
-
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
     heat_flow: Optional[ScalarOrVU] = None
-
     dt_cont: ScalarOrVU
     htc: ScalarOrVU
     price: ScalarOrVU
-
     active: bool = True
-
     model_config = ConfigDict(use_enum_values=True)
 
 
@@ -364,18 +357,7 @@ class TurbineOption(BaseModel):
 
     key: TurbineOptionsPropKeys
     value: Any
-
     model_config = ConfigDict(use_enum_values=True)
-
-
-# class Options(BaseModel):
-#     """Primary checkbox-style options plus turbine configuration."""
-
-#     main: List[MainOptionsPropKeys] = Field(default_factory=list)
-#     # graphs: List[GraphOptionsPropKeys]
-#     turbine: List[TurbineOption] = Field(default_factory=list)
-
-#     model_config = ConfigDict(use_enum_values=True)
 
 
 # ---- Complete request --------------------------------------------------------

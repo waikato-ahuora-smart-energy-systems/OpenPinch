@@ -60,9 +60,8 @@ def _stream(
 
 def _base_args(**overrides):
     args = {
-        "system_type": HPRcycle.MultiTempCarnot.value,
+        "hpr_type": HPRcycle.MultiTempCarnot.value,
         "Q_hpr_target": 200.0,
-        "Q_amb_max": 20.0,
         "dt_range_max": 110.0,
         "T_hot": np.array([140.0, 90.0, 40.0]),
         "H_hot": np.array([0.0, -80.0, -160.0]),
@@ -80,7 +79,6 @@ def _base_args(**overrides):
         "dt_phase_change": 1.0,
         "heat_to_power_ratio": 1.0,
         "cold_to_power_ratio": 0.0,
-        "load_fraction": 1.0,
         "is_heat_pumping": True,
         "max_multi_start": 2,
         "T_env": 20.0,

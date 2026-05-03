@@ -143,13 +143,13 @@ def solve_hpr_placement(
     )
     if local_minima_x.size == 0:
         raise ValueError(
-            f"Heat pump and refrigeration targeting ({args.system_type}) failed to return any local minima."
+            f"Heat pump and refrigeration targeting ({args.hpr_type}) failed to return any local minima."
         )
 
     res = f_obj(local_minima_x[0], args, debug=args.debug)
     if not res.get("success", True):
         raise ValueError(
-            f"Heat pump and refrigeration targeting ({args.system_type}) failed to return an optimal result."
+            f"Heat pump and refrigeration targeting ({args.hpr_type}) failed to return an optimal result."
         )
     res["success"] = True
     res["amb_streams"] = get_ambient_air_stream(

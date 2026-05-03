@@ -37,7 +37,6 @@ def test_optimise_brayton_heat_pump_placement_raises_on_failed_solver(monkeypatc
         eta_comp=0.75,
         eta_exp=0.75,
         dt_phase_change=1.0,
-        Q_amb_max=0.0,
         dtcont_hp=5.0,
         dt_env_cont=5.0,
         T_env=20.0,

@@ -147,7 +147,7 @@ def _compute_brayton_hp_system_obj(
     Q_ext = pt_gas_cooler.col[PT.H_NET.value][0]
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     cop = (args.Q_hpr_target - Q_ext) / (w_hpr + 1e-9)
-    Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
+    # Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
     obj = calc_hpr_obj(
         work=w_hpr,
         Q_ext_heat=Q_ext,
@@ -199,9 +199,9 @@ def _build_simulated_hpr_streams(
     return hp_streams
 
 
-def _calc_Q_amb(
-    Q_evap_total: float,
-    H_hot_limit: float,
-    Q_amb_max: float,
-) -> float:
-    return max(Q_evap_total - (H_hot_limit - Q_amb_max), 0.0)
+# def _calc_Q_amb(
+#     Q_evap_total: float,
+#     H_hot_limit: float,
+#     Q_amb_max: float,
+# ) -> float:
+#     return max(Q_evap_total - (H_hot_limit - Q_amb_max), 0.0)

@@ -102,7 +102,6 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         Q_hpr_target=300.0,
         Q_heat_max=300.0,
         Q_cool_max=260.0,
-        Q_amb_max=0.0,
         heat_to_power_ratio=1.0,
         cold_to_power_ratio=0.0,
         rho_penalty=10,

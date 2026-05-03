@@ -29,7 +29,7 @@ from ..classes.problem_table import ProblemTable
 from ..classes.stream import Stream
 from ..classes.zone import Zone
 from ..lib.enums import ArrowHead, LineColour
-from ..analysis.graph_data import get_output_graph_data
+from ..analysis import get_output_graph_data
 
 __all__ = [
     "StreamlitGraphSet",

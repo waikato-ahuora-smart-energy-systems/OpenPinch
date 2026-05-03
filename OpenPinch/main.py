@@ -8,10 +8,13 @@ in larger workflows.
 
 from typing import Any, List
 
-from .analysis.data_preparation import prepare_problem
-from .analysis.direct_integration_entry import compute_direct_integration_targets
-from .analysis.graph_data import get_output_graph_data, visualise_graphs
-from .analysis.indirect_integration_entry import compute_indirect_integration_targets
+from .analysis import (
+    compute_direct_integration_targets,
+    compute_indirect_integration_targets,
+    get_output_graph_data,
+    prepare_problem,
+    visualise_graphs,
+)
 from .classes.energy_target import EnergyTarget
 from .classes.stream import Stream
 from .classes.stream_collection import StreamCollection

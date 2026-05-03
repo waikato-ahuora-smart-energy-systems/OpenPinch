@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 import pandas as pd
 from pydantic import ValidationError
 
-from ..analysis.graph_data import get_output_graph_data
+from ..analysis import get_output_graph_data
 from ..lib.enums import GT
 from ..lib.schema import (
     HeatPumpIntegrationComparison,
@@ -23,7 +23,7 @@ from ..lib.schema import (
     TargetOutput,
 )
 from ..utils.csv_to_json import get_problem_from_csv
-from ..utils.export import _build_summary_dataframe
+from ..utils.export import build_summary_dataframe
 from ..utils.export import export_target_summary_to_excel_with_units
 from ..utils.input_validation import validate_stream_data, validate_utility_data
 from ..utils.miscellaneous import get_value
@@ -293,10 +293,10 @@ class PinchProblem:
             context=self._validation_context or {},
         )
 
-        from ..analysis.data_preparation import prepare_problem
+        from ..analysis import data_preparation as process_data_preparation
 
         try:
-            prepare_problem(
+            process_data_preparation.prepare_problem(
                 streams=payload.streams,
                 utilities=payload.utilities,
                 options=payload.options,
@@ -311,7 +311,7 @@ class PinchProblem:
         """Return the solved target summary as a pandas DataFrame."""
         results = self.run()
         if detailed:
-            return _build_summary_dataframe(results.targets)
+            return build_summary_dataframe(results.targets)
 
         rows = []
         for target in results.targets:
