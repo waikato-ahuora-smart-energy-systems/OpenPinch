@@ -183,8 +183,6 @@ def _sum_subzone_targets(zone: Zone) -> Zone:
     )
 
     for z in zone.subzones.values():
-        z: Zone
-        t: EnergyTarget
         t = z.targets[f"{z.name}/{TargetType.DI.value}"]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target

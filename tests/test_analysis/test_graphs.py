@@ -1,5 +1,6 @@
 """Regression tests for graphs analysis routines."""
 
+import sys
 from unittest.mock import MagicMock
 
 import pytest
@@ -96,7 +97,8 @@ def test_get_output_graph_data_single_zone(monkeypatch):
     zone.targets = {TargetType.DI.value: MagicMock(name="TI", graphs={})}
 
     monkeypatch.setattr(
-        "OpenPinch.services.common.graph_data._create_graph_set",
+        sys.modules[_create_graph_set.__module__],
+        "_create_graph_set",
         lambda z, n: {"name": n, "graphs": []},
     )
     result = get_output_graph_data(zone)

@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
 
 import pandas as pd
 
+from ..streamlit_webviewer.web_graphing import problem_table_to_dataframe
+
 if TYPE_CHECKING:
     from ..classes.zone import Zone
     from ..lib.schema import TargetOutput
@@ -212,8 +214,6 @@ def _write_problem_tables(
     """Emit shifted and real-temperature problem tables for every solved zone."""
     if master_zone is None:
         return
-
-    from ..streamlit_webviewer.web_graphing import problem_table_to_dataframe
 
     used_sheet_names: set[str] = set()
 

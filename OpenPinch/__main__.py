@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+import OpenPinch as _openpinch
 from .resources import (
     copy_notebook,
     copy_sample_case,
@@ -204,8 +205,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Execute the OpenPinch CLI."""
-    from . import PinchProblem
-
     parser = build_parser()
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] not in _COMMANDS and not argv[0].startswith("-"):
@@ -214,17 +213,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "run":
-            return _run_command(PinchProblem, args)
+            return _run_command(_openpinch.PinchProblem, args)
         if args.command == "graph":
-            return _graph_command(PinchProblem, args)
+            return _graph_command(_openpinch.PinchProblem, args)
         if args.command == "validate":
-            return _validate_command(PinchProblem, args)
+            return _validate_command(_openpinch.PinchProblem, args)
         if args.command == "sample":
             return _sample_command(args)
         if args.command == "notebook":
             return _notebook_command(args)
         if args.command == "heat-pump":
-            return _heat_pump_command(PinchProblem, args)
+            return _heat_pump_command(_openpinch.PinchProblem, args)
     except Exception as exc:
         if args.debug:
             raise

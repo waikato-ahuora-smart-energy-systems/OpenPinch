@@ -1,16 +1,57 @@
-"""Single-state process targeting package."""
+"""Public service-layer entry points and reusable targeting helpers."""
 
-from .common.capital_cost_and_area_targeting import *  # noqa: F401,F403
-from .input_data_processing.data_preparation import *  # noqa: F401,F403
-from .direct_heat_integration.direct_integration_entry import *  # noqa: F401,F403
-from .energy_transfer_analysis.energy_transfer_analysis import *  # noqa: F401,F403
-from .exergy_analysis.exergy_targeting_entry import *  # noqa: F401,F403
-from .common.gcc_manipulation import *  # noqa: F401,F403
-from .common.graph_data import *  # noqa: F401,F403
-from .indirect_heat_integration.indirect_integration_entry import *  # noqa: F401,F403
-from .common.problem_table_analysis import *  # noqa: F401,F403
-from .common.temperature_driving_force import *  # noqa: F401,F403
-from .common.utility_targeting import *  # noqa: F401,F403
-from .services_entry import *
+from __future__ import annotations
 
-__all__ = [name for name in globals() if not name.startswith("_")]
+from functools import lru_cache
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+from .common.capital_cost_and_area_targeting import (
+    get_area_targets,
+    get_capital_cost_targets,
+)
+from .common.graph_data import get_output_graph_data
+from .common.utility_targeting import get_utility_targets
+from .input_data_processing.data_preparation import prepare_problem
+
+if TYPE_CHECKING:
+    from types import ModuleType
+
+    from ..classes.zone import Zone
+
+__all__ = [
+    "data_preprocessing_service",
+    "direct_heat_integration_service",
+    "get_area_targets",
+    "get_capital_cost_targets",
+    "get_output_graph_data",
+    "get_utility_targets",
+    "indirect_heat_integration_service",
+    "prepare_problem",
+]
+
+@lru_cache(maxsize=1)
+def _load_services_entry_module() -> "ModuleType":
+    """Load orchestration services lazily to avoid package import cycles."""
+    return import_module(".services_entry", __name__)
+
+
+def data_preprocessing_service(
+    input_data: Any,
+    project_name: str = "Site",
+) -> "Zone":
+    """Validate raw input payloads and construct the in-memory zone tree."""
+    return _load_services_entry_module().data_preprocessing_service(
+        input_data=input_data,
+        project_name=project_name,
+    )
+
+
+def direct_heat_integration_service(zone: "Zone") -> "Zone":
+    """Run direct heat integration targeting for a prepared zone."""
+    return _load_services_entry_module().direct_heat_integration_service(zone)
+
+
+def indirect_heat_integration_service(zone: "Zone") -> "Zone":
+    """Run indirect heat integration targeting for an aggregated zone."""
+    return _load_services_entry_module().indirect_heat_integration_service(zone)

@@ -9,12 +9,13 @@ minimal so user projects can layer additional controls as needed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import sys
 import math
 from io import BytesIO
 from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tuple
 
-import pandas as pd
 import openpyxl as xl_writer
+import pandas as pd
 
 try:
     import plotly.graph_objects as go
@@ -24,12 +25,20 @@ except ImportError as exc:  # pragma: no cover - optional dependency guard
 else:
     _PLOTLY_IMPORT_ERROR = None
 
+try:
+    import streamlit as st
+except ImportError as exc:  # pragma: no cover - optional dependency guard
+    st = None
+    _STREAMLIT_IMPORT_ERROR = exc
+else:
+    _STREAMLIT_IMPORT_ERROR = None
+
 from ..classes.energy_target import EnergyTarget
 from ..classes.problem_table import ProblemTable
 from ..classes.stream import Stream
 from ..classes.zone import Zone
 from ..lib.enums import ArrowHead, LineColour
-from ..services import get_output_graph_data
+from ..services.common.graph_data import get_output_graph_data
 
 __all__ = [
     "StreamlitGraphSet",
@@ -57,6 +66,18 @@ def _require_plotly():
         "Plotly is required for graph rendering. "
         "Reinstall OpenPinch or install it directly with 'pip install plotly'."
     ) from _PLOTLY_IMPORT_ERROR
+
+
+def _require_streamlit():
+    streamlit_mod = sys.modules.get("streamlit")
+    if streamlit_mod is not None:
+        return streamlit_mod
+    if _STREAMLIT_IMPORT_ERROR is None:
+        return st
+    raise ImportError(
+        "Streamlit is required for 'render_streamlit_dashboard'. "
+        "Reinstall OpenPinch or install it directly with 'pip install streamlit'."
+    ) from _STREAMLIT_IMPORT_ERROR
 
 
 @dataclass(slots=True)
@@ -114,13 +135,7 @@ def render_streamlit_dashboard(
     value_rounding: int = 2,
 ) -> None:
     """Render a basic Streamlit dashboard for ``zone``."""
-    try:
-        import streamlit as st
-    except ImportError as exc:  # pragma: no cover - streamlit dependency guard
-        raise ImportError(
-            "Streamlit is required for 'render_streamlit_dashboard'. "
-            "Reinstall OpenPinch or install it directly with 'pip install streamlit'."
-        ) from exc
+    st = _require_streamlit()
 
     st.set_page_config(
         page_title=page_title or f"{zone.name} Pinch Dashboard",

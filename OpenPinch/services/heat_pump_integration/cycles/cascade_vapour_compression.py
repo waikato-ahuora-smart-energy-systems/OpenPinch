@@ -26,6 +26,8 @@ from ..common.shared import (
     get_process_heat_cascade,
     g_ineq_penalty,
     plot_multi_hp_profiles_from_results,
+    solve_hpr_placement,
+    validate_vapour_hp_refrigerant_ls,
 )
 
 
@@ -49,7 +51,6 @@ def optimise_cascade_heat_pump_placement(
         if args.initialise_simulated_cycle
         else None
     )
-    from ..common.shared import validate_vapour_hp_refrigerant_ls, solve_hpr_placement
 
     args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(num_stages, args)
     res = solve_hpr_placement(

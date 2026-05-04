@@ -8,11 +8,11 @@ in larger workflows.
 
 from typing import Any, List
 
-from .services import (
+from .services.common.graph_data import get_output_graph_data
+from .services.services_entry import (
     data_preprocessing_service,
     direct_heat_integration_service,
     indirect_heat_integration_service,
-    get_output_graph_data,
 )
 from .classes.energy_target import EnergyTarget
 from .classes.stream import Stream

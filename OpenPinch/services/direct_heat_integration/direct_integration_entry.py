@@ -14,6 +14,7 @@ from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
+from ...classes.energy_target import EnergyTarget
 from ...lib.config import Configuration, tol
 from ...lib.enums import GT, PT, StreamType, TargetType, Z
 from ...utils.miscellaneous import delta_vals
@@ -48,6 +49,12 @@ def compute_direct_integration_targets(zone: Zone):
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
+    # res = EnergyTarget(
+    #     name=target_name,
+    #     identifier=TargetType.DI.value,
+    #     parent_zone=zone.parent_zone,
+    #     zone_config=zone.config,
+    # )    
     res: dict = {}
     pt = get_process_heat_cascade(
         hot_streams=zone.hot_streams,

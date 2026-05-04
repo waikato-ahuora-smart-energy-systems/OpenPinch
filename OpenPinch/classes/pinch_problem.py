@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 import pandas as pd
 from pydantic import ValidationError
 
-from ..services import get_output_graph_data
+from ..services.common.graph_data import get_output_graph_data
 from ..lib.enums import GT
 from ..lib.schema import (
     HeatPumpIntegrationComparison,
