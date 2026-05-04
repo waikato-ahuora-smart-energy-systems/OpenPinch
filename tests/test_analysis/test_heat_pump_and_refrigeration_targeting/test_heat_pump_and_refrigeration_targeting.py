@@ -78,7 +78,7 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
             q_amb_hot, q_amb_cold, _base_args()
         ),
     )
-    out = hp.calc_heat_pump_and_refrigeration_cascade(
+    out = hp._calc_hpr_cascade(
         pt,
         res,
         is_T_vals_shifted=True,
