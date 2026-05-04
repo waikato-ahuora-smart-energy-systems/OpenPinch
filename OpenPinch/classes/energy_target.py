@@ -381,6 +381,14 @@ class EnergyTarget:
             setattr(self, key, value)
 
     # === Methods ===
+    def update(self, value_dict: dict, type: str = "values"):
+        if type == "values":
+            for key, value in value_dict.items():
+                setattr(self, key, value)
+        elif type == "graph":
+            for key, value in value_dict.items():
+                self.add_graph(key, value)
+
     def add_graph(self, name: str, result):
         """Store a graph result under ``name`` for later export or display."""
         self._graphs[name] = result

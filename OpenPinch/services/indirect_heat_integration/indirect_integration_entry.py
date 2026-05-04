@@ -15,7 +15,7 @@ from ...classes.problem_table import ProblemTable
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
-from ...lib.config import Configuration, tol
+from ...lib.config import tol
 from ...lib.enums import GT, PT, TargetType, Z
 from ..heat_pump_integration.heat_pump_and_refrigeration_entry import (
     get_indirect_heat_pump_and_refrigeration_target,
@@ -24,38 +24,91 @@ from ..common.problem_table_analysis import (
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
     problem_table_algorithm,
-    set_zonal_targets,
 )
 
-__all__ = ["compute_indirect_integration_targets"]
+__all__ = [
+    "compute_total_subzone_utility_targets",
+    "compute_indirect_integration_targets",
+]
 
 
 #######################################################################################################
 # Public API
 #######################################################################################################
 
+def compute_total_subzone_utility_targets(zone: Zone) -> EnergyTarget:
+    """Sums and records zonal targets."""
+    target = EnergyTarget(
+        zone_name=zone.name,
+        identifier=TargetType.TZ.value,
+        parent_zone=zone.parent_zone,
+        zone_config=zone.config,
+    )
+    # Sum targets from subzones
+    hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
+    utility_cost = num_units = area = capital_cost = total_cost = 0.0
 
-def compute_indirect_integration_targets(zone: Zone) -> Zone:
+    hot_utilities = deepcopy(zone.hot_utilities)
+    cold_utilities = deepcopy(zone.cold_utilities)
+    hot_utilities, cold_utilities = _reset_utility_heat_flows(
+        hot_utilities, cold_utilities
+    )
+    for z in zone.subzones.values():
+        t = z.targets[TargetType.DI.value]
+        hot_utility_target += t.hot_utility_target
+        cold_utility_target += t.cold_utility_target
+        heat_recovery_target += t.heat_recovery_target
+        utility_cost += t.utility_cost
+
+        for j in range(len(hot_utilities)):
+            hot_utilities[j].set_heat_flow(
+                hot_utilities[j].heat_flow + t.hot_utilities[j].heat_flow
+            )
+
+        for j in range(len(cold_utilities)):
+            cold_utilities[j].set_heat_flow(
+                cold_utilities[j].heat_flow + t.cold_utilities[j].heat_flow
+            )
+
+        if area > tol:
+            num_units += t.num_units
+            area += t.area
+            # capital_cost = t.capital_cost
+
+    heat_recovery_limit = zone.targets[TargetType.DI.value].heat_recovery_limit
+    target.update(
+        {
+            "hot_utilities": hot_utilities,
+            "cold_utilities": cold_utilities,
+            "hot_utility_target": hot_utility_target,
+            "cold_utility_target": cold_utility_target,
+            "heat_recovery_target": heat_recovery_target,
+            "heat_recovery_limit": heat_recovery_limit,
+            "degree_of_int": (
+                (heat_recovery_target / heat_recovery_limit)
+                if heat_recovery_limit > 0
+                else 1.0
+            ),
+        }        
+    )
+    return target
+
+
+def compute_indirect_integration_targets(zone: Zone) -> EnergyTarget:
     """Compute indirect integration targets for an aggregated zone.
 
     The routine assumes the relevant child zones have already been solved for
     direct integration. It then sums subzone targets, builds site-level net
     stream cascades, performs utility-to-utility balancing, and records the
     resulting total-site style target on ``zone`` before returning it.
-    """
-    zone_config: Configuration = zone.config
-    res: dict = {}
-
-    # Sum targets from subzones
-    _sum_subzone_targets(zone)
-
-    # Total site profiles - process side
-    zone.import_hot_and_cold_streams_from_sub_zones(
-        get_net_streams=True,
-        is_n_zone_depth=False,
-        is_new_stream_collection=True,
+    """ 
+    target = EnergyTarget(
+        zone_name=zone.name,
+        identifier=TargetType.TS.value,
+        parent_zone=zone.parent_zone,
+        zone_config=zone.config,
     )
-
+    # Total site profiles - process side
     pt = get_process_heat_cascade(
         hot_streams=zone.net_hot_streams,
         cold_streams=zone.net_cold_streams,
@@ -71,11 +124,6 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
-    target_values = set_zonal_targets(
-        pt=pt,
-        pt_real=pt_real,
-    )
-
     pt.update(
         _get_site_process_heat_load_profiles(
             pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value]
@@ -113,6 +161,20 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     # Apply the utility targeting method to determine the net utility use and generation
     _match_utility_gen_and_use_at_same_level(hot_utilities, cold_utilities)
 
+    # Determine if heat pump or refrigeration targeting is warranted based on the utility cascade profiles and user settings
+    if zone.identifier == Z.S.value and (
+        zone.config.DO_UTILITY_HP_TARGETING or zone.config.DO_UTILITY_RFRG_TARGETING
+    ):
+        target.update(
+            get_indirect_heat_pump_and_refrigeration_target(
+                pt=pt,
+                hot_utilities=hot_utilities,
+                cold_utilities=cold_utilities,
+                zone_name=zone.name,
+                zone_config=zone.config,
+            )
+        )
+
     # Extract overall heat integration targets
     hot_utility_target = pt.loc[0, PT.H_NET_UT.value]
     cold_utility_target = pt.loc[-1, PT.H_NET_UT.value]
@@ -121,110 +183,33 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
-    # Determine if heat pump or refrigeration targeting is warranted based on the utility cascade profiles and user settings
-    if zone.identifier == Z.S.value and (
-        zone_config.DO_UTILITY_HP_TARGETING or zone_config.DO_UTILITY_RFRG_TARGETING
-    ):
-        res.update(
-            get_indirect_heat_pump_and_refrigeration_target(
-                pt=pt,
-                hot_utilities=hot_utilities,
-                cold_utilities=cold_utilities,
-                zone_name=zone.name,
-                zone_config=zone_config,
-            )
-        )
-
-    # if zone_config.DO_TURBINE_WORK:
-    #     work_target = 0.0
-    #     if zone_config.ABOVE_PINCH_CHECKBOX:
-    #         pass
-    #         # s_tsi = get_power_cogeneration_above_pinch(s_tsi)
-    #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
-
-    target_values = _set_sites_targets(
-        hot_utility_target,
-        cold_utility_target,
-        heat_recovery_target,
-        s_tzt.heat_recovery_limit,
-    )
-    res.update(
+    target.update(
         {
             "pt": pt,
             "pt_real": pt_real,
-            "target_values": target_values,
-            "graphs": _save_graph_data(pt, pt_real),
-            "hot_utilities": hot_utilities,
-            "cold_utilities": cold_utilities,
+            "graphs": _save_graph_data(pt, pt_real),          
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
+            "hot_utilities": hot_utilities,
+            "cold_utilities": cold_utilities,
+            "hot_utility_target": hot_utility_target,
+            "cold_utility_target": cold_utility_target,
+            "heat_recovery_target": heat_recovery_target,
+            "heat_recovery_limit": s_tzt.heat_recovery_limit,
+            "degree_of_int": (
+                (heat_recovery_target / s_tzt.heat_recovery_limit)
+                if s_tzt.heat_recovery_limit > 0
+                else 1.0
+            ),
             "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
         }
     )
-    zone.add_target_from_results(TargetType.TS.value, res)
-    return zone
+    return target
 
 
 #######################################################################################################
 # Helper Functions
 #######################################################################################################
-
-
-def _sum_subzone_targets(zone: Zone) -> Zone:
-    """Sums and records zonal targets."""
-    hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
-    utility_cost = num_units = area = capital_cost = total_cost = 0.0
-
-    hot_utilities = deepcopy(zone.hot_utilities)
-    cold_utilities = deepcopy(zone.cold_utilities)
-    hot_utilities, cold_utilities = _reset_utility_heat_flows(
-        hot_utilities, cold_utilities
-    )
-
-    for z in zone.subzones.values():
-        t = z.targets[TargetType.DI.value]
-        hot_utility_target += t.hot_utility_target
-        cold_utility_target += t.cold_utility_target
-        heat_recovery_target += t.heat_recovery_target
-        utility_cost += t.utility_cost
-
-        for j in range(len(hot_utilities)):
-            hot_utilities[j].set_heat_flow(
-                hot_utilities[j].heat_flow + t.hot_utilities[j].heat_flow
-            )
-
-        for j in range(len(cold_utilities)):
-            cold_utilities[j].set_heat_flow(
-                cold_utilities[j].heat_flow + t.cold_utilities[j].heat_flow
-            )
-
-        if area > tol:
-            num_units += t.num_units
-            area += t.area
-            # capital_cost = t.capital_cost
-
-    heat_recovery_limit = zone.targets[TargetType.DI.value].heat_recovery_limit
-
-    # Target co-generation of heat and power
-    # if zone_config.DO_TURBINE_WORK:
-    #     st = get_power_cogeneration_above_pinch(st)
-    #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
-
-    target_values = _set_sites_targets(
-        hot_utility_target=hot_utility_target,
-        cold_utility_target=cold_utility_target,
-        heat_recovery_target=heat_recovery_target,
-        heat_recovery_limit=heat_recovery_limit,
-    )
-    zone.add_target_from_results(
-        TargetType.TZ.value,
-        {
-            "target_values": target_values,
-            "hot_utilities": hot_utilities,
-            "cold_utilities": cold_utilities,
-        },
-    )
-    return zone
 
 
 def _reset_utility_heat_flows(
@@ -238,26 +223,6 @@ def _reset_utility_heat_flows(
     for cu in cold_utilities:
         cu.heat_flow = 0.0
     return hot_utilities, cold_utilities
-
-
-def _set_sites_targets(
-    hot_utility_target: float,
-    cold_utility_target: float,
-    heat_recovery_target: float,
-    heat_recovery_limit: float,
-) -> dict:
-    """Assign thermal targets and integration degree to the zone based on site analysis methods."""
-    return {
-        "hot_utility_target": hot_utility_target,
-        "cold_utility_target": cold_utility_target,
-        "heat_recovery_target": heat_recovery_target,
-        "heat_recovery_limit": heat_recovery_limit,
-        "degree_of_int": (
-            (heat_recovery_target / heat_recovery_limit)
-            if heat_recovery_limit > 0
-            else 1.0
-        ),
-    }
 
 
 def _match_utility_gen_and_use_at_same_level(

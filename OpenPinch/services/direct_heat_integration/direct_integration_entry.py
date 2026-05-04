@@ -42,20 +42,19 @@ __all__ = ["compute_direct_integration_targets"]
 #######################################################################################################
 
 
-def compute_direct_integration_targets(zone: Zone):
+def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
     """Populate a ``Zone`` with detailed direct heat integration pinch targets.
 
     The function aggregates problem-table calculations, multi-utility targeting,
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
-    # res = EnergyTarget(
-    #     name=target_name,
-    #     identifier=TargetType.DI.value,
-    #     parent_zone=zone.parent_zone,
-    #     zone_config=zone.config,
-    # )    
-    res: dict = {}
+    target = EnergyTarget(
+        zone_name=zone.name,
+        identifier=TargetType.DI.value,
+        parent_zone=zone.parent_zone,
+        zone_config=zone.config,
+    )
     pt = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
@@ -71,10 +70,6 @@ def compute_direct_integration_targets(zone: Zone):
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
-    target_values = set_zonal_targets(
-        pt=pt,
-        pt_real=pt_real,
-    )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     pt = get_additional_GCCs(
         pt,
@@ -85,7 +80,7 @@ def compute_direct_integration_targets(zone: Zone):
     if zone.identifier == Z.P.value and (
         zone.config.DO_PROCESS_HP_TARGETING or zone.config.DO_PROCESS_RFRG_TARGETING
     ):
-        res.update(
+        target.update(
             get_direct_heat_pump_and_refrigeration_target(
                 pt=pt,
                 zone_name=zone.name,
@@ -153,7 +148,7 @@ def compute_direct_integration_targets(zone: Zone):
                 num_units=num_units,
                 zone_config=zone.config,
             )
-            res.update(
+            target.update(
                 {
                     "Area target": area,
                     "Units target": num_units,
@@ -162,11 +157,13 @@ def compute_direct_integration_targets(zone: Zone):
                 }
             )
 
-    res.update(
-        {
+    target.update(
+        set_zonal_targets(
+            pt=pt,
+            pt_real=pt_real,
+        ) | {
             "pt": pt,
             "pt_real": pt_real,
-            "target_values": target_values,
             "graphs": _save_graph_data(pt, pt_real),
             "hot_utilities": zone.hot_utilities,
             "cold_utilities": zone.cold_utilities,
@@ -176,8 +173,7 @@ def compute_direct_integration_targets(zone: Zone):
             "cold_pinch": cold_pinch,
         }
     )
-    zone.add_target_from_results(TargetType.DI.value, res)
-    return zone
+    return target
 
 
 #######################################################################################################
