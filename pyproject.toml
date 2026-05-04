@@ -39,7 +39,7 @@ dependencies=[
   "plotly",
   "tespy",
 ]
-version = "0.1.15"
+version = "0.1.16"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
