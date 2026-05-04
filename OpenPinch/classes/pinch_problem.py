@@ -723,8 +723,12 @@ class PinchProblem:
 
         zone_items = payload.items()
         if zone_name is not None:
+            resolved_zone_key = zone_name
+            if resolved_zone_key not in payload:
+                resolved_zone_key = str(zone_name).split("/", 1)[-1]
+
             try:
-                zone_items = [(zone_name, payload[zone_name])]
+                zone_items = [(resolved_zone_key, payload[resolved_zone_key])]
             except KeyError as exc:
                 raise KeyError(
                     f"Unknown zone {zone_name!r}. Available zones: {', '.join(payload)}"

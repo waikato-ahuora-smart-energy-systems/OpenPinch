@@ -25,17 +25,22 @@ class EnergyTarget:
 
     def __init__(
         self,
-        name: str = "untitled",
-        identifier: str = TargetType.DI.value,
+        zone_name: str,
+        identifier: str,
         parent_zone: "Zone" = None,
         zone_config: Optional[Configuration] = None,
     ):
         """Initialise a target container with empty tables, utilities, and metrics."""
         # === Metadata ===
+        if not zone_name:
+            raise ValueError("zone_name is required.")
+        if not identifier:
+            raise ValueError("identifier is required.")
+
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
         self._identifier = identifier
-        self._name = name
+        self._name = self._format_target_name(zone_name, identifier)
         self._active = True
 
         self._graphs = {}
@@ -77,6 +82,16 @@ class EnergyTarget:
         self._capital_cost = 0.0
         self._total_cost = 0.0
         self._utility_cost = 0.0
+        self._target_values = {}
+
+    @staticmethod
+    def _format_target_name(zone_name: str, identifier: str) -> str:
+        """Normalise display names while avoiding duplicate identifier suffixes."""
+        suffix = f"/{identifier}"
+        if zone_name.endswith(suffix):
+            return zone_name
+
+        return f"{zone_name}{suffix}"
 
     # === Properties ===
     @property

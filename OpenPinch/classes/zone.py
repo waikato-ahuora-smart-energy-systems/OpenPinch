@@ -236,7 +236,7 @@ class Zone:
 
     def add_target(self, target_to_add: EnergyTarget):
         """Add one target to a specific zone."""
-        self._targets[target_to_add.name] = target_to_add
+        self._targets[target_to_add.identifier] = target_to_add
 
     def add_targets(self, targets: list):
         """Add multiple targets to a specific zone."""
@@ -245,9 +245,8 @@ class Zone:
 
     def add_target_from_results(self, target_id: str = None, results: dict = None):
         """Create and register an :class:`EnergyTarget` from a result mapping."""
-        target_name = f"{self.name}/{target_id}" if target_id is not None else self.name
         res = EnergyTarget(
-            name=target_name,
+            zone_name=self.name,
             identifier=target_id,
             parent_zone=self.parent_zone,
             zone_config=self.config,

@@ -15,7 +15,7 @@ def dummy_zone():
 @pytest.fixture
 def dummy_tar():
     """Return dummy tar data used by this test module."""
-    return EnergyTarget("Z1")
+    return EnergyTarget(zone_name="Z1", identifier="DI")
 
 
 @pytest.fixture
@@ -188,7 +188,7 @@ def test_serialize_json_basic(dummy_tar):
 
     json_data = dummy_tar.serialize_json()
 
-    assert json_data["name"] == "Z1"
+    assert json_data["name"] == "Z1/DI"
     assert json_data["Qh"] == 100
     assert json_data["Qc"] == 50
     assert json_data["Qr"] == 30

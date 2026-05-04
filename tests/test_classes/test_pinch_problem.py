@@ -547,6 +547,28 @@ def test_graph_catalog_and_plot_helpers(monkeypatch):
     assert fig == {"built": "GCC"}
 
 
+def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypatch):
+    payload = {
+        "Direct Integration": {
+            "graphs": [
+                {"type": "Grand Composite Curve", "name": "GCC"},
+            ]
+        }
+    }
+    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_plotly_graph",
+        lambda graph: {"built": graph["name"]},
+        raising=True,
+    )
+
+    obj = PinchProblem(run=False)
+    fig = obj.plot_grand_composite_curve(zone_name="Plant/Direct Integration")
+
+    assert fig == {"built": "GCC"}
+
+
 def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
     payload = {
         "Plant/DI": {

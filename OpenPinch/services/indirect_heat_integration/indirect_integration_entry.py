@@ -17,7 +17,6 @@ from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import Configuration, tol
 from ...lib.enums import GT, PT, TargetType, Z
-from ...utils.miscellaneous import key_name
 from ..heat_pump_integration.heat_pump_and_refrigeration_entry import (
     get_indirect_heat_pump_and_refrigeration_target,
 )
@@ -89,7 +88,7 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     )
 
     # Get utility duties based on the summation of subzones
-    s_tzt: EnergyTarget = zone.targets[key_name(zone.name, TargetType.TZ.value)]
+    s_tzt = zone.targets[TargetType.TZ.value]
     hot_utilities = deepcopy(s_tzt.hot_utilities)
     cold_utilities = deepcopy(s_tzt.cold_utilities)
 
@@ -183,7 +182,7 @@ def _sum_subzone_targets(zone: Zone) -> Zone:
     )
 
     for z in zone.subzones.values():
-        t = z.targets[f"{z.name}/{TargetType.DI.value}"]
+        t = z.targets[TargetType.DI.value]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target
         heat_recovery_target += t.heat_recovery_target
@@ -204,9 +203,7 @@ def _sum_subzone_targets(zone: Zone) -> Zone:
             area += t.area
             # capital_cost = t.capital_cost
 
-    heat_recovery_limit = zone.targets[
-        f"{zone.name}/{TargetType.DI.value}"
-    ].heat_recovery_limit
+    heat_recovery_limit = zone.targets[TargetType.DI.value].heat_recovery_limit
 
     # Target co-generation of heat and power
     # if zone_config.DO_TURBINE_WORK:

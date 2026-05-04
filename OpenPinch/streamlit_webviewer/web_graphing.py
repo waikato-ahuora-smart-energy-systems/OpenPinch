@@ -100,8 +100,8 @@ def collect_targets(zone: Zone) -> Dict[str, EnergyTarget]:
     """Flattens all energy targets beneath ``zone`` keyed by their display name."""
 
     def _iter(current: Zone) -> Iterator[tuple[str, EnergyTarget]]:
-        for name, target in current.targets.items():
-            yield name, target
+        for _, target in current.targets.items():
+            yield target.name, target
         for subzone in current.subzones.values():
             yield from _iter(subzone)
 

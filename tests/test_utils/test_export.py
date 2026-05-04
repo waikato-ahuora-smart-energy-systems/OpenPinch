@@ -217,17 +217,17 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
 
 def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     master_zone = Zone("Plant")
-    master_target = EnergyTarget(name="Master")
+    master_target = EnergyTarget(zone_name="Master", identifier="DI")
     master_target.pt = _make_problem_table([10.0, 20.0])
     master_target.pt_real = _make_problem_table([30.0])
-    master_zone.targets["Master"] = master_target
+    master_zone.targets["DI"] = master_target
 
     sub_zone = Zone("Sub/Zone", parent_zone=master_zone)
     master_zone.add_zone(sub_zone, sub=True)
-    sub_target = EnergyTarget(name="Alt:Target", parent_zone=sub_zone)
+    sub_target = EnergyTarget(zone_name="Alt:Target", identifier="DI", parent_zone=sub_zone)
     sub_target.pt = _make_problem_table([40.0])
     sub_target.pt_real = _make_problem_table([50.0])
-    sub_zone.targets["Alt:Target"] = sub_target
+    sub_zone.targets["DI"] = sub_target
 
     target_response = SimpleNamespace(name="Project", targets=[])
     out = export_target_summary_to_excel_with_units(
@@ -235,10 +235,10 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     )
     xls = pd.ExcelFile(out)
 
-    master_shifted = "Plant - Master (Shifted)"
-    master_real = "Plant - Master (Real)"
-    sub_shifted = "Sub_Zone - Alt_Target (Shifted)"
-    sub_real = "Sub_Zone - Alt_Target (Real)"
+    master_shifted = "Plant - DI (Shifted)"
+    master_real = "Plant - DI (Real)"
+    sub_shifted = "Sub_Zone - DI (Shifted)"
+    sub_real = "Sub_Zone - DI (Real)"
 
     assert master_shifted in xls.sheet_names
     assert master_real in xls.sheet_names
@@ -246,8 +246,8 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     assert sub_real in xls.sheet_names
 
     wb = openpyxl.load_workbook(out, data_only=True)
-    assert wb[master_shifted]["A1"].value == "Master"
-    assert wb[sub_shifted]["A1"].value == "Alt:Target"
+    assert wb[master_shifted]["A1"].value == "Master/DI"
+    assert wb[sub_shifted]["A1"].value == "Alt:Target/DI"
 
     master_df = pd.read_excel(
         out,
@@ -345,7 +345,7 @@ def test_autosize_columns_sets_reasonable_widths(tmp_path: Path):
 
 def test_write_problem_tables_skips_empty_dataframes(monkeypatch, tmp_path: Path):
     zone = Zone("Plant")
-    target = EnergyTarget(name="Plant/DI")
+    target = EnergyTarget(zone_name="Plant", identifier="DI")
     target.pt = object()
     target.pt_real = object()
     zone.targets["DI"] = target
