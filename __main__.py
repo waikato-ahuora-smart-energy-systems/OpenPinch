@@ -1,14 +1,7 @@
-"""Local entry point for running a bundled OpenPinch example case."""
+"""Compatibility wrapper for invoking the packaged OpenPinch CLI."""
 
-from pathlib import Path
+from OpenPinch.__main__ import main
 
-from OpenPinch import *
 
 if __name__ == "__main__":
-    problem_path = Path("enter path to the source problem file(s)")
-    export_path = Path("enter path to the export folder")
-
-    pp = PinchProblem()
-    pp.load(problem_path)
-    pp.target()
-    pp.export_to_Excel(export_path)
+    raise SystemExit(main())

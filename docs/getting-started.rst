@@ -1,15 +1,15 @@
 Getting Started
 ===============
 
-This guide covers the minimum you need to install OpenPinch, validate data, and
-invoke the analysis engine.
+This guide covers the minimum path from installation to a working OpenPinch
+analysis.
 
 Requirements
 ------------
 
-- Python 3.11 or newer (3.14 is fully supported)
-- ``numpy``, ``pandas``, and other dependencies listed in ``pyproject.toml``
-- Optional: Microsoft Excel if you plan to export results to workbooks
+- Python ``>=3.14``
+- ``numpy``, ``pandas``, and the dependencies listed in ``pyproject.toml``
+- Optional: Jupyter if you want to use the packaged notebook series
 
 Installation
 ------------
@@ -41,6 +41,59 @@ responds:
    python -c "import importlib.metadata; print(importlib.metadata.version('OpenPinch'))"
    python -m OpenPinch --help
 
-If you intend to build the documentation locally, install the dependencies under
-``docs/requirements.txt`` and run ``sphinx-build`` as described in
-:ref:`docs-build`.
+Run A Sample Case
+-----------------
+
+OpenPinch ships with packaged sample cases so you can verify the workflow
+without cloning the repository examples.
+
+.. code-block:: bash
+
+   openpinch sample -o basic_pinch.json
+   openpinch validate basic_pinch.json
+   openpinch run basic_pinch.json --graph-output graphs -o results
+
+This will print a compact summary to the terminal, export an Excel workbook to
+``results/``, and write graph HTML files to ``graphs/``.
+
+Copy The Notebook Series
+------------------------
+
+To copy the packaged notebooks into your working directory:
+
+.. code-block:: bash
+
+   openpinch notebook -o notebooks
+
+The notebook series is organized around distinct workflows, including basic
+pinch analysis, graph interpretation, zonal analysis, heat-pump targeting, and
+batch comparison.
+
+Run The Heat-Pump Targeting Sample
+----------------------------------
+
+OpenPinch also ships with a dedicated sample for the public heat-pump
+integration workflow:
+
+.. code-block:: bash
+
+   openpinch sample --name heat_pump_targeting.json -o heat_pump_targeting.json
+   openpinch heat-pump heat_pump_targeting.json \
+     --condenser-temperature 170 \
+     --condenser-duty 500 \
+     --evaporator-temperature 90 \
+     --evaporator-duty 400
+
+This prints a before-and-after comparison table so you can judge whether the
+candidate lift improves the plant utility picture.
+
+Next Steps
+----------
+
+- Continue to :doc:`user-guide/quickstart` for the Python workflow.
+- Use :doc:`user-guide/interpreting-results` to understand the summary metrics,
+  graphs, and heat-pump integration workflow.
+- Use :doc:`user-guide/heat-pump-targeting` for the dedicated heat-pump
+  targeting helper and sample workflow.
+- Use ``openpinch graph`` to export specific graph types directly from the CLI.
+- Explore :doc:`reference/index` for the public API and architectural reference.

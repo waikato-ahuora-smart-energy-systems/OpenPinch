@@ -17,9 +17,7 @@ from OpenPinch.lib.enums import ZoneType
 
 def get_example_problem_filepaths():
     """Return example problem filepaths used by this test module."""
-    test_data_dir = (
-        Path(__file__).resolve().parents[2] / "OpenPinch" / "examples" / "stream_data"
-    )
+    test_data_dir = Path(__file__).resolve().parents[2] / "examples" / "stream_data"
     return [
         filepath
         for filepath in test_data_dir.iterdir()

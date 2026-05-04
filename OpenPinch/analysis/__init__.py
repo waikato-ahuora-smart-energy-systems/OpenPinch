@@ -1,19 +1,15 @@
-"""Analysis submodules implementing OpenPinch targeting algorithms.
+"""Single-state process targeting package."""
 
-This package re-exports the most commonly used entry points for preparing
-problem structures, running Pinch Analysis at different aggregation levels, and
-assembling response payloads.  More specialised helpers remain in their
-respective modules (e.g. ``support_methods`` and ``additional_analysis``).
-"""
+from .capital_cost_and_area_targeting import *  # noqa: F401,F403
+from .data_preparation import *  # noqa: F401,F403
+from .direct_integration_entry import *  # noqa: F401,F403
+from .energy_transfer_analysis import *  # noqa: F401,F403
+from .exergy_targeting import *  # noqa: F401,F403
+from .gcc_manipulation import *  # noqa: F401,F403
+from .graph_data import *  # noqa: F401,F403
+from .indirect_integration_entry import *  # noqa: F401,F403
+from .problem_table_analysis import *  # noqa: F401,F403
+from .temperature_driving_force import *  # noqa: F401,F403
+from .utility_targeting import *  # noqa: F401,F403
 
-from .capital_cost_and_area_targeting import *
-from .gcc_manipulation import *
-from .data_preparation import *
-from .graph_data import *
-from .heat_pump_and_refrigeration_targeting import *
-from .power_cogeneration_analysis import *
-from .problem_table_analysis import *
-from .utility_targeting import *
-
-from .direct_integration_entry import *
-from .indirect_integration_entry import *
+__all__ = [name for name in globals() if not name.startswith("_")]

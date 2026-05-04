@@ -5,13 +5,16 @@ interval problem table, cascade shifting logic, and helper routines used when
 deriving zonal targets and plotting data for composite curves.
 """
 
-from typing import Dict, Tuple
+import math
+from typing import Dict, List, Tuple
 
 import numpy as np
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
+from ..classes.problem_table import ProblemTable
+from ..classes.stream_collection import StreamCollection
+from ..lib.config import Configuration, tol
+from ..lib.enums import PT
+from ..utils.miscellaneous import delta_with_zero_at_start, linear_interpolation
 
 
 __all__ = [

@@ -3,7 +3,22 @@
 import math
 import numpy as np
 
-from ..lib import HeatExchangerTypes as HX
+from ..lib.enums import HeatExchangerTypes as HX
+
+__all__ = [
+    "CalcAreaUE",
+    "Coth",
+    "CrossflowUnmixedEff1",
+    "CrossflowUnmixedEff2",
+    "HX_Eff",
+    "HX_NTU",
+    "HX_NTU_Numerical",
+    "MultiPassEff",
+    "MultiPassNTU",
+    "compute_LMTD_from_dts",
+    "compute_LMTD_from_ts",
+    "eNTU_slope_Numerical",
+]
 
 
 def compute_LMTD_from_dts(

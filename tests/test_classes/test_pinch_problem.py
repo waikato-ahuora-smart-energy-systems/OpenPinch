@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from OpenPinch.classes.pinch_problem import PinchProblem
+from OpenPinch.resources import copy_sample_case
 
 
 @pytest.fixture
@@ -394,3 +395,341 @@ def test_render_streamlit_dashboard_requires_available_zone():
     obj = PinchProblem(run=False)
     with pytest.raises(RuntimeError, match="No analysed zone is available"):
         obj.render_streamlit_dashboard()
+
+
+def test_run_is_alias_for_target(monkeypatch):
+    monkeypatch.setattr(PinchProblem, "validate", lambda self: {"validated": True})
+    monkeypatch.setattr(PinchProblem, "target", lambda self: {"ok": True})
+    obj = PinchProblem(run=False)
+    assert obj.run() == {"ok": True}
+
+
+def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
+    mod = sys.modules[PinchProblem.__module__]
+    calls = {}
+
+    class DummyPayload:
+        streams = ["s"]
+        utilities = ["u"]
+        options = {"x": 1}
+        zone_tree = {"name": "z"}
+
+    monkeypatch.setattr(
+        mod.TargetInput,
+        "model_validate",
+        classmethod(lambda cls, value: DummyPayload()),
+    )
+    monkeypatch.setattr(
+        mod, "_validate_problem_semantics", lambda payload, context: None
+    )
+
+    def fake_prepare_problem(**kwargs):
+        calls["kwargs"] = kwargs
+        return {"zone": "ok"}
+
+    monkeypatch.setattr(
+        sys.modules["OpenPinch.analysis.data_preparation"],
+        "prepare_problem",
+        fake_prepare_problem,
+        raising=True,
+    )
+
+    obj = PinchProblem(run=False)
+    obj._problem_data = sample_problem
+    obj._project_name = "Example"
+
+    payload = obj.validate()
+
+    assert payload.streams == ["s"]
+    assert calls["kwargs"]["project_name"] == "Example"
+    assert calls["kwargs"]["utilities"] == ["u"]
+
+
+def test_summary_frame_compact_and_detailed(monkeypatch):
+    class _Value:
+        def __init__(self, value, units="kW"):
+            self.value = value
+            self.units = units
+
+    class _Utility:
+        def __init__(self, name, heat_flow):
+            self.name = name
+            self.heat_flow = heat_flow
+
+    target = type(
+        "Target",
+        (),
+        {
+            "name": "Plant/DI",
+            "Qh": _Value(10.0),
+            "Qc": _Value(20.0),
+            "Qr": _Value(30.0),
+            "temp_pinch": type(
+                "TempPinch",
+                (),
+                {"hot_temp": _Value(110.0, "degC"), "cold_temp": _Value(90.0, "degC")},
+            )(),
+            "hot_utilities": [_Utility("Steam", _Value(10.0))],
+            "cold_utilities": [_Utility("CW", _Value(20.0))],
+        },
+    )()
+    results = type("Results", (), {"targets": [target]})()
+
+    monkeypatch.setattr(PinchProblem, "run", lambda self: results)
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "build_summary_dataframe",
+        lambda targets: __import__("pandas").DataFrame([{"Target": targets[0].name}]),
+        raising=True,
+    )
+
+    obj = PinchProblem(run=False)
+    compact = obj.summary_frame()
+    detailed = obj.summary_frame(detailed=True)
+
+    assert list(compact.columns[:4]) == [
+        "Target",
+        "Hot Utility Target",
+        "Cold Utility Target",
+        "Heat Recovery",
+    ]
+    assert compact.iloc[0]["Hot Utilities"] == "Steam: 10.00"
+    assert detailed.iloc[0]["Target"] == "Plant/DI"
+
+
+def test_graph_data_uses_results_then_master_zone(monkeypatch):
+    obj = PinchProblem(run=False)
+    obj._results = type(
+        "Results",
+        (),
+        {
+            "graphs": {
+                "Plant": type(
+                    "GraphSet", (), {"model_dump": lambda self: {"graphs": []}}
+                )()
+            }
+        },
+    )()
+    monkeypatch.setattr(PinchProblem, "run", lambda self: obj._results)
+    assert obj.graph_data() == {"Plant": {"graphs": []}}
+
+    obj._results = type("Results", (), {"graphs": None})()
+    obj._master_zone = {"zone": "ok"}
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "get_output_graph_data",
+        lambda zone: {"Fallback": {"graphs": [{"type": "Grand Composite Curve"}]}},
+        raising=True,
+    )
+    assert obj.graph_data()["Fallback"]["graphs"][0]["type"] == "Grand Composite Curve"
+
+
+def test_graph_catalog_and_plot_helpers(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "graphs": [
+                {"type": "Composite Curves", "name": "Composite"},
+                {"type": "Grand Composite Curve", "name": "GCC"},
+            ]
+        }
+    }
+    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_plotly_graph",
+        lambda graph: {"built": graph["name"]},
+        raising=True,
+    )
+
+    obj = PinchProblem(run=False)
+    catalog = obj.graph_catalog()
+    fig = obj.plot_grand_composite_curve(zone_name="Plant/DI")
+
+    assert set(catalog["Graph Name"]) == {"Composite", "GCC"}
+    assert fig == {"built": "GCC"}
+
+
+def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
+    payload = {
+        "Plant/DI": {
+            "graphs": [
+                {"type": "Grand Composite Curve", "name": "GCC"},
+            ]
+        }
+    }
+    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+
+    class FakeFigure:
+        def write_html(self, path):
+            Path(path).write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_plotly_graph",
+        lambda graph: FakeFigure(),
+        raising=True,
+    )
+
+    obj = PinchProblem(run=False)
+    written = obj.export_graphs(tmp_path)
+
+    assert len(written) == 1
+    assert written[0].exists()
+
+
+def test_export_excel_and_show_dashboard_aliases(monkeypatch, tmp_path: Path):
+    captured = {}
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "export_to_Excel",
+        lambda self, results_dir=None: Path(results_dir) / "alias.xlsx",
+    )
+
+    def fake_render(self, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(PinchProblem, "render_streamlit_dashboard", fake_render)
+
+    obj = PinchProblem(run=False)
+    assert obj.export_excel(tmp_path) == tmp_path / "alias.xlsx"
+    obj.show_dashboard(page_title="Demo")
+    assert captured["page_title"] == "Demo"
+
+
+def test_compare_to_builds_delta_table(monkeypatch):
+    base_frame = __import__("pandas").DataFrame(
+        [
+            {
+                "Target": "Plant/Direct Integration",
+                "Hot Utility Target": 750.0,
+                "Cold Utility Target": 1000.0,
+                "Heat Recovery": 5150.0,
+                "Hot Pinch": None,
+                "Cold Pinch": 145.0,
+            }
+        ]
+    )
+    other_frame = __import__("pandas").DataFrame(
+        [
+            {
+                "Target": "Plant/Direct Integration",
+                "Hot Utility Target": 500.0,
+                "Cold Utility Target": 850.0,
+                "Heat Recovery": 5800.0,
+                "Hot Pinch": None,
+                "Cold Pinch": 170.0,
+            }
+        ]
+    )
+    base_problem = PinchProblem(run=False)
+    other_problem = PinchProblem(run=False)
+
+    monkeypatch.setattr(
+        base_problem, "summary_frame", lambda detailed=False: base_frame
+    )
+    monkeypatch.setattr(
+        other_problem,
+        "summary_frame",
+        lambda detailed=False: other_frame,
+    )
+
+    comparison = base_problem.compare_to(other_problem)
+
+    assert comparison.loc["Base case", "Hot Utility Target"] == 750.0
+    assert comparison.loc["Scenario", "Cold Utility Target"] == 850.0
+    assert comparison.loc["Change", "Heat Recovery"] == 650.0
+
+
+def test_evaluate_heat_pump_integration_uses_packaged_sample(tmp_path: Path):
+    case_path = copy_sample_case(
+        "heat_pump_targeting.json",
+        tmp_path / "heat_pump_targeting.json",
+    )
+    problem = PinchProblem(problem_filepath=case_path)
+
+    evaluation = problem.evaluate_heat_pump_integration(
+        {
+            "zone": "Plant",
+            "condenser_temperature": 170.0,
+            "condenser_duty": 500.0,
+            "evaporator_temperature": 90.0,
+            "evaporator_duty": 400.0,
+        },
+        target_name="Plant/Direct Integration",
+    )
+
+    assert evaluation.comparison.target == "Plant/Direct Integration"
+    assert evaluation.comparison.hot_utility_target_delta < 0
+    assert evaluation.comparison.cold_utility_target_delta < 0
+    assert evaluation.comparison.approximate_power_input == 100.0
+    assert "Approx. HP Power Input" in evaluation.comparison_frame.columns
+
+
+def test_validate_formats_schema_errors_with_stream_context(tmp_path: Path):
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "Hot Feed",
+                "t_supply": 150.0,
+                "heat_flow": 100.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "options": {},
+    }
+    path = tmp_path / "broken.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    problem = PinchProblem(problem_filepath=path)
+
+    with pytest.raises(ValueError) as exc_info:
+        problem.validate()
+
+    message = str(exc_info.value)
+    assert "Input validation failed" in message
+    assert "Stream 1 'Hot Feed' (entry 1)" in message
+    assert "t_target" in message
+
+
+def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": 150.0,
+                "t_target": 60.0,
+                "heat_flow": 100.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [
+            {
+                "name": "Cooling Water",
+                "type": "Cold",
+                "t_supply": 35.0,
+                "t_target": 25.0,
+                "heat_flow": 50.0,
+                "dt_cont": 5.0,
+                "htc": 0.8,
+                "price": 10.0,
+            }
+        ],
+        "options": {},
+    }
+    path = tmp_path / "invalid_utility.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    problem = PinchProblem(problem_filepath=path)
+
+    with pytest.raises(ValueError) as exc_info:
+        problem.validate()
+
+    message = str(exc_info.value)
+    assert "Utility 1 'Cooling Water' (entry 1)" in message
+    assert "cold utilities must have t_supply <= t_target" in message

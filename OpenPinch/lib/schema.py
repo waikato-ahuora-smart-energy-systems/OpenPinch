@@ -7,14 +7,14 @@ graph structures, and specialist analysis helper payloads.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .enums import MainOptionsPropKeys, StreamType, TurbineOptionsPropKeys
-
+from .enums import StreamType, TurbineOptionsPropKeys
 from ..classes.stream_collection import StreamCollection
+
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
@@ -91,8 +91,8 @@ class HPRTargetInputs(BaseModel):
     # Optional arguments
     dT_subcool: Optional[np.ndarray] = None
     dT_superheat: Optional[np.ndarray] = None
-    bckgrd_hot_streams: Optional[StreamCollection] = StreamCollection()
-    bckgrd_cold_streams: Optional[StreamCollection] = StreamCollection()
+    bckgrd_hot_streams: Optional[StreamCollection] = None
+    bckgrd_cold_streams: Optional[StreamCollection] = None
     bb_minimiser: Optional[str] = None
     eta_penalty: Optional[float] = 0.01
     rho_penalty: Optional[float] = 10
@@ -114,7 +114,7 @@ class HPRTargetOutputs(BaseModel):
     w_net: float | list | np.ndarray
     w_hpr: Optional[float | list | np.ndarray] = None
     w_he: Optional[float | list | np.ndarray] = None
-    heat_ex: Optional[float | list | np.ndarray] = None
+    heat_recovery: Optional[float | list | np.ndarray] = None
     Q_ext: float
     Q_amb_hot: float
     Q_amb_cold: float
@@ -133,6 +133,8 @@ class HPRTargetOutputs(BaseModel):
     T_evap: Optional[np.ndarray] = None
     Q_cond: Optional[np.ndarray] = None
     Q_evap: Optional[np.ndarray] = None
+    Q_cond_he: Optional[np.ndarray] = None
+    Q_evap_he: Optional[np.ndarray] = None
 
     # Simple Vapour Compression only
     dT_subcool: Optional[np.ndarray] = None
@@ -281,20 +283,47 @@ class TargetOutput(BaseModel):
     graphs: Optional[Dict[str, GraphSet]] = None
 
 
+# ---- Heat-pump integration helpers ------------------------------------------
+class HeatPumpIntegrationScenario(BaseModel):
+    """User-facing definition of a candidate integrated heat-pump scenario."""
+
+    zone: str = "Plant"
+    condenser_temperature: float
+    condenser_duty: float
+    evaporator_temperature: float
+    evaporator_duty: float
+    dt_phase_change: float = 0.1
+    dt_cont: float = 0.0
+    htc: float = 1.0
+    condenser_name: str = "HP Condenser"
+    evaporator_name: str = "HP Evaporator"
+
+
+class HeatPumpIntegrationComparison(BaseModel):
+    """Compact before/after comparison for a heat-pump integration scenario."""
+
+    target: str
+    base_case_name: str
+    scenario_case_name: str
+    hot_utility_target_delta: float
+    cold_utility_target_delta: float
+    heat_recovery_delta: float
+    hot_pinch_delta: Optional[float] = None
+    cold_pinch_delta: Optional[float] = None
+    approximate_power_input: float
+
+
 # ---- Stream & Utility definitions -------------------------------------------
 class StreamSchema(BaseModel):
     """Process stream definition supplied to the targeting service."""
 
     zone: str
     name: str
-
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
     heat_flow: ScalarOrVU
-
     dt_cont: ScalarOrVU
     htc: ScalarOrVU
-
     active: bool = True
 
 
@@ -303,17 +332,13 @@ class UtilitySchema(BaseModel):
 
     name: str
     type: StreamType
-
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
     heat_flow: Optional[ScalarOrVU] = None
-
     dt_cont: ScalarOrVU
     htc: ScalarOrVU
     price: ScalarOrVU
-
     active: bool = True
-
     model_config = ConfigDict(use_enum_values=True)
 
 
@@ -332,18 +357,7 @@ class TurbineOption(BaseModel):
 
     key: TurbineOptionsPropKeys
     value: Any
-
     model_config = ConfigDict(use_enum_values=True)
-
-
-# class Options(BaseModel):
-#     """Primary checkbox-style options plus turbine configuration."""
-
-#     main: List[MainOptionsPropKeys] = Field(default_factory=list)
-#     # graphs: List[GraphOptionsPropKeys]
-#     turbine: List[TurbineOption] = Field(default_factory=list)
-
-#     model_config = ConfigDict(use_enum_values=True)
 
 
 # ---- Complete request --------------------------------------------------------

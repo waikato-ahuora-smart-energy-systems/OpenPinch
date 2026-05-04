@@ -1,10 +1,11 @@
 """Temperature-driving-force calculations for composite-curve analysis."""
 
+import math
+
 import numpy as np
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
+from ..lib.config import tol
+from ..utils.miscellaneous import interp_with_plateaus
 
 __all__ = ["get_temperature_driving_forces"]
 

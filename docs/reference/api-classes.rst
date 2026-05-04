@@ -19,8 +19,8 @@ How These Objects Fit Together
   temperature-interval cascade that drives pinch and utility calculations.
 - :class:`~OpenPinch.classes.energy_target.EnergyTarget` stores one solved set
   of metrics for a zone and is later serialised into the public output schema.
-- :class:`~OpenPinch.classes.value.Value` wraps quantities with units for
-  report-friendly serialisation.
+- :class:`~OpenPinch.classes.value.Value` wraps scalar and discrete-state
+  quantities with units for report-friendly serialisation.
 
 Streams and Collections
 -----------------------
@@ -51,25 +51,34 @@ These classes represent the solved hierarchy and its numerical results.
 Units and Scalar Helpers
 ------------------------
 
+:class:`~OpenPinch.classes.value.Value` supports both ordinary scalar
+quantities and discrete-state values with ``state_ids`` and normalised
+``weights``. This makes it suitable for both deterministic reports and
+state-weighted scenario data.
+
 .. automodule:: OpenPinch.classes.value
    :members:
 
-Heat Pump Classes
------------------
+Thermal Cycle Classes
+---------------------
 
-These classes support the heat-pump targeting and cascade-construction
-workflows documented in :mod:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting`. They are
+These classes support the advanced heat-pump, refrigeration, and utility-system
+workflows documented in
+:mod:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting`. They are
 primarily useful for advanced users who want to inspect or construct detailed
 cycle configurations directly.
 
-.. automodule:: OpenPinch.classes.simple_heat_pump
+.. automodule:: OpenPinch.classes.vapour_compression_cycle
    :members:
 
-.. automodule:: OpenPinch.classes.multi_simple_heat_pump
+.. automodule:: OpenPinch.classes.parallel_vapour_compression_cycles
    :members:
 
-.. automodule:: OpenPinch.classes.cascade_heat_pump
+.. automodule:: OpenPinch.classes.cascade_vapour_compression_cycle
    :members:
 
 .. automodule:: OpenPinch.classes.brayton_heat_pump
+   :members:
+
+.. automodule:: OpenPinch.classes.multi_stage_steam_turbine
    :members:

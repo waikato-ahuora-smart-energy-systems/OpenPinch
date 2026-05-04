@@ -319,12 +319,25 @@ def test_parse_sheet_with_units_handles_extra_and_missing_columns(monkeypatch):
 
     monkeypatch.setattr(wkbook_to_json, "_write_problem_to_dict_and_list", _capture)
 
+    class _FakeExcel:
+        def __init__(self, sheet_names):
+            self.sheet_names = sheet_names
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
     extra_df = pd.DataFrame(
         [
             ["ignored"] * 11,
             [None, None, "degC", "degC", "kW", "K", "kW/mK", None, None, None, None],
             ["Zone A", "H1", 150, 60, 100, 10, 0.5, "IN", 1, "x", "y"],
         ]
+    )
+    monkeypatch.setattr(
+        wkbook_to_json.pd, "ExcelFile", lambda excel_file: _FakeExcel(["Stream Data"])
     )
     monkeypatch.setattr(
         wkbook_to_json.pd, "read_excel", lambda *args, **kwargs: extra_df.copy()
@@ -488,3 +501,31 @@ def test_validate_utilities_data_alias_executes():
         ]
     )
     assert out[0]["name"] == "HP Steam"
+
+
+def test_get_problem_from_excel_reports_missing_sheet(tmp_path: Path):
+    xlsx = tmp_path / "missing_sheet.xlsx"
+    with pd.ExcelWriter(xlsx, engine="openpyxl") as writer:
+        pd.DataFrame(
+            [
+                ["ignored"] * 9,
+                [None, None, "degC", "degC", "kW", "K", "kW/mK", None, None],
+                ["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5, "IN", 1],
+            ]
+        ).to_excel(writer, sheet_name="Stream Data", header=None, index=False)
+
+    with pytest.raises(
+        ValueError, match="Workbook is missing required sheet 'Utility Data'"
+    ):
+        wkbook_to_json.get_problem_from_excel(xlsx)
+
+
+def test_parse_sheet_with_units_reports_short_sheet(tmp_path: Path):
+    xlsx = tmp_path / "short.xlsx"
+    with pd.ExcelWriter(xlsx, engine="openpyxl") as writer:
+        pd.DataFrame([["ignored"] * 9]).to_excel(
+            writer, sheet_name="Stream Data", header=None, index=False
+        )
+
+    with pytest.raises(ValueError, match="must include at least 3 rows"):
+        wkbook_to_json._parse_sheet_with_units(xlsx, sheet_name="Stream Data")

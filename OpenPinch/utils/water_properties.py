@@ -4,16 +4,34 @@ from CoolProp.CoolProp import PropsSI
 
 FLUID = "Water"
 
+__all__ = [
+    "Tsat_p",
+    "fromSIunit_T",
+    "fromSIunit_h",
+    "fromSIunit_p",
+    "fromSIunit_s",
+    "hL_p",
+    "hV_p",
+    "h_pT",
+    "h_ps",
+    "psat_T",
+    "s_ph",
+    "toSIunit_T",
+    "toSIunit_h",
+    "toSIunit_p",
+    "toSIunit_s",
+]
+
 
 def Tsat_p(P):
-    """Saturation temperature (°C) at pressure ``P`` (bar)."""
+    """Saturation temperature (degC) at pressure ``P`` (bar)."""
     P = toSIunit_p(P)
     T = PropsSI("T", "P", P, "Q", 1, FLUID)
     return fromSIunit_T(T)
 
 
 def psat_T(T):
-    """Saturation pressure (bar) at temperature ``T`` (°C)."""
+    """Saturation pressure (bar) at temperature ``T`` (degC)."""
     T = toSIunit_T(T)
     p = PropsSI("P", "T", T, "Q", 1, FLUID)
     return fromSIunit_p(p)
@@ -34,7 +52,7 @@ def hL_p(P):
 
 
 def h_pT(P, T):
-    """Specific enthalpy (kJ/kg) at ``(P, T)`` where ``P`` is bar and ``T`` is °C."""
+    """Specific enthalpy (kJ/kg) at ``(P, T)`` where ``P`` is bar and ``T`` is degC."""
     P = toSIunit_p(P)
     T = toSIunit_T(T)
     h = PropsSI("H", "P", P, "T", T, FLUID)
@@ -57,55 +75,44 @@ def s_ph(P, H):
     return fromSIunit_s(s)
 
 
-"""'
-***********************************************************************************************************
-*2 Units                                                                                                  *
-***********************************************************************************************************
-"""
-
-
 def toSIunit_p(Ins):
     """Convert bar to Pa."""
-    # Translate bar to Pa
-    if Ins == None:
+    if Ins is None:
         Ins = 0
     return Ins * 100000
 
 
 def fromSIunit_p(Ins):
     """Convert Pa to bar."""
-    # Translate MPa to bar
-    if Ins == None:
+    if Ins is None:
         Ins = 0
     return Ins / 100000
 
 
 def toSIunit_T(Ins):
-    """Convert °C to Kelvin."""
-    # Translate degC to Kelvin
-    if Ins == None:
+    """Convert degC to Kelvin."""
+    if Ins is None:
         Ins = 0
     return Ins + 273.15
 
 
 def fromSIunit_T(Ins):
-    """Convert Kelvin to °C."""
-    # Translate Kelvin to degC
-    if Ins == None:
+    """Convert Kelvin to degC."""
+    if Ins is None:
         Ins = 0
     return Ins - 273.15
 
 
 def toSIunit_h(Ins):
     """Convert kJ/kg to J/kg."""
-    if Ins == None:
+    if Ins is None:
         Ins = 0
     return Ins * 1000
 
 
 def fromSIunit_h(Ins):
     """Convert J/kg to kJ/kg."""
-    if Ins == None:
+    if Ins is None:
         Ins = 0
     return Ins / 1000
 

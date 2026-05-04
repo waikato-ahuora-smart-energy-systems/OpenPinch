@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from ..lib.enums import *
+from ..lib.enums import StreamType
 
 
 class Stream:

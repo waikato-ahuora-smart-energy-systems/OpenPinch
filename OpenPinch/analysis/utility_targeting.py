@@ -1,10 +1,13 @@
 """Target multiple utilities over a heating or cooler profile starting from the pinch temperature."""
 
+from typing import Tuple
+
 import numpy as np
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
+from ..classes.problem_table import ProblemTable
+from ..classes.stream_collection import StreamCollection
+from ..lib.config import tol
+from ..lib.enums import PT, StreamType
 
 from .problem_table_analysis import get_utility_heat_cascade
 from .gcc_manipulation import get_seperated_gcc_heat_load_profiles

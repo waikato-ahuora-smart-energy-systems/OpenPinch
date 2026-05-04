@@ -111,54 +111,13 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
     assert (sc == 1) is False
 
 
-def test_value_arithmetic_comparison_and_conversion_paths():
-    v = Value(10.0, "kW")
-    assert str(v)
-    assert repr(v)
-    assert float(v) == 10.0
-    assert int(Value(5.9, "kW")) == 5
-    assert round(Value(5.49, "kW"), 1) == 5.5
-
-    v.value = 20.0
-    v.unit = "kW"
-    assert v.value == 20.0
-    assert v.to("W").value == pytest.approx(20_000.0)
-
-    assert v == 20.0
-    assert (v == object()) is False
-    assert v > Value(10.0, "kW")
-    assert v >= Value(20.0, "kW")
-    assert v < Value(30.0, "kW")
-    assert v <= Value(20.0, "kW")
-
-    w = Value(5.0, "kW")
-    assert (v + w).value == 25.0
-    assert (w + v).value == 25.0
-    assert (v - w).value == 15.0
-    assert (Value(25.0, "kW") - v).value == 5.0
-    assert (v * 2).value == 40.0
-    assert (2 * v).value == 40.0
-    assert (v / 2).value == 10.0
-    assert (Value(40.0, "kW") / v).value == 2.0
-
-    as_dict = v.to_dict()
-    assert Value.from_dict(as_dict).value == v.value
-
-    # Exercise ValueWithUnit branch with unit conversion failure fallback.
-    vw = ValueWithUnit(value=3.0, units="m")
-    fallback = Value(vw, unit="s")
-    assert fallback.value == 3.0
-
-
 def test_energy_target_and_zone_property_branches():
     t = EnergyTarget(name="T0")
     t.name = "T1"
     t.identifier = "DI"
     t.config = Configuration()
     t.parent_zone = "parent"
-    with pytest.raises(TypeError):
-        t.active = True
-    t._active = Value(1)
+    t._active = 1
     assert t.active == 1
 
     hot = StreamCollection()
@@ -280,10 +239,6 @@ def test_energy_target_and_zone_property_branches():
     )
     assert len(parent.hot_streams) >= 1
     assert len(parent.cold_streams) >= 1
-
-
-# ===== Merged from test_energy_target_extra.py =====
-"""Additional branch coverage tests for EnergyTarget properties."""
 
 
 def test_energy_target_identifier_parent_active_and_cost_properties():

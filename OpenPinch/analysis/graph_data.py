@@ -2,12 +2,14 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
 from typing import Iterable, List, Optional, Tuple
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
+from ..classes.energy_target import EnergyTarget
+from ..classes.problem_table import ProblemTable
+from ..classes.zone import Zone
+from ..lib.enums import ArrowHead, GT, LegendSeries, LineColour, PT, StreamLoc
+from ..utils.miscellaneous import clean_composite_curve
+from ..lib.config import tol
 
 DECIMAL_PLACES = 2
 GCC_VERTICAL_TOL = 1e-3

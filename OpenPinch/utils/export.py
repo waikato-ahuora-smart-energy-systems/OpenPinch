@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
 import pandas as pd
 
 if TYPE_CHECKING:
-    from ..classes import Zone
-    from ..lib import TargetOutput
+    from ..classes.zone import Zone
+    from ..lib.schema import TargetOutput
+
+__all__ = ["export_target_summary_to_excel_with_units"]
 
 #######################################################################################################
 # Public API
@@ -45,7 +47,7 @@ def export_target_summary_to_excel_with_units(
     table sheets. Value-with-unit objects are flattened into adjacent
     ``(value)`` and ``(unit)`` columns for easy review in Excel.
     """
-    df_summary = _build_summary_dataframe(target_response.targets)
+    df_summary = build_summary_dataframe(target_response.targets)
 
     out_path = _compose_output_path(
         project_name=getattr(target_response, "name", "Project"),
@@ -57,6 +59,14 @@ def export_target_summary_to_excel_with_units(
         _write_problem_tables(master_zone, xw)
 
     return str(out_path)
+
+
+def build_summary_dataframe(targets) -> pd.DataFrame:
+    """Convert TargetResults objects into a tabular dataframe with value/unit columns."""
+    rows = []
+    for target in targets:
+        rows.append(_make_summary_row(target))
+    return pd.DataFrame(rows)
 
 
 #######################################################################################################
@@ -98,14 +108,6 @@ def _safe_name(name: str) -> str:
     name = re.sub(r"[\\/:*?\"<>|]+", "_", name)  # replace forbidden characters
     name = re.sub(r"\s+", "_", name)  # spaces -> underscore
     return name or "Project"
-
-
-def _build_summary_dataframe(targets) -> pd.DataFrame:
-    """Convert TargetResults objects into a tabular dataframe with value/unit columns."""
-    rows = []
-    for target in targets:
-        rows.append(_make_summary_row(target))
-    return pd.DataFrame(rows)
 
 
 def _make_summary_row(t) -> dict:
@@ -194,7 +196,9 @@ def _compose_output_path(project_name: str, out_dir: str) -> Path:
     project = _safe_name(project_name)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{project}_{timestamp}.xlsx"
-    return Path(out_dir) / filename
+    output_dir = Path(out_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir / filename
 
 
 def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> None:

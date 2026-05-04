@@ -1,5 +1,6 @@
 """Bayesian-optimisation multi-start backend."""
 
+import os
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
@@ -23,7 +24,7 @@ def _get_bo_multiminima_in_parallel(
     x0_ls=None,
     args=(),
     constraints=(),
-    n_runs=6,
+    n_runs=os.cpu_count(),
     maxiter=300,
     seed=0,
     maxfun=1_000_000,
@@ -209,7 +210,7 @@ def _run_bo_single(
                 xi=xi,
                 best_u=best_u,
             )
-        except (np.linalg.LinAlgError, ValueError, FloatingPointError):
+        except np.linalg.LinAlgError, ValueError, FloatingPointError:
             u_next = rng.uniform(0.0, 1.0, size=n_dim)
 
         if X_arr.size > 0:

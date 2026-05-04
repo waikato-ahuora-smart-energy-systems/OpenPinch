@@ -60,7 +60,7 @@ def test_heat_pump_cycle_case_1():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=5.0,
+        dT_ihx_gas_side=5.0,
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=1000,
@@ -80,7 +80,7 @@ def test_heat_pump_cycle_case_2():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
-        dt_ihx_gas_side=5.0,
+        dT_ihx_gas_side=5.0,
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=1000,
@@ -100,7 +100,7 @@ def test_heat_pump_cycle_case_3():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
-        dt_ihx_gas_side=5.0,
+        dT_ihx_gas_side=5.0,
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=0,
@@ -122,7 +122,7 @@ def test_heat_pump_cycle_case_4():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=0,
+        dT_ihx_gas_side=0,
         eta_comp=0.75,
         refrigerant="R134a",
         Q_heat=1000,
@@ -144,7 +144,7 @@ def test_heat_pump_cycle_case_5():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=0,
+        dT_ihx_gas_side=0,
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=1000,
@@ -166,7 +166,7 @@ def test_heat_pump_cycle_case_6():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=0,
+        dT_ihx_gas_side=0,
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=1000,
@@ -188,7 +188,7 @@ def test_heat_pump_cycle_case_7():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=10,
+        dT_ihx_gas_side=10,
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=1000,
@@ -210,7 +210,7 @@ def test_heat_pump_cycle_case_8():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=10,
+        dT_ihx_gas_side=10,
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=500,
@@ -225,7 +225,7 @@ def test_heat_pump_cycle_case_8():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=10,
+        dT_ihx_gas_side=10,
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=500,
@@ -251,7 +251,7 @@ def test_heat_pump_cycle_case_9():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=10,
+        dT_ihx_gas_side=10,
         eta_comp=0.75,
         refrigerant="R601",
         Q_heat=500,
@@ -284,7 +284,7 @@ def test_heat_pump_cycle_case_10():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=10,
+        dT_ihx_gas_side=10,
         eta_comp=0.7,
         refrigerant="R134A",
         Q_heat=0.0,
@@ -305,6 +305,44 @@ def test_heat_pump_cycle_case_10():
     )
 
 
+def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
+    T_evap = 0.0  # degC, evaporator dew temperature
+    T_cond = 35.0  # degC, condenser dew temperature
+    dT_superheat = 5.0  # K superheat
+    dT_subcool = 3.0  # K subcooling
+
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        T_evap=T_evap,
+        T_cond=T_cond,
+        dT_superheat=dT_superheat,
+        dT_subcool=dT_subcool,
+        dT_ihx_gas_side=5.0,
+        eta_comp=0.75,
+        refrigerant="R407C",
+        Q_heat=1000.0,
+        is_heat_pump=True,
+    )
+
+    cond_streams = cycle.build_stream_collection(include_cond=True)
+    evap_streams = cycle.build_stream_collection(include_evap=True)
+
+    assert cycle.solved is True
+    assert cycle.refrigerant == "R407C"
+    assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0.0)
+    assert np.isclose(cycle.Q_cond - cycle.Q_heat - cycle.Q_cas_heat, 0.0)
+    assert np.isclose(sum(s.heat_flow for s in cond_streams), cycle.Q_heat, 0.0)
+    assert np.isclose(sum(s.heat_flow for s in evap_streams), cycle.Q_cool, 0.0)
+
+    # Zeotropic blends should preserve glide across the phase-change profiles.
+    assert min(s.t_target for s in cond_streams) < T_cond
+    assert max(s.t_target for s in cond_streams) > T_cond
+    assert min(s.t_supply for s in evap_streams) < T_evap
+    assert max(s.t_target for s in evap_streams) > T_evap
+    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in cond_streams)
+    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in evap_streams)
+
+
 def test_refrigeration_cycle_uses_q_cool_as_primary_duty():
     T_evap = -15  # degC, evaporator saturation temperature
     T_cond = 35  # degC, condenser saturation temperature
@@ -317,7 +355,7 @@ def test_refrigeration_cycle_uses_q_cool_as_primary_duty():
         T_cond=T_cond,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
-        dt_ihx_gas_side=5.0,
+        dT_ihx_gas_side=5.0,
         eta_comp=0.75,
         refrigerant="R134a",
         Q_cool=1000.0,
@@ -350,7 +388,7 @@ def test_refrigeration_cycle_caps_q_heat_to_available_q_cond():
         T_cond=30.0,
         dT_superheat=3.0,
         dT_subcool=2.0,
-        dt_ihx_gas_side=5.0,
+        dT_ihx_gas_side=5.0,
         eta_comp=0.75,
         refrigerant="R134a",
         Q_cool=600.0,
@@ -436,7 +474,7 @@ def test_simple_cycle_property_getters_and_require_solution():
     assert hp.dT_superheat == 5.0
     assert hp.dT_subcool == 2.0
     assert hp.eta_comp == 0.8
-    assert hp.dt_ihx_gas_side == 7.0
+    assert hp.dT_ihx_gas_side == 7.0
 
     hp._solved = False
     with pytest.raises(RuntimeError, match="Solve the cycle"):

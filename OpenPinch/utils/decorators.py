@@ -6,9 +6,7 @@ from collections import defaultdict
 from functools import wraps
 from time import perf_counter as timer
 
-# from ..lib import config
-
-from ..lib import *
+import OpenPinch.lib.config as config
 
 logger = logging.getLogger(__name__)
 _LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -76,6 +74,9 @@ def timing_decorator(func=None, *, activate_overide=False):
     if callable(func):
         return decorator(func)
     return decorator
+
+
+__all__ = ["timing_decorator"]
 
 
 @atexit.register

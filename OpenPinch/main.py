@@ -8,13 +8,20 @@ in larger workflows.
 
 from typing import Any, List
 
-from .lib import *
-from .utils import *
-from .classes import *
-from .analysis.data_preparation import *
-from .analysis.graph_data import *
-from .analysis.direct_integration_entry import *
-from .analysis.indirect_integration_entry import *
+from .analysis import (
+    compute_direct_integration_targets,
+    compute_indirect_integration_targets,
+    get_output_graph_data,
+    prepare_problem,
+    visualise_graphs,
+)
+from .classes.energy_target import EnergyTarget
+from .classes.stream import Stream
+from .classes.stream_collection import StreamCollection
+from .classes.zone import Zone
+from .lib.enums import Z, ZoneType
+from .lib.schema import TargetInput, TargetOutput
+from .utils.decorators import timing_decorator
 
 __all__ = ["pinch_analysis_service", "get_targets", "get_visualise", "extract_results"]
 
@@ -182,11 +189,11 @@ def _get_site_targets(zone: Zone):
     # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
         for z in zone.subzones.values():
-            if z.identifier == ZoneType.O.value:
+            if z.identifier == Z.O.value:
                 _get_unit_operation_targets(z)
-            elif z.identifier == ZoneType.P.value:
+            elif z.identifier == Z.P.value:
                 _get_process_targets(z)
-            elif z.identifier == ZoneType.S.value:
+            elif z.identifier == Z.S.value:
                 _get_site_targets(z)
             else:
                 raise ValueError(

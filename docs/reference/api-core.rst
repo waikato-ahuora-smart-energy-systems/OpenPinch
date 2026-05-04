@@ -15,7 +15,7 @@ For new code, prefer one of these two patterns:
    :func:`~OpenPinch.main.pinch_analysis_service`.
 2. Load a problem file into
    :class:`~OpenPinch.classes.pinch_problem.PinchProblem`, call
-   :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target`, and inspect or
+   :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.run`, and inspect or
    export the cached results.
 
 The lower-level helpers documented on this page are still useful when you want
@@ -94,15 +94,28 @@ PinchProblem Convenience Wrapper
 --------------------------------
 
 :class:`~OpenPinch.classes.pinch_problem.PinchProblem` adds file loading,
-cached execution state, Excel export, and Streamlit dashboard integration on
-top of the core service layer.
+cached execution state, tabular summaries, graph generation, Excel export, and
+Streamlit dashboard integration on top of the core service layer.
 
 Use it when you want:
 
 - a single object that owns the problem definition and solved result
 - support for JSON, workbook, and CSV-bundle inputs
-- simple export and dashboard hooks without manually wiring the lower-level
+- simple summary, graph, export, and dashboard hooks without manually wiring the lower-level
   functions
+
+The main user-facing methods are:
+
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.run`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.validate`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.summary_frame`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_composite_curve`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_grand_composite_curve`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.compare_to`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_graphs`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_excel`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.show_dashboard`
 
 The wrapper is intentionally light. Once targeting has run, the same solved
 :class:`~OpenPinch.classes.zone.Zone` hierarchy and

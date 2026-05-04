@@ -8,22 +8,30 @@ instances.
 
 from typing import List, Tuple
 
-from ..classes import *
-from ..lib import *
-from ..utils import *
-from . import (
-    get_process_heat_cascade,
-    get_heat_recovery_target_from_pt,
-    set_zonal_targets,
-    get_utility_targets,
+import numpy as np
+
+from ..classes.stream import Stream
+from ..classes.stream_collection import StreamCollection
+from ..classes.problem_table import ProblemTable
+from ..classes.zone import Zone
+from ..lib.config import Configuration, tol
+from ..lib.enums import GT, PT, StreamType, TargetType, Z
+from ..utils.miscellaneous import delta_vals
+from .capital_cost_and_area_targeting import (
     get_area_targets,
-    get_min_number_hx,
-    get_capital_cost_targets,
     get_balanced_CC,
-    get_additional_GCCs,
-    validate_heat_pump_or_refrigeration_targeting_required,
-    get_heat_pump_and_refrigeration_targets,
-    calc_heat_pump_and_refrigeration_cascade,
+    get_capital_cost_targets,
+    get_min_number_hx,
+)
+from .gcc_manipulation import get_additional_GCCs
+from .problem_table_analysis import (
+    get_heat_recovery_target_from_pt,
+    get_process_heat_cascade,
+    set_zonal_targets,
+)
+from .utility_targeting import get_utility_targets
+from .heat_pump_and_refrigeration_targeting import (
+    get_direct_heat_pump_and_refrigeration_target,
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -52,14 +60,14 @@ def compute_direct_integration_targets(zone: Zone):
         hot_streams=hot_streams,
         cold_streams=cold_streams,
         all_streams=all_streams,
-        zone_config=config,
+        zone_config=zone_config,
         is_shifted=True,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=hot_streams,
         cold_streams=cold_streams,
         all_streams=all_streams,
-        zone_config=config,
+        zone_config=zone_config,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
@@ -77,49 +85,13 @@ def compute_direct_integration_targets(zone: Zone):
     if zone.identifier == Z.P.value and (
         zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING
     ):
-        hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
-            pt,
-            is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
-            zone_name=zone.name,
-            zone_config=zone_config,
-        )
-        if hp_target_load > tol:
-            res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target=hp_target_load,
-                T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_NET_HOT.value],
-                H_cold=pt.col[PT.H_NET_COLD.value],
-                zone_config=zone_config,
-                is_heat_pumping=True,
-            )
-            calc_heat_pump_and_refrigeration_cascade(
+        res.update(
+            get_direct_heat_pump_and_refrigeration_target(
                 pt=pt,
-                res=res["Heat pump"],
-                is_T_vals_shifted=True,
-                is_heat_pumping=True,
-            )
-
-        r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
-            pt,
-            is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
-            zone_name=zone.name,
-            zone_config=zone_config,
-        )
-        if r_target_load > tol:
-            res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target=r_target_load,
-                T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_NET_HOT.value],
-                H_cold=pt.col[PT.H_NET_COLD.value],
+                zone_name=zone.name,
                 zone_config=zone_config,
-                is_heat_pumping=False,
             )
-            calc_heat_pump_and_refrigeration_cascade(
-                pt=pt,
-                res=res["Refrigeration"],
-                is_T_vals_shifted=True,
-                is_heat_pumping=False,
-            )
+        )
 
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True

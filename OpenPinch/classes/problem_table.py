@@ -13,7 +13,6 @@ import pandas as pd
 
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
-from ..utils import *
 
 PT = ProblemTableLabel
 INTERPOLATION_KEYS = (
@@ -262,7 +261,7 @@ class ProblemTable:
             try:
                 cast_left = col_left.astype(float)
                 cast_right = col_right.astype(float)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
             else:
                 if not np.allclose(
@@ -865,7 +864,7 @@ class ProblemTable:
 
     def update(
         self,
-        updates: Mapping[Union[str, ProblemTableLabel], Sequence[float]],
+        updates: dict,
     ) -> "ProblemTable":
         """Assign column values in-place using a mapping of ``column -> iterable``."""
         if not updates:

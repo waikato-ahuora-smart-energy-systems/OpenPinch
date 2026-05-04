@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import pandas as pd
+import pytest
 from OpenPinch.utils.csv_to_json import get_problem_from_csv
 import io
 import json
@@ -187,3 +188,21 @@ def test_parse_csv_with_units_pads_missing_columns_and_converts_blanks(monkeypat
     assert df.iloc[0]["t_supply"] is None
     assert df.iloc[0]["loc"] == 0
     assert df.iloc[0]["index"] == 0
+
+
+def test_get_problem_from_csv_reports_short_stream_csv(tmp_path: Path):
+    streams_csv = tmp_path / "streams.csv"
+    utilities_csv = tmp_path / "utilities.csv"
+    _write_csv(streams_csv, [["ignored"] * 9])
+    _write_csv(utilities_csv, _utility_rows())
+
+    with pytest.raises(ValueError, match="Failed to read CSV problem inputs"):
+        csv_to_json.get_problem_from_csv(streams_csv, utilities_csv)
+
+
+def test_get_problem_from_csv_reports_missing_file(tmp_path: Path):
+    streams_csv = tmp_path / "streams.csv"
+    _write_csv(streams_csv, _stream_rows())
+
+    with pytest.raises(FileNotFoundError, match="CSV input file not found"):
+        csv_to_json.get_problem_from_csv(streams_csv, tmp_path / "missing.csv")

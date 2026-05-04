@@ -1,6 +1,27 @@
 [build-system]
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+  "/examples/**",
+  "/tests/fixtures/workbooks/**",
+  "**/__pycache__/**",
+  "**/.DS_Store",
+  "**/*.py[cod]",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/LICENSE",
+  "/README.md",
+  "/pyproject.toml",
+  "/OpenPinch",
+]
+exclude = [
+  "/.gitignore",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["OpenPinch"]
 [project]
@@ -16,10 +37,9 @@ dependencies=[
   "scipy",
   "streamlit",
   "plotly",
-  "matplotlib",
   "tespy",
 ]
-version = "0.1.14"
+version = "0.1.16"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -37,6 +57,9 @@ license-files = ["LICEN[CS]E*"]
 Homepage = "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch"
 Issues = "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/issues"
 
+[project.scripts]
+openpinch = "OpenPinch.__main__:main"
+
 [project.optional-dependencies]
 dev = [
   "black>=23.9",
@@ -45,8 +68,12 @@ dev = [
 
 [dependency-groups]
 dev = [
+    "build>=1.3.0",
+    "hatchling>=1.26",
     "pytest>=9.0.3",
     "ruff>=0.15.8",
+    "sphinx>=9.1.0",
+    "sphinx-rtd-theme>=3.1.0",    
 ]
 
 [tool.black]

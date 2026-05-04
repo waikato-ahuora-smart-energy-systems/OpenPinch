@@ -1,7 +1,8 @@
 """Exergy targeting analysis."""
 
 import math
-from ..lib import *
+
+from ..lib.config import C_to_K
 
 __all__ = ["compute_exergetic_temperature"]
 
