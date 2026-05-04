@@ -5,10 +5,13 @@ from ast import literal_eval
 import numpy as np
 
 from ..classes.problem_table import ProblemTable
+from ..classes.zone import Zone
+from ..classes.stream_collection import StreamCollection
 from ..lib.config import Configuration, tol
 from ..lib.enums import HPRcycle, PT
 from ..lib.schema import HPRTargetOutputs
 from ..utils.miscellaneous import get_value
+from .gcc_manipulation import get_additional_GCCs
 from .heat_pump_and_refrigeration_placement.brayton import (
     optimise_brayton_heat_pump_placement,
 )
@@ -35,9 +38,10 @@ from .heat_pump_and_refrigeration_placement.shared import (
 from .problem_table_analysis import create_problem_table_with_t_int
 
 __all__ = [
-    "validate_heat_pump_or_refrigeration_targeting_required",
-    "get_heat_pump_and_refrigeration_targets",
-    "calc_heat_pump_and_refrigeration_cascade",
+    "get_indirect_heat_pump_and_refrigeration_target",
+    "_validate_hpr_required",
+    "_get_hpr_targets",
+    "_calc_hpr_cascade",
     "plot_multi_hp_profiles_from_results",
 ]
 
@@ -47,7 +51,127 @@ __all__ = [
 #######################################################################################################
 
 
-def validate_heat_pump_or_refrigeration_targeting_required(
+def get_direct_heat_pump_and_refrigeration_target(
+    pt: ProblemTable,
+    zone_name: str,
+    zone_config: Configuration,
+) -> dict:
+    res = {}
+    hp_target_load = _validate_hpr_required(
+        pt,
+        is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
+        zone_name=zone_name,
+        zone_config=zone_config,
+    )
+    if hp_target_load > tol:
+        res["Heat pump"] = _get_hpr_targets(
+            Q_hpr_target=hp_target_load,
+            T_vals=pt.col[PT.T.value],
+            H_hot=pt.col[PT.H_NET_HOT.value],
+            H_cold=pt.col[PT.H_NET_COLD.value],
+            zone_config=zone_config,
+            is_heat_pumping=True,
+        )
+        _calc_hpr_cascade(
+            pt=pt,
+            res=res["Heat pump"],
+            is_T_vals_shifted=True,
+            is_heat_pumping=True,
+        )
+
+    r_target_load = _validate_hpr_required(
+        pt,
+        is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
+        zone_name=zone_name,
+        zone_config=zone_config,
+    )
+    if r_target_load > tol:
+        res["Refrigeration"] = _get_hpr_targets(
+            Q_hpr_target=r_target_load,
+            T_vals=pt.col[PT.T.value],
+            H_hot=pt.col[PT.H_NET_HOT.value],
+            H_cold=pt.col[PT.H_NET_COLD.value],
+            zone_config=zone_config,
+            is_heat_pumping=False,
+        )
+        _calc_hpr_cascade(
+            pt=pt,
+            res=res["Refrigeration"],
+            is_T_vals_shifted=True,
+            is_heat_pumping=False,
+        )
+    return res
+
+
+def get_indirect_heat_pump_and_refrigeration_target(
+    pt: ProblemTable,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    zone_name: str,
+    zone_config: Configuration,
+) -> dict:
+    res = {}
+    # Create problem table based on inverted utility streams
+    pt_ut_gen = get_process_heat_cascade(
+        hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
+        cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
+        zone_config=zone_config,
+        is_shifted=True,
+    )
+    get_additional_GCCs(pt_ut_gen)
+    # Perform heat pump and/or refrigeration targeting on the correct cascades
+    hp_target_load = _validate_hpr_required(
+        pt,
+        is_heat_pumping=zone_config.DO_UTILITY_HP_TARGETING,
+        zone_name=zone_name,
+        zone_config=zone_config,
+    )
+    if hp_target_load > tol:
+        res["Heat pump"] = _get_hpr_targets(
+            Q_hpr_target=hp_target_load,
+            T_vals=pt_ut_gen.col[PT.T.value],
+            H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
+            H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
+            zone_config=zone_config,
+            is_heat_pumping=True,
+        )
+        _calc_hpr_cascade(
+            pt=pt,
+            res=res["Heat pump"],
+            is_T_vals_shifted=True,
+            is_heat_pumping=True,
+        )
+
+    r_target_load = _validate_hpr_required(
+        pt,
+        is_refrigeration=zone_config.DO_UTILITY_RFRG_TARGETING,
+        zone_name=zone_name,
+        zone_config=zone_config,
+    )
+    if r_target_load > tol:
+        res["Refrigeration"] = _get_hpr_targets(
+            Q_hpr_target=r_target_load,
+            T_vals=pt_ut_gen.col[PT.T.value],
+            H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
+            H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
+            zone_config=zone_config,
+            is_heat_pumping=False,
+        )
+        _calc_hpr_cascade(
+            pt=pt,
+            res=res["Refrigeration"],
+            is_T_vals_shifted=True,
+            is_heat_pumping=False,
+        )
+    return res
+
+
+#######################################################################################################
+# Helper functions API
+#######################################################################################################
+
+
+def _validate_hpr_required(
     pt: ProblemTable,
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
@@ -71,7 +195,7 @@ def validate_heat_pump_or_refrigeration_targeting_required(
     elif isinstance(hpr_load, str):
         hpr_load = literal_eval(hpr_load.strip())
         if isinstance(hpr_load, float | int | dict):
-            Q = validate_heat_pump_or_refrigeration_targeting_required(
+            Q = _validate_hpr_required(
                 pt=pt,
                 is_heat_pumping=is_heat_pumping,
                 is_refrigeration=is_refrigeration,
@@ -82,7 +206,7 @@ def validate_heat_pump_or_refrigeration_targeting_required(
     return Q
 
 
-def get_heat_pump_and_refrigeration_targets(
+def _get_hpr_targets(
     Q_hpr_target: float,
     T_vals: np.ndarray,
     H_hot: np.ndarray,
@@ -108,7 +232,7 @@ def get_heat_pump_and_refrigeration_targets(
     return HPRTargetOutputs.model_validate(handler(args))
 
 
-def calc_heat_pump_and_refrigeration_cascade(
+def _calc_hpr_cascade(
     pt: ProblemTable,
     res: HPRTargetOutputs,
     is_T_vals_shifted: bool,

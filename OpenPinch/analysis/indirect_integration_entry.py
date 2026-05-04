@@ -18,11 +18,8 @@ from ..classes.zone import Zone
 from ..lib.config import Configuration, tol
 from ..lib.enums import GT, PT, TargetType, Z
 from ..utils.miscellaneous import key_name
-from .gcc_manipulation import get_additional_GCCs
 from .heat_pump_and_refrigeration_targeting import (
-    calc_heat_pump_and_refrigeration_cascade,
-    get_heat_pump_and_refrigeration_targets,
-    validate_heat_pump_or_refrigeration_targeting_required,
+    get_indirect_heat_pump_and_refrigeration_target,
 )
 from .problem_table_analysis import (
     get_heat_recovery_target_from_pt,
@@ -129,58 +126,15 @@ def compute_indirect_integration_targets(zone: Zone) -> Zone:
     if zone.identifier == Z.S.value and (
         zone_config.DO_UTILITY_HP_TARGETING or zone_config.DO_UTILITY_RFRG_TARGETING
     ):
-        # Create problem table based on inverted utility streams
-        pt_ut_gen = get_process_heat_cascade(
-            hot_streams=cold_utilities.get_hot_streams(invert_utility=True),
-            cold_streams=hot_utilities.get_cold_streams(invert_utility=True),
-            zone_config=zone.config,
-            is_shifted=True,
-        )
-        get_additional_GCCs(pt_ut_gen)
-        # Perform heat pump and/or refrigeration targeting on the correct cascades
-        hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
-            pt,
-            is_heat_pumping=zone_config.DO_UTILITY_HP_TARGETING,
-            zone_name=zone.name,
-            zone_config=zone_config,
-        )
-        if hp_target_load > tol:
-            res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target=hp_target_load,
-                T_vals=pt_ut_gen.col[PT.T.value],
-                H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
-                H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
-                zone_config=zone_config,
-                is_heat_pumping=True,
-            )
-            calc_heat_pump_and_refrigeration_cascade(
+        res.update(
+            get_indirect_heat_pump_and_refrigeration_target(
                 pt=pt,
-                res=res["Heat pump"],
-                is_T_vals_shifted=True,
-                is_heat_pumping=True,
-            )
-
-        r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
-            pt,
-            is_refrigeration=zone_config.DO_UTILITY_RFRG_TARGETING,
-            zone_name=zone.name,
-            zone_config=zone_config,
-        )
-        if r_target_load > tol:
-            res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target=r_target_load,
-                T_vals=pt_ut_gen.col[PT.T.value],
-                H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
-                H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
+                hot_utilities=hot_utilities,
+                cold_utilities=cold_utilities,
+                zone_name=zone.name,
                 zone_config=zone_config,
-                is_heat_pumping=False,
             )
-            calc_heat_pump_and_refrigeration_cascade(
-                pt=pt,
-                res=res["Refrigeration"],
-                is_T_vals_shifted=True,
-                is_heat_pumping=False,
-            )
+        )
 
     # if zone_config.DO_TURBINE_WORK:
     #     work_target = 0.0
@@ -262,10 +216,10 @@ def _sum_subzone_targets(zone: Zone) -> Zone:
     #     utility_cost = utility_cost - work_target / 1000 * zone_config.ELECTRICITY_PRICE * zone_config.ANNUAL_OP_TIME
 
     target_values = _set_sites_targets(
-        hot_utility_target,
-        cold_utility_target,
-        heat_recovery_target,
-        heat_recovery_limit,
+        hot_utility_target=hot_utility_target,
+        cold_utility_target=cold_utility_target,
+        heat_recovery_target=heat_recovery_target,
+        heat_recovery_limit=heat_recovery_limit,
     )
     zone.add_target_from_results(
         TargetType.TZ.value,
@@ -292,7 +246,10 @@ def _reset_utility_heat_flows(
 
 
 def _set_sites_targets(
-    hot_utility_target, cold_utility_target, heat_recovery_target, heat_recovery_limit
+    hot_utility_target: float,
+    cold_utility_target: float,
+    heat_recovery_target: float,
+    heat_recovery_limit: float,
 ) -> dict:
     """Assign thermal targets and integration degree to the zone based on site analysis methods."""
     return {

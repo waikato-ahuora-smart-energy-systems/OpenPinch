@@ -30,6 +30,9 @@ from .problem_table_analysis import (
     set_zonal_targets,
 )
 from .utility_targeting import get_utility_targets
+from .heat_pump_and_refrigeration_targeting import (
+    get_direct_heat_pump_and_refrigeration_target,
+)
 
 __all__ = ["compute_direct_integration_targets"]
 
@@ -82,55 +85,13 @@ def compute_direct_integration_targets(zone: Zone):
     if zone.identifier == Z.P.value and (
         zone_config.DO_PROCESS_HP_TARGETING or zone_config.DO_PROCESS_RFRG_TARGETING
     ):
-        from .heat_pump_and_refrigeration_targeting import (
-            calc_heat_pump_and_refrigeration_cascade,
-            get_heat_pump_and_refrigeration_targets,
-            validate_heat_pump_or_refrigeration_targeting_required,
-        )
-
-        hp_target_load = validate_heat_pump_or_refrigeration_targeting_required(
-            pt,
-            is_heat_pumping=zone_config.DO_PROCESS_HP_TARGETING,
-            zone_name=zone.name,
-            zone_config=zone_config,
-        )
-        if hp_target_load > tol:
-            res["Heat pump"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target=hp_target_load,
-                T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_NET_HOT.value],
-                H_cold=pt.col[PT.H_NET_COLD.value],
-                zone_config=zone_config,
-                is_heat_pumping=True,
-            )
-            calc_heat_pump_and_refrigeration_cascade(
+        res.update(
+            get_direct_heat_pump_and_refrigeration_target(
                 pt=pt,
-                res=res["Heat pump"],
-                is_T_vals_shifted=True,
-                is_heat_pumping=True,
-            )
-
-        r_target_load = validate_heat_pump_or_refrigeration_targeting_required(
-            pt,
-            is_refrigeration=zone_config.DO_PROCESS_RFRG_TARGETING,
-            zone_name=zone.name,
-            zone_config=zone_config,
-        )
-        if r_target_load > tol:
-            res["Refrigeration"] = get_heat_pump_and_refrigeration_targets(
-                Q_hpr_target=r_target_load,
-                T_vals=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_NET_HOT.value],
-                H_cold=pt.col[PT.H_NET_COLD.value],
+                zone_name=zone.name,
                 zone_config=zone_config,
-                is_heat_pumping=False,
             )
-            calc_heat_pump_and_refrigeration_cascade(
-                pt=pt,
-                res=res["Refrigeration"],
-                is_T_vals_shifted=True,
-                is_heat_pumping=False,
-            )
+        )
 
     get_utility_targets(
         pt, pt_real, hot_utilities, cold_utilities, is_direct_integration=True

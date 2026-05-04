@@ -93,8 +93,6 @@ Heat Pump Targeting API
 
 Public entry points exposed by ``OpenPinch.analysis.heat_pump_and_refrigeration_targeting``:
 
-- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.get_heat_pump_and_refrigeration_targets`
-- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.calc_heat_pump_and_refrigeration_cascade`
 - :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.plot_multi_hp_profiles_from_results`
 
 .. automodule:: OpenPinch.analysis.heat_pump_and_refrigeration_targeting

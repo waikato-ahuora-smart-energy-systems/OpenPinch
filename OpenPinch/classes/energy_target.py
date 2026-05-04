@@ -8,7 +8,6 @@ from ..lib.config import Configuration, tol
 from ..lib.enums import ProblemTableLabel, SummaryRowType, TargetType
 from .problem_table import ProblemTable
 from .stream_collection import StreamCollection
-from .value import Value
 
 if TYPE_CHECKING:
     from .zone import Zone
@@ -119,14 +118,11 @@ class EnergyTarget:
     @property
     def active(self) -> bool:
         """Whether the target is active in analysis."""
-        if isinstance(self._active, Value):
-            return self._active.value
-        else:
-            return self._active
+        return self._active
 
     @active.setter
     def active(self, value: bool):
-        self._active = Value(value)
+        self._active = value
 
     @property
     def pt(self):
