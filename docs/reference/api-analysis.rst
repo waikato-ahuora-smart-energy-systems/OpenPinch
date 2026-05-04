@@ -46,6 +46,9 @@ constructed.
   cost/exergy add-ons.
 - Indirect integration aggregates the net thermal behaviour of solved subzones
   and applies utility-to-utility balancing for total-site style studies.
+- Lower-level heat-pump and refrigeration screening for both routes is
+  centralised in
+  :mod:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting`.
 
 .. automodule:: OpenPinch.analysis.direct_integration_entry
    :members:
@@ -91,8 +94,16 @@ are enabled, while others are better viewed as expert-level helper libraries.
 Heat Pump Targeting API
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Public entry points exposed by ``OpenPinch.analysis.heat_pump_and_refrigeration_targeting``:
+The main user-facing screening workflow is
+:meth:`OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`.
+The module below exposes the lower-level targeting helpers used by the direct
+and indirect integration entrypoints, plus advanced plotting helpers for solved
+multi-cycle results.
 
+Current public helpers include:
+
+- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.get_direct_heat_pump_and_refrigeration_target`
+- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.get_indirect_heat_pump_and_refrigeration_target`
 - :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.plot_multi_hp_profiles_from_results`
 
 .. automodule:: OpenPinch.analysis.heat_pump_and_refrigeration_targeting

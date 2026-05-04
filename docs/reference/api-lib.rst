@@ -49,8 +49,14 @@ Common response and reporting models include:
 - :class:`~OpenPinch.lib.schema.Segment`
 - :class:`~OpenPinch.lib.schema.DataPoint`
 
-Specialised helper models capture heat-pump optimisation inputs/outputs,
-piecewise stream linearisation requests, and legacy visualisation payloads.
+Heat-pump integration helper models include:
+
+- :class:`~OpenPinch.lib.schema.HeatPumpIntegrationScenario`
+- :class:`~OpenPinch.lib.schema.HeatPumpIntegrationComparison`
+
+Specialised helper models also capture lower-level heat-pump optimisation
+inputs/outputs, piecewise stream linearisation requests, and legacy
+visualisation payloads.
 
 .. automodule:: OpenPinch.lib.schema
    :members:

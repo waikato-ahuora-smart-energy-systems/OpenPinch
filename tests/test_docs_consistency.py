@@ -12,6 +12,9 @@ QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
 NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
 HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
 INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
+API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
+API_LIB = REPO_ROOT / "docs" / "reference" / "api-lib.rst"
+API_ANALYSIS = REPO_ROOT / "docs" / "reference" / "api-analysis.rst"
 
 
 def _read(path: Path) -> str:
@@ -73,3 +76,24 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
     assert "Interpreting Results" in combined
     assert "heat-pump targeting and integration" in combined
     assert "heat_pump_targeting.json" in combined
+
+
+def test_reference_docs_match_current_heat_pump_and_schema_surface():
+    api_classes = _read(API_CLASSES)
+    api_lib = _read(API_LIB)
+    api_analysis = _read(API_ANALYSIS)
+
+    assert "OpenPinch.classes.vapour_compression_cycle" in api_classes
+    assert "OpenPinch.classes.parallel_vapour_compression_cycles" in api_classes
+    assert "OpenPinch.classes.cascade_vapour_compression_cycle" in api_classes
+    assert "OpenPinch.classes.simple_heat_pump" not in api_classes
+    assert "OpenPinch.classes.multi_simple_heat_pump" not in api_classes
+    assert "OpenPinch.classes.cascade_heat_pump" not in api_classes
+    assert "state_ids" in api_classes
+    assert "weights" in api_classes
+
+    assert "HeatPumpIntegrationScenario" in api_lib
+    assert "HeatPumpIntegrationComparison" in api_lib
+
+    assert "get_direct_heat_pump_and_refrigeration_target" in api_analysis
+    assert "get_indirect_heat_pump_and_refrigeration_target" in api_analysis
