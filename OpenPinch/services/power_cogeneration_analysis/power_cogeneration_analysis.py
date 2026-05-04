@@ -6,13 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ...classes.multi_stage_steam_turbine import (
-    MultiStageSteamTurbine,
-    Set_Coeff,
-    Work_MedinaModel,
-    Work_SunModel,
-    Work_THM,
-)
+from ...classes.multi_stage_steam_turbine import MultiStageSteamTurbine
 from ...lib.config import T_CRIT, Configuration, tol
 from ...utils.water_properties import psat_T
 
@@ -25,10 +19,6 @@ if TYPE_CHECKING:
 __all__ = [
     "get_power_cogeneration_above_pinch",
     "get_power_cogeneration_below_pinch",
-    "Set_Coeff",
-    "Work_MedinaModel",
-    "Work_SunModel",
-    "Work_THM",
 ]
 
 

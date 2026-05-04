@@ -12,11 +12,7 @@ from ..lib.schema import TurbineSolveResult, TurbineStageResult
 from ..utils.water_properties import Tsat_p, h_ps, h_pT, hL_p, hV_p, psat_T, s_ph
 
 __all__ = [
-    "MultiStageSteamTurbine",
-    "Work_MedinaModel",
-    "Work_SunModel",
-    "Work_THM",
-    "Set_Coeff",
+    "MultiStageSteamTurbine"
 ]
 
 
@@ -69,7 +65,7 @@ def _predict_stage_work(
     if model == TurbineModel.SUN_SMITH.value:
         if mass_flow_max <= tol:
             return 0.0
-        return Work_SunModel(
+        return _work_SunModel(
             pressure_in,
             enthalpy_in,
             pressure_out,
@@ -80,9 +76,9 @@ def _predict_stage_work(
             mech_eff,
         )
     if model == TurbineModel.MEDINA_FLORES.value:
-        return Work_MedinaModel(pressure_in, mass_flow, dh_isentropic)
+        return _work_MedinaModel(pressure_in, mass_flow, dh_isentropic)
     if model == TurbineModel.VARBANOV.value:
-        return Work_THM(
+        return _work_THM(
             pressure_in,
             enthalpy_in,
             pressure_out,
@@ -208,14 +204,14 @@ def _iterate_turbine_state(state: _TurbineState) -> None:
         state.m_in_est += state.m_k[j]
 
 
-def Work_MedinaModel(P_in, m, dh_is):
+def _work_MedinaModel(P_in, m, dh_is):
     """Determine power generation using Medina-Flores & Picon-Nunez (2010)."""
     A0 = 185.4 + 43.3 * (P_in * 0.1)
     b0 = 1.2057 + 0.0075 * (P_in * 0.1)
     return (m * dh_is - A0) / b0
 
 
-def Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
+def _work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
     """Determine power generation using Sun & Smith (2015)."""
     coeff = {
         "BPST": {
@@ -259,11 +255,11 @@ def Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
     h_out = h_in - w_act / (n_mech * m)
 
     if h_out <= h_sat + tol and t_type_key == "BPST":
-        w_act = Work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, "CT")
+        w_act = _work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, "CT")
     return w_act
 
 
-def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
+def _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
     """Determine power generation using Varbanov et al. (2004)."""
     coeff = {
         "BPST": {
@@ -298,58 +294,13 @@ def Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
     w_max = (dh_is * m - a) / b
 
     if w_max > 2000 and t_size_key == "<2MW":
-        w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, ">2MW", t_type_key)
+        w_max = _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, ">2MW", t_type_key)
 
     h_out = h_in - w_max / (n_mech * m)
     if h_out <= h_sat + tol and t_type_key == "BPST":
-        w_max = Work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size_key, "CT")
+        w_max = _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size_key, "CT")
 
     return w_max
-
-
-def Set_Coeff(SunCoef=None, VarCoef=None):
-    """Populate legacy coefficient arrays for backward-compatible callers."""
-    if VarCoef is not None:
-        VarCoef[0][0][0] = 0
-        VarCoef[0][0][1] = 0.00108
-        VarCoef[0][0][2] = 1.097
-        VarCoef[0][0][3] = 0.00172
-
-        VarCoef[0][1][0] = 0
-        VarCoef[0][1][1] = 0.00423
-        VarCoef[0][1][2] = 1.155
-        VarCoef[0][1][3] = 0.000538
-
-        VarCoef[1][0][0] = 0
-        VarCoef[1][0][1] = 0.000662
-        VarCoef[1][0][2] = 1.191
-        VarCoef[1][0][3] = 0.000759
-
-        VarCoef[1][1][0] = -0.463
-        VarCoef[1][1][1] = 0.00353
-        VarCoef[1][1][2] = 1.22
-        VarCoef[1][1][3] = 0.000148
-
-    if SunCoef is not None:
-        SunCoef[0][0][0] = 1.18795366
-        SunCoef[0][0][1] = -0.00029564
-        SunCoef[0][0][2] = 0.004647288
-        SunCoef[0][1][0] = 449.9767142
-        SunCoef[0][1][1] = 5.670176939
-        SunCoef[0][1][2] = -11.5045814
-        SunCoef[0][2][0] = 0.205149333
-        SunCoef[0][2][1] = -0.000695171
-        SunCoef[0][2][2] = 0.002844611
-
-        SunCoef[1][0][0] = 1.314991261
-        SunCoef[1][0][1] = -0.001634725
-        SunCoef[1][0][2] = -0.367975103
-        SunCoef[1][1][0] = -437.7746025
-        SunCoef[1][1][1] = 29.00736723
-        SunCoef[1][1][2] = 10.35902331
-        SunCoef[1][2][0] = 0.07886297
-        SunCoef[1][2][1] = 0.000528327
-        SunCoef[1][2][2] = -0.703153891
 
 
 class MultiStageSteamTurbine:

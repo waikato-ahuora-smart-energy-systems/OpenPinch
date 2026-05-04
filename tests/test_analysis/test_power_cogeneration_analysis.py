@@ -161,9 +161,9 @@ def test_get_power_cogeneration_below_pinch_uses_environment_default(monkeypatch
 def test_work_models_and_coeff_setter(monkeypatch):
     _patch_steam_properties(monkeypatch)
 
-    assert np.isfinite(pca.Work_MedinaModel(10.0, 4.0, 100.0))
+    assert np.isfinite(turbine_mod._work_MedinaModel(10.0, 4.0, 100.0))
 
-    w_sun = pca.Work_SunModel(
+    w_sun = turbine_mod._work_SunModel(
         P_in=10.0,
         h_in=3_000.0,
         P_out=5.0,
@@ -176,7 +176,7 @@ def test_work_models_and_coeff_setter(monkeypatch):
     )
     assert np.isfinite(w_sun)
 
-    w_thm = pca.Work_THM(
+    w_thm = turbine_mod._work_THM(
         P_in=30.0,
         h_in=3_000.0,
         P_out=5.0,
@@ -190,15 +190,10 @@ def test_work_models_and_coeff_setter(monkeypatch):
     assert np.isfinite(w_thm)
 
     with pytest.raises(ValueError, match="Unsupported Sun model turbine type"):
-        pca.Work_SunModel(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 3.0, 120.0, 0.9, "bad")
+        turbine_mod._work_SunModel(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 3.0, 120.0, 0.9, "bad")
 
     with pytest.raises(ValueError, match="Unsupported THM turbine type"):
-        pca.Work_THM(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 120.0, 0.9, 1, "bad")
+        turbine_mod._work_THM(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 120.0, 0.9, 1, "bad")
 
     with pytest.raises(ValueError, match="Unsupported THM turbine size"):
-        pca.Work_THM(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 120.0, 0.9, "bad", 1)
-
-    var_coef = [[[None for _ in range(4)] for _ in range(2)] for _ in range(2)]
-    pca.Set_Coeff(VarCoef=var_coef)
-    assert var_coef[0][0][2] == pytest.approx(1.097)
-    assert var_coef[1][1][0] == pytest.approx(-0.463)
+        turbine_mod._work_THM(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 120.0, 0.9, "bad", 1)
