@@ -4,14 +4,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from OpenPinch.analysis.graph_data import (
+from OpenPinch.services.common.graph_data import (
     _classify_segment,
     _create_curve,
     _create_graph_set,
     _graph_cc,
     _graph_gcc,
     get_output_graph_data,
-    visualise_graphs,
 )
 from OpenPinch.classes import Zone
 from OpenPinch.lib import *
@@ -86,44 +85,6 @@ def test_create_graph_set_with_mock_zone():
 
 
 # ----------------------------------------------------------------------------------------------------
-# Tests for visualise_graphs
-# ----------------------------------------------------------------------------------------------------
-
-
-def test_visualise_graphs_composite():
-    graph_set = {"graphs": []}
-    graph = MagicMock()
-    graph.type = GT.CC.value
-    graph.data = {
-        PT.T.value: MagicMock(to_list=lambda: [100, 200]),
-        PT.H_HOT.value: MagicMock(to_list=lambda: [150, 200]),
-        PT.H_COLD.value: MagicMock(to_list=lambda: [100, 150]),
-    }
-    visualise_graphs(graph_set, graph)
-    assert len(graph_set["graphs"]) == 1
-    assert graph_set["graphs"][0]["type"] == GT.CC.value
-
-
-def test_visualise_graphs_gcc_utility():
-    graph_set = {"graphs": []}
-    graph = MagicMock()
-    graph.type = GT.GCC.value
-    graph.data = {
-        PT.T.value: MagicMock(to_list=lambda: [100, 200]),
-        PT.H_NET.value: MagicMock(to_list=lambda: [0, -100]),
-        PT.H_NET_A.value: MagicMock(to_list=lambda: [0, -100]),
-        PT.H_NET_AI.value: MagicMock(to_list=lambda: [0, -100]),
-        PT.H_NET_NP.value: MagicMock(to_list=lambda: [0, -100]),
-        PT.H_NET_V.value: MagicMock(to_list=lambda: [0, -100]),
-        PT.H_NET_PK.value: MagicMock(to_list=lambda: [0, -100]),
-        PT.H_NET_UT.value: MagicMock(to_list=lambda: [0, -100]),
-    }
-    visualise_graphs(graph_set, graph)
-    assert len(graph_set["graphs"]) == 1
-    assert graph_set["graphs"][0]["type"] == f"{GT.GCC.value}"
-
-
-# ----------------------------------------------------------------------------------------------------
 # Tests for get_output_graph_data
 # ----------------------------------------------------------------------------------------------------
 
@@ -135,7 +96,7 @@ def test_get_output_graph_data_single_zone(monkeypatch):
     zone.targets = {TargetType.DI.value: MagicMock(name="TI", graphs={})}
 
     monkeypatch.setattr(
-        "OpenPinch.analysis.graph_data._create_graph_set",
+        "OpenPinch.services.common.graph_data._create_graph_set",
         lambda z, n: {"name": n, "graphs": []},
     )
     result = get_output_graph_data(zone)

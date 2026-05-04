@@ -243,26 +243,10 @@ def test_get_targets_raises_on_unknown_identifier():
         main_mod.get_targets(zone)
 
 
-def test_get_visualise_legacy_path(monkeypatch):
-    calls = []
-
-    def _fake_visualise_graphs(graph_set, graph):
-        calls.append((graph_set["name"], graph))
-        graph_set["graphs"].append(graph)
-
-    monkeypatch.setattr(main_mod, "visualise_graphs", _fake_visualise_graphs)
-    data = [SimpleNamespace(name="A", graphs=[{"id": 1}, {"id": 2}])]
-
-    res = main_mod.get_visualise(data)
-    assert res["graphs"][0]["name"] == "A"
-    assert len(res["graphs"][0]["graphs"]) == 2
-    assert len(calls) == 2
-
-
 def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        main_mod, "compute_direct_integration_targets", lambda z: calls.append(z.name)
+        main_mod, "direct_heat_integration_service", lambda z: calls.append(z.name)
     )
 
     valid = Zone(name="UO", identifier=ZoneType.O.value)
@@ -289,12 +273,12 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
     calls = []
     monkeypatch.setattr(
         main_mod,
-        "compute_direct_integration_targets",
+        "direct_heat_integration_service",
         lambda z: calls.append(f"direct:{z.name}"),
     )
     monkeypatch.setattr(
         main_mod,
-        "compute_indirect_integration_targets",
+        "indirect_heat_integration_service",
         lambda z: calls.append(f"indirect:{z.name}"),
     )
     monkeypatch.setattr(
@@ -315,8 +299,8 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
 
 
 def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
-    monkeypatch.setattr(main_mod, "compute_direct_integration_targets", lambda z: z)
-    monkeypatch.setattr(main_mod, "compute_indirect_integration_targets", lambda z: z)
+    monkeypatch.setattr(main_mod, "direct_heat_integration_service", lambda z: z)
+    monkeypatch.setattr(main_mod, "indirect_heat_integration_service", lambda z: z)
 
     invalid = Zone(name="S_bad", identifier=ZoneType.S.value)
     invalid.add_zone(Zone(name="bad", identifier="X"))
@@ -326,12 +310,12 @@ def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
     calls = []
     monkeypatch.setattr(
         main_mod,
-        "compute_direct_integration_targets",
+        "direct_heat_integration_service",
         lambda z: calls.append(f"direct:{z.name}"),
     )
     monkeypatch.setattr(
         main_mod,
-        "compute_indirect_integration_targets",
+        "indirect_heat_integration_service",
         lambda z: calls.append(f"indirect:{z.name}"),
     )
     monkeypatch.setattr(

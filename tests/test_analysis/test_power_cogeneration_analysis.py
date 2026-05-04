@@ -7,8 +7,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import OpenPinch.analysis.power_cogeneration_analysis as pca
 import OpenPinch.classes.multi_stage_steam_turbine as turbine_mod
+from OpenPinch.services.power_cogeneration_analysis import (
+    power_cogeneration_analysis as pca,
+)
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 

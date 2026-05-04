@@ -83,9 +83,6 @@ modules.
 - :func:`~OpenPinch.main.extract_results` converts the solved in-memory zone
   hierarchy into the dictionary structure consumed by
   :class:`~OpenPinch.lib.schema.TargetOutput`.
-- :func:`~OpenPinch.main.get_visualise` is a legacy compatibility helper for
-  older graph payload formats and should generally be avoided in new
-  integrations.
 
 .. automodule:: OpenPinch.main
    :members:

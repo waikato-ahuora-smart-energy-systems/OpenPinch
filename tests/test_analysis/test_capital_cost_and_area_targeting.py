@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.capital_cost_and_area_targeting import (
+from OpenPinch.services.common.capital_cost_and_area_targeting import (
     get_area_targets,
     get_min_number_hx,
 )
@@ -50,7 +50,7 @@ def _make_stream(
 #         "t_c2": np.array([235.0, 195.0]),
 #     }
 #     monkeypatch.setattr(
-#         "OpenPinch.analysis.capital_cost_and_area_targeting.get_temperature_driving_forces",
+#         "OpenPinch.services.capital_cost_and_area_targeting.get_temperature_driving_forces",
 #         lambda *args, **kwargs: tdf_payload,
 #     )
 

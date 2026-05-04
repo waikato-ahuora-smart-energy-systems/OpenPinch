@@ -2,7 +2,7 @@
 
 Run with ``streamlit run streamlit_app.py`` to load the bundled demonstration
 case and launch the interactive dashboard defined in
-``OpenPinch.analysis.graphing``.
+``OpenPinch.services.graphing``.
 """
 
 from __future__ import annotations

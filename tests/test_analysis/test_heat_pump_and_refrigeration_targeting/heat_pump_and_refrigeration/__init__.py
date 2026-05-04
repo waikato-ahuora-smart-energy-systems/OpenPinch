@@ -1,1 +1,1 @@
-"""Tests mirroring OpenPinch.analysis.heat_pump_and_refrigeration."""
+"""Tests mirroring OpenPinch.services.heat_pump_and_refrigeration."""

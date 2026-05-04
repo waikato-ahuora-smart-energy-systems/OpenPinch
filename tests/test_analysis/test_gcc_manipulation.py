@@ -6,7 +6,7 @@ import pytest
 from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.analysis.gcc_manipulation import *
+from OpenPinch.services.common.gcc_manipulation import *
 
 
 """Tests for gcc manipulation"""

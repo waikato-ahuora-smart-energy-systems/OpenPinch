@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
-from OpenPinch.analysis.heat_pump_and_refrigeration_placement.brayton import (
+from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
+from OpenPinch.services.heat_pump_integration.cycles.brayton import (
     _build_simulated_hpr_streams,
 )
 from OpenPinch.classes.problem_table import ProblemTable

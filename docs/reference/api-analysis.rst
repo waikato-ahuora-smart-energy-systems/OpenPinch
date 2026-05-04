@@ -12,18 +12,18 @@ Pipeline Overview
 
 The analysis stack typically runs in this order:
 
-1. :mod:`OpenPinch.analysis.data_preparation` validates options, normalises the
+1. :mod:`OpenPinch.services.data_preparation` validates options, normalises the
    zone hierarchy, and constructs :class:`~OpenPinch.classes.zone.Zone`,
    :class:`~OpenPinch.classes.stream.Stream`, and
    :class:`~OpenPinch.classes.stream_collection.StreamCollection` objects.
-2. :mod:`OpenPinch.analysis.problem_table_analysis` builds the shifted and
+2. :mod:`OpenPinch.services.common.problem_table_analysis` builds the shifted and
    real-temperature problem tables used throughout the rest of the workflow.
-3. :mod:`OpenPinch.analysis.direct_integration_entry` computes direct
+3. :mod:`OpenPinch.services.direct_heat_integration.direct_integration_entry` computes direct
    integration targets for unit-operation and process zones.
-4. :mod:`OpenPinch.analysis.indirect_integration_entry` aggregates solved
+4. :mod:`OpenPinch.services.indirect_heat_integration.indirect_integration_entry` aggregates solved
    subzones into site-style indirect integration targets when the hierarchy
    requires it.
-5. :mod:`OpenPinch.analysis.graph_data` converts solved tables and targets into
+5. :mod:`OpenPinch.services.common.graph_data` converts solved tables and targets into
    serialisable graph payloads for reporting and Streamlit visualisation.
 
 Preparation and Zone Construction
@@ -32,7 +32,7 @@ Preparation and Zone Construction
 These functions are the bridge between external schema payloads and the
 internal object model.
 
-.. automodule:: OpenPinch.analysis.data_preparation
+.. automodule:: OpenPinch.services.data_preparation
    :members:
 
 Direct and Indirect Targeting Entrypoints
@@ -48,12 +48,12 @@ constructed.
   and applies utility-to-utility balancing for total-site style studies.
 - Lower-level heat-pump and refrigeration screening for both routes is
   centralised in
-  :mod:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting`.
+  :mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`.
 
-.. automodule:: OpenPinch.analysis.direct_integration_entry
+.. automodule:: OpenPinch.services.direct_heat_integration.direct_integration_entry
    :members:
 
-.. automodule:: OpenPinch.analysis.indirect_integration_entry
+.. automodule:: OpenPinch.services.indirect_heat_integration.indirect_integration_entry
    :members:
 
 Problem Tables, Utility Allocation, and Graph Data
@@ -62,26 +62,26 @@ Problem Tables, Utility Allocation, and Graph Data
 These modules implement the numerical building blocks that the entry-point
 workflows depend on.
 
-- :mod:`OpenPinch.analysis.problem_table_analysis` generates the cascade tables
+- :mod:`OpenPinch.services.common.problem_table_analysis` generates the cascade tables
   and extracts pinch, utility, and heat-recovery targets from them.
-- :mod:`OpenPinch.analysis.utility_targeting` assigns multiple utilities across
+- :mod:`OpenPinch.services.common.utility_targeting` assigns multiple utilities across
   heating and cooling deficits while respecting temperature feasibility.
-- :mod:`OpenPinch.analysis.gcc_manipulation` derives pocket-free, assisted, and
+- :mod:`OpenPinch.services.common.gcc_manipulation` derives pocket-free, assisted, and
   other grand-composite-curve variants used for interpretation and advanced
   targeting.
-- :mod:`OpenPinch.analysis.graph_data` translates tables and targets into the
+- :mod:`OpenPinch.services.common.graph_data` translates tables and targets into the
   graph structures emitted in :class:`~OpenPinch.lib.schema.TargetOutput`.
 
-.. automodule:: OpenPinch.analysis.problem_table_analysis
+.. automodule:: OpenPinch.services.common.problem_table_analysis
    :members:
 
-.. automodule:: OpenPinch.analysis.utility_targeting
+.. automodule:: OpenPinch.services.common.utility_targeting
    :members:
 
-.. automodule:: OpenPinch.analysis.gcc_manipulation
+.. automodule:: OpenPinch.services.common.gcc_manipulation
    :members:
 
-.. automodule:: OpenPinch.analysis.graph_data
+.. automodule:: OpenPinch.services.common.graph_data
    :members:
 
 Advanced Analyses
@@ -102,29 +102,29 @@ multi-cycle results.
 
 Current public helpers include:
 
-- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.get_direct_heat_pump_and_refrigeration_target`
-- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.get_indirect_heat_pump_and_refrigeration_target`
-- :func:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting.plot_multi_hp_profiles_from_results`
+- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.get_direct_heat_pump_and_refrigeration_target`
+- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.get_indirect_heat_pump_and_refrigeration_target`
+- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.plot_multi_hp_profiles_from_results`
 
-.. automodule:: OpenPinch.analysis.heat_pump_and_refrigeration_targeting
+.. automodule:: OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry
    :members:
 
-.. automodule:: OpenPinch.analysis.capital_cost_and_area_targeting
+.. automodule:: OpenPinch.services.common.capital_cost_and_area_targeting
    :members:
 
-.. automodule:: OpenPinch.analysis.temperature_driving_force
+.. automodule:: OpenPinch.services.common.temperature_driving_force
    :members:
 
-.. automodule:: OpenPinch.analysis.power_cogeneration_analysis
+.. automodule:: OpenPinch.services.power_cogeneration_analysis
    :members:
 
-.. automodule:: OpenPinch.analysis.exergy_targeting
+.. automodule:: OpenPinch.services.exergy_analysis.exergy_targeting_entry
    :members:
 
 Legacy Research Module
 ~~~~~~~~~~~~~~~~~~~~~~
 
-:mod:`OpenPinch.analysis.energy_transfer_analysis` is retained in the source
+:mod:`OpenPinch.services.energy_transfer_analysis.energy_transfer_analysis` is retained in the source
 tree as an experimental placeholder from older research code. It is not part of
 the supported public workflow and is therefore intentionally omitted from the
 generated API listing here.

@@ -3,7 +3,7 @@ Domain Classes
 
 The class layer is the in-memory model behind the OpenPinch workflow. Most of
 these objects are created for you by
-:func:`~OpenPinch.analysis.data_preparation.prepare_problem`, but they are also
+:func:`~OpenPinch.services.data_preparation.prepare_problem`, but they are also
 useful directly when building tests, custom workflows, or post-processing
 studies.
 
@@ -64,7 +64,7 @@ Thermal Cycle Classes
 
 These classes support the advanced heat-pump, refrigeration, and utility-system
 workflows documented in
-:mod:`OpenPinch.analysis.heat_pump_and_refrigeration_targeting`. They are
+:mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`. They are
 primarily useful for advanced users who want to inspect or construct detailed
 cycle configurations directly.
 

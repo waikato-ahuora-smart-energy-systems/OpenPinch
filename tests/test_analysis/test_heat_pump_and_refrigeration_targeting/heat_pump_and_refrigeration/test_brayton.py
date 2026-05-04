@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration_placement import (
+from OpenPinch.services.heat_pump_integration.cycles import (
     brayton as hp_brayton,
 )
 from OpenPinch.classes.stream_collection import StreamCollection

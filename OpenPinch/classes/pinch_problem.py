@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 import pandas as pd
 from pydantic import ValidationError
 
-from ..analysis import get_output_graph_data
+from ..services import get_output_graph_data
 from ..lib.enums import GT
 from ..lib.schema import (
     HeatPumpIntegrationComparison,
@@ -104,6 +104,7 @@ class PinchProblem:
     _input_source_kind: str = "unknown"
     _validation_context: Optional[dict[str, list[dict[str, Any]]]] = None
 
+
     def __init__(
         self,
         problem_filepath: Optional[PathLike] = None,
@@ -150,6 +151,7 @@ class PinchProblem:
     # ----------------------------------------------------------------------------
     # Public API
     # ----------------------------------------------------------------------------
+
 
     def load(
         self,
@@ -256,6 +258,7 @@ class PinchProblem:
             f"a directory with 'streams.csv' and 'utilities.csv', or a (streams, utilities) tuple."
         )
 
+
     def target(self) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
         if self._problem_data is None:
@@ -268,6 +271,7 @@ class PinchProblem:
             )
         return self._results
 
+
     def run(self) -> TargetOutput:
         """Run the targeting workflow and return the cached result."""
         self.validate()
@@ -278,7 +282,7 @@ class PinchProblem:
         if self._problem_data is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
         try:
-            payload = TargetInput.model_validate(self._problem_data)
+            input_data = TargetInput.model_validate(self._problem_data)
         except ValidationError as exc:
             raise ValueError(
                 _format_schema_validation_error(
@@ -289,23 +293,11 @@ class PinchProblem:
             ) from exc
 
         _validate_problem_semantics(
-            payload,
+            input_data,
             context=self._validation_context or {},
         )
+        return input_data
 
-        from ..analysis import data_preparation as process_data_preparation
-
-        try:
-            process_data_preparation.prepare_problem(
-                streams=payload.streams,
-                utilities=payload.utilities,
-                options=payload.options,
-                project_name=self._project_name,
-                zone_tree=payload.zone_tree,
-            )
-        except Exception as exc:
-            raise ValueError(f"Problem structure validation failed: {exc}") from exc
-        return payload
 
     def summary_frame(self, *, detailed: bool = False) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
@@ -334,6 +326,7 @@ class PinchProblem:
                 }
             )
         return pd.DataFrame(rows)
+
 
     def graph_data(self) -> GraphPayload:
         """Return the serialized graph payload for the solved problem."""
@@ -366,6 +359,7 @@ class PinchProblem:
                 )
         return pd.DataFrame(rows)
 
+
     def plot(
         self,
         *,
@@ -380,6 +374,7 @@ class PinchProblem:
             index=index,
         )
         return _build_plotly_graph(graph)
+
 
     def plot_composite_curve(
         self,
@@ -399,9 +394,11 @@ class PinchProblem:
             )
         return self.plot(zone_name=zone_name, graph_type=selector)
 
+
     def plot_grand_composite_curve(self, *, zone_name: Optional[str] = None):
         """Build the grand composite curve Plotly figure for the selected zone."""
         return self.plot(zone_name=zone_name, graph_type=GT.GCC.value)
+
 
     def export_graphs(
         self,
@@ -424,6 +421,7 @@ class PinchProblem:
             written_paths.append(destination)
         return written_paths
 
+
     def export_to_Excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Export the solved target summary and problem tables to an Excel file."""
         if results_dir is not None:
@@ -445,9 +443,11 @@ class PinchProblem:
 
         return Path(output_path)
 
+
     def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Alias for :meth:`export_to_Excel` with a conventional snake_case name."""
         return self.export_to_Excel(results_dir)
+
 
     def compare_to(
         self,
@@ -490,6 +490,7 @@ class PinchProblem:
         comparison.loc["Change", "Target"] = str(base_row["Target"])
         return comparison
 
+
     def build_heat_pump_integration_problem(
         self,
         scenario: HeatPumpIntegrationScenario | dict[str, Any],
@@ -512,6 +513,7 @@ class PinchProblem:
         integrated_problem = PinchProblem.from_json(scenario_data)
         integrated_problem._project_name = f"{self._project_name}_with_hp"
         return validated_scenario, integrated_problem
+
 
     def evaluate_heat_pump_integration(
         self,

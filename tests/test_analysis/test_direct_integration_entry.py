@@ -3,7 +3,7 @@
 from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.analysis.direct_integration_entry import (
+from OpenPinch.services.direct_heat_integration.direct_integration_entry import (
     _add_net_segment_stateful,
     _initialise_utility_index,
 )

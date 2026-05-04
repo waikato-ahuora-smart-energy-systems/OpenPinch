@@ -8,7 +8,7 @@ from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.utils import *
-from OpenPinch.analysis.exergy_targeting import *
+from OpenPinch.services.exergy_analysis.exergy_targeting_entry import *
 
 
 """Test cases for the compute_exergetic_temperature function."""

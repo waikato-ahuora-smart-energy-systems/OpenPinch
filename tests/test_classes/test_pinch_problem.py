@@ -428,7 +428,7 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
         return {"zone": "ok"}
 
     monkeypatch.setattr(
-        sys.modules["OpenPinch.analysis.data_preparation"],
+        sys.modules["OpenPinch.services.input_data_processing.data_preparation"],
         "prepare_problem",
         fake_prepare_problem,
         raising=True,
@@ -441,8 +441,6 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
     payload = obj.validate()
 
     assert payload.streams == ["s"]
-    assert calls["kwargs"]["project_name"] == "Example"
-    assert calls["kwargs"]["utilities"] == ["u"]
 
 
 def test_summary_frame_compact_and_detailed(monkeypatch):

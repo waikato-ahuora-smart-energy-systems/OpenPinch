@@ -4,7 +4,9 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
+from OpenPinch.services.heat_pump_integration import (
+    heat_pump_and_refrigeration_entry as hp,
+)
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection

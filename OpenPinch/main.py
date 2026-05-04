@@ -8,12 +8,11 @@ in larger workflows.
 
 from typing import Any, List
 
-from .analysis import (
-    compute_direct_integration_targets,
-    compute_indirect_integration_targets,
+from .services import (
+    data_preprocessing_service,
+    direct_heat_integration_service,
+    indirect_heat_integration_service,
     get_output_graph_data,
-    prepare_problem,
-    visualise_graphs,
 )
 from .classes.energy_target import EnergyTarget
 from .classes.stream import Stream
@@ -23,7 +22,7 @@ from .lib.enums import Z, ZoneType
 from .lib.schema import TargetInput, TargetOutput
 from .utils.decorators import timing_decorator
 
-__all__ = ["pinch_analysis_service", "get_targets", "get_visualise", "extract_results"]
+__all__ = ["pinch_analysis_service", "get_targets", "extract_results"]
 
 
 #######################################################################################################
@@ -57,16 +56,11 @@ def pinch_analysis_service(
         Validated response payload, optionally paired with the in-memory zone
         tree for advanced inspection and post-processing.
     """
-    # Validate request data using Pydantic model
-    request_data = TargetInput.model_validate(data)
 
     # Formulate the top level zone with all subzones and approperiate input data
-    master_zone = prepare_problem(
+    master_zone = data_preprocessing_service(
         project_name=project_name,
-        streams=request_data.streams,
-        utilities=request_data.utilities,
-        options=request_data.options,
-        zone_tree=request_data.zone_tree,
+        input_data=data,
     )
 
     # Perform advanced targeting analysis on the master zone and all subzones
@@ -111,25 +105,6 @@ def extract_results(master_zone: Zone) -> dict:
     }
 
 
-########### TODO: This function is untested and not updated since the overhaul of OpenPinch. Broken, most likely.#####
-def get_visualise(data) -> dict:
-    """Build graph payloads directly from legacy problem-table structures.
-
-    Notes
-    -----
-    This helper predates the class-based refactor and retains compatibility with
-    older tooling.  It is currently untested and should be considered provisional.
-    """
-    r_data = {"graphs": []}
-    z: Zone
-    for z in data:
-        graph_set = {"name": f"{z.name}", "graphs": []}
-        for graph in z.graphs:
-            visualise_graphs(graph_set, graph)
-        r_data["graphs"].append(graph_set)
-    return r_data
-
-
 #######################################################################################################
 # Helper functions
 #######################################################################################################
@@ -143,13 +118,13 @@ def _get_unit_operation_targets(zone: Zone):
             for z in zone.subzones.values():
                 if z.identifier == ZoneType.O.value:
                     if zone.config.DO_DIRECT_OPERATION_TARGETING:
-                        compute_direct_integration_targets(z)
+                        direct_heat_integration_service(z)
                 else:
                     raise ValueError(
                         "Invalid zone nesting. Unit operation zones can only contain other operation zones."
                     )
 
-        compute_direct_integration_targets(zone)
+        direct_heat_integration_service(zone)
 
     return zone
 
@@ -170,9 +145,9 @@ def _get_process_targets(zone: Zone):
                 )
 
         if zone.config.DO_INDIRECT_PROCESS_TARGETING:
-            compute_indirect_integration_targets(zone)
+            indirect_heat_integration_service(zone)
 
-    compute_direct_integration_targets(zone)
+    direct_heat_integration_service(zone)
 
     return zone
 
@@ -184,7 +159,7 @@ def _get_site_targets(zone: Zone):
     """
 
     # Totally integrated analysis for a site zone
-    compute_direct_integration_targets(zone)
+    direct_heat_integration_service(zone)
 
     # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
@@ -201,7 +176,7 @@ def _get_site_targets(zone: Zone):
                 )
 
         # Calculates TS targets based on different approaches
-        compute_indirect_integration_targets(zone)
+        indirect_heat_integration_service(zone)
 
     return zone
 

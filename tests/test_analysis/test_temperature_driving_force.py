@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from OpenPinch.analysis.temperature_driving_force import (
+from OpenPinch.services.common.temperature_driving_force import (
     get_temperature_driving_forces,
 )
 

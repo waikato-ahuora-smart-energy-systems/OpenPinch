@@ -247,7 +247,10 @@ class Zone:
         """Create and register an :class:`EnergyTarget` from a result mapping."""
         target_name = f"{self.name}/{target_id}" if target_id is not None else self.name
         res = EnergyTarget(
-            target_name, target_id, self.parent_zone, zone_config=self.config
+            name=target_name,
+            identifier=target_id,
+            parent_zone=self.parent_zone,
+            zone_config=self.config,
         )
         for key, value in results.items():
             setattr(res, key, value)

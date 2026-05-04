@@ -37,11 +37,11 @@ Analysis Workflow
 
 1. Validate input payloads via :mod:`OpenPinch.lib.schema` models.
 2. Build the zone tree and stream/utility collections with
-   :func:`OpenPinch.analysis.data_preparation.prepare_problem`.
+   :func:`OpenPinch.services.data_preparation.prepare_problem`.
 3. Run direct integration (problem-table and multi-utility targeting) with
-   :func:`OpenPinch.analysis.direct_integration_entry.compute_direct_integration_targets`.
+   :func:`OpenPinch.services.direct_heat_integration.direct_integration_entry.compute_direct_integration_targets`.
 4. For site-style aggregation, run indirect integration with
-   :func:`OpenPinch.analysis.indirect_integration_entry.compute_indirect_integration_targets`.
+   :func:`OpenPinch.services.indirect_heat_integration.indirect_integration_entry.compute_indirect_integration_targets`.
 5. Package targets, utilities, and graph payloads for programmatic use and
    Excel export.
 

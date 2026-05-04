@@ -3,11 +3,11 @@
 import json
 import os
 import pytest
-from OpenPinch.analysis.data_preparation import prepare_problem
+from OpenPinch.services.input_data_processing.data_preparation import prepare_problem
 from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.analysis.utility_targeting import _target_utility
+from OpenPinch.services.common.utility_targeting import _target_utility
 
 
 """Tests for _target_utility"""

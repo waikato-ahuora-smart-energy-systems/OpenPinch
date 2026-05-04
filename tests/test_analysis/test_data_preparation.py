@@ -47,15 +47,15 @@ All edge cases aim to test both robustness and realistic behavior. Some tests in
 
 import pytest
 from pydantic import ValidationError
-from OpenPinch.analysis.data_preparation import _validate_input_data, prepare_problem
+from OpenPinch.services.input_data_processing.data_preparation import _validate_input_data, prepare_problem
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.analysis.data_preparation import _validate_zone_tree_structure
-from OpenPinch.analysis.data_preparation import (
+from OpenPinch.services.input_data_processing.data_preparation import _validate_zone_tree_structure
+from OpenPinch.services.input_data_processing.data_preparation import (
     _validate_config_data_completed,
 )
-from OpenPinch.analysis.data_preparation import _get_validated_zone_info
-from OpenPinch.analysis.data_preparation import _create_nested_zones
+from OpenPinch.services.input_data_processing.data_preparation import _get_validated_zone_info
+from OpenPinch.services.input_data_processing.data_preparation import _create_nested_zones
 
 
 # ---------------- Fixtures ---------------- #

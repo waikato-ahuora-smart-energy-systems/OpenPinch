@@ -3,8 +3,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
-from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
+from OpenPinch.services.heat_pump_integration import (
+    heat_pump_and_refrigeration_entry as hp,
+)
+from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection

@@ -1,7 +1,7 @@
 """Streamlit helpers for visualising OpenPinch outputs.
 
 The functions in this module provide a lightweight dashboard scaffold that
-renders the composite-curve style graphs emitted by :mod:`OpenPinch.analysis`
+renders the composite-curve style graphs emitted by :mod:`OpenPinch.services`
 alongside the corresponding problem tables.  The dashboard is intentionally
 minimal so user projects can layer additional controls as needed.
 """
@@ -29,7 +29,7 @@ from ..classes.problem_table import ProblemTable
 from ..classes.stream import Stream
 from ..classes.zone import Zone
 from ..lib.enums import ArrowHead, LineColour
-from ..analysis import get_output_graph_data
+from ..services import get_output_graph_data
 
 __all__ = [
     "StreamlitGraphSet",
