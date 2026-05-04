@@ -1047,7 +1047,7 @@ def test_creates_nested_zones_correctly():
     zone_tree = make_zone_tree_schema()
     master_zone = Zone(
         name=zone_config.TOP_ZONE_NAME,
-        identifier=zone_config.TOP_ZONE_IDENTIFIER,
+        type=zone_config.TOP_ZONE_IDENTIFIER,
         zone_config=zone_config,
     )
 
@@ -1058,12 +1058,12 @@ def test_creates_nested_zones_correctly():
 
     area1 = result.subzones["Area1"]
     assert area1.name == "Area1"
-    assert area1.identifier == ZoneType.P.value
+    assert area1.type == ZoneType.P.value
     assert len(area1.subzones) == 1
 
     line1 = area1.subzones["Line1"]
     assert line1.name == "Line1"
-    assert line1.identifier == ZoneType.P.value
+    assert line1.type == ZoneType.P.value
     assert line1.subzones == {}
 
 
@@ -1071,7 +1071,7 @@ def test_empty_zone_tree_returns_parent():
     zone_config = Configuration()
     zone_tree = ZoneTreeSchema(name="MySite", type=ZoneType.S.value, children=None)
     parent_zone = Zone(
-        name="MySite", identifier=ZoneType.S.value, zone_config=zone_config
+        name="MySite", type=ZoneType.S.value, zone_config=zone_config
     )
 
     result = _create_nested_zones(parent_zone, zone_tree, zone_config)

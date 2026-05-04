@@ -26,7 +26,7 @@ class EnergyTarget:
     def __init__(
         self,
         zone_name: str,
-        identifier: str,
+        type: str,
         parent_zone: "Zone" = None,
         zone_config: Optional[Configuration] = None,
     ):
@@ -34,13 +34,13 @@ class EnergyTarget:
         # === Metadata ===
         if not zone_name:
             raise ValueError("zone_name is required.")
-        if not identifier:
-            raise ValueError("identifier is required.")
+        if not type:
+            raise ValueError("type is required.")
 
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
-        self._identifier = identifier
-        self._name = self._format_target_name(zone_name, identifier)
+        self._type = type
+        self._name = self._format_target_name(zone_name, type)
         self._active = True
 
         self._graphs = {}
@@ -85,9 +85,9 @@ class EnergyTarget:
         self._target_values = {}
 
     @staticmethod
-    def _format_target_name(zone_name: str, identifier: str) -> str:
-        """Normalise display names while avoiding duplicate identifier suffixes."""
-        suffix = f"/{identifier}"
+    def _format_target_name(zone_name: str, type: str) -> str:
+        """Normalise display names while avoiding duplicate type suffixes."""
+        suffix = f"/{type}"
         if zone_name.endswith(suffix):
             return zone_name
 
@@ -104,13 +104,13 @@ class EnergyTarget:
         self._name = value
 
     @property
-    def identifier(self):
-        """Target type identifier from :class:`TargetType`."""
-        return self._identifier
+    def type(self):
+        """Target type type from :class:`TargetType`."""
+        return self._type
 
-    @identifier.setter
-    def identifier(self, value):
-        self._identifier = value
+    @type.setter
+    def type(self, value):
+        self._type = value
 
     @property
     def config(self):

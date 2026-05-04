@@ -100,7 +100,7 @@ class _StreamlitStub:
 
 
 def _make_target(name: str) -> EnergyTarget:
-    target = EnergyTarget(zone_name=name, identifier="DI")
+    target = EnergyTarget(zone_name=name, type="DI")
     target.cold_pinch = 80.0
     target.hot_pinch = 120.0
     target.hot_utility_target = 100.0
@@ -399,7 +399,7 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     monkeypatch.setitem(sys.modules, "streamlit", st)
 
     zone = Zone(name="Plant")
-    target = EnergyTarget(zone_name="Plant", identifier="DI")
+    target = EnergyTarget(zone_name="Plant", type="DI")
     target.cold_pinch = 80.0
     target.hot_pinch = 120.0
     target.hot_utility_target = 100.0

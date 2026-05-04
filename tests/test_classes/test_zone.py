@@ -15,7 +15,7 @@ def dummy_zone():
 @pytest.fixture
 def dummy_tar():
     """Return dummy tar data used by this test module."""
-    return EnergyTarget(zone_name="Z1", identifier="DI")
+    return EnergyTarget(zone_name="Z1", type="DI")
 
 
 @pytest.fixture

@@ -25,14 +25,14 @@ class Zone:
     def __init__(
         self,
         name: str = "Zone",
-        identifier: str = ZoneType.P.value,
+        type: str = ZoneType.P.value,
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
     ):
         """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
         self._name = name
-        self._identifier = identifier
+        self._type = type
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
         self._active = True
@@ -60,13 +60,13 @@ class Zone:
         self._name = value
 
     @property
-    def identifier(self):
-        """Zone type identifier from :class:`ZoneType`."""
-        return self._identifier
+    def type(self):
+        """Zone type type from :class:`ZoneType`."""
+        return self._type
 
-    @identifier.setter
-    def identifier(self, value):
-        self._identifier = value
+    @type.setter
+    def type(self, value):
+        self._type = value
 
     @property
     def config(self):
@@ -236,7 +236,7 @@ class Zone:
 
     def add_target(self, target_to_add: EnergyTarget):
         """Add one target to a specific zone."""
-        self._targets[target_to_add.identifier] = target_to_add
+        self._targets[target_to_add.type] = target_to_add
 
     def add_targets(self, targets: list):
         """Add multiple targets to a specific zone."""
@@ -247,7 +247,7 @@ class Zone:
         """Create and register an :class:`EnergyTarget` from a result mapping."""
         res = EnergyTarget(
             zone_name=self.name,
-            identifier=target_id,
+            type=target_id,
             parent_zone=self.parent_zone,
             zone_config=self.config,
         )

@@ -40,7 +40,7 @@ def compute_total_subzone_utility_targets(zone: Zone) -> EnergyTarget:
     """Sums and records zonal targets."""
     target = EnergyTarget(
         zone_name=zone.name,
-        identifier=TargetType.TZ.value,
+        type=TargetType.TZ.value,
         parent_zone=zone.parent_zone,
         zone_config=zone.config,
     )
@@ -104,7 +104,7 @@ def compute_indirect_integration_targets(zone: Zone) -> EnergyTarget:
     """ 
     target = EnergyTarget(
         zone_name=zone.name,
-        identifier=TargetType.TS.value,
+        type=TargetType.TS.value,
         parent_zone=zone.parent_zone,
         zone_config=zone.config,
     )
@@ -162,7 +162,7 @@ def compute_indirect_integration_targets(zone: Zone) -> EnergyTarget:
     _match_utility_gen_and_use_at_same_level(hot_utilities, cold_utilities)
 
     # Determine if heat pump or refrigeration targeting is warranted based on the utility cascade profiles and user settings
-    if zone.identifier == Z.S.value and (
+    if zone.type == Z.S.value and (
         zone.config.DO_UTILITY_HP_TARGETING or zone.config.DO_UTILITY_RFRG_TARGETING
     ):
         target.update(

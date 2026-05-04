@@ -88,7 +88,7 @@ def get_targets(master_zone: Zone) -> Zone:
     populated.
     """
 
-    handler = _TARGET_HANDLERS.get(master_zone.identifier)
+    handler = _TARGET_HANDLERS.get(master_zone.type)
     if handler is None:
         raise ValueError("No valid zone passed into OpenPinch for analysis.")
 
@@ -116,7 +116,7 @@ def _get_unit_operation_targets(zone: Zone):
         if len(zone.subzones) > 0:
             z: Zone
             for z in zone.subzones.values():
-                if z.identifier == ZoneType.O.value:
+                if z.type == ZoneType.O.value:
                     if zone.config.DO_DIRECT_OPERATION_TARGETING:
                         direct_heat_integration_service(z)
                 else:
@@ -135,9 +135,9 @@ def _get_process_targets(zone: Zone):
     if len(zone.subzones) > 0:
         z: Zone
         for z in zone.subzones.values():
-            if z.identifier == ZoneType.O.value:
+            if z.type == ZoneType.O.value:
                 z = _get_unit_operation_targets(z)
-            elif z.identifier == ZoneType.P.value:
+            elif z.type == ZoneType.P.value:
                 z = _get_process_targets(z)
             else:
                 raise ValueError(
@@ -164,11 +164,11 @@ def _get_site_targets(zone: Zone):
     # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
         for z in zone.subzones.values():
-            if z.identifier == Z.O.value:
+            if z.type == Z.O.value:
                 _get_unit_operation_targets(z)
-            elif z.identifier == Z.P.value:
+            elif z.type == Z.P.value:
                 _get_process_targets(z)
-            elif z.identifier == Z.S.value:
+            elif z.type == Z.S.value:
                 _get_site_targets(z)
             else:
                 raise ValueError(

@@ -51,7 +51,7 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
     """
     target = EnergyTarget(
         zone_name=zone.name,
-        identifier=TargetType.DI.value,
+        type=TargetType.DI.value,
         parent_zone=zone.parent_zone,
         zone_config=zone.config,
     )
@@ -77,7 +77,7 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
         do_assisted_ht_calc=zone.config.DO_ASSITED_HT,
     )
 
-    if zone.identifier == Z.P.value and (
+    if zone.type == Z.P.value and (
         zone.config.DO_PROCESS_HP_TARGETING or zone.config.DO_PROCESS_RFRG_TARGETING
     ):
         target.update(

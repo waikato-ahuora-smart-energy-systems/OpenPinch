@@ -73,7 +73,7 @@ def prepare_problem(
     )
     master_zone = Zone(
         name=zone_config.TOP_ZONE_NAME,
-        identifier=zone_config.TOP_ZONE_IDENTIFIER,
+        type=zone_config.TOP_ZONE_IDENTIFIER,
         zone_config=zone_config,
     )
     master_zone = _create_nested_zones(master_zone, zone_tree, master_zone.config)
@@ -98,7 +98,7 @@ def prepare_problem(
 def _get_validated_zone_info(
     zone_tree: ZoneTreeSchema, project_name: str = None, depth: int = 0
 ) -> Tuple[str, str]:
-    """Get from input data (zone_tree) the identifier/type for the top level zone."""
+    """Get from input data (zone_tree) the type for the top level zone."""
     if isinstance(zone_tree, ZoneTreeSchema):
         normalized_type = (zone_tree.type or "").strip()
         type_map = {
@@ -165,7 +165,7 @@ def _create_nested_zones(
     for child_schema in zone_tree.children:
         child_zone = Zone(
             name=child_schema.name,
-            identifier=child_schema.type,
+            type=child_schema.type,
             zone_config=zone_config,
             parent_zone=parent_zone,
         )

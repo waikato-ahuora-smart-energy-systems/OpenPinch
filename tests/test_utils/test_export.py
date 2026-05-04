@@ -217,14 +217,14 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
 
 def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     master_zone = Zone("Plant")
-    master_target = EnergyTarget(zone_name="Master", identifier="DI")
+    master_target = EnergyTarget(zone_name="Master", type="DI")
     master_target.pt = _make_problem_table([10.0, 20.0])
     master_target.pt_real = _make_problem_table([30.0])
     master_zone.targets["DI"] = master_target
 
     sub_zone = Zone("Sub/Zone", parent_zone=master_zone)
     master_zone.add_zone(sub_zone, sub=True)
-    sub_target = EnergyTarget(zone_name="Alt:Target", identifier="DI", parent_zone=sub_zone)
+    sub_target = EnergyTarget(zone_name="Alt:Target", type="DI", parent_zone=sub_zone)
     sub_target.pt = _make_problem_table([40.0])
     sub_target.pt_real = _make_problem_table([50.0])
     sub_zone.targets["DI"] = sub_target
@@ -345,7 +345,7 @@ def test_autosize_columns_sets_reasonable_widths(tmp_path: Path):
 
 def test_write_problem_tables_skips_empty_dataframes(monkeypatch, tmp_path: Path):
     zone = Zone("Plant")
-    target = EnergyTarget(zone_name="Plant", identifier="DI")
+    target = EnergyTarget(zone_name="Plant", type="DI")
     target.pt = object()
     target.pt_real = object()
     zone.targets["DI"] = target
