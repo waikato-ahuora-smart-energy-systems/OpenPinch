@@ -159,6 +159,7 @@ The notebook series includes:
 - ``03_zonal_analysis.ipynb``
 - ``04_heat_pump_workflow.ipynb``
 - ``05_batch_comparison.ipynb``
+- ``06_target_services_workflow.ipynb``
 
 Advanced Heat-Pump Workflow
 ---------------------------
@@ -189,6 +190,11 @@ sample case:
        target_name="Plant/Direct Integration",
    )
    print(evaluation.comparison_frame)
+
+For the broader advanced-service workflow, use
+``06_target_services_workflow.ipynb``. It demonstrates the explicit
+``target_*`` methods on the packaged ``chocolate_factory.json`` sample derived
+from the Chocolote Factory workbook.
 
 Next Steps
 ----------

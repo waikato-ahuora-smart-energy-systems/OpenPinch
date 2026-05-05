@@ -65,6 +65,7 @@ The packaged notebook series currently includes:
 - `03_zonal_analysis.ipynb`
 - `04_heat_pump_workflow.ipynb`
 - `05_batch_comparison.ipynb`
+- `06_target_services_workflow.ipynb`
 
 These notebooks are intended to be the main learning path for new users.
 
@@ -85,6 +86,13 @@ For graph-based interpretation:
 - total-site graphs are the right level for comparing zonal interactions and utility-system effects
 
 The packaged `04_heat_pump_workflow.ipynb` notebook focuses on heat-pump targeting and integration. It compares a base case against an integrated heat-pump scenario and treats cycle performance as supporting context rather than the main result.
+
+The packaged `06_target_services_workflow.ipynb` notebook demonstrates the
+explicit `PinchProblem.target_direct_heat_pump`,
+`target_indirect_heat_pump`, `target_direct_refrigeration`,
+`target_indirect_refrigeration`, `target_cogeneration`, and
+`target_area_cost` workflow on the `chocolate_factory.json` sample derived
+from the Chocolote Factory workbook.
 
 For a dedicated written walkthrough, see `docs/user-guide/heat-pump-targeting.rst` in the source tree or the matching Read the Docs page.
 

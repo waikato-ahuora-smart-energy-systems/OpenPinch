@@ -27,6 +27,7 @@ def test_packaged_notebook_series_is_present():
         "03_zonal_analysis.ipynb",
         "04_heat_pump_workflow.ipynb",
         "05_batch_comparison.ipynb",
+        "06_target_services_workflow.ipynb",
     ]
 
 
@@ -54,3 +55,25 @@ def test_heat_pump_notebook_focuses_on_integration_workflow(
     assert "evaluate_heat_pump_integration" in combined_source
     assert "heat_pump_targeting.json" in combined_source
     assert "VapourCompressionCycle" not in combined_source
+
+
+def test_target_services_notebook_uses_chocolate_factory_and_public_target_api(
+    tmp_path: Path,
+):
+    notebook_path = copy_notebook(
+        "06_target_services_workflow.ipynb",
+        tmp_path / "06_target_services_workflow.ipynb",
+    )
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    combined_source = "\n".join(
+        "".join(cell.get("source", [])) for cell in notebook["cells"]
+    )
+
+    assert "chocolate_factory.json" in combined_source
+    assert "Chocolote Factory.xlsb" in combined_source
+    assert "target_direct_heat_pump" in combined_source
+    assert "target_direct_refrigeration" in combined_source
+    assert "target_indirect_heat_pump" in combined_source
+    assert "target_indirect_refrigeration" in combined_source
+    assert "target_cogeneration" in combined_source
+    assert "target_area_cost" in combined_source

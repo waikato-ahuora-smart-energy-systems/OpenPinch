@@ -4,7 +4,7 @@ from typing import Tuple
 
 import numpy as np
 
-from ....lib.schema import HPRTargetInputs, HPRTargetOutputs
+from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.encoding import map_x_arr_to_T_arr
@@ -33,8 +33,8 @@ __all__ = [
 
 @timing_decorator
 def optimise_multi_simple_carnot_heat_pump_placement(
-    args: HPRTargetInputs,
-) -> HPRTargetOutputs:
+    args: HeatPumpTargetInputs,
+) -> HeatPumpTargetOutputs:
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
     res = solve_hpr_placement(
         f_obj=_compute_multi_simple_carnot_hp_opt_obj,
@@ -47,7 +47,7 @@ def optimise_multi_simple_carnot_heat_pump_placement(
             res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args
         )
     )
-    return HPRTargetOutputs.model_validate(res)
+    return HeatPumpTargetOutputs.model_validate(res)
 
 
 #######################################################################################################
@@ -57,7 +57,7 @@ def optimise_multi_simple_carnot_heat_pump_placement(
 
 def _parse_multi_simple_carnot_hp_state_variables(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     T_cond = map_x_arr_to_T_arr(x[: args.n_cond], args.T_cold[0], args.T_cold[-1])
     T_evap = args.T_hot[-1] - np.array(x[args.n_cond : -1]) * (
@@ -79,7 +79,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
     T_evap: np.ndarray,
     H_hot_with_amb: np.ndarray,
     H_cold_with_amb: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray, np.ndarray, list]:
     Q_cond = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond, args.T_cold, H_cold_with_amb, is_cond=True
@@ -181,7 +181,7 @@ def _get_multi_simple_carnot_stage_duties_and_work(
 
 def _compute_multi_simple_carnot_hp_opt_obj(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
 ) -> dict:

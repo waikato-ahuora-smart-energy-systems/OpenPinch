@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.pinch_problem import PinchProblem
+from OpenPinch.lib.enums import HPRcycle, TT
 from OpenPinch.resources import copy_sample_case
 
 
@@ -753,3 +755,94 @@ def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
     message = str(exc_info.value)
     assert "Utility 1 'Cooling Water' (entry 1)" in message
     assert "cold utilities must have t_supply <= t_target" in message
+
+
+def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
+    case_path = copy_sample_case(
+        "chocolate_factory.json",
+        tmp_path / "chocolate_factory.json",
+    )
+    problem = PinchProblem(problem_filepath=case_path)
+
+    validated = problem.validate()
+
+    assert validated.zone_tree is None
+    assert len(validated.streams) == 65
+    assert len(validated.utilities) == 5
+
+
+def test_target_services_workflow_refreshes_cached_results(tmp_path: Path):
+    case_path = copy_sample_case(
+        "chocolate_factory.json",
+        tmp_path / "chocolate_factory.json",
+    )
+    problem = PinchProblem(problem_filepath=case_path)
+    options = {
+        "MAX_HP_MULTISTART": 1,
+        "HPR_TYPE": HPRcycle.MultiTempCarnot.value,
+    }
+
+    baseline = problem.target()
+    baseline_target_count = len(baseline.targets)
+
+    direct_hp = problem.target_direct_heat_pump(zone_name="Vacuum", options=options)
+    direct_r = problem.target_direct_refrigeration(zone_name="Vacuum", options=options)
+    indirect_hp = problem.target_indirect_heat_pump(options=options)
+    indirect_r = problem.target_indirect_refrigeration(options=options)
+    cogeneration = problem.target_cogeneration(zone_name="Vacuum")
+    area_cost = problem.target_area_cost(zone_name="Vacuum")
+
+    assert direct_hp.type == TT.DHP.value
+    assert direct_r.type == TT.DR.value
+    assert indirect_hp.type == TT.IHP.value
+    assert indirect_r.type == TT.IR.value
+    assert cogeneration.type == TT.DI.value
+    assert area_cost.type == TT.DI.value
+
+    assert len(problem.results.targets) == baseline_target_count + 4
+    result_names = {target.name for target in problem.results.targets}
+    assert direct_hp.name in result_names
+    assert direct_r.name in result_names
+    assert indirect_hp.name in result_names
+    assert indirect_r.name in result_names
+
+    direct_hp_result = next(
+        target for target in problem.results.targets if target.name == direct_hp.name
+    )
+    assert direct_hp_result.hpr_cycle == HPRcycle.MultiTempCarnot.value
+    assert isinstance(direct_hp_result.hpr_hot_streams, StreamCollection)
+    assert isinstance(direct_hp_result.hpr_cold_streams, StreamCollection)
+    assert len(direct_hp_result.hpr_hot_streams) > 0
+    assert direct_hp_result.hpr_success is True
+    assert cogeneration.work_target > 0.0
+    assert area_cost.area > 0.0
+
+
+def test_target_service_methods_auto_bootstrap_and_overwrite_existing_target(
+    tmp_path: Path,
+):
+    case_path = copy_sample_case(
+        "chocolate_factory.json",
+        tmp_path / "chocolate_factory.json",
+    )
+    problem = PinchProblem(problem_filepath=case_path)
+    options = {
+        "MAX_HP_MULTISTART": 1,
+        "HPR_TYPE": HPRcycle.MultiTempCarnot.value,
+    }
+
+    first_target = problem.target_direct_heat_pump(
+        zone_name="chocolate_factory/Vacuum",
+        options=options,
+    )
+    target_count_after_first_run = len(problem.results.targets)
+    second_target = problem.target_direct_heat_pump(zone_name="Vacuum", options=options)
+
+    assert problem.master_zone is not None
+    assert first_target.name == "Vacuum/Direct Heat Pump"
+    assert second_target.name == first_target.name
+    assert first_target.type == TT.DHP.value
+    assert len(problem.results.targets) == target_count_after_first_run
+    assert sum(
+        1 for target in problem.results.targets if target.name == first_target.name
+    ) == 1

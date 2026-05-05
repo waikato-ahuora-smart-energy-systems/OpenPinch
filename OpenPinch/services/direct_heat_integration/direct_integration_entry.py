@@ -135,10 +135,10 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
             )
             target.update(
                 {
-                    "Area target": area,
-                    "Units target": num_units,
-                    "Capital cost target": capital_cost,
-                    "Annualised capital cost target": annual_capital_cost,
+                    "area": area,
+                    "num_units": num_units,
+                    "capital_cost": capital_cost,
+                    "total_cost": annual_capital_cost,
                 }
             )
 

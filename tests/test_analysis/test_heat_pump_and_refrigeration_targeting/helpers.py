@@ -123,7 +123,7 @@ def _pt_with_hnet(h0, h1, *, h_hot=None, h_cold=None):
 
 def _patch_output_model_validate(monkeypatch):
     monkeypatch.setattr(
-        hp.HPRTargetOutputs,
+        hp.HeatPumpTargetOutputs,
         "model_validate",
         classmethod(lambda cls, value: value),
     )

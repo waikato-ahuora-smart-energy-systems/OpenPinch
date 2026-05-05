@@ -17,6 +17,7 @@ from .heat_pump_integration.heat_pump_and_refrigeration_entry import (
     compute_direct_heat_pump_or_refrigeration_target,
     compute_indirect_heat_pump_or_refrigeration_target,
 )
+from .power_cogeneration_analysis import get_power_cogeneration_above_pinch
 
 __all__ = [
     "data_preprocessing_service",
@@ -26,6 +27,8 @@ __all__ = [
     "indirect_heat_pump_service",
     "direct_refrigeration_service",
     "indirect_refrigeration_service",
+    "power_cogeneration_service",
+    "area_cost_targeting_service",
 ]
 
 
@@ -62,33 +65,72 @@ def indirect_heat_integration_service(zone: Zone) -> Zone:
     return zone
 
 
+def _enable_zone_option(zone: Zone, name: str) -> None:
+    setattr(zone.config, name, True)
+
+
 def direct_heat_pump_service(zone: Zone) -> Zone:
-    if not TT.DI.value in zone.targets:
+    _enable_zone_option(zone, "DO_PROCESS_HP_TARGETING")
+    if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
-    if zone.config.DO_PROCESS_HP_TARGETING:
-        zone.add_target(compute_direct_heat_pump_or_refrigeration_target(zone, is_heat_pumping=True))
+    zone.add_target(
+        compute_direct_heat_pump_or_refrigeration_target(
+            zone,
+            is_heat_pumping=True,
+        )
+    )
     return zone
 
 
 def indirect_heat_pump_service(zone: Zone) -> Zone:
-    if not TT.TS.value in zone.targets:
+    _enable_zone_option(zone, "DO_UTILITY_HP_TARGETING")
+    if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
-    if zone.config.DO_UTILITY_HP_TARGETING:
-        zone.add_target(compute_indirect_heat_pump_or_refrigeration_target(zone, is_heat_pumping=True))
+    zone.add_target(
+        compute_indirect_heat_pump_or_refrigeration_target(
+            zone,
+            is_heat_pumping=True,
+        )
+    )
     return zone
 
 
 def direct_refrigeration_service(zone: Zone) -> Zone:
-    if not TT.DI.value in zone.targets:
+    _enable_zone_option(zone, "DO_PROCESS_RFRG_TARGETING")
+    if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
-    if zone.config.DO_PROCESS_RFRG_TARGETING:
-        zone.add_target(compute_direct_heat_pump_or_refrigeration_target(zone, is_heat_pumping=False))
+    zone.add_target(
+        compute_direct_heat_pump_or_refrigeration_target(
+            zone,
+            is_heat_pumping=False,
+        )
+    )
     return zone
 
 
 def indirect_refrigeration_service(zone: Zone) -> Zone:
-    if not TT.TS.value in zone.targets:
+    _enable_zone_option(zone, "DO_UTILITY_RFRG_TARGETING")
+    if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
-    if zone.config.DO_UTILITY_RFRG_TARGETING:
-        zone.add_target(compute_indirect_heat_pump_or_refrigeration_target(zone, is_heat_pumping=False))
+    zone.add_target(
+        compute_indirect_heat_pump_or_refrigeration_target(
+            zone,
+            is_heat_pumping=False,
+        )
+    )
+    return zone
+
+
+def power_cogeneration_service(zone: Zone) -> Zone:
+    _enable_zone_option(zone, "DO_TURBINE_WORK")
+    _enable_zone_option(zone, "DO_TURBINE_TARGETING")
+    if TT.DI.value not in zone.targets:
+        direct_heat_integration_service(zone)
+    get_power_cogeneration_above_pinch(zone.targets[TT.DI.value])
+    return zone
+
+
+def area_cost_targeting_service(zone: Zone) -> Zone:
+    _enable_zone_option(zone, "DO_AREA_TARGETING")
+    direct_heat_integration_service(zone)
     return zone

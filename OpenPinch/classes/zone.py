@@ -236,24 +236,13 @@ class Zone:
 
     def add_target(self, target_to_add: EnergyTarget):
         """Add one target to a specific zone."""
-        self._targets[target_to_add.type] = target_to_add
+        if isinstance(target_to_add, EnergyTarget):
+            self._targets[target_to_add.type] = target_to_add
 
     def add_targets(self, targets: list):
         """Add multiple targets to a specific zone."""
         for t in targets:
             self.add_target(t)
-
-    def add_target_from_results(self, target_id: str = None, results: dict = None):
-        """Create and register an :class:`EnergyTarget` from a result mapping."""
-        res = EnergyTarget(
-            zone_name=self.name,
-            type=target_id,
-            parent_zone=self.parent_zone,
-            zone_config=self.config,
-        )
-        for key, value in results.items():
-            setattr(res, key, value)
-        self.add_target(res)
 
     def get_subzone(self, loc: str):
         """Resolve a slash-delimited zone path relative to this zone."""

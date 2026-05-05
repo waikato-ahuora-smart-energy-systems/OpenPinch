@@ -9,8 +9,8 @@ from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...classes.energy_target import EnergyTarget
 from ...lib.config import Configuration, tol
-from ...lib.enums import HPRcycle, PT, TT
-from ...lib.schema import HPRTargetOutputs
+from ...lib.enums import GT, HPRcycle, PT, TT
+from ...lib.schema import HeatPumpTargetOutputs
 from ...utils.miscellaneous import get_value
 from .cycles.brayton import (
     optimise_brayton_heat_pump_placement,
@@ -54,10 +54,10 @@ def compute_direct_heat_pump_or_refrigeration_target(
     is_heat_pumping: bool,
 ) -> EnergyTarget:
     is_refrigeration = not (is_heat_pumping)
-    pt = deepcopy(zone.targets[TT.DI.value]["pt"])
+    pt = deepcopy(zone.targets[TT.DI.value].pt)
     target = EnergyTarget(
         zone_name=zone.name,
-        type=TT.DHP.value,
+        type=TT.DHP.value if is_heat_pumping else TT.DR.value,
         parent_zone=zone.parent_zone,
         zone_config=zone.config,
     )
@@ -88,8 +88,13 @@ def compute_direct_heat_pump_or_refrigeration_target(
     target.update(
         {
             "pt": pt,
+            "graphs": _get_hpr_graphs(
+                pt=pt,
+                is_direct=True,
+                is_heat_pumping=is_heat_pumping,
+            ),
         }
-        | res
+        | _get_hpr_target_summary(res, zone)
     )
     return target
 
@@ -99,10 +104,10 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     is_heat_pumping: bool,
 ) -> EnergyTarget:
     is_refrigeration = not (is_heat_pumping)
-    pt = deepcopy(zone.targets[TT.TS.value]["pt"])
+    pt = deepcopy(zone.targets[TT.TS.value].pt)
     target = EnergyTarget(
         zone_name=zone.name,
-        type=TT.IHP.value,
+        type=TT.IHP.value if is_heat_pumping else TT.IR.value,
         parent_zone=zone.parent_zone,
         zone_config=zone.config,
     )
@@ -110,7 +115,6 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     pt_ut_gen = get_process_heat_cascade(
         hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
         cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
-        zone_config=zone.config,
         is_shifted=True,
         is_full_analysis=True,
     )
@@ -135,17 +139,22 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     )
     pt = _calc_hpr_cascade(
         pt=pt,
-        res=res["Heat pump"],
+        res=res,
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
     )
     target.update(
         {
             "pt": pt,
+            "graphs": _get_hpr_graphs(
+                pt=pt,
+                is_direct=False,
+                is_heat_pumping=is_heat_pumping,
+            ),
         }
-        | res
+        | _get_hpr_target_summary(res, zone)
     )
-    return res
+    return target
 
 
 #######################################################################################################
@@ -195,7 +204,7 @@ def _get_hpr_targets(
     H_cold: np.ndarray,
     zone_config: Configuration,
     is_heat_pumping: bool,
-) -> HPRTargetOutputs:
+) -> HeatPumpTargetOutputs:
     # zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
     # zone_config.N_COND = 2
     # zone_config.N_EVAP = 2
@@ -211,12 +220,53 @@ def _get_hpr_targets(
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
-    return HPRTargetOutputs.model_validate(handler(args))
+    return HeatPumpTargetOutputs.model_validate(handler(args))
+
+
+def _get_hpr_target_summary(
+    res: HeatPumpTargetOutputs,
+    zone: Zone,
+) -> dict:
+    return {
+        "hpr_cycle": str(zone.config.HPR_TYPE),
+        "hpr_utility_total": res.utility_tot,
+        "hpr_work": res.w_net,
+        "hpr_external_utility": res.Q_ext,
+        "hpr_ambient_hot": res.Q_amb_hot,
+        "hpr_ambient_cold": res.Q_amb_cold,
+        "hpr_cop": res.cop_h,
+        "hpr_eta_he": res.eta_he,
+        "hpr_success": res.success,
+        "hpr_hot_streams": res.hpr_hot_streams,
+        "hpr_cold_streams": res.hpr_cold_streams,
+        "hpr_details": res,
+    }
+
+
+def _get_hpr_graphs(
+    pt: ProblemTable,
+    *,
+    is_direct: bool,
+    is_heat_pumping: bool,
+) -> dict:
+    if not is_heat_pumping:
+        return {}
+
+    if is_direct:
+        return {
+            GT.GCC_HP.value: pt[
+                [PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]
+            ]
+        }
+
+    return {
+        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]
+    }
 
 
 def _calc_hpr_cascade(
     pt: ProblemTable,
-    res: HPRTargetOutputs,
+    res: HeatPumpTargetOutputs,
     is_T_vals_shifted: bool = True,
     is_heat_pumping: bool = True,
 ) -> ProblemTable:

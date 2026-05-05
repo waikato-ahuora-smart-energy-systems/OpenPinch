@@ -212,8 +212,7 @@ def test_energy_target_and_zone_property_branches():
     assert any(name.startswith("Child") for name in z.subzones.keys())
 
     z.add_target(t)
-    z.add_targets([EnergyTarget(zone_name="T2", type="DI")])
-    z.add_target_from_results(target_id="DI", results={"hot_pinch": 100.0})
+    z.add_targets([EnergyTarget(zone_name="T2", type="DI")])    
     assert "DI" in z.targets
 
     assert z.get_subzone(next(iter(z.subzones.keys()))) is not None

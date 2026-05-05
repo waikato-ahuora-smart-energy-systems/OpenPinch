@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from ....classes.stream_collection import StreamCollection
 from ....classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ....lib.enums import PT
-from ....lib.schema import HPRTargetInputs, HPRTargetOutputs
+from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.shared import (
@@ -29,8 +29,8 @@ __all__ = [
 
 @timing_decorator
 def optimise_brayton_heat_pump_placement(
-    args: HPRTargetInputs,
-) -> HPRTargetOutputs:
+    args: HeatPumpTargetInputs,
+) -> HeatPumpTargetOutputs:
     args.n_cond = args.n_evap = 1
     args.refrigerant_ls = ["air"]
 
@@ -48,10 +48,10 @@ def optimise_brayton_heat_pump_placement(
 
     res = _compute_brayton_hp_system_obj(opt.x, args)
     res["success"] = opt.success
-    return HPRTargetOutputs.model_validate(res)
+    return HeatPumpTargetOutputs.model_validate(res)
 
 
-def _get_x0_for_brayton_hp_opt(args: HPRTargetInputs) -> list:
+def _get_x0_for_brayton_hp_opt(args: HeatPumpTargetInputs) -> list:
     return [
         0.0,
         abs(args.T_cold[0] - args.T_hot[0]) / args.dt_range_max,
@@ -65,7 +65,7 @@ def _get_x0_for_brayton_hp_opt(args: HPRTargetInputs) -> list:
 #######################################################################################################
 
 
-def _get_bounds_for_brayton_hp_opt(args: HPRTargetInputs) -> list:
+def _get_bounds_for_brayton_hp_opt(args: HeatPumpTargetInputs) -> list:
     return [
         (-0.2, 1.0),
         (0.01, 1.5),
@@ -76,7 +76,7 @@ def _get_bounds_for_brayton_hp_opt(args: HPRTargetInputs) -> list:
 
 def _parse_brayton_hp_state_variables(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray]:
     T_comp_out = np.array(args.T_cold[0] + x[0] * args.dt_range_max, dtype=np.float64)
     dT_comp = np.array(x[1] * args.dt_range_max, dtype=np.float64)
@@ -90,7 +90,7 @@ def _create_brayton_hp_list(
     dT_gc: np.ndarray,
     Q_gc: np.ndarray,
     dT_comp: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> List[SimpleBraytonHeatPumpCycle]:
     hp_list = []
     n_hp = args.n_cond
@@ -112,7 +112,7 @@ def _create_brayton_hp_list(
 
 def _compute_brayton_hp_system_obj(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> float:
     T_comp_out, dT_comp, dT_gc, Q_heat = _parse_brayton_hp_state_variables(x, args)
 

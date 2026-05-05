@@ -23,6 +23,12 @@ __all__ = [
     "data_preprocessing_service",
     "direct_heat_integration_service",
     "indirect_heat_integration_service",
+    "direct_heat_pump_service",
+    "indirect_heat_pump_service",
+    "direct_refrigeration_service",
+    "indirect_refrigeration_service",
+    "power_cogeneration_service",
+    "area_cost_targeting_service",
     "get_area_targets",
     "get_capital_cost_targets",
     "get_output_graph_data",
@@ -55,3 +61,33 @@ def direct_heat_integration_service(zone: "Zone") -> "Zone":
 def indirect_heat_integration_service(zone: "Zone") -> "Zone":
     """Run indirect heat integration targeting for an aggregated zone."""
     return _load_services_entry_module().indirect_heat_integration_service(zone)
+
+
+def direct_heat_pump_service(zone: "Zone") -> "Zone":
+    """Run direct heat-pump targeting for a prepared zone."""
+    return _load_services_entry_module().direct_heat_pump_service(zone)
+
+
+def indirect_heat_pump_service(zone: "Zone") -> "Zone":
+    """Run indirect heat-pump targeting for an aggregated zone."""
+    return _load_services_entry_module().indirect_heat_pump_service(zone)
+
+
+def direct_refrigeration_service(zone: "Zone") -> "Zone":
+    """Run direct refrigeration targeting for a prepared zone."""
+    return _load_services_entry_module().direct_refrigeration_service(zone)
+
+
+def indirect_refrigeration_service(zone: "Zone") -> "Zone":
+    """Run indirect refrigeration targeting for an aggregated zone."""
+    return _load_services_entry_module().indirect_refrigeration_service(zone)
+
+
+def power_cogeneration_service(zone: "Zone") -> "Zone":
+    """Run turbine cogeneration targeting for a prepared zone."""
+    return _load_services_entry_module().power_cogeneration_service(zone)
+
+
+def area_cost_targeting_service(zone: "Zone") -> "Zone":
+    """Recompute direct integration targets with area/cost targeting enabled."""
+    return _load_services_entry_module().area_cost_targeting_service(zone)

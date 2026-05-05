@@ -48,6 +48,7 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "show_dashboard()" in combined
     assert "plot_grand_composite_curve" in combined
     assert "evaluate_heat_pump_integration" in combined
+    assert "target_direct_heat_pump" in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():
@@ -76,6 +77,7 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
     assert "Interpreting Results" in combined
     assert "heat-pump targeting and integration" in combined
     assert "heat_pump_targeting.json" in combined
+    assert "06_target_services_workflow.ipynb" in combined
 
 
 def test_reference_docs_match_current_heat_pump_and_schema_surface():
@@ -92,8 +94,6 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "state_ids" in api_classes
     assert "weights" in api_classes
 
-    assert "HeatPumpIntegrationScenario" in api_lib
-    assert "HeatPumpIntegrationComparison" in api_lib
-
-    assert "compute_direct_hpr_target" in api_analysis
-    assert "compute_indirect_hpr_target" in api_analysis
+    assert "compute_direct_heat_pump_or_refrigeration_target" in api_analysis
+    assert "compute_indirect_heat_pump_or_refrigeration_target" in api_analysis
+    assert "HeatPumpTargetOutputs" in api_lib

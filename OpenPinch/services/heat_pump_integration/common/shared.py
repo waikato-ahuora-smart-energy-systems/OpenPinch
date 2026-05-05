@@ -10,7 +10,7 @@ from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
 from ....lib.config import tol
 from ....lib.enums import PT
-from ....lib.schema import HPRTargetInputs
+from ....lib.schema import HeatPumpTargetInputs
 from ....utils.blackbox_minimisers import multiminima
 from ....utils.miscellaneous import (
     clean_composite_curve_ends,
@@ -125,7 +125,7 @@ def solve_hpr_placement(
     f_obj: Callable,
     x0_ls: list | float,
     bnds: list,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> dict:
     if isinstance(x0_ls, (int, float)):
         x0_ls = [x0_ls]
@@ -139,7 +139,7 @@ def solve_hpr_placement(
         x0_ls=x0_ls,
         bounds=bnds,
         optimiser_handle=args.bb_minimiser,
-        opt_kwargs={"n_runs": 10},
+        opt_kwargs={"n_runs": max(1, int(args.max_multi_start))},
     )
     if local_minima_x.size == 0:
         raise ValueError(
@@ -261,7 +261,7 @@ def calc_carnot_heat_engine_eta(
 
 def validate_vapour_hp_refrigerant_ls(
     num_stages: int,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> list:
     if len(args.refrigerant_ls) > 0:
         if args.do_refrigerant_sort:
@@ -303,7 +303,7 @@ def get_carnot_hpr_cycle_streams(
 def get_ambient_air_stream(
     Q_amb_hot: float = 0.0,
     Q_amb_cold: float = 0.0,
-    args: HPRTargetInputs = None,
+    args: HeatPumpTargetInputs = None,
 ) -> StreamCollection:
     sc = StreamCollection()
     if Q_amb_hot > tol:

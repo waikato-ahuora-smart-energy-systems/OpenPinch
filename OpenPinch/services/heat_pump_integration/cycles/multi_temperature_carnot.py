@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from ....lib.schema import HPRTargetInputs, HPRTargetOutputs
+from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.encoding import map_x_arr_to_T_arr, map_x_to_Q_amb
@@ -35,8 +35,8 @@ __all__ = [
 
 @timing_decorator
 def optimise_multi_temperature_carnot_heat_pump_placement(
-    args: HPRTargetInputs,
-) -> HPRTargetOutputs:
+    args: HeatPumpTargetInputs,
+) -> HeatPumpTargetOutputs:
     res = solve_hpr_placement(
         f_obj=_compute_multi_temperature_carnot_cycle_obj,
         x0_ls=_get_x0_for_multi_temperature_carnot_hp_opt(args),
@@ -48,7 +48,7 @@ def optimise_multi_temperature_carnot_heat_pump_placement(
             res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args
         )
     )
-    return HPRTargetOutputs.model_validate(res)
+    return HeatPumpTargetOutputs.model_validate(res)
 
 
 #######################################################################################################
@@ -57,14 +57,14 @@ def optimise_multi_temperature_carnot_heat_pump_placement(
 
 
 def _get_x0_for_multi_temperature_carnot_hp_opt(
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> list:
     n_cond, n_evap = int(args.n_cond), int(args.n_evap)
     return [0.0] + [0.0] * n_cond + [0.0] * n_evap
 
 
 def _get_bounds_for_multi_temperature_carnot_hp_opt(
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> list:
     n_cond, n_evap = int(args.n_cond), int(args.n_evap)
     return [(-1.0, 10.0)] + [(0.0, 1.0)] * n_cond + [(0.0, 1.0)] * n_evap
@@ -72,7 +72,7 @@ def _get_bounds_for_multi_temperature_carnot_hp_opt(
 
 def _parse_multi_temperature_carnot_cycle_state_variables(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> dict:
     x_amb = x[0]
     a = 1 + int(args.n_cond)
@@ -102,7 +102,7 @@ def _get_heat_engine_and_recovery_duty(
     T_evap: np.ndarray,
     Qc_pool: np.ndarray,
     Qe_pool: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray]:
     Qc_he = np.zeros_like(Qc_pool)
     Qe_he = np.zeros_like(Qe_pool)
@@ -131,7 +131,7 @@ def _get_heat_pump_duty(
     T_evap: np.ndarray,
     Qc_pool: np.ndarray,
     Qe_pool: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray]:
     Qc_hpr = np.zeros_like(Qc_pool)
     Qe_hpr = np.zeros_like(Qe_pool)
@@ -161,7 +161,7 @@ def _opt_wrapper_for_heat_pump(
     Q_evap: np.ndarray,
     Qc_he: np.ndarray,
     Qe_he: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray]:
     Qc_hpr, Qe_hpr = _get_heat_pump_duty(
         is_on=is_on,
@@ -181,7 +181,7 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     T_evap: np.ndarray,
     H_hot_with_amb: np.ndarray,
     H_cold_with_amb: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> dict:
     Q_cond = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond, args.T_cold, H_cold_with_amb, is_cond=True
@@ -265,7 +265,7 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
 
 def _compute_multi_temperature_carnot_cycle_obj(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
 ) -> dict:

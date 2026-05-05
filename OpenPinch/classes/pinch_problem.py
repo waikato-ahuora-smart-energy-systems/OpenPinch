@@ -9,13 +9,21 @@ import json
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
 
 import pandas as pd
 from pydantic import ValidationError
 
 from ..services.common.graph_data import get_output_graph_data
-from ..lib.enums import GT
+from ..services import (
+    area_cost_targeting_service,
+    direct_heat_pump_service,
+    direct_refrigeration_service,
+    indirect_heat_pump_service,
+    indirect_refrigeration_service,
+    power_cogeneration_service,
+)
+from ..lib.enums import GT, TT
 from ..lib.schema import (
     HeatPumpIntegrationComparison,
     HeatPumpIntegrationScenario,
@@ -32,14 +40,16 @@ from ..streamlit_webviewer.web_graphing import (
     _build_plotly_graph,
     render_streamlit_dashboard as _render_streamlit_dashboard,
 )
-from ..main import pinch_analysis_service
+from ..main import extract_results, pinch_analysis_service
 
 if TYPE_CHECKING:
+    from .energy_target import EnergyTarget
     from .zone import Zone
 
 JsonDict = Dict[str, Any]
 PathLike = Union[str, Path]
 GraphPayload = Dict[str, Dict[str, Any]]
+ZoneService = Callable[["Zone"], "Zone"]
 
 _GRAPH_TYPE_ALIASES = {
     "cc": GT.CC.value,
@@ -267,6 +277,90 @@ class PinchProblem:
                 is_return_full_results=True,
             )
         return self._results
+
+    def target_direct_heat_pump(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Run direct heat-pump targeting on the selected solved zone."""
+        return self._execute_zone_service(
+            direct_heat_pump_service,
+            target_id=TT.DHP.value,
+            zone_name=zone_name,
+            options=options,
+        )
+
+    def target_indirect_heat_pump(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Run indirect heat-pump targeting on the selected solved zone."""
+        return self._execute_zone_service(
+            indirect_heat_pump_service,
+            target_id=TT.IHP.value,
+            zone_name=zone_name,
+            options=options,
+        )
+
+    def target_direct_refrigeration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Run direct refrigeration targeting on the selected solved zone."""
+        return self._execute_zone_service(
+            direct_refrigeration_service,
+            target_id=TT.DR.value,
+            zone_name=zone_name,
+            options=options,
+        )
+
+    def target_indirect_refrigeration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Run indirect refrigeration targeting on the selected solved zone."""
+        return self._execute_zone_service(
+            indirect_refrigeration_service,
+            target_id=TT.IR.value,
+            zone_name=zone_name,
+            options=options,
+        )
+
+    def target_cogeneration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Run cogeneration targeting on the selected solved zone."""
+        return self._execute_zone_service(
+            power_cogeneration_service,
+            target_id=TT.DI.value,
+            zone_name=zone_name,
+            options=options,
+        )
+
+    def target_area_cost(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Recompute direct targets with area and cost targeting enabled."""
+        return self._execute_zone_service(
+            area_cost_targeting_service,
+            target_id=TT.DI.value,
+            zone_name=zone_name,
+            options=options,
+        )
 
     def run(self) -> TargetOutput:
         """Run the targeting workflow and return the cached result."""
@@ -675,6 +769,58 @@ class PinchProblem:
             page_title=page_title,
             value_rounding=value_rounding,
         )
+
+    def _execute_zone_service(
+        self,
+        service: ZoneService,
+        *,
+        target_id: str,
+        zone_name: Optional[str],
+        options: Optional[dict[str, Any]],
+    ) -> "EnergyTarget":
+        if self._master_zone is None:
+            self.target()
+
+        zone = self._resolve_target_zone(zone_name)
+        self._apply_zone_options(zone, options)
+        service(zone)
+        self._refresh_results_from_master_zone()
+
+        try:
+            return zone.targets[target_id]
+        except KeyError as exc:
+            raise RuntimeError(
+                f"Service {service.__name__!r} did not produce target {target_id!r}."
+            ) from exc
+
+    def _resolve_target_zone(self, zone_name: Optional[str]) -> "Zone":
+        if self._master_zone is None:
+            raise RuntimeError("No analysed zone is available. Run target() first.")
+        if zone_name is None:
+            return self._master_zone
+
+        resolved = str(zone_name).strip("/")
+        if resolved == self._master_zone.name:
+            return self._master_zone
+        if resolved.startswith(f"{self._master_zone.name}/"):
+            resolved = resolved.split("/", 1)[1]
+        return self._master_zone.get_subzone(resolved)
+
+    def _apply_zone_options(
+        self,
+        zone: "Zone",
+        options: Optional[dict[str, Any]],
+    ) -> None:
+        if not options:
+            return
+        for key, value in options.items():
+            setattr(zone.config, key, value)
+
+    def _refresh_results_from_master_zone(self) -> TargetOutput:
+        if self._master_zone is None:
+            raise RuntimeError("No analysed zone is available. Run target() first.")
+        self._results = TargetOutput.model_validate(extract_results(self._master_zone))
+        return self._results
 
     # ----------------------------------------------------------------------------
     # Internal graph helpers

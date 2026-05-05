@@ -6,7 +6,7 @@ from ....classes.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
 from ....lib.enums import PT
-from ....lib.schema import HPRTargetInputs, HPRTargetOutputs
+from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.encoding import (
@@ -42,8 +42,8 @@ __all__ = [
 
 @timing_decorator
 def optimise_multi_simple_heat_pump_placement(
-    args: HPRTargetInputs,
-) -> HPRTargetOutputs:
+    args: HeatPumpTargetInputs,
+) -> HeatPumpTargetOutputs:
     num_stages = args.n_cond = args.n_evap = int(max(args.n_cond, args.n_evap))
     init_res = (
         optimise_multi_simple_carnot_heat_pump_placement(args)
@@ -57,12 +57,12 @@ def optimise_multi_simple_heat_pump_placement(
         bnds=_get_bounds_for_multi_single_hp_opt(args),
         args=args,
     )
-    return HPRTargetOutputs.model_validate(res)
+    return HeatPumpTargetOutputs.model_validate(res)
 
 
 def _get_x0_for_multi_single_hp_opt(
-    init_res: HPRTargetOutputs,
-    args: HPRTargetInputs,
+    init_res: HeatPumpTargetOutputs,
+    args: HeatPumpTargetInputs,
 ) -> np.ndarray:
     if init_res is None:
         return None
@@ -93,7 +93,7 @@ def _get_x0_for_multi_single_hp_opt(
 #######################################################################################################
 
 
-def _get_bounds_for_multi_single_hp_opt(args: HPRTargetInputs) -> list:
+def _get_bounds_for_multi_single_hp_opt(args: HeatPumpTargetInputs) -> list:
     n_units = int(args.n_cond)
     return (
         [(-1.0, 10.0)]
@@ -107,7 +107,7 @@ def _get_bounds_for_multi_single_hp_opt(args: HPRTargetInputs) -> list:
 
 def _parse_multi_simple_hp_state_temperatures(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> dict:
     n = int(args.n_cond)
     x_amb = x[0]
@@ -144,7 +144,7 @@ def _parse_multi_simple_hp_state_temperatures(
 
 def _compute_multi_simple_hp_system_obj(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
     debug: bool = False,
 ) -> dict:
     state_vars = _parse_multi_simple_hp_state_temperatures(x, args)
@@ -205,8 +205,9 @@ def _compute_multi_simple_hp_system_obj(
 
     Q_ext_heat = max(float(pt_cond.col[PT.H_NET.value][0]), 0.0)
     Q_ext_cold = max(float(pt_evap.col[PT.H_NET.value][0]), 0.0)
+    penalty_terms = np.atleast_1d(np.asarray(hp.penalty, dtype=float)).sum()
     g = np.maximum(
-        np.array([pt_cond.col[PT.H_NET.value][-1], hp.penalty], dtype=float),
+        np.array([pt_cond.col[PT.H_NET.value][-1], penalty_terms], dtype=float),
         0.0,
     )
     p = g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty, form="square")

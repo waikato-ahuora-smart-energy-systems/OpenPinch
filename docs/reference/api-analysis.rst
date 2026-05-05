@@ -96,14 +96,20 @@ Heat Pump Targeting API
 
 The main user-facing screening workflow is
 :meth:`OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`.
+For solved-zone post-processing, the main advanced workflow is the
+``PinchProblem.target_*`` family, including
+:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_direct_heat_pump`,
+:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_heat_pump`,
+:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_direct_refrigeration`,
+and :meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_refrigeration`.
 The module below exposes the lower-level targeting helpers used by the direct
 and indirect integration entrypoints, plus advanced plotting helpers for solved
 multi-cycle results.
 
 Current public helpers include:
 
-- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_direct_hpr_target`
-- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_indirect_hpr_target`
+- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_direct_heat_pump_or_refrigeration_target`
+- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_indirect_heat_pump_or_refrigeration_target`
 - :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.plot_multi_hp_profiles_from_results`
 
 .. automodule:: OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry
@@ -118,13 +124,4 @@ Current public helpers include:
 .. automodule:: OpenPinch.services.power_cogeneration_analysis
    :members:
 
-.. automodule:: OpenPinch.services.exergy_analysis.exergy_targeting_entry
-   :members:
 
-Legacy Research Module
-~~~~~~~~~~~~~~~~~~~~~~
-
-:mod:`OpenPinch.services.energy_transfer_analysis.energy_transfer_analysis` is retained in the source
-tree as an experimental placeholder from older research code. It is not part of
-the supported public workflow and is therefore intentionally omitted from the
-generated API listing here.

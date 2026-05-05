@@ -106,6 +106,12 @@ The main user-facing methods are:
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.run`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.validate`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.summary_frame`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_direct_heat_pump`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_heat_pump`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_direct_refrigeration`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_refrigeration`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_cogeneration`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_area_cost`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_composite_curve`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_grand_composite_curve`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.compare_to`
@@ -118,6 +124,15 @@ The wrapper is intentionally light. Once targeting has run, the same solved
 :class:`~OpenPinch.classes.zone.Zone` hierarchy and
 :class:`~OpenPinch.lib.schema.TargetOutput` objects remain available for direct
 inspection.
+
+The ``target_*`` methods are explicit advanced post-processing entrypoints. Each
+returns the affected :class:`~OpenPinch.classes.energy_target.EnergyTarget` and
+refreshes cached :class:`~OpenPinch.lib.schema.TargetOutput` results on the
+same :class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat-pump
+and refrigeration targets also surface HPR summary fields such as
+``hpr_cycle``, ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``,
+and ``StreamCollection`` payloads on ``hpr_hot_streams`` and
+``hpr_cold_streams``.
 
 .. automodule:: OpenPinch.classes.pinch_problem
    :members:

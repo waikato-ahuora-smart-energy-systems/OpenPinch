@@ -7,7 +7,7 @@ import numpy as np
 from ....classes.problem_table import ProblemTable
 from ....lib.config import Configuration
 from ....lib.enums import PT
-from ....lib.schema import HPRTargetInputs
+from ....lib.schema import HeatPumpTargetInputs
 from ....utils.miscellaneous import clean_composite_curve, linear_interpolation
 
 from .shared import create_stream_collection_of_background_profile
@@ -30,7 +30,7 @@ def construct_HPRTargetInputs(
     is_heat_pumping: bool = True,
     zone_config: Configuration = Configuration(),
     debug: bool = False,
-) -> HPRTargetInputs:
+) -> HeatPumpTargetInputs:
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
     T_hot, T_cold = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
         T_vals, zone_config.DT_CONT_HP
@@ -94,7 +94,7 @@ def construct_HPRTargetInputs(
         "allow_integrated_expander": zone_config.ALLOW_INTEGRATED_EXPANDER,
         "initialise_simulated_cycle": zone_config.INITIALISE_SIMULATED_CYCLE,
     }
-    return HPRTargetInputs(**inputs)
+    return HeatPumpTargetInputs(**inputs)
 
 
 #######################################################################################################

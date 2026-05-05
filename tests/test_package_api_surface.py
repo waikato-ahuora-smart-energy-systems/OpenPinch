@@ -37,6 +37,7 @@ EXPECTED_EXPORTS = {
         "HeatUtility",
         "HeatPumpIntegrationComparison",
         "HeatPumpIntegrationScenario",
+        "HeatPumpTargetOutputs",
         "StreamCollection",
         "StreamSchema",
         "TargetInput",
@@ -73,12 +74,18 @@ EXPECTED_EXPORTS = {
         "validate_utility_data",
     },
     "OpenPinch.services": {
+        "area_cost_targeting_service",
+        "direct_heat_pump_service",
         "direct_heat_integration_service",
+        "direct_refrigeration_service",
         "indirect_heat_integration_service",
+        "indirect_heat_pump_service",
+        "indirect_refrigeration_service",
         "get_area_targets",
         "get_capital_cost_targets",
         "get_output_graph_data",
         "get_utility_targets",
+        "power_cogeneration_service",
     },
 }
 

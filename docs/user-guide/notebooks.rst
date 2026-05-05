@@ -29,6 +29,7 @@ The packaged notebook series currently includes:
 3. ``03_zonal_analysis.ipynb``
 4. ``04_heat_pump_workflow.ipynb``
 5. ``05_batch_comparison.ipynb``
+6. ``06_target_services_workflow.ipynb``
 
 Each notebook is intentionally narrow:
 
@@ -47,6 +48,7 @@ For new users, the best learning path is:
 3. ``03_zonal_analysis.ipynb`` if your work involves nested zones or total-site studies
 4. ``04_heat_pump_workflow.ipynb`` for heat-pump targeting and integration
 5. ``05_batch_comparison.ipynb`` for comparing multiple cases programmatically
+6. ``06_target_services_workflow.ipynb`` for the advanced ``target_*`` service workflow
 
 Interpretation Focus
 --------------------
@@ -60,6 +62,8 @@ to show users how to read the outputs:
 
 For a consolidated written guide, see :doc:`interpreting-results`.
 For the dedicated helper-backed workflow, see :doc:`heat-pump-targeting`.
+For the packaged advanced-target workflow, see
+``06_target_services_workflow.ipynb`` based on the Chocolate Factory sample.
 
 Design Intent
 -------------

@@ -4,7 +4,7 @@ import numpy as np
 
 from ....classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
 from ....lib.enums import PT
-from ....lib.schema import HPRTargetInputs, HPRTargetOutputs
+from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.encoding import (
@@ -43,8 +43,8 @@ __all__ = [
 
 @timing_decorator
 def optimise_cascade_heat_pump_placement(
-    args: HPRTargetInputs,
-) -> HPRTargetOutputs:
+    args: HeatPumpTargetInputs,
+) -> HeatPumpTargetOutputs:
     num_stages = int(args.n_cond + args.n_evap - 1)
     init_res = (
         optimise_multi_temperature_carnot_heat_pump_placement(args)
@@ -59,7 +59,7 @@ def optimise_cascade_heat_pump_placement(
         bnds=_get_bounds_for_cascade_hp_opt(args),
         args=args,
     )
-    return HPRTargetOutputs.model_validate(res)
+    return HeatPumpTargetOutputs.model_validate(res)
 
 
 #######################################################################################################
@@ -68,8 +68,8 @@ def optimise_cascade_heat_pump_placement(
 
 
 def _get_x0_for_cascade_hp_opt(
-    init_res: HPRTargetOutputs,
-    args: HPRTargetInputs,
+    init_res: HeatPumpTargetOutputs,
+    args: HeatPumpTargetInputs,
 ) -> np.ndarray:
     if init_res is None:
         return None
@@ -95,7 +95,7 @@ def _get_x0_for_cascade_hp_opt(
     )
 
 
-def _get_bounds_for_cascade_hp_opt(args: HPRTargetInputs) -> list:
+def _get_bounds_for_cascade_hp_opt(args: HeatPumpTargetInputs) -> list:
     n_cond = n_heat = int(args.n_cond)
     n_evap = int(args.n_evap)
     n_cool = n_evap - 1
@@ -113,7 +113,7 @@ def _get_bounds_for_cascade_hp_opt(args: HPRTargetInputs) -> list:
 
 def _parse_cascade_hp_state_variables(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
 ) -> dict:
     x_amb = x[0]
     a = 1 + int(args.n_cond)
@@ -154,7 +154,7 @@ def _parse_cascade_hp_state_variables(
 
 def _compute_cascade_hp_system_obj(
     x: np.ndarray,
-    args: HPRTargetInputs,
+    args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
 ) -> dict:
