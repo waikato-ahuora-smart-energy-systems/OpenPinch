@@ -79,7 +79,6 @@ EXPECTED_EXPORTS = {
         "get_capital_cost_targets",
         "get_output_graph_data",
         "get_utility_targets",
-        "prepare_problem",
     },
 }
 

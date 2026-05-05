@@ -12,7 +12,7 @@ import OpenPinch.main as main_mod
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.enums import ZoneType
+from OpenPinch.lib.enums import ZT
 
 
 def get_example_problem_filepaths():
@@ -249,15 +249,15 @@ def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
         main_mod, "direct_heat_integration_service", lambda z: calls.append(z.name)
     )
 
-    valid = Zone(name="UO", type=ZoneType.O.value)
+    valid = Zone(name="UO", type=ZT.O.value)
     valid.config.DO_DIRECT_OPERATION_TARGETING = True
-    child = Zone(name="child", type=ZoneType.O.value)
+    child = Zone(name="child", type=ZT.O.value)
     valid.add_zone(child)
     out = main_mod._get_unit_operation_targets(valid)
     assert out is valid
     assert set(calls) == {"UO", "child"}
 
-    invalid = Zone(name="UO_bad", type=ZoneType.O.value)
+    invalid = Zone(name="UO_bad", type=ZT.O.value)
     invalid.config.DO_DIRECT_OPERATION_TARGETING = True
     invalid.add_zone(Zone(name="bad", type="X"))
     with pytest.raises(ValueError, match="Unit operation zones can only contain"):
@@ -265,7 +265,7 @@ def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
 
 
 def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
-    invalid = Zone(name="P_bad", type=ZoneType.P.value)
+    invalid = Zone(name="P_bad", type=ZT.P.value)
     invalid.add_zone(Zone(name="bad", type="X"))
     with pytest.raises(ValueError, match="Process zones can only contain"):
         main_mod._get_process_targets(invalid)
@@ -287,9 +287,9 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
         lambda z: calls.append(f"uo:{z.name}") or z,
     )
 
-    proc = Zone(name="P", type=ZoneType.P.value)
-    proc.add_zone(Zone(name="op", type=ZoneType.O.value))
-    proc.add_zone(Zone(name="sub_proc", type=ZoneType.P.value))
+    proc = Zone(name="P", type=ZT.P.value)
+    proc.add_zone(Zone(name="op", type=ZT.O.value))
+    proc.add_zone(Zone(name="sub_proc", type=ZT.P.value))
     proc.config.DO_INDIRECT_PROCESS_TARGETING = True
     out = main_mod._get_process_targets(proc)
 
@@ -302,7 +302,7 @@ def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
     monkeypatch.setattr(main_mod, "direct_heat_integration_service", lambda z: z)
     monkeypatch.setattr(main_mod, "indirect_heat_integration_service", lambda z: z)
 
-    invalid = Zone(name="S_bad", type=ZoneType.S.value)
+    invalid = Zone(name="S_bad", type=ZT.S.value)
     invalid.add_zone(Zone(name="bad", type="X"))
     with pytest.raises(ValueError, match="Sites zones can only contain"):
         main_mod._get_site_targets(invalid)
@@ -327,10 +327,10 @@ def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
         main_mod, "_get_process_targets", lambda z: calls.append(f"proc:{z.name}") or z
     )
 
-    site = Zone(name="S", type=ZoneType.S.value)
-    site.add_zone(Zone(name="op", type=ZoneType.O.value))
-    site.add_zone(Zone(name="proc", type=ZoneType.P.value))
-    site.add_zone(Zone(name="sub_site", type=ZoneType.S.value))
+    site = Zone(name="S", type=ZT.S.value)
+    site.add_zone(Zone(name="op", type=ZT.O.value))
+    site.add_zone(Zone(name="proc", type=ZT.P.value))
+    site.add_zone(Zone(name="sub_site", type=ZT.S.value))
     out = main_mod._get_site_targets(site)
 
     assert out is site
@@ -346,8 +346,8 @@ def test_community_and_regional_dispatch(monkeypatch):
         main_mod, "_get_site_targets", lambda z: calls.append(f"site:{z.name}") or z
     )
 
-    community = Zone(name="C", type=ZoneType.C.value)
-    community.add_zone(Zone(name="S1", type=ZoneType.S.value))
+    community = Zone(name="C", type=ZT.C.value)
+    community.add_zone(Zone(name="S1", type=ZT.S.value))
     out_c = main_mod._get_community_targets(community)
     assert out_c is community
     assert "site:S1" in calls
@@ -357,16 +357,16 @@ def test_community_and_regional_dispatch(monkeypatch):
         "_get_community_targets",
         lambda z: calls.append(f"community:{z.name}") or z,
     )
-    regional = Zone(name="R", type=ZoneType.R.value)
-    regional.add_zone(Zone(name="C1", type=ZoneType.C.value))
+    regional = Zone(name="R", type=ZT.R.value)
+    regional.add_zone(Zone(name="C1", type=ZT.C.value))
     out_r = main_mod._get_regional_targets(regional)
     assert out_r is regional
     assert "community:C1" in calls
 
 
 def test_report_and_utility_extractors_and_extract_results(monkeypatch):
-    root = Zone(name="Root", type=ZoneType.P.value)
-    child = Zone(name="Child", type=ZoneType.P.value)
+    root = Zone(name="Root", type=ZT.P.value)
+    child = Zone(name="Child", type=ZT.P.value)
     root.add_zone(child)
 
     root._targets = {"t0": _DummyTarget("root_target")}

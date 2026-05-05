@@ -34,7 +34,7 @@ def test_create_curve_formats_data_correctly():
 def test_graph_cc_hot_curve():
     x_vals = [0, 10]
     y_vals = [100, 200]
-    result = _graph_cc("Hot CC", StreamType.Hot.value, y_vals, x_vals)
+    result = _graph_cc("Hot CC", ST.Hot.value, y_vals, x_vals)
     assert result[0]["title"] == "Hot CC"
     assert result[0]["arrow"] == ArrowHead.END.value
 
@@ -94,7 +94,7 @@ def test_get_output_graph_data_single_zone(monkeypatch):
     zone = MagicMock(spec=Zone)
     zone.name = "Site"
     zone.subzones = {}
-    zone.targets = {TargetType.DI.value: MagicMock(name="TI", graphs={})}
+    zone.targets = {TT.DI.value: MagicMock(name="TI", graphs={})}
 
     monkeypatch.setattr(
         sys.modules[_create_graph_set.__module__],
@@ -102,4 +102,4 @@ def test_get_output_graph_data_single_zone(monkeypatch):
         lambda z, n: {"name": n, "graphs": []},
     )
     result = get_output_graph_data(zone)
-    assert result[TargetType.DI.value]["graphs"] == []
+    assert result[TT.DI.value]["graphs"] == []

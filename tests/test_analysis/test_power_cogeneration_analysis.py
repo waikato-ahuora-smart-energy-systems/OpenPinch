@@ -190,7 +190,9 @@ def test_work_models_and_coeff_setter(monkeypatch):
     assert np.isfinite(w_thm)
 
     with pytest.raises(ValueError, match="Unsupported Sun model turbine type"):
-        turbine_mod._work_SunModel(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 3.0, 120.0, 0.9, "bad")
+        turbine_mod._work_SunModel(
+            10.0, 3_000.0, 5.0, 2_000.0, 2.0, 3.0, 120.0, 0.9, "bad"
+        )
 
     with pytest.raises(ValueError, match="Unsupported THM turbine type"):
         turbine_mod._work_THM(10.0, 3_000.0, 5.0, 2_000.0, 2.0, 120.0, 0.9, 1, "bad")

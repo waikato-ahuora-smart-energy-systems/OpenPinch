@@ -22,13 +22,13 @@ if TYPE_CHECKING:
 __all__ = [
     "data_preprocessing_service",
     "direct_heat_integration_service",
+    "indirect_heat_integration_service",
     "get_area_targets",
     "get_capital_cost_targets",
     "get_output_graph_data",
     "get_utility_targets",
-    "indirect_heat_integration_service",
-    "prepare_problem",
 ]
+
 
 @lru_cache(maxsize=1)
 def _load_services_entry_module() -> "ModuleType":

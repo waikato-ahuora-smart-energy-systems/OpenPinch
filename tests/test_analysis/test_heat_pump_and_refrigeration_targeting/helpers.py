@@ -110,8 +110,15 @@ def _base_args(**overrides):
     return SimpleNamespace(**args)
 
 
-def _pt_with_hnet(h0, h1):
-    return ProblemTable({PT.T.value: [120.0, 60.0], PT.H_NET.value: [h0, h1]})
+def _pt_with_hnet(h0, h1, *, h_hot=None, h_cold=None):
+    return ProblemTable(
+        {
+            PT.T.value: [120.0, 60.0],
+            PT.H_NET.value: [h0, h1],
+            PT.H_NET_HOT.value: [0.0, 0.0] if h_hot is None else h_hot,
+            PT.H_NET_COLD.value: [0.0, 0.0] if h_cold is None else h_cold,
+        }
+    )
 
 
 def _patch_output_model_validate(monkeypatch):

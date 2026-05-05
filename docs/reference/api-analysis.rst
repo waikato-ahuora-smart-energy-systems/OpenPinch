@@ -102,8 +102,8 @@ multi-cycle results.
 
 Current public helpers include:
 
-- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.get_direct_heat_pump_and_refrigeration_target`
-- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.get_indirect_heat_pump_and_refrigeration_target`
+- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_direct_hpr_target`
+- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_indirect_hpr_target`
 - :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.plot_multi_hp_profiles_from_results`
 
 .. automodule:: OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry

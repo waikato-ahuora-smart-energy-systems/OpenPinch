@@ -67,8 +67,17 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
             PT.H_COLD_UT.value: np.array([0.0, 0.0]),
         },
     )
+    ambient_hot = np.array([-4.0, 1.0]) if q_amb_hot > 0.0 else np.zeros(2)
+    ambient_cold = np.array([4.0, -1.0]) if q_amb_cold > 0.0 else np.zeros(2)
     monkeypatch.setattr(
-        hp, "get_process_heat_cascade", lambda **_kwargs: _pt_with_hnet(4.0, -1.0)
+        hp,
+        "get_process_heat_cascade",
+        lambda **_kwargs: _pt_with_hnet(
+            4.0,
+            -1.0,
+            h_hot=ambient_hot,
+            h_cold=ambient_cold,
+        ),
     )
 
     res = SimpleNamespace(

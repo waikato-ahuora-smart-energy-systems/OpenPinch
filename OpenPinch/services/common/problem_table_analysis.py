@@ -12,7 +12,8 @@ import numpy as np
 
 from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
-from ...lib.config import Configuration, tol
+from ...services.common.gcc_manipulation import get_additional_GCCs
+from ...lib.config import tol
 from ...lib.enums import PT
 from ...utils.miscellaneous import delta_with_zero_at_start, linear_interpolation
 
@@ -36,9 +37,10 @@ def get_process_heat_cascade(
     hot_streams: StreamCollection = StreamCollection(),
     cold_streams: StreamCollection = StreamCollection(),
     all_streams: StreamCollection = None,
-    zone_config: Configuration = None,
     is_shifted: bool = True,
     known_heat_recovery: float = None,
+    extra_T_intervals: list = [],
+    is_full_analysis: bool = False,
 ) -> ProblemTable:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
     # Get all possible temperature intervals, remove duplicates and order from high to low
@@ -48,6 +50,7 @@ def get_process_heat_cascade(
     pt = create_problem_table_with_t_int(
         streams=all_streams,
         is_shifted=is_shifted,
+        extra_T_intervals=extra_T_intervals,
     )
     # Perform the heat cascade of the problem table
     problem_table_algorithm(
@@ -69,6 +72,9 @@ def get_process_heat_cascade(
     if heat_recovery_target > tol:
         # Add additional temperature intervals for ease in targeting utility etc
         _insert_temperature_interval_into_pt_at_constant_h(pt)
+
+    if is_full_analysis:
+        get_additional_GCCs(pt, is_process_stream=True)
 
     return pt
 
@@ -102,13 +108,14 @@ def get_utility_heat_cascade(
 def create_problem_table_with_t_int(
     streams: StreamCollection = StreamCollection(),
     is_shifted: bool = True,
+    extra_T_intervals: list = [],
 ) -> ProblemTable:
     """Return a problem table populated with ordered unique temperature intervals."""
     T_vals = [
         t
         for s in streams
         for t in ((s.t_min_star, s.t_max_star) if is_shifted else (s.t_min, s.t_max))
-    ]
+    ] + extra_T_intervals
     dp = int(-math.log10(tol))
     T_vals = np.array(T_vals).round(dp)
     return ProblemTable({PT.T.value: sorted(set(T_vals), reverse=True)})

@@ -6,7 +6,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 from ..lib.config import tol
-from ..lib.enums import TargetType
 
 if TYPE_CHECKING:
     from ..lib.schema import ValueWithUnit

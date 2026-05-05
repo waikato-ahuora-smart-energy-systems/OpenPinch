@@ -33,7 +33,7 @@
 #         site.Extract_Pro_ETC(ETD_star, z, z.graphs['PT_star'], Req_ut)
 #         site.Extract_Pro_ETC(ETD, z, z.graphs['PT'], Req_ut)
 
-#     site_tit: Zone = site.targets[TargetType.DI.value]
+#     site_tit: Zone = site.targets[TT.DI.value]
 #     PT_TIT = site_tit.graphs['PT']
 #     PT_star_TIT = site_tit.graphs['PT_star']
 
@@ -66,7 +66,7 @@
 #     # Record retrofit targets
 #     Hot_Pinch, Cold_Pinch = get_pinch_temperatures(PT_star_TIT, 10, 0)
 
-#     Retrofit = Zone(name=TargetType.ET.value, config=site.config)
+#     Retrofit = Zone(name=TT.ET.value, config=site.config)
 #     Retrofit.hot_pinch = Hot_Pinch
 #     Retrofit.hot_utility_target = ETD_star[-1][1]
 #     Retrofit.cold_utility_target = ETD_star[-1][-1]

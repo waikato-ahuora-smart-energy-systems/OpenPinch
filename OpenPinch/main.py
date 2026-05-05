@@ -18,7 +18,7 @@ from .classes.energy_target import EnergyTarget
 from .classes.stream import Stream
 from .classes.stream_collection import StreamCollection
 from .classes.zone import Zone
-from .lib.enums import Z, ZoneType
+from .lib.enums import ZT
 from .lib.schema import TargetInput, TargetOutput
 from .utils.decorators import timing_decorator
 
@@ -116,7 +116,7 @@ def _get_unit_operation_targets(zone: Zone):
         if len(zone.subzones) > 0:
             z: Zone
             for z in zone.subzones.values():
-                if z.type == ZoneType.O.value:
+                if z.type == ZT.O.value:
                     if zone.config.DO_DIRECT_OPERATION_TARGETING:
                         direct_heat_integration_service(z)
                 else:
@@ -135,9 +135,9 @@ def _get_process_targets(zone: Zone):
     if len(zone.subzones) > 0:
         z: Zone
         for z in zone.subzones.values():
-            if z.type == ZoneType.O.value:
+            if z.type == ZT.O.value:
                 z = _get_unit_operation_targets(z)
-            elif z.type == ZoneType.P.value:
+            elif z.type == ZT.P.value:
                 z = _get_process_targets(z)
             else:
                 raise ValueError(
@@ -164,11 +164,11 @@ def _get_site_targets(zone: Zone):
     # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
         for z in zone.subzones.values():
-            if z.type == Z.O.value:
+            if z.type == ZT.O.value:
                 _get_unit_operation_targets(z)
-            elif z.type == Z.P.value:
+            elif z.type == ZT.P.value:
                 _get_process_targets(z)
-            elif z.type == Z.S.value:
+            elif z.type == ZT.S.value:
                 _get_site_targets(z)
             else:
                 raise ValueError(
@@ -222,9 +222,9 @@ def _get_utilities(zone: Zone) -> StreamCollection:
 
 
 _TARGET_HANDLERS = {
-    ZoneType.R.value: _get_regional_targets,
-    ZoneType.C.value: _get_community_targets,
-    ZoneType.S.value: _get_site_targets,
-    ZoneType.P.value: _get_process_targets,
-    ZoneType.O.value: _get_unit_operation_targets,
+    ZT.R.value: _get_regional_targets,
+    ZT.C.value: _get_community_targets,
+    ZT.S.value: _get_site_targets,
+    ZT.P.value: _get_process_targets,
+    ZT.O.value: _get_unit_operation_targets,
 }

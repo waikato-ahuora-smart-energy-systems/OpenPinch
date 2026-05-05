@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from ..lib.enums import StreamType
+from ..lib.enums import ST
 
 
 class Stream:
@@ -313,11 +313,7 @@ class Stream:
         self._h_supply = self._h_target
         self._h_target = hs
 
-        self._type = (
-            StreamType.Cold.value
-            if self._type == StreamType.Hot.value
-            else StreamType.Hot.value
-        )
+        self._type = ST.Cold.value if self._type == ST.Hot.value else ST.Hot.value
         self._is_process_stream = True
         self._update_attributes()
 
@@ -353,7 +349,7 @@ class Stream:
         self._t_min_star = self._t_min - self._dt_cont
         self._t_max_star = self._t_max - self._dt_cont
         if self._type is None:
-            self._type = StreamType.Hot.value
+            self._type = ST.Hot.value
 
     def _set_cold_stream_min_max_temperatures(self):
         self._t_min = self._t_supply
@@ -361,11 +357,11 @@ class Stream:
         self._t_min_star = self._t_min + self._dt_cont
         self._t_max_star = self._t_max + self._dt_cont
         if self._type is None:
-            self._type = StreamType.Cold.value
+            self._type = ST.Cold.value
 
     def _set_neutral_stream_min_max_temperatures(self):
         self._t_min = self._t_supply
         self._t_max = self._t_target
         self._t_min_star = self._t_min
         self._t_max_star = self._t_max
-        self._type = StreamType.Both.value
+        self._type = ST.Both.value

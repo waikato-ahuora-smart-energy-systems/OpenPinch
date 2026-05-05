@@ -1,7 +1,7 @@
 """Additional coverage tests for config and enum helpers."""
 
 from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import TargetType, ZoneType
+from OpenPinch.lib.enums import TT, ZT
 
 
 def test_configuration_parses_refrigerant_list_option():
@@ -10,5 +10,5 @@ def test_configuration_parses_refrigerant_list_option():
 
 
 def test_zone_and_target_enum_str_methods():
-    assert str(ZoneType.S) == ZoneType.S.value
-    assert str(TargetType.DI) == TargetType.DI.value
+    assert str(ZT.S) == ZT.S.value
+    assert str(TT.DI) == TT.DI.value

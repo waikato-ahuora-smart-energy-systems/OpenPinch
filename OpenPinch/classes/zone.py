@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Optional
 
 from ..lib.config import Configuration
-from ..lib.enums import ZoneType
+from ..lib.enums import ZT
 from .stream_collection import StreamCollection
 from .energy_target import EnergyTarget
 
@@ -25,7 +25,7 @@ class Zone:
     def __init__(
         self,
         name: str = "Zone",
-        type: str = ZoneType.P.value,
+        type: str = ZT.P.value,
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
     ):

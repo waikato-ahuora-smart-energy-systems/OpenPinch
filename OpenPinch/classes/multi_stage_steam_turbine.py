@@ -11,9 +11,7 @@ from ..lib.enums import TurbineModel
 from ..lib.schema import TurbineSolveResult, TurbineStageResult
 from ..utils.water_properties import Tsat_p, h_ps, h_pT, hL_p, hV_p, psat_T, s_ph
 
-__all__ = [
-    "MultiStageSteamTurbine"
-]
+__all__ = ["MultiStageSteamTurbine"]
 
 
 def _normalise_model_name(model: str | TurbineModel) -> str:
@@ -294,7 +292,9 @@ def _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
     w_max = (dh_is * m - a) / b
 
     if w_max > 2000 and t_size_key == "<2MW":
-        w_max = _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, ">2MW", t_type_key)
+        w_max = _work_THM(
+            P_in, h_in, P_out, h_sat, m, dh_is, n_mech, ">2MW", t_type_key
+        )
 
     h_out = h_in - w_max / (n_mech * m)
     if h_out <= h_sat + tol and t_type_key == "BPST":

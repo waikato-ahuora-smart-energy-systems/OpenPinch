@@ -95,5 +95,5 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "HeatPumpIntegrationScenario" in api_lib
     assert "HeatPumpIntegrationComparison" in api_lib
 
-    assert "get_direct_heat_pump_and_refrigeration_target" in api_analysis
-    assert "get_indirect_heat_pump_and_refrigeration_target" in api_analysis
+    assert "compute_direct_hpr_target" in api_analysis
+    assert "compute_indirect_hpr_target" in api_analysis

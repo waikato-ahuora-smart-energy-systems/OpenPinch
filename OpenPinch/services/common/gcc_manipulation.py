@@ -31,6 +31,7 @@ def get_additional_GCCs(
     pt: ProblemTable,
     do_vert_cc_calc: bool = False,
     do_assisted_ht_calc: bool = False,
+    is_process_stream: bool = True,
 ) -> ProblemTable:
     """Populate derived GCC variants used by utility and integration targeting.
 
@@ -64,7 +65,11 @@ def get_additional_GCCs(
         pt.update(get_GGC_pockets(pt))
 
     pt.update(get_GCC_needing_utility(pt.col[PT.H_NET_NP.value]))
-    pt.update(get_seperated_gcc_heat_load_profiles(pt.col[PT.H_NET_A.value]))
+    pt.update(
+        get_seperated_gcc_heat_load_profiles(
+            pt.col[PT.H_NET_A.value], is_process_stream=is_process_stream
+        )
+    )
     return pt
 
 

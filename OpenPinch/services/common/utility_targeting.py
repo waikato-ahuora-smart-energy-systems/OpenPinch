@@ -7,7 +7,7 @@ import numpy as np
 from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
 from ...lib.config import tol
-from ...lib.enums import PT, StreamType
+from ...lib.enums import PT, ST
 
 from .problem_table_analysis import get_utility_heat_cascade
 from .gcc_manipulation import get_seperated_gcc_heat_load_profiles
@@ -123,7 +123,7 @@ def _target_utility(
     if H_vals.min() < -tol:
         H_vals = H_vals * -1
 
-    if utilities[0].type == StreamType.Hot.value and abs(H_vals[0]) > tol:
+    if utilities[0].type == ST.Hot.value and abs(H_vals[0]) > tol:
         utilities = _assign_utility(
             T_vals,
             H_vals,
@@ -133,7 +133,7 @@ def _target_utility(
             is_real_temperatures=is_real_temperatures,
         )
 
-    elif utilities[0].type == StreamType.Cold.value and abs(H_vals[-1]) > tol:
+    elif utilities[0].type == ST.Cold.value and abs(H_vals[-1]) > tol:
         utilities = _assign_utility(
             T_vals,
             H_vals,

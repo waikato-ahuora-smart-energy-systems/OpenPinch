@@ -1008,14 +1008,12 @@ def test_problem_table_algorithm_executes():
         hot_streams=z.hot_streams,
         cold_streams=z.cold_streams,
         all_streams=z.all_streams,
-        zone_config=z.config,
         is_shifted=True,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=z.hot_streams,
         cold_streams=z.cold_streams,
         all_streams=z.all_streams,
-        zone_config=z.config,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )

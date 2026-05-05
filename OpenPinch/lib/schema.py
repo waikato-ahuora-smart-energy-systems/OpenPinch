@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .enums import StreamType, TurbineOptionsPropKeys
+from .enums import ST
 from ..classes.stream_collection import StreamCollection
 
 
@@ -331,7 +331,7 @@ class UtilitySchema(BaseModel):
     """Utility definition including thermal and optional economic attributes."""
 
     name: str
-    type: StreamType
+    type: ST
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
     heat_flow: Optional[ScalarOrVU] = None
@@ -349,15 +349,6 @@ class ZoneTreeSchema(BaseModel):
     name: str
     type: str
     children: Optional[List["ZoneTreeSchema"]] = None
-
-
-# ---- Options -----------------------------------------------------------------
-class TurbineOption(BaseModel):
-    """Configure individual turbine properties referenced by key."""
-
-    key: TurbineOptionsPropKeys
-    value: Any
-    model_config = ConfigDict(use_enum_values=True)
 
 
 # ---- Complete request --------------------------------------------------------

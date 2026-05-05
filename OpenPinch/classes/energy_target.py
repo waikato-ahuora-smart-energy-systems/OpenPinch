@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 import pandas as pd
 
 from ..lib.config import Configuration, tol
-from ..lib.enums import ProblemTableLabel, SummaryRowType, TargetType
+from ..lib.enums import ProblemTableLabel, SummaryRowType
 from .problem_table import ProblemTable
 from .stream_collection import StreamCollection
 

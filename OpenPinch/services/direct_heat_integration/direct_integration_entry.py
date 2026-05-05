@@ -15,8 +15,8 @@ from ...classes.stream_collection import StreamCollection
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...classes.energy_target import EnergyTarget
-from ...lib.config import Configuration, tol
-from ...lib.enums import GT, PT, StreamType, TargetType, Z
+from ...lib.config import tol
+from ...lib.enums import GT, PT, ST, TT, ZT
 from ...utils.miscellaneous import delta_vals
 from ..common.capital_cost_and_area_targeting import (
     get_area_targets,
@@ -31,9 +31,7 @@ from ..common.problem_table_analysis import (
     set_zonal_targets,
 )
 from ..common.utility_targeting import get_utility_targets
-from ..heat_pump_integration.heat_pump_and_refrigeration_entry import (
-    get_direct_heat_pump_and_refrigeration_target,
-)
+
 
 __all__ = ["compute_direct_integration_targets"]
 
@@ -51,7 +49,7 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
     """
     target = EnergyTarget(
         zone_name=zone.name,
-        type=TargetType.DI.value,
+        type=TT.DI.value,
         parent_zone=zone.parent_zone,
         zone_config=zone.config,
     )
@@ -59,14 +57,12 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
         all_streams=zone.all_streams,
-        zone_config=zone.config,
         is_shifted=True,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
         all_streams=zone.all_streams,
-        zone_config=zone.config,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
@@ -76,17 +72,6 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
         do_vert_cc_calc=zone.config.DO_VERTICAL_GCC,
         do_assisted_ht_calc=zone.config.DO_ASSITED_HT,
     )
-
-    if zone.type == Z.P.value and (
-        zone.config.DO_PROCESS_HP_TARGETING or zone.config.DO_PROCESS_RFRG_TARGETING
-    ):
-        target.update(
-            get_direct_heat_pump_and_refrigeration_target(
-                pt=pt,
-                zone_name=zone.name,
-                zone_config=zone.config,
-            )
-        )
 
     get_utility_targets(
         pt=pt,
@@ -161,7 +146,8 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
         set_zonal_targets(
             pt=pt,
             pt_real=pt_real,
-        ) | {
+        )
+        | {
             "pt": pt,
             "pt_real": pt_real,
             "graphs": _save_graph_data(pt, pt_real),
@@ -284,8 +270,8 @@ def _add_net_segment_stateful(
     net_streams.add(
         Stream(
             name=f"Segment {k}" if j == 0 else f"Segment {k}-{j}",
-            t_supply=T_i if curr_u.type == StreamType.Hot.value else T_ub,
-            t_target=T_ub if curr_u.type == StreamType.Hot.value else T_i,
+            t_supply=T_i if curr_u.type == ST.Hot.value else T_ub,
+            t_target=T_ub if curr_u.type == ST.Hot.value else T_i,
             heat_flow=dh_curr,
             dt_cont=curr_u.dt_cont,
             htc=1.0,

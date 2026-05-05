@@ -14,7 +14,7 @@ from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import Configuration
-from ...lib.enums import StreamLoc, StreamType, ZoneType
+from ...lib.enums import StreamLoc, ST, ZT
 from ...lib.schema import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ...utils.miscellaneous import get_value
 
@@ -102,13 +102,13 @@ def _get_validated_zone_info(
     if isinstance(zone_tree, ZoneTreeSchema):
         normalized_type = (zone_tree.type or "").strip()
         type_map = {
-            "Zone": ZoneType.P.value,
-            "Sub-Zone": ZoneType.P.value,
-            "Process Zone": ZoneType.P.value,
-            "Site": ZoneType.S.value,
-            "Community": ZoneType.C.value,
-            "Region": ZoneType.R.value,
-            "Utility Zone": ZoneType.U.value,
+            "Zone": ZT.P.value,
+            "Sub-Zone": ZT.P.value,
+            "Process Zone": ZT.P.value,
+            "Site": ZT.S.value,
+            "Community": ZT.C.value,
+            "Region": ZT.R.value,
+            "Utility Zone": ZT.U.value,
         }
         if normalized_type:
             try:
@@ -122,15 +122,15 @@ def _get_validated_zone_info(
 
         if not normalized_type or normalized_type == "Zone":
             if depth == 0:
-                zone_type = ZoneType.S.value
+                zone_type = ZT.S.value
             elif depth == 1:
-                zone_type = ZoneType.P.value
+                zone_type = ZT.P.value
             else:
-                zone_type = ZoneType.O.value
+                zone_type = ZT.O.value
 
         zone_name = zone_tree.name
     else:
-        zone_type = ZoneType.S.value
+        zone_type = ZT.S.value
         zone_name = project_name
     return zone_name, zone_type
 
@@ -234,7 +234,7 @@ def _get_process_streams_in_each_subzone(
 
         for stream_schema in matched_streams:
             stream_obj = _create_process_stream(stream_schema)
-            if stream_obj.type == StreamType.Hot.value:
+            if stream_obj.type == ST.Hot.value:
                 key = ".".join(
                     [stream_schema.zone, StreamLoc.HotS.value, stream_schema.name]
                 )
@@ -276,10 +276,10 @@ def _get_hot_and_cold_utilities(
         utilities, zone_config, addDefaultHU, addDefaultCU, HU_T_min, CU_T_max
     )
     hot_utilities, utilities = _create_utilities_list(
-        utilities, utility_type=StreamType.Hot.value
+        utilities, utility_type=ST.Hot.value
     )
     cold_utilities, utilities = _create_utilities_list(
-        utilities, utility_type=StreamType.Cold.value
+        utilities, utility_type=ST.Cold.value
     )
     return hot_utilities, cold_utilities
 
@@ -400,7 +400,7 @@ def _create_utilities_list(
 
     def _sort_key(selected: UtilitySchema):
         order = selected.t_supply
-        return -order if utility_type == StreamType.Hot.value else order
+        return -order if utility_type == ST.Hot.value else order
 
     candidates = sorted(
         (u for u in utilities if u.active and u.type in ["Both", utility_type]),
@@ -411,7 +411,7 @@ def _create_utilities_list(
         if selected.type == utility_type:
             selected.active = False
 
-        if utility_type == StreamType.Hot.value:
+        if utility_type == ST.Hot.value:
             t_supply = max(selected.t_supply, selected.t_target)
             t_target = min(selected.t_supply, selected.t_target)
         else:
@@ -420,7 +420,7 @@ def _create_utilities_list(
 
         key = (
             ".".join([StreamLoc.HotU.value, selected.name])
-            if utility_type == StreamType.Hot.value
+            if utility_type == ST.Hot.value
             else ".".join([StreamLoc.ColdU.value, selected.name])
         )
 
@@ -497,9 +497,7 @@ def _rewrite_stream_zones_from_tree(
                 counter += 1
                 process_name = f"{base_name}_{counter}"
 
-            new_node = ZoneTreeSchema(
-                name=process_name, type=ZoneType.P.value, children=None
-            )
+            new_node = ZoneTreeSchema(name=process_name, type=ZT.P.value, children=None)
             zone_tree.children.append(new_node)
             root_child_names.add(process_name)
 
@@ -533,7 +531,7 @@ def _validate_zone_tree_structure(
 ) -> ZoneTreeSchema:
     """Normalise a provided zone tree or synthesise one from stream zone paths."""
     if isinstance(zone_tree, ZoneTreeSchema):
-        if zone_tree.type == ZoneType.U.value:
+        if zone_tree.type == ZT.U.value:
             raise ValueError("Pinch analysis does not apply to Utility Zones.")
 
         def _check_zone_tree(
@@ -558,9 +556,9 @@ def _validate_zone_tree_structure(
 
     # Build zone tree from stream zone names
     if not isinstance(top_zone_name, str):
-        top_zone_name = ZoneType.S.value
+        top_zone_name = ZT.S.value
 
-    root = {"name": top_zone_name, "type": ZoneType.S.value, "children": {}}
+    root = {"name": top_zone_name, "type": ZT.S.value, "children": {}}
     stream_iter = [stream for stream in (streams or []) if stream.zone]
 
     def _split_zone_name(name: str):
@@ -587,7 +585,7 @@ def _validate_zone_tree_structure(
             if z_name not in current["children"]:
                 current["children"][z_name] = {
                     "name": z_name,
-                    "type": ZoneType.P.value,
+                    "type": ZT.P.value,
                     "children": {},
                 }
             current = current["children"][z_name]
@@ -603,7 +601,7 @@ def _validate_zone_tree_structure(
 
         current["children"][subzone_name] = {
             "name": subzone_name,
-            "type": ZoneType.O.value,
+            "type": ZT.O.value,
             "children": {},
         }
         stream.zone = _build_full_path(path_components, subzone_name)

@@ -602,7 +602,7 @@ def _create_curve(
 #     if zone_name[-3:] == 'ACC':
 #         _graph_cc(HCC, 4, 7, 0, graph, False, True)
 
-#     site_ret = list(filter(lambda p: p.name == TargetType.ET.value, site.subzones))[0]
+#     site_ret = list(filter(lambda p: p.name == TT.ET.value, site.subzones))[0]
 #     x_seg[1] = site_ret.cold_utility_target
 #     y_seg[0] = ETD[1][len(ETD[1]) - 1]
 #     y_seg[1] = ETD[1][len(ETD[1]) - 1]
