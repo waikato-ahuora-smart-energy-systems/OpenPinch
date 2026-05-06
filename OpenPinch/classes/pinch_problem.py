@@ -358,9 +358,12 @@ class PinchProblem:
         options: Optional[dict[str, Any]] = None,
     ) -> "EnergyTarget":
         """Run cogeneration targeting on the selected solved zone."""
+        target_id = TT.DI.value
+        if options and "base_target_type" in options:
+            target_id = str(options["base_target_type"])
         return self._execute_zone_service(
             power_cogeneration_service,
-            target_id=TT.DI.value,
+            target_id=target_id,
             zone_name=zone_name,
             options=options,
         )
@@ -510,6 +513,11 @@ class PinchProblem:
         """Build the grand composite curve Plotly figure for the selected zone."""
         return self.plot(zone_name=zone_name, graph_type=GT.GCC.value)
 
+
+    def plot_grand_composite_curve_with_heat_pump(self, *, zone_name: Optional[str] = None):
+        """Build the heat pump load profile curve Plotly figure for the selected zone."""
+        return self.plot(zone_name=zone_name, graph_type=GT.GCC_HP.value)
+    
 
     def export_graphs(
         self,

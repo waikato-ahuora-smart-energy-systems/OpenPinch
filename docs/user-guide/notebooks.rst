@@ -41,7 +41,7 @@ Recommended Usage
 For new users, the best learning path is:
 
 1. ``01_basic_pinch_and_dtcont_sensitivity.ipynb`` to learn the baseline pinch workflow, graph reading, and minimum approach sensitivity
-2. ``02_total_site_targets_and_sugcc.ipynb`` to compare direct, total-process, and total-site views and inspect the SUGCC
+2. ``02_total_site_targets_and_sugcc.ipynb`` to study the pulp mill case, compare direct, total-process, and total-site views, and screen total-site cogeneration with the SUGCC
 3. ``03_carnot_hpr_comparison.ipynb`` to compare direct and indirect Carnot HPR options over multiple target loads
 
 Interpretation Focus
