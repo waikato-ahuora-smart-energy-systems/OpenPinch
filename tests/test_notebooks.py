@@ -57,11 +57,21 @@ def test_notebook_1_uses_real_case_and_dtcont_sensitivity(tmp_path: Path):
     combined_source = _combined_source(notebook)
     lead_markdown = "".join(notebook["cells"][0].get("source", []))
 
-    assert "basic pinch and `dt_cont` sensitivity" in lead_markdown.lower()
+    assert "basic pinch analysis" in lead_markdown.lower()
+    assert "`dt_cont`" in combined_source
     assert "crude_preheat_train.json" in combined_source
     assert "plot_composite_curve" in combined_source
+    assert "variant=\"shifted\"" in combined_source
     assert "plot_grand_composite_curve" in combined_source
-    assert "multipliers = [0.8, 1.0, 1.2]" in combined_source
+    assert "multipliers =" in combined_source
+    assert "dt_cont multiplier" in combined_source
+    assert "display_plotly" in combined_source
+    assert "PLOT_WIDTH = 720" in combined_source
+    assert "PLOT_HEIGHT = 540" in combined_source
+    assert "figure.update_layout(width=width, height=height, autosize=False)" in combined_source
+    assert "figure.to_html" in combined_source
+    assert "make_subplots" in combined_source
+    assert "sensitivity_fig" in combined_source
 
 
 def test_notebook_2_covers_total_site_sugcc_and_cogeneration(tmp_path: Path):
