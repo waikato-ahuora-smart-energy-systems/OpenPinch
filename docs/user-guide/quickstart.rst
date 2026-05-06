@@ -154,12 +154,9 @@ Copy them into your working directory with:
 
 The notebook series includes:
 
-- ``01_basic_pinch_analysis.ipynb``
-- ``02_graphs_and_interpretation.ipynb``
-- ``03_zonal_analysis.ipynb``
-- ``04_heat_pump_workflow.ipynb``
-- ``05_batch_comparison.ipynb``
-- ``06_target_services_workflow.ipynb``
+- ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
+- ``02_total_site_targets_and_sugcc.ipynb``
+- ``03_carnot_hpr_comparison.ipynb``
 
 Advanced Heat-Pump Workflow
 ---------------------------
@@ -191,10 +188,12 @@ sample case:
    )
    print(evaluation.comparison_frame)
 
-For the broader advanced-service workflow, use
-``06_target_services_workflow.ipynb``. It demonstrates the explicit
-``target_*`` methods on the packaged ``chocolate_factory.json`` sample derived
-from the Chocolote Factory workbook.
+For the broader direct-versus-indirect Carnot workflow, use
+``03_carnot_hpr_comparison.ipynb``. It
+demonstrates the explicit ``target_direct_heat_pump``,
+``target_direct_refrigeration``, ``target_indirect_heat_pump``, and
+``target_indirect_refrigeration`` methods on the packaged
+``chocolate_factory.json`` sample.
 
 Next Steps
 ----------

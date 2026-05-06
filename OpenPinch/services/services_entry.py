@@ -32,6 +32,21 @@ __all__ = [
 ]
 
 
+def _apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
+    """Apply supported runtime option overrides onto the selected zone config."""
+    if not isinstance(args, dict):
+        return
+
+    for key, value in args.items():
+        if key == "base_target_type":
+            continue
+        if not hasattr(zone.config, key):
+            continue
+        if key == "REFRIGERANTS" and isinstance(value, str):
+            value = value.replace(";", ",").split(",")
+        setattr(zone.config, key, value)
+
+
 def data_preprocessing_service(
     input_data: TargetInput,
     project_name: str = "Site",
@@ -65,6 +80,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def direct_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
+    _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
     zone.add_target(
@@ -77,6 +93,7 @@ def direct_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def indirect_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
+    _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
     zone.add_target(
@@ -89,6 +106,7 @@ def indirect_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def direct_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
+    _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
     zone.add_target(
@@ -101,6 +119,7 @@ def direct_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def indirect_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
+    _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
     zone.add_target(
@@ -113,6 +132,7 @@ def indirect_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
+    _apply_zone_config_overrides(zone, args)
     target_type = [
         TT.IHP.value,
         TT.IR.value,
@@ -124,8 +144,7 @@ def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
     if not(isinstance(args, dict)):
         args = {}
     if "base_target_type" in args:
-        if args["base_target_type"] in TT:
-            target_type = [args["base_target_type"]]
+        target_type = [str(args["base_target_type"])]
     if len(zone.targets) == 0:
         direct_heat_integration_service(zone)
     for tt in target_type:

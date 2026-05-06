@@ -719,7 +719,7 @@ class PinchProblem:
     @project_name.setter
     def project_name(self, value: str):
         self._project_name = value
-        if isinstance(self._master_zone, "Zone"):
+        if isinstance(self._master_zone, Zone):
             self._master_zone.name = value
 
     # ----------------------------------------------------------------------------
