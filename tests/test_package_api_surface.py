@@ -25,9 +25,7 @@ EXPECTED_EXPORTS = {
         "VisualiseOutput",
         "ZoneTreeSchema",
         "ZoneType",
-        "extract_results",
         "get_piecewise_linearisation_for_streams",
-        "get_targets",
         "pinch_analysis_service",
     },
     "OpenPinch.lib": {
@@ -75,6 +73,7 @@ EXPECTED_EXPORTS = {
     },
     "OpenPinch.services": {
         "area_cost_targeting_service",
+        "data_preprocessing_service",
         "direct_heat_pump_service",
         "direct_heat_integration_service",
         "direct_refrigeration_service",

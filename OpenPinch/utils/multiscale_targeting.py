@@ -15,6 +15,11 @@ from ..services.services_entry import (
     indirect_heat_integration_service,
 )
 
+__all__ = [
+    "get_targets",
+    "extract_results",
+]
+
 
 def get_targets(
     zone: Zone, 
