@@ -6,7 +6,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 from ..lib.config import tol
-from ..lib.enums import TargetType
 
 if TYPE_CHECKING:
     from ..lib.schema import ValueWithUnit
@@ -20,7 +19,6 @@ __all__ = [
     "get_value",
     "graph_simple_cc_plot",
     "interp_with_plateaus",
-    "key_name",
     "linear_interpolation",
     "make_monotonic",
 ]
@@ -42,11 +40,6 @@ class _PlotlyShowProxy:
 
 
 plt = _PlotlyShowProxy()
-
-
-def key_name(zone_name: str, target_type: str = TargetType.DI.value):
-    """Compose the canonical dictionary key for storing zone targets."""
-    return f"{zone_name}/{target_type}"
 
 
 def get_value(
@@ -115,9 +108,11 @@ def get_value(
             )
     elif val is None and val2 is not None:
         return get_value(val2, zone_name=zone_name)
+    elif val is None:
+        return None
     else:
         raise TypeError(
-            f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
+            "Unsupported type"
         )
 
 

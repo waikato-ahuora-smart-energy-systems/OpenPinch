@@ -12,13 +12,14 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .enums import StreamType, TurbineOptionsPropKeys
+from .enums import ST
 from ..classes.stream_collection import StreamCollection
 
 
 # ---- Common type aliases -----------------------------------------------------
 ScalarOrVU = Union[float, "ValueWithUnit"]
 MaybeVU = Union[float, "ValueWithUnit", None]
+HPRMetric = Union[float, list[float], np.ndarray, None]
 
 
 # ---- Core value types --------------------------------------------------------
@@ -46,7 +47,7 @@ class TempPinch(BaseModel):
     hot_temp: MaybeVU = None
 
 
-class HPRTargetInputs(BaseModel):
+class HeatPumpTargetInputs(BaseModel):
     """Parameter bundle for heat pump and refrigeration targeting routines."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -101,7 +102,7 @@ class HPRTargetInputs(BaseModel):
     debug: bool
 
 
-class HPRTargetOutputs(BaseModel):
+class HeatPumpTargetOutputs(BaseModel):
     """Normalized output requirement for heat pump and refrigeration targeting routines."""
 
     model_config = ConfigDict(
@@ -154,6 +155,8 @@ class HPRTargetOutputs(BaseModel):
 class TargetResults(BaseModel):
     """Summary metrics for a single zone/target returned by the analysis."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     name: str
 
     degree_of_integration: MaybeVU = None
@@ -183,6 +186,18 @@ class TargetResults(BaseModel):
     ETE: Optional[float] = None
     exergy_req_min: MaybeVU = None
     exergy_des_min: MaybeVU = None
+
+    hpr_cycle: Optional[str] = None
+    hpr_utility_total: HPRMetric = None
+    hpr_work: HPRMetric = None
+    hpr_external_utility: HPRMetric = None
+    hpr_ambient_hot: HPRMetric = None
+    hpr_ambient_cold: HPRMetric = None
+    hpr_cop: HPRMetric = None
+    hpr_eta_he: HPRMetric = None
+    hpr_success: Optional[bool] = None
+    hpr_hot_streams: Optional[StreamCollection] = None
+    hpr_cold_streams: Optional[StreamCollection] = None
 
 
 class TurbineStageResult(BaseModel):
@@ -322,8 +337,8 @@ class StreamSchema(BaseModel):
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
     heat_flow: ScalarOrVU
-    dt_cont: ScalarOrVU
-    htc: ScalarOrVU
+    dt_cont: Optional[ScalarOrVU] = 0.0
+    htc: Optional[ScalarOrVU] = 1.0
     active: bool = True
 
 
@@ -331,13 +346,13 @@ class UtilitySchema(BaseModel):
     """Utility definition including thermal and optional economic attributes."""
 
     name: str
-    type: StreamType
+    type: ST
     t_supply: ScalarOrVU
-    t_target: ScalarOrVU
+    t_target: Optional[ScalarOrVU] = None
     heat_flow: Optional[ScalarOrVU] = None
-    dt_cont: ScalarOrVU
-    htc: ScalarOrVU
-    price: ScalarOrVU
+    dt_cont: Optional[ScalarOrVU] = 0.0
+    htc: Optional[ScalarOrVU] = 1.0
+    price: Optional[ScalarOrVU] = 1.0
     active: bool = True
     model_config = ConfigDict(use_enum_values=True)
 
@@ -349,15 +364,6 @@ class ZoneTreeSchema(BaseModel):
     name: str
     type: str
     children: Optional[List["ZoneTreeSchema"]] = None
-
-
-# ---- Options -----------------------------------------------------------------
-class TurbineOption(BaseModel):
-    """Configure individual turbine properties referenced by key."""
-
-    key: TurbineOptionsPropKeys
-    value: Any
-    model_config = ConfigDict(use_enum_values=True)
 
 
 # ---- Complete request --------------------------------------------------------

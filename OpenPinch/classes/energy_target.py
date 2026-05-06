@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 import pandas as pd
 
 from ..lib.config import Configuration, tol
-from ..lib.enums import ProblemTableLabel, SummaryRowType, TargetType
+from ..lib.enums import ProblemTableLabel, SummaryRowType
 from .problem_table import ProblemTable
 from .stream_collection import StreamCollection
 
@@ -25,17 +25,22 @@ class EnergyTarget:
 
     def __init__(
         self,
-        name: str = "untitled",
-        identifier: str = TargetType.DI.value,
+        zone_name: str,
+        type: str,
         parent_zone: "Zone" = None,
         zone_config: Optional[Configuration] = None,
     ):
         """Initialise a target container with empty tables, utilities, and metrics."""
         # === Metadata ===
+        if not zone_name:
+            raise ValueError("zone_name is required.")
+        if not type:
+            raise ValueError("type is required.")
+
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
-        self._identifier = identifier
-        self._name = name
+        self._type = type
+        self._name = self._format_target_name(zone_name, type)
         self._active = True
 
         self._graphs = {}
@@ -77,6 +82,30 @@ class EnergyTarget:
         self._capital_cost = 0.0
         self._total_cost = 0.0
         self._utility_cost = 0.0
+        self._target_values = {}
+
+        # === Heat Pump / Refrigeration Targeting ===
+        self._hpr_cycle: str | None = None
+        self._hpr_utility_total = None
+        self._hpr_work = None
+        self._hpr_external_utility = None
+        self._hpr_ambient_hot = None
+        self._hpr_ambient_cold = None
+        self._hpr_cop = None
+        self._hpr_eta_he = None
+        self._hpr_success: bool | None = None
+        self._hpr_hot_streams: StreamCollection = StreamCollection()
+        self._hpr_cold_streams: StreamCollection = StreamCollection()
+        self._hpr_details = None
+
+    @staticmethod
+    def _format_target_name(zone_name: str, type: str) -> str:
+        """Normalise display names while avoiding duplicate type suffixes."""
+        suffix = f"/{type}"
+        if zone_name.endswith(suffix):
+            return zone_name
+
+        return f"{zone_name}{suffix}"
 
     # === Properties ===
     @property
@@ -89,13 +118,13 @@ class EnergyTarget:
         self._name = value
 
     @property
-    def identifier(self):
-        """Target type identifier from :class:`TargetType`."""
-        return self._identifier
+    def type(self):
+        """Target type type from :class:`TargetType`."""
+        return self._type
 
-    @identifier.setter
-    def identifier(self, value):
-        self._identifier = value
+    @type.setter
+    def type(self, value):
+        self._type = value
 
     @property
     def config(self):
@@ -355,6 +384,114 @@ class EnergyTarget:
         self._w_eff_target = value
 
     @property
+    def hpr_cycle(self):
+        """Selected heat-pump or refrigeration cycle family."""
+        return self._hpr_cycle
+
+    @hpr_cycle.setter
+    def hpr_cycle(self, value):
+        self._hpr_cycle = value
+
+    @property
+    def hpr_utility_total(self):
+        """Total utility-equivalent burden reported by the HPR solve."""
+        return self._hpr_utility_total
+
+    @hpr_utility_total.setter
+    def hpr_utility_total(self, value):
+        self._hpr_utility_total = value
+
+    @property
+    def hpr_work(self):
+        """Net work requirement or generation reported by the HPR solve."""
+        return self._hpr_work
+
+    @hpr_work.setter
+    def hpr_work(self, value):
+        self._hpr_work = value
+
+    @property
+    def hpr_external_utility(self):
+        """External utility demand remaining after the HPR placement."""
+        return self._hpr_external_utility
+
+    @hpr_external_utility.setter
+    def hpr_external_utility(self, value):
+        self._hpr_external_utility = value
+
+    @property
+    def hpr_ambient_hot(self):
+        """Ambient-source hot-side contribution used by the HPR solve."""
+        return self._hpr_ambient_hot
+
+    @hpr_ambient_hot.setter
+    def hpr_ambient_hot(self, value):
+        self._hpr_ambient_hot = value
+
+    @property
+    def hpr_ambient_cold(self):
+        """Ambient-source cold-side contribution used by the HPR solve."""
+        return self._hpr_ambient_cold
+
+    @hpr_ambient_cold.setter
+    def hpr_ambient_cold(self, value):
+        self._hpr_ambient_cold = value
+
+    @property
+    def hpr_cop(self):
+        """Coefficient of performance summary for the HPR solve."""
+        return self._hpr_cop
+
+    @hpr_cop.setter
+    def hpr_cop(self, value):
+        self._hpr_cop = value
+
+    @property
+    def hpr_eta_he(self):
+        """Heat-engine efficiency summary reported by the HPR solve."""
+        return self._hpr_eta_he
+
+    @hpr_eta_he.setter
+    def hpr_eta_he(self, value):
+        self._hpr_eta_he = value
+
+    @property
+    def hpr_success(self):
+        """Whether the HPR optimisation converged successfully."""
+        return self._hpr_success
+
+    @hpr_success.setter
+    def hpr_success(self, value):
+        self._hpr_success = value
+
+    @property
+    def hpr_hot_streams(self):
+        """Hot-side latent or utility streams synthesized by the HPR solve."""
+        return self._hpr_hot_streams
+
+    @hpr_hot_streams.setter
+    def hpr_hot_streams(self, value):
+        self._hpr_hot_streams = value
+
+    @property
+    def hpr_cold_streams(self):
+        """Cold-side latent or utility streams synthesized by the HPR solve."""
+        return self._hpr_cold_streams
+
+    @hpr_cold_streams.setter
+    def hpr_cold_streams(self, value):
+        self._hpr_cold_streams = value
+
+    @property
+    def hpr_details(self):
+        """Full raw HPR solver output retained for advanced inspection."""
+        return self._hpr_details
+
+    @hpr_details.setter
+    def hpr_details(self, value):
+        self._hpr_details = value
+
+    @property
     def target_values(self):
         """Bulk assignment mapping used to populate target attributes."""
         return self._target_values
@@ -366,6 +503,14 @@ class EnergyTarget:
             setattr(self, key, value)
 
     # === Methods ===
+    def update(self, value_dict: dict, type: str = "values"):
+        if type == "values":
+            for key, value in value_dict.items():
+                setattr(self, key, value)
+        elif type == "graph":
+            for key, value in value_dict.items():
+                self.add_graph(key, value)
+
     def add_graph(self, name: str, result):
         """Store a graph result under ``name`` for later export or display."""
         self._graphs[name] = result
@@ -427,6 +572,25 @@ class EnergyTarget:
             data["ETE"] = self.ETE * 100
             data["exergy_req_min"] = self.exergy_req_min
             data["exergy_des_min"] = self.exergy_des_min
+
+        if (
+            self.hpr_cycle is not None
+            or self.hpr_success is not None
+            or len(self.hpr_hot_streams) > 0
+            or len(self.hpr_cold_streams) > 0
+            or self.hpr_details is not None
+        ):
+            data["hpr_cycle"] = self.hpr_cycle
+            data["hpr_utility_total"] = self.hpr_utility_total
+            data["hpr_work"] = self.hpr_work
+            data["hpr_external_utility"] = self.hpr_external_utility
+            data["hpr_ambient_hot"] = self.hpr_ambient_hot
+            data["hpr_ambient_cold"] = self.hpr_ambient_cold
+            data["hpr_cop"] = self.hpr_cop
+            data["hpr_eta_he"] = self.hpr_eta_he
+            data["hpr_success"] = self.hpr_success
+            data["hpr_hot_streams"] = self.hpr_hot_streams
+            data["hpr_cold_streams"] = self.hpr_cold_streams
 
         for utility in self.hot_utilities:
             data["hot_utilities"].append(

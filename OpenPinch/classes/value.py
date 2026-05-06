@@ -222,9 +222,7 @@ class Value:
         combined_state_ids = existing_state_ids + new_state_ids
         combined_values = np.concatenate([self._magnitude_array(), new_values])
         remaining_mass = max(0.0, 1.0 - float(new_weights.sum()))
-        combined_weights = np.concatenate(
-            [self._weights * remaining_mass, new_weights]
-        )
+        combined_weights = np.concatenate([self._weights * remaining_mass, new_weights])
 
         self._set_storage(
             Q_(combined_values, self._quantity.units),
@@ -612,7 +610,9 @@ class Value:
             try:
                 raw_weight_values = list(weight)
             except TypeError as exc:
-                raise TypeError("weight must be a scalar or 1-D array-like data.") from exc
+                raise TypeError(
+                    "weight must be a scalar or 1-D array-like data."
+                ) from exc
             if any(_is_bool_like(item) for item in raw_weight_values):
                 raise TypeError("Boolean weights are not supported.")
             raw_weights = np.asarray(raw_weight_values, dtype=float).reshape(-1)

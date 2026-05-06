@@ -6,24 +6,13 @@ and output formatting.  They act as the main entry points used by the
 in larger workflows.
 """
 
-from typing import Any, List
+from typing import Any
 
-from .analysis import (
-    compute_direct_integration_targets,
-    compute_indirect_integration_targets,
-    get_output_graph_data,
-    prepare_problem,
-    visualise_graphs,
-)
-from .classes.energy_target import EnergyTarget
-from .classes.stream import Stream
-from .classes.stream_collection import StreamCollection
-from .classes.zone import Zone
-from .lib.enums import Z, ZoneType
+from .classes.pinch_problem import PinchProblem
 from .lib.schema import TargetInput, TargetOutput
-from .utils.decorators import timing_decorator
 
-__all__ = ["pinch_analysis_service", "get_targets", "get_visualise", "extract_results"]
+
+__all__ = ["pinch_analysis_service"]
 
 
 #######################################################################################################
@@ -31,12 +20,10 @@ __all__ = ["pinch_analysis_service", "get_targets", "get_visualise", "extract_re
 #######################################################################################################
 
 
-@timing_decorator
 def pinch_analysis_service(
     data: Any,
     project_name: str = "Project",
-    is_return_full_results: bool = False,
-) -> TargetOutput | tuple[TargetOutput, Zone]:
+) -> TargetOutput:
     """Validate user data, run the targeting workflow, and return structured results.
 
     Parameters
@@ -57,199 +44,9 @@ def pinch_analysis_service(
         Validated response payload, optionally paired with the in-memory zone
         tree for advanced inspection and post-processing.
     """
-    # Validate request data using Pydantic model
-    request_data = TargetInput.model_validate(data)
+    input_data = TargetInput.model_validate(data)
+    problem = PinchProblem(project_name=project_name)
+    problem.load(input_data)
+    problem.target()
+    return TargetOutput.model_validate(problem.results)
 
-    # Formulate the top level zone with all subzones and approperiate input data
-    master_zone = prepare_problem(
-        project_name=project_name,
-        streams=request_data.streams,
-        utilities=request_data.utilities,
-        options=request_data.options,
-        zone_tree=request_data.zone_tree,
-    )
-
-    # Perform advanced targeting analysis on the master zone and all subzones
-    master_zone = get_targets(master_zone)
-
-    # Extract the core results from the master zone
-    return_data = extract_results(master_zone)
-
-    # Validate response data
-    validated_data = TargetOutput.model_validate(return_data)
-
-    # Return data
-    return (
-        validated_data if not is_return_full_results else (validated_data, master_zone)
-    )
-
-
-def get_targets(master_zone: Zone) -> Zone:
-    """Dispatch a prepared zone tree to the appropriate targeting routine.
-
-    This function is a lower-level hook compared to
-    :func:`pinch_analysis_service`. It expects a fully prepared
-    :class:`~OpenPinch.classes.zone.Zone` hierarchy and returns the same zone
-    tree after the relevant direct and indirect integration targets have been
-    populated.
-    """
-
-    handler = _TARGET_HANDLERS.get(master_zone.identifier)
-    if handler is None:
-        raise ValueError("No valid zone passed into OpenPinch for analysis.")
-
-    return handler(master_zone)
-
-
-def extract_results(master_zone: Zone) -> dict:
-    """Serialise solved targets, generated utilities, and graph payloads."""
-    return {
-        "name": master_zone.name,
-        "targets": _get_report(master_zone),
-        "utilities": _get_utilities(master_zone),
-        "graphs": get_output_graph_data(master_zone),
-    }
-
-
-########### TODO: This function is untested and not updated since the overhaul of OpenPinch. Broken, most likely.#####
-def get_visualise(data) -> dict:
-    """Build graph payloads directly from legacy problem-table structures.
-
-    Notes
-    -----
-    This helper predates the class-based refactor and retains compatibility with
-    older tooling.  It is currently untested and should be considered provisional.
-    """
-    r_data = {"graphs": []}
-    z: Zone
-    for z in data:
-        graph_set = {"name": f"{z.name}", "graphs": []}
-        for graph in z.graphs:
-            visualise_graphs(graph_set, graph)
-        r_data["graphs"].append(graph_set)
-    return r_data
-
-
-#######################################################################################################
-# Helper functions
-#######################################################################################################
-
-
-def _get_unit_operation_targets(zone: Zone):
-    """Populate a ``Zone`` with detailed unit operation-level pinch targets."""
-    if zone.config.DO_DIRECT_OPERATION_TARGETING:
-        if len(zone.subzones) > 0:
-            z: Zone
-            for z in zone.subzones.values():
-                if z.identifier == ZoneType.O.value:
-                    if zone.config.DO_DIRECT_OPERATION_TARGETING:
-                        compute_direct_integration_targets(z)
-                else:
-                    raise ValueError(
-                        "Invalid zone nesting. Unit operation zones can only contain other operation zones."
-                    )
-
-        compute_direct_integration_targets(zone)
-
-    return zone
-
-
-def _get_process_targets(zone: Zone):
-    """Populate a ``Zone`` with detailed process-level pinch targets."""
-
-    if len(zone.subzones) > 0:
-        z: Zone
-        for z in zone.subzones.values():
-            if z.identifier == ZoneType.O.value:
-                z = _get_unit_operation_targets(z)
-            elif z.identifier == ZoneType.P.value:
-                z = _get_process_targets(z)
-            else:
-                raise ValueError(
-                    "Invalid zone nesting. Process zones can only contain other process zones and operation zones."
-                )
-
-        if zone.config.DO_INDIRECT_PROCESS_TARGETING:
-            compute_indirect_integration_targets(zone)
-
-    compute_direct_integration_targets(zone)
-
-    return zone
-
-
-def _get_site_targets(zone: Zone):
-    """Targets heat integration using Total Site Anlysis,
-    by systematically analysing individual zones and then performing
-    site-level indirect integration through the utility system.
-    """
-
-    # Totally integrated analysis for a site zone
-    compute_direct_integration_targets(zone)
-
-    # Targets sub-zone energy requirements
-    if len(zone.subzones) > 0:
-        for z in zone.subzones.values():
-            if z.identifier == Z.O.value:
-                _get_unit_operation_targets(z)
-            elif z.identifier == Z.P.value:
-                _get_process_targets(z)
-            elif z.identifier == Z.S.value:
-                _get_site_targets(z)
-            else:
-                raise ValueError(
-                    "Invalid zone nesting. Sites zones can only contain site, process and operation zones."
-                )
-
-        # Calculates TS targets based on different approaches
-        compute_indirect_integration_targets(zone)
-
-    return zone
-
-
-def _get_community_targets(zone: Zone):
-    """Targets a Community Zone."""
-    z: Zone
-    for z in zone.subzones.values():
-        z = _get_site_targets(z)
-    return zone
-
-
-def _get_regional_targets(zone: Zone):
-    """Targets a Regional Zone."""
-    z: Zone
-    for z in zone.subzones.values():
-        z = _get_community_targets(z)
-    return zone
-
-
-def _get_report(zone: Zone) -> dict:
-    """Creates the database summary of zone targets."""
-    targets: List[dict] = []
-
-    for t in zone.targets.values():
-        t: EnergyTarget
-        targets.append(t.serialize_json())
-
-    if len(zone.subzones) > 0:
-        for z in zone.subzones.values():
-            z: Zone
-            targets.extend(_get_report(z))
-
-    return targets
-
-
-def _get_utilities(zone: Zone) -> StreamCollection:
-    """Gets a list of any default utilities generated during the analysis."""
-    utilities: StreamCollection = zone.hot_utilities + zone.cold_utilities
-    default_hu: Stream = next((u for u in utilities if u.name == "HU"), None)
-    default_cu: Stream = next((u for u in utilities if u.name == "CU"), None)
-    return [default_hu, default_cu]
-
-
-_TARGET_HANDLERS = {
-    ZoneType.R.value: _get_regional_targets,
-    ZoneType.C.value: _get_community_targets,
-    ZoneType.S.value: _get_site_targets,
-    ZoneType.P.value: _get_process_targets,
-    ZoneType.O.value: _get_unit_operation_targets,
-}

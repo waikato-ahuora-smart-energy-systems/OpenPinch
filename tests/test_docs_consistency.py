@@ -21,16 +21,6 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_readme_highlights_current_cli_workflow():
-    text = _read(README)
-    assert "openpinch sample" in text
-    assert "openpinch run" in text
-    assert "openpinch graph" in text
-    assert "openpinch heat-pump" in text
-    assert "openpinch validate" in text
-    assert "openpinch notebook" in text
-
-
 def test_docs_highlight_current_pinchproblem_methods():
     combined = "\n".join(
         [
@@ -48,6 +38,7 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "show_dashboard()" in combined
     assert "plot_grand_composite_curve" in combined
     assert "evaluate_heat_pump_integration" in combined
+    assert "target_direct_heat_pump" in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():
@@ -74,8 +65,18 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
         ]
     )
     assert "Interpreting Results" in combined
-    assert "heat-pump targeting and integration" in combined
+    assert "heat-pump integration" in combined
     assert "heat_pump_targeting.json" in combined
+    assert "03_carnot_hpr_comparison.ipynb" in combined
+
+
+def test_docs_reference_the_current_three_notebook_series():
+    combined = "\n".join([_read(README), _read(QUICKSTART), _read(NOTEBOOKS)])
+    assert "01_basic_pinch_and_dtcont_sensitivity.ipynb" in combined
+    assert "02_total_site_targets_and_sugcc.ipynb" in combined
+    assert "03_carnot_hpr_comparison.ipynb" in combined
+    assert "01_basic_pinch_analysis.ipynb" not in combined
+    assert "06_target_services_workflow.ipynb" not in combined
 
 
 def test_reference_docs_match_current_heat_pump_and_schema_surface():
@@ -92,8 +93,6 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "state_ids" in api_classes
     assert "weights" in api_classes
 
-    assert "HeatPumpIntegrationScenario" in api_lib
-    assert "HeatPumpIntegrationComparison" in api_lib
-
-    assert "get_direct_heat_pump_and_refrigeration_target" in api_analysis
-    assert "get_indirect_heat_pump_and_refrigeration_target" in api_analysis
+    assert "compute_direct_heat_pump_or_refrigeration_target" in api_analysis
+    assert "compute_indirect_heat_pump_or_refrigeration_target" in api_analysis
+    assert "HeatPumpTargetOutputs" in api_lib

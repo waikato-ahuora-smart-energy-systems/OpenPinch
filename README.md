@@ -12,43 +12,6 @@ python -m pip install openpinch
 
 OpenPinch currently requires Python `>=3.14`.
 
-## First Run
-
-Copy a known-good sample case and run it:
-
-```bash
-openpinch sample -o basic_pinch.json
-openpinch run basic_pinch.json --graph-output graphs -o results
-```
-
-That command sequence will:
-
-- print a compact terminal summary
-- export an Excel workbook to `results/`
-- export HTML graph files to `graphs/`
-
-Validate an input file without running the full analysis:
-
-```bash
-openpinch validate basic_pinch.json
-```
-
-Export graphs only:
-
-```bash
-openpinch graph basic_pinch.json --graph-type gcc -o graphs
-```
-
-Run the packaged heat-pump targeting sample and compare an integrated scenario:
-
-```bash
-openpinch sample --name heat_pump_targeting.json -o heat_pump_targeting.json
-openpinch heat-pump heat_pump_targeting.json \
-  --condenser-temperature 170 \
-  --condenser-duty 500 \
-  --evaporator-temperature 90 \
-  --evaporator-duty 400
-```
 
 ## Notebook Workflow
 
@@ -60,33 +23,12 @@ openpinch notebook -o notebooks
 
 The packaged notebook series currently includes:
 
-- `01_basic_pinch_analysis.ipynb`
-- `02_graphs_and_interpretation.ipynb`
-- `03_zonal_analysis.ipynb`
-- `04_heat_pump_workflow.ipynb`
-- `05_batch_comparison.ipynb`
+- `01_basic_pinch_and_dtcont_sensitivity.ipynb`
+- `02_total_site_targets_and_sugcc.ipynb`
+- `03_carnot_hpr_comparison.ipynb`
 
 These notebooks are intended to be the main learning path for new users.
 
-## Interpreting Results
-
-Start with the compact summary:
-
-- `Hot Utility Target` is the minimum external heating demand for the case.
-- `Cold Utility Target` is the minimum external cooling demand.
-- `Heat Recovery` is the internal heat recovery achieved by the targeting result.
-- `Hot Pinch` and `Cold Pinch` identify the constrained temperature region that limits further direct recovery.
-
-For graph-based interpretation:
-
-- composite curves show overall source and sink overlap
-- shifted composite curves show the effect of the minimum approach temperature
-- grand composite curves are the main view for utility selection and heat-pump opportunity identification
-- total-site graphs are the right level for comparing zonal interactions and utility-system effects
-
-The packaged `04_heat_pump_workflow.ipynb` notebook focuses on heat-pump targeting and integration. It compares a base case against an integrated heat-pump scenario and treats cycle performance as supporting context rather than the main result.
-
-For a dedicated written walkthrough, see `docs/user-guide/heat-pump-targeting.rst` in the source tree or the matching Read the Docs page.
 
 ## Python Workflow
 

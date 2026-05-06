@@ -21,7 +21,7 @@ class ZoneType(Enum):
         return self.value
 
 
-Z = ZoneType
+ZT = ZoneType
 
 
 class TargetType(Enum):
@@ -33,9 +33,16 @@ class TargetType(Enum):
     TS = "Total Site Target"  # Also indirect integration
     RT = "Regional Target"  # Currently the same as TS
     ET = "Energy Transfer Analysis"
+    DHP = "Direct Heat Pump"
+    IHP = "Indirect Heat Pump"
+    DR = "Direct Refrigeration"
+    IR = "Indirect Refrigeration"
 
     def __str__(self):
         return self.value
+
+
+TT = TargetType
 
 
 class HeatExchangerTypes(Enum):
@@ -92,12 +99,18 @@ class StreamType(Enum):
     Unassigned = ""
 
 
+ST = StreamType
+
+
 class StreamID(Enum):
     """Stream identity"""
 
     Process = "Process"
     Utility = "Utility"
     Unassigned = "Unassigned"
+
+
+SID = StreamID
 
 
 class StreamLoc(Enum):

@@ -66,8 +66,8 @@ To copy the packaged notebooks into your working directory:
    openpinch notebook -o notebooks
 
 The notebook series is organized around distinct workflows, including basic
-pinch analysis, graph interpretation, zonal analysis, heat-pump targeting, and
-batch comparison.
+pinch sensitivity, total-site utility planning, and direct-versus-indirect
+Carnot heat-pump and refrigeration studies.
 
 Run The Heat-Pump Targeting Sample
 ----------------------------------

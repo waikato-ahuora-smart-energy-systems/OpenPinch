@@ -4,7 +4,7 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.classes.stream import Stream
-from OpenPinch.lib.enums import StreamType
+from OpenPinch.lib.enums import ST
 
 
 class DummyStream(Stream):
@@ -70,14 +70,14 @@ def test_temperature_calculations(hot_stream, cold_stream):
     assert hot_stream.t_max == 300
     assert hot_stream.t_min_star == 190
     assert hot_stream.t_max_star == 290
-    assert hot_stream.type == StreamType.Hot.value
+    assert hot_stream.type == ST.Hot.value
 
     # Cold Stream
     assert cold_stream.t_min == 100
     assert cold_stream.t_max == 250
     assert cold_stream.t_min_star == 105
     assert cold_stream.t_max_star == 255
-    assert cold_stream.type == StreamType.Cold.value
+    assert cold_stream.type == ST.Cold.value
 
 
 def test_heat_capacity_flowrate_and_RCP(hot_stream):
@@ -128,7 +128,7 @@ def test_zero_heat_flow_isothermal_stream_initialises_without_error():
         dt_cont=5.0,
     )
 
-    assert s.type == StreamType.Both.value
+    assert s.type == ST.Both.value
     assert s.t_min == 100.0
     assert s.t_max == 100.0
     assert s.t_min_star == 100.0
@@ -155,7 +155,7 @@ def test_stream_pressure_and_enthalpy_property_getters():
 
 def test_stream_equal_temperature_negative_heat_flow_sets_hot_profile():
     s = Stream(name="Iso", t_supply=100.0, t_target=100.0, heat_flow=-50.0, htc=1.0)
-    assert s.type == StreamType.Hot.value
+    assert s.type == ST.Hot.value
     assert s.t_target == pytest.approx(99.99, abs=1e-6)
 
 
@@ -190,7 +190,7 @@ def test_stream_invert_swaps_states_for_utility_stream():
     assert s.P_target == 5.0
     assert s.h_supply == 900.0
     assert s.h_target == 1200.0
-    assert s.type == StreamType.Cold.value
+    assert s.type == ST.Cold.value
     assert s.t_min == 140.0
     assert s.t_max == 180.0
 

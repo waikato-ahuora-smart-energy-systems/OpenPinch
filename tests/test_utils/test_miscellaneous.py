@@ -6,7 +6,7 @@ from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.utils import *
-from OpenPinch.analysis.exergy_targeting import *
+from OpenPinch.services.exergy_analysis.exergy_targeting_entry import *
 import numpy as np
 from OpenPinch.utils import miscellaneous
 
@@ -202,19 +202,10 @@ def test_get_value_val2_fallback_does_not_mutate_payload():
 
 
 def test_get_value_none_raises_type_error():
-    with pytest.raises(TypeError, match="Unsupported type"):
-        get_value(None)
-
-
-def test_get_value_dict_none_value_raises_type_error():
-    with pytest.raises(TypeError, match="Unsupported type"):
-        get_value({"value": None})
-
-
-def test_get_value_zone_name_none_value_raises_type_error():
-    with pytest.raises(TypeError, match="Unsupported type"):
-        get_value({"zone-a": None}, zone_name="zone-a")
-
+    assert get_value(None) == None
+    assert get_value({"value": None}) == None
+    assert get_value({"zone-a": None}, zone_name="zone-a") == None
+        
 
 @pytest.mark.parametrize(
     ("payload", "zone_name", "val2", "error_type", "match"),
@@ -276,7 +267,6 @@ def test_get_value_zone_name_none_value_raises_type_error():
             "Unsupported type",
             id="zone-bool",
         ),
-        pytest.param(None, None, None, TypeError, "Unsupported type", id="none"),
         pytest.param([1.0], None, None, TypeError, "Unsupported type", id="list"),
     ],
 )

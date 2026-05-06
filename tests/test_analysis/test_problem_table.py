@@ -7,21 +7,25 @@ from pathlib import Path
 import uuid
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.analysis.problem_table_analysis import (
+from OpenPinch.services.common.problem_table_analysis import (
     _sum_mcp_between_temperature_boundaries,
 )
-from OpenPinch.analysis.problem_table_analysis import problem_table_algorithm
-from OpenPinch.analysis.problem_table_analysis import (
+from OpenPinch.services.common.problem_table_analysis import problem_table_algorithm
+from OpenPinch.services.common.problem_table_analysis import (
     _insert_temperature_interval_into_pt_at_constant_h,
 )
-from OpenPinch.analysis.problem_table_analysis import set_zonal_targets
-from OpenPinch.analysis.problem_table_analysis import (
+from OpenPinch.services.common.problem_table_analysis import set_zonal_targets
+from OpenPinch.services.common.problem_table_analysis import (
     get_process_heat_cascade,
     get_heat_recovery_target_from_pt,
     set_zonal_targets,
 )
-from OpenPinch.analysis.problem_table_analysis import _shift_pt_to_set_heat_recovery
-from OpenPinch.analysis.problem_table_analysis import create_problem_table_with_t_int
+from OpenPinch.services.common.problem_table_analysis import (
+    _shift_pt_to_set_heat_recovery,
+)
+from OpenPinch.services.common.problem_table_analysis import (
+    create_problem_table_with_t_int,
+)
 
 
 # Core helper function
@@ -1004,14 +1008,12 @@ def test_problem_table_algorithm_executes():
         hot_streams=z.hot_streams,
         cold_streams=z.cold_streams,
         all_streams=z.all_streams,
-        zone_config=z.config,
         is_shifted=True,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=z.hot_streams,
         cold_streams=z.cold_streams,
         all_streams=z.all_streams,
-        zone_config=z.config,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )

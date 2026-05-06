@@ -42,7 +42,6 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
-    "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
 ]
 
@@ -69,12 +68,10 @@ napoleon_use_rtype = True
 
 autodoc_mock_imports = [
     "CoolProp",
-    "numpy",
     "openpyxl",
     "pint",
     "plotly",
     "pyxlsb",
-    "scipy",
     "streamlit",
     "tespy",
 ]

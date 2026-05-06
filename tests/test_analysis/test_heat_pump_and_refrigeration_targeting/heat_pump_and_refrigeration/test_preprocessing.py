@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pump_and_refrigeration_placement import (
+from OpenPinch.services.heat_pump_integration.common import (
     preprocessing as hp_pre,
 )
 

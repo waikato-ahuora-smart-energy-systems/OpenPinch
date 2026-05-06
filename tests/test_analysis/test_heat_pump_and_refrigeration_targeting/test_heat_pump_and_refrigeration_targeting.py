@@ -3,8 +3,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.analysis import heat_pump_and_refrigeration_targeting as hp
-from OpenPinch.analysis.heat_pump_and_refrigeration_placement import shared as hp_shared
+from OpenPinch.services.heat_pump_integration import (
+    heat_pump_and_refrigeration_entry as hp,
+)
+from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection
@@ -65,8 +67,17 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
             PT.H_COLD_UT.value: np.array([0.0, 0.0]),
         },
     )
+    ambient_hot = np.array([-4.0, 1.0]) if q_amb_hot > 0.0 else np.zeros(2)
+    ambient_cold = np.array([4.0, -1.0]) if q_amb_cold > 0.0 else np.zeros(2)
     monkeypatch.setattr(
-        hp, "get_process_heat_cascade", lambda **_kwargs: _pt_with_hnet(4.0, -1.0)
+        hp,
+        "get_process_heat_cascade",
+        lambda **_kwargs: _pt_with_hnet(
+            4.0,
+            -1.0,
+            h_hot=ambient_hot,
+            h_cold=ambient_cold,
+        ),
     )
 
     res = SimpleNamespace(

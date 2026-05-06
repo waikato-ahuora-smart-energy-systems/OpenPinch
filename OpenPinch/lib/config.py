@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import List
 
-from .enums import BB_Minimiser, HPRcycle, TurbineModel, ZoneType
+from .enums import BB_Minimiser, HPRcycle, TurbineModel, ZT
 
 # TODO: This file needs a refactor once the purpose of it is well defined.
 # At present, the config includes many options corresponding to the Excel
@@ -43,7 +43,7 @@ class Configuration:
 
     ### General parameters ###
     TOP_ZONE_NAME: str = "Site"
-    TOP_ZONE_IDENTIFIER: str = ZoneType.S.value
+    TOP_ZONE_IDENTIFIER: str = ZT.S.value
     DT_CONT: float = 5
     DT_PHASE_CHANGE: float = 0.1
     HTC: float = 1.0
@@ -140,7 +140,7 @@ class Configuration:
         self,
         options: dict = None,
         top_zone_name: str = "Site",
-        top_zone_identifier: str = ZoneType.S.value,
+        top_zone_identifier: str = ZT.S.value,
     ):
         """Initialise defaults and optionally apply user-provided options."""
         self.TOP_ZONE_NAME = top_zone_name

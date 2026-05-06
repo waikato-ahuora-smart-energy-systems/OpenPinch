@@ -15,7 +15,7 @@ def dummy_zone():
 @pytest.fixture
 def dummy_tar():
     """Return dummy tar data used by this test module."""
-    return EnergyTarget("Z1")
+    return EnergyTarget(zone_name="Z1", type="DI")
 
 
 @pytest.fixture
@@ -105,15 +105,15 @@ def test_add_zone_invalid(dummy_zone: Zone):
 
 def test_get_process_zones(dummy_zone: Zone):
     dummy_zone.add_zone(Zone(name="Area1"))
-    dummy_zone.add_zone(Zone(name=TargetType.DI.value), sub=False)  # site-level
+    dummy_zone.add_zone(Zone(name=TT.DI.value), sub=False)  # site-level
     assert "Area1" in dummy_zone.subzones
-    assert TargetType.DI.value not in dummy_zone.subzones
+    assert TT.DI.value not in dummy_zone.subzones
 
 
 def test_get_site_zones(dummy_zone: Zone):
     dummy_zone.add_zone(Zone(name="Area1"))
-    dummy_zone.add_zone(Zone(name=TargetType.DI.value), sub=False)
-    assert TargetType.DI.value in dummy_zone.targets
+    dummy_zone.add_zone(Zone(name=TT.DI.value), sub=False)
+    assert TT.DI.value in dummy_zone.targets
     assert "Area1" not in dummy_zone.targets
 
 
@@ -188,7 +188,7 @@ def test_serialize_json_basic(dummy_tar):
 
     json_data = dummy_tar.serialize_json()
 
-    assert json_data["name"] == "Z1"
+    assert json_data["name"] == "Z1/DI"
     assert json_data["Qh"] == 100
     assert json_data["Qc"] == 50
     assert json_data["Qr"] == 30

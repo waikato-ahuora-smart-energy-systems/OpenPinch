@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import OpenPinch
-import OpenPinch.analysis
+import OpenPinch.services
 import OpenPinch.classes
 import OpenPinch.lib
 import OpenPinch.utils
@@ -25,10 +25,7 @@ EXPECTED_EXPORTS = {
         "VisualiseOutput",
         "ZoneTreeSchema",
         "ZoneType",
-        "extract_results",
         "get_piecewise_linearisation_for_streams",
-        "get_targets",
-        "get_visualise",
         "pinch_analysis_service",
     },
     "OpenPinch.lib": {
@@ -38,6 +35,7 @@ EXPECTED_EXPORTS = {
         "HeatUtility",
         "HeatPumpIntegrationComparison",
         "HeatPumpIntegrationScenario",
+        "HeatPumpTargetOutputs",
         "StreamCollection",
         "StreamSchema",
         "TargetInput",
@@ -73,15 +71,20 @@ EXPECTED_EXPORTS = {
         "validate_stream_data",
         "validate_utility_data",
     },
-    "OpenPinch.analysis": {
-        "compute_direct_integration_targets",
-        "compute_indirect_integration_targets",
+    "OpenPinch.services": {
+        "area_cost_targeting_service",
+        "data_preprocessing_service",
+        "direct_heat_pump_service",
+        "direct_heat_integration_service",
+        "direct_refrigeration_service",
+        "indirect_heat_integration_service",
+        "indirect_heat_pump_service",
+        "indirect_refrigeration_service",
         "get_area_targets",
         "get_capital_cost_targets",
         "get_output_graph_data",
         "get_utility_targets",
-        "prepare_problem",
-        "visualise_graphs",
+        "power_cogeneration_service",
     },
 }
 
@@ -91,7 +94,7 @@ MODULES = {
     "OpenPinch.lib": OpenPinch.lib,
     "OpenPinch.classes": OpenPinch.classes,
     "OpenPinch.utils": OpenPinch.utils,
-    "OpenPinch.analysis": OpenPinch.analysis,
+    "OpenPinch.services": OpenPinch.services,
 }
 
 

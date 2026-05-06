@@ -7,7 +7,7 @@ from pathlib import Path
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
 
-from ..lib.enums import StreamType
+from ..lib.enums import ST
 
 if TYPE_CHECKING:
     from .stream import Stream
@@ -93,11 +93,7 @@ class StreamCollection:
             include_process_streams = False
             include_utility_streams = True
 
-        opposite_type = (
-            StreamType.Cold.value
-            if target_type == StreamType.Hot.value
-            else StreamType.Hot.value
-        )
+        opposite_type = ST.Cold.value if target_type == ST.Hot.value else ST.Hot.value
         subset = StreamCollection()
         subset._sort_spec = self._sort_spec
         subset._rebuild_sort_key()
@@ -132,7 +128,7 @@ class StreamCollection:
     ):
         """Return a new collection containing only hot streams."""
         return self._build_stream_subset(
-            target_type=StreamType.Hot.value,
+            target_type=ST.Hot.value,
             include_process_streams=include_process_streams,
             include_utility_streams=include_utility_streams,
             invert_utility=invert_utility,
@@ -146,7 +142,7 @@ class StreamCollection:
     ):
         """Return a new collection containing only cold streams."""
         return self._build_stream_subset(
-            target_type=StreamType.Cold.value,
+            target_type=ST.Cold.value,
             include_process_streams=include_process_streams,
             include_utility_streams=include_utility_streams,
             invert_utility=invert_utility,

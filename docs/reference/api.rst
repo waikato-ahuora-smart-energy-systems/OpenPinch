@@ -15,8 +15,8 @@ Where To Start
   OpenPinch into another application and want a typed service boundary based on
   :class:`~OpenPinch.lib.schema.TargetInput` and
   :class:`~OpenPinch.lib.schema.TargetOutput`.
-- Use :func:`~OpenPinch.analysis.data_preparation.prepare_problem` together
-  with :func:`~OpenPinch.main.get_targets` when you need to inspect or mutate
+- Use :func:`~OpenPinch.services.data_preparation.prepare_problem` together
+  with :func:`~OpenPinch.utils.multiscale_targeting.get_targets` when you need to inspect or mutate
   the intermediate :class:`~OpenPinch.classes.zone.Zone` tree directly.
 - Use :mod:`OpenPinch.streamlit_webviewer.web_graphing` when you already have a
   solved zone hierarchy and want to embed OpenPinch plots or a Streamlit-based

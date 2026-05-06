@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Optional
 
 from ..lib.config import Configuration
-from ..lib.enums import ZoneType
+from ..lib.enums import ZT
 from .stream_collection import StreamCollection
 from .energy_target import EnergyTarget
 
@@ -25,14 +25,14 @@ class Zone:
     def __init__(
         self,
         name: str = "Zone",
-        identifier: str = ZoneType.P.value,
+        type: str = ZT.P.value,
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
     ):
         """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
         self._name = name
-        self._identifier = identifier
+        self._type = type
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
         self._active = True
@@ -60,13 +60,13 @@ class Zone:
         self._name = value
 
     @property
-    def identifier(self):
-        """Zone type identifier from :class:`ZoneType`."""
-        return self._identifier
+    def type(self):
+        """Zone type type from :class:`ZoneType`."""
+        return self._type
 
-    @identifier.setter
-    def identifier(self, value):
-        self._identifier = value
+    @type.setter
+    def type(self, value):
+        self._type = value
 
     @property
     def config(self):
@@ -236,33 +236,32 @@ class Zone:
 
     def add_target(self, target_to_add: EnergyTarget):
         """Add one target to a specific zone."""
-        self._targets[target_to_add.name] = target_to_add
+        if isinstance(target_to_add, EnergyTarget):
+            self._targets[target_to_add.type] = target_to_add
 
     def add_targets(self, targets: list):
         """Add multiple targets to a specific zone."""
         for t in targets:
             self.add_target(t)
 
-    def add_target_from_results(self, target_id: str = None, results: dict = None):
-        """Create and register an :class:`EnergyTarget` from a result mapping."""
-        target_name = f"{self.name}/{target_id}" if target_id is not None else self.name
-        res = EnergyTarget(
-            target_name, target_id, self.parent_zone, zone_config=self.config
-        )
-        for key, value in results.items():
-            setattr(res, key, value)
-        self.add_target(res)
-
-    def get_subzone(self, loc: str):
+    def get_subzone(self, loc: str) -> "Zone":
         """Resolve a slash-delimited zone path relative to this zone."""
-        loc_address = loc.split("/")
         zone = self
-        for sub in loc_address:
-            try:
-                zone = zone.subzones[sub]
-            except KeyError as exc:
-                raise ValueError(f"Subzone '{loc}' not found.") from exc
-        return zone
+        loc_address = loc.split("/", 1)
+        if loc_address[0] == zone.name:
+            loc_address.pop(0)
+            if len(loc_address) == 0:
+                return zone
+            loc_address = loc_address[-1].split("/", 1)
+        sub = loc_address[0]
+        if sub in zone.subzones.keys():
+            if len(loc_address) == 1:
+                return zone.subzones[sub]
+            else:
+                sub_loc = loc_address[-1]
+                return zone.subzones[sub].get_subzone(sub_loc)
+        else:
+            raise ValueError(f"Subzone '{loc}' not found.")
 
     def calc_utility_cost(self):
         """Calculate and cache the annual utility cost across assigned utilities."""
@@ -318,3 +317,15 @@ class Zone:
             for s in cs_src:
                 key = f"{z.name}.{s.name}"
                 cs_dst.add(s, key)
+
+
+    def get_target_zone(self, zone_name: Optional[str | list]) -> "Zone":
+        if zone_name is None:
+            return self
+        resolved = str(zone_name).strip()
+        if resolved == self.name:
+            return self
+        resolved = resolved.split("/", 1)
+        if resolved[0] == self.name:
+            resolved.pop(0)
+        return self.get_subzone(resolved)

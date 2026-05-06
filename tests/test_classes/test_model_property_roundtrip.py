@@ -112,9 +112,7 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
 
 
 def test_energy_target_and_zone_property_branches():
-    t = EnergyTarget(name="T0")
-    t.name = "T1"
-    t.identifier = "DI"
+    t = EnergyTarget(zone_name="T0", type="DI")
     t.config = Configuration()
     t.parent_zone = "parent"
     t._active = 1
@@ -183,9 +181,8 @@ def test_energy_target_and_zone_property_branches():
     assert payload_all["area"] == 1.0
     assert payload_all["exergy_sources"] == 6.0
 
-    z = Zone(name="Root")
+    z = Zone(name="Root", type="P")
     z.name = "Root2"
-    z.identifier = "P"
     z.config = Configuration()
     z.parent_zone = None
     z.active = True
@@ -215,9 +212,8 @@ def test_energy_target_and_zone_property_branches():
     assert any(name.startswith("Child") for name in z.subzones.keys())
 
     z.add_target(t)
-    z.add_targets([EnergyTarget(name="T2")])
-    z.add_target_from_results(target_id="DI", results={"hot_pinch": 100.0})
-    assert "Root2/DI" in z.targets
+    z.add_targets([EnergyTarget(zone_name="T2", type="DI")])
+    assert "DI" in z.targets
 
     assert z.get_subzone(next(iter(z.subzones.keys()))) is not None
     with pytest.raises(ValueError, match="Subzone"):
@@ -241,9 +237,23 @@ def test_energy_target_and_zone_property_branches():
     assert len(parent.cold_streams) >= 1
 
 
+def test_energy_target_requires_zone_name_and_identifier():
+    with pytest.raises(TypeError):
+        EnergyTarget()
+
+    with pytest.raises(TypeError):
+        EnergyTarget(zone_name="T")
+
+    with pytest.raises(ValueError, match="zone_name is required"):
+        EnergyTarget(zone_name="", type="DI")
+
+    with pytest.raises(ValueError, match="type is required"):
+        EnergyTarget(zone_name="T", type="")
+
+
 def test_energy_target_identifier_parent_active_and_cost_properties():
-    target = EnergyTarget(name="T", identifier="id", parent_zone="Z")
-    assert target.identifier == "id"
+    target = EnergyTarget(zone_name="T", type="id", parent_zone="Z")
+    assert target.type == "id"
     assert target.parent_zone == "Z"
 
     target._active = True
@@ -262,6 +272,6 @@ def test_energy_target_identifier_parent_active_and_cost_properties():
 
 
 def test_energy_target_capital_cost_descriptor_access():
-    target = EnergyTarget(name="T", identifier="id", parent_zone="Z")
+    target = EnergyTarget(zone_name="T", type="id", parent_zone="Z")
     EnergyTarget.capital_cost.fset(target, 321.0)
     assert EnergyTarget.capital_cost.fget(target) == 321.0

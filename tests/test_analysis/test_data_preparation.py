@@ -47,15 +47,24 @@ All edge cases aim to test both robustness and realistic behavior. Some tests in
 
 import pytest
 from pydantic import ValidationError
-from OpenPinch.analysis.data_preparation import _validate_input_data, prepare_problem
+from OpenPinch.services.input_data_processing.data_preparation import (
+    _validate_input_data,
+    prepare_problem,
+)
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.analysis.data_preparation import _validate_zone_tree_structure
-from OpenPinch.analysis.data_preparation import (
+from OpenPinch.services.input_data_processing.data_preparation import (
+    _validate_zone_tree_structure,
+)
+from OpenPinch.services.input_data_processing.data_preparation import (
     _validate_config_data_completed,
 )
-from OpenPinch.analysis.data_preparation import _get_validated_zone_info
-from OpenPinch.analysis.data_preparation import _create_nested_zones
+from OpenPinch.services.input_data_processing.data_preparation import (
+    _get_validated_zone_info,
+)
+from OpenPinch.services.input_data_processing.data_preparation import (
+    _create_nested_zones,
+)
 
 
 # ---------------- Fixtures ---------------- #
@@ -204,9 +213,9 @@ def test_zone_names_and_ordering(dummy_streams):
     zone_names = list(site.subzones.keys())
     expected_subzones = {"Z1"}
     expected_this_zone = {
-        f"{TargetType.DI.value}",
-        f"{TargetType.TS.value}",
-        f"{TargetType.TZ.value}",
+        f"{TT.DI.value}",
+        f"{TT.TS.value}",
+        f"{TT.TZ.value}",
     }
     assert expected_subzones == set(zone_names)
 
@@ -813,12 +822,12 @@ def test_flat_single_zone():
     assert len(tree.children) == 1
     process_zone = tree.children[0]
     assert process_zone.name == "Boiler"
-    assert process_zone.type == ZoneType.P.value
+    assert process_zone.type == ZT.P.value
     assert process_zone.children is not None
     assert len(process_zone.children) == 1
     operation_zone = process_zone.children[0]
     assert operation_zone.name == "O1"
-    assert operation_zone.type == ZoneType.O.value
+    assert operation_zone.type == ZT.O.value
     assert operation_zone.children is None
 
 
@@ -829,10 +838,10 @@ def test_nested_zone_with_slash():
     assert plant.name == "Plant"
     line1 = plant.children[0]
     assert line1.name == "Line1"
-    assert line1.type == ZoneType.P.value
+    assert line1.type == ZT.P.value
     assert len(line1.children) == 1
     assert line1.children[0].name == "O1"
-    assert line1.children[0].type == ZoneType.O.value
+    assert line1.children[0].type == ZT.O.value
 
 
 def test_generic_zone_tree_defaults_by_depth():
@@ -848,9 +857,9 @@ def test_generic_zone_tree_defaults_by_depth():
         ],
     )
     normalised = _validate_zone_tree_structure(zone_tree, [])
-    assert normalised.type == ZoneType.S.value
-    assert normalised.children[0].type == ZoneType.P.value
-    assert normalised.children[0].children[0].type == ZoneType.O.value
+    assert normalised.type == ZT.S.value
+    assert normalised.children[0].type == ZT.P.value
+    assert normalised.children[0].children[0].type == ZT.O.value
 
 
 def test_site_level_streams_get_individual_process_zones():
@@ -886,7 +895,7 @@ def test_site_level_streams_get_individual_process_zones():
 
     for child in normalised.children:
         if child.name in {"HotStream", "ColdStream"}:
-            assert child.type == ZoneType.P.value
+            assert child.type == ZT.P.value
             assert child.children is None
 
     assert streams[0].zone == "SiteRoot/HotStream"
@@ -970,13 +979,13 @@ def test_invalid_config_missing_op_time(dummy_config):
 @pytest.mark.parametrize(
     "zone_type_str, expected_zone_type",
     [
-        ("Zone", ZoneType.S.value),
-        ("Sub-Zone", ZoneType.P.value),
-        ("Process Zone", ZoneType.P.value),
-        ("Site", ZoneType.S.value),
-        ("Community", ZoneType.C.value),
-        ("Region", ZoneType.R.value),
-        ("Utility Zone", ZoneType.U.value),
+        ("Zone", ZT.S.value),
+        ("Sub-Zone", ZT.P.value),
+        ("Process Zone", ZT.P.value),
+        ("Site", ZT.S.value),
+        ("Community", ZT.C.value),
+        ("Region", ZT.R.value),
+        ("Utility Zone", ZT.U.value),
     ],
 )
 def test_valid_zone_types(zone_type_str, expected_zone_type):
@@ -995,8 +1004,8 @@ def test_zone_type_defaults_with_depth():
     _, grandchild_type = _get_validated_zone_info(
         ZoneTreeSchema(name="Grandchild", type="Zone"), depth=2
     )
-    assert child_type == ZoneType.P.value
-    assert grandchild_type == ZoneType.O.value
+    assert child_type == ZT.P.value
+    assert grandchild_type == ZT.O.value
 
 
 def test_unexpected_zone_type_raises():
@@ -1011,7 +1020,7 @@ def test_unexpected_zone_type_raises():
 
 def test_non_schema_input_returns_site_zone_type():
     _, actual_zone_type = _get_validated_zone_info("not_a_schema")
-    assert actual_zone_type == ZoneType.S.value
+    assert actual_zone_type == ZT.S.value
 
 
 @pytest.fixture
@@ -1021,7 +1030,7 @@ def config():
 
     class Config:
         TOP_ZONE_NAME = "MySite"
-        TOP_ZONE_IDENTIFIER = ZoneType.S.value
+        TOP_ZONE_IDENTIFIER = ZT.S.value
 
     return Config()
 
@@ -1031,12 +1040,12 @@ def make_zone_tree_schema():
     """Build zone tree schema data used by this test module."""
     return ZoneTreeSchema(
         name="MySite",
-        type=ZoneType.S.value,
+        type=ZT.S.value,
         children=[
             ZoneTreeSchema(
                 name="Area1",
-                type=ZoneType.P.value,
-                children=[ZoneTreeSchema(name="Line1", type=ZoneType.P.value)],
+                type=ZT.P.value,
+                children=[ZoneTreeSchema(name="Line1", type=ZT.P.value)],
             )
         ],
     )
@@ -1047,7 +1056,7 @@ def test_creates_nested_zones_correctly():
     zone_tree = make_zone_tree_schema()
     master_zone = Zone(
         name=zone_config.TOP_ZONE_NAME,
-        identifier=zone_config.TOP_ZONE_IDENTIFIER,
+        type=zone_config.TOP_ZONE_IDENTIFIER,
         zone_config=zone_config,
     )
 
@@ -1058,21 +1067,19 @@ def test_creates_nested_zones_correctly():
 
     area1 = result.subzones["Area1"]
     assert area1.name == "Area1"
-    assert area1.identifier == ZoneType.P.value
+    assert area1.type == ZT.P.value
     assert len(area1.subzones) == 1
 
     line1 = area1.subzones["Line1"]
     assert line1.name == "Line1"
-    assert line1.identifier == ZoneType.P.value
+    assert line1.type == ZT.P.value
     assert line1.subzones == {}
 
 
 def test_empty_zone_tree_returns_parent():
     zone_config = Configuration()
-    zone_tree = ZoneTreeSchema(name="MySite", type=ZoneType.S.value, children=None)
-    parent_zone = Zone(
-        name="MySite", identifier=ZoneType.S.value, zone_config=zone_config
-    )
+    zone_tree = ZoneTreeSchema(name="MySite", type=ZT.S.value, children=None)
+    parent_zone = Zone(name="MySite", type=ZT.S.value, zone_config=zone_config)
 
     result = _create_nested_zones(parent_zone, zone_tree, zone_config)
 

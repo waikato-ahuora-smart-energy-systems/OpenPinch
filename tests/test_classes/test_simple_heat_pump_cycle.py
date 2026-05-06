@@ -37,7 +37,7 @@ def _validate_results(
     )
     assert np.isclose(evap_streams[-1].t_target - (T_evap + dT_superheat), 0, atol=0.02)
 
-    if evap_streams[0].type == StreamType.Cold.value:
+    if evap_streams[0].type == ST.Cold.value:
         assert np.isclose(sum([s.heat_flow for s in evap_streams]) - cycle.Q_cool, 0)
     else:
         assert np.isclose(

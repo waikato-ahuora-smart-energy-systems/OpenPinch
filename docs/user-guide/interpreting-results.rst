@@ -89,13 +89,13 @@ Cycle-level values such as condenser duty, evaporator duty, or compressor power
 matter, but they are supporting context. The first decision is whether the
 integration target improves the overall thermal picture.
 
-The packaged ``04_heat_pump_workflow.ipynb`` notebook is organized around this
+The packaged ``03_carnot_hpr_comparison.ipynb`` notebook is organized around this
 comparison:
 
 1. solve the base case
-2. introduce a candidate heat-pump integration scenario
-3. compare utility targets and heat recovery
-4. compare the before-and-after grand composite curves
+2. run direct and indirect Carnot heat-pump and refrigeration targets
+3. compare utility targets, heat recovery, and HPR work across load levels
+4. compare the supporting grand-composite views
 
 For the concrete helper API and packaged sample, see :doc:`heat-pump-targeting`.
 
