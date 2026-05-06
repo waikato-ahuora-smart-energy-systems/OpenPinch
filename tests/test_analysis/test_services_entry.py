@@ -27,17 +27,15 @@ def _make_target(zone: Zone, target_type: str) -> EnergyTarget:
 
 
 @pytest.mark.parametrize(
-    ("service_name", "flag_name", "target_id", "expected_is_heat_pumping"),
+    ("service_name", "target_id", "expected_is_heat_pumping"),
     [
         (
             "direct_heat_pump_service",
-            "DO_PROCESS_HP_TARGETING",
             TT.DHP.value,
             True,
         ),
         (
             "direct_refrigeration_service",
-            "DO_PROCESS_RFRG_TARGETING",
             TT.DR.value,
             False,
         ),
@@ -46,7 +44,6 @@ def _make_target(zone: Zone, target_type: str) -> EnergyTarget:
 def test_direct_hpr_services_enable_flags_and_bootstrap_direct_integration(
     monkeypatch,
     service_name: str,
-    flag_name: str,
     target_id: str,
     expected_is_heat_pumping: bool,
 ):
@@ -76,24 +73,21 @@ def test_direct_hpr_services_enable_flags_and_bootstrap_direct_integration(
     out = getattr(svc, service_name)(zone)
 
     assert out is zone
-    assert getattr(zone.config, flag_name) is True
     assert calls["direct"] == 1
     assert TT.DI.value in zone.targets
     assert target_id in zone.targets
 
 
 @pytest.mark.parametrize(
-    ("service_name", "flag_name", "target_id", "expected_is_heat_pumping"),
+    ("service_name", "target_id", "expected_is_heat_pumping"),
     [
         (
             "indirect_heat_pump_service",
-            "DO_UTILITY_HP_TARGETING",
             TT.IHP.value,
             True,
         ),
         (
             "indirect_refrigeration_service",
-            "DO_UTILITY_RFRG_TARGETING",
             TT.IR.value,
             False,
         ),
@@ -102,7 +96,6 @@ def test_direct_hpr_services_enable_flags_and_bootstrap_direct_integration(
 def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
     monkeypatch,
     service_name: str,
-    flag_name: str,
     target_id: str,
     expected_is_heat_pumping: bool,
 ):
@@ -132,7 +125,6 @@ def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
     out = getattr(svc, service_name)(zone)
 
     assert out is zone
-    assert getattr(zone.config, flag_name) is True
     assert calls["indirect"] == 1
     assert TT.TS.value in zone.targets
     assert target_id in zone.targets
@@ -144,10 +136,10 @@ def test_indirect_service_skips_none_targets(monkeypatch):
     monkeypatch.setattr(
         svc,
         "indirect_heat_integration_service",
-        lambda target_zone: target_zone.add_target(
-            _make_target(target_zone, TT.TS.value)
-        )
-        or target_zone,
+        lambda target_zone: (
+            target_zone.add_target(_make_target(target_zone, TT.TS.value))
+            or target_zone
+        ),
     )
     monkeypatch.setattr(
         svc,
@@ -199,9 +191,6 @@ def test_cogeneration_and_area_cost_services_update_direct_integration_target(
 
     assert cogeneration_out is zone
     assert area_out is zone
-    assert zone.config.DO_TURBINE_WORK is True
-    assert zone.config.DO_TURBINE_TARGETING is True
-    assert zone.config.DO_AREA_TARGETING is True
     assert calls["direct"] == 2
     assert calls["cogen"] == 1
     assert zone.targets[TT.DI.value].work_target == 12.0

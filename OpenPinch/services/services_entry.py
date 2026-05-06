@@ -33,11 +33,10 @@ __all__ = [
 
 
 def data_preprocessing_service(
-    input_data: Any,
+    input_data: TargetInput,
     project_name: str = "Site",
 ) -> Zone:
     """Validate raw input payloads and construct the in-memory zone tree."""
-    input_data = TargetInput.model_validate(input_data)
     return prepare_problem(
         project_name=project_name,
         streams=input_data.streams,
@@ -47,13 +46,13 @@ def data_preprocessing_service(
     )
 
 
-def direct_heat_integration_service(zone: Zone) -> Zone:
+def direct_heat_integration_service(zone: Zone, args: dict = {}) -> Zone:
     """Run direct heat integration targeting for a prepared zone."""
     zone.add_target(compute_direct_integration_targets(zone))
     return zone
 
 
-def indirect_heat_integration_service(zone: Zone) -> Zone:
+def indirect_heat_integration_service(zone: Zone, args: dict = {}) -> Zone:
     """Run indirect heat integration targeting for a prepared zone."""
     zone.import_hot_and_cold_streams_from_sub_zones(
         get_net_streams=True,
@@ -65,12 +64,7 @@ def indirect_heat_integration_service(zone: Zone) -> Zone:
     return zone
 
 
-def _enable_zone_option(zone: Zone, name: str) -> None:
-    setattr(zone.config, name, True)
-
-
-def direct_heat_pump_service(zone: Zone) -> Zone:
-    _enable_zone_option(zone, "DO_PROCESS_HP_TARGETING")
+def direct_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
     if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
     zone.add_target(
@@ -82,8 +76,7 @@ def direct_heat_pump_service(zone: Zone) -> Zone:
     return zone
 
 
-def indirect_heat_pump_service(zone: Zone) -> Zone:
-    _enable_zone_option(zone, "DO_UTILITY_HP_TARGETING")
+def indirect_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
     if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
     zone.add_target(
@@ -95,8 +88,7 @@ def indirect_heat_pump_service(zone: Zone) -> Zone:
     return zone
 
 
-def direct_refrigeration_service(zone: Zone) -> Zone:
-    _enable_zone_option(zone, "DO_PROCESS_RFRG_TARGETING")
+def direct_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
     if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
     zone.add_target(
@@ -108,8 +100,7 @@ def direct_refrigeration_service(zone: Zone) -> Zone:
     return zone
 
 
-def indirect_refrigeration_service(zone: Zone) -> Zone:
-    _enable_zone_option(zone, "DO_UTILITY_RFRG_TARGETING")
+def indirect_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
     if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
     zone.add_target(
@@ -121,16 +112,29 @@ def indirect_refrigeration_service(zone: Zone) -> Zone:
     return zone
 
 
-def power_cogeneration_service(zone: Zone) -> Zone:
-    _enable_zone_option(zone, "DO_TURBINE_WORK")
-    _enable_zone_option(zone, "DO_TURBINE_TARGETING")
-    if TT.DI.value not in zone.targets:
+def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
+    target_type = [
+        TT.IHP.value,
+        TT.IR.value,
+        TT.TS.value,
+        TT.DHP.value,
+        TT.DR.value,
+        TT.DI.value,
+    ]
+    if not(isinstance(args, dict)):
+        args = {}
+    if "base_target_type" in args:
+        if args["base_target_type"] in TT:
+            target_type = [args["base_target_type"]]
+    if len(zone.targets) == 0:
         direct_heat_integration_service(zone)
-    get_power_cogeneration_above_pinch(zone.targets[TT.DI.value])
-    return zone
+    for tt in target_type:
+        if tt in zone.targets: 
+            get_power_cogeneration_above_pinch(zone.targets[tt])
+            return zone
+    raise ValueError("Load data before running pinch analysis services.")
 
 
-def area_cost_targeting_service(zone: Zone) -> Zone:
-    _enable_zone_option(zone, "DO_AREA_TARGETING")
+def area_cost_targeting_service(zone: Zone, args: dict = {}) -> Zone:
     direct_heat_integration_service(zone)
     return zone

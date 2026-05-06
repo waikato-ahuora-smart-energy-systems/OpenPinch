@@ -53,41 +53,41 @@ def data_preprocessing_service(
     )
 
 
-def direct_heat_integration_service(zone: "Zone") -> "Zone":
+def direct_heat_integration_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run direct heat integration targeting for a prepared zone."""
-    return _load_services_entry_module().direct_heat_integration_service(zone)
+    return _load_services_entry_module().direct_heat_integration_service(zone, args)
 
 
-def indirect_heat_integration_service(zone: "Zone") -> "Zone":
+def indirect_heat_integration_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run indirect heat integration targeting for an aggregated zone."""
-    return _load_services_entry_module().indirect_heat_integration_service(zone)
+    return _load_services_entry_module().indirect_heat_integration_service(zone, args)
 
 
-def direct_heat_pump_service(zone: "Zone") -> "Zone":
+def direct_heat_pump_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run direct heat-pump targeting for a prepared zone."""
-    return _load_services_entry_module().direct_heat_pump_service(zone)
+    return _load_services_entry_module().direct_heat_pump_service(zone, args)
 
 
-def indirect_heat_pump_service(zone: "Zone") -> "Zone":
+def indirect_heat_pump_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run indirect heat-pump targeting for an aggregated zone."""
-    return _load_services_entry_module().indirect_heat_pump_service(zone)
+    return _load_services_entry_module().indirect_heat_pump_service(zone, args)
 
 
-def direct_refrigeration_service(zone: "Zone") -> "Zone":
+def direct_refrigeration_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run direct refrigeration targeting for a prepared zone."""
-    return _load_services_entry_module().direct_refrigeration_service(zone)
+    return _load_services_entry_module().direct_refrigeration_service(zone, args)
 
 
-def indirect_refrigeration_service(zone: "Zone") -> "Zone":
+def indirect_refrigeration_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run indirect refrigeration targeting for an aggregated zone."""
-    return _load_services_entry_module().indirect_refrigeration_service(zone)
+    return _load_services_entry_module().indirect_refrigeration_service(zone, args)
 
 
-def power_cogeneration_service(zone: "Zone") -> "Zone":
+def power_cogeneration_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run turbine cogeneration targeting for a prepared zone."""
-    return _load_services_entry_module().power_cogeneration_service(zone)
+    return _load_services_entry_module().power_cogeneration_service(zone, args)
 
 
-def area_cost_targeting_service(zone: "Zone") -> "Zone":
+def area_cost_targeting_service(zone: "Zone", args: dict = None) -> "Zone":
     """Recompute direct integration targets with area/cost targeting enabled."""
-    return _load_services_entry_module().area_cost_targeting_service(zone)
+    return _load_services_entry_module().area_cost_targeting_service(zone, args)

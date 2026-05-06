@@ -58,8 +58,8 @@ In particular, the package root exposes:
 
 - :class:`~OpenPinch.classes.pinch_problem.PinchProblem`
 - :func:`~OpenPinch.main.pinch_analysis_service`
-- :func:`~OpenPinch.main.get_targets`
-- :func:`~OpenPinch.main.extract_results`
+- :func:`~OpenPinch.utils.multiscale_targeting.get_targets`
+- :func:`~OpenPinch.utils.multiscale_targeting.extract_results`
 - :func:`~OpenPinch.utils.stream_linearisation.get_piecewise_linearisation_for_streams`
 
 Package Entrypoints
@@ -77,10 +77,10 @@ modules.
 - :func:`~OpenPinch.main.pinch_analysis_service` validates the incoming payload,
   prepares the zone hierarchy, runs the appropriate direct and indirect
   targeting steps, and returns a structured response.
-- :func:`~OpenPinch.main.get_targets` accepts an already prepared
+- :func:`~OpenPinch.utils.multiscale_targeting.get_targets` accepts an already prepared
   :class:`~OpenPinch.classes.zone.Zone` tree and dispatches it to the correct
   zone-level targeting routine.
-- :func:`~OpenPinch.main.extract_results` converts the solved in-memory zone
+- :func:`~OpenPinch.utils.multiscale_targeting.extract_results` converts the solved in-memory zone
   hierarchy into the dictionary structure consumed by
   :class:`~OpenPinch.lib.schema.TargetOutput`.
 

@@ -337,8 +337,8 @@ class StreamSchema(BaseModel):
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
     heat_flow: ScalarOrVU
-    dt_cont: ScalarOrVU
-    htc: ScalarOrVU
+    dt_cont: Optional[ScalarOrVU] = 0.0
+    htc: Optional[ScalarOrVU] = 1.0
     active: bool = True
 
 
@@ -348,11 +348,11 @@ class UtilitySchema(BaseModel):
     name: str
     type: ST
     t_supply: ScalarOrVU
-    t_target: ScalarOrVU
+    t_target: Optional[ScalarOrVU] = None
     heat_flow: Optional[ScalarOrVU] = None
-    dt_cont: ScalarOrVU
-    htc: ScalarOrVU
-    price: ScalarOrVU
+    dt_cont: Optional[ScalarOrVU] = 0.0
+    htc: Optional[ScalarOrVU] = 1.0
+    price: Optional[ScalarOrVU] = 1.0
     active: bool = True
     model_config = ConfigDict(use_enum_values=True)
 

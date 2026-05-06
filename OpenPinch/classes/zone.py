@@ -244,16 +244,24 @@ class Zone:
         for t in targets:
             self.add_target(t)
 
-    def get_subzone(self, loc: str):
+    def get_subzone(self, loc: str) -> "Zone":
         """Resolve a slash-delimited zone path relative to this zone."""
-        loc_address = loc.split("/")
         zone = self
-        for sub in loc_address:
-            try:
-                zone = zone.subzones[sub]
-            except KeyError as exc:
-                raise ValueError(f"Subzone '{loc}' not found.") from exc
-        return zone
+        loc_address = loc.split("/", 1)
+        if loc_address[0] == zone.name:
+            loc_address.pop(0)
+            if len(loc_address) == 0:
+                return zone
+            loc_address = loc_address[-1].split("/", 1)
+        sub = loc_address[0]
+        if sub in zone.subzones.keys():
+            if len(loc_address) == 1:
+                return zone.subzones[sub]
+            else:
+                sub_loc = loc_address[-1]
+                return zone.subzones[sub].get_subzone(sub_loc)
+        else:
+            raise ValueError(f"Subzone '{loc}' not found.")
 
     def calc_utility_cost(self):
         """Calculate and cache the annual utility cost across assigned utilities."""
@@ -309,3 +317,15 @@ class Zone:
             for s in cs_src:
                 key = f"{z.name}.{s.name}"
                 cs_dst.add(s, key)
+
+
+    def get_target_zone(self, zone_name: Optional[str | list]) -> "Zone":
+        if zone_name is None:
+            return self
+        resolved = str(zone_name).strip()
+        if resolved == self.name:
+            return self
+        resolved = resolved.split("/", 1)
+        if resolved[0] == self.name:
+            resolved.pop(0)
+        return self.get_subzone(resolved)

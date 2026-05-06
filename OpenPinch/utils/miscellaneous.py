@@ -108,9 +108,11 @@ def get_value(
             )
     elif val is None and val2 is not None:
         return get_value(val2, zone_name=zone_name)
+    elif val is None:
+        return None
     else:
         raise TypeError(
-            f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
+            "Unsupported type"
         )
 
 
