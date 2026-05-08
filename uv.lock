@@ -817,9 +817,14 @@ dev = [
     { name = "black" },
     { name = "ruff" },
 ]
+notebook = [
+    { name = "ipykernel" },
+    { name = "nbformat" },
+]
 
 [package.dev-dependencies]
 dev = [
+    { name = "black" },
     { name = "build" },
     { name = "hatchling" },
     { name = "ipykernel" },
@@ -834,6 +839,8 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.9" },
     { name = "coolprop" },
+    { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=7.2.0" },
+    { name = "nbformat", marker = "extra == 'notebook'", specifier = ">=5.10.4" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -846,15 +853,17 @@ requires-dist = [
     { name = "streamlit" },
     { name = "tespy" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "notebook"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "black", specifier = ">=23.9" },
     { name = "build", specifier = ">=1.3.0" },
     { name = "hatchling", specifier = ">=1.26" },
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "nbformat", specifier = ">=5.10.4" },
     { name = "pytest", specifier = ">=9.0.3" },
+    { name = "ruff", specifier = ">=0.1.8" },
     { name = "ruff", specifier = ">=0.15.8" },
     { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },

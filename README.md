@@ -4,10 +4,16 @@ OpenPinch is an open-source toolkit for advanced Pinch Analysis and Total Site I
 
 ## Install
 
-Install the published package from PyPI:
+Install the published package from PyPI for core CLI and Python usage:
 
 ```bash
 python -m pip install openpinch
+```
+
+If you plan to run the packaged Jupyter notebooks, install the notebook extra:
+
+```bash
+python -m pip install "openpinch[notebook]"
 ```
 
 OpenPinch currently requires Python `>=3.14`.
@@ -20,6 +26,8 @@ OpenPinch ships with a notebook series for distinct outputs and workflows. Copy 
 ```bash
 openpinch notebook -o notebooks
 ```
+
+To run the packaged notebooks in Jupyter, install the notebook extra first with `python -m pip install "openpinch[notebook]"`.
 
 The packaged notebook series currently includes:
 
@@ -148,7 +156,7 @@ pytest
 
 ## Contributors
 
-Founder: Dr Tim Walmsley, University of Waikato
+Founder: Tim Walmsley, University of Waikato
 
 Stephen Burroughs, Benjamin Lincoln, Alex Geary, Harrison Whiting, Khang Tran, Roger Padullés, Jasper Walden
 

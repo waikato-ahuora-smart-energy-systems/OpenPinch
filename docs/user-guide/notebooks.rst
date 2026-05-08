@@ -7,6 +7,12 @@ working workflow rather than a blank notebook.
 Copy The Notebook Series
 ------------------------
 
+Install the notebook extra before running the packaged notebooks in Jupyter:
+
+.. code-block:: bash
+
+   python -m pip install "openpinch[notebook]"
+
 Use the CLI to copy the notebooks into your working directory:
 
 .. code-block:: bash

@@ -79,6 +79,23 @@ def test_docs_reference_the_current_three_notebook_series():
     assert "06_target_services_workflow.ipynb" not in combined
 
 
+def test_docs_explain_base_and_notebook_installs():
+    readme = _read(README)
+    getting_started = _read(GETTING_STARTED)
+    quickstart = _read(QUICKSTART)
+    notebooks = _read(NOTEBOOKS)
+
+    assert "python -m pip install openpinch" in readme
+    assert 'python -m pip install "openpinch[notebook]"' in readme
+
+    assert "python -m pip install openpinch" in getting_started
+    assert 'python -m pip install "openpinch[notebook]"' in getting_started
+
+    notebook_guides = "\n".join([readme, getting_started, quickstart, notebooks])
+    assert notebook_guides.count('python -m pip install "openpinch[notebook]"') >= 4
+    assert "Optional: Jupyter" not in getting_started
+
+
 def test_reference_docs_match_current_heat_pump_and_schema_surface():
     api_classes = _read(API_CLASSES)
     api_lib = _read(API_LIB)

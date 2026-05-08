@@ -152,6 +152,12 @@ Copy them into your working directory with:
 
    openpinch notebook -o notebooks
 
+To run these notebooks in Jupyter, install the notebook extra first:
+
+.. code-block:: bash
+
+   python -m pip install "openpinch[notebook]"
+
 The notebook series includes:
 
 - ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
