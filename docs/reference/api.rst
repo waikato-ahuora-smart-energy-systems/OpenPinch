@@ -31,8 +31,8 @@ The reference pages repeatedly refer to the same small set of core types:
   programmatic analysis.
 - :class:`~OpenPinch.classes.zone.Zone` is the in-memory hierarchy built during
   preparation and then populated with streams, utilities, targets, and graphs.
-- :class:`~OpenPinch.classes.energy_target.EnergyTarget` stores the solved
-  metrics for one direct-integration, total-zone, or total-site target.
+- :class:`~OpenPinch.lib.target_schema.BaseTargetModel` stores the solved
+  metrics for one direct-integration, total-zone, total-site, or HPR target.
 - :class:`~OpenPinch.classes.problem_table.ProblemTable` is the numerical table
   behind composite curves, pinch temperatures, and utility cascades.
 - :class:`~OpenPinch.lib.schema.TargetOutput` is the structured response

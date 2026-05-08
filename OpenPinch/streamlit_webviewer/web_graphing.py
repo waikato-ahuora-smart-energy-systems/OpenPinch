@@ -33,11 +33,11 @@ except ImportError as exc:  # pragma: no cover - optional dependency guard
 else:
     _STREAMLIT_IMPORT_ERROR = None
 
-from ..classes.energy_target import EnergyTarget
 from ..classes.problem_table import ProblemTable
 from ..classes.stream import Stream
 from ..classes.zone import Zone
 from ..lib.enums import ArrowHead, LineColour
+from ..lib.target_schema import BaseTargetModel
 from ..services.common.graph_data import get_output_graph_data
 
 __all__ = [
@@ -96,10 +96,10 @@ class StreamlitGraphSet:
         )
 
 
-def collect_targets(zone: Zone) -> Dict[str, EnergyTarget]:
+def collect_targets(zone: Zone) -> Dict[str, BaseTargetModel]:
     """Flattens all energy targets beneath ``zone`` keyed by their display name."""
 
-    def _iter(current: Zone) -> Iterator[tuple[str, EnergyTarget]]:
+    def _iter(current: Zone) -> Iterator[tuple[str, BaseTargetModel]]:
         for _, target in current.targets.items():
             yield target.name, target
         for subzone in current.subzones.values():

@@ -4,14 +4,21 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
-from OpenPinch.classes.energy_target import EnergyTarget
+from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.value import Value
 from OpenPinch.classes.zone import Zone
 from OpenPinch.classes import stream_collection as sc_mod
 from OpenPinch.lib.config import Configuration
+from OpenPinch.lib.enums import ProblemTableLabel as PT
 from OpenPinch.lib.schema import ValueWithUnit
+from OpenPinch.lib.target_schema import BaseTargetModel, DirectIntegrationTarget
+from pydantic import ValidationError
+
+
+def _dummy_problem_table():
+    return ProblemTable({PT.T.value: [0.0]})
 
 
 def test_stream_property_roundtrip_and_mutation_paths():
@@ -111,12 +118,22 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
     assert (sc == 1) is False
 
 
-def test_energy_target_and_zone_property_branches():
-    t = EnergyTarget(zone_name="T0", type="DI")
+def test_target_model_and_zone_property_branches():
+    t = DirectIntegrationTarget(
+        zone_name="T0",
+        type="DI",
+        pt=_dummy_problem_table(),
+        pt_real=_dummy_problem_table(),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
     t.config = Configuration()
     t.parent_zone = "parent"
-    t._active = 1
-    assert t.active == 1
+    t.active = True
+    assert t.active is True
 
     hot = StreamCollection()
     cold = StreamCollection()
@@ -158,7 +175,8 @@ def test_energy_target_and_zone_property_branches():
     assert t.graphs["g"] == {"x": 1}
     assert t.calc_utility_cost() == pytest.approx(14.0)
 
-    t.target_values = {"hot_pinch": 120.0, "cold_pinch": 120.0}
+    t.hot_pinch = 120.0
+    t.cold_pinch = 120.0
     assert t.hot_pinch == 120.0
     payload_same = t.serialize_json(isTotal=True)
     assert payload_same["temp_pinch"] == {"cold_temp": 120.0}
@@ -212,7 +230,21 @@ def test_energy_target_and_zone_property_branches():
     assert any(name.startswith("Child") for name in z.subzones.keys())
 
     z.add_target(t)
-    z.add_targets([EnergyTarget(zone_name="T2", type="DI")])
+    z.add_targets(
+        [
+            DirectIntegrationTarget(
+                zone_name="T2",
+                type="DI",
+                pt=_dummy_problem_table(),
+                pt_real=_dummy_problem_table(),
+                hot_utilities=StreamCollection(),
+                cold_utilities=StreamCollection(),
+                hot_utility_target=0.0,
+                cold_utility_target=0.0,
+                heat_recovery_target=0.0,
+            )
+        ]
+    )
     assert "DI" in z.targets
 
     assert z.get_subzone(next(iter(z.subzones.keys()))) is not None
@@ -237,41 +269,44 @@ def test_energy_target_and_zone_property_branches():
     assert len(parent.cold_streams) >= 1
 
 
-def test_energy_target_requires_zone_name_and_identifier():
-    with pytest.raises(TypeError):
-        EnergyTarget()
+def test_target_model_requires_zone_name_and_identifier():
+    with pytest.raises(ValidationError):
+        BaseTargetModel()
 
-    with pytest.raises(TypeError):
-        EnergyTarget(zone_name="T")
+    with pytest.raises(ValidationError):
+        BaseTargetModel(zone_name="T")
 
     with pytest.raises(ValueError, match="zone_name is required"):
-        EnergyTarget(zone_name="", type="DI")
+        BaseTargetModel(zone_name="", type="DI")
 
     with pytest.raises(ValueError, match="type is required"):
-        EnergyTarget(zone_name="T", type="")
+        BaseTargetModel(zone_name="T", type="")
 
 
-def test_energy_target_identifier_parent_active_and_cost_properties():
-    target = EnergyTarget(zone_name="T", type="id", parent_zone="Z")
+def test_target_model_identifier_parent_active_and_cost_properties():
+    target = BaseTargetModel(zone_name="T", type="id", parent_zone="Z")
     assert target.type == "id"
     assert target.parent_zone == "Z"
 
-    target._active = True
+    target.active = True
     assert target.active is True
-    target._active = Value(0.0)
-    assert target.active == 0.0
 
-    target.capital_cost = 123.0
-    assert target.capital_cost == 123.0
+    direct_target = DirectIntegrationTarget(
+        zone_name="T",
+        type="DI",
+        parent_zone="Z",
+        pt=_dummy_problem_table(),
+        pt_real=_dummy_problem_table(),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    direct_target.capital_cost = 123.0
+    assert direct_target.capital_cost == 123.0
 
-    target.utility_heat_recovery_target = 44.0
-    assert target.utility_heat_recovery_target == 44.0
-
-    target.target_values = {"hot_utility_target": 10.0}
-    assert target.target_values == {"hot_utility_target": 10.0}
-
-
-def test_energy_target_capital_cost_descriptor_access():
-    target = EnergyTarget(zone_name="T", type="id", parent_zone="Z")
-    EnergyTarget.capital_cost.fset(target, 321.0)
-    assert EnergyTarget.capital_cost.fget(target) == 321.0
+    direct_target.utility_heat_recovery_target = 44.0
+    assert direct_target.utility_heat_recovery_target == 44.0
+    direct_target.hot_utility_target = 10.0
+    assert direct_target.hot_utility_target == 10.0

@@ -13,8 +13,8 @@ Core Concepts
   community, region).
 - ``ProblemTable``: temperature-interval cascade structure used to derive pinch
   temperatures, utility targets, and composite curves.
-- ``EnergyTarget``: packaged targeting outcomes for a zone, including utility
-  demands, recovery targets, and optional economic metrics.
+- ``BaseTargetModel``: validated runtime targeting outcomes for a zone,
+  including utility demands, recovery targets, and optional economic metrics.
 - ``PinchProblem``: convenience orchestrator that loads input data, runs
   analysis, and exports results.
 

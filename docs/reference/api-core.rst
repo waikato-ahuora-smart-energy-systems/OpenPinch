@@ -126,7 +126,7 @@ The wrapper is intentionally light. Once targeting has run, the same solved
 inspection.
 
 The ``target_*`` methods are explicit advanced post-processing entrypoints. Each
-returns the affected :class:`~OpenPinch.classes.energy_target.EnergyTarget` and
+returns the affected :class:`~OpenPinch.lib.target_schema.BaseTargetModel` and
 refreshes cached :class:`~OpenPinch.lib.schema.TargetOutput` results on the
 same :class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat-pump
 and refrigeration targets also surface HPR summary fields such as

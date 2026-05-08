@@ -10,13 +10,13 @@ from typing import Dict, Tuple
 
 import numpy as np
 
-from ...classes.energy_target import EnergyTarget
 from ...classes.problem_table import ProblemTable
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import GT, PT, TT
+from ...lib.target_schema import TotalProcessTarget, TotalSiteTarget
 from ..common.problem_table_analysis import (
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
@@ -34,14 +34,8 @@ __all__ = [
 #######################################################################################################
 
 
-def compute_total_subzone_utility_targets(zone: Zone) -> EnergyTarget:
+def compute_total_subzone_utility_targets(zone: Zone) -> TotalProcessTarget:
     """Sums and records zonal targets."""
-    target = EnergyTarget(
-        zone_name=zone.name,
-        type=TT.TZ.value,
-        parent_zone=zone.parent_zone,
-        zone_config=zone.config,
-    )
     # Sum targets from subzones
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = num_units = area = capital_cost = total_cost = 0.0
@@ -74,25 +68,28 @@ def compute_total_subzone_utility_targets(zone: Zone) -> EnergyTarget:
             # capital_cost = t.capital_cost
 
     heat_recovery_limit = zone.targets[TT.DI.value].heat_recovery_limit
-    target.update(
-        {
-            "hot_utilities": hot_utilities,
-            "cold_utilities": cold_utilities,
-            "hot_utility_target": hot_utility_target,
-            "cold_utility_target": cold_utility_target,
-            "heat_recovery_target": heat_recovery_target,
-            "heat_recovery_limit": heat_recovery_limit,
-            "degree_of_int": (
-                (heat_recovery_target / heat_recovery_limit)
-                if heat_recovery_limit > 0
-                else 1.0
-            ),
-        }
-    )
-    return target
+    payload = {
+        "zone_name": zone.name,
+        "type": TT.TZ.value,
+        "parent_zone": zone.parent_zone,
+        "config": zone.config,
+        "hot_utilities": hot_utilities,
+        "cold_utilities": cold_utilities,
+        "hot_utility_target": hot_utility_target,
+        "cold_utility_target": cold_utility_target,
+        "heat_recovery_target": heat_recovery_target,
+        "heat_recovery_limit": heat_recovery_limit,
+        "degree_of_int": (
+            (heat_recovery_target / heat_recovery_limit)
+            if heat_recovery_limit > 0
+            else 1.0
+        ),
+        "utility_cost": utility_cost,
+    }
+    return TotalProcessTarget.model_validate(payload)
 
 
-def compute_indirect_integration_targets(zone: Zone) -> EnergyTarget:
+def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     """Compute indirect integration targets for an aggregated zone.
 
     The routine assumes the relevant child zones have already been solved for
@@ -100,12 +97,6 @@ def compute_indirect_integration_targets(zone: Zone) -> EnergyTarget:
     stream cascades, performs utility-to-utility balancing, and records the
     resulting total-site style target on ``zone`` before returning it.
     """
-    target = EnergyTarget(
-        zone_name=zone.name,
-        type=TT.TS.value,
-        parent_zone=zone.parent_zone,
-        zone_config=zone.config,
-    )
     # Total site profiles - process side
     pt = get_process_heat_cascade(
         hot_streams=zone.net_hot_streams,
@@ -165,28 +156,30 @@ def compute_indirect_integration_targets(zone: Zone) -> EnergyTarget:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
-    target.update(
-        {
-            "pt": pt,
-            "pt_real": pt_real,
-            "graphs": _save_graph_data(pt, pt_real),
-            "hot_pinch": hot_pinch,
-            "cold_pinch": cold_pinch,
-            "hot_utilities": hot_utilities,
-            "cold_utilities": cold_utilities,
-            "hot_utility_target": hot_utility_target,
-            "cold_utility_target": cold_utility_target,
-            "heat_recovery_target": heat_recovery_target,
-            "heat_recovery_limit": s_tzt.heat_recovery_limit,
-            "degree_of_int": (
-                (heat_recovery_target / s_tzt.heat_recovery_limit)
-                if s_tzt.heat_recovery_limit > 0
-                else 1.0
-            ),
-            "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
-        }
-    )
-    return target
+    payload = {
+        "zone_name": zone.name,
+        "type": TT.TS.value,
+        "parent_zone": zone.parent_zone,
+        "config": zone.config,
+        "pt": pt,
+        "pt_real": pt_real,
+        "graphs": _save_graph_data(pt, pt_real),
+        "hot_pinch": hot_pinch,
+        "cold_pinch": cold_pinch,
+        "hot_utilities": hot_utilities,
+        "cold_utilities": cold_utilities,
+        "hot_utility_target": hot_utility_target,
+        "cold_utility_target": cold_utility_target,
+        "heat_recovery_target": heat_recovery_target,
+        "heat_recovery_limit": s_tzt.heat_recovery_limit,
+        "degree_of_int": (
+            (heat_recovery_target / s_tzt.heat_recovery_limit)
+            if s_tzt.heat_recovery_limit > 0
+            else 1.0
+        ),
+        "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities),
+    }
+    return TotalSiteTarget.model_validate(payload)
 
 
 #######################################################################################################

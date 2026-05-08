@@ -11,12 +11,12 @@ from OpenPinch.utils.export import (
     _split_vu,
     export_target_summary_to_excel_with_units,
 )
-from OpenPinch.classes import EnergyTarget, ProblemTable, Zone
+from OpenPinch.classes import ProblemTable, Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
+from OpenPinch.lib.target_schema import DirectIntegrationTarget
 import OpenPinch.utils.export as export_mod
 import openpyxl
 from openpyxl import Workbook
-from OpenPinch.classes import EnergyTarget, Zone
 
 
 # --------------------------------------------------------------------------------------
@@ -217,14 +217,31 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
 
 def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     master_zone = Zone("Plant")
-    master_target = EnergyTarget(zone_name="Master", type="DI")
+    master_target = DirectIntegrationTarget(
+        zone_name="Master",
+        type="DI",
+        pt=_make_problem_table([10.0]),
+        pt_real=_make_problem_table([30.0]),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
     master_target.pt = _make_problem_table([10.0, 20.0])
     master_target.pt_real = _make_problem_table([30.0])
     master_zone.targets["DI"] = master_target
 
     sub_zone = Zone("Sub/Zone", parent_zone=master_zone)
     master_zone.add_zone(sub_zone, sub=True)
-    sub_target = EnergyTarget(zone_name="Alt:Target", type="DI", parent_zone=sub_zone)
+    sub_target = DirectIntegrationTarget(
+        zone_name="Alt:Target",
+        type="DI",
+        parent_zone=sub_zone,
+        pt=_make_problem_table([40.0]),
+        pt_real=_make_problem_table([50.0]),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
     sub_target.pt = _make_problem_table([40.0])
     sub_target.pt_real = _make_problem_table([50.0])
     sub_zone.targets["DI"] = sub_target
@@ -345,13 +362,20 @@ def test_autosize_columns_sets_reasonable_widths(tmp_path: Path):
 
 def test_write_problem_tables_skips_empty_dataframes(monkeypatch, tmp_path: Path):
     zone = Zone("Plant")
-    target = EnergyTarget(zone_name="Plant", type="DI")
-    target.pt = object()
-    target.pt_real = object()
+    target = DirectIntegrationTarget(
+        zone_name="Plant",
+        type="DI",
+        pt=_make_problem_table([1.0]),
+        pt_real=_make_problem_table([2.0]),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
     zone.targets["DI"] = target
 
     monkeypatch.setattr(
-        "OpenPinch.streamlit_webviewer.web_graphing.problem_table_to_dataframe",
+        export_mod,
+        "problem_table_to_dataframe",
         lambda table, round_decimals=2: pd.DataFrame(),
     )
 

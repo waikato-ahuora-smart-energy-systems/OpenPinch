@@ -1,10 +1,4 @@
-"""Direct heat-integration entry point for process and unit-level targeting.
-
-This module orchestrates the classical pinch-analysis workflow for a single
-zone: problem-table construction, utility targeting, optional heat pump and
-area-cost calculations, and packaging of outputs into ``EnergyTarget``
-instances.
-"""
+"""Direct heat-integration entry point for process and unit-level targeting."""
 
 from typing import List, Tuple
 
@@ -14,9 +8,9 @@ from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
-from ...classes.energy_target import EnergyTarget
 from ...lib.config import tol
 from ...lib.enums import GT, PT, ST, TT, ZT
+from ...lib.target_schema import DirectIntegrationTarget
 from ...utils.miscellaneous import delta_vals
 from ..common.capital_cost_and_area_targeting import (
     get_area_targets,
@@ -40,19 +34,13 @@ __all__ = ["compute_direct_integration_targets"]
 #######################################################################################################
 
 
-def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
+def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     """Populate a ``Zone`` with detailed direct heat integration pinch targets.
 
     The function aggregates problem-table calculations, multi-utility targeting,
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
-    target = EnergyTarget(
-        zone_name=zone.name,
-        type=TT.DI.value,
-        parent_zone=zone.parent_zone,
-        zone_config=zone.config,
-    )
     pt = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
@@ -133,33 +121,38 @@ def compute_direct_integration_targets(zone: Zone) -> EnergyTarget:
                 num_units=num_units,
                 zone_config=zone.config,
             )
-            target.update(
-                {
-                    "area": area,
-                    "num_units": num_units,
-                    "capital_cost": capital_cost,
-                    "total_cost": annual_capital_cost,
-                }
-            )
+            area_payload = {
+                "area": area,
+                "num_units": num_units,
+                "capital_cost": capital_cost,
+                "total_cost": annual_capital_cost,
+            }
+        else:
+            area_payload = {}
+    else:
+        area_payload = {}
 
-    target.update(
+    payload = (
         set_zonal_targets(
             pt=pt,
             pt_real=pt_real,
         )
         | {
+            "zone_name": zone.name,
+            "type": TT.DI.value,
+            "parent_zone": zone.parent_zone,
+            "config": zone.config,
             "pt": pt,
             "pt_real": pt_real,
             "graphs": _save_graph_data(pt, pt_real),
             "hot_utilities": zone.hot_utilities,
             "cold_utilities": zone.cold_utilities,
-            "net_hot_streams": zone.net_hot_streams,
-            "net_cold_streams": zone.net_cold_streams,
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
         }
+        | area_payload
     )
-    return target
+    return DirectIntegrationTarget.model_validate(payload)
 
 
 #######################################################################################################

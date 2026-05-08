@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Optional
 
 from ..lib.config import Configuration
 from ..lib.enums import ZT
+from ..lib.target_schema import BaseTargetModel
 from .stream_collection import StreamCollection
-from .energy_target import EnergyTarget
 
 if TYPE_CHECKING:
     from .stream import Stream
@@ -234,9 +234,9 @@ class Zone:
         else:
             loc[base_name] = zone_to_add
 
-    def add_target(self, target_to_add: EnergyTarget):
+    def add_target(self, target_to_add: BaseTargetModel):
         """Add one target to a specific zone."""
-        if isinstance(target_to_add, EnergyTarget):
+        if isinstance(target_to_add, BaseTargetModel):
             self._targets[target_to_add.type] = target_to_add
 
     def add_targets(self, targets: list):

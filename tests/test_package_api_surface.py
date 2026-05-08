@@ -29,6 +29,8 @@ EXPECTED_EXPORTS = {
         "pinch_analysis_service",
     },
     "OpenPinch.lib": {
+        "BaseTargetModel",
+        "DirectIntegrationTarget",
         "Configuration",
         "Graph",
         "GraphSet",
@@ -50,7 +52,6 @@ EXPECTED_EXPORTS = {
     },
     "OpenPinch.classes": {
         "CascadeVapourCompressionCycle",
-        "EnergyTarget",
         "MultiStageSteamTurbine",
         "ParallelVapourCompressionCycles",
         "PinchProblem",

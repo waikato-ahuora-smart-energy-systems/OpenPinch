@@ -17,7 +17,7 @@ How These Objects Fit Together
   subzones into a hierarchical model of the process, site, or wider system.
 - :class:`~OpenPinch.classes.problem_table.ProblemTable` stores the numerical
   temperature-interval cascade that drives pinch and utility calculations.
-- :class:`~OpenPinch.classes.energy_target.EnergyTarget` stores one solved set
+- :class:`~OpenPinch.lib.target_schema.BaseTargetModel` stores one solved set
   of metrics for a zone and is later serialised into the public output schema.
 - :class:`~OpenPinch.classes.value.Value` wraps scalar and discrete-state
   quantities with units for report-friendly serialisation.
@@ -43,9 +43,6 @@ These classes represent the solved hierarchy and its numerical results.
    :members:
 
 .. automodule:: OpenPinch.classes.problem_table
-   :members:
-
-.. automodule:: OpenPinch.classes.energy_target
    :members:
 
 Units and Scalar Helpers

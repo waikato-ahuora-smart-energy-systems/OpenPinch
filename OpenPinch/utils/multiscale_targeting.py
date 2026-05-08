@@ -4,9 +4,8 @@
 from typing import Callable, List
 
 from ..lib.enums import ZT
+from ..lib.target_schema import BaseTargetModel
 from ..classes.zone import Zone
-from ..classes.energy_target import EnergyTarget
-from ..classes.energy_target import EnergyTarget
 from ..classes.stream import Stream
 from ..classes.stream_collection import StreamCollection
 from ..services.common.graph_data import get_output_graph_data
@@ -169,7 +168,7 @@ def _get_report(zone: Zone) -> dict:
     targets: List[dict] = []
 
     for t in zone.targets.values():
-        t: EnergyTarget
+        t: BaseTargetModel
         targets.append(t.serialize_json())
 
     if len(zone.subzones) > 0:

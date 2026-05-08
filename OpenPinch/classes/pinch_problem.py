@@ -34,6 +34,7 @@ from ..lib.schema import (
     TargetInput,
     TargetOutput,
 )
+from ..lib.target_schema import BaseTargetModel
 from ..utils.csv_to_json import get_problem_from_csv
 from ..utils.export import build_summary_dataframe
 from ..utils.export import export_target_summary_to_excel_with_units
@@ -45,16 +46,11 @@ from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
 )
 from .zone import Zone
-from .energy_target import EnergyTarget
 from ..services.services_entry import data_preprocessing_service
 from ..utils.multiscale_targeting import (
     get_targets, 
     extract_results,
 )
-
-
-if TYPE_CHECKING:
-    from .energy_target import EnergyTarget
     
 
 JsonDict = Dict[str, Any]
@@ -295,7 +291,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Run direct heat-pump targeting on the selected solved zone."""
         return self._execute_zone_service(
             direct_heat_integration_service,
@@ -310,7 +306,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Run direct heat-pump targeting on the selected solved zone."""
         return self._execute_zone_service(
             indirect_heat_integration_service,
@@ -325,7 +321,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Run direct heat-pump targeting on the selected solved zone."""
         return self._execute_zone_service(
             direct_heat_pump_service,
@@ -340,7 +336,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Run indirect heat-pump targeting on the selected solved zone."""
         return self._execute_zone_service(
             indirect_heat_pump_service,
@@ -355,7 +351,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Run direct refrigeration targeting on the selected solved zone."""
         return self._execute_zone_service(
             direct_refrigeration_service,
@@ -370,7 +366,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Run indirect refrigeration targeting on the selected solved zone."""
         return self._execute_zone_service(
             indirect_refrigeration_service,
@@ -385,7 +381,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Run cogeneration targeting on the selected solved zone."""
         target_id = TT.DI.value
         if options and "base_target_type" in options:
@@ -403,7 +399,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         """Recompute direct targets with area and cost targeting enabled."""
         return self._execute_zone_service(
             area_cost_targeting_service,
@@ -868,7 +864,7 @@ class PinchProblem:
         target_id: str,
         zone_name: Optional[str],
         options: Optional[dict[str, Any]],
-    ) -> "EnergyTarget":
+    ) -> BaseTargetModel:
         if self._master_zone is None:
             self.target()
 

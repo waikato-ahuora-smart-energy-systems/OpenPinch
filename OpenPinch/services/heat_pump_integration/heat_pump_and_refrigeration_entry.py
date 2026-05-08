@@ -7,10 +7,15 @@ from copy import deepcopy
 
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
-from ...classes.energy_target import EnergyTarget
 from ...lib.config import Configuration, tol
 from ...lib.enums import GT, HPRcycle, PT, TT
 from ...lib.schema import HeatPumpTargetOutputs
+from ...lib.target_schema import (
+    DirectHeatPumpTarget,
+    DirectRefrigerationTarget,
+    IndirectHeatPumpTarget,
+    IndirectRefrigerationTarget,
+)
 from ...utils.miscellaneous import get_value
 from .cycles.brayton import (
     optimise_brayton_heat_pump_placement,
@@ -52,15 +57,9 @@ __all__ = [
 def compute_direct_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
-) -> EnergyTarget:
+) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.DI.value].pt)
-    target = EnergyTarget(
-        zone_name=zone.name,
-        type=TT.DHP.value if is_heat_pumping else TT.DR.value,
-        parent_zone=zone.parent_zone,
-        zone_config=zone.config,
-    )
     target_load = _validate_hpr_required(
         pt,
         is_heat_pumping=is_heat_pumping,
@@ -85,32 +84,28 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
     )
-    target.update(
-        {
-            "pt": pt,
-            "graphs": _get_hpr_graphs(
-                pt=pt,
-                is_direct=True,
-                is_heat_pumping=is_heat_pumping,
-            ),
-        }
-        | _get_hpr_target_summary(res, zone)
-    )
-    return target
+    payload = {
+        "zone_name": zone.name,
+        "type": TT.DHP.value if is_heat_pumping else TT.DR.value,
+        "parent_zone": zone.parent_zone,
+        "config": zone.config,
+        "pt": pt,
+        "graphs": _get_hpr_graphs(
+            pt=pt,
+            is_direct=True,
+            is_heat_pumping=is_heat_pumping,
+        ),
+    } | _get_hpr_target_summary(res, zone)
+    model_cls = DirectHeatPumpTarget if is_heat_pumping else DirectRefrigerationTarget
+    return model_cls.model_validate(payload)
 
 
 def compute_indirect_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
-) -> EnergyTarget:
+) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.TS.value].pt)
-    target = EnergyTarget(
-        zone_name=zone.name,
-        type=TT.IHP.value if is_heat_pumping else TT.IR.value,
-        parent_zone=zone.parent_zone,
-        zone_config=zone.config,
-    )
     # Create problem table based on inverted utility streams
     pt_ut_gen = get_process_heat_cascade(
         hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
@@ -143,18 +138,20 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
     )
-    target.update(
-        {
-            "pt": pt,
-            "graphs": _get_hpr_graphs(
-                pt=pt,
-                is_direct=False,
-                is_heat_pumping=is_heat_pumping,
-            ),
-        }
-        | _get_hpr_target_summary(res, zone)
-    )
-    return target
+    payload = {
+        "zone_name": zone.name,
+        "type": TT.IHP.value if is_heat_pumping else TT.IR.value,
+        "parent_zone": zone.parent_zone,
+        "config": zone.config,
+        "pt": pt,
+        "graphs": _get_hpr_graphs(
+            pt=pt,
+            is_direct=False,
+            is_heat_pumping=is_heat_pumping,
+        ),
+    } | _get_hpr_target_summary(res, zone)
+    model_cls = IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
+    return model_cls.model_validate(payload)
 
 
 #######################################################################################################
