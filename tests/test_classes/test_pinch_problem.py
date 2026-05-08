@@ -356,7 +356,7 @@ def test_run_is_alias_for_target(monkeypatch):
     monkeypatch.setattr(PinchProblem, "validate", lambda self: {"validated": True})
     monkeypatch.setattr(PinchProblem, "target", lambda self: {"ok": True})
     obj = PinchProblem()
-    assert obj.run() == {"ok": True}
+    assert obj.target() == {"ok": True}
 
 
 def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
@@ -428,7 +428,7 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     )()
     results = type("Results", (), {"targets": [target]})()
 
-    monkeypatch.setattr(PinchProblem, "run", lambda self: results)
+    monkeypatch.setattr(PinchProblem, "target", lambda self: results)
     monkeypatch.setattr(
         sys.modules[PinchProblem.__module__],
         "build_summary_dataframe",
@@ -463,7 +463,7 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
             }
         },
     )()
-    monkeypatch.setattr(PinchProblem, "run", lambda self: obj._results)
+    monkeypatch.setattr(PinchProblem, "target", lambda self: obj._results)
     assert obj.graph_data() == {"Plant": {"graphs": []}}
 
     obj._results = type("Results", (), {"graphs": None})()

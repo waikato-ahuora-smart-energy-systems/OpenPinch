@@ -19,8 +19,10 @@ from ..services.common.graph_data import get_output_graph_data
 from ..services import (
     data_preprocessing_service,
     area_cost_targeting_service,
+    direct_heat_integration_service,
     direct_heat_pump_service,
     direct_refrigeration_service,
+    indirect_heat_integration_service,
     indirect_heat_pump_service,
     indirect_refrigeration_service,
     power_cogeneration_service,
@@ -138,9 +140,6 @@ class PinchProblem:
         results_dir:
             Destination directory for exported Excel summaries. May be ``None`` if export
             is handled later.
-        run:
-            When ``True``, execute targeting immediately after construction and
-            export results if ``results_dir`` is provided.
         """
         self._input_source_kind = "unknown"
         self._validation_context = None
@@ -291,6 +290,36 @@ class PinchProblem:
         return self._results
 
 
+    def target_direct_heat_integration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Run direct heat-pump targeting on the selected solved zone."""
+        return self._execute_zone_service(
+            direct_heat_integration_service,
+            target_id=TT.DI.value,
+            zone_name=zone_name,
+            options=options,
+        )
+    
+
+    def target_indirect_heat_integration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> "EnergyTarget":
+        """Run direct heat-pump targeting on the selected solved zone."""
+        return self._execute_zone_service(
+            indirect_heat_integration_service,
+            target_id=TT.TS.value,
+            zone_name=zone_name,
+            options=options,
+        )
+
+
     def target_direct_heat_pump(
         self,
         *,
@@ -384,12 +413,6 @@ class PinchProblem:
         )
 
 
-    def run(self) -> TargetOutput:
-        """Run the targeting workflow and return the cached result."""
-        self.validate()
-        return self.target()
-
-
     def validate(self) -> TargetInput:
         """Validate the currently loaded problem data without running targeting."""
         if self._problem_data is None:
@@ -414,7 +437,7 @@ class PinchProblem:
 
     def summary_frame(self, *, detailed: bool = False) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
-        results = self.run()
+        results = self.target()
         if detailed:
             return build_summary_dataframe(results.targets)
 
@@ -443,7 +466,7 @@ class PinchProblem:
 
     def graph_data(self) -> GraphPayload:
         """Return the serialized graph payload for the solved problem."""
-        self.run()
+        self.target()
 
         graphs = getattr(self._results, "graphs", None)
         if graphs:
