@@ -205,7 +205,7 @@ def test_get_value_none_raises_type_error():
     assert get_value(None) == None
     assert get_value({"value": None}) == None
     assert get_value({"zone-a": None}, zone_name="zone-a") == None
-        
+
 
 @pytest.mark.parametrize(
     ("payload", "zone_name", "val2", "error_type", "match"),

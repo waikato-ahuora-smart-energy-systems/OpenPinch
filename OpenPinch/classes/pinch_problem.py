@@ -48,10 +48,10 @@ from ..streamlit_webviewer.web_graphing import (
 from .zone import Zone
 from ..services.services_entry import data_preprocessing_service
 from ..utils.multiscale_targeting import (
-    get_targets, 
+    get_targets,
     extract_results,
 )
-    
+
 
 JsonDict = Dict[str, Any]
 PathLike = Union[str, Path]
@@ -82,6 +82,7 @@ _GRAPH_TYPE_ALIASES = {
     "sugcc": GT.SUGCC.value,
     "site utility grand composite curve": GT.SUGCC.value,
 }
+
 
 @dataclass
 class HeatPumpIntegrationEvaluation:
@@ -125,7 +126,7 @@ class PinchProblem:
         self,
         problem_filepath: Optional[PathLike] = None,
         results_dir: Optional[PathLike] = None,
-        project_name: Optional[str] = "Untitled",        
+        project_name: Optional[str] = "Untitled",
     ) -> None:
         """Initialise the orchestrator and optionally run the full targeting workflow.
 
@@ -148,7 +149,6 @@ class PinchProblem:
 
         self.results_dir = Path(results_dir) if results_dir is not None else None
         self._results = None
-
 
     # ----------------------------------------------------------------------------
     # Public API
@@ -210,7 +210,9 @@ class PinchProblem:
                     with src_path.open("r", encoding="utf-8") as f:
                         self._problem_data = json.load(f)
                 except Exception as e:
-                    raise ValueError(f"Failed to parse JSON from {src_path}: {e}") from e
+                    raise ValueError(
+                        f"Failed to parse JSON from {src_path}: {e}"
+                    ) from e
                 if isinstance(self._problem_data, dict) and isinstance(
                     self._problem_data.get("streams"), list
                 ):
@@ -268,7 +270,6 @@ class PinchProblem:
         self._master_zone = self._data_preprocessing()
         return self._master_zone
 
-
     def target(self) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
         if self._master_zone is None:
@@ -276,7 +277,7 @@ class PinchProblem:
                 raise RuntimeError("No input loaded. Call load(...) first.")
             else:
                 self.load(self._problem_data)
-        
+
         # Perform advanced targeting analysis on the master zone and all subzones
         master_zone = get_targets(self._master_zone)
         # Extract the core results from the master zone
@@ -284,7 +285,6 @@ class PinchProblem:
         # Validate response data
         self._results = TargetOutput.model_validate(return_data)
         return self._results
-
 
     def target_direct_heat_integration(
         self,
@@ -299,7 +299,6 @@ class PinchProblem:
             zone_name=zone_name,
             options=options,
         )
-    
 
     def target_indirect_heat_integration(
         self,
@@ -315,7 +314,6 @@ class PinchProblem:
             options=options,
         )
 
-
     def target_direct_heat_pump(
         self,
         *,
@@ -329,7 +327,6 @@ class PinchProblem:
             zone_name=zone_name,
             options=options,
         )
-
 
     def target_indirect_heat_pump(
         self,
@@ -345,7 +342,6 @@ class PinchProblem:
             options=options,
         )
 
-
     def target_direct_refrigeration(
         self,
         *,
@@ -360,7 +356,6 @@ class PinchProblem:
             options=options,
         )
 
-
     def target_indirect_refrigeration(
         self,
         *,
@@ -374,7 +369,6 @@ class PinchProblem:
             zone_name=zone_name,
             options=options,
         )
-
 
     def target_cogeneration(
         self,
@@ -393,7 +387,6 @@ class PinchProblem:
             options=options,
         )
 
-
     def target_area_cost(
         self,
         *,
@@ -407,7 +400,6 @@ class PinchProblem:
             zone_name=zone_name,
             options=options,
         )
-
 
     def validate(self) -> TargetInput:
         """Validate the currently loaded problem data without running targeting."""
@@ -429,7 +421,6 @@ class PinchProblem:
             context=self._validation_context or {},
         )
         return input_data
-
 
     def summary_frame(self, *, detailed: bool = False) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
@@ -459,7 +450,6 @@ class PinchProblem:
             )
         return pd.DataFrame(rows)
 
-
     def graph_data(self) -> GraphPayload:
         """Return the serialized graph payload for the solved problem."""
         self.target()
@@ -476,7 +466,6 @@ class PinchProblem:
 
         return get_output_graph_data(self._master_zone)
 
-
     def graph_catalog(self) -> pd.DataFrame:
         """Return a table describing the available graph outputs."""
         rows = []
@@ -492,7 +481,6 @@ class PinchProblem:
                 )
         return pd.DataFrame(rows)
 
-
     def plot(
         self,
         *,
@@ -507,7 +495,6 @@ class PinchProblem:
             index=index,
         )
         return _build_plotly_graph(graph)
-
 
     def plot_composite_curve(
         self,
@@ -527,16 +514,15 @@ class PinchProblem:
             )
         return self.plot(zone_name=zone_name, graph_type=selector)
 
-
     def plot_grand_composite_curve(self, *, zone_name: Optional[str] = None):
         """Build the grand composite curve Plotly figure for the selected zone."""
         return self.plot(zone_name=zone_name, graph_type=GT.GCC.value)
 
-
-    def plot_grand_composite_curve_with_heat_pump(self, *, zone_name: Optional[str] = None):
+    def plot_grand_composite_curve_with_heat_pump(
+        self, *, zone_name: Optional[str] = None
+    ):
         """Build the heat pump load profile curve Plotly figure for the selected zone."""
         return self.plot(zone_name=zone_name, graph_type=GT.GCC_HP.value)
-    
 
     def export_graphs(
         self,
@@ -559,7 +545,6 @@ class PinchProblem:
             written_paths.append(destination)
         return written_paths
 
-
     def export_to_Excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Export the solved target summary and problem tables to an Excel file."""
         if results_dir is not None:
@@ -581,11 +566,9 @@ class PinchProblem:
 
         return Path(output_path)
 
-
     def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Alias for :meth:`export_to_Excel` with a conventional snake_case name."""
         return self.export_to_Excel(results_dir)
-
 
     def compare_to(
         self,
@@ -628,7 +611,6 @@ class PinchProblem:
         comparison.loc["Change", "Target"] = str(base_row["Target"])
         return comparison
 
-
     def build_heat_pump_integration_problem(
         self,
         scenario: HeatPumpIntegrationScenario | dict[str, Any],
@@ -651,7 +633,6 @@ class PinchProblem:
         integrated_problem = PinchProblem.from_json(scenario_data)
         integrated_problem._project_name = f"{self._project_name}_with_hp"
         return validated_scenario, integrated_problem
-
 
     def evaluate_heat_pump_integration(
         self,
@@ -708,15 +689,15 @@ class PinchProblem:
             integrated_problem=integrated_problem,
         )
 
-
     def _data_preprocessing(self) -> "Zone":
-        if isinstance(self._validated_data, TargetInput) and isinstance(self._project_name, str):
+        if isinstance(self._validated_data, TargetInput) and isinstance(
+            self._project_name, str
+        ):
             return data_preprocessing_service(
                 input_data=self._validated_data,
                 project_name=self._project_name,
             )
         raise ValueError("No validated data load. Try ``load(source)``.")
-
 
     @property
     def problem_filepath(self) -> Optional[Path]:
@@ -742,7 +723,7 @@ class PinchProblem:
     def project_name(self) -> str:
         """Return the analysed Zone hierarchy after a successful ``target()`` run."""
         return self._project_name
-    
+
     @project_name.setter
     def project_name(self, value: str):
         self._project_name = value
@@ -752,7 +733,6 @@ class PinchProblem:
     # ----------------------------------------------------------------------------
     # Convenience helpers
     # ----------------------------------------------------------------------------
-
 
     @classmethod
     def from_json(cls, data: JsonDict) -> "PinchProblem":
@@ -778,7 +758,6 @@ class PinchProblem:
         )
         return obj
 
-
     def to_problem_json(self) -> JsonDict:
         """Return the currently loaded problem payload in its canonical mapping form."""
         if self._problem_data is None:
@@ -786,7 +765,6 @@ class PinchProblem:
                 "No problem_data available. Did you call load(...) or from_json(...)?"
             )
         return self._problem_data
-
 
     def __repr__(self) -> str:
         """Machine-readable summary capturing source, export target, and result cache state."""
@@ -799,11 +777,9 @@ class PinchProblem:
         has_results = "yes" if self._results is not None else "no"
         return f"PinchProblem(source={src}, export={tgt}, results={has_results})"
 
-
     # ----------------------------------------------------------------------------
     # Visualisation helpers
     # ----------------------------------------------------------------------------
-
 
     def render_streamlit_dashboard(
         self,
@@ -839,7 +815,6 @@ class PinchProblem:
             value_rounding=value_rounding,
         )
 
-
     def show_dashboard(
         self,
         *,
@@ -855,7 +830,6 @@ class PinchProblem:
             page_title=page_title,
             value_rounding=value_rounding,
         )
-
 
     def _execute_zone_service(
         self,
@@ -879,7 +853,6 @@ class PinchProblem:
                 f"Service {service.__name__!r} did not produce target {target_id!r}."
             ) from exc
 
-
     def _resolve_target_zone(self, zone_name: Optional[str]) -> "Zone":
         if self._master_zone is None:
             raise RuntimeError("No analysed zone is available. Run target() first.")
@@ -887,18 +860,15 @@ class PinchProblem:
             return self._master_zone
         return self._master_zone.get_subzone(zone_name)
 
-
     def _refresh_results_from_master_zone(self) -> TargetOutput:
         if self._master_zone is None:
             raise RuntimeError("No analysed zone is available. Run target() first.")
         self._results = TargetOutput.model_validate(extract_results(self._master_zone))
         return self._results
 
-
     # ----------------------------------------------------------------------------
     # Internal graph helpers
     # ----------------------------------------------------------------------------
-
 
     def _select_graph(
         self,
@@ -916,7 +886,6 @@ class PinchProblem:
             raise IndexError(
                 f"Graph index {index} is out of range for the selected graphs."
             ) from exc
-
 
     def _select_graphs(
         self,
@@ -1205,7 +1174,7 @@ def _validate_problem_semantics(
                     "streams",
                     index,
                     context,
-                    f"field '{"heat_flow"}' - value must be non-negative.",
+                    f"field '{'heat_flow'}' - value must be non-negative.",
                 )
             )
 
@@ -1216,7 +1185,7 @@ def _validate_problem_semantics(
                     "streams",
                     index,
                     context,
-                    f"Warning: field '{"dt_cont"}' - value should be non-negative.",
+                    f"Warning: field '{'dt_cont'}' - value should be non-negative.",
                 )
             )
 
@@ -1227,7 +1196,7 @@ def _validate_problem_semantics(
                     "streams",
                     index,
                     context,
-                    f"field '{"htc"}' - value must be non-negative.",
+                    f"field '{'htc'}' - value must be non-negative.",
                 )
             )
 
@@ -1283,7 +1252,7 @@ def _validate_problem_semantics(
                     "utilities",
                     index,
                     context,
-                    f"field '{"htc"}' - value must be non-negative.",
+                    f"field '{'htc'}' - value must be non-negative.",
                 )
             )
 
@@ -1292,13 +1261,13 @@ def _validate_problem_semantics(
             "Input validation failed with "
             f"{len(fatal_issues)} issue(s):\n" + "\n".join(fatal_issues)
         )
-    
+
     if warnings_issues:
         warnings.warn(
             "Input validation failed with "
             f"{len(fatal_issues)} issue(s):\n" + "\n".join(fatal_issues),
             UserWarning,
-        )    
+        )
 
 
 def _format_semantic_issue(

@@ -318,7 +318,6 @@ class Zone:
                 key = f"{z.name}.{s.name}"
                 cs_dst.add(s, key)
 
-
     def get_target_zone(self, zone_name: Optional[str | list]) -> "Zone":
         if zone_name is None:
             return self

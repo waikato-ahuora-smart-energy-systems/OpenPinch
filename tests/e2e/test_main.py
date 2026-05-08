@@ -191,4 +191,3 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
                         )
                         < 1e-3
                     )
-

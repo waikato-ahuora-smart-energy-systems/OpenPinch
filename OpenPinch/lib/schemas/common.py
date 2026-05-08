@@ -7,6 +7,7 @@ from typing import Optional, Union
 import numpy as np
 from pydantic import BaseModel, Field
 
+
 class ValueWithUnit(BaseModel):
     """Container storing a magnitude and its associated unit string."""
 

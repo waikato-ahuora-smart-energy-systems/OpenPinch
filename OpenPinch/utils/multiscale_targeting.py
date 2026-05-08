@@ -1,5 +1,4 @@
-"""
-"""
+""" """
 
 from typing import Callable, List
 
@@ -21,9 +20,9 @@ __all__ = [
 
 
 def get_targets(
-    zone: Zone, 
-    direct_service_func: Callable = direct_heat_integration_service, 
-    indirect_service_func: Callable = indirect_heat_integration_service, 
+    zone: Zone,
+    direct_service_func: Callable = direct_heat_integration_service,
+    indirect_service_func: Callable = indirect_heat_integration_service,
 ):
     """Dispatch a prepared zone tree to the appropriate targeting routine.
 
@@ -57,9 +56,9 @@ def extract_results(zone: Zone) -> dict:
 
 
 def _get_unit_operation_targets(
-    zone: Zone, 
-    direct_service_func: Callable = direct_heat_integration_service, 
-    indirect_service_func: Callable = indirect_heat_integration_service, 
+    zone: Zone,
+    direct_service_func: Callable = direct_heat_integration_service,
+    indirect_service_func: Callable = indirect_heat_integration_service,
 ):
     """Populate a ``Zone`` with detailed unit operation-level pinch targets."""
     if zone.config.DO_DIRECT_OPERATION_TARGETING:
@@ -80,9 +79,9 @@ def _get_unit_operation_targets(
 
 
 def _get_process_targets(
-    zone: Zone, 
-    direct_service_func: Callable = direct_heat_integration_service, 
-    indirect_service_func: Callable = indirect_heat_integration_service, 
+    zone: Zone,
+    direct_service_func: Callable = direct_heat_integration_service,
+    indirect_service_func: Callable = indirect_heat_integration_service,
 ):
     """Populate a ``Zone`` with detailed process-level pinch targets."""
 
@@ -107,9 +106,9 @@ def _get_process_targets(
 
 
 def _get_site_targets(
-    zone: Zone, 
-    direct_service_func: Callable = direct_heat_integration_service, 
-    indirect_service_func: Callable = indirect_heat_integration_service, 
+    zone: Zone,
+    direct_service_func: Callable = direct_heat_integration_service,
+    indirect_service_func: Callable = indirect_heat_integration_service,
 ):
     """Targets heat integration using Total Site Anlysis,
     by systematically analysing individual zones and then performing
@@ -140,9 +139,9 @@ def _get_site_targets(
 
 
 def _get_community_targets(
-    zone: Zone, 
-    direct_service_func: Callable = direct_heat_integration_service, 
-    indirect_service_func: Callable = indirect_heat_integration_service, 
+    zone: Zone,
+    direct_service_func: Callable = direct_heat_integration_service,
+    indirect_service_func: Callable = indirect_heat_integration_service,
 ):
     """Targets a Community Zone."""
     z: Zone
@@ -152,9 +151,9 @@ def _get_community_targets(
 
 
 def _get_regional_targets(
-    zone: Zone, 
-    direct_service_func: Callable = direct_heat_integration_service, 
-    indirect_service_func: Callable = indirect_heat_integration_service, 
+    zone: Zone,
+    direct_service_func: Callable = direct_heat_integration_service,
+    indirect_service_func: Callable = indirect_heat_integration_service,
 ):
     """Targets a Regional Zone."""
     z: Zone

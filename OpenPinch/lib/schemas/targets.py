@@ -49,7 +49,10 @@ def _build_temp_pinch(
 
 
 def _build_heat_utilities(utilities: StreamCollection) -> list[HeatUtility]:
-    return [HeatUtility(name=utility.name, heat_flow=utility.heat_flow) for utility in utilities]
+    return [
+        HeatUtility(name=utility.name, heat_flow=utility.heat_flow)
+        for utility in utilities
+    ]
 
 
 def _row_type(isTotal: bool) -> str:

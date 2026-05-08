@@ -189,7 +189,7 @@ def test_target_model_and_zone_property_branches():
     t.hot_pinch = 135.0
     t.cold_pinch = None
     payload_hot = t.serialize_json(isTotal=False)
-    assert payload_hot["temp_pinch"]["hot_temp"] ==  135.0
+    assert payload_hot["temp_pinch"]["hot_temp"] == 135.0
 
     t.config.DO_TURBINE_WORK = True
     t.config.DO_AREA_TARGETING = True

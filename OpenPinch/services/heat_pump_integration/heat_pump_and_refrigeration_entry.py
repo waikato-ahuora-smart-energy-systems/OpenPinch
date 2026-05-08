@@ -150,7 +150,9 @@ def compute_indirect_heat_pump_or_refrigeration_target(
             is_heat_pumping=is_heat_pumping,
         ),
     } | _get_hpr_target_summary(res, zone)
-    model_cls = IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
+    model_cls = (
+        IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
+    )
     return model_cls.model_validate(payload)
 
 
@@ -251,14 +253,10 @@ def _get_hpr_graphs(
 
     if is_direct:
         return {
-            GT.GCC_HP.value: pt[
-                [PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]
-            ]
+            GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]]
         }
 
-    return {
-        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]
-    }
+    return {GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]}
 
 
 def _calc_hpr_cascade(
@@ -268,15 +266,19 @@ def _calc_hpr_cascade(
     is_heat_pumping: bool = True,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
-    T_ls = create_problem_table_with_t_int(
-        streams=(
-            res.hpr_hot_streams
-            + res.hpr_cold_streams
-            + res.amb_streams.get_hot_streams()
-            + res.amb_streams.get_cold_streams()
-        ),
-        is_shifted=is_T_vals_shifted,
-    ).col[PT.T.value].tolist()
+    T_ls = (
+        create_problem_table_with_t_int(
+            streams=(
+                res.hpr_hot_streams
+                + res.hpr_cold_streams
+                + res.amb_streams.get_hot_streams()
+                + res.amb_streams.get_cold_streams()
+            ),
+            is_shifted=is_T_vals_shifted,
+        )
+        .col[PT.T.value]
+        .tolist()
+    )
     pt.insert_temperature_interval(T_ls)
 
     # Ambient air addition to the process stream set

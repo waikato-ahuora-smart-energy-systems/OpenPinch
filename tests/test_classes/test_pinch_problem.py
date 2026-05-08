@@ -21,7 +21,14 @@ def sample_problem():
     return {
         "options": {"dt_min": 10},
         "streams": [
-            {"zone": "Z1", "name": "H1", "t_supply": 150, "t_target": 60, "heat_flow": 2.0, "dtcont": 1}
+            {
+                "zone": "Z1",
+                "name": "H1",
+                "t_supply": 150,
+                "t_target": 60,
+                "heat_flow": 2.0,
+                "dtcont": 1,
+            }
         ],
         "utilities": [{"name": "LP Steam", "t_supply": 150, "type": "Hot", "cost": 20}],
     }
@@ -728,8 +735,8 @@ def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
 
 #     master_zone = problem.master_zone
 #     assert id(master_zone) == id(problem.master_zone)
-    
-    
+
+
 #     zone = problem.master_zone.get_subzone("Vacuum")
 #     zone.config.MAX_HP_MULTISTART = 1
 #     zone.config.HPR_TYPE = HPRcycle.MultiTempCarnot.value

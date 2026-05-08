@@ -111,9 +111,7 @@ def get_value(
     elif val is None:
         return None
     else:
-        raise TypeError(
-            "Unsupported type"
-        )
+        raise TypeError("Unsupported type")
 
 
 def _is_value_with_unit(val: Any) -> bool:
