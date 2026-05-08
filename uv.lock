@@ -813,10 +813,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-dev = [
-    { name = "black" },
-    { name = "ruff" },
-]
 notebook = [
     { name = "ipykernel" },
     { name = "nbformat" },
@@ -837,7 +833,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "black", marker = "extra == 'dev'", specifier = ">=23.9" },
     { name = "coolprop" },
     { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=7.2.0" },
     { name = "nbformat", marker = "extra == 'notebook'", specifier = ">=5.10.4" },
@@ -848,12 +843,11 @@ requires-dist = [
     { name = "plotly" },
     { name = "pydantic" },
     { name = "pyxlsb" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.8" },
     { name = "scipy" },
     { name = "streamlit" },
     { name = "tespy" },
 ]
-provides-extras = ["dev", "notebook"]
+provides-extras = ["notebook"]
 
 [package.metadata.requires-dev]
 dev = [
