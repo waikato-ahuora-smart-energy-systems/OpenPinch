@@ -1,4 +1,4 @@
-"""Schemas used by heat-pump and refrigeration solvers."""
+"""Schemas used by heat pump and refrigeration solvers."""
 
 from __future__ import annotations
 

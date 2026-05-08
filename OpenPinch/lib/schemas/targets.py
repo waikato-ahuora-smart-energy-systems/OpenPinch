@@ -251,11 +251,11 @@ class HeatPumpTargetBase(GraphBackedTarget):
 
 
 class DirectHeatPumpTarget(HeatPumpTargetBase):
-    """Direct heat-pump targeting result."""
+    """Direct heat pump targeting result."""
 
 
 class IndirectHeatPumpTarget(HeatPumpTargetBase):
-    """Indirect heat-pump targeting result."""
+    """Indirect heat pump targeting result."""
 
 
 class DirectRefrigerationTarget(HeatPumpTargetBase):

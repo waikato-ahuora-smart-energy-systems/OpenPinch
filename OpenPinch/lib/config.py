@@ -35,7 +35,7 @@ class Configuration:
     """Runtime configuration defaults used throughout OpenPinch.
 
     The attributes on this class combine global numerical settings, workbook-
-    compatible feature flags, and advanced-analysis parameters such as heat-pump
+    compatible feature flags, and advanced-analysis parameters such as heat pump
     or costing options. A ``Configuration`` instance is attached to each
     :class:`~OpenPinch.classes.zone.Zone` so workflows can vary behaviour by
     hierarchy level if needed.

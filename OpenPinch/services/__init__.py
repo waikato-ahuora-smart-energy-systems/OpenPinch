@@ -64,12 +64,12 @@ def indirect_heat_integration_service(zone: "Zone", args: dict = None) -> "Zone"
 
 
 def direct_heat_pump_service(zone: "Zone", args: dict = None) -> "Zone":
-    """Run direct heat-pump targeting for a prepared zone."""
+    """Run direct heat pump targeting for a prepared zone."""
     return _load_services_entry_module().direct_heat_pump_service(zone, args)
 
 
 def indirect_heat_pump_service(zone: "Zone", args: dict = None) -> "Zone":
-    """Run indirect heat-pump targeting for an aggregated zone."""
+    """Run indirect heat pump targeting for an aggregated zone."""
     return _load_services_entry_module().indirect_heat_pump_service(zone, args)
 
 

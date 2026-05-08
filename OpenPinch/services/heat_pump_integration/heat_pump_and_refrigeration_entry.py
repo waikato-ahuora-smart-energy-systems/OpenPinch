@@ -1,4 +1,4 @@
-"""Public entrypoint for heat-pump and refrigeration targeting."""
+"""Public entrypoint for heat pump and refrigeration targeting."""
 
 from ast import literal_eval
 

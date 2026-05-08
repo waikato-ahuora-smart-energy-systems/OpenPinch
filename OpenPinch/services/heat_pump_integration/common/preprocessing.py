@@ -1,4 +1,4 @@
-"""Preprocessing helpers for heat-pump and refrigeration targeting."""
+"""Preprocessing helpers for heat pump and refrigeration targeting."""
 
 from typing import Tuple
 

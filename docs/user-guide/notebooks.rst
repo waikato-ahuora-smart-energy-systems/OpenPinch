@@ -52,7 +52,7 @@ to show users how to read the outputs:
 
 - summary metrics such as hot utility, cold utility, heat recovery, and pinch temperatures
 - graph outputs such as composite curves, shifted curves, grand composite curves, total-site profiles, and the site utility grand composite curve
-- workflow-specific decisions such as whether a ``dt_cont`` assumption is too aggressive, whether total-site targeting changes the answer, and whether a heat-pump or refrigeration target is displacing the right utilities
+- workflow-specific decisions such as whether a ``dt_cont`` assumption is too aggressive, whether total-site targeting changes the answer, and whether a heat pump or refrigeration target is displacing the right utilities
 
 For a consolidated written guide, see :doc:`interpreting-results`.
 For the dedicated helper-backed workflow, see :doc:`heat-pump-targeting`.

@@ -1,4 +1,4 @@
-"""Cycle-specific heat-pump optimisation models."""
+"""Cycle-specific heat pump optimisation models."""
 
 from . import (
     brayton,

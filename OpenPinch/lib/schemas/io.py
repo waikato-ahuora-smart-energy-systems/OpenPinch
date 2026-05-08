@@ -67,7 +67,7 @@ class TargetOutput(BaseModel):
 
 
 class HeatPumpIntegrationScenario(BaseModel):
-    """User-facing definition of a candidate integrated heat-pump scenario."""
+    """User-facing definition of a candidate integrated heat pump scenario."""
 
     zone: str = "Plant"
     condenser_temperature: float

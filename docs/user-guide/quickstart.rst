@@ -72,7 +72,7 @@ You can also export HTML graph files for later review:
    print(written)
 
 The grand composite curve is usually the first graph to inspect when you are
-deciding between utility levels or considering heat-pump integration.
+deciding between utility levels or considering heat pump integration.
 
 Step 5. Export Results
 ----------------------
@@ -158,10 +158,10 @@ The notebook series includes:
 - ``02_total_site_targets_and_sugcc.ipynb``
 - ``03_carnot_hpr_comparison.ipynb``
 
-Advanced Heat-Pump Workflow
+Advanced Heat Pump Workflow
 ---------------------------
 
-For a dedicated integrated heat-pump workflow, use the packaged helper and
+For a dedicated integrated heat pump workflow, use the packaged helper and
 sample case:
 
 .. code-block:: python
@@ -200,6 +200,6 @@ Next Steps
 
 - Use :doc:`../reference/api-core` for the supported API surface.
 - Use :doc:`interpreting-results` for output-reading guidance.
-- Use :doc:`heat-pump-targeting` for the dedicated heat-pump workflow.
+- Use :doc:`heat-pump-targeting` for the dedicated heat pump workflow.
 - Use ``openpinch run`` and ``openpinch graph`` for CLI-driven workflows.
 - Use the notebook series as the main learning path for distinct outputs.

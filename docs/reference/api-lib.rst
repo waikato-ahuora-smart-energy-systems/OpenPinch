@@ -31,7 +31,21 @@ you need stable identifiers instead of free-form strings.
 Pydantic Schemas
 ----------------
 
-The schema layer is the primary programmatic interface to OpenPinch.
+The schema layer is the primary programmatic interface to OpenPinch. It is now
+split by concern under :mod:`OpenPinch.lib.schemas` rather than concentrated in
+one large module.
+
+The main schema modules are:
+
+- :mod:`OpenPinch.lib.schemas.common` for shared primitives such as
+  ``ValueWithUnit``
+- :mod:`OpenPinch.lib.schemas.graphs` for graph payload contracts
+- :mod:`OpenPinch.lib.schemas.io` for public request and response payloads
+- :mod:`OpenPinch.lib.schemas.reporting` for summary and report-facing models
+- :mod:`OpenPinch.lib.schemas.hpr` for lower-level heat pump solver payloads
+- :mod:`OpenPinch.lib.schemas.targets` for runtime target models stored on
+  solved zones
+- :mod:`OpenPinch.lib.schemas.turbine` for turbine solve result models
 
 Common request models include:
 
@@ -49,11 +63,11 @@ Common response and reporting models include:
 - :class:`~OpenPinch.lib.schemas.graphs.Segment`
 - :class:`~OpenPinch.lib.schemas.graphs.DataPoint`
 
-Heat-pump integration helper models include:
+Heat pump integration helper models include:
 
 - :class:`~OpenPinch.lib.schemas.hpr.HeatPumpTargetOutputs`
 
-Specialised helper models also capture lower-level heat-pump optimisation
+Specialised helper models also capture lower-level heat pump optimisation
 inputs/outputs, piecewise stream linearisation requests, and legacy
 visualisation payloads.
 

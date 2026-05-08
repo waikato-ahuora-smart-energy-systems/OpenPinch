@@ -64,7 +64,7 @@ class TargetResults(BaseModel):
 
 
 class HeatPumpIntegrationComparison(BaseModel):
-    """Compact before/after comparison for a heat-pump integration scenario."""
+    """Compact before/after comparison for a heat pump integration scenario."""
 
     target: str
     base_case_name: str

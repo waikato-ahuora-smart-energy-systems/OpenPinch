@@ -292,7 +292,7 @@ class PinchProblem:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
     ) -> BaseTargetModel:
-        """Run direct heat-pump targeting on the selected solved zone."""
+        """Run direct heat integration targeting on the selected solved zone."""
         return self._execute_zone_service(
             direct_heat_integration_service,
             target_id=TT.DI.value,
@@ -307,7 +307,7 @@ class PinchProblem:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
     ) -> BaseTargetModel:
-        """Run direct heat-pump targeting on the selected solved zone."""
+        """Run indirect heat integration targeting on the selected solved zone."""
         return self._execute_zone_service(
             indirect_heat_integration_service,
             target_id=TT.TS.value,
@@ -322,7 +322,7 @@ class PinchProblem:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
     ) -> BaseTargetModel:
-        """Run direct heat-pump targeting on the selected solved zone."""
+        """Run direct heat pump targeting on the selected solved zone."""
         return self._execute_zone_service(
             direct_heat_pump_service,
             target_id=TT.DHP.value,
@@ -337,7 +337,7 @@ class PinchProblem:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
     ) -> BaseTargetModel:
-        """Run indirect heat-pump targeting on the selected solved zone."""
+        """Run indirect heat pump targeting on the selected solved zone."""
         return self._execute_zone_service(
             indirect_heat_pump_service,
             target_id=TT.IHP.value,
@@ -633,7 +633,7 @@ class PinchProblem:
         self,
         scenario: HeatPumpIntegrationScenario | dict[str, Any],
     ) -> tuple[HeatPumpIntegrationScenario, "PinchProblem"]:
-        """Build a new :class:`PinchProblem` with an integrated heat-pump scenario."""
+        """Build a new :class:`PinchProblem` with an integrated heat pump scenario."""
         if self._problem_data is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
 
@@ -659,9 +659,9 @@ class PinchProblem:
         *,
         target_name: Optional[str] = None,
         base_label: str = "Base case",
-        scenario_label: str = "Integrated heat-pump scenario",
+        scenario_label: str = "Integrated heat pump scenario",
     ) -> HeatPumpIntegrationEvaluation:
-        """Solve and compare a candidate integrated heat-pump scenario."""
+        """Solve and compare a candidate integrated heat pump scenario."""
         validated_scenario, integrated_problem = (
             self.build_heat_pump_integration_problem(scenario)
         )

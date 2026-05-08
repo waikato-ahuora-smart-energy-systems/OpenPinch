@@ -128,7 +128,7 @@ inspection.
 The ``target_*`` methods are explicit advanced post-processing entrypoints. Each
 returns the affected :class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` and
 refreshes cached :class:`~OpenPinch.lib.schemas.io.TargetOutput` results on the
-same :class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat-pump
+same :class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat pump
 and refrigeration targets also surface HPR summary fields such as
 ``hpr_cycle``, ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``,
 and ``StreamCollection`` payloads on ``hpr_hot_streams`` and

@@ -59,7 +59,7 @@ state-weighted scenario data.
 Thermal Cycle Classes
 ---------------------
 
-These classes support the advanced heat-pump, refrigeration, and utility-system
+These classes support the advanced heat pump, refrigeration, and utility-system
 workflows documented in
 :mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`. They are
 primarily useful for advanced users who want to inspect or construct detailed

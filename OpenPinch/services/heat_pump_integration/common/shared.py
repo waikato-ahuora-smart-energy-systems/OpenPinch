@@ -1,4 +1,4 @@
-"""Shared helpers for heat-pump and refrigeration targeting."""
+"""Shared helpers for heat pump and refrigeration targeting."""
 
 from typing import Callable, Tuple
 

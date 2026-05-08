@@ -42,11 +42,11 @@ These modules own the top-level targeting workflows once a zone tree has been
 constructed.
 
 - Direct integration works on process streams within a zone and applies problem
-  table analysis, utility targeting, optional heat-pump targeting, and optional
+  table analysis, utility targeting, optional heat pump targeting, and optional
   cost/exergy add-ons.
 - Indirect integration aggregates the net thermal behaviour of solved subzones
   and applies utility-to-utility balancing for total-site style studies.
-- Lower-level heat-pump and refrigeration screening for both routes is
+- Lower-level heat pump and refrigeration screening for both routes is
   centralised in
   :mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`.
 
@@ -123,4 +123,3 @@ Current public helpers include:
 
 .. automodule:: OpenPinch.services.power_cogeneration_analysis
    :members:
-

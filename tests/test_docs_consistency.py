@@ -65,7 +65,7 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
         ]
     )
     assert "Interpreting Results" in combined
-    assert "heat-pump integration" in combined
+    assert "heat pump integration" in combined
     assert "heat_pump_targeting.json" in combined
     assert "03_carnot_hpr_comparison.ipynb" in combined
 
