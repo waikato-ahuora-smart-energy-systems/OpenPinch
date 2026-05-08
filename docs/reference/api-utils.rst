@@ -25,7 +25,7 @@ Export and Reporting
 --------------------
 
 Use the export helpers when you want the solved
-:class:`~OpenPinch.lib.schema.TargetOutput` and
+:class:`~OpenPinch.lib.schemas.io.TargetOutput` and
 :class:`~OpenPinch.classes.zone.Zone` hierarchy written back to an Excel
 workbook for review or archiving.
 

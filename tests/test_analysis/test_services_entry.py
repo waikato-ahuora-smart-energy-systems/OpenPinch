@@ -8,7 +8,11 @@ from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import ProblemTableLabel as PT, TT, ZT
-from OpenPinch.lib.target_schema import BaseTargetModel, DirectIntegrationTarget, TotalSiteTarget
+from OpenPinch.lib.schemas.targets import (
+    BaseTargetModel,
+    DirectIntegrationTarget,
+    TotalSiteTarget,
+)
 from OpenPinch.services import services_entry as svc
 
 

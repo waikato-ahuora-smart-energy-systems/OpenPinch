@@ -12,8 +12,8 @@ from OpenPinch.classes.zone import Zone
 from OpenPinch.classes import stream_collection as sc_mod
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import ProblemTableLabel as PT
-from OpenPinch.lib.schema import ValueWithUnit
-from OpenPinch.lib.target_schema import BaseTargetModel, DirectIntegrationTarget
+from OpenPinch.lib.schemas.common import ValueWithUnit
+from OpenPinch.lib.schemas.targets import BaseTargetModel, DirectIntegrationTarget
 from pydantic import ValidationError
 
 
@@ -179,17 +179,17 @@ def test_target_model_and_zone_property_branches():
     t.cold_pinch = 120.0
     assert t.hot_pinch == 120.0
     payload_same = t.serialize_json(isTotal=True)
-    assert payload_same["temp_pinch"] == {"cold_temp": 120.0}
+    assert payload_same["temp_pinch"]["cold_temp"] == 120.0
 
     t.hot_pinch = None
     t.cold_pinch = 95.0
     payload_cold = t.serialize_json(isTotal=False)
-    assert payload_cold["temp_pinch"] == {"cold_temp": 95.0}
+    assert payload_cold["temp_pinch"]["cold_temp"] == 95.0
 
     t.hot_pinch = 135.0
     t.cold_pinch = None
     payload_hot = t.serialize_json(isTotal=False)
-    assert payload_hot["temp_pinch"] == {"hot_temp": 135.0}
+    assert payload_hot["temp_pinch"]["hot_temp"] ==  135.0
 
     t.config.DO_TURBINE_WORK = True
     t.config.DO_AREA_TARGETING = True

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional
 
 from ..lib.config import Configuration
 from ..lib.enums import ZT
-from ..lib.target_schema import BaseTargetModel
+from ..lib.schemas.targets import BaseTargetModel
 from .stream_collection import StreamCollection
 
 if TYPE_CHECKING:

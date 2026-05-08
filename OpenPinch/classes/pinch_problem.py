@@ -28,13 +28,13 @@ from ..services import (
     power_cogeneration_service,
 )
 from ..lib.enums import GT, TT, ZT
-from ..lib.schema import (
-    HeatPumpIntegrationComparison,
+from ..lib.schemas.io import (
     HeatPumpIntegrationScenario,
     TargetInput,
     TargetOutput,
 )
-from ..lib.target_schema import BaseTargetModel
+from ..lib.schemas.reporting import HeatPumpIntegrationComparison
+from ..lib.schemas.targets import BaseTargetModel
 from ..utils.csv_to_json import get_problem_from_csv
 from ..utils.export import build_summary_dataframe
 from ..utils.export import export_target_summary_to_excel_with_units

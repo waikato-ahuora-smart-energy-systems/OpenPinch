@@ -37,7 +37,7 @@ from ..classes.problem_table import ProblemTable
 from ..classes.stream import Stream
 from ..classes.zone import Zone
 from ..lib.enums import ArrowHead, LineColour
-from ..lib.target_schema import BaseTargetModel
+from ..lib.schemas.targets import BaseTargetModel
 from ..services.common.graph_data import get_output_graph_data
 
 __all__ = [

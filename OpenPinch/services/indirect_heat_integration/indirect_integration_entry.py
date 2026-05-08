@@ -16,7 +16,7 @@ from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import GT, PT, TT
-from ...lib.target_schema import TotalProcessTarget, TotalSiteTarget
+from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
 from ..common.problem_table_analysis import (
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,

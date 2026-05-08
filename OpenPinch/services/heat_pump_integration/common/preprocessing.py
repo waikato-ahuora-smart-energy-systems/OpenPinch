@@ -7,7 +7,7 @@ import numpy as np
 from ....classes.problem_table import ProblemTable
 from ....lib.config import Configuration
 from ....lib.enums import PT
-from ....lib.schema import HeatPumpTargetInputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs
 from ....utils.miscellaneous import clean_composite_curve, linear_interpolation
 
 from .shared import create_stream_collection_of_background_profile

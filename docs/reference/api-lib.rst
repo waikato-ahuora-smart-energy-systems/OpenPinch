@@ -35,27 +35,27 @@ The schema layer is the primary programmatic interface to OpenPinch.
 
 Common request models include:
 
-- :class:`~OpenPinch.lib.schema.TargetInput`
-- :class:`~OpenPinch.lib.schema.StreamSchema`
-- :class:`~OpenPinch.lib.schema.UtilitySchema`
-- :class:`~OpenPinch.lib.schema.ZoneTreeSchema`
+- :class:`~OpenPinch.lib.schemas.io.TargetInput`
+- :class:`~OpenPinch.lib.schemas.io.StreamSchema`
+- :class:`~OpenPinch.lib.schemas.io.UtilitySchema`
+- :class:`~OpenPinch.lib.schemas.io.ZoneTreeSchema`
 
 Common response and reporting models include:
 
-- :class:`~OpenPinch.lib.schema.TargetOutput`
-- :class:`~OpenPinch.lib.schema.TargetResults`
-- :class:`~OpenPinch.lib.schema.GraphSet`
-- :class:`~OpenPinch.lib.schema.Graph`
-- :class:`~OpenPinch.lib.schema.Segment`
-- :class:`~OpenPinch.lib.schema.DataPoint`
+- :class:`~OpenPinch.lib.schemas.io.TargetOutput`
+- :class:`~OpenPinch.lib.schemas.reporting.TargetResults`
+- :class:`~OpenPinch.lib.schemas.graphs.GraphSet`
+- :class:`~OpenPinch.lib.schemas.graphs.Graph`
+- :class:`~OpenPinch.lib.schemas.graphs.Segment`
+- :class:`~OpenPinch.lib.schemas.graphs.DataPoint`
 
 Heat-pump integration helper models include:
 
-- :class:`~OpenPinch.lib.schema.HeatPumpTargetOutputs`
+- :class:`~OpenPinch.lib.schemas.hpr.HeatPumpTargetOutputs`
 
 Specialised helper models also capture lower-level heat-pump optimisation
 inputs/outputs, piecewise stream linearisation requests, and legacy
 visualisation payloads.
 
-.. automodule:: OpenPinch.lib.schema
+.. automodule:: OpenPinch.lib.schemas
    :members:

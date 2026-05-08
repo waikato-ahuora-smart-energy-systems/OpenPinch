@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from ....classes.stream_collection import StreamCollection
 from ....classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ....lib.enums import PT
-from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.shared import (

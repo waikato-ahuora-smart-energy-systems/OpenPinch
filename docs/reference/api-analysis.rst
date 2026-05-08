@@ -70,7 +70,7 @@ workflows depend on.
   other grand-composite-curve variants used for interpretation and advanced
   targeting.
 - :mod:`OpenPinch.services.common.graph_data` translates tables and targets into the
-  graph structures emitted in :class:`~OpenPinch.lib.schema.TargetOutput`.
+  graph structures emitted in :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 
 .. automodule:: OpenPinch.services.common.problem_table_analysis
    :members:
@@ -123,5 +123,4 @@ Current public helpers include:
 
 .. automodule:: OpenPinch.services.power_cogeneration_analysis
    :members:
-
 

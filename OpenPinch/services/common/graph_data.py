@@ -7,7 +7,7 @@ from typing import Iterable, List, Optional, Tuple
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...lib.enums import ArrowHead, GT, LegendSeries, LineColour, PT, StreamLoc
-from ...lib.target_schema import BaseTargetModel
+from ...lib.schemas.targets import BaseTargetModel
 from ...utils.miscellaneous import clean_composite_curve
 from ...lib.config import tol
 

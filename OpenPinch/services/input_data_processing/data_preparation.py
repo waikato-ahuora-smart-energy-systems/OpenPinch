@@ -15,7 +15,7 @@ from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import Configuration
 from ...lib.enums import StreamLoc, ST, ZT
-from ...lib.schema import StreamSchema, UtilitySchema, ZoneTreeSchema
+from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ...utils.miscellaneous import get_value
 
 __all__ = ["prepare_problem"]
@@ -38,10 +38,10 @@ def prepare_problem(
     Parameters
     ----------
     streams:
-        Iterable of validated :class:`OpenPinch.lib.schema.StreamSchema` objects describing
+        Iterable of validated :class:`OpenPinch.lib.schemas.io.StreamSchema` objects describing
         the process streams to analyse.
     utilities:
-        Iterable of :class:`OpenPinch.lib.schema.UtilitySchema` describing candidate hot
+        Iterable of :class:`OpenPinch.lib.schemas.io.UtilitySchema` describing candidate hot
         and cold utilities.
     options:
         Optional :class:`OpenPinch.lib.config.Configuration` overrides.  When omitted the
@@ -49,7 +49,7 @@ def prepare_problem(
     project_name:
         Human-friendly label applied to the root zone when no explicit zone tree is supplied.
     zone_tree:
-        Optional :class:`OpenPinch.lib.schema.ZoneTreeSchema` describing the desired zone
+        Optional :class:`OpenPinch.lib.schemas.io.ZoneTreeSchema` describing the desired zone
         hierarchy (i.e., Zone A encompasses Zones B and C).
 
     Returns

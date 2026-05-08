@@ -4,7 +4,7 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.target_schema import DirectIntegrationTarget
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 

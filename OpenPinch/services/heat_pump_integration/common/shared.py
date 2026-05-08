@@ -10,7 +10,7 @@ from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
 from ....lib.config import tol
 from ....lib.enums import PT
-from ....lib.schema import HeatPumpTargetInputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs
 from ....utils.blackbox_minimisers import multiminima
 from ....utils.miscellaneous import (
     clean_composite_curve_ends,

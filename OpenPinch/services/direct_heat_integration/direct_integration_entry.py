@@ -10,7 +10,7 @@ from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import GT, PT, ST, TT, ZT
-from ...lib.target_schema import DirectIntegrationTarget
+from ...lib.schemas.targets import DirectIntegrationTarget
 from ...utils.miscellaneous import delta_vals
 from ..common.capital_cost_and_area_targeting import (
     get_area_targets,

@@ -13,8 +13,8 @@ Where To Start
   run the analysis, and export results.
 - Use :func:`~OpenPinch.main.pinch_analysis_service` when you are integrating
   OpenPinch into another application and want a typed service boundary based on
-  :class:`~OpenPinch.lib.schema.TargetInput` and
-  :class:`~OpenPinch.lib.schema.TargetOutput`.
+  :class:`~OpenPinch.lib.schemas.io.TargetInput` and
+  :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 - Use :func:`~OpenPinch.services.data_preparation.prepare_problem` together
   with :func:`~OpenPinch.utils.multiscale_targeting.get_targets` when you need to inspect or mutate
   the intermediate :class:`~OpenPinch.classes.zone.Zone` tree directly.
@@ -27,15 +27,15 @@ Common Data Contracts
 
 The reference pages repeatedly refer to the same small set of core types:
 
-- :class:`~OpenPinch.lib.schema.TargetInput` is the validated request model for
+- :class:`~OpenPinch.lib.schemas.io.TargetInput` is the validated request model for
   programmatic analysis.
 - :class:`~OpenPinch.classes.zone.Zone` is the in-memory hierarchy built during
   preparation and then populated with streams, utilities, targets, and graphs.
-- :class:`~OpenPinch.lib.target_schema.BaseTargetModel` stores the solved
+- :class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` stores the solved
   metrics for one direct-integration, total-zone, total-site, or HPR target.
 - :class:`~OpenPinch.classes.problem_table.ProblemTable` is the numerical table
   behind composite curves, pinch temperatures, and utility cascades.
-- :class:`~OpenPinch.lib.schema.TargetOutput` is the structured response
+- :class:`~OpenPinch.lib.schemas.io.TargetOutput` is the structured response
   returned by the high-level service layer.
 
 Reference Map

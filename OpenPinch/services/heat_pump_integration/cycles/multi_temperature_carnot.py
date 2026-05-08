@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.encoding import map_x_arr_to_T_arr, map_x_to_Q_amb

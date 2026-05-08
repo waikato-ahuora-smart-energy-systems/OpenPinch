@@ -4,7 +4,7 @@ from typing import Tuple
 
 import numpy as np
 
-from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.encoding import map_x_arr_to_T_arr

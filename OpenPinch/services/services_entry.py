@@ -3,7 +3,7 @@
 from typing import Any
 
 from ..classes.zone import Zone
-from ..lib.schema import TargetInput
+from ..lib.schemas.io import TargetInput
 from ..lib.enums import TT
 from .direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,

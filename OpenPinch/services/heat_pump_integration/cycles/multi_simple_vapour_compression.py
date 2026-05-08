@@ -6,7 +6,7 @@ from ....classes.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
 from ....lib.enums import PT
-from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 
 from ..common.encoding import (

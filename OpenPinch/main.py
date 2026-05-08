@@ -9,7 +9,7 @@ in larger workflows.
 from typing import Any
 
 from .classes.pinch_problem import PinchProblem
-from .lib.schema import TargetInput, TargetOutput
+from .lib.schemas.io import TargetInput, TargetOutput
 
 
 __all__ = ["pinch_analysis_service"]
@@ -29,13 +29,13 @@ def pinch_analysis_service(
     Parameters
     ----------
     data:
-        Raw request payload matching :class:`OpenPinch.lib.schema.TargetInput`.
+        Raw request payload matching :class:`OpenPinch.lib.schemas.io.TargetInput`.
         Dictionaries, Pydantic models, and dataclass-like objects are accepted.
     project_name:
         Optional label used in generated graphs and result files.
     is_return_full_results:
         When ``True``, return both the validated
-        :class:`~OpenPinch.lib.schema.TargetOutput` and the solved
+        :class:`~OpenPinch.lib.schemas.io.TargetOutput` and the solved
         :class:`~OpenPinch.classes.zone.Zone` hierarchy.
 
     Returns
@@ -49,4 +49,3 @@ def pinch_analysis_service(
     problem.load(input_data)
     problem.target()
     return TargetOutput.model_validate(problem.results)
-

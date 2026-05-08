@@ -8,5 +8,4 @@ inputs programmatically.
 
 from .config import *
 from .enums import *
-from .schema import *
-from .target_schema import *
+from .schemas import *

@@ -8,7 +8,7 @@ import numpy as np
 
 from ..lib.config import tol
 from ..lib.enums import TurbineModel
-from ..lib.schema import TurbineSolveResult, TurbineStageResult
+from ..lib.schemas.turbine import TurbineSolveResult, TurbineStageResult
 from ..utils.water_properties import Tsat_p, h_ps, h_pT, hL_p, hV_p, psat_T, s_ph
 
 __all__ = ["MultiStageSteamTurbine"]

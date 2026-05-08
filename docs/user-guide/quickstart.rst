@@ -103,7 +103,7 @@ service layer:
 
    from OpenPinch import pinch_analysis_service
    from OpenPinch.lib.enums import StreamType
-   from OpenPinch.lib.schema import StreamSchema, TargetInput, UtilitySchema
+   from OpenPinch.lib.schemas.io import StreamSchema, TargetInput, UtilitySchema
 
    streams = [
        StreamSchema(

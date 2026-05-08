@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from ..lib.config import tol
 
 if TYPE_CHECKING:
-    from ..lib.schema import ValueWithUnit
+    from ..lib.schemas.common import ValueWithUnit
 
 __all__ = [
     "clean_composite_curve",

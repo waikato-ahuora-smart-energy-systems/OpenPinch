@@ -11,7 +11,7 @@ Recommended Usage
 
 For new code, prefer one of these two patterns:
 
-1. Build a :class:`~OpenPinch.lib.schema.TargetInput` payload and call
+1. Build a :class:`~OpenPinch.lib.schemas.io.TargetInput` payload and call
    :func:`~OpenPinch.main.pinch_analysis_service`.
 2. Load a problem file into
    :class:`~OpenPinch.classes.pinch_problem.PinchProblem`, call
@@ -28,7 +28,7 @@ Service-Layer Example
 .. code-block:: python
 
    from OpenPinch import pinch_analysis_service
-   from OpenPinch.lib.schema import StreamSchema, TargetInput
+   from OpenPinch.lib.schemas.io import StreamSchema, TargetInput
 
    payload = TargetInput(
        streams=[
@@ -82,7 +82,7 @@ modules.
   zone-level targeting routine.
 - :func:`~OpenPinch.utils.multiscale_targeting.extract_results` converts the solved in-memory zone
   hierarchy into the dictionary structure consumed by
-  :class:`~OpenPinch.lib.schema.TargetOutput`.
+  :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 
 .. automodule:: OpenPinch.main
    :members:
@@ -122,12 +122,12 @@ The main user-facing methods are:
 
 The wrapper is intentionally light. Once targeting has run, the same solved
 :class:`~OpenPinch.classes.zone.Zone` hierarchy and
-:class:`~OpenPinch.lib.schema.TargetOutput` objects remain available for direct
+:class:`~OpenPinch.lib.schemas.io.TargetOutput` objects remain available for direct
 inspection.
 
 The ``target_*`` methods are explicit advanced post-processing entrypoints. Each
-returns the affected :class:`~OpenPinch.lib.target_schema.BaseTargetModel` and
-refreshes cached :class:`~OpenPinch.lib.schema.TargetOutput` results on the
+returns the affected :class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` and
+refreshes cached :class:`~OpenPinch.lib.schemas.io.TargetOutput` results on the
 same :class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat-pump
 and refrigeration targets also surface HPR summary fields such as
 ``hpr_cycle``, ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``,

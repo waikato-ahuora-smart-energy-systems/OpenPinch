@@ -13,7 +13,7 @@ from OpenPinch.utils.export import (
 )
 from OpenPinch.classes import ProblemTable, Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
-from OpenPinch.lib.target_schema import DirectIntegrationTarget
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 import OpenPinch.utils.export as export_mod
 import openpyxl
 from openpyxl import Workbook

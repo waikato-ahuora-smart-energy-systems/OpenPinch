@@ -11,7 +11,7 @@ from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.enums import ArrowHead, ProblemTableLabel as PT
-from OpenPinch.lib.target_schema import DirectIntegrationTarget
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.streamlit_webviewer import web_graphing as wg
 import sys
 from OpenPinch.lib.enums import ArrowHead

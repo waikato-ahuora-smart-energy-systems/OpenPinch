@@ -35,7 +35,7 @@ integration steps where appropriate.
 Analysis Workflow
 -----------------
 
-1. Validate input payloads via :mod:`OpenPinch.lib.schema` models.
+1. Validate input payloads via :mod:`OpenPinch.lib.schemas.io` models.
 2. Build the zone tree and stream/utility collections with
    :func:`OpenPinch.services.data_preparation.prepare_problem`.
 3. Run direct integration (problem-table and multi-utility targeting) with

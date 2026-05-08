@@ -9,8 +9,8 @@ from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...lib.config import Configuration, tol
 from ...lib.enums import GT, HPRcycle, PT, TT
-from ...lib.schema import HeatPumpTargetOutputs
-from ...lib.target_schema import (
+from ...lib.schemas.hpr import HeatPumpTargetOutputs
+from ...lib.schemas.targets import (
     DirectHeatPumpTarget,
     DirectRefrigerationTarget,
     IndirectHeatPumpTarget,

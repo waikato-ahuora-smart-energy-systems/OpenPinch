@@ -4,7 +4,7 @@
 from typing import Callable, List
 
 from ..lib.enums import ZT
-from ..lib.target_schema import BaseTargetModel
+from ..lib.schemas.targets import BaseTargetModel
 from ..classes.zone import Zone
 from ..classes.stream import Stream
 from ..classes.stream_collection import StreamCollection

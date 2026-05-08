@@ -1,18 +1,16 @@
-"""Rich runtime target models used by OpenPinch services."""
+"""Runtime target schemas used by OpenPinch analysis services."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ..classes.problem_table import ProblemTable
-from ..classes.stream_collection import StreamCollection
-from .config import Configuration, tol
-from .enums import SummaryRowType
-
-if TYPE_CHECKING:
-    from ..classes.zone import Zone
+from ...classes.problem_table import ProblemTable
+from ...classes.stream_collection import StreamCollection
+from ..config import Configuration, tol
+from ..enums import SummaryRowType
+from .reporting import HeatUtility, TargetResults, TempPinch
 
 
 def _normalise_target_name(
@@ -35,20 +33,27 @@ def _normalise_target_name(
     return zone_name if str(zone_name).endswith(suffix) else f"{zone_name}{suffix}"
 
 
-def _serialise_temp_pinch(cold_pinch: Optional[float], hot_pinch: Optional[float]) -> dict[str, float | None]:
+def _build_temp_pinch(
+    cold_pinch: Optional[float],
+    hot_pinch: Optional[float],
+) -> TempPinch:
     if isinstance(cold_pinch, float) and isinstance(hot_pinch, float):
         if abs(cold_pinch - hot_pinch) < tol:
-            return {"cold_temp": cold_pinch}
-        return {"cold_temp": cold_pinch, "hot_temp": hot_pinch}
+            return TempPinch(cold_temp=cold_pinch)
+        return TempPinch(cold_temp=cold_pinch, hot_temp=hot_pinch)
     if isinstance(cold_pinch, float):
-        return {"cold_temp": cold_pinch}
+        return TempPinch(cold_temp=cold_pinch)
     if isinstance(hot_pinch, float):
-        return {"hot_temp": hot_pinch}
-    return {"cold_temp": None, "hot_temp": None}
+        return TempPinch(hot_temp=hot_pinch)
+    return TempPinch()
 
 
-def _serialise_utilities(utilities: StreamCollection) -> list[dict[str, Any]]:
-    return [{"name": utility.name, "heat_flow": utility.heat_flow} for utility in utilities]
+def _build_heat_utilities(utilities: StreamCollection) -> list[HeatUtility]:
+    return [HeatUtility(name=utility.name, heat_flow=utility.heat_flow) for utility in utilities]
+
+
+def _row_type(isTotal: bool) -> str:
+    return SummaryRowType.FOOTER.value if isTotal else SummaryRowType.CONTENT.value
 
 
 class BaseTargetModel(BaseModel):
@@ -79,8 +84,11 @@ class BaseTargetModel(BaseModel):
         )
         return data
 
+    def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        raise NotImplementedError
+
     def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
-        raise NotImplementedError(f"{type(self).__name__} must implement serialize_json().")
+        return self.to_target_results(isTotal=isTotal).model_dump(mode="python")
 
 
 class GraphBackedTarget(BaseTargetModel):
@@ -93,18 +101,16 @@ class GraphBackedTarget(BaseTargetModel):
 
 
 class UtilitySummaryTarget(BaseTargetModel):
-    """Target that returns utility duties and recovered heat summaries."""
+    """Target that returns utility duties and recovered-heat summaries."""
 
     hot_utilities: StreamCollection = Field(default_factory=StreamCollection)
     cold_utilities: StreamCollection = Field(default_factory=StreamCollection)
-
     hot_utility_target: float
     cold_utility_target: float
     heat_recovery_target: float
     heat_recovery_limit: Optional[float] = None
     degree_of_int: Optional[float] = None
     utility_cost: float = 0.0
-
     hot_pinch: Optional[float] = None
     cold_pinch: Optional[float] = None
 
@@ -116,70 +122,65 @@ class UtilitySummaryTarget(BaseTargetModel):
         self.utility_cost = sum(u.ut_cost for u in self.utility_streams)
         return float(self.utility_cost)
 
-    def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
+    def _base_target_results(self, isTotal: bool = False) -> TargetResults:
         degree_of_integration = None
         if self.degree_of_int is not None:
             degree_of_integration = self.degree_of_int * 100
 
-        return {
-            "name": self.name,
-            "degree_of_integration": degree_of_integration,
-            "Qh": self.hot_utility_target,
-            "Qc": self.cold_utility_target,
-            "Qr": self.heat_recovery_target,
-            "utility_cost": self.utility_cost,
-            "row_type": SummaryRowType.FOOTER.value
-            if isTotal
-            else SummaryRowType.CONTENT.value,
-            "hot_utilities": _serialise_utilities(self.hot_utilities),
-            "cold_utilities": _serialise_utilities(self.cold_utilities),
-            "temp_pinch": _serialise_temp_pinch(self.cold_pinch, self.hot_pinch),
-        }
+        return TargetResults(
+            name=self.name,
+            degree_of_integration=degree_of_integration,
+            Qh=self.hot_utility_target,
+            Qc=self.cold_utility_target,
+            Qr=self.heat_recovery_target,
+            utility_cost=self.utility_cost,
+            row_type=_row_type(isTotal),
+            hot_utilities=_build_heat_utilities(self.hot_utilities),
+            cold_utilities=_build_heat_utilities(self.cold_utilities),
+            temp_pinch=_build_temp_pinch(self.cold_pinch, self.hot_pinch),
+        )
+
+    def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        return self._base_target_results(isTotal=isTotal)
 
 
 class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
-    """Detailed direct-integration target returned by `compute_direct_integration_targets`."""
+    """Detailed direct-integration runtime target."""
 
     pt: ProblemTable
     pt_real: ProblemTable
-
     utility_heat_recovery_target: Optional[float] = None
-
     area: Optional[float] = None
     num_units: Optional[float] = None
     capital_cost: Optional[float] = None
     total_cost: Optional[float] = None
-
     exergy_sinks: Optional[float] = None
     exergy_sources: Optional[float] = None
     exergy_des_min: Optional[float] = None
     exergy_req_min: Optional[float] = None
     ETE: Optional[float] = None
-
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
 
-    def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
-        data = super().serialize_json(isTotal=isTotal)
-        if self.area is not None or self.num_units is not None:
-            data["area"] = self.area
-            data["num_units"] = self.num_units
-            data["capital_cost"] = self.capital_cost
-            data["total_cost"] = self.total_cost
-        if self.exergy_sources is not None or self.exergy_sinks is not None:
-            data["exergy_sources"] = self.exergy_sources
-            data["exergy_sinks"] = self.exergy_sinks
-            data["ETE"] = None if self.ETE is None else self.ETE * 100
-            data["exergy_req_min"] = self.exergy_req_min
-            data["exergy_des_min"] = self.exergy_des_min
-        if self.work_target is not None or self.turbine_efficiency_target is not None:
-            data["work_target"] = self.work_target
-            data["turbine_efficiency_target"] = (
-                None
+    def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        base = self._base_target_results(isTotal=isTotal)
+        return base.model_copy(
+            update={
+                "work_target": self.work_target,
+                "turbine_efficiency_target": None
                 if self.turbine_efficiency_target is None
-                else self.turbine_efficiency_target * 100
-            )
-        return data
+                else self.turbine_efficiency_target * 100,
+                "area": self.area,
+                "num_units": self.num_units,
+                "capital_cost": self.capital_cost,
+                "total_cost": self.total_cost,
+                "exergy_sources": self.exergy_sources,
+                "exergy_sinks": self.exergy_sinks,
+                "ETE": None if self.ETE is None else self.ETE * 100,
+                "exergy_req_min": self.exergy_req_min,
+                "exergy_des_min": self.exergy_des_min,
+            }
+        )
 
 
 class TotalProcessTarget(UtilitySummaryTarget):
@@ -191,20 +192,19 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
 
     pt: ProblemTable
     pt_real: ProblemTable
-
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
 
-    def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
-        data = super().serialize_json(isTotal=isTotal)
-        if self.work_target is not None or self.turbine_efficiency_target is not None:
-            data["work_target"] = self.work_target
-            data["turbine_efficiency_target"] = (
-                None
+    def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        base = self._base_target_results(isTotal=isTotal)
+        return base.model_copy(
+            update={
+                "work_target": self.work_target,
+                "turbine_efficiency_target": None
                 if self.turbine_efficiency_target is None
-                else self.turbine_efficiency_target * 100
-            )
-        return data
+                else self.turbine_efficiency_target * 100,
+            }
+        )
 
 
 class HeatPumpTargetBase(GraphBackedTarget):
@@ -224,32 +224,30 @@ class HeatPumpTargetBase(GraphBackedTarget):
     hpr_cold_streams: StreamCollection
     hpr_details: Any
 
-    def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "degree_of_integration": None,
-            "Qh": 0.0,
-            "Qc": 0.0,
-            "Qr": 0.0,
-            "utility_cost": None,
-            "row_type": SummaryRowType.FOOTER.value
-            if isTotal
-            else SummaryRowType.CONTENT.value,
-            "hot_utilities": [],
-            "cold_utilities": [],
-            "temp_pinch": {"cold_temp": None, "hot_temp": None},
-            "hpr_cycle": self.hpr_cycle,
-            "hpr_utility_total": self.hpr_utility_total,
-            "hpr_work": self.hpr_work,
-            "hpr_external_utility": self.hpr_external_utility,
-            "hpr_ambient_hot": self.hpr_ambient_hot,
-            "hpr_ambient_cold": self.hpr_ambient_cold,
-            "hpr_cop": self.hpr_cop,
-            "hpr_eta_he": self.hpr_eta_he,
-            "hpr_success": self.hpr_success,
-            "hpr_hot_streams": self.hpr_hot_streams,
-            "hpr_cold_streams": self.hpr_cold_streams,
-        }
+    def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        return TargetResults(
+            name=self.name,
+            degree_of_integration=None,
+            Qh=0.0,
+            Qc=0.0,
+            Qr=0.0,
+            utility_cost=None,
+            row_type=_row_type(isTotal),
+            hot_utilities=[],
+            cold_utilities=[],
+            temp_pinch=TempPinch(),
+            hpr_cycle=self.hpr_cycle,
+            hpr_utility_total=self.hpr_utility_total,
+            hpr_work=self.hpr_work,
+            hpr_external_utility=self.hpr_external_utility,
+            hpr_ambient_hot=self.hpr_ambient_hot,
+            hpr_ambient_cold=self.hpr_ambient_cold,
+            hpr_cop=self.hpr_cop,
+            hpr_eta_he=self.hpr_eta_he,
+            hpr_success=self.hpr_success,
+            hpr_hot_streams=self.hpr_hot_streams,
+            hpr_cold_streams=self.hpr_cold_streams,
+        )
 
 
 class DirectHeatPumpTarget(HeatPumpTargetBase):
