@@ -23,8 +23,9 @@ def create_problem_and_results_json():
 
                 r_json_file = filepath_save + "/results/r_" + project_name + ".json"
                 get_results_from_excel(excel_file, r_json_file, project_name)
-            except: 
+            except:
                 pass
-            
+
+
 if __name__ == "__main__":
     create_problem_and_results_json()

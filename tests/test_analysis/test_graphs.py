@@ -139,28 +139,30 @@ def test_get_output_graph_data_single_zone(monkeypatch):
     monkeypatch.setattr(
         sys.modules[_create_graph_set.__module__],
         "_create_graph_set",
-        lambda target, zone=None: {"name": target.name, "zone_address": zone.address, "graphs": []},
+        lambda target, zone=None: {
+            "name": target.name,
+            "zone_address": zone.address,
+            "graphs": [],
+        },
     )
     result = get_output_graph_data(zone)
     assert result["Site/Direct Integration"]["graphs"] == []
 
 
-def test_get_output_graph_data_keeps_same_target_type_for_multiple_subzones(monkeypatch):
+def test_get_output_graph_data_keeps_same_target_type_for_multiple_subzones(
+    monkeypatch,
+):
     site = Zone(name="Site")
     area_a = Zone(name="AreaA", parent_zone=site)
     area_b = Zone(name="AreaB", parent_zone=site)
     site._subzones = {"AreaA": area_a, "AreaB": area_b}
 
-    area_a._targets = {
-        TT.DI.value: MagicMock()
-    }
+    area_a._targets = {TT.DI.value: MagicMock()}
     area_a._targets[TT.DI.value].name = "Site/AreaA/Direct Integration"
     area_a._targets[TT.DI.value].type = TT.DI.value
     area_a._targets[TT.DI.value].graphs = {}
     area_a._targets[TT.DI.value].zone_name = "AreaA"
-    area_b._targets = {
-        TT.DI.value: MagicMock()
-    }
+    area_b._targets = {TT.DI.value: MagicMock()}
     area_b._targets[TT.DI.value].name = "Site/AreaB/Direct Integration"
     area_b._targets[TT.DI.value].type = TT.DI.value
     area_b._targets[TT.DI.value].graphs = {}

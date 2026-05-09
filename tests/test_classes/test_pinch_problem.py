@@ -607,7 +607,7 @@ def test_graph_catalog_and_plot_helpers(monkeypatch):
             "graphs": [
                 {"type": "Composite Curves", "name": "Composite"},
                 {"type": "Grand Composite Curve", "name": "GCC"},
-            ]
+            ],
         }
     }
     monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
@@ -635,7 +635,7 @@ def test_plot_helper_executes_display_hook_when_available(monkeypatch):
             "zone_address": "Site/Plant",
             "graphs": [
                 {"type": "Composite Curves", "name": "Composite"},
-            ]
+            ],
         }
     }
     shown = {"count": 0}
@@ -667,7 +667,7 @@ def test_plot_helper_uses_default_notebook_dimensions(monkeypatch):
             "zone_address": "Site/Plant",
             "graphs": [
                 {"type": "Composite Curves", "name": "Composite", "segments": []},
-            ]
+            ],
         }
     }
     monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
@@ -689,7 +689,7 @@ def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypat
             "target_type": "Direct Integration",
             "graphs": [
                 {"type": "Grand Composite Curve", "name": "GCC"},
-            ]
+            ],
         }
     }
     monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
@@ -753,7 +753,7 @@ def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
             "zone_address": "Site/Plant",
             "graphs": [
                 {"type": "Grand Composite Curve", "name": "GCC"},
-            ]
+            ],
         }
     }
     monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)

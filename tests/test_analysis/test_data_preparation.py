@@ -853,7 +853,9 @@ def test_zone_dt_cont_multiplier_inherits_from_root_for_streams_and_utilities():
     site = prepare_problem(streams=streams, utilities=utilities, zone_tree=zone_tree)
     area = site.get_subzone("AreaA")
     hot_stream = next(stream for stream in area.hot_streams if stream.name == "HotA")
-    hot_utility = next(utility for utility in area.hot_utilities if utility.name == "Steam")
+    hot_utility = next(
+        utility for utility in area.hot_utilities if utility.name == "Steam"
+    )
 
     assert site.dt_cont_multiplier == 2.0
     assert area.dt_cont_multiplier == 2.0
