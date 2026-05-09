@@ -1,0 +1,236 @@
+{
+    "targets": [
+        {
+            "name": "Castillo/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 835.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 835.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 885.4189999999999,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3752.489999999999,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 220469.33100000035,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 885.4190000000015,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Castillo/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 835.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 835.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 885.4189999999999,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3752.489999999999,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 220469.33100000035,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 885.4190000000015,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Castillo/Total Process Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": null,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": null,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 885.4189999999999,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3752.489999999999,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 220469.33100000035,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 885.4190000000015,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Castillo/Total Site Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 40.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 40.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 885.4190000000015,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3752.489999999999,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 220469.33100000035,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 885.4190000000015,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

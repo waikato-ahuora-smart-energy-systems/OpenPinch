@@ -59,7 +59,7 @@ def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     direct = lambda z: calls.append(z.name)
 
     valid = Zone(name="UO", type=ZT.O.value)
-    valid.config.DO_OPERATION_LEVEL_TARGETING = True
+    valid.config.DO_DIRECT_OPERATION_TARGETING = True
     child = Zone(name="child", type=ZT.O.value)
     valid.add_zone(child)
     out = ms._get_unit_operation_targets(valid, direct_service_func=direct)
@@ -67,7 +67,7 @@ def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     assert calls.count("UO") == 2
 
     invalid = Zone(name="UO_bad", type=ZT.O.value)
-    invalid.config.DO_OPERATION_LEVEL_TARGETING = True
+    invalid.config.DO_DIRECT_OPERATION_TARGETING = True
     invalid.add_zone(Zone(name="bad", type="X"))
     with pytest.raises(ValueError, match="Unit operation zones can only contain"):
         ms._get_unit_operation_targets(invalid)

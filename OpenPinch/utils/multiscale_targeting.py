@@ -49,12 +49,12 @@ def _get_unit_operation_targets(
     indirect_service_func: Callable = None,
 ):
     """Populate a ``Zone`` with detailed unit operation-level pinch targets."""
-    if zone.config.DO_OPERATION_LEVEL_TARGETING:
+    if zone.config.DO_DIRECT_OPERATION_TARGETING:
         if len(zone.subzones) > 0:
             z: Zone
             for z in zone.subzones.values():
                 if z.type == ZT.O.value:
-                    if zone.config.DO_OPERATION_LEVEL_TARGETING:
+                    if zone.config.DO_DIRECT_OPERATION_TARGETING:
                         if isinstance(direct_service_func, Callable):
                             direct_service_func(zone)
                 else:
