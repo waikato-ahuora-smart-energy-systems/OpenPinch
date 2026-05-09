@@ -45,7 +45,7 @@ class Configuration:
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER: str = ZT.S.value
     DT_CONT: float = 5
-    DT_PHASE_CHANGE: float = 0.1
+    DT_PHASE_CHANGE: float = 0.01
     HTC: float = 1.0
     T_ENV: float = 15
     DT_ENV_CONT: float = 10

@@ -338,7 +338,7 @@ def _complete_utility_data(
         if t_target is None or t_target == utility.t_supply:
             delta = (
                 -zone_config.DT_PHASE_CHANGE
-                if utility.type == "Hot"
+                if utility.type in [ST.Hot.value, ST.Both.value]
                 else zone_config.DT_PHASE_CHANGE
             )
             utility.t_target = utility.t_supply + delta
@@ -360,13 +360,13 @@ def _complete_utility_data(
         utility.htc = zone_config.HTC if not htc else htc
 
         if (
-            utility.type in ["Hot", "Both"]
+            utility.type in [ST.Hot.value, ST.Both.value]
             and utility.active
             and min(utility.t_supply, utility.t_target) - utility.dt_cont >= HU_T_min
         ):
             addDefaultHU = False
         if (
-            utility.type in ["Cold", "Both"]
+            utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
             and max(utility.t_supply, utility.t_target) - utility.dt_cont <= CU_T_max
         ):
@@ -389,7 +389,7 @@ def _add_default_utilities(
         utilities.append(
             _create_default_utility(
                 "HU",
-                "Hot",
+                ST.Hot.value,
                 HU_T_min,
                 zone_config,
                 dt_cont_multiplier=dt_cont_multiplier,
@@ -399,7 +399,7 @@ def _add_default_utilities(
         utilities.append(
             _create_default_utility(
                 "CU",
-                "Cold",
+                ST.Cold.value,
                 CU_T_max,
                 zone_config,
                 dt_cont_multiplier=dt_cont_multiplier,
@@ -416,7 +416,7 @@ def _create_default_utility(
     dt_cont_multiplier: float = 1.0,
 ) -> UtilitySchema:
     """Construct a default utility entry anchored to the extreme process temperature."""
-    a = 1 if ut_type == "Hot" else -1
+    a = 1 if ut_type == ST.Hot.value else -1
     dt_cont = zone_config.DT_CONT * dt_cont_multiplier
     return UtilitySchema.model_validate(
         {

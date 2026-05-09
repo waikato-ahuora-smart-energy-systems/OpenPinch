@@ -1,0 +1,719 @@
+{
+    "streams": [
+        {
+            "zone": "A",
+            "name": "A1 Hot",
+            "t_supply": {
+                "value": 170.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "A2 Hot",
+            "t_supply": {
+                "value": 150.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6.477,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "A3 Cold",
+            "t_supply": {
+                "value": 25.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1.5,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "A4 Cold",
+            "t_supply": {
+                "value": 70.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.75,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "A5 Cold",
+            "t_supply": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 65.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5.25,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "B1 Hot",
+            "t_supply": {
+                "value": 200.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 10.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "B2 Cold",
+            "t_supply": {
+                "value": 20.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 105.0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "B3 Cold",
+            "t_supply": {
+                "value": 100.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 10.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 125.0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "B4 Hot",
+            "t_supply": {
+                "value": 150.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 35.0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "B5 Cold",
+            "t_supply": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 110.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 115.0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "B6 Cold",
+            "t_supply": {
+                "value": 75.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 150.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C1 Hot",
+            "t_supply": {
+                "value": 85.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.023850000000000003,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 30.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C2 Hot",
+            "t_supply": {
+                "value": 80.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.0964,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 30.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C3 Hot",
+            "t_supply": {
+                "value": 25.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.0177,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 28.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C4 Cold",
+            "t_supply": {
+                "value": 55.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 85.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.0774,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 75.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C5 Cold",
+            "t_supply": {
+                "value": 33.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.0072,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 75.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C6 Cold",
+            "t_supply": {
+                "value": 25.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.077,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 70.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C7 Cold",
+            "t_supply": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 121.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.01274,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 70.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C8 Cold",
+            "t_supply": {
+                "value": 25.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 28.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.15168,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 250.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C9 Cold",
+            "t_supply": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.0595,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 38.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C10 Cold",
+            "t_supply": {
+                "value": 18.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 25.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.1008,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 110.0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C11 Cold",
+            "t_supply": {
+                "value": 21.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 121.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 0.005,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 60.0,
+            "index": 0
+        },
+        {
+            "zone": "D",
+            "name": "D1 Cold",
+            "t_supply": {
+                "value": 15.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 65.0,
+            "index": 0
+        },
+        {
+            "zone": "D",
+            "name": "D2 Cold",
+            "t_supply": {
+                "value": 15.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80.0,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5.0,
+                "units": "MW"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": NaN,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "VHPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 320.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 190.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "MPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 160.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 25.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 10.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

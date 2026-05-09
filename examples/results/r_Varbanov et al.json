@@ -1,0 +1,508 @@
+{
+    "targets": [
+        {
+            "name": "Total Integrated Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 21.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 21.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 193850.00000000003,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 793750.0000000001,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 534173060000.00024,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 106372.72242790829,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 87477.27757209181,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process A - chemical plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 82.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 82.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 51468.297213622296,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 84768.29721362228,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 265231.70278637763,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 83.74856418894147,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 375413559603.7151,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 51468.297213622296,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 14816.9190862689,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 69951.37812735338,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process B - food plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 52.5,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 52.5,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 8648.548510313212,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 36848.54851031322,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 286651.4514896869,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 97.07126701310085,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 125371800550.03822,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 8648.548510313216,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 36848.54851031322,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process C - hospital/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 23.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 23.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 77350.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 120250.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 213145660000.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 75000.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 2350.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Process D - residential area/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 21.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 21.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 178000.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 490496800000.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 178000.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Process Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 21.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 21.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 315466.8457239355,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 121616.8457239355,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 672133.1542760646,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 1204427820153.7534,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 135116.84572393552,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 180350.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 14816.9190862689,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 106799.9266376666,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Site Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 40.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 300649.92663766665,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 106799.92663766662,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 686950.0733623335,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 86.54489113226246,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 1122768815685.5083,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 135116.84572393552,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 165533.0809137311,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 106799.9266376666,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

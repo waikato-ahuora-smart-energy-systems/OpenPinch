@@ -26,7 +26,7 @@ from ..services import (
     indirect_refrigeration_service,
     power_cogeneration_service,
 )
-from ..lib.enums import GT, TT
+from ..lib.enums import GT, TT, ST
 from ..lib.schemas.io import (
     TargetInput,
     TargetOutput,
@@ -1256,7 +1256,7 @@ def _validate_problem_semantics(
         t_supply = _maybe_get_value(utility.t_supply)
         t_target = _maybe_get_value(utility.t_target)
         if (
-            utility_type == "Hot"
+            utility_type == ST.Hot.value
             and t_supply is not None
             and t_target is not None
             and t_supply < t_target
@@ -1270,7 +1270,7 @@ def _validate_problem_semantics(
                 )
             )
         if (
-            utility_type == "Cold"
+            utility_type == ST.Cold.value
             and t_supply is not None
             and t_target is not None
             and t_supply > t_target
