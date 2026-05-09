@@ -337,7 +337,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
             ]
         ],
         GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_NET_UT.value]],
-        GT.NLC.value: pt[
+        GT.NLP.value: pt[
             [
                 PT.T.value,
                 PT.H_NET_HOT.value,

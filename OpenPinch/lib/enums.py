@@ -237,7 +237,7 @@ class GraphType(Enum):
     # GCC_U = "Utility Grand Composite Curve"
     # GCC_U_real = "Utility Grand Composite Curve (Real)"
     # GCC_Lim = "Thermodynamic Limiting GCC"
-    NLC = "Net Load Curves"
+    NLP = "Net Load Profiles"
 
     TSP = "Total Site Profiles"
     TSU = "Total Site Utility"

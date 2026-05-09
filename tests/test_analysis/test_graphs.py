@@ -89,7 +89,7 @@ def test_create_graph_set_includes_net_load_curves():
     mock_zone = MagicMock(spec=Zone)
     mock_zone.name = "ZoneA"
     mock_zone.graphs = {
-        GT.NLC.value: {
+        GT.NLP.value: {
             PT.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
             PT.H_NET_HOT.value: MagicMock(to_list=lambda: [0, -20, -40]),
             PT.H_NET_COLD.value: MagicMock(to_list=lambda: [30, 10, 0]),
@@ -101,7 +101,7 @@ def test_create_graph_set_includes_net_load_curves():
     graph_set = _create_graph_set(mock_zone, "ZoneA")
 
     assert len(graph_set["graphs"]) == 1
-    assert graph_set["graphs"][0]["type"] == GT.NLC.value
+    assert graph_set["graphs"][0]["type"] == GT.NLP.value
     assert graph_set["graphs"][0]["name"] == "Net Load Curves: ZoneA"
     assert len(graph_set["graphs"][0]["segments"]) == 4
 

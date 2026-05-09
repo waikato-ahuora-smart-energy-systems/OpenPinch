@@ -364,11 +364,9 @@ def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
     fig = plotly_go.Figure()
     legend_seen: Dict[str, bool] = {}
     for segment in graph.get("segments", []):
-        traces, arrow_annotation = _segment_trace(segment, graph, legend_seen)
+        traces, _arrow_annotation = _segment_trace(segment, graph, legend_seen)
         for trace in traces:
             fig.add_trace(trace)
-        if arrow_annotation is not None:
-            fig.add_annotation(**arrow_annotation)
     _apply_default_layout(fig)
     return fig
 

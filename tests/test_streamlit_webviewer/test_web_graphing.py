@@ -191,7 +191,7 @@ def test_build_plotly_helpers_cover_arrow_and_legend_logic():
     }
     fig = wg._build_plotly_graph(graph)
     assert len(fig.data) == 2
-    assert len(fig.layout.annotations) >= 1
+    assert len(fig.layout.annotations) == 0
 
     traces, ann = wg._segment_trace(
         segment={"data_points": [{"x": 1.0, "y": 1.0}], "title": "Flat"},

@@ -58,6 +58,7 @@ def test_dummy_zone_instantiation(dummy_zone: Zone):
     assert dummy_zone.name == "Z1"
     assert isinstance(dummy_zone.hot_streams, StreamCollection)
     assert isinstance(dummy_zone.cold_streams, StreamCollection)
+    assert dummy_zone.dt_cont_multiplier == 1.0
 
 
 # === Property Setters and Getters ===
@@ -75,6 +76,9 @@ def test_property_setters_getters(dummy_zone: Zone):
 
     dummy_zone.ETE = 0.75
     assert dummy_zone.ETE == 0.75
+
+    dummy_zone.dt_cont_multiplier = 1.5
+    assert dummy_zone.dt_cont_multiplier == 1.5
 
 
 # === Adding Utilities ===

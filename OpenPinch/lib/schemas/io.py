@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..enums import ST
 from .common import ScalarOrVU
@@ -46,7 +47,17 @@ class ZoneTreeSchema(BaseModel):
 
     name: str
     type: str
+    dt_cont_multiplier: Optional[float] = None
     children: Optional[List["ZoneTreeSchema"]] = None
+
+    @field_validator("dt_cont_multiplier")
+    @classmethod
+    def _validate_dt_cont_multiplier(cls, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError("dt_cont_multiplier must be a finite non-negative value.")
+        return float(value)
 
 
 class TargetInput(BaseModel):

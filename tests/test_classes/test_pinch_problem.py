@@ -679,7 +679,7 @@ def test_plot_accepts_net_load_profile_alias(monkeypatch):
     payload = {
         "Plant/DI": {
             "graphs": [
-                {"type": "Net Load Curves", "name": "NLC"},
+                {"type": "Net Load Curves", "name": "NLP"},
             ]
         }
     }
@@ -694,7 +694,7 @@ def test_plot_accepts_net_load_profile_alias(monkeypatch):
     obj = PinchProblem()
     fig = obj.plot(zone_name="Plant/DI", graph_type="net_load profiles")
 
-    assert fig == {"built": "NLC"}
+    assert fig == {"built": "NLP"}
 
 
 def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):

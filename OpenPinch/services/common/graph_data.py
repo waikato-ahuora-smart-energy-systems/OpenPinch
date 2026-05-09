@@ -122,12 +122,12 @@ def _create_graph_set(t: BaseTargetModel, graphTitle: str) -> dict:
             )
         )
 
-    if GT.NLC.value in target_graphs:
+    if GT.NLP.value in target_graphs:
         graphs.append(
             _make_composite_graph(
                 graph_title=graphTitle,
-                key=GT.NLC.value,
-                data=target_graphs[GT.NLC.value],
+                key=GT.NLP.value,
+                data=target_graphs[GT.NLP.value],
                 col_keys=[
                     PT.H_NET_HOT.value,
                     PT.H_NET_COLD.value,

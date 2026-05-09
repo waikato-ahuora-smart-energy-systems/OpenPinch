@@ -802,6 +802,157 @@ def test_zero_dtcont_and_dtglide():
     assert stream.t_max_star == stream.t_supply
 
 
+def test_zone_tree_dt_cont_multiplier_validation():
+    with pytest.raises(ValidationError, match="dt_cont_multiplier"):
+        ZoneTreeSchema.model_validate(
+            {
+                "name": "Root",
+                "type": "Site",
+                "dt_cont_multiplier": -1.0,
+            }
+        )
+
+
+def test_zone_dt_cont_multiplier_inherits_from_root_for_streams_and_utilities():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "Site/AreaA",
+                "t_supply": 200.0,
+                "t_target": 100.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        )
+    ]
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "Steam",
+                "type": "Hot",
+                "t_supply": 250.0,
+                "t_target": 220.0,
+                "heat_flow": 0.0,
+                "dt_cont": 8.0,
+                "htc": 1.0,
+                "price": 10.0,
+            }
+        )
+    ]
+    zone_tree = ZoneTreeSchema.model_validate(
+        {
+            "name": "Site",
+            "type": "Site",
+            "dt_cont_multiplier": 2.0,
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        }
+    )
+
+    site = prepare_problem(streams=streams, utilities=utilities, zone_tree=zone_tree)
+    area = site.get_subzone("AreaA")
+    hot_stream = next(stream for stream in area.hot_streams if stream.name == "HotA")
+    hot_utility = next(utility for utility in area.hot_utilities if utility.name == "Steam")
+
+    assert site.dt_cont_multiplier == 2.0
+    assert area.dt_cont_multiplier == 2.0
+    assert hot_stream.dt_cont == 20.0
+    assert hot_stream.t_min_star == 80.0
+    assert hot_utility.dt_cont == 16.0
+
+
+def test_zone_dt_cont_multiplier_child_override_is_absolute():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "Site/AreaA",
+                "t_supply": 220.0,
+                "t_target": 120.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "HotB",
+                "zone": "Site/AreaB",
+                "t_supply": 220.0,
+                "t_target": 120.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+    ]
+    zone_tree = ZoneTreeSchema.model_validate(
+        {
+            "name": "Site",
+            "type": "Site",
+            "dt_cont_multiplier": 2.0,
+            "children": [
+                {"name": "AreaA", "type": "Process Zone"},
+                {
+                    "name": "AreaB",
+                    "type": "Process Zone",
+                    "dt_cont_multiplier": 0.5,
+                },
+            ],
+        }
+    )
+
+    site = prepare_problem(streams=streams, zone_tree=zone_tree)
+    area_a = site.get_subzone("AreaA")
+    area_b = site.get_subzone("AreaB")
+
+    hot_a = next(stream for stream in area_a.hot_streams if stream.name == "HotA")
+    hot_b = next(stream for stream in area_b.hot_streams if stream.name == "HotB")
+
+    assert area_a.dt_cont_multiplier == 2.0
+    assert area_b.dt_cont_multiplier == 0.5
+    assert hot_a.dt_cont == 20.0
+    assert hot_b.dt_cont == 5.0
+
+
+def test_default_utilities_use_zone_effective_dt_cont_multiplier():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "AreaA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            }
+        )
+    ]
+    zone_tree = ZoneTreeSchema.model_validate(
+        {
+            "name": "Site",
+            "type": "Site",
+            "children": [
+                {
+                    "name": "AreaA",
+                    "type": "Process Zone",
+                    "dt_cont_multiplier": 3.0,
+                }
+            ],
+        }
+    )
+
+    site = prepare_problem(streams=streams, zone_tree=zone_tree)
+    area = site.get_subzone("AreaA")
+    hu = next(utility for utility in area.hot_utilities if utility.name == "HU")
+    cu = next(utility for utility in area.cold_utilities if utility.name == "CU")
+
+    assert hu.dt_cont == pytest.approx(area.config.DT_CONT * 3.0)
+    assert cu.dt_cont == pytest.approx(area.config.DT_CONT * 3.0)
+
+
 def make_stream(zone: str) -> StreamSchema:
     """Build stream data used by this test module."""
     return StreamSchema(

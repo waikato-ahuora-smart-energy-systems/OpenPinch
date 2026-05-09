@@ -28,6 +28,7 @@ class Zone:
         type: str = ZT.P.value,
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
+        dt_cont_multiplier: float = 1.0,
     ):
         """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
@@ -35,6 +36,7 @@ class Zone:
         self._type = type
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
+        self._dt_cont_multiplier = float(dt_cont_multiplier)
         self._active = True
         self._subzones = {}
         self._targets = {}
@@ -94,6 +96,15 @@ class Zone:
     @active.setter
     def active(self, value: bool):
         self._active = bool(value)
+
+    @property
+    def dt_cont_multiplier(self) -> float:
+        """Effective multiplier applied to stream and utility ``dt_cont`` values."""
+        return self._dt_cont_multiplier
+
+    @dt_cont_multiplier.setter
+    def dt_cont_multiplier(self, value: float):
+        self._dt_cont_multiplier = float(value)
 
     @property
     def hot_streams(self):
