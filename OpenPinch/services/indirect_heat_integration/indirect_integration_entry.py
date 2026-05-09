@@ -45,8 +45,8 @@ def compute_total_subzone_utility_targets(zone: Zone) -> TotalProcessTarget:
     hot_utilities, cold_utilities = _reset_utility_heat_flows(
         hot_utilities, cold_utilities
     )
-    for z in zone.subzones.values():
-        t = z.targets[TT.DI.value]
+    for subzone in zone.subzones.values():
+        t = subzone.targets[TT.DI.value]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target
         heat_recovery_target += t.heat_recovery_target
