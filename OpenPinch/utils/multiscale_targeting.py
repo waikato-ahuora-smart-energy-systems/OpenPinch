@@ -51,7 +51,7 @@ def _get_unit_operation_targets(
         if len(zone.subzones) > 0:
             for subzone in zone.subzones.values():
                 if subzone.type == ZT.O.value:
-                    if zone.config.DO_DIRECT_OPERATION_TARGETING:
+                    if subzone.config.DO_DIRECT_OPERATION_TARGETING:
                         if isinstance(direct_service_func, Callable):
                             direct_service_func(subzone)
                 else:
