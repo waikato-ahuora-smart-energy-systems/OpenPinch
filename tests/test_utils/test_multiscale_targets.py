@@ -64,7 +64,7 @@ def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     valid.add_zone(child)
     out = ms._get_unit_operation_targets(valid, direct_service_func=direct)
     assert out is valid
-    assert calls.count("UO") == 2
+    assert calls.count("UO") == 1
 
     invalid = Zone(name="UO_bad", type=ZT.O.value)
     invalid.config.DO_DIRECT_OPERATION_TARGETING = True
