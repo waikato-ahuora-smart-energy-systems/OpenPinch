@@ -562,13 +562,29 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
         {
             "graphs": {
                 "Plant": type(
-                    "GraphSet", (), {"model_dump": lambda self: {"graphs": []}}
+                    "GraphSet",
+                    (),
+                    {
+                        "model_dump": lambda self: {
+                            "name": "Plant/Direct Integration",
+                            "zone_name": "Plant",
+                            "zone_address": "Site/Plant",
+                            "graphs": [],
+                        }
+                    },
                 )()
             }
         },
     )()
     monkeypatch.setattr(PinchProblem, "target", lambda self: obj._results)
-    assert obj.graph_data() == {"Plant": {"graphs": []}}
+    assert obj.graph_data() == {
+        "Plant": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [],
+        }
+    }
 
     obj._results = type("Results", (), {"graphs": None})()
     obj._master_zone = {"zone": "ok"}
@@ -584,6 +600,10 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
 def test_graph_catalog_and_plot_helpers(monkeypatch):
     payload = {
         "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "target_type": "Direct Integration",
             "graphs": [
                 {"type": "Composite Curves", "name": "Composite"},
                 {"type": "Grand Composite Curve", "name": "GCC"},
@@ -603,12 +623,16 @@ def test_graph_catalog_and_plot_helpers(monkeypatch):
     fig = obj.plot.grand_composite_curve(zone_name="Plant/DI")
 
     assert set(catalog["Graph Name"]) == {"Composite", "GCC"}
+    assert set(catalog["Zone Address"]) == {"Site/Plant"}
     assert fig == {"built": "GCC"}
 
 
 def test_plot_helper_executes_display_hook_when_available(monkeypatch):
     payload = {
         "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
             "graphs": [
                 {"type": "Composite Curves", "name": "Composite"},
             ]
@@ -638,6 +662,9 @@ def test_plot_helper_executes_display_hook_when_available(monkeypatch):
 def test_plot_helper_uses_default_notebook_dimensions(monkeypatch):
     payload = {
         "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
             "graphs": [
                 {"type": "Composite Curves", "name": "Composite", "segments": []},
             ]
@@ -656,6 +683,10 @@ def test_plot_helper_uses_default_notebook_dimensions(monkeypatch):
 def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypatch):
     payload = {
         "Direct Integration": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "target_type": "Direct Integration",
             "graphs": [
                 {"type": "Grand Composite Curve", "name": "GCC"},
             ]
@@ -675,9 +706,51 @@ def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypat
     assert fig == {"built": "GCC"}
 
 
+def test_plot_helpers_match_zone_address_when_target_types_repeat(monkeypatch):
+    payload = {
+        "Site/AreaA/Direct Integration": {
+            "name": "Site/AreaA/Direct Integration",
+            "zone_name": "AreaA",
+            "zone_address": "Site/AreaA",
+            "target_type": "Direct Integration",
+            "graphs": [
+                {"type": "Grand Composite Curve", "name": "AreaA GCC"},
+            ],
+        },
+        "Site/AreaB/Direct Integration": {
+            "name": "Site/AreaB/Direct Integration",
+            "zone_name": "AreaB",
+            "zone_address": "Site/AreaB",
+            "target_type": "Direct Integration",
+            "graphs": [
+                {"type": "Grand Composite Curve", "name": "AreaB GCC"},
+            ],
+        },
+    }
+    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_plotly_graph",
+        lambda graph: {"built": graph["name"]},
+        raising=True,
+    )
+
+    obj = PinchProblem()
+
+    assert obj.plot.grand_composite_curve(zone_name="Site/AreaA") == {
+        "built": "AreaA GCC"
+    }
+    assert obj.plot.grand_composite_curve(zone_name="Site/AreaB") == {
+        "built": "AreaB GCC"
+    }
+
+
 def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
     payload = {
         "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
             "graphs": [
                 {"type": "Grand Composite Curve", "name": "GCC"},
             ]

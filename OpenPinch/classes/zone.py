@@ -98,6 +98,13 @@ class Zone:
         self._active = bool(value)
 
     @property
+    def address(self) -> str:
+        """Slash-delimited path from the root zone to this zone."""
+        if self.parent_zone is None:
+            return str(self.name)
+        return f"{self.parent_zone.address}/{self.name}"
+
+    @property
     def dt_cont_multiplier(self) -> float:
         """Effective multiplier applied to stream and utility ``dt_cont`` values."""
         return self._dt_cont_multiplier

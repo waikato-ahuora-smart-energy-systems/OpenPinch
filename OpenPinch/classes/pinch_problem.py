@@ -607,11 +607,18 @@ class PinchProblem:
     def graph_catalog(self) -> pd.DataFrame:
         """Return a table describing the available graph outputs."""
         rows = []
-        for zone_name, graph_set in self.graph_data().items():
+        for graph_key, graph_set in self.graph_data().items():
+            graph_zone_name = graph_set.get("zone_name", graph_key)
+            graph_zone_address = graph_set.get("zone_address", graph_zone_name)
+            target_name = graph_set.get("name", graph_key)
+            target_type = graph_set.get("target_type")
             for index, graph in enumerate(graph_set.get("graphs", [])):
                 rows.append(
                     {
-                        "Zone": zone_name,
+                        "Zone": graph_zone_name,
+                        "Zone Address": graph_zone_address,
+                        "Target": target_name,
+                        "Target Type": target_type,
                         "Graph Type": graph.get("type"),
                         "Graph Name": graph.get("name", f"Graph {index + 1}"),
                         "Index": index,
@@ -946,26 +953,33 @@ class PinchProblem:
 
         zone_items = payload.items()
         if zone_name is not None:
-            resolved_zone_key = zone_name
-            if resolved_zone_key not in payload:
-                resolved_zone_key = str(zone_name).split("/", 1)[-1]
-
-            try:
-                zone_items = [(resolved_zone_key, payload[resolved_zone_key])]
-            except KeyError as exc:
+            matched_zone_items = [
+                (graph_key, graph_set)
+                for graph_key, graph_set in payload.items()
+                if _graph_set_matches_zone_selector(
+                    selector=str(zone_name),
+                    graph_key=graph_key,
+                    graph_set=graph_set,
+                )
+            ]
+            if not matched_zone_items:
                 raise KeyError(
                     f"Unknown zone {zone_name!r}. Available zones: {', '.join(payload)}"
-                ) from exc
+                )
+            zone_items = matched_zone_items
 
         selected = []
-        for zone_key, graph_set in zone_items:
+        for graph_key, graph_set in zone_items:
+            zone_identifier = graph_set.get("zone_address") or graph_set.get(
+                "zone_name", graph_key
+            )
             for graph in graph_set.get("graphs", []):
                 if (
                     selected_graph_type is not None
                     and graph.get("type") != selected_graph_type
                 ):
                     continue
-                selected.append((zone_key, graph))
+                selected.append((zone_identifier, graph))
         return selected
 
 
@@ -974,6 +988,32 @@ def _normalise_graph_type_selector(graph_type: Optional[str]) -> Optional[str]:
         return None
     text = str(graph_type).strip()
     return _GRAPH_TYPE_ALIASES.get(text.lower(), text)
+
+
+def _graph_set_matches_zone_selector(
+    *,
+    selector: str,
+    graph_key: str,
+    graph_set: dict[str, Any],
+) -> bool:
+    text = str(selector).strip()
+    suffix = text.split("/", 1)[-1]
+    candidates = (
+        graph_key,
+        graph_set.get("name"),
+        graph_set.get("zone_name"),
+        graph_set.get("zone_address"),
+        graph_set.get("target_type"),
+    )
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate_text = str(candidate)
+        if text == candidate_text or suffix == candidate_text:
+            return True
+        if "/" in candidate_text and suffix == candidate_text.split("/", 1)[-1]:
+            return True
+    return False
 
 
 def _slugify(value: str) -> str:

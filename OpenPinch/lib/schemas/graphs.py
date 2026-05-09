@@ -42,6 +42,9 @@ class GraphSet(BaseModel):
     """Named group of graphs emitted for a particular zone or context."""
 
     name: str = "GraphSet"
+    target_type: Optional[str] = None
+    zone_name: Optional[str] = None
+    zone_address: Optional[str] = None
     graphs: List[Graph] = Field(default_factory=list)
 
 
