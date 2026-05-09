@@ -8,35 +8,23 @@ from ..classes.zone import Zone
 from ..classes.stream import Stream
 from ..classes.stream_collection import StreamCollection
 from ..services.common.graph_data import get_output_graph_data
-from ..services.services_entry import (
-    direct_heat_integration_service,
-    indirect_heat_integration_service,
-)
+
 
 __all__ = [
-    "get_targets",
+    "get_targets_for_zone_and_sub_zones",
     "extract_results",
 ]
 
 
-def get_targets(
+def get_targets_for_zone_and_sub_zones(
     zone: Zone,
-    direct_service_func: Callable = direct_heat_integration_service,
-    indirect_service_func: Callable = indirect_heat_integration_service,
+    direct_service_func: Callable = None,
+    indirect_service_func: Callable = None,
 ):
-    """Dispatch a prepared zone tree to the appropriate targeting routine.
-
-    This function is a lower-level hook compared to
-    :func:`pinch_analysis_service`. It expects a fully prepared
-    :class:`~OpenPinch.classes.zone.Zone` hierarchy and returns the same zone
-    tree after the relevant direct and indirect integration targets have been
-    populated.
-    """
-
+    """Dispatch a prepared zone tree to the appropriate targeting routine."""
     handler = _TARGET_HANDLERS.get(zone.type)
     if handler is None:
         raise ValueError("No valid zone passed into OpenPinch for analysis.")
-
     return handler(zone, direct_service_func, indirect_service_func)
 
 
@@ -57,31 +45,33 @@ def extract_results(zone: Zone) -> dict:
 
 def _get_unit_operation_targets(
     zone: Zone,
-    direct_service_func: Callable = direct_heat_integration_service,
-    indirect_service_func: Callable = indirect_heat_integration_service,
+    direct_service_func: Callable = None,
+    indirect_service_func: Callable = None,
 ):
     """Populate a ``Zone`` with detailed unit operation-level pinch targets."""
-    if zone.config.DO_DIRECT_OPERATION_TARGETING:
+    if zone.config.DO_OPERATION_LEVEL_TARGETING:
         if len(zone.subzones) > 0:
             z: Zone
             for z in zone.subzones.values():
                 if z.type == ZT.O.value:
-                    if zone.config.DO_DIRECT_OPERATION_TARGETING:
-                        direct_heat_integration_service(z)
+                    if zone.config.DO_OPERATION_LEVEL_TARGETING:
+                        if isinstance(direct_service_func, Callable):
+                            direct_service_func(zone)
                 else:
                     raise ValueError(
                         "Invalid zone nesting. Unit operation zones can only contain other operation zones."
                     )
 
-        direct_heat_integration_service(zone)
+        if isinstance(direct_service_func, Callable):
+            direct_service_func(zone)
 
     return zone
 
 
 def _get_process_targets(
     zone: Zone,
-    direct_service_func: Callable = direct_heat_integration_service,
-    indirect_service_func: Callable = indirect_heat_integration_service,
+    direct_service_func: Callable = None,
+    indirect_service_func: Callable = None,
 ):
     """Populate a ``Zone`` with detailed process-level pinch targets."""
 
@@ -89,26 +79,36 @@ def _get_process_targets(
         z: Zone
         for z in zone.subzones.values():
             if z.type == ZT.O.value:
-                z = _get_unit_operation_targets(z)
+                z = _get_unit_operation_targets(
+                    z,
+                    direct_service_func=direct_service_func,
+                    indirect_service_func=indirect_service_func,
+                )
             elif z.type == ZT.P.value:
-                z = _get_process_targets(z)
+                z = _get_process_targets(
+                    z,
+                    direct_service_func=direct_service_func,
+                    indirect_service_func=indirect_service_func,
+                )
             else:
                 raise ValueError(
                     "Invalid zone nesting. Process zones can only contain other process zones and operation zones."
                 )
 
         if zone.config.DO_INDIRECT_PROCESS_TARGETING:
-            indirect_heat_integration_service(zone)
+            if isinstance(indirect_service_func, Callable):
+                indirect_service_func(zone)
 
-    direct_heat_integration_service(zone)
+    if isinstance(direct_service_func, Callable):
+        direct_service_func(zone)
 
     return zone
 
 
 def _get_site_targets(
     zone: Zone,
-    direct_service_func: Callable = direct_heat_integration_service,
-    indirect_service_func: Callable = indirect_heat_integration_service,
+    direct_service_func: Callable = None,
+    indirect_service_func: Callable = None,
 ):
     """Targets heat integration using Total Site Anlysis,
     by systematically analysing individual zones and then performing
@@ -116,49 +116,71 @@ def _get_site_targets(
     """
 
     # Totally integrated analysis for a site zone
-    direct_heat_integration_service(zone)
+    if isinstance(direct_service_func, Callable):
+        direct_service_func(zone)
 
     # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
         for z in zone.subzones.values():
             if z.type == ZT.O.value:
-                _get_unit_operation_targets(z)
+                _get_unit_operation_targets(
+                    z,
+                    direct_service_func=direct_service_func,
+                    indirect_service_func=indirect_service_func,
+                )
             elif z.type == ZT.P.value:
-                _get_process_targets(z)
+                _get_process_targets(
+                    z,
+                    direct_service_func=direct_service_func,
+                    indirect_service_func=indirect_service_func,
+                )
             elif z.type == ZT.S.value:
-                _get_site_targets(z)
+                _get_site_targets(
+                    z,
+                    direct_service_func=direct_service_func,
+                    indirect_service_func=indirect_service_func,
+                )
             else:
                 raise ValueError(
                     "Invalid zone nesting. Sites zones can only contain site, process and operation zones."
                 )
 
-        # Calculates TS targets based on different approaches
-        indirect_heat_integration_service(zone)
+        # Calculates indirect targets based on different approaches
+        if isinstance(indirect_service_func, Callable):
+            indirect_service_func(zone)
 
     return zone
 
 
 def _get_community_targets(
     zone: Zone,
-    direct_service_func: Callable = direct_heat_integration_service,
-    indirect_service_func: Callable = indirect_heat_integration_service,
+    direct_service_func: Callable = None,
+    indirect_service_func: Callable = None,
 ):
     """Targets a Community Zone."""
     z: Zone
     for z in zone.subzones.values():
-        z = _get_site_targets(z)
+        z = _get_site_targets(
+            z,
+            direct_service_func=direct_service_func,
+            indirect_service_func=indirect_service_func,
+        )
     return zone
 
 
 def _get_regional_targets(
     zone: Zone,
-    direct_service_func: Callable = direct_heat_integration_service,
-    indirect_service_func: Callable = indirect_heat_integration_service,
+    direct_service_func: Callable = None,
+    indirect_service_func: Callable = None,
 ):
     """Targets a Regional Zone."""
     z: Zone
     for z in zone.subzones.values():
-        z = _get_community_targets(z)
+        z = _get_community_targets(
+            z,
+            direct_service_func=direct_service_func,
+            indirect_service_func=indirect_service_func,
+        )
     return zone
 
 

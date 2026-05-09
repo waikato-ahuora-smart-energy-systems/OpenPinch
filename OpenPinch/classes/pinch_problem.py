@@ -7,10 +7,9 @@ launching the Streamlit dashboard.
 
 import json
 import warnings
-from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import pandas as pd
 from pydantic import ValidationError
@@ -27,13 +26,11 @@ from ..services import (
     indirect_refrigeration_service,
     power_cogeneration_service,
 )
-from ..lib.enums import GT, TT, ZT
+from ..lib.enums import GT, TT
 from ..lib.schemas.io import (
-    HeatPumpIntegrationScenario,
     TargetInput,
     TargetOutput,
 )
-from ..lib.schemas.reporting import HeatPumpIntegrationComparison
 from ..lib.schemas.targets import BaseTargetModel
 from ..utils.csv_to_json import get_problem_from_csv
 from ..utils.export import build_summary_dataframe
@@ -48,7 +45,7 @@ from ..streamlit_webviewer.web_graphing import (
 from .zone import Zone
 from ..services.services_entry import data_preprocessing_service
 from ..utils.multiscale_targeting import (
-    get_targets,
+    get_targets_for_zone_and_sub_zones,
     extract_results,
 )
 
@@ -76,6 +73,17 @@ _GRAPH_TYPE_ALIASES = {
     "gcc": GT.GCC.value,
     "grand composite": GT.GCC.value,
     "grand composite curve": GT.GCC.value,
+    "nlc": GT.NLC.value,
+    "net load": GT.NLC.value,
+    "net load curve": GT.NLC.value,
+    "net load curves": GT.NLC.value,
+    "net load profile": GT.NLC.value,
+    "net load profiles": GT.NLC.value,
+    "net_load": GT.NLC.value,
+    "net_load curve": GT.NLC.value,
+    "net_load curves": GT.NLC.value,
+    "net_load profile": GT.NLC.value,
+    "net_load profiles": GT.NLC.value,
     "tsp": GT.TSP.value,
     "total site": GT.TSP.value,
     "total site profiles": GT.TSP.value,
@@ -84,14 +92,249 @@ _GRAPH_TYPE_ALIASES = {
 }
 
 
-@dataclass
-class HeatPumpIntegrationEvaluation:
-    """Container returned by :meth:`PinchProblem.evaluate_heat_pump_integration`."""
+class _PlotAccessor:
+    """Callable graph helper that also exposes common named plot shortcuts."""
 
-    scenario: HeatPumpIntegrationScenario
-    comparison: HeatPumpIntegrationComparison
-    comparison_frame: pd.DataFrame
-    integrated_problem: "PinchProblem"
+    def __init__(self, problem: "PinchProblem") -> None:
+        self._problem = problem
+
+    def __call__(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        graph_type: Optional[str] = None,
+        index: int = 0,
+        show: bool = False,
+    ):
+        return self._problem._plot_graph(
+            zone_name=zone_name,
+            graph_type=graph_type,
+            index=index,
+            show=show,
+        )
+
+    def composite_curve(
+        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+    ):
+        return self(
+            zone_name=zone_name,
+            graph_type=GT.CC.value,
+            index=index,
+            show=show,
+        )
+
+    def shifted_composite_curve(
+        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+    ):
+        return self(
+            zone_name=zone_name,
+            graph_type=GT.SCC.value,
+            index=index,
+            show=show,
+        )
+
+    def balanced_composite_curve(
+        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+    ):
+        return self(
+            zone_name=zone_name,
+            graph_type=GT.BCC.value,
+            index=index,
+            show=show,
+        )
+
+    def grand_composite_curve(
+        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+    ):
+        return self(
+            zone_name=zone_name,
+            graph_type=GT.GCC.value,
+            index=index,
+            show=show,
+        )
+
+    def grand_composite_curve_with_heat_pump(
+        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+    ):
+        return self(
+            zone_name=zone_name,
+            graph_type=GT.GCC_HP.value,
+            index=index,
+            show=show,
+        )
+
+    def net_load_profiles(
+        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+    ):
+        return self(
+            zone_name=zone_name,
+            graph_type=GT.NLC.value,
+            index=index,
+            show=show,
+        )
+
+
+class _PlotAccessorDescriptor:
+    """Non-data descriptor exposing a callable plot accessor on instances."""
+
+    def __get__(self, obj: Optional["PinchProblem"], owner=None):
+        if obj is None:
+            return self
+        return _PlotAccessor(obj)
+
+
+class _TargetAccessor:
+    """Callable targeting helper that also exposes named targeting workflows."""
+
+    def __init__(self, problem: "PinchProblem") -> None:
+        self._problem = problem
+
+    def __call__(self):
+        return self._problem._run_targeting(
+            zone=self._problem._master_zone,
+            direct_service_func=direct_heat_integration_service,
+            indirect_service_func=indirect_heat_integration_service,
+        )
+
+    def direct_heat_integration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        return self._problem._execute_targeting(
+            target_id=TT.DI.value,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=direct_heat_integration_service,
+            direct_service_func=direct_heat_integration_service,
+        )
+
+    def indirect_heat_integration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        return self._problem._execute_targeting(
+            target_id=TT.TS.value,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=indirect_heat_integration_service,
+            indirect_service_func=indirect_heat_integration_service,
+        )
+
+    def direct_heat_pump(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        return self._problem._execute_targeting(
+            target_id=TT.DHP.value,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=direct_heat_pump_service,
+            direct_service_func=direct_heat_pump_service,
+        )
+
+    def indirect_heat_pump(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        return self._problem._execute_targeting(
+            target_id=TT.IHP.value,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=indirect_heat_pump_service,
+            indirect_service_func=indirect_heat_pump_service,
+        )
+
+    def direct_refrigeration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        return self._problem._execute_targeting(
+            target_id=TT.DR.value,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=direct_refrigeration_service,
+            direct_service_func=direct_refrigeration_service,
+        )
+
+    def indirect_refrigeration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        return self._problem._execute_targeting(
+            target_id=TT.IR.value,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=indirect_refrigeration_service,
+            indirect_service_func=indirect_refrigeration_service,
+        )
+
+    def cogeneration(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        target_id = TT.DI.value
+        if options and "base_target_type" in options:
+            target_id = str(options["base_target_type"])
+        return self._problem._execute_targeting(
+            target_id=target_id,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=power_cogeneration_service,
+            direct_service_func=power_cogeneration_service,
+        )
+
+    def area_cost(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+    ) -> BaseTargetModel:
+        return self._problem._execute_targeting(
+            target_id=TT.DI.value,
+            application_zone=zone_name,
+            options=options,
+            include_subzones=include_subzones,
+            single_zone_service=area_cost_targeting_service,
+            direct_service_func=area_cost_targeting_service,
+        )
+
+
+class _TargetAccessorDescriptor:
+    """Non-data descriptor exposing a callable target accessor on instances."""
+
+    def __get__(self, obj: Optional["PinchProblem"], owner=None):
+        if obj is None:
+            return self
+        return _TargetAccessor(obj)
 
 
 @dataclass
@@ -112,21 +355,20 @@ class PinchProblem:
 
     problem_filepath: Optional[Path] = None
     results_dir: Optional[Path] = None
-
-    # Internal state
     problem_data: Optional[JsonDict] = None
-    _project_name: str = "Untitled"
+    _project_name: str = "Site"
     _results: Optional[TargetOutput] = None
     _validated_data: TargetInput = None
     _master_zone: Optional["Zone"] = None
     _input_source_kind: str = "unknown"
     _validation_context: Optional[dict[str, list[dict[str, Any]]]] = None
+    plot = _PlotAccessorDescriptor()
+    target = _TargetAccessorDescriptor()
 
     def __init__(
         self,
-        problem_filepath: Optional[PathLike] = None,
-        results_dir: Optional[PathLike] = None,
-        project_name: Optional[str] = "Untitled",
+        project_name: Optional[str] = "Site",
+        source: Union[TargetInput, PathLike, Tuple[PathLike, PathLike]] = None,
     ) -> None:
         """Initialise the orchestrator and optionally run the full targeting workflow.
 
@@ -138,17 +380,13 @@ class PinchProblem:
             Destination directory for exported Excel summaries. May be ``None`` if export
             is handled later.
         """
+        self._project_name = project_name
         self._input_source_kind = "unknown"
         self._validation_context = None
-        self._project_name = project_name
-        if problem_filepath is not None:
-            self.load(source=Path(problem_filepath))
-        else:
-            self._problem_filepath = None
-            self._problem_data = None
-
-        self.results_dir = Path(results_dir) if results_dir is not None else None
+        self._problem_filepath = None
+        self._problem_data = None
         self._results = None
+        self.load(source=source)
 
     # ----------------------------------------------------------------------------
     # Public API
@@ -171,6 +409,8 @@ class PinchProblem:
             The loaded input structure ready for targeting.
         """
         if source is None:
+            if self.problem_filepath is None:
+                return None
             source = Path(self.problem_filepath)
 
         try:
@@ -270,136 +510,34 @@ class PinchProblem:
         self._master_zone = self._data_preprocessing()
         return self._master_zone
 
-    def target(self) -> TargetOutput:
+    def _run_targeting(
+        self,
+        zone: Zone = None,
+        direct_service_func: Callable = None,
+        indirect_service_func: Callable = None,
+    ) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
         if self._master_zone is None:
             if self._problem_data is None:
                 raise RuntimeError("No input loaded. Call load(...) first.")
             else:
                 self.load(self._problem_data)
-
+        if not isinstance(zone, Zone):
+            zone = self._master_zone
+        if direct_service_func is None and indirect_service_func is None:
+            direct_service_func = direct_heat_integration_service
+            indirect_service_func = indirect_heat_integration_service
         # Perform advanced targeting analysis on the master zone and all subzones
-        master_zone = get_targets(self._master_zone)
+        get_targets_for_zone_and_sub_zones(
+            zone=zone,
+            direct_service_func=direct_service_func,
+            indirect_service_func=indirect_service_func,
+        )
         # Extract the core results from the master zone
-        return_data = extract_results(master_zone)
+        return_data = extract_results(zone)
         # Validate response data
         self._results = TargetOutput.model_validate(return_data)
         return self._results
-
-    def target_direct_heat_integration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Run direct heat integration targeting on the selected solved zone."""
-        return self._execute_zone_service(
-            direct_heat_integration_service,
-            target_id=TT.DI.value,
-            zone_name=zone_name,
-            options=options,
-        )
-
-    def target_indirect_heat_integration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Run indirect heat integration targeting on the selected solved zone."""
-        return self._execute_zone_service(
-            indirect_heat_integration_service,
-            target_id=TT.TS.value,
-            zone_name=zone_name,
-            options=options,
-        )
-
-    def target_direct_heat_pump(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Run direct heat pump targeting on the selected solved zone."""
-        return self._execute_zone_service(
-            direct_heat_pump_service,
-            target_id=TT.DHP.value,
-            zone_name=zone_name,
-            options=options,
-        )
-
-    def target_indirect_heat_pump(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Run indirect heat pump targeting on the selected solved zone."""
-        return self._execute_zone_service(
-            indirect_heat_pump_service,
-            target_id=TT.IHP.value,
-            zone_name=zone_name,
-            options=options,
-        )
-
-    def target_direct_refrigeration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Run direct refrigeration targeting on the selected solved zone."""
-        return self._execute_zone_service(
-            direct_refrigeration_service,
-            target_id=TT.DR.value,
-            zone_name=zone_name,
-            options=options,
-        )
-
-    def target_indirect_refrigeration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Run indirect refrigeration targeting on the selected solved zone."""
-        return self._execute_zone_service(
-            indirect_refrigeration_service,
-            target_id=TT.IR.value,
-            zone_name=zone_name,
-            options=options,
-        )
-
-    def target_cogeneration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Run cogeneration targeting on the selected solved zone."""
-        target_id = TT.DI.value
-        if options and "base_target_type" in options:
-            target_id = str(options["base_target_type"])
-        return self._execute_zone_service(
-            power_cogeneration_service,
-            target_id=target_id,
-            zone_name=zone_name,
-            options=options,
-        )
-
-    def target_area_cost(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-    ) -> BaseTargetModel:
-        """Recompute direct targets with area and cost targeting enabled."""
-        return self._execute_zone_service(
-            area_cost_targeting_service,
-            target_id=TT.DI.value,
-            zone_name=zone_name,
-            options=options,
-        )
 
     def validate(self) -> TargetInput:
         """Validate the currently loaded problem data without running targeting."""
@@ -481,12 +619,13 @@ class PinchProblem:
                 )
         return pd.DataFrame(rows)
 
-    def plot(
+    def _plot_graph(
         self,
         *,
         zone_name: Optional[str] = None,
         graph_type: Optional[str] = None,
         index: int = 0,
+        show: bool = False,
     ):
         """Build a Plotly figure for one graph from the solved result set."""
         graph = self._select_graph(
@@ -494,35 +633,10 @@ class PinchProblem:
             graph_type=graph_type,
             index=index,
         )
-        return _build_plotly_graph(graph)
-
-    def plot_composite_curve(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        variant: str = "composite",
-    ):
-        """Build a composite-curve Plotly figure for the selected zone."""
-        selector = {
-            "composite": GT.CC.value,
-            "shifted": GT.SCC.value,
-            "balanced": GT.BCC.value,
-        }.get(variant.strip().lower())
-        if selector is None:
-            raise ValueError(
-                "variant must be one of: 'composite', 'shifted', or 'balanced'."
-            )
-        return self.plot(zone_name=zone_name, graph_type=selector)
-
-    def plot_grand_composite_curve(self, *, zone_name: Optional[str] = None):
-        """Build the grand composite curve Plotly figure for the selected zone."""
-        return self.plot(zone_name=zone_name, graph_type=GT.GCC.value)
-
-    def plot_grand_composite_curve_with_heat_pump(
-        self, *, zone_name: Optional[str] = None
-    ):
-        """Build the heat pump load profile curve Plotly figure for the selected zone."""
-        return self.plot(zone_name=zone_name, graph_type=GT.GCC_HP.value)
+        figure = _build_plotly_graph(graph)
+        if hasattr(figure, "show") and show:
+            figure.show()
+        return figure
 
     def export_graphs(
         self,
@@ -611,84 +725,6 @@ class PinchProblem:
         comparison.loc["Change", "Target"] = str(base_row["Target"])
         return comparison
 
-    def build_heat_pump_integration_problem(
-        self,
-        scenario: HeatPumpIntegrationScenario | dict[str, Any],
-    ) -> tuple[HeatPumpIntegrationScenario, "PinchProblem"]:
-        """Build a new :class:`PinchProblem` with an integrated heat pump scenario."""
-        if self._problem_data is None:
-            raise RuntimeError("No input loaded. Call load(...) first.")
-
-        validated_scenario = HeatPumpIntegrationScenario.model_validate(scenario)
-        base_problem_data = self.to_problem_json()
-        scenario_data = deepcopy(
-            base_problem_data.model_dump()
-            if hasattr(base_problem_data, "model_dump")
-            else base_problem_data
-        )
-        scenario_data.setdefault("streams", []).extend(
-            _build_heat_pump_stream_payloads(validated_scenario)
-        )
-
-        integrated_problem = PinchProblem.from_json(scenario_data)
-        integrated_problem._project_name = f"{self._project_name}_with_hp"
-        return validated_scenario, integrated_problem
-
-    def evaluate_heat_pump_integration(
-        self,
-        scenario: HeatPumpIntegrationScenario | dict[str, Any],
-        *,
-        target_name: Optional[str] = None,
-        base_label: str = "Base case",
-        scenario_label: str = "Integrated heat pump scenario",
-    ) -> HeatPumpIntegrationEvaluation:
-        """Solve and compare a candidate integrated heat pump scenario."""
-        validated_scenario, integrated_problem = (
-            self.build_heat_pump_integration_problem(scenario)
-        )
-        comparison_frame = self.compare_to(
-            integrated_problem,
-            target_name=target_name,
-            base_label=base_label,
-            other_label=scenario_label,
-        )
-
-        approximate_power_input = (
-            validated_scenario.condenser_duty - validated_scenario.evaporator_duty
-        )
-        comparison_frame["Approx. HP Power Input"] = [
-            None,
-            approximate_power_input,
-            None,
-        ]
-
-        target_value = str(comparison_frame.loc[base_label, "Target"])
-        comparison_summary = HeatPumpIntegrationComparison(
-            target=target_value,
-            base_case_name=self._project_name,
-            scenario_case_name=integrated_problem._project_name,
-            hot_utility_target_delta=float(
-                comparison_frame.loc["Change", "Hot Utility Target"]
-            ),
-            cold_utility_target_delta=float(
-                comparison_frame.loc["Change", "Cold Utility Target"]
-            ),
-            heat_recovery_delta=float(comparison_frame.loc["Change", "Heat Recovery"]),
-            hot_pinch_delta=_coerce_optional_float(
-                comparison_frame.loc["Change", "Hot Pinch"]
-            ),
-            cold_pinch_delta=_coerce_optional_float(
-                comparison_frame.loc["Change", "Cold Pinch"]
-            ),
-            approximate_power_input=float(approximate_power_input),
-        )
-        return HeatPumpIntegrationEvaluation(
-            scenario=validated_scenario,
-            comparison=comparison_summary,
-            comparison_frame=comparison_frame,
-            integrated_problem=integrated_problem,
-        )
-
     def _data_preprocessing(self) -> "Zone":
         if isinstance(self._validated_data, TargetInput) and isinstance(
             self._project_name, str
@@ -737,7 +773,7 @@ class PinchProblem:
     @classmethod
     def from_json(cls, data: JsonDict) -> "PinchProblem":
         """Build from an in-memory mapping and apply the normal input cleaners."""
-        obj = cls(problem_filepath=None, results_dir=None)
+        obj = cls()
         obj._problem_data = data
         if isinstance(obj._problem_data, dict) and isinstance(
             obj._problem_data.get("streams"), list
@@ -831,34 +867,46 @@ class PinchProblem:
             value_rounding=value_rounding,
         )
 
-    def _execute_zone_service(
+    def _execute_targeting(
         self,
-        service: ZoneService,
         *,
         target_id: str,
-        zone_name: Optional[str],
+        application_zone: Optional[str | Zone],
         options: Optional[dict[str, Any]],
+        include_subzones: bool,
+        single_zone_service: ZoneService,
+        direct_service_func: Optional[Callable] = None,
+        indirect_service_func: Optional[Callable] = None,
     ) -> BaseTargetModel:
         if self._master_zone is None:
             self.target()
 
-        zone = self._resolve_target_zone(zone_name)
-        service(zone, options)
-        self._refresh_results_from_master_zone()
+        zone = self._resolve_target_zone(application_zone)
+        if include_subzones:
+            self._run_targeting(
+                zone=zone,
+                direct_service_func=direct_service_func,
+                indirect_service_func=indirect_service_func,
+            )
+        else:
+            single_zone_service(zone, options)
+            self._refresh_results_from_master_zone()
 
         try:
             return zone.targets[target_id]
         except KeyError as exc:
             raise RuntimeError(
-                f"Service {service.__name__!r} did not produce target {target_id!r}."
+                f"Targeting did not produce target {target_id!r} for zone {zone.name!r}."
             ) from exc
 
-    def _resolve_target_zone(self, zone_name: Optional[str]) -> "Zone":
+    def _resolve_target_zone(self, application_zone: Optional[str] = None) -> "Zone":
+        if isinstance(application_zone, Zone):
+            return application_zone
         if self._master_zone is None:
             raise RuntimeError("No analysed zone is available. Run target() first.")
-        if zone_name is None:
+        if application_zone is None:
             return self._master_zone
-        return self._master_zone.get_subzone(zone_name)
+        return self._master_zone.get_subzone(application_zone)
 
     def _refresh_results_from_master_zone(self) -> TargetOutput:
         if self._master_zone is None:
@@ -981,43 +1029,6 @@ def _locate_summary_row(
     if not direct_match.empty:
         return direct_match.iloc[0]
     return frame.iloc[0]
-
-
-def _build_heat_pump_stream_payloads(
-    scenario: HeatPumpIntegrationScenario,
-) -> list[dict[str, Any]]:
-    return [
-        {
-            "zone": scenario.zone,
-            "name": scenario.condenser_name,
-            "t_supply": {"value": scenario.condenser_temperature, "units": "degC"},
-            "t_target": {
-                "value": scenario.condenser_temperature - scenario.dt_phase_change,
-                "units": "degC",
-            },
-            "heat_flow": {"value": scenario.condenser_duty, "units": "kW"},
-            "dt_cont": {"value": scenario.dt_cont, "units": "degC"},
-            "htc": {"value": scenario.htc, "units": "kW/m^2/degC"},
-        },
-        {
-            "zone": scenario.zone,
-            "name": scenario.evaporator_name,
-            "t_supply": {
-                "value": scenario.evaporator_temperature - scenario.dt_phase_change,
-                "units": "degC",
-            },
-            "t_target": {"value": scenario.evaporator_temperature, "units": "degC"},
-            "heat_flow": {"value": scenario.evaporator_duty, "units": "kW"},
-            "dt_cont": {"value": scenario.dt_cont, "units": "degC"},
-            "htc": {"value": scenario.htc, "units": "kW/m^2/degC"},
-        },
-    ]
-
-
-def _coerce_optional_float(value: Any) -> Optional[float]:
-    if value is None or pd.isna(value):
-        return None
-    return float(value)
 
 
 def _build_validation_context(

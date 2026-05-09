@@ -107,7 +107,7 @@ result = pinch_analysis_service(payload, project_name="Example")
 For graph generation in Python:
 
 ```python
-figure = problem.plot_grand_composite_curve()
+figure = problem.plot.grand_composite_curve()
 figure.show()
 ```
 

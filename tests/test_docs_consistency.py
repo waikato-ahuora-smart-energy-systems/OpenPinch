@@ -37,9 +37,9 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "summary_frame()" in combined
     assert "export_excel" in combined
     assert "show_dashboard()" in combined
-    assert "plot_grand_composite_curve" in combined
+    assert "plot.grand_composite_curve" in combined
     assert "evaluate_heat_pump_integration" in combined
-    assert "target_direct_heat_pump" in combined
+    assert "problem.target.direct_heat_pump" in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():

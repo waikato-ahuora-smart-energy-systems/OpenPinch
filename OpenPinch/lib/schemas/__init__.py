@@ -14,8 +14,6 @@ __all__ = [
     "Graph",
     "GraphSet",
     "HPRMetric",
-    "HeatPumpIntegrationComparison",
-    "HeatPumpIntegrationScenario",
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",
     "HeatUtility",

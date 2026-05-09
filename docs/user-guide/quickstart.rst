@@ -61,8 +61,8 @@ Build Plotly figures directly from the solved result set:
 
 .. code-block:: python
 
-   gcc = problem.plot_grand_composite_curve()
-   cc = problem.plot_composite_curve()
+   gcc = problem.plot.grand_composite_curve()
+   cc = problem.plot.composite_curve()
 
 You can also export HTML graph files for later review:
 
@@ -196,9 +196,10 @@ sample case:
 
 For the broader direct-versus-indirect Carnot workflow, use
 ``03_carnot_hpr_comparison.ipynb``. It
-demonstrates the explicit ``target_direct_heat_pump``,
-``target_direct_refrigeration``, ``target_indirect_heat_pump``, and
-``target_indirect_refrigeration`` methods on the packaged
+demonstrates the explicit ``problem.target.direct_heat_pump(...)``,
+``problem.target.direct_refrigeration(...)``,
+``problem.target.indirect_heat_pump(...)``, and
+``problem.target.indirect_refrigeration(...)`` accessors on the packaged
 ``chocolate_factory.json`` sample.
 
 Next Steps

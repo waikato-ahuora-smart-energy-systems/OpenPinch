@@ -122,6 +122,29 @@ def _create_graph_set(t: BaseTargetModel, graphTitle: str) -> dict:
             )
         )
 
+    if GT.NLC.value in target_graphs:
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graphTitle,
+                key=GT.NLC.value,
+                data=target_graphs[GT.NLC.value],
+                col_keys=[
+                    PT.H_NET_HOT.value,
+                    PT.H_NET_COLD.value,
+                    PT.H_HOT_UT.value,
+                    PT.H_COLD_UT.value,
+                ],
+                stream_types=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                    StreamLoc.HotU,
+                    StreamLoc.ColdU,
+                ],
+                label="Net Load Curves",
+                include_arrows=True,
+            )
+        )
+
     if GT.TSP.value in target_graphs:
         graphs.append(
             _make_composite_graph(

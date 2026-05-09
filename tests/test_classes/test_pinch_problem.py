@@ -251,29 +251,9 @@ def test_init_with_problem_filepath_calls_load(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(PinchProblem, "load", fake_load)
     p = tmp_path / "p.json"
     p.write_text("{}", encoding="utf-8")
-    PinchProblem(problem_filepath=p)
+    PinchProblem().load(source=p)
 
     assert called["source"] == p
-
-
-def test_init_run_true_success_calls_export(monkeypatch, tmp_path: Path):
-    called = {"target": 0, "export": None}
-
-    def fake_target(self):
-        called["target"] += 1
-        self._results = {"ok": True}
-        return self._results
-
-    def fake_export(self, results_dir=None):
-        called["export"] = results_dir
-        return Path(results_dir) / "out.xlsx"
-
-    monkeypatch.setattr(PinchProblem, "target", fake_target)
-    monkeypatch.setattr(PinchProblem, "export_to_Excel", fake_export)
-
-    PinchProblem(results_dir=tmp_path)
-
-    assert called["target"] == 0
 
 
 def test_load_json_parse_error_raises_value_error(tmp_path: Path):
@@ -364,6 +344,87 @@ def test_run_is_alias_for_target(monkeypatch):
     monkeypatch.setattr(PinchProblem, "target", lambda self: {"ok": True})
     obj = PinchProblem()
     assert obj.target() == {"ok": True}
+
+
+def test_target_accessor_supports_named_workflow(monkeypatch):
+    called = {}
+
+    def fake_execute_targeting(
+        self,
+        *,
+        target_id,
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        single_zone_service=None,
+        direct_service_func=None,
+        indirect_service_func=None,
+    ):
+        called["target_id"] = target_id
+        called["application_zone"] = application_zone
+        called["options"] = options
+        called["include_subzones"] = include_subzones
+        called["single_zone_service"] = single_zone_service
+        called["direct_service_func"] = direct_service_func
+        called["indirect_service_func"] = indirect_service_func
+        return {"target": "di"}
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "_execute_targeting",
+        fake_execute_targeting,
+    )
+
+    obj = PinchProblem()
+    out = obj.target.direct_heat_integration(
+        zone_name="Plant/DI",
+        options={"dt_min": 15},
+    )
+
+    assert out == {"target": "di"}
+    assert called["target_id"] == "Direct Integration"
+    assert called["application_zone"] == "Plant/DI"
+    assert called["options"] == {"dt_min": 15}
+    assert called["include_subzones"] is False
+
+
+def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
+    called = {}
+
+    def fake_execute_targeting(
+        self,
+        *,
+        target_id,
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        single_zone_service=None,
+        direct_service_func=None,
+        indirect_service_func=None,
+    ):
+        called["target_id"] = target_id
+        called["application_zone"] = application_zone
+        called["options"] = options
+        called["include_subzones"] = include_subzones
+        called["single_zone_service"] = single_zone_service
+        called["direct_service_func"] = direct_service_func
+        called["indirect_service_func"] = indirect_service_func
+        return {"target": "di"}
+
+    monkeypatch.setattr(PinchProblem, "_execute_targeting", fake_execute_targeting)
+
+    obj = PinchProblem()
+    out = obj.target.direct_heat_integration(
+        zone_name="Plant/DI",
+        include_subzones=True,
+    )
+
+    assert out == {"target": "di"}
+    assert called["target_id"] == "Direct Integration"
+    assert called["application_zone"] == "Plant/DI"
+    assert called["include_subzones"] is True
+    assert called["direct_service_func"] is not None
+    assert called["indirect_service_func"] is None
 
 
 def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
@@ -457,6 +518,42 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     assert detailed.iloc[0]["Target"] == "Plant/DI"
 
 
+def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
+    class _Value:
+        def __init__(self, value, units="kW"):
+            self.value = value
+            self.units = units
+
+    target = type(
+        "Target",
+        (),
+        {
+            "name": "Plant/DI",
+            "Qh": _Value(10.0),
+            "Qc": _Value(20.0),
+            "Qr": _Value(30.0),
+            "temp_pinch": type(
+                "TempPinch",
+                (),
+                {
+                    "hot_temp": _Value(120.0, "degC"),
+                    "cold_temp": _Value(120.0, "degC"),
+                },
+            )(),
+            "hot_utilities": [],
+            "cold_utilities": [],
+        },
+    )()
+    obj = PinchProblem()
+    results = type("Results", (), {"targets": [target]})()
+    obj.target = lambda: results
+
+    summary = obj.summary_frame()
+
+    assert summary.iloc[0]["Hot Pinch"] == 120.0
+    assert summary.iloc[0]["Cold Pinch"] == 120.0
+
+
 def test_graph_data_uses_results_then_master_zone(monkeypatch):
     obj = PinchProblem()
     obj._results = type(
@@ -503,10 +600,57 @@ def test_graph_catalog_and_plot_helpers(monkeypatch):
 
     obj = PinchProblem()
     catalog = obj.graph_catalog()
-    fig = obj.plot_grand_composite_curve(zone_name="Plant/DI")
+    fig = obj.plot.grand_composite_curve(zone_name="Plant/DI")
 
     assert set(catalog["Graph Name"]) == {"Composite", "GCC"}
     assert fig == {"built": "GCC"}
+
+
+def test_plot_helper_executes_display_hook_when_available(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "graphs": [
+                {"type": "Composite Curves", "name": "Composite"},
+            ]
+        }
+    }
+    shown = {"count": 0}
+
+    class FakeFigure:
+        def show(self):
+            shown["count"] += 1
+
+    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_plotly_graph",
+        lambda graph: FakeFigure(),
+        raising=True,
+    )
+
+    obj = PinchProblem()
+    fig = obj.plot.composite_curve(zone_name="Plant/DI", show=True)
+
+    assert isinstance(fig, FakeFigure)
+    assert shown["count"] == 1
+
+
+def test_plot_helper_uses_default_notebook_dimensions(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "graphs": [
+                {"type": "Composite Curves", "name": "Composite", "segments": []},
+            ]
+        }
+    }
+    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+
+    obj = PinchProblem()
+    fig = obj.plot.composite_curve(zone_name="Plant/DI")
+
+    assert fig.layout.width == 720
+    assert fig.layout.height == 540
+    assert fig.layout.autosize is False
 
 
 def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypatch):
@@ -526,9 +670,31 @@ def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypat
     )
 
     obj = PinchProblem()
-    fig = obj.plot_grand_composite_curve(zone_name="Plant/Direct Integration")
+    fig = obj.plot.grand_composite_curve(zone_name="Plant/Direct Integration")
 
     assert fig == {"built": "GCC"}
+
+
+def test_plot_accepts_net_load_profile_alias(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "graphs": [
+                {"type": "Net Load Curves", "name": "NLC"},
+            ]
+        }
+    }
+    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_plotly_graph",
+        lambda graph: {"built": graph["name"]},
+        raising=True,
+    )
+
+    obj = PinchProblem()
+    fig = obj.plot(zone_name="Plant/DI", graph_type="net_load profiles")
+
+    assert fig == {"built": "NLC"}
 
 
 def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
@@ -623,31 +789,6 @@ def test_compare_to_builds_delta_table(monkeypatch):
     assert comparison.loc["Change", "Heat Recovery"] == 650.0
 
 
-def test_evaluate_heat_pump_integration_uses_packaged_sample(tmp_path: Path):
-    case_path = copy_sample_case(
-        "heat_pump_targeting.json",
-        tmp_path / "heat_pump_targeting.json",
-    )
-    problem = PinchProblem(problem_filepath=case_path)
-
-    evaluation = problem.evaluate_heat_pump_integration(
-        {
-            "zone": "Plant",
-            "condenser_temperature": 170.0,
-            "condenser_duty": 500.0,
-            "evaporator_temperature": 90.0,
-            "evaporator_duty": 400.0,
-        },
-        target_name="Plant/Direct Integration",
-    )
-
-    assert evaluation.comparison.target == "Plant/Direct Integration"
-    assert evaluation.comparison.hot_utility_target_delta < 0
-    assert evaluation.comparison.cold_utility_target_delta < 0
-    assert evaluation.comparison.approximate_power_input == 100.0
-    assert "Approx. HP Power Input" in evaluation.comparison_frame.columns
-
-
 def test_validate_formats_schema_errors_with_stream_context(tmp_path: Path):
     payload = {
         "streams": [
@@ -667,7 +808,7 @@ def test_validate_formats_schema_errors_with_stream_context(tmp_path: Path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError) as exc_info:
-        PinchProblem(problem_filepath=path)
+        PinchProblem().load(source=path)
 
     message = str(exc_info.value)
     assert "Input validation failed" in message
@@ -706,7 +847,7 @@ def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.warns() as exc_info:
-        PinchProblem(problem_filepath=path)
+        PinchProblem().load(source=path)
 
 
 def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
@@ -714,100 +855,11 @@ def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
         "chocolate_factory.json",
         tmp_path / "chocolate_factory.json",
     )
-    problem = PinchProblem(problem_filepath=case_path)
+    problem = PinchProblem()
+    problem.load(source=case_path)
 
     validated = problem.validate()
 
     assert validated.zone_tree is None
     assert len(validated.streams) == 65
     assert len(validated.utilities) == 5
-
-
-# def test_target_services_workflow_refreshes_cached_results(tmp_path: Path):
-#     case_path = copy_sample_case(
-#         "chocolate_factory.json",
-#         tmp_path / "chocolate_factory.json",
-#     )
-#     problem = PinchProblem(problem_filepath=case_path)
-
-#     problem.master_zone.config.MAX_HP_MULTISTART = 1
-#     problem.master_zone.config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
-
-#     master_zone = problem.master_zone
-#     assert id(master_zone) == id(problem.master_zone)
-
-
-#     zone = problem.master_zone.get_subzone("Vacuum")
-#     zone.config.MAX_HP_MULTISTART = 1
-#     zone.config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
-
-#     config = problem.master_zone.get_subzone("Vacuum").config
-#     problem.master_zone.get_subzone("Vacuum")._config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
-
-#     setattr(problem.master_zone.get_subzone("Vacuum")._config, "HPR_TYPE",  HPRcycle.MultiTempCarnot.value)
-
-#     baseline = problem.target()
-#     baseline_target_count = len(baseline.targets)
-
-#     direct_hp = problem.target_direct_heat_pump(zone_name="Vacuum")
-#     direct_r = problem.target_direct_refrigeration(zone_name="Vacuum")
-#     indirect_hp = problem.target_indirect_heat_pump()
-#     indirect_r = problem.target_indirect_refrigeration()
-#     cogeneration = problem.target_cogeneration(zone_name="Vacuum")
-#     area_cost = problem.target_area_cost(zone_name="Vacuum")
-
-#     assert direct_hp.type == TT.DHP.value
-#     assert direct_r.type == TT.DR.value
-#     assert indirect_hp.type == TT.IHP.value
-#     assert indirect_r.type == TT.IR.value
-#     assert cogeneration.type == TT.DI.value
-#     assert area_cost.type == TT.DI.value
-
-#     assert len(problem.results.targets) == baseline_target_count + 4
-#     result_names = {target.name for target in problem.results.targets}
-#     assert direct_hp.name in result_names
-#     assert direct_r.name in result_names
-#     assert indirect_hp.name in result_names
-#     assert indirect_r.name in result_names
-
-#     direct_hp_result = next(
-#         target for target in problem.results.targets if target.name == direct_hp.name
-#     )
-#     assert direct_hp_result.hpr_cycle == HPRcycle.MultiTempCarnot.value
-#     assert isinstance(direct_hp_result.hpr_hot_streams, StreamCollection)
-#     assert isinstance(direct_hp_result.hpr_cold_streams, StreamCollection)
-#     assert len(direct_hp_result.hpr_hot_streams) > 0
-#     assert direct_hp_result.hpr_success is True
-#     assert cogeneration.work_target > 0.0
-#     assert area_cost.area > 0.0
-
-
-# def test_target_service_methods_auto_bootstrap_and_overwrite_existing_target(
-#     tmp_path: Path,
-# ):
-#     case_path = copy_sample_case(
-#         "chocolate_factory.json",
-#         tmp_path / "chocolate_factory.json",
-#     )
-#     problem = PinchProblem(problem_filepath=case_path)
-#     options = {
-#         "MAX_HP_MULTISTART": 1,
-#         "HPR_TYPE": HPRcycle.MultiTempCarnot.value,
-#     }
-
-#     first_target = problem.target_direct_heat_pump(
-#         zone_name="chocolate_factory/Vacuum",
-#         options=options,
-#     )
-#     target_count_after_first_run = len(problem.results.targets)
-#     second_target = problem.target_direct_heat_pump(zone_name="Vacuum", options=options)
-
-#     assert problem.master_zone is not None
-#     assert first_target.name == "Vacuum/Direct Heat Pump"
-#     assert second_target.name == first_target.name
-#     assert first_target.type == TT.DHP.value
-#     assert len(problem.results.targets) == target_count_after_first_run
-#     assert (
-#         sum(1 for target in problem.results.targets if target.name == first_target.name)
-#         == 1
-#     )

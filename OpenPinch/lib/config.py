@@ -53,7 +53,7 @@ class Configuration:
     DECIMAL_PLACES: int = 2
 
     ### Targeting analysis flags ###
-    DO_DIRECT_OPERATION_TARGETING: bool = False
+    DO_OPERATION_LEVEL_TARGETING: bool = False  ### modified, change in the template
     DO_DIRECT_SITE_TARGETING: bool = True
     DO_INDIRECT_PROCESS_TARGETING: bool = False
     DO_BALANCED_CC: bool = True

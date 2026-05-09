@@ -110,7 +110,7 @@ export graphs:
 
 .. code-block:: python
 
-   gcc = evaluation.integrated_problem.plot_grand_composite_curve(
+   gcc = evaluation.integrated_problem.plot.grand_composite_curve(
        zone_name="Plant/Direct Integration"
    )
 

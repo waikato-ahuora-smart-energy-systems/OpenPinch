@@ -97,11 +97,11 @@ Heat Pump Targeting API
 The main user-facing screening workflow is
 :meth:`OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`.
 For solved-zone post-processing, the main advanced workflow is the
-``PinchProblem.target_*`` family, including
-:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_direct_heat_pump`,
-:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_heat_pump`,
-:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_direct_refrigeration`,
-and :meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_refrigeration`.
+``PinchProblem.target.*`` accessor family, including
+``problem.target.direct_heat_pump(...)``,
+``problem.target.indirect_heat_pump(...)``,
+``problem.target.direct_refrigeration(...)``,
+and ``problem.target.indirect_refrigeration(...)``.
 The module below exposes the lower-level targeting helpers used by the direct
 and indirect integration entrypoints, plus advanced plotting helpers for solved
 multi-cycle results.

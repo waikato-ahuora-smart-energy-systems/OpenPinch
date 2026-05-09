@@ -7,12 +7,6 @@ import pytest
 from OpenPinch import *
 from OpenPinch.utils.miscellaneous import get_value
 from OpenPinch.lib import *
-from types import SimpleNamespace
-import OpenPinch.main as main_mod
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.enums import ZT
 
 
 def get_example_problem_filepaths():

@@ -27,7 +27,6 @@ def _normalise_target_name(
         raise ValueError("zone_name or name is required.")
     if name:
         return str(name)
-
     suffix = f"/{target_type}"
     assert zone_name is not None
     return zone_name if str(zone_name).endswith(suffix) else f"{zone_name}{suffix}"
@@ -38,8 +37,6 @@ def _build_temp_pinch(
     hot_pinch: Optional[float],
 ) -> TempPinch:
     if isinstance(cold_pinch, float) and isinstance(hot_pinch, float):
-        if abs(cold_pinch - hot_pinch) < tol:
-            return TempPinch(cold_temp=cold_pinch)
         return TempPinch(cold_temp=cold_pinch, hot_temp=hot_pinch)
     if isinstance(cold_pinch, float):
         return TempPinch(cold_temp=cold_pinch)

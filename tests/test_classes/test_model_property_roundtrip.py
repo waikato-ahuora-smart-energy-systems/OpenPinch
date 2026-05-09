@@ -180,6 +180,7 @@ def test_target_model_and_zone_property_branches():
     assert t.hot_pinch == 120.0
     payload_same = t.serialize_json(isTotal=True)
     assert payload_same["temp_pinch"]["cold_temp"] == 120.0
+    assert payload_same["temp_pinch"]["hot_temp"] == 120.0
 
     t.hot_pinch = None
     t.cold_pinch = 95.0

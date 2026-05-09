@@ -509,6 +509,9 @@ def _hover_template(
 
 def _apply_default_layout(fig: go.Figure) -> None:
     fig.update_layout(
+        width=720,
+        height=540,
+        autosize=False,
         xaxis_title="Heat Flow / kW",
         yaxis_title="Temperature / \N{DEGREE SIGN}C",
         template="plotly_white",

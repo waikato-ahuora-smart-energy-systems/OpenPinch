@@ -63,22 +63,7 @@ class TargetResults(BaseModel):
     hpr_cold_streams: Optional[StreamCollection] = None
 
 
-class HeatPumpIntegrationComparison(BaseModel):
-    """Compact before/after comparison for a heat pump integration scenario."""
-
-    target: str
-    base_case_name: str
-    scenario_case_name: str
-    hot_utility_target_delta: float
-    cold_utility_target_delta: float
-    heat_recovery_delta: float
-    hot_pinch_delta: Optional[float] = None
-    cold_pinch_delta: Optional[float] = None
-    approximate_power_input: float
-
-
 __all__ = [
-    "HeatPumpIntegrationComparison",
     "HeatUtility",
     "TargetResults",
     "TempPinch",
