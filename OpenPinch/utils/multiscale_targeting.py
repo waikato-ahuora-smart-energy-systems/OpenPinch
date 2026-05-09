@@ -6,7 +6,6 @@ from ..classes.stream import Stream
 from ..classes.stream_collection import StreamCollection
 from ..classes.zone import Zone
 from ..lib.enums import ZT
-from ..lib.schemas.targets import BaseTargetModel
 from ..services.common.graph_data import get_output_graph_data
 
 __all__ = [
@@ -50,12 +49,11 @@ def _get_unit_operation_targets(
     """Populate a ``Zone`` with detailed unit operation-level pinch targets."""
     if zone.config.DO_DIRECT_OPERATION_TARGETING:
         if len(zone.subzones) > 0:
-            z: Zone
-            for z in zone.subzones.values():
-                if z.type == ZT.O.value:
-                    if zone.config.DO_DIRECT_OPERATION_TARGETING:
+            for subzone in zone.subzones.values():
+                if subzone.type == ZT.O.value:
+                    if subzone.config.DO_DIRECT_OPERATION_TARGETING:
                         if isinstance(direct_service_func, Callable):
-                            direct_service_func(zone)
+                            direct_service_func(subzone)
                 else:
                     raise ValueError(
                         "Invalid zone nesting. Unit operation zones can only contain other operation zones."
@@ -75,17 +73,16 @@ def _get_process_targets(
     """Populate a ``Zone`` with detailed process-level pinch targets."""
 
     if len(zone.subzones) > 0:
-        z: Zone
-        for z in zone.subzones.values():
-            if z.type == ZT.O.value:
-                z = _get_unit_operation_targets(
-                    z,
+        for subzone in zone.subzones.values():
+            if subzone.type == ZT.O.value:
+                subzone = _get_unit_operation_targets(
+                    subzone,
                     direct_service_func=direct_service_func,
                     indirect_service_func=indirect_service_func,
                 )
-            elif z.type == ZT.P.value:
-                z = _get_process_targets(
-                    z,
+            elif subzone.type == ZT.P.value:
+                subzone = _get_process_targets(
+                    subzone,
                     direct_service_func=direct_service_func,
                     indirect_service_func=indirect_service_func,
                 )
@@ -120,22 +117,22 @@ def _get_site_targets(
 
     # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
-        for z in zone.subzones.values():
-            if z.type == ZT.O.value:
+        for subzone in zone.subzones.values():
+            if subzone.type == ZT.O.value:
                 _get_unit_operation_targets(
-                    z,
+                    subzone,
                     direct_service_func=direct_service_func,
                     indirect_service_func=indirect_service_func,
                 )
-            elif z.type == ZT.P.value:
+            elif subzone.type == ZT.P.value:
                 _get_process_targets(
-                    z,
+                    subzone,
                     direct_service_func=direct_service_func,
                     indirect_service_func=indirect_service_func,
                 )
-            elif z.type == ZT.S.value:
+            elif subzone.type == ZT.S.value:
                 _get_site_targets(
-                    z,
+                    subzone,
                     direct_service_func=direct_service_func,
                     indirect_service_func=indirect_service_func,
                 )
@@ -157,10 +154,9 @@ def _get_community_targets(
     indirect_service_func: Callable = None,
 ):
     """Targets a Community Zone."""
-    z: Zone
-    for z in zone.subzones.values():
-        z = _get_site_targets(
-            z,
+    for subzone in zone.subzones.values():
+        subzone = _get_site_targets(
+            subzone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
         )
@@ -173,10 +169,9 @@ def _get_regional_targets(
     indirect_service_func: Callable = None,
 ):
     """Targets a Regional Zone."""
-    z: Zone
-    for z in zone.subzones.values():
-        z = _get_community_targets(
-            z,
+    for subzone in zone.subzones.values():
+        subzone = _get_community_targets(
+            subzone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
         )
@@ -187,14 +182,12 @@ def _get_report(zone: Zone) -> dict:
     """Creates the database summary of zone targets."""
     targets: List[dict] = []
 
-    for t in zone.targets.values():
-        t: BaseTargetModel
-        targets.append(t.serialize_json())
+    for target in zone.targets.values():
+        targets.append(target.serialize_json())
 
     if len(zone.subzones) > 0:
-        for z in zone.subzones.values():
-            z: Zone
-            targets.extend(_get_report(z))
+        for subzone in zone.subzones.values():
+            targets.extend(_get_report(subzone))
 
     return targets
 

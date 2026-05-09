@@ -53,8 +53,8 @@ def get_output_graph_data(zone: Zone, graph_sets: Optional[dict] = None) -> dict
         graph_sets[target.name] = _create_graph_set(target, zone=zone)
 
     if len(zone.subzones) > 0:
-        for z in zone.subzones.values():
-            graph_sets = get_output_graph_data(z, graph_sets)
+        for subzone in zone.subzones.values():
+            graph_sets = get_output_graph_data(subzone, graph_sets)
 
     return graph_sets
 
