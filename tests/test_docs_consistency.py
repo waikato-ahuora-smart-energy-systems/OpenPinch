@@ -15,6 +15,7 @@ INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results
 API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
 API_LIB = REPO_ROOT / "docs" / "reference" / "api-lib.rst"
 API_ANALYSIS = REPO_ROOT / "docs" / "reference" / "api-analysis.rst"
+REFERENCE_INDEX = REPO_ROOT / "docs" / "reference" / "index.rst"
 
 
 def _read(path: Path) -> str:
@@ -113,3 +114,26 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "compute_direct_heat_pump_or_refrigeration_target" in api_analysis
     assert "compute_indirect_heat_pump_or_refrigeration_target" in api_analysis
     assert "HeatPumpTargetOutputs" in api_lib
+    assert "OpenPinch.services.input_data_processing.data_preparation" in api_analysis
+    assert "OpenPinch.services.data_preparation" not in api_analysis
+
+
+def test_reference_docs_show_uv_docs_build_command():
+    reference_index = _read(REFERENCE_INDEX)
+
+    assert "uv run scripts/build_docs.py" in reference_index
+    assert "sphinx-build -b html docs/ docs/_build/html" not in reference_index
+
+
+def test_reference_docs_use_current_data_preparation_module_path():
+    combined = "\n".join(
+        [
+            _read(REPO_ROOT / "docs" / "reference" / "api.rst"),
+            _read(REPO_ROOT / "docs" / "reference" / "architecture.rst"),
+            _read(API_CLASSES),
+            _read(API_ANALYSIS),
+        ]
+    )
+
+    assert "OpenPinch.services.input_data_processing.data_preparation" in combined
+    assert "OpenPinch.services.data_preparation" not in combined

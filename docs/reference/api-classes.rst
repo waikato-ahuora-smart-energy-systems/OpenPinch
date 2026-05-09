@@ -3,7 +3,7 @@ Domain Classes
 
 The class layer is the in-memory model behind the OpenPinch workflow. Most of
 these objects are created for you by
-:func:`~OpenPinch.services.data_preparation.prepare_problem`, but they are also
+:func:`~OpenPinch.services.input_data_processing.data_preparation.prepare_problem`, but they are also
 useful directly when building tests, custom workflows, or post-processing
 studies.
 

@@ -12,7 +12,7 @@ Pipeline Overview
 
 The analysis stack typically runs in this order:
 
-1. :mod:`OpenPinch.services.data_preparation` validates options, normalises the
+1. :mod:`OpenPinch.services.input_data_processing.data_preparation` validates options, normalises the
    zone hierarchy, and constructs :class:`~OpenPinch.classes.zone.Zone`,
    :class:`~OpenPinch.classes.stream.Stream`, and
    :class:`~OpenPinch.classes.stream_collection.StreamCollection` objects.
@@ -32,7 +32,7 @@ Preparation and Zone Construction
 These functions are the bridge between external schema payloads and the
 internal object model.
 
-.. automodule:: OpenPinch.services.data_preparation
+.. automodule:: OpenPinch.services.input_data_processing.data_preparation
    :members:
 
 Direct and Indirect Targeting Entrypoints
