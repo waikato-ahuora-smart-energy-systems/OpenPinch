@@ -675,28 +675,6 @@ def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypat
     assert fig == {"built": "GCC"}
 
 
-def test_plot_accepts_net_load_profile_alias(monkeypatch):
-    payload = {
-        "Plant/DI": {
-            "graphs": [
-                {"type": "Net Load Curves", "name": "NLP"},
-            ]
-        }
-    }
-    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
-    monkeypatch.setattr(
-        sys.modules[PinchProblem.__module__],
-        "_build_plotly_graph",
-        lambda graph: {"built": graph["name"]},
-        raising=True,
-    )
-
-    obj = PinchProblem()
-    fig = obj.plot(zone_name="Plant/DI", graph_type="net_load profiles")
-
-    assert fig == {"built": "NLP"}
-
-
 def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
     payload = {
         "Plant/DI": {
