@@ -160,9 +160,12 @@ def _assign_utility(
         H_segment = H_vals[: pinch_row + 1]
         segment_limit = H_segment[0]
     else:
-        T_segment = T_vals[pinch_row - 1 :]
-        H_segment = H_vals[pinch_row - 1 :]
+        T_segment = T_vals[pinch_row :]
+        H_segment = H_vals[pinch_row :]
         segment_limit = H_segment[-1]
+    
+    if len(np.where(H_segment<tol)) != 1:
+        raise ValueError("Error in utility targeting. Please report the the data that produced this error.")
 
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
