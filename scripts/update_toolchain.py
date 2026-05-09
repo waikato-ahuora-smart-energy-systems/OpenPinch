@@ -14,6 +14,7 @@ def _run(cmd: list[str], *, cwd: Path) -> None:
 
 
 def main() -> int:
+    """Refresh the pinned Python toolchain, lockfile, and synced dev env."""
     repo_root = Path(__file__).resolve().parents[1]
     uv_bin = which("uv") or "/opt/homebrew/bin/uv"
     python_minor = "3.14"

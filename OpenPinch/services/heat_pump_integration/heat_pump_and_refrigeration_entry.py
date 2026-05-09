@@ -1,14 +1,14 @@
 """Public entrypoint for heat pump and refrigeration targeting."""
 
 from ast import literal_eval
+from copy import deepcopy
 
 import numpy as np
-from copy import deepcopy
 
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...lib.config import Configuration, tol
-from ...lib.enums import GT, HPRcycle, PT, TT
+from ...lib.enums import GT, PT, TT, HPRcycle
 from ...lib.schemas.hpr import HeatPumpTargetOutputs
 from ...lib.schemas.targets import (
     DirectHeatPumpTarget,
@@ -17,6 +17,15 @@ from ...lib.schemas.targets import (
     IndirectRefrigerationTarget,
 )
 from ...utils.miscellaneous import get_value
+from ..common.problem_table_analysis import create_problem_table_with_t_int
+from .common.preprocessing import (
+    construct_HPRTargetInputs,
+)
+from .common.shared import (
+    get_process_heat_cascade,
+    get_utility_heat_cascade,
+    plot_multi_hp_profiles_from_results,
+)
 from .cycles.brayton import (
     optimise_brayton_heat_pump_placement,
 )
@@ -32,15 +41,6 @@ from .cycles.multi_simple_vapour_compression import (
 from .cycles.multi_temperature_carnot import (
     optimise_multi_temperature_carnot_heat_pump_placement,
 )
-from .common.preprocessing import (
-    construct_HPRTargetInputs,
-)
-from .common.shared import (
-    get_process_heat_cascade,
-    get_utility_heat_cascade,
-    plot_multi_hp_profiles_from_results,
-)
-from ..common.problem_table_analysis import create_problem_table_with_t_int
 
 __all__ = [
     "compute_direct_heat_pump_or_refrigeration_target",
@@ -58,6 +58,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
 ) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
+    """Solve an explicit direct heat-pump or refrigeration target for one zone."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.DI.value].pt)
     target_load = _validate_hpr_required(
@@ -104,6 +105,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
 ) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
+    """Solve an indirect / utility-system heat-pump or refrigeration target."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.TS.value].pt)
     # Create problem table based on inverted utility streams

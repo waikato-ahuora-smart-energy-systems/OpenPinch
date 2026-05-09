@@ -92,6 +92,27 @@ class HeatPumpIntegrationScenario(BaseModel):
     evaporator_name: str = "HP Evaporator"
 
 
+class HeatPumpIntegrationComparisonRow(BaseModel):
+    """One labelled summary row from a heat-pump integration comparison."""
+
+    label: str
+    target: str
+    hot_utility_target: Optional[float] = None
+    cold_utility_target: Optional[float] = None
+    heat_recovery: Optional[float] = None
+    hot_pinch: Optional[float] = None
+    cold_pinch: Optional[float] = None
+
+
+class HeatPumpIntegrationComparison(BaseModel):
+    """Structured before/after summary for a candidate integrated heat pump."""
+
+    scenario: HeatPumpIntegrationScenario
+    target_name: str
+    approximate_power: float
+    rows: list[HeatPumpIntegrationComparisonRow]
+
+
 class THSchema(BaseModel):
     """Temperature-enthalpy series payload used for problem-table exchange."""
 
@@ -162,6 +183,8 @@ class VisualiseOutput(BaseModel):
 
 __all__ = [
     "GetInputOutputData",
+    "HeatPumpIntegrationComparison",
+    "HeatPumpIntegrationComparisonRow",
     "HeatPumpIntegrationScenario",
     "LineariseInput",
     "LineariseOutput",

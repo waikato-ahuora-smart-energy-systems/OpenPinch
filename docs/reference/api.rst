@@ -45,18 +45,24 @@ Reference Map
   from.
 - :doc:`api-analysis` documents the preparation and targeting algorithms that
   execute after validation.
+- :doc:`api-heat-pump` documents the lower-level heat-pump and refrigeration
+  stack used by the advanced HPR workflows.
 - :doc:`api-classes` explains the domain objects created and returned by the
   analysis pipeline.
 - :doc:`api-lib` documents configuration, enums, and Pydantic schemas that make
   up the typed wire format.
 - :doc:`api-utils` covers import/export helpers, numerical utilities, and
   visualisation support.
+- :doc:`api-entrypoints` documents the CLI, packaged resources, Streamlit app,
+  and repository maintenance scripts.
 
 .. toctree::
    :maxdepth: 1
 
    api-core
    api-analysis
+   api-heat-pump
    api-classes
    api-lib
    api-utils
+   api-entrypoints

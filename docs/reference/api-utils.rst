@@ -12,6 +12,9 @@ Data Conversion and Validation
 These modules translate spreadsheet- or table-oriented data sources into the
 schema-compatible structures consumed by the service layer.
 
+.. automodule:: OpenPinch.utils
+   :no-members:
+
 .. automodule:: OpenPinch.utils.wkbook_to_json
    :members:
 
@@ -38,6 +41,9 @@ Math, Optimisation, and Targeting Helpers
 These modules provide reusable numerical support for targeting and post-
 processing tasks.
 
+.. automodule:: OpenPinch.utils.multiscale_targeting
+   :members:
+
 .. automodule:: OpenPinch.utils.miscellaneous
    :members:
 
@@ -55,6 +61,26 @@ processing tasks.
 
 .. automodule:: OpenPinch.utils.water_properties
    :members:
+
+Internal Optimiser Backends
+---------------------------
+
+The modules below back :func:`OpenPinch.utils.blackbox_minimisers.multiminima`.
+They are primarily useful when you need to inspect or extend the optimiser
+implementations themselves.
+
+.. automodule:: OpenPinch.utils.bb_optimisers
+   :no-members:
+
+.. automodule:: OpenPinch.utils.bb_optimisers.common
+
+.. automodule:: OpenPinch.utils.bb_optimisers.dual_annealing
+
+.. automodule:: OpenPinch.utils.bb_optimisers.cmaes
+
+.. automodule:: OpenPinch.utils.bb_optimisers.bayesian_optimisation
+
+.. automodule:: OpenPinch.utils.bb_optimisers.rbf_surrogate
 
 Plotting and Instrumentation
 ----------------------------

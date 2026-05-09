@@ -4,7 +4,6 @@ from typing import Tuple
 
 import numpy as np
 
-
 __all__ = [
     "map_x_arr_to_T_arr",
     "map_T_arr_to_x_arr",
@@ -22,6 +21,7 @@ def map_x_arr_to_T_arr(
     T_0: float,
     T_1: float,
 ) -> np.ndarray:
+    """Map cumulative optimisation fractions onto descending stage temperatures."""
     temp = []
     for i in range(x.size):
         temp.append(T_0 - x[i] * (T_0 - T_1))
@@ -34,6 +34,7 @@ def map_T_arr_to_x_arr(
     T_0: float,
     T_1: float,
 ) -> np.ndarray:
+    """Encode descending stage temperatures as cumulative optimisation fractions."""
     temp = []
     for i in range(T_arr.size):
         temp.append((T_0 - T_arr[i]) / (T_0 - T_1) if T_0 != T_1 else 0.0)
@@ -46,6 +47,7 @@ def map_x_arr_to_DT_arr(
     T_arr: np.ndarray,
     T_last: float,
 ) -> np.ndarray:
+    """Scale optimisation fractions into temperature differences."""
     return x * np.abs(T_arr - T_last)
 
 
@@ -54,6 +56,7 @@ def map_DT_arr_to_x_arr(
     T_arr: np.ndarray,
     T_last: float,
 ) -> np.ndarray:
+    """Normalise temperature differences back into optimisation fractions."""
     return np.where(
         T_arr != T_last,
         DT_arr / np.abs(T_arr - T_last),
@@ -65,6 +68,7 @@ def map_x_arr_to_Q_arr(
     x: np.ndarray,
     Q_max: float,
 ) -> np.ndarray:
+    """Scale optimisation fractions into heat duties."""
     return x * Q_max
 
 
@@ -72,6 +76,7 @@ def map_Q_arr_to_x_arr(
     Q_arr: np.ndarray,
     Q_max: float,
 ) -> np.ndarray:
+    """Normalise heat duties back into optimisation fractions."""
     return np.where(Q_max != 0, Q_arr / Q_max, 0.0)
 
 
@@ -79,6 +84,7 @@ def map_x_to_Q_amb(
     x: float,
     scale: float,
 ) -> Tuple[float, float]:
+    """Split one signed ambient-exchange variable into hot and cold duties."""
     Q_amb_hot = max(-scale * x, 0.0)
     Q_amb_cold = max(scale * x, 0.0)
     return Q_amb_hot, Q_amb_cold
@@ -89,4 +95,5 @@ def map_Q_amb_to_x(
     Q_amb_cold: float,
     scale: float,
 ) -> float:
+    """Encode hot/cold ambient duties back into one signed decision variable."""
     return (Q_amb_cold - Q_amb_hot) / scale

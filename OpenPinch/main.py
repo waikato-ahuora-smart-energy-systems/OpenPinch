@@ -11,7 +11,6 @@ from typing import Any
 from .classes.pinch_problem import PinchProblem
 from .lib.schemas.io import TargetInput, TargetOutput
 
-
 __all__ = ["pinch_analysis_service"]
 
 
@@ -24,7 +23,7 @@ def pinch_analysis_service(
     data: Any,
     project_name: str = "Project",
 ) -> TargetOutput:
-    """Validate user data, run the targeting workflow, and return structured results.
+    """Validate an input payload, run targeting, and return ``TargetOutput``.
 
     Parameters
     ----------
@@ -33,16 +32,11 @@ def pinch_analysis_service(
         Dictionaries, Pydantic models, and dataclass-like objects are accepted.
     project_name:
         Optional label used in generated graphs and result files.
-    is_return_full_results:
-        When ``True``, return both the validated
-        :class:`~OpenPinch.lib.schemas.io.TargetOutput` and the solved
-        :class:`~OpenPinch.classes.zone.Zone` hierarchy.
 
     Returns
     -------
-    TargetOutput or tuple[TargetOutput, Zone]
-        Validated response payload, optionally paired with the in-memory zone
-        tree for advanced inspection and post-processing.
+    TargetOutput
+        Validated response payload containing solved targets and graph data.
     """
     input_data = TargetInput.model_validate(data)
     problem = PinchProblem(project_name=project_name)

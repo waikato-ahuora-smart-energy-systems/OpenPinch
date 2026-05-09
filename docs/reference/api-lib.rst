@@ -15,6 +15,9 @@ global constants used across multiple modules. Many option names intentionally
 mirror the long-standing Excel workbook so workbook and Python workflows can
 share the same mental model.
 
+.. automodule:: OpenPinch.lib
+   :no-members:
+
 .. automodule:: OpenPinch.lib.config
    :members:
 
@@ -68,8 +71,29 @@ Heat pump integration helper models include:
 - :class:`~OpenPinch.lib.schemas.hpr.HeatPumpTargetOutputs`
 
 Specialised helper models also capture lower-level heat pump optimisation
-inputs/outputs, piecewise stream linearisation requests, and legacy
-visualisation payloads.
+inputs/outputs, integrated heat-pump screening comparisons, piecewise stream
+linearisation requests, and legacy visualisation payloads.
 
 .. automodule:: OpenPinch.lib.schemas
+   :no-members:
+
+.. automodule:: OpenPinch.lib.schemas.common
+   :members:
+
+.. automodule:: OpenPinch.lib.schemas.graphs
+   :members:
+
+.. automodule:: OpenPinch.lib.schemas.hpr
+   :members:
+
+.. automodule:: OpenPinch.lib.schemas.io
+   :members:
+
+.. automodule:: OpenPinch.lib.schemas.reporting
+   :members:
+
+.. automodule:: OpenPinch.lib.schemas.targets
+   :members:
+
+.. automodule:: OpenPinch.lib.schemas.turbine
    :members:

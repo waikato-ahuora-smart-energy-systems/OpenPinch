@@ -312,20 +312,24 @@ class MultiStageSteamTurbine:
 
     @property
     def solved(self) -> bool:
+        """Return ``True`` after :meth:`solve` has produced a valid result."""
         return self._solved
 
     @property
     def result(self) -> TurbineSolveResult:
+        """Return the validated solve result for the most recent run."""
         self._require_solution()
         return self._result
 
     @property
     def stages(self) -> list[TurbineStageResult]:
+        """Return the per-stage turbine results from the most recent run."""
         self._require_solution()
         return self._result.stages
 
     @property
     def total_work(self) -> float:
+        """Return the total shaft work recovered by the solved turbine train."""
         self._require_solution()
         return self._result.total_work
 

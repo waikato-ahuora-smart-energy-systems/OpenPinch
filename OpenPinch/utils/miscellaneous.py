@@ -31,9 +31,11 @@ class _PlotlyShowProxy:
         self._current_figure: go.Figure | None = None
 
     def set_current_figure(self, figure: go.Figure) -> None:
+        """Remember the figure to be shown by the compatibility ``show`` hook."""
         self._current_figure = figure
 
     def show(self) -> None:
+        """Display the most recently registered Plotly figure."""
         if self._current_figure is None:
             raise RuntimeError("No current figure is available to show.")
         self._current_figure.show()

@@ -9,9 +9,7 @@ from ....lib.config import Configuration
 from ....lib.enums import PT
 from ....lib.schemas.hpr import HeatPumpTargetInputs
 from ....utils.miscellaneous import clean_composite_curve, linear_interpolation
-
 from .shared import create_stream_collection_of_background_profile
-
 
 __all__ = ["construct_HPRTargetInputs"]
 
@@ -31,6 +29,7 @@ def construct_HPRTargetInputs(
     zone_config: Configuration = Configuration(),
     debug: bool = False,
 ) -> HeatPumpTargetInputs:
+    """Prepare normalised background cascades and solver arguments for HPR targeting."""
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
     T_hot, T_cold = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
         T_vals, zone_config.DT_CONT_HP

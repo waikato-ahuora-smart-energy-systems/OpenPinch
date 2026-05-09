@@ -66,6 +66,14 @@ Package Entrypoints
 -------------------
 
 .. automodule:: OpenPinch
+   :no-members:
+
+.. autofunction:: OpenPinch.main.pinch_analysis_service
+
+.. autoclass:: OpenPinch.classes.pinch_problem.PinchProblem
+   :members:
+
+.. autoclass:: OpenPinch.classes.pinch_problem.HeatPumpIntegrationEvaluation
    :members:
 
 Core Service Functions
@@ -85,7 +93,7 @@ modules.
   :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 
 .. automodule:: OpenPinch.main
-   :members:
+   :no-members:
 
 PinchProblem Convenience Wrapper
 --------------------------------
@@ -127,6 +135,3 @@ entrypoint family. Each named workflow returns the affected
 refrigeration targets also surface HPR summary fields such as ``hpr_cycle``,
 ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``, and
 ``StreamCollection`` payloads on ``hpr_hot_streams`` and ``hpr_cold_streams``.
-
-.. automodule:: OpenPinch.classes.pinch_problem
-   :members:

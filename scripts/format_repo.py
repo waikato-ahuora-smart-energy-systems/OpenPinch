@@ -8,6 +8,7 @@ from shutil import which
 
 
 def main() -> int:
+    """Run the repository formatter through the local ``uv`` toolchain."""
     repo_root = Path(__file__).resolve().parents[1]
     uv_bin = which("uv") or "/opt/homebrew/bin/uv"
 

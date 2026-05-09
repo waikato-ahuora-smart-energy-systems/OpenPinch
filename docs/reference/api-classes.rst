@@ -22,6 +22,9 @@ How These Objects Fit Together
 - :class:`~OpenPinch.classes.value.Value` wraps scalar and discrete-state
   quantities with units for report-friendly serialisation.
 
+.. automodule:: OpenPinch.classes
+   :no-members:
+
 Streams and Collections
 -----------------------
 
