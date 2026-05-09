@@ -1,13 +1,13 @@
-Heat-Pump Targeting
+Heat Pump Targeting
 ===================
 
 This page documents the public OpenPinch workflow for evaluating a candidate
-heat-pump integration scenario against a base process case.
+heat pump integration scenario against a base process case.
 
 What This Workflow Answers
 --------------------------
 
-The main question is not whether a refrigeration or heat-pump cycle can be
+The main question is not whether a refrigeration or heat pump cycle can be
 solved in isolation. The main question is whether a candidate temperature lift
 improves the utility picture of the process.
 
@@ -98,7 +98,7 @@ Start with the delta row:
 - a negative ``Cold Utility Target`` delta is also usually desirable
 - a positive ``Heat Recovery`` delta indicates more internal recovery
 
-The helper also reports an approximate heat-pump power input as the difference
+The helper also reports an approximate heat pump power input as the difference
 between condenser duty and evaporator duty. That value is supporting context,
 not the primary screening metric.
 
@@ -110,7 +110,7 @@ export graphs:
 
 .. code-block:: python
 
-   gcc = evaluation.integrated_problem.plot_grand_composite_curve(
+   gcc = evaluation.integrated_problem.plot.grand_composite_curve(
        zone_name="Plant/Direct Integration"
    )
 

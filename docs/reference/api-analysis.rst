@@ -12,19 +12,33 @@ Pipeline Overview
 
 The analysis stack typically runs in this order:
 
-1. :mod:`OpenPinch.services.data_preparation` validates options, normalises the
-   zone hierarchy, and constructs :class:`~OpenPinch.classes.zone.Zone`,
+1. :mod:`OpenPinch.services.input_data_processing.data_preparation` validates
+   options, normalises the zone hierarchy, and constructs
+   :class:`~OpenPinch.classes.zone.Zone`,
    :class:`~OpenPinch.classes.stream.Stream`, and
    :class:`~OpenPinch.classes.stream_collection.StreamCollection` objects.
-2. :mod:`OpenPinch.services.common.problem_table_analysis` builds the shifted and
-   real-temperature problem tables used throughout the rest of the workflow.
-3. :mod:`OpenPinch.services.direct_heat_integration.direct_integration_entry` computes direct
-   integration targets for unit-operation and process zones.
-4. :mod:`OpenPinch.services.indirect_heat_integration.indirect_integration_entry` aggregates solved
-   subzones into site-style indirect integration targets when the hierarchy
-   requires it.
-5. :mod:`OpenPinch.services.common.graph_data` converts solved tables and targets into
-   serialisable graph payloads for reporting and Streamlit visualisation.
+2. :mod:`OpenPinch.services.services_entry` selects the orchestration path used
+   by the high-level service layer and ``PinchProblem.target.*`` helpers.
+3. :mod:`OpenPinch.services.common.problem_table_analysis` builds the shifted
+   and real-temperature problem tables used throughout the rest of the
+   workflow.
+4. :mod:`OpenPinch.services.direct_heat_integration.direct_integration_entry`
+   computes direct integration targets for unit-operation and process zones.
+5. :mod:`OpenPinch.services.indirect_heat_integration.indirect_integration_entry`
+   aggregates solved subzones into site-style indirect integration targets when
+   the hierarchy requires it.
+6. :mod:`OpenPinch.services.common.graph_data` converts solved tables and
+   targets into serialisable graph payloads for reporting and Streamlit
+   visualisation.
+
+Service Package Map
+-------------------
+
+.. automodule:: OpenPinch.services
+   :no-members:
+
+.. automodule:: OpenPinch.services.services_entry
+   :members:
 
 Preparation and Zone Construction
 ---------------------------------
@@ -32,7 +46,10 @@ Preparation and Zone Construction
 These functions are the bridge between external schema payloads and the
 internal object model.
 
-.. automodule:: OpenPinch.services.data_preparation
+.. automodule:: OpenPinch.services.input_data_processing
+   :no-members:
+
+.. automodule:: OpenPinch.services.input_data_processing.data_preparation
    :members:
 
 Direct and Indirect Targeting Entrypoints
@@ -42,11 +59,11 @@ These modules own the top-level targeting workflows once a zone tree has been
 constructed.
 
 - Direct integration works on process streams within a zone and applies problem
-  table analysis, utility targeting, optional heat-pump targeting, and optional
+  table analysis, utility targeting, optional heat pump targeting, and optional
   cost/exergy add-ons.
 - Indirect integration aggregates the net thermal behaviour of solved subzones
   and applies utility-to-utility balancing for total-site style studies.
-- Lower-level heat-pump and refrigeration screening for both routes is
+- Lower-level heat pump and refrigeration screening for both routes is
   centralised in
   :mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`.
 
@@ -70,7 +87,7 @@ workflows depend on.
   other grand-composite-curve variants used for interpretation and advanced
   targeting.
 - :mod:`OpenPinch.services.common.graph_data` translates tables and targets into the
-  graph structures emitted in :class:`~OpenPinch.lib.schema.TargetOutput`.
+  graph structures emitted in :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 
 .. automodule:: OpenPinch.services.common.problem_table_analysis
    :members:
@@ -91,29 +108,12 @@ The modules below expose specialised calculations that sit on top of the core
 problem-table workflow. Some are used automatically when corresponding options
 are enabled, while others are better viewed as expert-level helper libraries.
 
-Heat Pump Targeting API
-~~~~~~~~~~~~~~~~~~~~~~~
-
-The main user-facing screening workflow is
-:meth:`OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`.
-For solved-zone post-processing, the main advanced workflow is the
-``PinchProblem.target_*`` family, including
-:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_direct_heat_pump`,
-:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_heat_pump`,
-:meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_direct_refrigeration`,
-and :meth:`OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_refrigeration`.
-The module below exposes the lower-level targeting helpers used by the direct
-and indirect integration entrypoints, plus advanced plotting helpers for solved
-multi-cycle results.
-
-Current public helpers include:
-
-- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_direct_heat_pump_or_refrigeration_target`
-- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.compute_indirect_heat_pump_or_refrigeration_target`
-- :func:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry.plot_multi_hp_profiles_from_results`
-
-.. automodule:: OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry
-   :members:
+The heat-pump and refrigeration stack is documented separately in
+:doc:`api-heat-pump` because it spans a dedicated package with multiple cycle
+optimisers and helper modules. The main low-level entrypoints remain
+``compute_direct_heat_pump_or_refrigeration_target(...)`` and
+``compute_indirect_heat_pump_or_refrigeration_target(...)`` in
+:mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`.
 
 .. automodule:: OpenPinch.services.common.capital_cost_and_area_targeting
    :members:
@@ -124,4 +124,14 @@ Current public helpers include:
 .. automodule:: OpenPinch.services.power_cogeneration_analysis
    :members:
 
+.. automodule:: OpenPinch.services.exergy_analysis
+   :no-members:
 
+.. automodule:: OpenPinch.services.exergy_analysis.exergy_targeting_entry
+   :members:
+
+.. automodule:: OpenPinch.services.energy_transfer_analysis
+   :no-members:
+
+.. automodule:: OpenPinch.services.energy_transfer_analysis.energy_transfer_analysis
+   :no-members:

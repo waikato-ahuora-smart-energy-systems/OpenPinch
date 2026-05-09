@@ -4,6 +4,12 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.classes.zone import Zone
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
+from OpenPinch.lib.enums import ProblemTableLabel as PT
+
+
+def _dummy_problem_table():
+    return ProblemTable({PT.T.value: [0.0]})
 
 
 @pytest.fixture
@@ -15,7 +21,15 @@ def dummy_zone():
 @pytest.fixture
 def dummy_tar():
     """Return dummy tar data used by this test module."""
-    return EnergyTarget(zone_name="Z1", type="DI")
+    return DirectIntegrationTarget(
+        zone_name="Z1",
+        type="DI",
+        pt=_dummy_problem_table(),
+        pt_real=_dummy_problem_table(),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
 
 
 @pytest.fixture
@@ -44,6 +58,7 @@ def test_dummy_zone_instantiation(dummy_zone: Zone):
     assert dummy_zone.name == "Z1"
     assert isinstance(dummy_zone.hot_streams, StreamCollection)
     assert isinstance(dummy_zone.cold_streams, StreamCollection)
+    assert dummy_zone.dt_cont_multiplier == 1.0
 
 
 # === Property Setters and Getters ===
@@ -61,6 +76,9 @@ def test_property_setters_getters(dummy_zone: Zone):
 
     dummy_zone.ETE = 0.75
     assert dummy_zone.ETE == 0.75
+
+    dummy_zone.dt_cont_multiplier = 1.5
+    assert dummy_zone.dt_cont_multiplier == 1.5
 
 
 # === Adding Utilities ===
@@ -120,7 +138,7 @@ def test_get_site_zones(dummy_zone: Zone):
 # === Utility Cost Calculation ===
 
 
-def test_calc_zonal_utility_cost(dummy_tar: EnergyTarget, sample_utilities):
+def test_calc_zonal_utility_cost(dummy_tar: DirectIntegrationTarget, sample_utilities):
     for u in sample_utilities:
         dummy_tar.hot_utilities.add(u)
     dummy_tar.calc_utility_cost()

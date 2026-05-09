@@ -13,10 +13,10 @@ Where To Start
   run the analysis, and export results.
 - Use :func:`~OpenPinch.main.pinch_analysis_service` when you are integrating
   OpenPinch into another application and want a typed service boundary based on
-  :class:`~OpenPinch.lib.schema.TargetInput` and
-  :class:`~OpenPinch.lib.schema.TargetOutput`.
-- Use :func:`~OpenPinch.services.data_preparation.prepare_problem` together
-  with :func:`~OpenPinch.utils.multiscale_targeting.get_targets` when you need to inspect or mutate
+  :class:`~OpenPinch.lib.schemas.io.TargetInput` and
+  :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
+- Use :func:`~OpenPinch.services.input_data_processing.data_preparation.prepare_problem` together
+  with :func:`~OpenPinch.utils.multiscale_targeting.get_targets_for_zone_and_sub_zones` when you need to inspect or mutate
   the intermediate :class:`~OpenPinch.classes.zone.Zone` tree directly.
 - Use :mod:`OpenPinch.streamlit_webviewer.web_graphing` when you already have a
   solved zone hierarchy and want to embed OpenPinch plots or a Streamlit-based
@@ -27,15 +27,15 @@ Common Data Contracts
 
 The reference pages repeatedly refer to the same small set of core types:
 
-- :class:`~OpenPinch.lib.schema.TargetInput` is the validated request model for
+- :class:`~OpenPinch.lib.schemas.io.TargetInput` is the validated request model for
   programmatic analysis.
 - :class:`~OpenPinch.classes.zone.Zone` is the in-memory hierarchy built during
   preparation and then populated with streams, utilities, targets, and graphs.
-- :class:`~OpenPinch.classes.energy_target.EnergyTarget` stores the solved
-  metrics for one direct-integration, total-zone, or total-site target.
+- :class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` stores the solved
+  metrics for one direct-integration, total-zone, total-site, or HPR target.
 - :class:`~OpenPinch.classes.problem_table.ProblemTable` is the numerical table
   behind composite curves, pinch temperatures, and utility cascades.
-- :class:`~OpenPinch.lib.schema.TargetOutput` is the structured response
+- :class:`~OpenPinch.lib.schemas.io.TargetOutput` is the structured response
   returned by the high-level service layer.
 
 Reference Map
@@ -45,18 +45,24 @@ Reference Map
   from.
 - :doc:`api-analysis` documents the preparation and targeting algorithms that
   execute after validation.
+- :doc:`api-heat-pump` documents the lower-level heat-pump and refrigeration
+  stack used by the advanced HPR workflows.
 - :doc:`api-classes` explains the domain objects created and returned by the
   analysis pipeline.
 - :doc:`api-lib` documents configuration, enums, and Pydantic schemas that make
   up the typed wire format.
 - :doc:`api-utils` covers import/export helpers, numerical utilities, and
   visualisation support.
+- :doc:`api-entrypoints` documents the CLI, packaged resources, Streamlit app,
+  and repository maintenance scripts.
 
 .. toctree::
    :maxdepth: 1
 
    api-core
    api-analysis
+   api-heat-pump
    api-classes
    api-lib
    api-utils
+   api-entrypoints

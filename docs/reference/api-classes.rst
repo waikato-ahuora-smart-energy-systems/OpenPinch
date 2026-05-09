@@ -3,7 +3,7 @@ Domain Classes
 
 The class layer is the in-memory model behind the OpenPinch workflow. Most of
 these objects are created for you by
-:func:`~OpenPinch.services.data_preparation.prepare_problem`, but they are also
+:func:`~OpenPinch.services.input_data_processing.data_preparation.prepare_problem`, but they are also
 useful directly when building tests, custom workflows, or post-processing
 studies.
 
@@ -17,10 +17,13 @@ How These Objects Fit Together
   subzones into a hierarchical model of the process, site, or wider system.
 - :class:`~OpenPinch.classes.problem_table.ProblemTable` stores the numerical
   temperature-interval cascade that drives pinch and utility calculations.
-- :class:`~OpenPinch.classes.energy_target.EnergyTarget` stores one solved set
+- :class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` stores one solved set
   of metrics for a zone and is later serialised into the public output schema.
 - :class:`~OpenPinch.classes.value.Value` wraps scalar and discrete-state
   quantities with units for report-friendly serialisation.
+
+.. automodule:: OpenPinch.classes
+   :no-members:
 
 Streams and Collections
 -----------------------
@@ -45,9 +48,6 @@ These classes represent the solved hierarchy and its numerical results.
 .. automodule:: OpenPinch.classes.problem_table
    :members:
 
-.. automodule:: OpenPinch.classes.energy_target
-   :members:
-
 Units and Scalar Helpers
 ------------------------
 
@@ -62,7 +62,7 @@ state-weighted scenario data.
 Thermal Cycle Classes
 ---------------------
 
-These classes support the advanced heat-pump, refrigeration, and utility-system
+These classes support the advanced heat pump, refrigeration, and utility-system
 workflows documented in
 :mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`. They are
 primarily useful for advanced users who want to inspect or construct detailed

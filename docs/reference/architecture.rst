@@ -13,8 +13,8 @@ Core Concepts
   community, region).
 - ``ProblemTable``: temperature-interval cascade structure used to derive pinch
   temperatures, utility targets, and composite curves.
-- ``EnergyTarget``: packaged targeting outcomes for a zone, including utility
-  demands, recovery targets, and optional economic metrics.
+- ``BaseTargetModel``: validated runtime targeting outcomes for a zone,
+  including utility demands, recovery targets, and optional economic metrics.
 - ``PinchProblem``: convenience orchestrator that loads input data, runs
   analysis, and exports results.
 
@@ -35,9 +35,9 @@ integration steps where appropriate.
 Analysis Workflow
 -----------------
 
-1. Validate input payloads via :mod:`OpenPinch.lib.schema` models.
+1. Validate input payloads via :mod:`OpenPinch.lib.schemas.io` models.
 2. Build the zone tree and stream/utility collections with
-   :func:`OpenPinch.services.data_preparation.prepare_problem`.
+   :func:`OpenPinch.services.input_data_processing.data_preparation.prepare_problem`.
 3. Run direct integration (problem-table and multi-utility targeting) with
    :func:`OpenPinch.services.direct_heat_integration.direct_integration_entry.compute_direct_integration_targets`.
 4. For site-style aggregation, run indirect integration with

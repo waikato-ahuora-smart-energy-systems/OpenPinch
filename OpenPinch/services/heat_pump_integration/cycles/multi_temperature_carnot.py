@@ -5,23 +5,21 @@ from typing import Tuple
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
-
 from ..common.encoding import map_x_arr_to_T_arr, map_x_to_Q_amb
 from ..common.shared import (
     calc_carnot_heat_engine_eta,
     calc_carnot_heat_pump_cop,
     calc_hpr_obj,
     compute_entropic_mean_temperature,
-    get_Q_vals_at_T_hpr_from_bckgrd_profile,
-    get_carnot_hpr_cycle_streams,
-    solve_hpr_placement,
     g_ineq_penalty,
+    get_carnot_hpr_cycle_streams,
+    get_Q_vals_at_T_hpr_from_bckgrd_profile,
     plot_multi_hp_profiles_from_results,
+    solve_hpr_placement,
     tol,
 )
-
 
 __all__ = [
     "optimise_multi_temperature_carnot_heat_pump_placement",
@@ -37,6 +35,7 @@ __all__ = [
 def optimise_multi_temperature_carnot_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
+    """Optimise multi-temperature Carnot stages for the prepared HPR case."""
     res = solve_hpr_placement(
         f_obj=_compute_multi_temperature_carnot_cycle_obj,
         x0_ls=_get_x0_for_multi_temperature_carnot_hp_opt(args),

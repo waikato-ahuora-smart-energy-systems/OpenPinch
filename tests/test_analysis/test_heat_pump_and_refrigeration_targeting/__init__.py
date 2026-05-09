@@ -1,1 +1,1 @@
-"""Tests for heat-pump and refrigeration targeting."""
+"""Tests for heat pump and refrigeration targeting."""

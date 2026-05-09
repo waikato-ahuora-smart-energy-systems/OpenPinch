@@ -60,9 +60,9 @@
 #     assert "basic pinch analysis" in lead_markdown.lower()
 #     assert "`dt_cont`" in combined_source
 #     assert "crude_preheat_train.json" in combined_source
-#     assert "plot_composite_curve" in combined_source
+#     assert "plot.composite_curve" in combined_source
 #     assert "variant=\"shifted\"" in combined_source
-#     assert "plot_grand_composite_curve" in combined_source
+#     assert "plot.grand_composite_curve" in combined_source
 #     assert "multipliers =" in combined_source
 #     assert "dt_cont multiplier" in combined_source
 #     assert "display_plotly" in combined_source

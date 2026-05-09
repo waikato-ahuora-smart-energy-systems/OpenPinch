@@ -56,7 +56,7 @@ Balanced composite curves
 Grand composite curves
    Show the residual heat load after direct recovery. This is usually the first
    graph to inspect for utility selection, utility-level placement, and
-   heat-pump opportunity identification.
+   heat pump opportunity identification.
 
 Total-site profiles
    Aggregate multiple subzones. Use them to see whether site-level integration
@@ -72,10 +72,10 @@ Common reading mistakes:
 - treating a graph improvement as sufficient without confirming the utility targets also improved
 - focusing on the detailed graph shape before checking the main hot and cold utility numbers
 
-Heat-Pump Targeting And Integration
+Heat Pump Targeting And Integration
 -----------------------------------
 
-For OpenPinch users, heat-pump work should be interpreted as an integration
+For OpenPinch users, heat pump work should be interpreted as an integration
 question first and a cycle question second.
 
 The main questions are:
@@ -93,7 +93,7 @@ The packaged ``03_carnot_hpr_comparison.ipynb`` notebook is organized around thi
 comparison:
 
 1. solve the base case
-2. run direct and indirect Carnot heat-pump and refrigeration targets
+2. run direct and indirect Carnot heat pump and refrigeration targets
 3. compare utility targets, heat recovery, and HPR work across load levels
 4. compare the supporting grand-composite views
 
@@ -123,4 +123,4 @@ Graph HTML export
 
 Notebook workflows
    Best for learning how to interpret outputs in context, especially for graph
-   reading, zonal comparison, and heat-pump integration.
+   reading, zonal comparison, and heat pump integration.

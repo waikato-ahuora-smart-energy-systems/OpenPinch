@@ -15,6 +15,7 @@ INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results
 API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
 API_LIB = REPO_ROOT / "docs" / "reference" / "api-lib.rst"
 API_ANALYSIS = REPO_ROOT / "docs" / "reference" / "api-analysis.rst"
+REFERENCE_INDEX = REPO_ROOT / "docs" / "reference" / "index.rst"
 
 
 def _read(path: Path) -> str:
@@ -36,9 +37,9 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "summary_frame()" in combined
     assert "export_excel" in combined
     assert "show_dashboard()" in combined
-    assert "plot_grand_composite_curve" in combined
+    assert "plot.grand_composite_curve" in combined
     assert "evaluate_heat_pump_integration" in combined
-    assert "target_direct_heat_pump" in combined
+    assert "problem.target.direct_heat_pump" in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():
@@ -65,7 +66,7 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
         ]
     )
     assert "Interpreting Results" in combined
-    assert "heat-pump integration" in combined
+    assert "heat pump integration" in combined
     assert "heat_pump_targeting.json" in combined
     assert "03_carnot_hpr_comparison.ipynb" in combined
 
@@ -77,6 +78,23 @@ def test_docs_reference_the_current_three_notebook_series():
     assert "03_carnot_hpr_comparison.ipynb" in combined
     assert "01_basic_pinch_analysis.ipynb" not in combined
     assert "06_target_services_workflow.ipynb" not in combined
+
+
+def test_docs_explain_base_and_notebook_installs():
+    readme = _read(README)
+    getting_started = _read(GETTING_STARTED)
+    quickstart = _read(QUICKSTART)
+    notebooks = _read(NOTEBOOKS)
+
+    assert "python -m pip install openpinch" in readme
+    assert 'python -m pip install "openpinch[notebook]"' in readme
+
+    assert "python -m pip install openpinch" in getting_started
+    assert 'python -m pip install "openpinch[notebook]"' in getting_started
+
+    notebook_guides = "\n".join([readme, getting_started, quickstart, notebooks])
+    assert notebook_guides.count('python -m pip install "openpinch[notebook]"') >= 4
+    assert "Optional: Jupyter" not in getting_started
 
 
 def test_reference_docs_match_current_heat_pump_and_schema_surface():
@@ -96,3 +114,26 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "compute_direct_heat_pump_or_refrigeration_target" in api_analysis
     assert "compute_indirect_heat_pump_or_refrigeration_target" in api_analysis
     assert "HeatPumpTargetOutputs" in api_lib
+    assert "OpenPinch.services.input_data_processing.data_preparation" in api_analysis
+    assert "OpenPinch.services.data_preparation" not in api_analysis
+
+
+def test_reference_docs_show_uv_docs_build_command():
+    reference_index = _read(REFERENCE_INDEX)
+
+    assert "uv run scripts/build_docs.py" in reference_index
+    assert "sphinx-build -b html docs/ docs/_build/html" not in reference_index
+
+
+def test_reference_docs_use_current_data_preparation_module_path():
+    combined = "\n".join(
+        [
+            _read(REPO_ROOT / "docs" / "reference" / "api.rst"),
+            _read(REPO_ROOT / "docs" / "reference" / "architecture.rst"),
+            _read(API_CLASSES),
+            _read(API_ANALYSIS),
+        ]
+    )
+
+    assert "OpenPinch.services.input_data_processing.data_preparation" in combined
+    assert "OpenPinch.services.data_preparation" not in combined

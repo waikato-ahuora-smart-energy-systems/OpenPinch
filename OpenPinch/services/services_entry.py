@@ -3,20 +3,20 @@
 from typing import Any
 
 from ..classes.zone import Zone
-from ..lib.schema import TargetInput
 from ..lib.enums import TT
+from ..lib.schemas.io import TargetInput
 from .direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,
 )
-from .indirect_heat_integration.indirect_integration_entry import (
-    compute_total_subzone_utility_targets,
-    compute_indirect_integration_targets,
-)
-from .input_data_processing.data_preparation import prepare_problem
 from .heat_pump_integration.heat_pump_and_refrigeration_entry import (
     compute_direct_heat_pump_or_refrigeration_target,
     compute_indirect_heat_pump_or_refrigeration_target,
 )
+from .indirect_heat_integration.indirect_integration_entry import (
+    compute_indirect_integration_targets,
+    compute_total_subzone_utility_targets,
+)
+from .input_data_processing.data_preparation import prepare_problem
 from .power_cogeneration_analysis import get_power_cogeneration_above_pinch
 
 __all__ = [
@@ -80,6 +80,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def direct_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
+    """Run direct heat-pump targeting after ensuring a base DI target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
@@ -93,6 +94,7 @@ def direct_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def indirect_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
+    """Run indirect heat-pump targeting after ensuring a base TS target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
@@ -106,6 +108,7 @@ def indirect_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def direct_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
+    """Run direct refrigeration targeting after ensuring a base DI target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
@@ -119,6 +122,7 @@ def direct_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def indirect_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
+    """Run indirect refrigeration targeting after ensuring a base TS target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
@@ -132,6 +136,7 @@ def indirect_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
 
 
 def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
+    """Post-process an existing target to recover above-pinch cogeneration work."""
     _apply_zone_config_overrides(zone, args)
     target_type = [
         TT.IHP.value,
@@ -141,19 +146,20 @@ def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
         TT.DR.value,
         TT.DI.value,
     ]
-    if not(isinstance(args, dict)):
+    if not (isinstance(args, dict)):
         args = {}
     if "base_target_type" in args:
         target_type = [str(args["base_target_type"])]
     if len(zone.targets) == 0:
         direct_heat_integration_service(zone)
     for tt in target_type:
-        if tt in zone.targets: 
+        if tt in zone.targets:
             get_power_cogeneration_above_pinch(zone.targets[tt])
             return zone
     raise ValueError("Load data before running pinch analysis services.")
 
 
 def area_cost_targeting_service(zone: Zone, args: dict = {}) -> Zone:
+    """Refresh direct integration targets before area and cost reporting."""
     direct_heat_integration_service(zone)
     return zone

@@ -1,4 +1,4 @@
-"""Shared builders for heat-pump and refrigeration targeting tests."""
+"""Shared builders for heat pump and refrigeration targeting tests."""
 
 from types import SimpleNamespace
 

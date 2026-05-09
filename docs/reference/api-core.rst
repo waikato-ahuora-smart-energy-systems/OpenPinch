@@ -11,7 +11,7 @@ Recommended Usage
 
 For new code, prefer one of these two patterns:
 
-1. Build a :class:`~OpenPinch.lib.schema.TargetInput` payload and call
+1. Build a :class:`~OpenPinch.lib.schemas.io.TargetInput` payload and call
    :func:`~OpenPinch.main.pinch_analysis_service`.
 2. Load a problem file into
    :class:`~OpenPinch.classes.pinch_problem.PinchProblem`, call
@@ -28,7 +28,7 @@ Service-Layer Example
 .. code-block:: python
 
    from OpenPinch import pinch_analysis_service
-   from OpenPinch.lib.schema import StreamSchema, TargetInput
+   from OpenPinch.lib.schemas.io import StreamSchema, TargetInput
 
    payload = TargetInput(
        streams=[
@@ -58,7 +58,7 @@ In particular, the package root exposes:
 
 - :class:`~OpenPinch.classes.pinch_problem.PinchProblem`
 - :func:`~OpenPinch.main.pinch_analysis_service`
-- :func:`~OpenPinch.utils.multiscale_targeting.get_targets`
+- :func:`~OpenPinch.utils.multiscale_targeting.get_targets_for_zone_and_sub_zones`
 - :func:`~OpenPinch.utils.multiscale_targeting.extract_results`
 - :func:`~OpenPinch.utils.stream_linearisation.get_piecewise_linearisation_for_streams`
 
@@ -66,6 +66,14 @@ Package Entrypoints
 -------------------
 
 .. automodule:: OpenPinch
+   :no-members:
+
+.. autofunction:: OpenPinch.main.pinch_analysis_service
+
+.. autoclass:: OpenPinch.classes.pinch_problem.PinchProblem
+   :members:
+
+.. autoclass:: OpenPinch.classes.pinch_problem.HeatPumpIntegrationEvaluation
    :members:
 
 Core Service Functions
@@ -77,15 +85,15 @@ modules.
 - :func:`~OpenPinch.main.pinch_analysis_service` validates the incoming payload,
   prepares the zone hierarchy, runs the appropriate direct and indirect
   targeting steps, and returns a structured response.
-- :func:`~OpenPinch.utils.multiscale_targeting.get_targets` accepts an already prepared
+- :func:`~OpenPinch.utils.multiscale_targeting.get_targets_for_zone_and_sub_zones` accepts an already prepared
   :class:`~OpenPinch.classes.zone.Zone` tree and dispatches it to the correct
   zone-level targeting routine.
 - :func:`~OpenPinch.utils.multiscale_targeting.extract_results` converts the solved in-memory zone
   hierarchy into the dictionary structure consumed by
-  :class:`~OpenPinch.lib.schema.TargetOutput`.
+  :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 
 .. automodule:: OpenPinch.main
-   :members:
+   :no-members:
 
 PinchProblem Convenience Wrapper
 --------------------------------
@@ -106,14 +114,8 @@ The main user-facing methods are:
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.run`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.validate`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.summary_frame`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_direct_heat_pump`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_heat_pump`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_direct_refrigeration`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_indirect_refrigeration`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_cogeneration`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target_area_cost`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_composite_curve`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot_grand_composite_curve`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot.composite_curve`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot.grand_composite_curve`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.compare_to`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_graphs`
@@ -122,17 +124,14 @@ The main user-facing methods are:
 
 The wrapper is intentionally light. Once targeting has run, the same solved
 :class:`~OpenPinch.classes.zone.Zone` hierarchy and
-:class:`~OpenPinch.lib.schema.TargetOutput` objects remain available for direct
+:class:`~OpenPinch.lib.schemas.io.TargetOutput` objects remain available for direct
 inspection.
 
-The ``target_*`` methods are explicit advanced post-processing entrypoints. Each
-returns the affected :class:`~OpenPinch.classes.energy_target.EnergyTarget` and
-refreshes cached :class:`~OpenPinch.lib.schema.TargetOutput` results on the
-same :class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat-pump
-and refrigeration targets also surface HPR summary fields such as
-``hpr_cycle``, ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``,
-and ``StreamCollection`` payloads on ``hpr_hot_streams`` and
-``hpr_cold_streams``.
-
-.. automodule:: OpenPinch.classes.pinch_problem
-   :members:
+The ``problem.target.*`` accessor is the explicit advanced post-processing
+entrypoint family. Each named workflow returns the affected
+:class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` and refreshes cached
+:class:`~OpenPinch.lib.schemas.io.TargetOutput` results on the same
+:class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat pump and
+refrigeration targets also surface HPR summary fields such as ``hpr_cycle``,
+``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``, and
+``StreamCollection`` payloads on ``hpr_hot_streams`` and ``hpr_cold_streams``.

@@ -35,7 +35,7 @@ class Configuration:
     """Runtime configuration defaults used throughout OpenPinch.
 
     The attributes on this class combine global numerical settings, workbook-
-    compatible feature flags, and advanced-analysis parameters such as heat-pump
+    compatible feature flags, and advanced-analysis parameters such as heat pump
     or costing options. A ``Configuration`` instance is attached to each
     :class:`~OpenPinch.classes.zone.Zone` so workflows can vary behaviour by
     hierarchy level if needed.
@@ -45,7 +45,7 @@ class Configuration:
     TOP_ZONE_NAME: str = "Site"
     TOP_ZONE_IDENTIFIER: str = ZT.S.value
     DT_CONT: float = 5
-    DT_PHASE_CHANGE: float = 0.1
+    DT_PHASE_CHANGE: float = 0.01
     HTC: float = 1.0
     T_ENV: float = 15
     DT_ENV_CONT: float = 10
@@ -59,9 +59,9 @@ class Configuration:
     DO_BALANCED_CC: bool = True
     DO_AREA_TARGETING: bool = False
     DO_PROCESS_HP_TARGETING: bool = False
-    DO_PROCESS_RFRG_TARGETING: bool = False  ### add to the template
+    DO_PROCESS_RFRG_TARGETING: bool = False
     DO_UTILITY_HP_TARGETING: bool = False
-    DO_UTILITY_RFRG_TARGETING: bool = False  ### add to the template
+    DO_UTILITY_RFRG_TARGETING: bool = False
     DO_TURBINE_TARGETING: bool = False
     DO_EXERGY_TARGETING: bool = False
     DO_VERTICAL_GCC: bool = False
@@ -69,30 +69,30 @@ class Configuration:
     DO_TURBINE_WORK: bool = False
 
     ### Heat pump and refrigeration targeting parameters ###
-    HPR_TYPE: str = HPRcycle.MultiTempCarnot.value  ### add to the template (modified)
-    HPR_LOAD_VALUE: float | str | dict = 1.0  ### add to the template (modified)
-    HPR_LOAD_VALUE_TYPE: str = "fraction"  ### add to the template (modified)
+    HPR_TYPE: str = HPRcycle.MultiTempCarnot.value
+    HPR_LOAD_VALUE: float | str | dict = 1.0
+    HPR_LOAD_VALUE_TYPE: str = "fraction"
     REFRIGERANTS: List[str] = ["water", "ammonia"]
     DO_REFRIGERANT_SORT: bool = True
-    PRICE_RATIO_HEAT_TO_ELE: float = 1.0  ### add to the template (modified)
-    PRICE_RATIO_COLD_TO_ELE: float = 1.0  ### add to the template (modified)
+    PRICE_RATIO_HEAT_TO_ELE: float = 1.0
+    PRICE_RATIO_COLD_TO_ELE: float = 1.0
     MAX_HP_MULTISTART: int = 10
     N_COND: int = 3
     N_EVAP: int = 2
     ETA_COMP: float = 0.7
     ETA_EXP: float = 0.7
-    ETA_MOTOR: float = 0.95  ### add to the template (modified)
-    ETA_II_HPR_CARNOT: float = 0.5  ### add to the template (modified)
-    ETA_II_HE_CARNOT: float = 0.5  ### add to the template (modified)
-    DT_CONT_HP: float = 0.0  ### add to the template (modified)
-    DT_HPR_IHX: float = 0.0  ### add to the template (modified)
-    DT_HPR_CASCADE_HX: float = 0.0  ### add to the template (modified)
-    BB_MINIMISER: str = BB_Minimiser.CMAES.value  ### add to the template
-    INITIALISE_SIMULATED_CYCLE: bool = True  ### add to the template
-    ALLOW_INTEGRATED_EXPANDER: bool = False  ### add to the template
+    ETA_MOTOR: float = 0.95
+    ETA_II_HPR_CARNOT: float = 0.5
+    ETA_II_HE_CARNOT: float = 0.5
+    DT_CONT_HP: float = 0.0
+    DT_HPR_IHX: float = 0.0
+    DT_HPR_CASCADE_HX: float = 0.0
+    BB_MINIMISER: str = BB_Minimiser.CMAES.value
+    INITIALISE_SIMULATED_CYCLE: bool = True
+    ALLOW_INTEGRATED_EXPANDER: bool = False
 
     ### Cost targeting parameters ###
-    ELE_PRICE: float = 200  # $/MWh   ### add to the template
+    ELE_PRICE: float = 200  # $/MWh
     UTILITY_PRICE: float = 100  # $/MWh
     ANNUAL_OP_TIME: float = 8300
     FIXED_COST: float = 0

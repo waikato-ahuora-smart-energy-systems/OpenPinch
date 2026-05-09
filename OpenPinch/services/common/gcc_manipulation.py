@@ -269,6 +269,7 @@ def _remove_pockets_on_one_side_of_the_pinch(
                 if is_above_pinch:
                     hot_pinch_loc += n_int_added
                     cold_pinch_loc += n_int_added
+                    pinch_loc += n_int_added
                 else:
                     i_0 += n_int_added
 

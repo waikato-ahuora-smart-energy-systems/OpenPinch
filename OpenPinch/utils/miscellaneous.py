@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from ..lib.config import tol
 
 if TYPE_CHECKING:
-    from ..lib.schema import ValueWithUnit
+    from ..lib.schemas.common import ValueWithUnit
 
 __all__ = [
     "clean_composite_curve",
@@ -31,9 +31,11 @@ class _PlotlyShowProxy:
         self._current_figure: go.Figure | None = None
 
     def set_current_figure(self, figure: go.Figure) -> None:
+        """Remember the figure to be shown by the compatibility ``show`` hook."""
         self._current_figure = figure
 
     def show(self) -> None:
+        """Display the most recently registered Plotly figure."""
         if self._current_figure is None:
             raise RuntimeError("No current figure is available to show.")
         self._current_figure.show()
@@ -111,9 +113,7 @@ def get_value(
     elif val is None:
         return None
     else:
-        raise TypeError(
-            "Unsupported type"
-        )
+        raise TypeError("Unsupported type")
 
 
 def _is_value_with_unit(val: Any) -> bool:

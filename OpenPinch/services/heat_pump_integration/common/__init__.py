@@ -1,4 +1,4 @@
-"""Common helpers shared across heat-pump targeting models."""
+"""Common helpers shared across heat pump targeting models."""
 
 from . import encoding, preprocessing, shared
 from .encoding import (

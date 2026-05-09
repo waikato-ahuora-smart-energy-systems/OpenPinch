@@ -1,0 +1,557 @@
+{
+    "targets": [
+        {
+            "name": "Total Integrated Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 11411.770000000004,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 29597.249999999996,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 31446273412.000004,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 11411.770000000002,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "A/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 160.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 160.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 3977.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 7499.999999999998,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 99.99999999999997,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 10959021200.000015,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 3977.0000000000055,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "B/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 85.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 85.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 6200.000000000002,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 2200.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 15799.999999999996,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 87.77777777777776,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 22834529909.090916,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 6200.000000000002,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 2086.590909090909,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "C/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 28.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 28.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 388.77,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 120.24999999999997,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 99.99999999999997,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 1071294612.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 388.77,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "D/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 11000.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 30311600000.0,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 11000.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Process Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 17588.770000000004,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 6177.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 23420.249999999993,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": null,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 65176445721.09093,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 17588.770000000004,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 6063.5909090909145,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Total Site Target/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 160.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 17588.770000000004,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 6063.590909090915,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 23420.24999999998,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 79.1298178040189,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 65176445721.09094,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 17588.770000000004,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 6063.5909090909145,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

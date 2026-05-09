@@ -1,17 +1,31 @@
-"""Public entrypoint for heat-pump and refrigeration targeting."""
+"""Public entrypoint for heat pump and refrigeration targeting."""
 
 from ast import literal_eval
+from copy import deepcopy
 
 import numpy as np
-from copy import deepcopy
 
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
-from ...classes.energy_target import EnergyTarget
 from ...lib.config import Configuration, tol
-from ...lib.enums import GT, HPRcycle, PT, TT
-from ...lib.schema import HeatPumpTargetOutputs
+from ...lib.enums import GT, PT, TT, HPRcycle
+from ...lib.schemas.hpr import HeatPumpTargetOutputs
+from ...lib.schemas.targets import (
+    DirectHeatPumpTarget,
+    DirectRefrigerationTarget,
+    IndirectHeatPumpTarget,
+    IndirectRefrigerationTarget,
+)
 from ...utils.miscellaneous import get_value
+from ..common.problem_table_analysis import create_problem_table_with_t_int
+from .common.preprocessing import (
+    construct_HPRTargetInputs,
+)
+from .common.shared import (
+    get_process_heat_cascade,
+    get_utility_heat_cascade,
+    plot_multi_hp_profiles_from_results,
+)
 from .cycles.brayton import (
     optimise_brayton_heat_pump_placement,
 )
@@ -27,15 +41,6 @@ from .cycles.multi_simple_vapour_compression import (
 from .cycles.multi_temperature_carnot import (
     optimise_multi_temperature_carnot_heat_pump_placement,
 )
-from .common.preprocessing import (
-    construct_HPRTargetInputs,
-)
-from .common.shared import (
-    get_process_heat_cascade,
-    get_utility_heat_cascade,
-    plot_multi_hp_profiles_from_results,
-)
-from ..common.problem_table_analysis import create_problem_table_with_t_int
 
 __all__ = [
     "compute_direct_heat_pump_or_refrigeration_target",
@@ -52,15 +57,10 @@ __all__ = [
 def compute_direct_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
-) -> EnergyTarget:
+) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
+    """Solve an explicit direct heat-pump or refrigeration target for one zone."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.DI.value].pt)
-    target = EnergyTarget(
-        zone_name=zone.name,
-        type=TT.DHP.value if is_heat_pumping else TT.DR.value,
-        parent_zone=zone.parent_zone,
-        zone_config=zone.config,
-    )
     target_load = _validate_hpr_required(
         pt,
         is_heat_pumping=is_heat_pumping,
@@ -85,32 +85,29 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
     )
-    target.update(
-        {
-            "pt": pt,
-            "graphs": _get_hpr_graphs(
-                pt=pt,
-                is_direct=True,
-                is_heat_pumping=is_heat_pumping,
-            ),
-        }
-        | _get_hpr_target_summary(res, zone)
-    )
-    return target
+    payload = {
+        "zone_name": zone.name,
+        "type": TT.DHP.value if is_heat_pumping else TT.DR.value,
+        "parent_zone": zone.parent_zone,
+        "config": zone.config,
+        "pt": pt,
+        "graphs": _get_hpr_graphs(
+            pt=pt,
+            is_direct=True,
+            is_heat_pumping=is_heat_pumping,
+        ),
+    } | _get_hpr_target_summary(res, zone)
+    model_cls = DirectHeatPumpTarget if is_heat_pumping else DirectRefrigerationTarget
+    return model_cls.model_validate(payload)
 
 
 def compute_indirect_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
-) -> EnergyTarget:
+) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
+    """Solve an indirect / utility-system heat-pump or refrigeration target."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.TS.value].pt)
-    target = EnergyTarget(
-        zone_name=zone.name,
-        type=TT.IHP.value if is_heat_pumping else TT.IR.value,
-        parent_zone=zone.parent_zone,
-        zone_config=zone.config,
-    )
     # Create problem table based on inverted utility streams
     pt_ut_gen = get_process_heat_cascade(
         hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
@@ -143,18 +140,22 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
     )
-    target.update(
-        {
-            "pt": pt,
-            "graphs": _get_hpr_graphs(
-                pt=pt,
-                is_direct=False,
-                is_heat_pumping=is_heat_pumping,
-            ),
-        }
-        | _get_hpr_target_summary(res, zone)
+    payload = {
+        "zone_name": zone.name,
+        "type": TT.IHP.value if is_heat_pumping else TT.IR.value,
+        "parent_zone": zone.parent_zone,
+        "config": zone.config,
+        "pt": pt,
+        "graphs": _get_hpr_graphs(
+            pt=pt,
+            is_direct=False,
+            is_heat_pumping=is_heat_pumping,
+        ),
+    } | _get_hpr_target_summary(res, zone)
+    model_cls = (
+        IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
     )
-    return target
+    return model_cls.model_validate(payload)
 
 
 #######################################################################################################
@@ -254,14 +255,10 @@ def _get_hpr_graphs(
 
     if is_direct:
         return {
-            GT.GCC_HP.value: pt[
-                [PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]
-            ]
+            GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]]
         }
 
-    return {
-        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]
-    }
+    return {GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]}
 
 
 def _calc_hpr_cascade(
@@ -271,15 +268,19 @@ def _calc_hpr_cascade(
     is_heat_pumping: bool = True,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
-    T_ls = create_problem_table_with_t_int(
-        streams=(
-            res.hpr_hot_streams
-            + res.hpr_cold_streams
-            + res.amb_streams.get_hot_streams()
-            + res.amb_streams.get_cold_streams()
-        ),
-        is_shifted=is_T_vals_shifted,
-    ).col[PT.T.value].tolist()
+    T_ls = (
+        create_problem_table_with_t_int(
+            streams=(
+                res.hpr_hot_streams
+                + res.hpr_cold_streams
+                + res.amb_streams.get_hot_streams()
+                + res.amb_streams.get_cold_streams()
+            ),
+            is_shifted=is_T_vals_shifted,
+        )
+        .col[PT.T.value]
+        .tolist()
+    )
     pt.insert_temperature_interval(T_ls)
 
     # Ambient air addition to the process stream set

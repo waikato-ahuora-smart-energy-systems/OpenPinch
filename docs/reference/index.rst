@@ -19,13 +19,13 @@ configuration objects, schema definitions, or lower-level analysis modules.
 Building the Documentation
 --------------------------
 
-Install the documentation requirements and build the HTML pages locally with
-``sphinx-build``:
+Build the HTML pages locally with ``uv``:
 
 .. code-block:: bash
 
-   python -m pip install -r docs/requirements.txt
-   sphinx-build -b html docs/ docs/_build/html
+   uv run scripts/build_docs.py
 
-The Read the Docs configuration in ``.readthedocs.yaml`` uses the same command
-and dependency set.
+The helper script installs the local Sphinx requirements declared in
+``scripts/build_docs.py`` and writes the output to ``docs/_build/html``.
+Read the Docs uses the environment defined in ``.readthedocs.yaml`` and builds
+the same ``docs/conf.py`` configuration.

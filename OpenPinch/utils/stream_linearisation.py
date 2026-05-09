@@ -5,7 +5,7 @@ from typing import List
 import numpy as np
 from scipy.optimize import NonlinearConstraint, minimize
 
-from ..lib.schema import NonLinearStream
+from ..lib.schemas.io import NonLinearStream
 
 __all__ = ["get_piecewise_linearisation_for_streams", "get_piecewise_data_points"]
 

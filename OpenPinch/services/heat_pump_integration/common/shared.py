@@ -1,4 +1,4 @@
-"""Shared helpers for heat-pump and refrigeration targeting."""
+"""Shared helpers for heat pump and refrigeration targeting."""
 
 from typing import Callable, Tuple
 
@@ -10,7 +10,7 @@ from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
 from ....lib.config import tol
 from ....lib.enums import PT
-from ....lib.schema import HeatPumpTargetInputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs
 from ....utils.blackbox_minimisers import multiminima
 from ....utils.miscellaneous import (
     clean_composite_curve_ends,
@@ -22,7 +22,6 @@ from ...common.problem_table_analysis import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
 )
-
 
 __all__ = [
     "PropsSI",
@@ -57,6 +56,7 @@ def plot_multi_hp_profiles_from_results(
     hpr_cold_streams: StreamCollection = None,
     title: str = None,
 ) -> go.Figure:
+    """Plot background source/sink profiles alongside solved HPR cycle streams."""
     fig = go.Figure()
 
     if T_hot is not None and H_hot is not None:
@@ -127,6 +127,7 @@ def solve_hpr_placement(
     bnds: list,
     args: HeatPumpTargetInputs,
 ) -> dict:
+    """Run the configured multistart optimiser and post-process the best result."""
     if isinstance(x0_ls, (int, float)):
         x0_ls = [x0_ls]
     x0_ls = np.asarray(x0_ls, dtype=np.float64)
@@ -162,6 +163,7 @@ def create_stream_collection_of_background_profile(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
 ) -> StreamCollection:
+    """Convert a temperature-enthalpy profile into piecewise stream segments."""
     s = StreamCollection()
 
     T_vals = np.asarray(T_vals)
@@ -199,6 +201,7 @@ def get_Q_vals_at_T_hpr_from_bckgrd_profile(
     *,
     is_cond: bool = True,
 ) -> np.ndarray:
+    """Read stage duties from a background profile at proposed HPR temperatures."""
     H_less_origin = np.interp(T_hpr, T_vals[::-1], H_vals[::-1])
     H = (
         np.concatenate((H_less_origin, np.array([0.0])))
@@ -218,6 +221,7 @@ def compute_entropic_mean_temperature(
     *,
     input_T_units: str = "C",
 ) -> float:
+    """Return the entropic mean temperature for a distributed heat load."""
     T_arr = np.asarray(T_arr, dtype=float)
     Q_arr = np.asarray(Q_arr, dtype=float)
     unit_offset = 273.15 if input_T_units == "C" else 0
@@ -232,6 +236,7 @@ def calc_carnot_heat_pump_cop(
     T_l: float | np.ndarray,
     eta_ii: float,
 ) -> float | np.ndarray:
+    """Compute a Carnot-based heating COP with a second-law efficiency factor."""
     T_h_arr = np.asarray(T_h, dtype=float)
     T_l_arr = np.asarray(T_l, dtype=float)
     delta_T = T_h_arr - T_l_arr
@@ -249,6 +254,7 @@ def calc_carnot_heat_engine_eta(
     T_l: float | np.ndarray,
     eta_ii: float,
 ) -> float | np.ndarray:
+    """Compute a Carnot-based heat-engine efficiency with a second-law factor."""
     T_h_arr = np.asarray(T_h, dtype=float)
     T_l_arr = np.asarray(T_l, dtype=float)
     eta = np.where(
@@ -263,6 +269,7 @@ def validate_vapour_hp_refrigerant_ls(
     num_stages: int,
     args: HeatPumpTargetInputs,
 ) -> list:
+    """Return one refrigerant name per vapour-compression stage."""
     if len(args.refrigerant_ls) > 0:
         if args.do_refrigerant_sort:
             refrigerants = [
@@ -290,6 +297,7 @@ def get_carnot_hpr_cycle_streams(
     Q_evap: np.ndarray,
     args,
 ) -> dict:
+    """Build latent condenser and evaporator streams for Carnot-cycle summaries."""
     return {
         "hpr_hot_streams": _build_latent_streams(
             T_cond, args.dt_phase_change, Q_cond, is_hot=True
@@ -305,6 +313,7 @@ def get_ambient_air_stream(
     Q_amb_cold: float = 0.0,
     args: HeatPumpTargetInputs = None,
 ) -> StreamCollection:
+    """Build ambient-air exchange streams implied by the solved HPR result."""
     sc = StreamCollection()
     if Q_amb_hot > tol:
         sc += _build_latent_streams(
@@ -338,6 +347,7 @@ def calc_hpr_obj(
     cold_to_power_ratio: float = 0.0,
     penalty: float = 0.0,
 ) -> float:
+    """Return the scalar screening objective used by HPR placement solvers."""
     return (
         work
         + (Q_ext_heat * heat_to_power_ratio)

@@ -8,17 +8,24 @@ def create_problem_and_results_json():
     """Convert each example workbook into paired problem/result JSON files."""
     # Read workbooks from the repo example fixture directory.
     filepath_root = os.path.dirname(__file__)
-    filepath_load = os.path.join(filepath_root, "OpenPinchWkbs")
+    filepath_load = os.path.join(filepath_root, "review")
     filepath_save = filepath_root
 
     for filename in os.listdir(filepath_load):
         if (
             filename.endswith(".xlsb") or filename.endswith(".xlsx")
         ) and not filename.startswith("~$"):
-            excel_file = os.path.join(filepath_load, filename)
-            project_name = os.path.splitext(filename)[0]
-            p_json_file = filepath_save + "/stream_data/p_" + project_name + ".json"
-            get_problem_from_excel(excel_file, p_json_file)
+            try:
+                excel_file = os.path.join(filepath_load, filename)
+                project_name = os.path.splitext(filename)[0]
+                p_json_file = filepath_save + "/stream_data/p_" + project_name + ".json"
+                get_problem_from_excel(excel_file, p_json_file)
 
-            r_json_file = filepath_save + "/results/r_" + project_name + ".json"
-            get_results_from_excel(excel_file, r_json_file, project_name)
+                r_json_file = filepath_save + "/results/r_" + project_name + ".json"
+                get_results_from_excel(excel_file, r_json_file, project_name)
+            except:
+                pass
+
+
+if __name__ == "__main__":
+    create_problem_and_results_json()

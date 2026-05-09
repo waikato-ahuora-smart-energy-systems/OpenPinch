@@ -12,10 +12,7 @@ import OpenPinch.utils
 EXPECTED_EXPORTS = {
     "OpenPinch": {
         "Configuration",
-        "HeatPumpIntegrationComparison",
-        "HeatPumpIntegrationScenario",
         "PinchProblem",
-        "StreamCollection",
         "StreamSchema",
         "StreamType",
         "TargetInput",
@@ -29,14 +26,13 @@ EXPECTED_EXPORTS = {
         "pinch_analysis_service",
     },
     "OpenPinch.lib": {
+        "BaseTargetModel",
+        "DirectIntegrationTarget",
         "Configuration",
         "Graph",
         "GraphSet",
         "HeatUtility",
-        "HeatPumpIntegrationComparison",
-        "HeatPumpIntegrationScenario",
         "HeatPumpTargetOutputs",
-        "StreamCollection",
         "StreamSchema",
         "TargetInput",
         "TargetOutput",
@@ -50,7 +46,6 @@ EXPECTED_EXPORTS = {
     },
     "OpenPinch.classes": {
         "CascadeVapourCompressionCycle",
-        "EnergyTarget",
         "MultiStageSteamTurbine",
         "ParallelVapourCompressionCycles",
         "PinchProblem",

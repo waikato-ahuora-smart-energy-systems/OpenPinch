@@ -4,10 +4,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
-from ...classes.energy_target import EnergyTarget
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...lib.enums import ArrowHead, GT, LegendSeries, LineColour, PT, StreamLoc
+from ...lib.schemas.targets import BaseTargetModel
 from ...utils.miscellaneous import clean_composite_curve
 from ...lib.config import tol
 
@@ -44,10 +44,13 @@ __all__ = ["get_output_graph_data"]
 #######################################################################################################
 
 
-def get_output_graph_data(zone: Zone, graph_sets: dict = {}) -> dict:
+def get_output_graph_data(zone: Zone, graph_sets: Optional[dict] = None) -> dict:
     """Returns Json data points for each process."""
-    for key, t in zone.targets.items():
-        graph_sets[key] = _create_graph_set(t, key)
+    if graph_sets is None:
+        graph_sets = {}
+
+    for target in zone.targets.values():
+        graph_sets[target.name] = _create_graph_set(target, zone=zone)
 
     if len(zone.subzones) > 0:
         for z in zone.subzones.values():
@@ -61,41 +64,45 @@ def get_output_graph_data(zone: Zone, graph_sets: dict = {}) -> dict:
 #######################################################################################################
 
 
-def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
+def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
     """Creates Pinch Analysis and total site analysis graphs for a specifc zone."""
 
     graphs: List[dict] = []
+    target_graphs = getattr(t, "graphs", {})
+    graph_title = t.name
+    zone_name = getattr(zone, "name", None) or getattr(t, "zone_name", None)
+    zone_address = getattr(zone, "address", None)
 
-    if GT.CC.value in t.graphs:
+    if GT.CC.value in target_graphs:
         graphs.append(
             _make_composite_graph(
-                graph_title=graphTitle,
+                graph_title=graph_title,
                 key=GT.CC.value,
-                data=t.graphs[GT.CC.value],
+                data=target_graphs[GT.CC.value],
                 col_keys=[PT.H_HOT.value, PT.H_COLD.value],
                 stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Composite Curve",
             )
         )
 
-    if GT.SCC.value in t.graphs:
+    if GT.SCC.value in target_graphs:
         graphs.append(
             _make_composite_graph(
-                graph_title=graphTitle,
+                graph_title=graph_title,
                 key=GT.SCC.value,
-                data=t.graphs[GT.SCC.value],
+                data=target_graphs[GT.SCC.value],
                 col_keys=[PT.H_HOT.value, PT.H_COLD.value],
                 stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Shifted Composite Curve",
             )
         )
 
-    if GT.BCC.value in t.graphs:
+    if GT.BCC.value in target_graphs:
         graphs.append(
             _make_composite_graph(
-                graph_title=graphTitle,
+                graph_title=graph_title,
                 key=GT.BCC.value,
-                data=t.graphs[GT.BCC.value],
+                data=target_graphs[GT.BCC.value],
                 col_keys=[PT.H_HOT_BAL.value, PT.H_COLD_BAL.value],
                 stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Balanced Composite Curve",
@@ -103,12 +110,12 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
             )
         )
 
-    if GT.GCC.value in t.graphs:
+    if GT.GCC.value in target_graphs:
         graphs.append(
             _make_gcc_graph(
-                graph_title=graphTitle,
+                graph_title=graph_title,
                 key=GT.GCC.value,
-                data=t.graphs[GT.GCC.value],
+                data=target_graphs[GT.GCC.value],
                 label="Grand Composite Curve",
                 value_field=[
                     PT.H_NET.value,
@@ -121,12 +128,35 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
             )
         )
 
-    if GT.TSP.value in t.graphs:
+    if GT.NLP.value in target_graphs:
         graphs.append(
             _make_composite_graph(
-                graph_title=graphTitle,
+                graph_title=graph_title,
+                key=GT.NLP.value,
+                data=target_graphs[GT.NLP.value],
+                col_keys=[
+                    PT.H_NET_HOT.value,
+                    PT.H_NET_COLD.value,
+                    PT.H_HOT_UT.value,
+                    PT.H_COLD_UT.value,
+                ],
+                stream_types=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                    StreamLoc.HotU,
+                    StreamLoc.ColdU,
+                ],
+                label="Net Load Curves",
+                include_arrows=True,
+            )
+        )
+
+    if GT.TSP.value in target_graphs:
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graph_title,
                 key=GT.TSP.value,
-                data=t.graphs[GT.TSP.value],
+                data=target_graphs[GT.TSP.value],
                 col_keys=[
                     PT.H_NET_HOT.value,
                     PT.H_NET_COLD.value,
@@ -144,31 +174,37 @@ def _create_graph_set(t: EnergyTarget, graphTitle: str) -> dict:
             )
         )
 
-    if GT.SUGCC.value in t.graphs:
+    if GT.SUGCC.value in target_graphs:
         graphs.append(
             _make_gcc_graph(
-                graph_title=graphTitle,
+                graph_title=graph_title,
                 key=GT.SUGCC.value,
-                data=t.graphs[GT.SUGCC.value],
+                data=target_graphs[GT.SUGCC.value],
                 label="Site Utility Grand Composite Curve",
                 value_field=[PT.H_NET_UT.value],
                 is_utility_profile=[True],
             )
         )
 
-    if GT.GCC_HP.value in t.graphs:
+    if GT.GCC_HP.value in target_graphs:
         graphs.append(
             _make_gcc_graph(
-                graph_title=graphTitle,
+                graph_title=graph_title,
                 key=GT.GCC_HP.value,
-                data=t.graphs[GT.GCC_HP.value],
+                data=target_graphs[GT.GCC_HP.value],
                 label="Grand Composite Curve with Heat Pump",
                 value_field=[PT.H_NET_W_AIR.value, PT.H_NET_HP.value],
                 is_utility_profile=[False, True],
             )
         )
 
-    return {"name": graphTitle, "graphs": graphs}
+    return {
+        "name": graph_title,
+        "target_type": getattr(t, "type", None),
+        "zone_name": zone_name,
+        "zone_address": zone_address,
+        "graphs": graphs,
+    }
 
 
 def _make_composite_graph(

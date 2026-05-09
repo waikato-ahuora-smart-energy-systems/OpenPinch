@@ -142,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     heat_pump_parser = subparsers.add_parser(
         "heat-pump",
-        help="Evaluate a candidate heat-pump integration scenario against a case.",
+        help="Evaluate a candidate heat pump integration scenario against a case.",
     )
     _add_problem_input_argument(heat_pump_parser)
     heat_pump_parser.add_argument(
@@ -355,7 +355,7 @@ def _heat_pump_command(problem_cls, args: argparse.Namespace) -> int:
             json.dumps(evaluation.comparison.model_dump(), indent=2),
             encoding="utf-8",
         )
-        print(f"Wrote heat-pump comparison JSON to {args.json_output}")
+        print(f"Wrote heat pump comparison JSON to {args.json_output}")
 
     if args.graph_output is not None:
         written = evaluation.integrated_problem.export_graphs(

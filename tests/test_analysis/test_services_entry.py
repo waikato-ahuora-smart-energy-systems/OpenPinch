@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
-from OpenPinch.classes.energy_target import EnergyTarget
+from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import TT, ZT
+from OpenPinch.lib.enums import ProblemTableLabel as PT, TT, ZT
+from OpenPinch.lib.schemas.targets import (
+    BaseTargetModel,
+    DirectIntegrationTarget,
+    TotalSiteTarget,
+)
 from OpenPinch.services import services_entry as svc
 
 
@@ -17,12 +20,40 @@ def _make_zone() -> Zone:
     return Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
 
 
-def _make_target(zone: Zone, target_type: str) -> EnergyTarget:
-    return EnergyTarget(
+def _dummy_problem_table() -> ProblemTable:
+    return ProblemTable({PT.T.value: [0.0]})
+
+
+def _make_target(zone: Zone, target_type: str) -> BaseTargetModel:
+    if target_type == TT.DI.value:
+        return DirectIntegrationTarget(
+            zone_name=zone.name,
+            type=target_type,
+            parent_zone=zone.parent_zone,
+            config=zone.config,
+            pt=_dummy_problem_table(),
+            pt_real=_dummy_problem_table(),
+            hot_utility_target=0.0,
+            cold_utility_target=0.0,
+            heat_recovery_target=0.0,
+        )
+    if target_type == TT.TS.value:
+        return TotalSiteTarget(
+            zone_name=zone.name,
+            type=target_type,
+            parent_zone=zone.parent_zone,
+            config=zone.config,
+            pt=_dummy_problem_table(),
+            pt_real=_dummy_problem_table(),
+            hot_utility_target=0.0,
+            cold_utility_target=0.0,
+            heat_recovery_target=0.0,
+        )
+    return BaseTargetModel(
         zone_name=zone.name,
         type=target_type,
         parent_zone=zone.parent_zone,
-        zone_config=zone.config,
+        config=zone.config,
     )
 
 
@@ -55,7 +86,7 @@ def test_direct_hpr_services_enable_flags_and_bootstrap_direct_integration(
         target_zone.add_target(_make_target(target_zone, TT.DI.value))
         return target_zone
 
-    def fake_compute(target_zone: Zone, is_heat_pumping: bool) -> EnergyTarget:
+    def fake_compute(target_zone: Zone, is_heat_pumping: bool) -> BaseTargetModel:
         assert is_heat_pumping is expected_is_heat_pumping
         return _make_target(target_zone, target_id)
 
@@ -107,7 +138,7 @@ def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
         target_zone.add_target(_make_target(target_zone, TT.TS.value))
         return target_zone
 
-    def fake_compute(target_zone: Zone, is_heat_pumping: bool) -> EnergyTarget:
+    def fake_compute(target_zone: Zone, is_heat_pumping: bool) -> BaseTargetModel:
         assert is_heat_pumping is expected_is_heat_pumping
         return _make_target(target_zone, target_id)
 

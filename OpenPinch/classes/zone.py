@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Optional
 
 from ..lib.config import Configuration
 from ..lib.enums import ZT
+from ..lib.schemas.targets import BaseTargetModel
 from .stream_collection import StreamCollection
-from .energy_target import EnergyTarget
 
 if TYPE_CHECKING:
     from .stream import Stream
@@ -28,6 +28,7 @@ class Zone:
         type: str = ZT.P.value,
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
+        dt_cont_multiplier: float = 1.0,
     ):
         """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
@@ -35,6 +36,7 @@ class Zone:
         self._type = type
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
+        self._dt_cont_multiplier = float(dt_cont_multiplier)
         self._active = True
         self._subzones = {}
         self._targets = {}
@@ -94,6 +96,22 @@ class Zone:
     @active.setter
     def active(self, value: bool):
         self._active = bool(value)
+
+    @property
+    def address(self) -> str:
+        """Slash-delimited path from the root zone to this zone."""
+        if self.parent_zone is None:
+            return str(self.name)
+        return f"{self.parent_zone.address}/{self.name}"
+
+    @property
+    def dt_cont_multiplier(self) -> float:
+        """Effective multiplier applied to stream and utility ``dt_cont`` values."""
+        return self._dt_cont_multiplier
+
+    @dt_cont_multiplier.setter
+    def dt_cont_multiplier(self, value: float):
+        self._dt_cont_multiplier = float(value)
 
     @property
     def hot_streams(self):
@@ -234,9 +252,9 @@ class Zone:
         else:
             loc[base_name] = zone_to_add
 
-    def add_target(self, target_to_add: EnergyTarget):
+    def add_target(self, target_to_add: BaseTargetModel):
         """Add one target to a specific zone."""
-        if isinstance(target_to_add, EnergyTarget):
+        if isinstance(target_to_add, BaseTargetModel):
             self._targets[target_to_add.type] = target_to_add
 
     def add_targets(self, targets: list):
@@ -317,7 +335,6 @@ class Zone:
             for s in cs_src:
                 key = f"{z.name}.{s.name}"
                 cs_dst.add(s, key)
-
 
     def get_target_zone(self, zone_name: Optional[str | list]) -> "Zone":
         if zone_name is None:

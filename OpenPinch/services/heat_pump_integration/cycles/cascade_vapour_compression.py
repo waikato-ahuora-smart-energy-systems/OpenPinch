@@ -4,9 +4,8 @@ import numpy as np
 
 from ....classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
 from ....lib.enums import PT
-from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
-
 from ..common.encoding import (
     map_Q_amb_to_x,
     map_Q_arr_to_x_arr,
@@ -16,20 +15,19 @@ from ..common.encoding import (
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
 )
-from .multi_temperature_carnot import (
-    optimise_multi_temperature_carnot_heat_pump_placement,
-)
 from ..common.shared import (
     _append_unspecified_final_cascade_cooling_duty,
     calc_hpr_obj,
+    g_ineq_penalty,
     get_ambient_air_stream,
     get_process_heat_cascade,
-    g_ineq_penalty,
     plot_multi_hp_profiles_from_results,
     solve_hpr_placement,
     validate_vapour_hp_refrigerant_ls,
 )
-
+from .multi_temperature_carnot import (
+    optimise_multi_temperature_carnot_heat_pump_placement,
+)
 
 __all__ = [
     "optimise_cascade_heat_pump_placement",
@@ -45,6 +43,7 @@ __all__ = [
 def optimise_cascade_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
+    """Optimise a cascade vapour-compression placement for the prepared HPR case."""
     num_stages = int(args.n_cond + args.n_evap - 1)
     init_res = (
         optimise_multi_temperature_carnot_heat_pump_placement(args)

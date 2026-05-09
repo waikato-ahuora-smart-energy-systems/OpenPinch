@@ -6,12 +6,12 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pytest
-from OpenPinch.classes.energy_target import EnergyTarget
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.enums import ArrowHead, ProblemTableLabel as PT
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.streamlit_webviewer import web_graphing as wg
 import sys
 from OpenPinch.lib.enums import ArrowHead
@@ -99,15 +99,7 @@ class _StreamlitStub:
         self.successes.append(str(msg))
 
 
-def _make_target(name: str) -> EnergyTarget:
-    target = EnergyTarget(zone_name=name, type="DI")
-    target.cold_pinch = 80.0
-    target.hot_pinch = 120.0
-    target.hot_utility_target = 100.0
-    target.cold_utility_target = 60.0
-    target.heat_recovery_target = 140.0
-    target.degree_of_int = 0.7
-
+def _make_target(name: str) -> DirectIntegrationTarget:
     hu = StreamCollection()
     hu.add(
         Stream(
@@ -128,8 +120,6 @@ def _make_target(name: str) -> EnergyTarget:
             is_process_stream=False,
         )
     )
-    target.hot_utilities = hu
-    target.cold_utilities = cu
 
     pt = ProblemTable(
         {
@@ -138,9 +128,20 @@ def _make_target(name: str) -> EnergyTarget:
             PT.H_COLD.value: [0.0, 10.0, 20.0],
         }
     )
-    target.pt = pt
-    target.pt_real = pt.copy
-    return target
+    return DirectIntegrationTarget(
+        zone_name=name,
+        type="DI",
+        cold_pinch=80.0,
+        hot_pinch=120.0,
+        hot_utility_target=100.0,
+        cold_utility_target=60.0,
+        heat_recovery_target=140.0,
+        degree_of_int=0.7,
+        hot_utilities=hu,
+        cold_utilities=cu,
+        pt=pt,
+        pt_real=pt.copy,
+    )
 
 
 def test_collect_targets_and_problem_table_dataframe_helpers():
@@ -190,7 +191,7 @@ def test_build_plotly_helpers_cover_arrow_and_legend_logic():
     }
     fig = wg._build_plotly_graph(graph)
     assert len(fig.data) == 2
-    assert len(fig.layout.annotations) >= 1
+    assert len(fig.layout.annotations) == 0
 
     traces, ann = wg._segment_trace(
         segment={"data_points": [{"x": 1.0, "y": 1.0}], "title": "Flat"},
@@ -399,17 +400,18 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     monkeypatch.setitem(sys.modules, "streamlit", st)
 
     zone = Zone(name="Plant")
-    target = EnergyTarget(zone_name="Plant", type="DI")
-    target.cold_pinch = 80.0
-    target.hot_pinch = 120.0
-    target.hot_utility_target = 100.0
-    target.cold_utility_target = 50.0
-    target.heat_recovery_target = 75.0
-    target.degree_of_int = 0.5
-    target.hot_utilities = []
-    target.cold_utilities = []
-    target.pt = None
-    target.pt_real = None
+    target = DirectIntegrationTarget(
+        zone_name="Plant",
+        type="DI",
+        pt=ProblemTable({PT.T.value: []}),
+        pt_real=ProblemTable({PT.T.value: []}),
+        cold_pinch=80.0,
+        hot_pinch=120.0,
+        hot_utility_target=100.0,
+        cold_utility_target=50.0,
+        heat_recovery_target=75.0,
+        degree_of_int=0.5,
+    )
     zone.add_target(target)
 
     wg.render_streamlit_dashboard(zone, graph_payload={})

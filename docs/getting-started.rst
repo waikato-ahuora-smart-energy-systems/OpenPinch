@@ -9,16 +9,23 @@ Requirements
 
 - Python ``>=3.14``
 - ``numpy``, ``pandas``, and the dependencies listed in ``pyproject.toml``
-- Optional: Jupyter if you want to use the packaged notebook series
+- ``openpinch[notebook]`` if you want to run the packaged notebook series in Jupyter
 
 Installation
 ------------
 
-Install the published package from PyPI:
+Install the published package from PyPI for core CLI and Python usage:
 
 .. code-block:: bash
 
    python -m pip install openpinch
+
+If you want to run the packaged notebooks in Jupyter, install the notebook
+extra instead:
+
+.. code-block:: bash
+
+   python -m pip install "openpinch[notebook]"
 
 To work on the project locally, clone the repository and install it in editable
 mode:
@@ -65,14 +72,17 @@ To copy the packaged notebooks into your working directory:
 
    openpinch notebook -o notebooks
 
+To run the copied notebooks in Jupyter, install the notebook extra first with
+``python -m pip install "openpinch[notebook]"``.
+
 The notebook series is organized around distinct workflows, including basic
 pinch sensitivity, total-site utility planning, and direct-versus-indirect
-Carnot heat-pump and refrigeration studies.
+Carnot heat pump and refrigeration studies.
 
-Run The Heat-Pump Targeting Sample
+Run The Heat Pump Targeting Sample
 ----------------------------------
 
-OpenPinch also ships with a dedicated sample for the public heat-pump
+OpenPinch also ships with a dedicated sample for the public heat pump
 integration workflow:
 
 .. code-block:: bash
@@ -92,8 +102,8 @@ Next Steps
 
 - Continue to :doc:`user-guide/quickstart` for the Python workflow.
 - Use :doc:`user-guide/interpreting-results` to understand the summary metrics,
-  graphs, and heat-pump integration workflow.
-- Use :doc:`user-guide/heat-pump-targeting` for the dedicated heat-pump
+  graphs, and heat pump integration workflow.
+- Use :doc:`user-guide/heat-pump-targeting` for the dedicated heat pump
   targeting helper and sample workflow.
 - Use ``openpinch graph`` to export specific graph types directly from the CLI.
 - Explore :doc:`reference/index` for the public API and architectural reference.

@@ -7,6 +7,7 @@ and propagate utility definitions across nested zones.
 """
 
 import copy
+import math
 from collections import defaultdict
 from typing import List, Optional, Tuple
 
@@ -15,7 +16,7 @@ from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import Configuration
 from ...lib.enums import StreamLoc, ST, ZT
-from ...lib.schema import StreamSchema, UtilitySchema, ZoneTreeSchema
+from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ...utils.miscellaneous import get_value
 
 __all__ = ["prepare_problem"]
@@ -38,10 +39,10 @@ def prepare_problem(
     Parameters
     ----------
     streams:
-        Iterable of validated :class:`OpenPinch.lib.schema.StreamSchema` objects describing
+        Iterable of validated :class:`OpenPinch.lib.schemas.io.StreamSchema` objects describing
         the process streams to analyse.
     utilities:
-        Iterable of :class:`OpenPinch.lib.schema.UtilitySchema` describing candidate hot
+        Iterable of :class:`OpenPinch.lib.schemas.io.UtilitySchema` describing candidate hot
         and cold utilities.
     options:
         Optional :class:`OpenPinch.lib.config.Configuration` overrides.  When omitted the
@@ -49,7 +50,7 @@ def prepare_problem(
     project_name:
         Human-friendly label applied to the root zone when no explicit zone tree is supplied.
     zone_tree:
-        Optional :class:`OpenPinch.lib.schema.ZoneTreeSchema` describing the desired zone
+        Optional :class:`OpenPinch.lib.schemas.io.ZoneTreeSchema` describing the desired zone
         hierarchy (i.e., Zone A encompasses Zones B and C).
 
     Returns
@@ -75,18 +76,14 @@ def prepare_problem(
         name=zone_config.TOP_ZONE_NAME,
         type=zone_config.TOP_ZONE_IDENTIFIER,
         zone_config=zone_config,
+        dt_cont_multiplier=_resolve_zone_dt_cont_multiplier(zone_tree, None),
     )
     master_zone = _create_nested_zones(master_zone, zone_tree, master_zone.config)
     master_zone = _get_process_streams_in_each_subzone(
         master_zone, sorted(streams, key=lambda x: x.name)
     )
     master_zone.import_hot_and_cold_streams_from_sub_zones()
-    hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
-        utilities, master_zone.hot_streams, master_zone.cold_streams, master_zone.config
-    )
-    master_zone = _set_utilities_for_zone_and_subzones(
-        master_zone, hot_utilities, cold_utilities
-    )
+    master_zone = _set_utilities_for_zone_and_subzones(master_zone, utilities)
     return master_zone
 
 
@@ -168,6 +165,9 @@ def _create_nested_zones(
             type=child_schema.type,
             zone_config=zone_config,
             parent_zone=parent_zone,
+            dt_cont_multiplier=_resolve_zone_dt_cont_multiplier(
+                child_schema, parent_zone.dt_cont_multiplier
+            ),
         )
         parent_zone.add_zone(child_zone, sub=True)
         _create_nested_zones(child_zone, child_schema, zone_config)
@@ -233,7 +233,7 @@ def _get_process_streams_in_each_subzone(
             continue
 
         for stream_schema in matched_streams:
-            stream_obj = _create_process_stream(stream_schema)
+            stream_obj = _create_process_stream(stream_schema, zone)
             if stream_obj.type == ST.Hot.value:
                 key = ".".join(
                     [stream_schema.zone, StreamLoc.HotS.value, stream_schema.name]
@@ -247,15 +247,19 @@ def _get_process_streams_in_each_subzone(
     return master_zone
 
 
-def _create_process_stream(stream: StreamSchema) -> Stream:
+def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Creates a Stream instance from StreamSchema."""
+    base_dt_cont = get_value(stream.dt_cont)
+    if base_dt_cont is None:
+        base_dt_cont = 0.0
+
     # Create and initialise stream
     return Stream(
         name=stream.name,
         t_supply=get_value(stream.t_supply),
         t_target=get_value(stream.t_target),
         heat_flow=get_value(stream.heat_flow),
-        dt_cont=get_value(stream.dt_cont),
+        dt_cont=base_dt_cont * zone.dt_cont_multiplier,
         htc=get_value(stream.htc),
         is_process_stream=True,
     )
@@ -266,14 +270,26 @@ def _get_hot_and_cold_utilities(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
     zone_config: Configuration,
+    dt_cont_multiplier: float = 1.0,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Extracts all utility data into class instances."""
+    utilities = copy.deepcopy(list(utilities))
     HU_T_min, CU_T_max = _find_extreme_process_temperatures(hot_streams, cold_streams)
     utilities, addDefaultHU, addDefaultCU = _complete_utility_data(
-        utilities, zone_config, HU_T_min, CU_T_max
+        utilities,
+        zone_config,
+        HU_T_min,
+        CU_T_max,
+        dt_cont_multiplier=dt_cont_multiplier,
     )
     utilities = _add_default_utilities(
-        utilities, zone_config, addDefaultHU, addDefaultCU, HU_T_min, CU_T_max
+        utilities,
+        zone_config,
+        addDefaultHU,
+        addDefaultCU,
+        HU_T_min,
+        CU_T_max,
+        dt_cont_multiplier=dt_cont_multiplier,
     )
     hot_utilities, utilities = _create_utilities_list(
         utilities, utility_type=ST.Hot.value
@@ -305,6 +321,7 @@ def _complete_utility_data(
     zone_config: Configuration,
     HU_T_min: float,
     CU_T_max: float,
+    dt_cont_multiplier: float = 1.0,
 ) -> Tuple[List[UtilitySchema], bool, bool]:
     """Completes the utility data with default values and adds default utilities if needed."""
     utility: UtilitySchema
@@ -321,7 +338,7 @@ def _complete_utility_data(
         if t_target is None or t_target == utility.t_supply:
             delta = (
                 -zone_config.DT_PHASE_CHANGE
-                if utility.type == "Hot"
+                if utility.type in [ST.Hot.value, ST.Both.value]
                 else zone_config.DT_PHASE_CHANGE
             )
             utility.t_target = utility.t_supply + delta
@@ -329,7 +346,8 @@ def _complete_utility_data(
             utility.t_target = t_target
 
         dt_cont = get_value(utility.dt_cont)
-        utility.dt_cont = zone_config.DT_CONT if dt_cont is None else dt_cont
+        base_dt_cont = zone_config.DT_CONT if dt_cont is None else dt_cont
+        utility.dt_cont = base_dt_cont * dt_cont_multiplier
 
         price = get_value(utility.price)
         utility.price = (
@@ -342,13 +360,13 @@ def _complete_utility_data(
         utility.htc = zone_config.HTC if not htc else htc
 
         if (
-            utility.type in ["Hot", "Both"]
+            utility.type in [ST.Hot.value, ST.Both.value]
             and utility.active
             and min(utility.t_supply, utility.t_target) - utility.dt_cont >= HU_T_min
         ):
             addDefaultHU = False
         if (
-            utility.type in ["Cold", "Both"]
+            utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
             and max(utility.t_supply, utility.t_target) - utility.dt_cont <= CU_T_max
         ):
@@ -363,29 +381,51 @@ def _add_default_utilities(
     addDefaultCU: bool,
     HU_T_min: float,
     CU_T_max: float,
+    dt_cont_multiplier: float = 1.0,
 ) -> List[UtilitySchema]:
     """Adds default hot and cold utilities to the list of utilities."""
     # Add default hot and cold utilities
     if addDefaultHU:
-        utilities.append(_create_default_utility("HU", "Hot", HU_T_min, zone_config))
+        utilities.append(
+            _create_default_utility(
+                "HU",
+                ST.Hot.value,
+                HU_T_min,
+                zone_config,
+                dt_cont_multiplier=dt_cont_multiplier,
+            )
+        )
     if addDefaultCU:
-        utilities.append(_create_default_utility("CU", "Cold", CU_T_max, zone_config))
+        utilities.append(
+            _create_default_utility(
+                "CU",
+                ST.Cold.value,
+                CU_T_max,
+                zone_config,
+                dt_cont_multiplier=dt_cont_multiplier,
+            )
+        )
     return utilities
 
 
 def _create_default_utility(
-    name: str, ut_type: str, T: float, zone_config: Configuration
+    name: str,
+    ut_type: str,
+    T: float,
+    zone_config: Configuration,
+    dt_cont_multiplier: float = 1.0,
 ) -> UtilitySchema:
     """Construct a default utility entry anchored to the extreme process temperature."""
-    a = 1 if ut_type == "Hot" else -1
+    a = 1 if ut_type == ST.Hot.value else -1
+    dt_cont = zone_config.DT_CONT * dt_cont_multiplier
     return UtilitySchema.model_validate(
         {
             "name": name,
             "type": ut_type,
-            "t_supply": T + (zone_config.DT_CONT) * a,
-            "t_target": T + (zone_config.DT_CONT - zone_config.DT_PHASE_CHANGE) * a,
+            "t_supply": T + dt_cont * a,
+            "t_target": T + (dt_cont - zone_config.DT_PHASE_CHANGE) * a,
             "heat_flow": 0,
-            "dt_cont": zone_config.DT_CONT,
+            "dt_cont": dt_cont,
             "price": zone_config.UTILITY_PRICE,
             "htc": zone_config.HTC,
         }
@@ -441,16 +481,35 @@ def _create_utilities_list(
 
 
 def _set_utilities_for_zone_and_subzones(
-    zone: Zone, hot_utilities: StreamCollection, cold_utilities: StreamCollection
+    zone: Zone,
+    utilities: List[UtilitySchema],
 ) -> Zone:
-    """Adds hot and cold utilities to the zone and each subzone under zone."""
-    zone.hot_utilities.add_many(copy.deepcopy(hot_utilities))
-    zone.cold_utilities.add_many(copy.deepcopy(cold_utilities))
+    """Adds utilities to the zone and each subzone using each zone's effective multiplier."""
+    hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
+        utilities,
+        zone.hot_streams,
+        zone.cold_streams,
+        zone.config,
+        dt_cont_multiplier=zone.dt_cont_multiplier,
+    )
+    zone.hot_utilities = hot_utilities
+    zone.cold_utilities = cold_utilities
     for subzone in zone.subzones.values():
-        subzone = _set_utilities_for_zone_and_subzones(
-            subzone, hot_utilities, cold_utilities
-        )
+        subzone = _set_utilities_for_zone_and_subzones(subzone, utilities)
     return zone
+
+
+def _resolve_zone_dt_cont_multiplier(
+    zone_tree: ZoneTreeSchema | None,
+    inherited_multiplier: float | None,
+) -> float:
+    """Resolve a zone's effective ``dt_cont`` multiplier with inheritance."""
+    if zone_tree is None or zone_tree.dt_cont_multiplier is None:
+        return 1.0 if inherited_multiplier is None else float(inherited_multiplier)
+    value = float(zone_tree.dt_cont_multiplier)
+    if not math.isfinite(value) or value < 0.0:
+        raise ValueError("dt_cont_multiplier must be a finite non-negative value.")
+    return value
 
 
 def _rewrite_stream_zones_from_tree(
@@ -541,6 +600,11 @@ def _validate_zone_tree_structure(
             zone_name, zone_type = _get_validated_zone_info(parent_schema, depth=depth)
             parent_schema.name = zone_name
             parent_schema.type = zone_type
+            if parent_schema.dt_cont_multiplier is not None:
+                parent_schema.dt_cont_multiplier = _resolve_zone_dt_cont_multiplier(
+                    parent_schema,
+                    inherited_multiplier=None,
+                )
 
             if not parent_schema.children:
                 return parent_schema

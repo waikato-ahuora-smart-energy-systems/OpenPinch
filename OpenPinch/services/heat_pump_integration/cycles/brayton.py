@@ -5,17 +5,15 @@ from typing import List, Tuple
 import numpy as np
 from scipy.optimize import minimize
 
-from ....classes.stream_collection import StreamCollection
 from ....classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
+from ....classes.stream_collection import StreamCollection
 from ....lib.enums import PT
-from ....lib.schema import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
-
 from ..common.shared import (
     calc_hpr_obj,
     get_process_heat_cascade,
 )
-
 
 __all__ = [
     "optimise_brayton_heat_pump_placement",
@@ -31,6 +29,7 @@ __all__ = [
 def optimise_brayton_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> HeatPumpTargetOutputs:
+    """Optimise a single-stage Brayton heat-pump placement against the background."""
     args.n_cond = args.n_evap = 1
     args.refrigerant_ls = ["air"]
 

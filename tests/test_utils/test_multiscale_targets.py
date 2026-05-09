@@ -56,17 +56,15 @@ def _utility_collection():
 
 def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     calls = []
-    monkeypatch.setattr(
-        ms, "direct_heat_integration_service", lambda z: calls.append(z.name)
-    )
+    direct = lambda z: calls.append(z.name)
 
     valid = Zone(name="UO", type=ZT.O.value)
     valid.config.DO_DIRECT_OPERATION_TARGETING = True
     child = Zone(name="child", type=ZT.O.value)
     valid.add_zone(child)
-    out = ms._get_unit_operation_targets(valid)
+    out = ms._get_unit_operation_targets(valid, direct_service_func=direct)
     assert out is valid
-    assert set(calls) == {"UO", "child"}
+    assert calls.count("UO") == 2
 
     invalid = Zone(name="UO_bad", type=ZT.O.value)
     invalid.config.DO_DIRECT_OPERATION_TARGETING = True
@@ -82,27 +80,30 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
         ms._get_process_targets(invalid)
 
     calls = []
-    monkeypatch.setattr(
-        ms,
-        "direct_heat_integration_service",
-        lambda z: calls.append(f"direct:{z.name}"),
-    )
-    monkeypatch.setattr(
-        ms,
-        "indirect_heat_integration_service",
-        lambda z: calls.append(f"indirect:{z.name}"),
-    )
+    direct = lambda z: calls.append(f"direct:{z.name}")
+    indirect = lambda z: calls.append(f"indirect:{z.name}")
     monkeypatch.setattr(
         ms,
         "_get_unit_operation_targets",
-        lambda z: calls.append(f"uo:{z.name}") or z,
+        lambda z, direct_service_func=None, indirect_service_func=None: (
+            calls.append(f"uo:{z.name}") or z
+        ),
+    )
+    monkeypatch.setattr(
+        ms,
+        "_get_process_targets",
+        ms._get_process_targets,
     )
 
     proc = Zone(name="P", type=ZT.P.value)
     proc.add_zone(Zone(name="op", type=ZT.O.value))
     proc.add_zone(Zone(name="sub_proc", type=ZT.P.value))
     proc.config.DO_INDIRECT_PROCESS_TARGETING = True
-    out = ms._get_process_targets(proc)
+    out = ms._get_process_targets(
+        proc,
+        direct_service_func=direct,
+        indirect_service_func=indirect,
+    )
 
     assert out is proc
     assert any("direct:P" == c for c in calls)
@@ -110,39 +111,43 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
 
 
 def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
-    monkeypatch.setattr(ms, "direct_heat_integration_service", lambda z: z)
-    monkeypatch.setattr(ms, "indirect_heat_integration_service", lambda z: z)
-
     invalid = Zone(name="S_bad", type=ZT.S.value)
     invalid.add_zone(Zone(name="bad", type="X"))
     with pytest.raises(ValueError, match="Sites zones can only contain"):
         ms._get_site_targets(invalid)
 
     calls = []
-    monkeypatch.setattr(
-        ms,
-        "direct_heat_integration_service",
-        lambda z: calls.append(f"direct:{z.name}"),
-    )
-    monkeypatch.setattr(
-        ms,
-        "indirect_heat_integration_service",
-        lambda z: calls.append(f"indirect:{z.name}"),
-    )
+    direct = lambda z: calls.append(f"direct:{z.name}")
+    indirect = lambda z: calls.append(f"indirect:{z.name}")
     monkeypatch.setattr(
         ms,
         "_get_unit_operation_targets",
-        lambda z: calls.append(f"uo:{z.name}") or z,
+        lambda z, direct_service_func=None, indirect_service_func=None: (
+            calls.append(f"uo:{z.name}") or z
+        ),
     )
     monkeypatch.setattr(
-        ms, "_get_process_targets", lambda z: calls.append(f"proc:{z.name}") or z
+        ms,
+        "_get_process_targets",
+        lambda z, direct_service_func=None, indirect_service_func=None: (
+            calls.append(f"proc:{z.name}") or z
+        ),
+    )
+    monkeypatch.setattr(
+        ms,
+        "_get_site_targets",
+        ms._get_site_targets,
     )
 
     site = Zone(name="S", type=ZT.S.value)
     site.add_zone(Zone(name="op", type=ZT.O.value))
     site.add_zone(Zone(name="proc", type=ZT.P.value))
     site.add_zone(Zone(name="sub_site", type=ZT.S.value))
-    out = ms._get_site_targets(site)
+    out = ms._get_site_targets(
+        site,
+        direct_service_func=direct,
+        indirect_service_func=indirect,
+    )
 
     assert out is site
     assert "uo:op" in calls
@@ -154,23 +159,37 @@ def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
 def test_community_and_regional_dispatch(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        ms, "_get_site_targets", lambda z: calls.append(f"site:{z.name}") or z
+        ms,
+        "_get_site_targets",
+        lambda z, direct_service_func=None, indirect_service_func=None: (
+            calls.append(f"site:{z.name}") or z
+        ),
     )
 
     community = Zone(name="C", type=ZT.C.value)
     community.add_zone(Zone(name="S1", type=ZT.S.value))
-    out_c = ms._get_community_targets(community)
+    out_c = ms._get_community_targets(
+        community,
+        direct_service_func=lambda z: z,
+        indirect_service_func=lambda z: z,
+    )
     assert out_c is community
     assert "site:S1" in calls
 
     monkeypatch.setattr(
         ms,
         "_get_community_targets",
-        lambda z: calls.append(f"community:{z.name}") or z,
+        lambda z, direct_service_func=None, indirect_service_func=None: (
+            calls.append(f"community:{z.name}") or z
+        ),
     )
     regional = Zone(name="R", type=ZT.R.value)
     regional.add_zone(Zone(name="C1", type=ZT.C.value))
-    out_r = ms._get_regional_targets(regional)
+    out_r = ms._get_regional_targets(
+        regional,
+        direct_service_func=lambda z: z,
+        indirect_service_func=lambda z: z,
+    )
     assert out_r is regional
     assert "community:C1" in calls
 
