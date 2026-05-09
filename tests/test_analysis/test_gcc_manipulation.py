@@ -106,6 +106,54 @@ def test_get_GCC_needing_utility_combines_columns():
     assert (result[PT.H_NET_A.value] == expected).all()
 
 
+def test_get_gcc_without_pockets_updates_pinch_after_insertions():
+    pt = ProblemTable(
+        {
+            PT.T.value: [
+                259.0,
+                258.9,
+                245.0,
+                235.0,
+                210.0,
+                195.0,
+                191.666667,
+                185.0,
+                145.0,
+                99.0,
+                85.0,
+                75.0,
+                35.0,
+                25.0,
+                11.1,
+                11.0,
+            ],
+            PT.H_NET.value: [
+                750.0,
+                750.0,
+                750.0,
+                900.0,
+                525.0,
+                300.0,
+                333.33333,
+                400.0,
+                0.0,
+                920.0,
+                1200.0,
+                1400.0,
+                1200.0,
+                1000.0,
+                1000.0,
+                1000.0,
+            ],
+        }
+    )
+
+    result = get_GCC_without_pockets(pt)
+
+    assert any(abs(t - 225.0) < 1e-6 for t in result.col[PT.T.value])
+    assert any(abs(t - 175.0) < 1e-6 for t in result.col[PT.T.value])
+
+
 def test_get_separated_heat_profiles_categorises_correctly():
     pt = ProblemTable(
         {
