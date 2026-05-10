@@ -480,16 +480,33 @@ class PinchProblem:
                 return None
             source = Path(self.problem_filepath)
 
-        try:
-            source = TargetInput.model_validate(source)
-        except:
-            pass
+        if not isinstance(source, (TargetInput, dict)):
+            try:
+                source = TargetInput.model_validate(source)
+            except ValidationError:
+                pass
 
         if isinstance(source, TargetInput):
             self._problem_data = source
             self._input_source_kind = "target_input"
             self._validation_context = _build_validation_context(
                 source.model_dump() if hasattr(source, "model_dump") else source,
+                source_kind=self._input_source_kind,
+            )
+
+        elif isinstance(source, dict):
+            self._problem_data = source
+            if isinstance(self._problem_data.get("streams"), list):
+                self._problem_data["streams"] = validate_stream_data(
+                    self._problem_data["streams"]
+                )
+            if isinstance(self._problem_data.get("utilities"), list):
+                self._problem_data["utilities"] = validate_utility_data(
+                    self._problem_data["utilities"]
+                )
+            self._input_source_kind = "target_input"
+            self._validation_context = _build_validation_context(
+                self._problem_data,
                 source_kind=self._input_source_kind,
             )
 
@@ -516,7 +533,7 @@ class PinchProblem:
                 try:
                     with src_path.open("r", encoding="utf-8") as f:
                         self._problem_data = json.load(f)
-                except Exception as e:
+                except (OSError, json.JSONDecodeError) as e:
                     raise ValueError(
                         f"Failed to parse JSON from {src_path}: {e}"
                     ) from e
@@ -743,7 +760,6 @@ class PinchProblem:
             self.results_dir = Path(results_dir)
 
         if self.results_dir is None:
-            print(self._results)
             raise ValueError("No results_dir set. Provide a path to export results.")
 
         # Ensure results exist
@@ -1592,9 +1608,10 @@ def _validate_problem_semantics(
 
     if warnings_issues:
         warnings.warn(
-            "Input validation failed with "
-            f"{len(fatal_issues)} issue(s):\n" + "\n".join(fatal_issues),
+            "Input validation reported "
+            f"{len(warnings_issues)} warning(s):\n" + "\n".join(warnings_issues),
             UserWarning,
+            stacklevel=2,
         )
 
 

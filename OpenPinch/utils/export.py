@@ -86,7 +86,7 @@ def _split_vu(x: Any) -> Tuple[Optional[float], Optional[str]]:
     # plain number
     try:
         return float(x), None
-    except Exception:
+    except (TypeError, ValueError):
         return None, None
 
 

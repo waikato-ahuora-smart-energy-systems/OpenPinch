@@ -64,7 +64,7 @@ class TargetInput(BaseModel):
     """Validated top-level input payload for :func:`OpenPinch.pinch_analysis_service`."""
 
     streams: List[StreamSchema]
-    utilities: List[UtilitySchema] = []
+    utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[dict] = None
     zone_tree: Optional[ZoneTreeSchema] = None
 
@@ -137,7 +137,7 @@ class GetInputOutputData(BaseModel):
     plant_profile_data: List[ProblemTableDataSchema]
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
-    options: Optional[dict] = {}
+    options: Optional[dict] = Field(default_factory=dict)
 
 
 class NonLinearStream(BaseModel):

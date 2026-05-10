@@ -153,13 +153,16 @@ def test_target_raises_without_problem_loaded():
         obj.target()
 
 
-def test_export_without_results_dir_raises(sample_problem):
+def test_export_without_results_dir_raises(sample_problem, capsys):
     obj = PinchProblem()
     # Simulate loaded data so export triggers the "no results_dir" error path
     obj._problem_data = sample_problem
     obj._results = {"ok": True}
     with pytest.raises(ValueError):
         obj.export_to_Excel(None)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
 
 
 def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
@@ -218,6 +221,15 @@ def test_repr_changes_with_state(tmp_path: Path):
 def test_from_json_builds_and_roundtrips(sample_problem):
     obj = PinchProblem.from_json(sample_problem)
     assert obj.to_problem_json() == sample_problem
+
+
+def test_load_in_memory_mapping_builds_zone(sample_problem):
+    obj = PinchProblem()
+
+    out = obj.load(sample_problem)
+
+    assert isinstance(out, Zone)
+    assert obj.problem_data == sample_problem
 
 
 def test_load_json_normalises_missing_zone_and_name(tmp_path: Path):
@@ -1012,6 +1024,11 @@ def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
 
     with pytest.warns() as exc_info:
         PinchProblem().load(source=path)
+
+    message = str(exc_info[0].message)
+    assert "Input validation reported 1 warning(s)" in message
+    assert "Cooling Water" in message
+    assert "0 issue(s)" not in message
 
 
 def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):

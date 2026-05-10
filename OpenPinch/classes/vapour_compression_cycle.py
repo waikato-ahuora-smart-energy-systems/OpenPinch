@@ -339,7 +339,7 @@ class VapourCompressionCycle:
         s = process_fluid_state(self._refrigerant)
         try:
             s.update(CoolProp.PT_INPUTS, P, T)
-        except:
+        except ValueError:
             s.update(CoolProp.PQ_INPUTS, P, phase)  # Close to saturated liquid/vapour
         return s
 

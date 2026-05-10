@@ -88,7 +88,6 @@ def get_problem_from_csv(
     if isinstance(output_json, str):
         with open(output_json, "w", encoding="utf-8") as f:
             json.dump(output_dict, f, indent=4)
-        print(f"JSON data successfully written to {output_json}")
 
     return output_dict
 
@@ -151,7 +150,6 @@ def get_results_from_csv(
     if isinstance(output_json, str):
         with open(output_json, "w", encoding="utf-8") as f:
             json.dump(output_dict, f, indent=4)
-        print(f"JSON data successfully written to {output_json}")
 
     return output_dict
 

@@ -61,14 +61,16 @@ def data_preprocessing_service(
     )
 
 
-def direct_heat_integration_service(zone: Zone, args: dict = {}) -> Zone:
+def direct_heat_integration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct heat integration targeting for a prepared zone."""
+    _apply_zone_config_overrides(zone, args)
     zone.add_target(compute_direct_integration_targets(zone))
     return zone
 
 
-def indirect_heat_integration_service(zone: Zone, args: dict = {}) -> Zone:
+def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run indirect heat integration targeting for a prepared zone."""
+    _apply_zone_config_overrides(zone, args)
     zone.import_hot_and_cold_streams_from_sub_zones(
         get_net_streams=True,
         is_n_zone_depth=False,
@@ -79,7 +81,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict = {}) -> Zone:
     return zone
 
 
-def direct_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
+def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct heat-pump targeting after ensuring a base DI target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
@@ -93,7 +95,7 @@ def direct_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
     return zone
 
 
-def indirect_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
+def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run indirect heat-pump targeting after ensuring a base TS target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
@@ -107,7 +109,7 @@ def indirect_heat_pump_service(zone: Zone, args: dict = {}) -> Zone:
     return zone
 
 
-def direct_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
+def direct_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct refrigeration targeting after ensuring a base DI target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
@@ -121,7 +123,7 @@ def direct_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
     return zone
 
 
-def indirect_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
+def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run indirect refrigeration targeting after ensuring a base TS target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
@@ -135,7 +137,7 @@ def indirect_refrigeration_service(zone: Zone, args: dict = {}) -> Zone:
     return zone
 
 
-def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
+def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Post-process an existing target to recover above-pinch cogeneration work."""
     _apply_zone_config_overrides(zone, args)
     target_type = [
@@ -146,10 +148,9 @@ def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
         TT.DR.value,
         TT.DI.value,
     ]
-    if not (isinstance(args, dict)):
-        args = {}
-    if "base_target_type" in args:
-        target_type = [str(args["base_target_type"])]
+    runtime_args = args if isinstance(args, dict) else {}
+    if "base_target_type" in runtime_args:
+        target_type = [str(runtime_args["base_target_type"])]
     if len(zone.targets) == 0:
         direct_heat_integration_service(zone)
     for tt in target_type:
@@ -159,7 +160,8 @@ def power_cogeneration_service(zone: Zone, args: dict = {}) -> Zone:
     raise ValueError("Load data before running pinch analysis services.")
 
 
-def area_cost_targeting_service(zone: Zone, args: dict = {}) -> Zone:
+def area_cost_targeting_service(zone: Zone, args: dict | None = None) -> Zone:
     """Refresh direct integration targets before area and cost reporting."""
+    _apply_zone_config_overrides(zone, args)
     direct_heat_integration_service(zone)
     return zone

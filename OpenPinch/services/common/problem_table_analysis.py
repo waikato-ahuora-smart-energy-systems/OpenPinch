@@ -34,15 +34,22 @@ __all__ = [
 
 
 def get_process_heat_cascade(
-    hot_streams: StreamCollection = StreamCollection(),
-    cold_streams: StreamCollection = StreamCollection(),
+    hot_streams: StreamCollection = None,
+    cold_streams: StreamCollection = None,
     all_streams: StreamCollection = None,
     is_shifted: bool = True,
     known_heat_recovery: float = None,
-    extra_T_intervals: list = [],
+    extra_T_intervals: list = None,
     is_full_analysis: bool = False,
 ) -> ProblemTable:
     """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
+    if hot_streams is None:
+        hot_streams = StreamCollection()
+    if cold_streams is None:
+        cold_streams = StreamCollection()
+    if extra_T_intervals is None:
+        extra_T_intervals = []
+
     # Get all possible temperature intervals, remove duplicates and order from high to low
     if all_streams is None:
         all_streams = hot_streams + cold_streams
@@ -106,11 +113,16 @@ def get_utility_heat_cascade(
 
 
 def create_problem_table_with_t_int(
-    streams: StreamCollection = StreamCollection(),
+    streams: StreamCollection = None,
     is_shifted: bool = True,
-    extra_T_intervals: list = [],
+    extra_T_intervals: list = None,
 ) -> ProblemTable:
     """Return a problem table populated with ordered unique temperature intervals."""
+    if streams is None:
+        streams = StreamCollection()
+    if extra_T_intervals is None:
+        extra_T_intervals = []
+
     T_vals = [
         t
         for s in streams

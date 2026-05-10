@@ -57,14 +57,14 @@ def get_piecewise_data_points(
         return _get_piecewise_breakpoints(
             curve=curve, epsilon=dt_diff_max, is_hot_stream=is_hot_stream
         )
-    except:
+    except (FloatingPointError, RuntimeError, ValueError):
         try:
             return _rdp(
                 curve=curve,
                 epsilon=dt_diff_max,
             )
-        except:
-            raise ValueError("Piecewise linearisation failed.")
+        except (FloatingPointError, RuntimeError, ValueError) as exc:
+            raise ValueError("Piecewise linearisation failed.") from exc
 
 
 #######################################################################################################
