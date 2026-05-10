@@ -6,54 +6,6 @@ issues first, then API safety, then architectural and documentation cleanup.
 
 ## Ranked TODOs
 
-### 1. Fix validation warning reporting
-
-Priority: Critical
-
-The validation warning path in `PinchProblem` reports the wrong issue list,
-which produces misleading warnings even when the test suite passes.
-
-- File: `OpenPinch/classes/pinch_problem.py`
-- Why it matters: diagnostic output is part of the public contract; misleading
-  warnings undermine trust in validation results.
-- Recommended action: use the warning issue list when building warning
-  messages, and add a regression test around mixed warning/fatal cases.
-
-### 2. Remove mutable default arguments and mutable schema defaults
-
-Priority: High
-
-Several public and internal APIs still use shared mutable defaults.
-
-- Files:
-  - `OpenPinch/services/services_entry.py`
-  - `OpenPinch/services/common/problem_table_analysis.py`
-  - `OpenPinch/utils/blackbox_minimisers.py`
-  - `OpenPinch/lib/schemas/io.py`
-- Why it matters: this can create shared-state bugs that are hard to reproduce.
-- Recommended action: replace mutable defaults with `None` plus local
-  initialization, and use Pydantic `Field(default_factory=...)` for schema
-  containers.
-
-### 3. Tighten exception handling and remove stray library-side prints
-
-Priority: High
-
-There are still broad `except` blocks and direct `print()` calls in code paths
-that behave like library APIs.
-
-- Files:
-  - `OpenPinch/classes/pinch_problem.py`
-  - `OpenPinch/utils/stream_linearisation.py`
-  - `OpenPinch/classes/value.py`
-  - `OpenPinch/utils/export.py`
-  - `OpenPinch/classes/vapour_compression_cycle.py`
-  - `OpenPinch/classes/brayton_heat_pump.py`
-- Why it matters: broad exception handling hides root causes and stdout side
-  effects make the package harder to embed and test cleanly.
-- Recommended action: narrow exception scopes, preserve traceback context, and
-  replace direct prints with structured logging or explicit return values.
-
 ### 4. Decide the fate of unfinished analysis subsystems
 
 Priority: High

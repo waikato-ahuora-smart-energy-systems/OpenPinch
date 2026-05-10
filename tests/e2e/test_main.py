@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import json
+import warnings
 from pathlib import Path
 import pytest
 from OpenPinch import *
@@ -9,14 +10,25 @@ from OpenPinch.utils.miscellaneous import get_value
 from OpenPinch.lib import *
 
 
+EXPECTED_VALIDATION_WARNINGS = {
+    "p_Sorsak and Kravanja.json": "Input validation reported 8 warning(s):",
+    "p_Bjork and Pettersson.json": "Input validation reported 1 warning(s):",
+    "p_Ziyatdinov et al (example 1).json": "Input validation reported 1 warning(s):",
+    "p_Gundersen et al.json": "Input validation reported 1 warning(s):",
+}
+
+
 def get_example_problem_filepaths():
     """Return example problem filepaths used by this test module."""
     test_data_dir = Path(__file__).resolve().parents[2] / "examples" / "stream_data"
-    return [
+    return sorted(
+        [
         filepath
         for filepath in test_data_dir.iterdir()
         if filepath.name.startswith("p_") and filepath.name.endswith(".json")
-    ]
+        ],
+        key=lambda filepath: filepath.name,
+    )
 
 
 def get_results_filepath(problem_filepath: Path) -> Path:
@@ -44,7 +56,11 @@ def get_results_filepath(problem_filepath: Path) -> Path:
     return result_path
 
 
-@pytest.mark.parametrize("p_filepath", get_example_problem_filepaths())
+@pytest.mark.parametrize(
+    "p_filepath",
+    get_example_problem_filepaths(),
+    ids=lambda filepath: filepath.name,
+)
 def test_pinch_analysis_pipeline(p_filepath: Path):
     """Validate each example problem produces target outputs matching reference results."""
     # if p_filepath.name != "p_pulp_mill.json":
@@ -58,7 +74,17 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
 
     project_name = p_filepath.stem[2:]
 
-    res = pinch_analysis_service(data=data, project_name=project_name)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        res = pinch_analysis_service(data=data, project_name=project_name)
+
+    warning_message = EXPECTED_VALIDATION_WARNINGS.get(p_filepath.name)
+    if warning_message is None:
+        assert caught == []
+    else:
+        assert len(caught) == 1
+        assert caught[0].category is UserWarning
+        assert warning_message in str(caught[0].message)
 
     # Get and validate the format of the "correct" targets from the Open Pinch workbook
     if r_filepath is not None:
