@@ -112,7 +112,7 @@ class _TurbineState:
         self.load_frac = params["load_frac"]
         self.n_mech = params["mech_eff"]
         self.min_eff = params["min_eff"]
-        self.flash_correction = params["flash_correction"]
+        self.is_high_p_cond_flash = params["is_high_p_cond_flash"]
 
         self.m_in_est = data["m_in_est"]
         self.mass_flow_in = [0.0] * self.s
@@ -147,8 +147,13 @@ def _segment_mass_flow(state: _TurbineState, *, index: int, mass_flow: float) ->
     if mass_flow <= tol:
         return 0.0
 
-    if state.flash_correction:
-        q_flash = state.m_k[index - 1] * (state.h_tar[index - 1] - state.h_tar[index])
+    if state.is_high_p_cond_flash:
+        # Higher-pressure condensate that has already condensed at upstream stages
+        # keeps cascading to lower pressure levels and can flash again.
+        carried_condensate_mass = sum(state.m_k[:index])
+        q_flash = carried_condensate_mass * (
+            state.h_tar[index - 1] - state.h_tar[index]
+        )
         q_stage = max(state.Q_users[index] - q_flash, 0.0)
     else:
         q_stage = state.Q_users[index]
@@ -346,7 +351,7 @@ class MultiStageSteamTurbine:
         min_eff: float = 0.1,
         load_frac: float = 1.0,
         mech_eff: float = 1.0,
-        flash_correction: bool = False,
+        is_high_p_cond_flash: bool = False,
     ) -> tuple[float, dict]:
         """Solve a turbine targeting problem and return total work plus details."""
         self._solved = False
@@ -361,7 +366,7 @@ class MultiStageSteamTurbine:
             "min_eff": min(max(float(min_eff), 0.0), 1.0),
             "load_frac": min(max(float(load_frac), 0.0), 1.0),
             "mech_eff": min(max(float(mech_eff), 0.0), 1.0),
-            "flash_correction": bool(flash_correction),
+            "is_high_p_cond_flash": bool(is_high_p_cond_flash),
         }
 
         if mode == "above_pinch":
@@ -445,7 +450,7 @@ class MultiStageSteamTurbine:
             "load_frac": params["load_frac"],
             "mech_eff": params["mech_eff"],
             "min_eff": params["min_eff"],
-            "flash_correction": params["flash_correction"],
+            "is_high_p_cond_flash": params["is_high_p_cond_flash"],
             "total_work": 0.0,
             "total_isentropic_work": 0.0,
             "overall_efficiency": 0.0,
@@ -595,7 +600,7 @@ class MultiStageSteamTurbine:
             "load_frac": state.load_frac,
             "mech_eff": state.n_mech,
             "min_eff": state.min_eff,
-            "flash_correction": state.flash_correction,
+            "is_high_p_cond_flash": state.is_high_p_cond_flash,
             "total_work": total_work,
             "total_isentropic_work": total_isentropic_work,
             "overall_efficiency": overall_efficiency,
@@ -706,7 +711,7 @@ class MultiStageSteamTurbine:
             "load_frac": params["load_frac"],
             "mech_eff": params["mech_eff"],
             "min_eff": params["min_eff"],
-            "flash_correction": params["flash_correction"],
+            "is_high_p_cond_flash": params["is_high_p_cond_flash"],
             "total_work": float(total_work),
             "total_isentropic_work": float(total_isentropic_work),
             "overall_efficiency": float(overall_efficiency),

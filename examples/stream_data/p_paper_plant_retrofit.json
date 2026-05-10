@@ -647,49 +647,5 @@
             "heat_flow": null
         }
     ],
-    "options": {
-        "main": [],
-        "turbine": [
-            {
-                "key": "PROP_TOP_0",
-                "value": 450
-            },
-            {
-                "key": "PROP_TOP_1",
-                "value": 90
-            },
-            {
-                "key": "PROP_TOP_2",
-                "value": 0.1
-            },
-            {
-                "key": "PROP_TOP_3",
-                "value": 100
-            },
-            {
-                "key": "PROP_TOP_4",
-                "value": 1
-            },
-            {
-                "key": "PROP_TOP_5",
-                "value": 1
-            },
-            {
-                "key": "PROP_TOP_6",
-                "value": "Medina-Flores et al. (2010)"
-            },
-            {
-                "key": "PROP_TOP_7",
-                "value": true
-            },
-            {
-                "key": "PROP_TOP_8",
-                "value": false
-            },
-            {
-                "key": "PROP_TOP_9",
-                "value": false
-            }
-        ]
-    }
+    "options": {}
 }

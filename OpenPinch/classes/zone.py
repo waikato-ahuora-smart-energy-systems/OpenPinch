@@ -29,6 +29,7 @@ class Zone:
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
         dt_cont_multiplier: float = 1.0,
+        lock_dt_cont_multiplier: bool = False,
     ):
         """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
@@ -37,6 +38,7 @@ class Zone:
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
         self._dt_cont_multiplier = float(dt_cont_multiplier)
+        self._lock_dt_cont_multiplier = bool(lock_dt_cont_multiplier)
         self._active = True
         self._subzones = {}
         self._targets = {}
@@ -111,6 +113,11 @@ class Zone:
 
     @dt_cont_multiplier.setter
     def dt_cont_multiplier(self, value: float):
+        if self._lock_dt_cont_multiplier:
+            raise RuntimeError(
+                "Direct mutation of dt_cont_multiplier on prepared analysis zones is not supported. "
+                "Use PinchProblem.set_dt_cont_multiplier(...) to rebuild the active stream state."
+            )
         self._dt_cont_multiplier = float(value)
 
     @property

@@ -49,6 +49,7 @@ def test_initialization(hot_stream):
     assert hot_stream.t_supply == 300
     assert hot_stream.t_target == 200
     assert hot_stream.dt_cont == 10
+    assert hot_stream.dt_cont_act == 10
     assert hot_stream.heat_flow == 5000
     assert hot_stream.htc == 2
     assert hot_stream.price == 50
@@ -62,6 +63,7 @@ def test_property_setters_getters(hot_stream):
     assert hot_stream.name == "NewName"
     assert hot_stream.price == 70
     assert hot_stream.dt_cont == 15
+    assert hot_stream.dt_cont_act == 15
 
 
 def test_temperature_calculations(hot_stream, cold_stream):
@@ -117,6 +119,29 @@ def test_manual_setters(hot_stream):
     assert hot_stream.t_max_star == 300
     assert hot_stream.CP == 100
     assert hot_stream.rCP == 50
+
+
+def test_dt_cont_act_updates_shifted_temperatures_without_mutating_base_dt_cont():
+    s = DummyStream(
+        name="Shifted",
+        t_supply=300.0,
+        t_target=200.0,
+        heat_flow=5000.0,
+        dt_cont=10.0,
+        dt_cont_act=15.0,
+        htc=2.0,
+    )
+
+    assert s.dt_cont == 10.0
+    assert s.dt_cont_act == 15.0
+    assert s.t_min_star == 185.0
+    assert s.t_max_star == 285.0
+
+    s.dt_cont_act = 20.0
+    assert s.dt_cont == 10.0
+    assert s.dt_cont_act == 20.0
+    assert s.t_min_star == 180.0
+    assert s.t_max_star == 280.0
 
 
 def test_zero_heat_flow_isothermal_stream_initialises_without_error():

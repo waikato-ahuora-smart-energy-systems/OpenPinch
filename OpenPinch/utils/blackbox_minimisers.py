@@ -176,9 +176,9 @@ def _get_multiminima_handler(
 def multiminima(
     func: Callable,
     x0_ls: Optional[tuple] = None,
-    func_kwargs: Optional[dict] = {},
+    func_kwargs: Optional[dict] = None,
     bounds: Optional[tuple] = None,
-    opt_kwargs: Optional[dict] = {},
+    opt_kwargs: Optional[dict] = None,
     optimiser_handle: Optional[str | BB_Minimiser] = _DEFAULT_MULTIMINIMA_HANDLE,
 ) -> list:
     """Run a selected multi-start optimizer by handle."""

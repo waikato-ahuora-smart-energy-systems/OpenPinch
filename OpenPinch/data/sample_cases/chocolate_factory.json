@@ -1812,7 +1812,7 @@
         "N_COND": 2,
         "N_EVAP": true,
         "ETA_COMP": 0.7,
-        "DTMIN_HP": 4,
-        "DT_HP_IHX": 20
+        "DT_CONT_HP": 4,
+        "DT_HPR_IHX": 20
     }
 }

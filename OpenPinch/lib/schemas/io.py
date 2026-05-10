@@ -64,7 +64,7 @@ class TargetInput(BaseModel):
     """Validated top-level input payload for :func:`OpenPinch.pinch_analysis_service`."""
 
     streams: List[StreamSchema]
-    utilities: List[UtilitySchema] = []
+    utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[dict] = None
     zone_tree: Optional[ZoneTreeSchema] = None
 
@@ -75,42 +75,6 @@ class TargetOutput(BaseModel):
     name: str = "Site"
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
-
-
-class HeatPumpIntegrationScenario(BaseModel):
-    """User-facing definition of a candidate integrated heat pump scenario."""
-
-    zone: str = "Plant"
-    condenser_temperature: float
-    condenser_duty: float
-    evaporator_temperature: float
-    evaporator_duty: float
-    dt_phase_change: float = 0.1
-    dt_cont: float = 0.0
-    htc: float = 1.0
-    condenser_name: str = "HP Condenser"
-    evaporator_name: str = "HP Evaporator"
-
-
-class HeatPumpIntegrationComparisonRow(BaseModel):
-    """One labelled summary row from a heat-pump integration comparison."""
-
-    label: str
-    target: str
-    hot_utility_target: Optional[float] = None
-    cold_utility_target: Optional[float] = None
-    heat_recovery: Optional[float] = None
-    hot_pinch: Optional[float] = None
-    cold_pinch: Optional[float] = None
-
-
-class HeatPumpIntegrationComparison(BaseModel):
-    """Structured before/after summary for a candidate integrated heat pump."""
-
-    scenario: HeatPumpIntegrationScenario
-    target_name: str
-    approximate_power: float
-    rows: list[HeatPumpIntegrationComparisonRow]
 
 
 class THSchema(BaseModel):
@@ -137,7 +101,7 @@ class GetInputOutputData(BaseModel):
     plant_profile_data: List[ProblemTableDataSchema]
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
-    options: Optional[dict] = {}
+    options: Optional[dict] = Field(default_factory=dict)
 
 
 class NonLinearStream(BaseModel):
@@ -183,9 +147,6 @@ class VisualiseOutput(BaseModel):
 
 __all__ = [
     "GetInputOutputData",
-    "HeatPumpIntegrationComparison",
-    "HeatPumpIntegrationComparisonRow",
-    "HeatPumpIntegrationScenario",
     "LineariseInput",
     "LineariseOutput",
     "NonLinearStream",

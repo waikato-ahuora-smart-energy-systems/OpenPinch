@@ -9,10 +9,8 @@ from pathlib import Path
 import pytest
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.enums import TT, HPRcycle
-from OpenPinch.lib.schemas.io import HeatPumpIntegrationComparison
+from OpenPinch.lib.enums import TT
 from OpenPinch.resources import copy_sample_case
 
 
@@ -20,7 +18,7 @@ from OpenPinch.resources import copy_sample_case
 def sample_problem():
     """Return sample problem data used by this test module."""
     return {
-        "options": {"dt_min": 10},
+        "options": {"DT_CONT": 10},
         "streams": [
             {
                 "zone": "Z1",
@@ -153,13 +151,16 @@ def test_target_raises_without_problem_loaded():
         obj.target()
 
 
-def test_export_without_results_dir_raises(sample_problem):
+def test_export_without_results_dir_raises(sample_problem, capsys):
     obj = PinchProblem()
     # Simulate loaded data so export triggers the "no results_dir" error path
     obj._problem_data = sample_problem
     obj._results = {"ok": True}
     with pytest.raises(ValueError):
         obj.export_to_Excel(None)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
 
 
 def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
@@ -218,6 +219,15 @@ def test_repr_changes_with_state(tmp_path: Path):
 def test_from_json_builds_and_roundtrips(sample_problem):
     obj = PinchProblem.from_json(sample_problem)
     assert obj.to_problem_json() == sample_problem
+
+
+def test_load_in_memory_mapping_builds_zone(sample_problem):
+    obj = PinchProblem()
+
+    out = obj.load(sample_problem)
+
+    assert isinstance(out, Zone)
+    assert obj.problem_data == sample_problem
 
 
 def test_load_json_normalises_missing_zone_and_name(tmp_path: Path):
@@ -367,96 +377,6 @@ def test_init_accepts_problem_filepath_and_run(monkeypatch, tmp_path: Path):
 
     assert called["load"] == case_path
     assert called["run"] == 1
-
-
-def test_evaluate_heat_pump_integration_builds_integrated_problem(monkeypatch):
-    class _Payload:
-        def model_dump(self, mode="python"):
-            return {"streams": [], "utilities": []}
-
-    target = type("Target", (), {"name": "Plant/Direct Integration"})()
-    zone = type(
-        "ZoneStub",
-        (),
-        {
-            "name": "Plant",
-            "address": "Site/Plant",
-            "targets": {TT.DI.value: target},
-        },
-    )()
-
-    comparison_frame = __import__("pandas").DataFrame(
-        [
-            {
-                "Target": "Plant/Direct Integration",
-                "Hot Utility Target": 750.0,
-                "Cold Utility Target": 1000.0,
-                "Heat Recovery": 5150.0,
-                "Hot Pinch": None,
-                "Cold Pinch": 145.0,
-            },
-            {
-                "Target": "Plant/Direct Integration",
-                "Hot Utility Target": 500.0,
-                "Cold Utility Target": 850.0,
-                "Heat Recovery": 5800.0,
-                "Hot Pinch": None,
-                "Cold Pinch": 170.0,
-            },
-            {
-                "Target": "Plant/Direct Integration",
-                "Hot Utility Target": -250.0,
-                "Cold Utility Target": -150.0,
-                "Heat Recovery": 650.0,
-                "Hot Pinch": None,
-                "Cold Pinch": 25.0,
-            },
-        ],
-        index=["Base case", "Integrated scenario", "Change"],
-    )
-
-    def fake_load(self, source=None):
-        self._problem_data = source
-        return zone
-
-    monkeypatch.setattr(PinchProblem, "load", fake_load)
-    monkeypatch.setattr(PinchProblem, "run", lambda self: {"ok": True})
-    monkeypatch.setattr(PinchProblem, "validate", lambda self: _Payload())
-    monkeypatch.setattr(
-        PinchProblem,
-        "_resolve_target_zone",
-        lambda self, application_zone=None: zone,
-    )
-    monkeypatch.setattr(
-        PinchProblem,
-        "compare_to",
-        lambda self, other_problem, **kwargs: comparison_frame,
-    )
-
-    obj = PinchProblem()
-    obj._problem_data = {"streams": [], "utilities": []}
-
-    evaluation = obj.evaluate_heat_pump_integration(
-        {
-            "zone": "Plant",
-            "condenser_temperature": 170.0,
-            "condenser_duty": 500.0,
-            "evaporator_temperature": 90.0,
-            "evaporator_duty": 400.0,
-        }
-    )
-
-    integrated_streams = evaluation.integrated_problem.problem_data["streams"]
-
-    assert isinstance(evaluation.comparison, HeatPumpIntegrationComparison)
-    assert integrated_streams[-2]["name"] == "HP Condenser"
-    assert integrated_streams[-1]["name"] == "HP Evaporator"
-    assert evaluation.comparison.approximate_power == 100.0
-    assert list(evaluation.comparison_frame.index) == [
-        "Base case",
-        "Integrated scenario",
-        "Change",
-    ]
 
 
 def test_target_accessor_supports_named_workflow(monkeypatch):
@@ -1013,6 +933,11 @@ def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
     with pytest.warns() as exc_info:
         PinchProblem().load(source=path)
 
+    message = str(exc_info[0].message)
+    assert "Input validation reported 1 warning(s)" in message
+    assert "Cooling Water" in message
+    assert "0 issue(s)" not in message
+
 
 def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
     case_path = copy_sample_case(
@@ -1027,3 +952,102 @@ def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
     assert validated.zone_tree is None
     assert len(validated.streams) == 65
     assert len(validated.utilities) == 5
+
+
+def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path):
+    case_path = copy_sample_case(
+        "crude_preheat_train.json",
+        tmp_path / "crude_preheat_train.json",
+    )
+    problem = PinchProblem(source=case_path, project_name=case_path.stem)
+
+    baseline = problem.summary_frame()
+    baseline_row = baseline.loc[
+        baseline["Target"] == f"{case_path.stem}/Direct Integration"
+    ].iloc[0]
+    unit = problem.master_zone.get_subzone("Crude Unit")
+    hot_stream = next(iter(unit.hot_streams))
+
+    assert hot_stream.dt_cont == hot_stream.dt_cont_act
+
+    problem.set_dt_cont_multiplier(0.5)
+
+    assert problem.results is None
+    assert problem.to_problem_json()["zone_tree"][
+        "dt_cont_multiplier"
+    ] == pytest.approx(0.5)
+
+    unit = problem.master_zone.get_subzone("Crude Unit")
+    updated_stream = next(iter(unit.hot_streams))
+    assert updated_stream.dt_cont == hot_stream.dt_cont
+    assert updated_stream.dt_cont_act == pytest.approx(hot_stream.dt_cont * 0.5)
+
+    updated = problem.summary_frame()
+    updated_row = updated.loc[
+        updated["Target"] == f"{case_path.stem}/Direct Integration"
+    ].iloc[0]
+
+    assert updated_row["Hot Utility Target"] != baseline_row["Hot Utility Target"]
+    assert updated_row["Cold Utility Target"] != baseline_row["Cold Utility Target"]
+
+
+def test_prepared_zone_dt_cont_multiplier_setter_guides_callers_to_problem_api(
+    tmp_path: Path,
+):
+    case_path = copy_sample_case(
+        "crude_preheat_train.json",
+        tmp_path / "crude_preheat_train.json",
+    )
+    problem = PinchProblem(source=case_path, project_name=case_path.stem)
+
+    with pytest.raises(RuntimeError, match="PinchProblem.set_dt_cont_multiplier"):
+        problem.master_zone.dt_cont_multiplier = 2.0
+
+
+def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+    problem.target()
+
+    area = problem.master_zone.get_subzone("AreaA")
+    cold_utility = next(
+        utility for utility in area.cold_utilities if utility.name == "CU"
+    )
+    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT)
+    assert len(area.net_hot_streams) > 0
+
+    problem.set_dt_cont_multiplier(3.0, zone_name="AreaA")
+    problem.target()
+
+    area = problem.master_zone.get_subzone("AreaA")
+    cold_utility = next(
+        utility for utility in area.cold_utilities if utility.name == "CU"
+    )
+    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
+    assert len(area.net_hot_streams) > 0
+
+    net_stream = area.net_hot_streams[0]
+    assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
+    assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)

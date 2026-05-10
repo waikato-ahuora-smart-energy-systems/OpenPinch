@@ -319,7 +319,7 @@ class SimpleBraytonHeatPumpCycle:
 
             self._solved = True
 
-        except Exception as e:
+        except (AttributeError, TypeError, ValueError) as e:
             raise RuntimeError(f"Failed to extract results from TESPy network: {e}")
 
         return self._work_net

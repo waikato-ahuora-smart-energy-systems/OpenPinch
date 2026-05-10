@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -79,6 +81,24 @@ def test_below_pinch_solve_uses_environment_sink(monkeypatch):
         stage["pressure_out"] == pytest.approx(details["sink_pressure"])
         for stage in details["stages"]
     )
+
+
+def test_segment_mass_flow_uses_all_higher_pressure_condensate_flash():
+    state = SimpleNamespace(
+        is_high_p_cond_flash=True,
+        m_k=[0.0, 10.0, 5.0, 0.0],
+        h_tar=[0.0, 200.0, 150.0, 100.0],
+        Q_users=[0.0, 0.0, 0.0, 1000.0],
+        h_out=[0.0, 0.0, 0.0, 300.0],
+    )
+
+    corrected = turbine_mod._segment_mass_flow(state, index=3, mass_flow=20.0)
+
+    state.is_high_p_cond_flash = False
+    uncorrected = turbine_mod._segment_mass_flow(state, index=3, mass_flow=20.0)
+
+    assert corrected == pytest.approx(1.25)
+    assert uncorrected == pytest.approx(5.0)
 
 
 def test_turbine_rejects_bad_inputs(monkeypatch):

@@ -7,6 +7,7 @@ advanced routines such as heat pump and cost targeting.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import List
 
 from .enums import BB_Minimiser, HPRcycle, TurbineModel, ZT
@@ -101,116 +102,97 @@ class Configuration:
     DISCOUNT_RATE: float = 0.07
     SERV_LIFE: float = 20  # years
 
-    ### OLD CONFIG -- TODO: Review ###
+    ### Turbine parameters ###
+    TURB_T_IN: float = 450  # degC
+    TURB_P_IN: float = 90  # bar
+    MIN_EFF: float = 0.1  # minimum isentropic efficiency
+    LOAD_FRACTION: float = 1
+    ETA_MECH: float = 1
+    TURB_MODEL: str = TurbineModel.MEDINA_FLORES.value
+    IS_HIGH_P_COND_FLASH: bool = False
 
-    T_TURBINE_BOX: float = 450
-    P_TURBINE_BOX: float = 90
-    MIN_EFF: float = 0.1
-    ELECTRICITY_PRICE: float = 100
-    LOAD: float = 1
-    MECH_EFF: float = 1
-    COMBOBOX: str = TurbineModel.MEDINA_FLORES.value
-    ABOVE_PINCH_CHECKBOX: bool = False
-    BELOW_PINCH_CHECKBOX: bool = False
-    CONDESATE_FLASH_CORRECTION: bool = False
-
-    # HHT_OPTION: bool = True
-    # VHT_OPTION: bool = False
-
-    # GCC_REG_FULL_POCKET: bool = True
-    # GCC_VERT_CUT_KINK_OPTION: bool = False
-    # SET_MIN_DH_THRES: bool = False
-    # SET_MIN_TH_AREA: bool = False
-    # AUTOMATED_RETROFIT_TARGETING_BUTTON: bool = False
-    # THRESHOLD: float = 0
-    # AREA_THRESHOLD: float = 0
-
-    # Q_MIN: float = 400
-    # NUM_HX: float = 6
-    # AREA_RATIO: float = 0
-    # PRICE_UTILITIES: float = 220
-    # MAX_RBBRIDGE: float = 100000
-    # RECORD: bool = True
-    # PARETO: bool = False
-    # QUANTIFY_AREA: bool = False
-    # ACCELERATION: bool = True
-    # HEURISTICS: bool = True
+    _LEGACY_OPTION_GATEWAYS = {"main", "turbine"}
+    _RENAMED_OPTIONS = {
+        "HP_CONDESATE": "IS_HIGH_P_COND_FLASH",
+        "IS_HP_CONDESATE": "IS_HIGH_P_COND_FLASH",
+        "IS_HP_CONDENSATE": "IS_HIGH_P_COND_FLASH",
+        "CONDENSATE_FLASH_CORRECTION": "IS_HIGH_P_COND_FLASH",
+    }
 
     def __init__(
         self,
-        options: dict = None,
+        options: dict | None = None,
         top_zone_name: str = "Site",
         top_zone_identifier: str = ZT.S.value,
     ):
         """Initialise defaults and optionally apply user-provided options."""
+        for key in type(self).__annotations__:
+            if key.startswith("_"):
+                continue
+            setattr(self, key, deepcopy(getattr(type(self), key)))
+
         self.TOP_ZONE_NAME = top_zone_name
         self.TOP_ZONE_IDENTIFIER = top_zone_identifier
-        if isinstance(options, dict):
-            for key in options.keys():
-                if key != "REFRIGERANTS":
-                    setattr(self, key, options[key])
-                else:
-                    ref_ls = options[key].replace(";", ",").split(",")
-                    setattr(self, key, ref_ls)
 
-    # def set_parameters(self, options: Options) -> None:
-    #     """Apply checkbox- and turbine-related configuration from :class:`Options`."""
-    #     # Main properties
-    #     main_props = set(options.main)
-    #     self.TIT_BUTTON_SELECTED = "PROP_MOP_0" in main_props
-    #     self.TS_BUTTON_SELECTED = "PROP_MOP_1" in main_props
-    #     self.DO_TURBINE_WORK = "PROP_MOP_2" in main_props
-    #     self.DO_AREA_TARGETING = "PROP_MOP_3" in main_props
-    #     self.ENERGY_RETROFIT_BUTTON = "PROP_MOP_4" in main_props
-    #     self.DO_EXERGY_TARGETING = "PROP_MOP_5" in main_props
-    #     self.PRINT_PTS = "PROP_MOP_6" in main_props
-    #     self.PLOT_GRAPHS = True
+        if options is None:
+            return
 
-    #     # Graph properties
-    #     if self.PLOT_GRAPHS:
-    #         for checkbox in (
-    #             "CC_CHECKBOX",
-    #             "SCC_CHECKBOX",
-    #             "BCC_CHECKBOX",
-    #             "GCC_CHECKBOX",
-    #             "GCC_N_CHECKBOX",
-    #             "GCCU_CHECKBOX",
-    #             "GCC_Lim_CHECKBOX",
-    #             "TSC_CHECKBOX",
-    #             "ERC_CHECKBOX",
-    #             "NLC_CHECKBOX",
-    #         ):
-    #             setattr(self, checkbox, True)
+        if not isinstance(options, dict):
+            raise TypeError("Configuration options must be provided as a dict.")
 
-    #     # Turbine options
-    #     turbine_options = options.turbine
-    #     self._set_turbine_parameters(turbine_options)
+        for key, value in self._validate_option_keys(options).items():
+            if key == "REFRIGERANTS":
+                ref_ls = (
+                    value.replace(";", ",").split(",")
+                    if isinstance(value, str)
+                    else list(value)
+                )
+                setattr(self, key, ref_ls)
+                continue
+            setattr(self, key, value)
 
-    # def _set_turbine_parameters(self, turbine_options: List["TurbineOption"]) -> None:
-    #     """Populate turbine settings when the turbine work toggle is active."""
+    @classmethod
+    def _known_option_keys(cls) -> set[str]:
+        """Return the supported configuration keys accepted by ``options``."""
+        return {
+            key
+            for key in cls.__annotations__
+            if not key.startswith("_")
+        }
 
-    #     option_map = {opt.key: opt.value for opt in turbine_options}
+    @classmethod
+    def _validate_option_keys(cls, options: dict) -> dict:
+        """Fail fast on unsupported workbook gateways and unknown option names."""
+        legacy_gateways = sorted(
+            key
+            for key in options
+            if key in cls._LEGACY_OPTION_GATEWAYS or str(key).startswith("PROP_TOP_")
+        )
+        if legacy_gateways:
+            raise ValueError(
+                "Legacy workbook option gateways are no longer supported: "
+                f"{', '.join(legacy_gateways)}. Set canonical turbine fields directly "
+                "on zone.config or pass them through Configuration(options=...), e.g. "
+                "TURB_T_IN, TURB_P_IN, MIN_EFF, LOAD_FRACTION, ETA_MECH, TURB_MODEL, "
+                "and IS_HIGH_P_COND_FLASH."
+            )
 
-    #     def get_turbine_value(key: str, default=None):
-    #         value = option_map.get(key, default)
-    #         return default if value is None else value
+        renamed_keys = sorted(key for key in options if key in cls._RENAMED_OPTIONS)
+        if renamed_keys:
+            rename_map = ", ".join(
+                f"{key} -> {cls._RENAMED_OPTIONS[key]}" for key in renamed_keys
+            )
+            raise ValueError(
+                "Unsupported configuration option name(s): "
+                f"{rename_map}. Use the canonical zone.config field names instead."
+            )
 
-    #     if self.DO_TURBINE_WORK:
-    #         self.T_TURBINE_BOX = get_turbine_value("PROP_TOP_0", self.T_TURBINE_BOX)
-    #         self.P_TURBINE_BOX = get_turbine_value("PROP_TOP_1", self.P_TURBINE_BOX)
-    #         self.MIN_EFF = get_turbine_value("PROP_TOP_2", self.MIN_EFF)
-    #         self.ELECTRICITY_PRICE = get_turbine_value(
-    #             "PROP_TOP_3", self.ELECTRICITY_PRICE
-    #         )
-    #         self.LOAD = get_turbine_value("PROP_TOP_4", self.LOAD)
-    #         self.MECH_EFF = get_turbine_value("PROP_TOP_5", self.MECH_EFF)
-    #         self.COMBOBOX = get_turbine_value("PROP_TOP_6", self.COMBOBOX)
-    #         self.ABOVE_PINCH_CHECKBOX = get_turbine_value(
-    #             "PROP_TOP_7", self.ABOVE_PINCH_CHECKBOX
-    #         )
-    #         self.BELOW_PINCH_CHECKBOX = get_turbine_value(
-    #             "PROP_TOP_8", self.BELOW_PINCH_CHECKBOX
-    #         )
-    #         self.CONDESATE_FLASH_CORRECTION = get_turbine_value(
-    #             "PROP_TOP_9", self.CONDESATE_FLASH_CORRECTION
-    #         )
+        known_keys = cls._known_option_keys()
+        unknown_keys = sorted(key for key in options if key not in known_keys)
+        if unknown_keys:
+            raise ValueError(
+                "Unknown configuration option(s): "
+                f"{', '.join(unknown_keys)}."
+            )
+
+        return options

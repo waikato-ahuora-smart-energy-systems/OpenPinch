@@ -210,7 +210,7 @@ def test_get_results_from_excel_parses_summary(tmp_path: Path):
     )
 
 
-def test_get_results_from_excel_writes_json_when_path_given(tmp_path: Path):
+def test_get_results_from_excel_writes_json_when_path_given(tmp_path: Path, capsys):
     xlsx = tmp_path / "results.xlsx"
     _write_test_workbook(xlsx)
     out_json = tmp_path / "out.json"
@@ -220,6 +220,7 @@ def test_get_results_from_excel_writes_json_when_path_given(tmp_path: Path):
     # Function returns the dict and writes the JSON file
     assert out_json.exists()
     assert out["targets"]  # non-empty
+    assert capsys.readouterr().out == ""
 
 
 def test_validate_stream_data_inherits_missing_zone_from_previous_stream():
@@ -278,7 +279,7 @@ def test_validate_stream_data_defaults_name_when_zone_and_name_missing():
 """Additional coverage tests for workbook-to-JSON helpers."""
 
 
-def test_get_problem_from_excel_writes_json(tmp_path: Path):
+def test_get_problem_from_excel_writes_json(tmp_path: Path, capsys):
     xlsx = tmp_path / "problem.xlsx"
     out_json = tmp_path / "problem.json"
     with pd.ExcelWriter(xlsx, engine="openpyxl") as writer:
@@ -300,6 +301,7 @@ def test_get_problem_from_excel_writes_json(tmp_path: Path):
     out = wkbook_to_json.get_problem_from_excel(xlsx, output_json=str(out_json))
     assert out_json.exists()
     assert out["streams"][0]["name"] == "H1"
+    assert capsys.readouterr().out == ""
 
 
 def test_get_column_names_and_units_pads_units_for_short_stream_sheet():

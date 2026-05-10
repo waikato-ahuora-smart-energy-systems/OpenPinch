@@ -30,7 +30,7 @@ __all__ = ["prepare_problem"]
 def prepare_problem(
     streams: Optional[List[StreamSchema]] = None,
     utilities: Optional[List[UtilitySchema]] = None,
-    options: Optional[Configuration] = None,
+    options: Optional[Configuration | dict] = None,
     project_name: str = "Site",
     zone_tree: ZoneTreeSchema = None,
 ) -> Zone:
@@ -45,8 +45,8 @@ def prepare_problem(
         Iterable of :class:`OpenPinch.lib.schemas.io.UtilitySchema` describing candidate hot
         and cold utilities.
     options:
-        Optional :class:`OpenPinch.lib.config.Configuration` overrides.  When omitted the
-        defaults from ``Configuration()`` are used.
+        Optional :class:`OpenPinch.lib.config.Configuration` instance or canonical option
+        dictionary. When omitted the defaults from ``Configuration()`` are used.
     project_name:
         Human-friendly label applied to the root zone when no explicit zone tree is supplied.
     zone_tree:
@@ -64,7 +64,7 @@ def prepare_problem(
     top_zone_name, top_zone_identifier = _get_validated_zone_info(
         zone_tree, project_name
     )
-    zone_config = Configuration(
+    zone_config = _build_zone_config(
         options=options,
         top_zone_name=top_zone_name,
         top_zone_identifier=top_zone_identifier,
@@ -77,6 +77,7 @@ def prepare_problem(
         type=zone_config.TOP_ZONE_IDENTIFIER,
         zone_config=zone_config,
         dt_cont_multiplier=_resolve_zone_dt_cont_multiplier(zone_tree, None),
+        lock_dt_cont_multiplier=True,
     )
     master_zone = _create_nested_zones(master_zone, zone_tree, master_zone.config)
     master_zone = _get_process_streams_in_each_subzone(
@@ -92,6 +93,35 @@ def prepare_problem(
 #######################################################################################################
 
 
+def _build_zone_config(
+    *,
+    options: Configuration | dict | None,
+    top_zone_name: str,
+    top_zone_identifier: str,
+) -> Configuration:
+    """Construct a zone config without discarding caller-provided settings."""
+    if options is None:
+        return Configuration(
+            top_zone_name=top_zone_name,
+            top_zone_identifier=top_zone_identifier,
+        )
+
+    if isinstance(options, Configuration):
+        zone_config = copy.deepcopy(options)
+        zone_config.TOP_ZONE_NAME = top_zone_name
+        zone_config.TOP_ZONE_IDENTIFIER = top_zone_identifier
+        return zone_config
+
+    if isinstance(options, dict):
+        return Configuration(
+            options=options,
+            top_zone_name=top_zone_name,
+            top_zone_identifier=top_zone_identifier,
+        )
+
+    raise TypeError("options must be a Configuration, dict, or None.")
+
+
 def _get_validated_zone_info(
     zone_tree: ZoneTreeSchema, project_name: str = None, depth: int = 0
 ) -> Tuple[str, str]:
@@ -102,6 +132,7 @@ def _get_validated_zone_info(
             "Zone": ZT.P.value,
             "Sub-Zone": ZT.P.value,
             "Process Zone": ZT.P.value,
+            "Unit Operation": ZT.O.value,
             "Site": ZT.S.value,
             "Community": ZT.C.value,
             "Region": ZT.R.value,
@@ -168,6 +199,7 @@ def _create_nested_zones(
             dt_cont_multiplier=_resolve_zone_dt_cont_multiplier(
                 child_schema, parent_zone.dt_cont_multiplier
             ),
+            lock_dt_cont_multiplier=True,
         )
         parent_zone.add_zone(child_zone, sub=True)
         _create_nested_zones(child_zone, child_schema, zone_config)
@@ -259,7 +291,8 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
         t_supply=get_value(stream.t_supply),
         t_target=get_value(stream.t_target),
         heat_flow=get_value(stream.heat_flow),
-        dt_cont=base_dt_cont * zone.dt_cont_multiplier,
+        dt_cont=base_dt_cont,
+        dt_cont_act=base_dt_cont * zone.dt_cont_multiplier,
         htc=get_value(stream.htc),
         is_process_stream=True,
     )
@@ -292,10 +325,14 @@ def _get_hot_and_cold_utilities(
         dt_cont_multiplier=dt_cont_multiplier,
     )
     hot_utilities, utilities = _create_utilities_list(
-        utilities, utility_type=ST.Hot.value
+        utilities,
+        utility_type=ST.Hot.value,
+        dt_cont_multiplier=dt_cont_multiplier,
     )
     cold_utilities, utilities = _create_utilities_list(
-        utilities, utility_type=ST.Cold.value
+        utilities,
+        utility_type=ST.Cold.value,
+        dt_cont_multiplier=dt_cont_multiplier,
     )
     return hot_utilities, cold_utilities
 
@@ -347,7 +384,8 @@ def _complete_utility_data(
 
         dt_cont = get_value(utility.dt_cont)
         base_dt_cont = zone_config.DT_CONT if dt_cont is None else dt_cont
-        utility.dt_cont = base_dt_cont * dt_cont_multiplier
+        utility.dt_cont = base_dt_cont
+        effective_dt_cont = base_dt_cont * dt_cont_multiplier
 
         price = get_value(utility.price)
         utility.price = (
@@ -362,13 +400,13 @@ def _complete_utility_data(
         if (
             utility.type in [ST.Hot.value, ST.Both.value]
             and utility.active
-            and min(utility.t_supply, utility.t_target) - utility.dt_cont >= HU_T_min
+            and min(utility.t_supply, utility.t_target) - effective_dt_cont >= HU_T_min
         ):
             addDefaultHU = False
         if (
             utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
-            and max(utility.t_supply, utility.t_target) - utility.dt_cont <= CU_T_max
+            and max(utility.t_supply, utility.t_target) - effective_dt_cont <= CU_T_max
         ):
             addDefaultCU = False
     return utilities, addDefaultHU, addDefaultCU
@@ -417,13 +455,14 @@ def _create_default_utility(
 ) -> UtilitySchema:
     """Construct a default utility entry anchored to the extreme process temperature."""
     a = 1 if ut_type == ST.Hot.value else -1
-    dt_cont = zone_config.DT_CONT * dt_cont_multiplier
+    dt_cont = zone_config.DT_CONT
+    dt_cont_act = dt_cont * dt_cont_multiplier
     return UtilitySchema.model_validate(
         {
             "name": name,
             "type": ut_type,
-            "t_supply": T + dt_cont * a,
-            "t_target": T + (dt_cont - zone_config.DT_PHASE_CHANGE) * a,
+            "t_supply": T + dt_cont_act * a,
+            "t_target": T + (dt_cont_act - zone_config.DT_PHASE_CHANGE) * a,
             "heat_flow": 0,
             "dt_cont": dt_cont,
             "price": zone_config.UTILITY_PRICE,
@@ -433,7 +472,9 @@ def _create_default_utility(
 
 
 def _create_utilities_list(
-    utilities: List[UtilitySchema], utility_type: str
+    utilities: List[UtilitySchema],
+    utility_type: str,
+    dt_cont_multiplier: float = 1.0,
 ) -> Tuple[StreamCollection, List[UtilitySchema]]:
     """Creates a sorted list of hot or cold Stream objects based on type."""
     created_utilities = StreamCollection()
@@ -470,6 +511,7 @@ def _create_utilities_list(
                 t_supply=t_supply,
                 t_target=t_target,
                 dt_cont=selected.dt_cont,
+                dt_cont_act=selected.dt_cont * dt_cont_multiplier,
                 htc=selected.htc,
                 price=selected.price,
                 is_process_stream=False,
@@ -704,8 +746,8 @@ def _validate_config_data_completed(zone_config: Configuration) -> Configuration
         zone_config.ANNUAL_OP_TIME = 365 * 24  # h/y
     # Ensures the inlet pressure to the turbine is below the critical pressure
     # TODO: Add units to the turbine pressure
-    if zone_config.DO_TURBINE_WORK and zone_config.P_TURBINE_BOX > 220:
-        zone_config.P_TURBINE_BOX = 200
+    if zone_config.DO_TURBINE_WORK and zone_config.TURB_P_IN > 220:
+        zone_config.TURB_P_IN = 200
     if zone_config.DT_PHASE_CHANGE <= 0:
         zone_config.DT_PHASE_CHANGE = 0.01
     if zone_config.DT_CONT < 0:

@@ -6,6 +6,7 @@ launching the Streamlit dashboard.
 """
 
 import json
+import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
@@ -17,9 +18,6 @@ from pydantic import ValidationError
 
 from ..lib.enums import GT, ST, TT
 from ..lib.schemas.io import (
-    HeatPumpIntegrationComparison,
-    HeatPumpIntegrationComparisonRow,
-    HeatPumpIntegrationScenario,
     TargetInput,
     TargetOutput,
 )
@@ -34,6 +32,9 @@ from ..services import (
     indirect_heat_pump_service,
     indirect_refrigeration_service,
     power_cogeneration_service,
+)
+from ..services.input_data_processing.data_preparation import (
+    _validate_zone_tree_structure,
 )
 from ..services.common.graph_data import get_output_graph_data
 from ..streamlit_webviewer.web_graphing import (
@@ -60,16 +61,6 @@ JsonDict = Dict[str, Any]
 PathLike = Union[str, Path]
 GraphPayload = Dict[str, Dict[str, Any]]
 ZoneService = Callable[["Zone"], "Zone"]
-
-
-@dataclass
-class HeatPumpIntegrationEvaluation:
-    """Bundle returned by :meth:`PinchProblem.evaluate_heat_pump_integration`."""
-
-    scenario: HeatPumpIntegrationScenario
-    integrated_problem: "PinchProblem"
-    comparison: HeatPumpIntegrationComparison
-    comparison_frame: pd.DataFrame
 
 
 _GRAPH_TYPE_ALIASES = {
@@ -476,16 +467,33 @@ class PinchProblem:
                 return None
             source = Path(self.problem_filepath)
 
-        try:
-            source = TargetInput.model_validate(source)
-        except:
-            pass
+        if not isinstance(source, (TargetInput, dict)):
+            try:
+                source = TargetInput.model_validate(source)
+            except ValidationError:
+                pass
 
         if isinstance(source, TargetInput):
             self._problem_data = source
             self._input_source_kind = "target_input"
             self._validation_context = _build_validation_context(
                 source.model_dump() if hasattr(source, "model_dump") else source,
+                source_kind=self._input_source_kind,
+            )
+
+        elif isinstance(source, dict):
+            self._problem_data = source
+            if isinstance(self._problem_data.get("streams"), list):
+                self._problem_data["streams"] = validate_stream_data(
+                    self._problem_data["streams"]
+                )
+            if isinstance(self._problem_data.get("utilities"), list):
+                self._problem_data["utilities"] = validate_utility_data(
+                    self._problem_data["utilities"]
+                )
+            self._input_source_kind = "target_input"
+            self._validation_context = _build_validation_context(
+                self._problem_data,
                 source_kind=self._input_source_kind,
             )
 
@@ -512,7 +520,7 @@ class PinchProblem:
                 try:
                     with src_path.open("r", encoding="utf-8") as f:
                         self._problem_data = json.load(f)
-                except Exception as e:
+                except (OSError, json.JSONDecodeError) as e:
                     raise ValueError(
                         f"Failed to parse JSON from {src_path}: {e}"
                     ) from e
@@ -739,7 +747,6 @@ class PinchProblem:
             self.results_dir = Path(results_dir)
 
         if self.results_dir is None:
-            print(self._results)
             raise ValueError("No results_dir set. Provide a path to export results.")
 
         # Ensure results exist
@@ -798,71 +805,6 @@ class PinchProblem:
         comparison.insert(0, "Target", str(base_row["Target"]))
         comparison.loc["Change", "Target"] = str(base_row["Target"])
         return comparison
-
-    def evaluate_heat_pump_integration(
-        self,
-        scenario: HeatPumpIntegrationScenario | dict[str, Any],
-        *,
-        target_name: Optional[str] = None,
-    ) -> HeatPumpIntegrationEvaluation:
-        """Screen a candidate integrated condenser/evaporator scenario.
-
-        The scenario is represented as two additional process streams:
-
-        - a hot condenser stream delivering ``condenser_duty`` at
-          ``condenser_temperature``
-        - a cold evaporator stream removing ``evaporator_duty`` at
-          ``evaporator_temperature``
-
-        The method returns both the solved integrated problem and a structured
-        before/after comparison against the current base case.
-        """
-        scenario_model = HeatPumpIntegrationScenario.model_validate(scenario)
-        if scenario_model.dt_phase_change <= 0.0:
-            raise ValueError("dt_phase_change must be positive.")
-        if scenario_model.condenser_duty <= 0.0:
-            raise ValueError("condenser_duty must be positive.")
-        if scenario_model.evaporator_duty <= 0.0:
-            raise ValueError("evaporator_duty must be positive.")
-
-        self.run()
-        target_zone = self._resolve_target_zone(scenario_model.zone)
-        default_target = target_zone.targets.get(TT.DI.value)
-        resolved_target_name = target_name or (
-            default_target.name
-            if default_target is not None
-            else f"{target_zone.name}/{TT.DI.value}"
-        )
-
-        payload = deepcopy(self.validate().model_dump(mode="python"))
-        payload.setdefault("streams", []).extend(
-            _build_heat_pump_integration_stream_payloads(
-                zone_name=target_zone.address,
-                scenario=scenario_model,
-            )
-        )
-
-        integrated_problem = PinchProblem(
-            source=payload,
-            project_name=self.project_name,
-        )
-        integrated_problem.run()
-        comparison_frame = self.compare_to(
-            integrated_problem,
-            target_name=resolved_target_name,
-            other_label="Integrated scenario",
-        )
-        comparison = _build_heat_pump_integration_comparison(
-            comparison_frame=comparison_frame,
-            scenario=scenario_model,
-            target_name=str(comparison_frame.iloc[0]["Target"]),
-        )
-        return HeatPumpIntegrationEvaluation(
-            scenario=scenario_model,
-            integrated_problem=integrated_problem,
-            comparison=comparison,
-            comparison_frame=comparison_frame,
-        )
 
     def _data_preprocessing(self) -> "Zone":
         if isinstance(self._validated_data, TargetInput) and isinstance(
@@ -940,6 +882,57 @@ class PinchProblem:
                 "No problem_data available. Did you call load(...) or from_json(...)?"
             )
         return self._problem_data
+
+    def set_dt_cont_multiplier(
+        self,
+        value: float,
+        *,
+        zone_name: Optional[str] = None,
+    ) -> Zone:
+        """Update one zone-tree multiplier and rebuild the prepared analysis state."""
+        resolved_value = float(value)
+        if not math.isfinite(resolved_value) or resolved_value < 0.0:
+            raise ValueError("dt_cont_multiplier must be a finite non-negative value.")
+
+        payload = self._canonical_problem_payload()
+        zone_tree = payload.get("zone_tree")
+        if not isinstance(zone_tree, dict):
+            raise RuntimeError("No zone_tree is available to update.")
+
+        target_zone = zone_name or str(zone_tree.get("name") or self.project_name)
+        zone_node = _find_zone_tree_node(zone_tree, target_zone)
+        zone_node["dt_cont_multiplier"] = resolved_value
+
+        self._problem_data = payload
+        self._validation_context = _build_validation_context(
+            self._problem_data,
+            source_kind=self._input_source_kind,
+        )
+        self._validated_data = self.validate()
+        self._master_zone = self._data_preprocessing()
+        self._results = None
+        return self._master_zone
+
+    def _canonical_problem_payload(self) -> JsonDict:
+        """Return a canonical mutable payload including an explicit zone tree."""
+        validated = self.validate()
+        payload = deepcopy(validated.model_dump(mode="python"))
+        stream_models = [stream.model_copy(deep=True) for stream in validated.streams]
+        zone_tree = (
+            validated.zone_tree.model_copy(deep=True)
+            if validated.zone_tree is not None
+            else None
+        )
+        canonical_zone_tree = _validate_zone_tree_structure(
+            zone_tree,
+            stream_models,
+            self.project_name,
+        )
+        payload["streams"] = [
+            stream.model_dump(mode="python") for stream in stream_models
+        ]
+        payload["zone_tree"] = canonical_zone_tree.model_dump(mode="python")
+        return payload
 
     def __repr__(self) -> str:
         """Machine-readable summary capturing source, export target, and result cache state."""
@@ -1168,68 +1161,6 @@ def _format_utility(name: str, heat_flow) -> str:
     return f"{name}: {value:.2f}"
 
 
-def _optional_float(value: Any) -> Optional[float]:
-    if value is None or pd.isna(value):
-        return None
-    return float(value)
-
-
-def _build_heat_pump_integration_stream_payloads(
-    *,
-    zone_name: str,
-    scenario: HeatPumpIntegrationScenario,
-) -> list[dict[str, Any]]:
-    dt_phase_change = float(scenario.dt_phase_change)
-    return [
-        {
-            "zone": zone_name,
-            "name": scenario.condenser_name,
-            "t_supply": float(scenario.condenser_temperature),
-            "t_target": float(scenario.condenser_temperature) - dt_phase_change,
-            "heat_flow": float(scenario.condenser_duty),
-            "dt_cont": float(scenario.dt_cont),
-            "htc": float(scenario.htc),
-            "active": True,
-        },
-        {
-            "zone": zone_name,
-            "name": scenario.evaporator_name,
-            "t_supply": float(scenario.evaporator_temperature) - dt_phase_change,
-            "t_target": float(scenario.evaporator_temperature),
-            "heat_flow": float(scenario.evaporator_duty),
-            "dt_cont": float(scenario.dt_cont),
-            "htc": float(scenario.htc),
-            "active": True,
-        },
-    ]
-
-
-def _build_heat_pump_integration_comparison(
-    *,
-    comparison_frame: pd.DataFrame,
-    scenario: HeatPumpIntegrationScenario,
-    target_name: str,
-) -> HeatPumpIntegrationComparison:
-    rows = [
-        HeatPumpIntegrationComparisonRow(
-            label=str(label),
-            target=str(row["Target"]),
-            hot_utility_target=_optional_float(row.get("Hot Utility Target")),
-            cold_utility_target=_optional_float(row.get("Cold Utility Target")),
-            heat_recovery=_optional_float(row.get("Heat Recovery")),
-            hot_pinch=_optional_float(row.get("Hot Pinch")),
-            cold_pinch=_optional_float(row.get("Cold Pinch")),
-        )
-        for label, row in comparison_frame.iterrows()
-    ]
-    return HeatPumpIntegrationComparison(
-        scenario=scenario,
-        target_name=target_name,
-        approximate_power=float(scenario.condenser_duty - scenario.evaporator_duty),
-        rows=rows,
-    )
-
-
 def _locate_summary_row(
     frame: pd.DataFrame,
     *,
@@ -1263,6 +1194,34 @@ def _locate_summary_row(
     if not direct_match.empty:
         return direct_match.iloc[0]
     return frame.iloc[0]
+
+
+def _find_zone_tree_node(
+    zone_tree: dict[str, Any],
+    zone_name: str,
+) -> dict[str, Any]:
+    root_name = str(zone_tree.get("name") or "")
+    path_parts = [part.strip() for part in str(zone_name).split("/") if part.strip()]
+    if not path_parts:
+        raise ValueError("zone_name must identify a zone in the zone_tree.")
+
+    if path_parts[0] == root_name:
+        path_parts = path_parts[1:]
+
+    node = zone_tree
+    if not path_parts:
+        return node
+
+    for part in path_parts:
+        children = node.get("children") or []
+        next_node = next(
+            (child for child in children if str(child.get("name")) == part),
+            None,
+        )
+        if next_node is None:
+            raise ValueError(f"Zone {zone_name!r} was not found in the zone_tree.")
+        node = next_node
+    return node
 
 
 def _build_validation_context(
@@ -1509,9 +1468,10 @@ def _validate_problem_semantics(
 
     if warnings_issues:
         warnings.warn(
-            "Input validation failed with "
-            f"{len(fatal_issues)} issue(s):\n" + "\n".join(fatal_issues),
+            "Input validation reported "
+            f"{len(warnings_issues)} warning(s):\n" + "\n".join(warnings_issues),
             UserWarning,
+            stacklevel=2,
         )
 
 

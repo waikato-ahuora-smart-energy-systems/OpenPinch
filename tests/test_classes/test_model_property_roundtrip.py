@@ -46,6 +46,7 @@ def test_stream_property_roundtrip_and_mutation_paths():
     s.h_supply = 2_500.0
     s.h_target = 2_000.0
     s.dt_cont = 4.0
+    s.dt_cont_act = 6.0
     s.heat_flow = 100.0
     s.htc = 3.0
     s.htr = 0.25
@@ -65,6 +66,8 @@ def test_stream_property_roundtrip_and_mutation_paths():
     assert s.CP == 2.5
     assert s.rCP == 0.4
     assert s.active is False
+    assert s.dt_cont == 4.0
+    assert s.dt_cont_act == 6.0
     assert s.t_min == 50.0
     assert s.t_max == 160.0
     assert s.t_min_star == 48.0

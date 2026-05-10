@@ -49,7 +49,6 @@ def get_problem_from_excel(excel_file, output_json=None):
         # Write the final JSON structure to file
         with open(output_json, "w", encoding="utf-8") as f:
             json.dump(output_dict, f, indent=4)
-        print(f"JSON data successfully written to {output_json}")
 
     return output_dict
 
@@ -78,7 +77,6 @@ def get_results_from_excel(excel_file, output_json, project_name):
         # Write the final JSON structure to file
         with open(output_json, "w", encoding="utf-8") as f:
             json.dump(output_dict, f, indent=4)
-        print(f"JSON data successfully written to {output_json}")
 
     return output_dict
 
@@ -235,7 +233,7 @@ def _parse_options_sheet(
         if hasattr(val, "item"):
             try:
                 return val.item()
-            except Exception:
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 pass
         return val
 

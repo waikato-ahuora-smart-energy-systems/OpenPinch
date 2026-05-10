@@ -103,7 +103,7 @@ def _summary_rows() -> list[list]:
     return [row0, row1, row2, row3, row4]
 
 
-def test_get_problem_from_csv_writes_json(tmp_path: Path):
+def test_get_problem_from_csv_writes_json(tmp_path: Path, capsys):
     streams_csv = tmp_path / "streams.csv"
     utilities_csv = tmp_path / "utilities.csv"
     output_json = tmp_path / "problem.json"
@@ -118,9 +118,10 @@ def test_get_problem_from_csv_writes_json(tmp_path: Path):
 
     assert output_json.exists()
     assert json.loads(output_json.read_text()) == out
+    assert capsys.readouterr().out == ""
 
 
-def test_get_results_from_csv_writes_json(tmp_path: Path):
+def test_get_results_from_csv_writes_json(tmp_path: Path, capsys):
     summary_csv = tmp_path / "summary.csv"
     output_json = tmp_path / "results.json"
     _write_csv(summary_csv, _summary_rows())
@@ -134,6 +135,7 @@ def test_get_results_from_csv_writes_json(tmp_path: Path):
     assert output_json.exists()
     assert json.loads(output_json.read_text()) == out
     assert out["targets"][0]["name"].startswith("Proj/")
+    assert capsys.readouterr().out == ""
 
 
 def test_parse_csv_with_units_drops_extra_columns(monkeypatch):

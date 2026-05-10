@@ -148,6 +148,60 @@ class StreamCollection:
             invert_utility=invert_utility,
         )
 
+    def get_hot_process_streams(self):
+        """Return a new collection containing only hot streams."""
+        return self._build_stream_subset(
+            target_type=ST.Hot.value,
+            include_process_streams=True,
+            include_utility_streams=False,
+            invert_utility=False,
+        )
+
+    def get_cold_process_streams(self):
+        """Return a new collection containing only cold streams."""
+        return self._build_stream_subset(
+            target_type=ST.Cold.value,
+            include_process_streams=True,
+            include_utility_streams=False,
+            invert_utility=False,
+        )
+
+    def get_hot_utility_streams(self):
+        """Return a new collection containing only hot streams."""
+        return self._build_stream_subset(
+            target_type=ST.Hot.value,
+            include_process_streams=False,
+            include_utility_streams=True,
+            invert_utility=False,
+        )
+
+    def get_cold_utility_streams(self):
+        """Return a new collection containing only cold streams."""
+        return self._build_stream_subset(
+            target_type=ST.Cold.value,
+            include_process_streams=False,
+            include_utility_streams=True,
+            invert_utility=False,
+        )
+
+    def get_inverted_hot_utility_streams(self):
+        """Return a new collection containing only hot streams."""
+        return self._build_stream_subset(
+            target_type=ST.Hot.value,
+            include_process_streams=False,
+            include_utility_streams=True,
+            invert_utility=True,
+        )
+
+    def get_inverted_cold_utility_streams(self):
+        """Return a new collection containing only cold streams."""
+        return self._build_stream_subset(
+            target_type=ST.Cold.value,
+            include_process_streams=False,
+            include_utility_streams=True,
+            invert_utility=True,
+        )
+
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
         """Replace the collection contents with the provided stream mapping."""
         self._streams = {}
@@ -260,7 +314,15 @@ class StreamCollection:
         with output_path.open("w", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(
-                ["name", "t_supply", "t_target", "heat_flow", "dt_cont", "htc"]
+                [
+                    "name",
+                    "t_supply",
+                    "t_target",
+                    "heat_flow",
+                    "dt_cont",
+                    "dt_cont_act",
+                    "htc",
+                ]
             )
             for stream in self._sorted_cache:
                 writer.writerow(
@@ -270,6 +332,7 @@ class StreamCollection:
                         stream.t_target,
                         stream.heat_flow,
                         stream.dt_cont,
+                        stream.dt_cont_act,
                         stream.htc,
                     ]
                 )
