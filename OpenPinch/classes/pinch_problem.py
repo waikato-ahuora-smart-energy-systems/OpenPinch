@@ -6,6 +6,7 @@ launching the Streamlit dashboard.
 """
 
 import json
+import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
@@ -34,6 +35,9 @@ from ..services import (
     indirect_heat_pump_service,
     indirect_refrigeration_service,
     power_cogeneration_service,
+)
+from ..services.input_data_processing.data_preparation import (
+    _validate_zone_tree_structure,
 )
 from ..services.common.graph_data import get_output_graph_data
 from ..streamlit_webviewer.web_graphing import (
@@ -941,6 +945,57 @@ class PinchProblem:
             )
         return self._problem_data
 
+    def set_dt_cont_multiplier(
+        self,
+        value: float,
+        *,
+        zone_name: Optional[str] = None,
+    ) -> Zone:
+        """Update one zone-tree multiplier and rebuild the prepared analysis state."""
+        resolved_value = float(value)
+        if not math.isfinite(resolved_value) or resolved_value < 0.0:
+            raise ValueError("dt_cont_multiplier must be a finite non-negative value.")
+
+        payload = self._canonical_problem_payload()
+        zone_tree = payload.get("zone_tree")
+        if not isinstance(zone_tree, dict):
+            raise RuntimeError("No zone_tree is available to update.")
+
+        target_zone = zone_name or str(zone_tree.get("name") or self.project_name)
+        zone_node = _find_zone_tree_node(zone_tree, target_zone)
+        zone_node["dt_cont_multiplier"] = resolved_value
+
+        self._problem_data = payload
+        self._validation_context = _build_validation_context(
+            self._problem_data,
+            source_kind=self._input_source_kind,
+        )
+        self._validated_data = self.validate()
+        self._master_zone = self._data_preprocessing()
+        self._results = None
+        return self._master_zone
+
+    def _canonical_problem_payload(self) -> JsonDict:
+        """Return a canonical mutable payload including an explicit zone tree."""
+        validated = self.validate()
+        payload = deepcopy(validated.model_dump(mode="python"))
+        stream_models = [stream.model_copy(deep=True) for stream in validated.streams]
+        zone_tree = (
+            validated.zone_tree.model_copy(deep=True)
+            if validated.zone_tree is not None
+            else None
+        )
+        canonical_zone_tree = _validate_zone_tree_structure(
+            zone_tree,
+            stream_models,
+            self.project_name,
+        )
+        payload["streams"] = [
+            stream.model_dump(mode="python") for stream in stream_models
+        ]
+        payload["zone_tree"] = canonical_zone_tree.model_dump(mode="python")
+        return payload
+
     def __repr__(self) -> str:
         """Machine-readable summary capturing source, export target, and result cache state."""
         src = (
@@ -1263,6 +1318,34 @@ def _locate_summary_row(
     if not direct_match.empty:
         return direct_match.iloc[0]
     return frame.iloc[0]
+
+
+def _find_zone_tree_node(
+    zone_tree: dict[str, Any],
+    zone_name: str,
+) -> dict[str, Any]:
+    root_name = str(zone_tree.get("name") or "")
+    path_parts = [part.strip() for part in str(zone_name).split("/") if part.strip()]
+    if not path_parts:
+        raise ValueError("zone_name must identify a zone in the zone_tree.")
+
+    if path_parts[0] == root_name:
+        path_parts = path_parts[1:]
+
+    node = zone_tree
+    if not path_parts:
+        return node
+
+    for part in path_parts:
+        children = node.get("children") or []
+        next_node = next(
+            (child for child in children if str(child.get("name")) == part),
+            None,
+        )
+        if next_node is None:
+            raise ValueError(f"Zone {zone_name!r} was not found in the zone_tree.")
+        node = next_node
+    return node
 
 
 def _build_validation_context(

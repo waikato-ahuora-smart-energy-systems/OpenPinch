@@ -260,7 +260,15 @@ class StreamCollection:
         with output_path.open("w", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(
-                ["name", "t_supply", "t_target", "heat_flow", "dt_cont", "htc"]
+                [
+                    "name",
+                    "t_supply",
+                    "t_target",
+                    "heat_flow",
+                    "dt_cont",
+                    "dt_cont_act",
+                    "htc",
+                ]
             )
             for stream in self._sorted_cache:
                 writer.writerow(
@@ -270,6 +278,7 @@ class StreamCollection:
                         stream.t_target,
                         stream.heat_flow,
                         stream.dt_cont,
+                        stream.dt_cont_act,
                         stream.htc,
                     ]
                 )

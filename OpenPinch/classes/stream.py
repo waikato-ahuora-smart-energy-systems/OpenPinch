@@ -25,6 +25,7 @@ class Stream:
         h_supply: Optional[float] = None,
         h_target: Optional[float] = None,
         dt_cont: float = 0.0,
+        dt_cont_act: Optional[float] = None,
         heat_flow: float | list[float, float] = 0.0,
         htc: float = 1.0,
         price: float = 0.0,
@@ -40,6 +41,7 @@ class Stream:
         self._h_supply: Optional[float] = h_supply
         self._h_target: Optional[float] = h_target
         self._dt_cont: float = dt_cont
+        self._dt_cont_act: float = dt_cont if dt_cont_act is None else dt_cont_act
         self._heat_flow: float = heat_flow
         self._htc: float = htc if htc != 0.0 and isinstance(htc, float | int) else 1.0
         self._htr: float = 1 / self._htc
@@ -139,12 +141,23 @@ class Stream:
 
     @property
     def dt_cont(self) -> float:
-        """Delta T minimum contribution (e.g., degC)."""
+        """Preserved base delta-T contribution before any zone multiplier."""
         return self._dt_cont
 
     @dt_cont.setter
     def dt_cont(self, value: float):
         self._dt_cont = value
+        self._dt_cont_act = value
+        self._update_attributes()
+
+    @property
+    def dt_cont_act(self) -> float:
+        """Effective delta-T contribution used in shifted-temperature calculations."""
+        return self._dt_cont_act
+
+    @dt_cont_act.setter
+    def dt_cont_act(self, value: float):
+        self._dt_cont_act = value
         self._update_attributes()
 
     @property
@@ -346,16 +359,16 @@ class Stream:
     def _set_hot_stream_min_max_temperatures(self):
         self._t_min = self._t_target
         self._t_max = self._t_supply
-        self._t_min_star = self._t_min - self._dt_cont
-        self._t_max_star = self._t_max - self._dt_cont
+        self._t_min_star = self._t_min - self._dt_cont_act
+        self._t_max_star = self._t_max - self._dt_cont_act
         if self._type is None:
             self._type = ST.Hot.value
 
     def _set_cold_stream_min_max_temperatures(self):
         self._t_min = self._t_supply
         self._t_max = self._t_target
-        self._t_min_star = self._t_min + self._dt_cont
-        self._t_max_star = self._t_max + self._dt_cont
+        self._t_min_star = self._t_min + self._dt_cont_act
+        self._t_max_star = self._t_max + self._dt_cont_act
         if self._type is None:
             self._type = ST.Cold.value
 

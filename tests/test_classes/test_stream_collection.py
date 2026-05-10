@@ -329,6 +329,7 @@ def test_export_to_csv(sample_streams):
             "t_target",
             "heat_flow",
             "dt_cont",
+            "dt_cont_act",
             "htc",
         }
         assert {row["name"] for row in rows} == {s.name for s in sample_streams}

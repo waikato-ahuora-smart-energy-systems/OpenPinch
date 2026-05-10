@@ -1027,3 +1027,102 @@ def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
     assert validated.zone_tree is None
     assert len(validated.streams) == 65
     assert len(validated.utilities) == 5
+
+
+def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path):
+    case_path = copy_sample_case(
+        "crude_preheat_train.json",
+        tmp_path / "crude_preheat_train.json",
+    )
+    problem = PinchProblem(source=case_path, project_name=case_path.stem)
+
+    baseline = problem.summary_frame()
+    baseline_row = baseline.loc[
+        baseline["Target"] == f"{case_path.stem}/Direct Integration"
+    ].iloc[0]
+    unit = problem.master_zone.get_subzone("Crude Unit")
+    hot_stream = next(iter(unit.hot_streams))
+
+    assert hot_stream.dt_cont == hot_stream.dt_cont_act
+
+    problem.set_dt_cont_multiplier(0.5)
+
+    assert problem.results is None
+    assert problem.to_problem_json()["zone_tree"][
+        "dt_cont_multiplier"
+    ] == pytest.approx(0.5)
+
+    unit = problem.master_zone.get_subzone("Crude Unit")
+    updated_stream = next(iter(unit.hot_streams))
+    assert updated_stream.dt_cont == hot_stream.dt_cont
+    assert updated_stream.dt_cont_act == pytest.approx(hot_stream.dt_cont * 0.5)
+
+    updated = problem.summary_frame()
+    updated_row = updated.loc[
+        updated["Target"] == f"{case_path.stem}/Direct Integration"
+    ].iloc[0]
+
+    assert updated_row["Hot Utility Target"] != baseline_row["Hot Utility Target"]
+    assert updated_row["Cold Utility Target"] != baseline_row["Cold Utility Target"]
+
+
+def test_prepared_zone_dt_cont_multiplier_setter_guides_callers_to_problem_api(
+    tmp_path: Path,
+):
+    case_path = copy_sample_case(
+        "crude_preheat_train.json",
+        tmp_path / "crude_preheat_train.json",
+    )
+    problem = PinchProblem(source=case_path, project_name=case_path.stem)
+
+    with pytest.raises(RuntimeError, match="PinchProblem.set_dt_cont_multiplier"):
+        problem.master_zone.dt_cont_multiplier = 2.0
+
+
+def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+    problem.target()
+
+    area = problem.master_zone.get_subzone("AreaA")
+    cold_utility = next(
+        utility for utility in area.cold_utilities if utility.name == "CU"
+    )
+    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT)
+    assert len(area.net_hot_streams) > 0
+
+    problem.set_dt_cont_multiplier(3.0, zone_name="AreaA")
+    problem.target()
+
+    area = problem.master_zone.get_subzone("AreaA")
+    cold_utility = next(
+        utility for utility in area.cold_utilities if utility.name == "CU"
+    )
+    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
+    assert len(area.net_hot_streams) > 0
+
+    net_stream = area.net_hot_streams[0]
+    assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
+    assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)

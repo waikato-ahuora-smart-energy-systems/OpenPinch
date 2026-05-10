@@ -103,7 +103,7 @@ def _preprocess_utilities(z: Zone, turbine_params: dict) -> dict | None:
         T_stage = (
             u.t_target
             if abs(u.t_supply - u.t_target) < 1.0 + tol
-            else u.t_target + u.dt_cont * 2
+            else u.t_target + u.dt_cont_act * 2
         )
         if turbine_params["P_in"] + tol < psat_T(T_stage):
             continue

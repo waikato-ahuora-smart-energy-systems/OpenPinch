@@ -204,8 +204,8 @@ def test_stream_attributes_are_computed_correctly(dummy_streams):
     z1 = site.subzones["Z1"]
     hot = next(s for s in z1.hot_streams if s.name == "H1")
     cold = next(s for s in z1.cold_streams if s.name == "C1")
-    assert hot.t_max_star == hot.t_supply - hot.dt_cont
-    assert cold.t_min_star == cold.t_supply + cold.dt_cont
+    assert hot.t_max_star == hot.t_supply - hot.dt_cont_act
+    assert cold.t_min_star == cold.t_supply + cold.dt_cont_act
 
 
 def test_zone_names_and_ordering(dummy_streams):
@@ -859,9 +859,11 @@ def test_zone_dt_cont_multiplier_inherits_from_root_for_streams_and_utilities():
 
     assert site.dt_cont_multiplier == 2.0
     assert area.dt_cont_multiplier == 2.0
-    assert hot_stream.dt_cont == 20.0
+    assert hot_stream.dt_cont == 10.0
+    assert hot_stream.dt_cont_act == 20.0
     assert hot_stream.t_min_star == 80.0
-    assert hot_utility.dt_cont == 16.0
+    assert hot_utility.dt_cont == 8.0
+    assert hot_utility.dt_cont_act == 16.0
 
 
 def test_zone_dt_cont_multiplier_child_override_is_absolute():
@@ -914,8 +916,10 @@ def test_zone_dt_cont_multiplier_child_override_is_absolute():
 
     assert area_a.dt_cont_multiplier == 2.0
     assert area_b.dt_cont_multiplier == 0.5
-    assert hot_a.dt_cont == 20.0
-    assert hot_b.dt_cont == 5.0
+    assert hot_a.dt_cont == 10.0
+    assert hot_a.dt_cont_act == 20.0
+    assert hot_b.dt_cont == 10.0
+    assert hot_b.dt_cont_act == 5.0
 
 
 def test_default_utilities_use_zone_effective_dt_cont_multiplier():
@@ -951,8 +955,10 @@ def test_default_utilities_use_zone_effective_dt_cont_multiplier():
     hu = next(utility for utility in area.hot_utilities if utility.name == "HU")
     cu = next(utility for utility in area.cold_utilities if utility.name == "CU")
 
-    assert hu.dt_cont == pytest.approx(area.config.DT_CONT * 3.0)
-    assert cu.dt_cont == pytest.approx(area.config.DT_CONT * 3.0)
+    assert hu.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert hu.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
+    assert cu.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert cu.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
 
 
 def make_stream(zone: str) -> StreamSchema:
