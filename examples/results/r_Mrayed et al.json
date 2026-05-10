@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Mrayed et al/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 132.70000000000002,
@@ -13,7 +13,7 @@
                 }
             },
             "Qh": {
-                "value": 48387.38952961323,
+                "value": 48387.389529613225,
                 "units": "kW"
             },
             "Qc": {
@@ -29,7 +29,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 223134101175.6045,
+                "value": 223134101175.60446,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -50,7 +50,7 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 12293.250903111017,
+                        "value": 12293.25090311101,
                         "units": "kW"
                     }
                 },
@@ -127,7 +127,7 @@
                 }
             },
             "Qh": {
-                "value": 48387.38952961323,
+                "value": 48387.389529613225,
                 "units": "kW"
             },
             "Qc": {
@@ -143,7 +143,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 223134101175.6045,
+                "value": 223134101175.60446,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -164,7 +164,7 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 12293.250903111017,
+                        "value": 12293.25090311101,
                         "units": "kW"
                     }
                 },
@@ -229,19 +229,19 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Mrayed et al/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 132.70000000000002,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 132.70000000000002,
+                    "value": null,
                     "units": "degC"
                 }
             },
             "Qh": {
-                "value": 48387.38952961323,
+                "value": 48387.389529613225,
                 "units": "kW"
             },
             "Qc": {
@@ -257,7 +257,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 223134101175.6045,
+                "value": 223134101175.60446,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -278,7 +278,7 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 12293.250903111017,
+                        "value": 12293.25090311101,
                         "units": "kW"
                     }
                 },
@@ -343,7 +343,7 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Mrayed et al/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 125.0,
@@ -355,7 +355,7 @@
                 }
             },
             "Qh": {
-                "value": 48387.38952961323,
+                "value": 48387.389529613225,
                 "units": "kW"
             },
             "Qc": {
@@ -371,7 +371,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 223134101175.6045,
+                "value": 223134101175.60446,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -392,7 +392,7 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 12293.250903111017,
+                        "value": 12293.25090311101,
                         "units": "kW"
                     }
                 },

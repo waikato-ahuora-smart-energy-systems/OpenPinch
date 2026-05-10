@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Xiao et al/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 136.3,
@@ -45,21 +45,21 @@
                 {
                     "name": "CU",
                     "heat_flow": {
-                        "value": 4480.500000000001,
+                        "value": 3283.3,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
-                        "value": 389.99999999999994,
+                        "value": 1587.2000000000007,
                         "units": "kW"
                     }
                 }
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Process/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 136.3,
@@ -67,6 +67,64 @@
                 },
                 "hot_temp": {
                     "value": 157.1,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 9020.499999999996,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 4870.500000000001,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 24529.5,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 83.43367346938776,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 38278039599.99999,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 9020.499999999996,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 3283.3,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "FRZ",
+                    "heat_flow": {
+                        "value": 1587.2000000000007,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Xiao et al/Total Process Target",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": null,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -103,28 +161,28 @@
                 {
                     "name": "CU",
                     "heat_flow": {
-                        "value": 4480.500000000001,
+                        "value": 3283.3,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
-                        "value": 389.99999999999994,
+                        "value": 1587.2000000000007,
                         "units": "kW"
                     }
                 }
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Xiao et al/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 40.0,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 324.0,
+                    "value": 325.0,
                     "units": "degC"
                 }
             },
@@ -161,14 +219,14 @@
                 {
                     "name": "CU",
                     "heat_flow": {
-                        "value": 4480.500000000001,
+                        "value": 3283.3,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
-                        "value": 389.99999999999994,
+                        "value": 1587.2000000000007,
                         "units": "kW"
                     }
                 }

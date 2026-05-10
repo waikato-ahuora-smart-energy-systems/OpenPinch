@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Ponce-Ortega et al (example 5)/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 149.91,
@@ -29,14 +29,14 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 13728740894.399998,
+                "value": 896756.4352058258,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
+                        "value": 420.0232000350958,
                         "units": "kW"
                     }
                 }
@@ -80,14 +80,14 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 13728740894.399998,
+                "value": 896756.4352058258,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
+                        "value": 420.0232000350958,
                         "units": "kW"
                     }
                 }
@@ -103,14 +103,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Ponce-Ortega et al (example 5)/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 149.91,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 149.91,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -131,14 +131,14 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 13728740894.399998,
+                "value": 896756.4352058258,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
+                        "value": 420.0232000350958,
                         "units": "kW"
                     }
                 }
@@ -154,19 +154,19 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Ponce-Ortega et al (example 5)/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 41.85000000000002,
+                    "value": 41.9,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 41.85000000000002,
+                    "value": 353.8,
                     "units": "degC"
                 }
             },
             "Qh": {
-                "value": 0.0,
+                "value": 420.02319999999816,
                 "units": "kW"
             },
             "Qc": {
@@ -174,22 +174,22 @@
                 "units": "kW"
             },
             "Qr": {
-                "value": 49279.4592000351,
+                "value": 48859.4360000351,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 100.00000000007121,
+                "value": 99.14767084139409,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 13728740894.399998,
+                "value": 896756.4352058258,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
+                        "value": 420.0232000350958,
                         "units": "kW"
                     }
                 }

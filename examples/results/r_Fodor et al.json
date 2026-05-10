@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Fodor et al/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 54.8,
@@ -93,15 +93,15 @@
                 "units": "kW"
             },
             "Qr": {
-                "value": 3972.468,
+                "value": 3972.4680000000017,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 94.71246280613411,
+                "value": 94.71246280613417,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 17672445390.4,
+                "value": 17672445390.399998,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -165,15 +165,15 @@
                 "units": "kW"
             },
             "Qr": {
-                "value": 4662.887100000003,
+                "value": 4662.887100000001,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 68.08362343188148,
+                "value": 68.08362343188146,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 40840835228.08005,
+                "value": 40840835228.08003,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -194,7 +194,7 @@
                 {
                     "name": "HW",
                     "heat_flow": {
-                        "value": 5007.965500000003,
+                        "value": 5007.965499999999,
                         "units": "kW"
                     }
                 }
@@ -245,7 +245,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 66816096861.60001,
+                "value": 66816096861.600006,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -289,14 +289,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Fodor et al/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 53.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 53.0,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -317,7 +317,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 125329377480.08006,
+                "value": 125329377480.08003,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -338,7 +338,7 @@
                 {
                     "name": "HW",
                     "heat_flow": {
-                        "value": 14790.477500000005,
+                        "value": 14790.4775,
                         "units": "kW"
                     }
                 }
@@ -361,7 +361,7 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Fodor et al/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 25.0,
@@ -389,7 +389,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 125329377480.08005,
+                "value": 125329377480.08002,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -410,7 +410,7 @@
                 {
                     "name": "HW",
                     "heat_flow": {
-                        "value": 14790.477500000005,
+                        "value": 14790.4775,
                         "units": "kW"
                     }
                 }

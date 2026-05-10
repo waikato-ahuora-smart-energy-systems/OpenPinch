@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Liu et al/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 615.0,
@@ -17,11 +17,11 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 1982199.9999999998,
+                "value": 1982.2000000000007,
                 "units": "kW"
             },
             "Qr": {
-                "value": 172800.00000000023,
+                "value": 172.80000000000018,
                 "units": "kW"
             },
             "degree_of_integration": {
@@ -29,7 +29,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1114017550604.0762,
+                "value": 493567.8000000002,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -66,28 +66,35 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 415615.4634920634,
+                        "value": 415.6154634920635,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 528621.8974463197,
+                        "value": 528.6218974463197,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 633831.193447582,
+                        "value": 633.8311934475819,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 404131.4456140347,
+                        "value": 337.7314456140359,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "Freezer",
+                    "heat_flow": {
+                        "value": 66.40000000000009,
                         "units": "kW"
                     }
                 }
@@ -106,7 +113,7 @@
                 }
             },
             "Qh": {
-                "value": 172800.0,
+                "value": 172.8,
                 "units": "kW"
             },
             "Qc": {
@@ -122,7 +129,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 43027200.0,
+                "value": 43027.200000000004,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -143,14 +150,14 @@
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 26800.0,
+                        "value": 26.80000000000001,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 146000.0,
+                        "value": 146.0,
                         "units": "kW"
                     }
                 }
@@ -178,7 +185,14 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "Freezer",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -203,7 +217,7 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 645400.0,
+                "value": 645.4,
                 "units": "kW"
             },
             "Qr": {
@@ -215,7 +229,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 160704600.0,
+                "value": 160704.6,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -259,19 +273,26 @@
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 146828.49999999985,
+                        "value": 146.82849999999988,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 498571.5000000001,
+                        "value": 498.5715000000001,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "Freezer",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -296,7 +317,7 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 885600.0000000001,
+                "value": 885.6000000000001,
                 "units": "kW"
             },
             "Qr": {
@@ -308,7 +329,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 136812022585.81079,
+                "value": 220514.40000000008,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -345,28 +366,35 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 415615.4634920634,
+                        "value": 415.6154634920635,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 363688.2250325267,
+                        "value": 363.68822503252676,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 56723.13252804149,
+                        "value": 56.72313252804145,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 49573.17894736851,
+                        "value": 49.57317894736843,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "Freezer",
+                    "heat_flow": {
+                        "value": 0.0,
                         "units": "kW"
                     }
                 }
@@ -389,7 +417,7 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 624000.0,
+                "value": 623.9999999999999,
                 "units": "kW"
             },
             "Qr": {
@@ -401,7 +429,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1453212503418.267,
+                "value": 155376.0,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -445,44 +473,51 @@
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 18105.1724137931,
+                        "value": 18.105172413793102,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 78536.56091954019,
+                        "value": 78.5365609195402,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 527358.2666666667,
+                        "value": 460.95826666666665,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "Freezer",
+                    "heat_flow": {
+                        "value": 66.39999999999998,
                         "units": "kW"
                     }
                 }
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Liu et al/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 315.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 315.0,
+                    "value": null,
                     "units": "degC"
                 }
             },
             "Qh": {
-                "value": 172800.0,
+                "value": 172.8,
                 "units": "kW"
             },
             "Qc": {
-                "value": 2155000.0,
+                "value": 2155.0,
                 "units": "kW"
             },
             "Qr": {
@@ -494,7 +529,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1590228257804.078,
+                "value": 579622.2000000001,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -515,14 +550,14 @@
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 26800.0,
+                        "value": 26.80000000000001,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 146000.0,
+                        "value": 146.0,
                         "units": "kW"
                     }
                 }
@@ -531,35 +566,42 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 415615.4634920634,
+                        "value": 415.6154634920635,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 528621.8974463197,
+                        "value": 528.6218974463197,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 633831.1934475818,
+                        "value": 633.8311934475818,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 576931.4456140352,
+                        "value": 510.5314456140351,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "Freezer",
+                    "heat_flow": {
+                        "value": 66.39999999999998,
                         "units": "kW"
                     }
                 }
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Liu et al/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 450.0,
@@ -575,19 +617,19 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 1982200.0,
+                "value": 1982.2000000000003,
                 "units": "kW"
             },
             "Qr": {
-                "value": 172800.0,
+                "value": 172.8,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 100.0,
+                "value": 100.00000000000003,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1590142203404.0776,
+                "value": 493567.80000000005,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -624,28 +666,35 @@
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 415615.4634920634,
+                        "value": 415.6154634920635,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "MPS",
                     "heat_flow": {
-                        "value": 501821.8974463197,
+                        "value": 501.8218974463197,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "LPS",
                     "heat_flow": {
-                        "value": 487831.19344758184,
+                        "value": 487.83119344758177,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 576931.4456140352,
+                        "value": 510.5314456140351,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "Freezer",
+                    "heat_flow": {
+                        "value": 66.39999999999998,
                         "units": "kW"
                     }
                 }

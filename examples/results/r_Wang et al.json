@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Wang et al/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 122.35,
@@ -13,11 +13,11 @@
                 }
             },
             "Qh": {
-                "value": 1721.6666666666638,
+                "value": 1721.6666666666633,
                 "units": "kW"
             },
             "Qc": {
-                "value": 6221.666666666666,
+                "value": 6221.666666666667,
                 "units": "kW"
             },
             "Qr": {
@@ -29,21 +29,14 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 21888649333.33332,
+                "value": 21888649333.33333,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
-                {
-                    "name": "HU",
-                    "heat_flow": {
-                        "value": 1721.6666666666638,
+                        "value": 1721.6666666666642,
                         "units": "kW"
                     }
                 }
@@ -52,7 +45,7 @@
                 {
                     "name": "CU",
                     "heat_flow": {
-                        "value": 6221.666666666666,
+                        "value": 6221.666666666667,
                         "units": "kW"
                     }
                 }
@@ -91,13 +84,6 @@
                 "units": "$/y"
             },
             "hot_utilities": [
-                {
-                    "name": "HU",
-                    "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
                 {
                     "name": "HU",
                     "heat_flow": {
@@ -152,13 +138,6 @@
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
-                {
-                    "name": "HU",
-                    "heat_flow": {
                         "value": 12000.000000000002,
                         "units": "kW"
                     }
@@ -210,13 +189,6 @@
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
-                {
-                    "name": "HU",
-                    "heat_flow": {
                         "value": 6499.999999999999,
                         "units": "kW"
                     }
@@ -233,14 +205,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Wang et al/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 62.35,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 62.35,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -268,13 +240,6 @@
                 {
                     "name": "HU",
                     "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
-                {
-                    "name": "HU",
-                    "heat_flow": {
                         "value": 18500.0,
                         "units": "kW"
                     }
@@ -291,14 +256,14 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Wang et al/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 30.0,
+                    "value": 20.0,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 130.0,
+                    "value": 150.0,
                     "units": "degC"
                 }
             },
@@ -323,13 +288,6 @@
                 "units": "$/y"
             },
             "hot_utilities": [
-                {
-                    "name": "HU",
-                    "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
                 {
                     "name": "HU",
                     "heat_flow": {

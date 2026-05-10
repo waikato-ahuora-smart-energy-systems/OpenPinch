@@ -296,7 +296,7 @@
                 "units": "degC"
             },
             "t_target": {
-                "value": 130.0,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
@@ -318,7 +318,7 @@
                 "units": "degC"
             },
             "t_target": {
-                "value": 30.0,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {

@@ -296,16 +296,16 @@
                 "units": "degC"
             },
             "t_target": {
-                "value": 353.85,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
                 "value": 5.0,
                 "units": "degC"
             },
-            "price": null,
+            "price": 20,
             "htc": {
-                "value": 2.5,
+                "value": null,
                 "units": "kW/m^2/degC"
             },
             "heat_flow": null
@@ -325,9 +325,9 @@
                 "value": 5.0,
                 "units": "degC"
             },
-            "price": null,
+            "price": 20,
             "htc": {
-                "value": 1.0,
+                "value": null,
                 "units": "kW/m^2/degC"
             },
             "heat_flow": null

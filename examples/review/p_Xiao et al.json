@@ -1,7 +1,7 @@
 {
     "streams": [
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H1",
             "t_supply": {
                 "value": 180.0,
@@ -27,7 +27,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H2",
             "t_supply": {
                 "value": 280.0,
@@ -53,7 +53,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H3",
             "t_supply": {
                 "value": 180.0,
@@ -79,7 +79,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H4",
             "t_supply": {
                 "value": 140.0,
@@ -105,7 +105,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H5",
             "t_supply": {
                 "value": 220.0,
@@ -131,7 +131,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H6",
             "t_supply": {
                 "value": 180.0,
@@ -157,7 +157,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H7",
             "t_supply": {
                 "value": 170.0,
@@ -183,7 +183,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H8",
             "t_supply": {
                 "value": 180.0,
@@ -209,7 +209,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H9",
             "t_supply": {
                 "value": 280.0,
@@ -235,7 +235,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "H10",
             "t_supply": {
                 "value": 180.0,
@@ -261,7 +261,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C1",
             "t_supply": {
                 "value": 40.0,
@@ -287,7 +287,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C2",
             "t_supply": {
                 "value": 120.0,
@@ -313,7 +313,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C3",
             "t_supply": {
                 "value": 40.0,
@@ -339,7 +339,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C4",
             "t_supply": {
                 "value": 50.0,
@@ -365,7 +365,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C5",
             "t_supply": {
                 "value": 50.0,
@@ -391,7 +391,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C6",
             "t_supply": {
                 "value": 40.0,
@@ -417,7 +417,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C7",
             "t_supply": {
                 "value": 40.0,
@@ -443,7 +443,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C8",
             "t_supply": {
                 "value": 120.0,
@@ -469,7 +469,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C9",
             "t_supply": {
                 "value": 40.0,
@@ -495,7 +495,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Process",
             "name": "C10",
             "t_supply": {
                 "value": 60.0,
@@ -530,7 +530,7 @@
                 "units": "degC"
             },
             "t_target": {
-                "value": 324.0,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
@@ -548,11 +548,11 @@
             "name": "CU",
             "type": "Cold",
             "t_supply": {
-                "value": null,
+                "value": 40.0,
                 "units": "degC"
             },
             "t_target": {
-                "value": 40.0,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
@@ -562,6 +562,28 @@
             "price": null,
             "htc": {
                 "value": 2.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "FRZ",
+            "type": "Cold",
+            "t_supply": {
+                "value": -60.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": null,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
                 "units": "kW/m^2/degC"
             },
             "heat_flow": null
