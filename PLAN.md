@@ -4,6 +4,11 @@ This file captures the highest-value cleanup and maintenance work identified
 from a repo scan on 2026-05-10. The ranking favors user-visible correctness
 issues first, then API safety, then architectural and documentation cleanup.
 
+## Dedicated Plans
+
+- Read the Docs overhaul backlog:
+  - `RTD_OVERHAUL_PLAN.md`
+
 ## Ranked TODOs
 
 ### 4. Decide the fate of unfinished analysis subsystems
@@ -38,4 +43,3 @@ needs to be.
 - Recommended action: review the minimum supported Python version, split
   optional features into extras where practical, and clean up duplicated dev
   dependencies.
-
