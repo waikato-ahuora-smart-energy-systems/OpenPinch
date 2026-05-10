@@ -7,6 +7,7 @@ advanced routines such as heat pump and cost targeting.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import List
 
 from .enums import BB_Minimiser, HPRcycle, TurbineModel, ZT
@@ -102,27 +103,96 @@ class Configuration:
     SERV_LIFE: float = 20  # years
 
     ### Turbine parameters ###
-    TURB_T_IN: float = 450 # degC
-    TURB_P_IN: float = 90 # bar
-    MIN_EFF: float = 0.1 # minimum isentropic efficiency
+    TURB_T_IN: float = 450  # degC
+    TURB_P_IN: float = 90  # bar
+    MIN_EFF: float = 0.1  # minimum isentropic efficiency
     LOAD_FRACTION: float = 1
     ETA_MECH: float = 1
     TURB_MODEL: str = TurbineModel.MEDINA_FLORES.value
-    HP_CONDESATE: bool = False
+    IS_HIGH_P_COND_FLASH: bool = False
+
+    _LEGACY_OPTION_GATEWAYS = {"main", "turbine"}
+    _RENAMED_OPTIONS = {
+        "HP_CONDESATE": "IS_HIGH_P_COND_FLASH",
+        "IS_HP_CONDESATE": "IS_HIGH_P_COND_FLASH",
+        "IS_HP_CONDENSATE": "IS_HIGH_P_COND_FLASH",
+        "CONDENSATE_FLASH_CORRECTION": "IS_HIGH_P_COND_FLASH",
+    }
 
     def __init__(
         self,
-        options: dict = None,
+        options: dict | None = None,
         top_zone_name: str = "Site",
         top_zone_identifier: str = ZT.S.value,
     ):
         """Initialise defaults and optionally apply user-provided options."""
+        for key in type(self).__annotations__:
+            if key.startswith("_"):
+                continue
+            setattr(self, key, deepcopy(getattr(type(self), key)))
+
         self.TOP_ZONE_NAME = top_zone_name
         self.TOP_ZONE_IDENTIFIER = top_zone_identifier
-        if isinstance(options, dict):
-            for key in options.keys():
-                if key != "REFRIGERANTS":
-                    setattr(self, key, options[key])
-                else:
-                    ref_ls = options[key].replace(";", ",").split(",")
-                    setattr(self, key, ref_ls)
+
+        if options is None:
+            return
+
+        if not isinstance(options, dict):
+            raise TypeError("Configuration options must be provided as a dict.")
+
+        for key, value in self._validate_option_keys(options).items():
+            if key == "REFRIGERANTS":
+                ref_ls = (
+                    value.replace(";", ",").split(",")
+                    if isinstance(value, str)
+                    else list(value)
+                )
+                setattr(self, key, ref_ls)
+                continue
+            setattr(self, key, value)
+
+    @classmethod
+    def _known_option_keys(cls) -> set[str]:
+        """Return the supported configuration keys accepted by ``options``."""
+        return {
+            key
+            for key in cls.__annotations__
+            if not key.startswith("_")
+        }
+
+    @classmethod
+    def _validate_option_keys(cls, options: dict) -> dict:
+        """Fail fast on unsupported workbook gateways and unknown option names."""
+        legacy_gateways = sorted(
+            key
+            for key in options
+            if key in cls._LEGACY_OPTION_GATEWAYS or str(key).startswith("PROP_TOP_")
+        )
+        if legacy_gateways:
+            raise ValueError(
+                "Legacy workbook option gateways are no longer supported: "
+                f"{', '.join(legacy_gateways)}. Set canonical turbine fields directly "
+                "on zone.config or pass them through Configuration(options=...), e.g. "
+                "TURB_T_IN, TURB_P_IN, MIN_EFF, LOAD_FRACTION, ETA_MECH, TURB_MODEL, "
+                "and IS_HIGH_P_COND_FLASH."
+            )
+
+        renamed_keys = sorted(key for key in options if key in cls._RENAMED_OPTIONS)
+        if renamed_keys:
+            rename_map = ", ".join(
+                f"{key} -> {cls._RENAMED_OPTIONS[key]}" for key in renamed_keys
+            )
+            raise ValueError(
+                "Unsupported configuration option name(s): "
+                f"{rename_map}. Use the canonical zone.config field names instead."
+            )
+
+        known_keys = cls._known_option_keys()
+        unknown_keys = sorted(key for key in options if key not in known_keys)
+        if unknown_keys:
+            raise ValueError(
+                "Unknown configuration option(s): "
+                f"{', '.join(unknown_keys)}."
+            )
+
+        return options

@@ -1135,6 +1135,45 @@ def test_invalid_config_missing_op_time(dummy_config):
     assert out_config.ANNUAL_OP_TIME > 0
 
 
+def test_turbine_pressure_is_clamped_using_canonical_config_fields(dummy_config):
+    dummy_config.DO_TURBINE_WORK = True
+    dummy_config.TURB_P_IN = 250.0
+
+    out_config = _validate_config_data_completed(dummy_config)
+
+    assert out_config.TURB_P_IN == 200
+
+
+def test_prepare_problem_preserves_passed_configuration_object(dummy_streams):
+    cfg = Configuration(
+        options={
+            "DO_TURBINE_WORK": True,
+            "TURB_P_IN": 12.0,
+            "TURB_T_IN": 375.0,
+            "IS_HIGH_P_COND_FLASH": True,
+        }
+    )
+
+    site = prepare_problem(streams=dummy_streams, options=cfg)
+
+    assert site.config is not cfg
+    assert site.config.DO_TURBINE_WORK is True
+    assert site.config.TURB_P_IN == 12.0
+    assert site.config.TURB_T_IN == 375.0
+    assert site.config.IS_HIGH_P_COND_FLASH is True
+
+
+def test_prepare_problem_rejects_legacy_turbine_option_gateway(dummy_streams):
+    with pytest.raises(
+        ValueError,
+        match="Legacy workbook option gateways are no longer supported",
+    ):
+        prepare_problem(
+            streams=dummy_streams,
+            options={"turbine": [{"key": "PROP_TOP_0", "value": 450.0}]},
+        )
+
+
 @pytest.mark.parametrize(
     "zone_type_str, expected_zone_type",
     [

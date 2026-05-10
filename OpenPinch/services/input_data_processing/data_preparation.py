@@ -30,7 +30,7 @@ __all__ = ["prepare_problem"]
 def prepare_problem(
     streams: Optional[List[StreamSchema]] = None,
     utilities: Optional[List[UtilitySchema]] = None,
-    options: Optional[Configuration] = None,
+    options: Optional[Configuration | dict] = None,
     project_name: str = "Site",
     zone_tree: ZoneTreeSchema = None,
 ) -> Zone:
@@ -45,8 +45,8 @@ def prepare_problem(
         Iterable of :class:`OpenPinch.lib.schemas.io.UtilitySchema` describing candidate hot
         and cold utilities.
     options:
-        Optional :class:`OpenPinch.lib.config.Configuration` overrides.  When omitted the
-        defaults from ``Configuration()`` are used.
+        Optional :class:`OpenPinch.lib.config.Configuration` instance or canonical option
+        dictionary. When omitted the defaults from ``Configuration()`` are used.
     project_name:
         Human-friendly label applied to the root zone when no explicit zone tree is supplied.
     zone_tree:
@@ -64,7 +64,7 @@ def prepare_problem(
     top_zone_name, top_zone_identifier = _get_validated_zone_info(
         zone_tree, project_name
     )
-    zone_config = Configuration(
+    zone_config = _build_zone_config(
         options=options,
         top_zone_name=top_zone_name,
         top_zone_identifier=top_zone_identifier,
@@ -91,6 +91,35 @@ def prepare_problem(
 #######################################################################################################
 # Helper Functions
 #######################################################################################################
+
+
+def _build_zone_config(
+    *,
+    options: Configuration | dict | None,
+    top_zone_name: str,
+    top_zone_identifier: str,
+) -> Configuration:
+    """Construct a zone config without discarding caller-provided settings."""
+    if options is None:
+        return Configuration(
+            top_zone_name=top_zone_name,
+            top_zone_identifier=top_zone_identifier,
+        )
+
+    if isinstance(options, Configuration):
+        zone_config = copy.deepcopy(options)
+        zone_config.TOP_ZONE_NAME = top_zone_name
+        zone_config.TOP_ZONE_IDENTIFIER = top_zone_identifier
+        return zone_config
+
+    if isinstance(options, dict):
+        return Configuration(
+            options=options,
+            top_zone_name=top_zone_name,
+            top_zone_identifier=top_zone_identifier,
+        )
+
+    raise TypeError("options must be a Configuration, dict, or None.")
 
 
 def _get_validated_zone_info(
@@ -717,8 +746,8 @@ def _validate_config_data_completed(zone_config: Configuration) -> Configuration
         zone_config.ANNUAL_OP_TIME = 365 * 24  # h/y
     # Ensures the inlet pressure to the turbine is below the critical pressure
     # TODO: Add units to the turbine pressure
-    if zone_config.DO_TURBINE_WORK and zone_config.P_TURBINE_BOX > 220:
-        zone_config.P_TURBINE_BOX = 200
+    if zone_config.DO_TURBINE_WORK and zone_config.TURB_P_IN > 220:
+        zone_config.TURB_P_IN = 200
     if zone_config.DT_PHASE_CHANGE <= 0:
         zone_config.DT_PHASE_CHANGE = 0.01
     if zone_config.DT_CONT < 0:

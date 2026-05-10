@@ -41,7 +41,7 @@ class TurbineSolveResult(BaseModel):
     load_frac: float
     mech_eff: float
     min_eff: float
-    flash_correction: bool
+    is_high_p_cond_flash: bool
     total_work: float
     total_isentropic_work: float
     overall_efficiency: float

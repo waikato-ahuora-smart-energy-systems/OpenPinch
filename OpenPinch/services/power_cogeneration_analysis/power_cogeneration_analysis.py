@@ -40,7 +40,7 @@ def get_power_cogeneration_above_pinch(z: Zone):
         min_eff=turbine_params["min_eff"],
         load_frac=turbine_params["load_frac"],
         mech_eff=turbine_params["mech_eff"],
-        flash_correction=turbine_params["flash_correction"],
+        is_high_p_cond_flash=turbine_params["is_high_p_cond_flash"],
     )
 
     z.work_target = total_work
@@ -70,22 +70,20 @@ def get_power_cogeneration_below_pinch(
         min_eff=turbine_params["min_eff"],
         load_frac=turbine_params["load_frac"],
         mech_eff=turbine_params["mech_eff"],
-        flash_correction=turbine_params["flash_correction"],
+        is_high_p_cond_flash=turbine_params["is_high_p_cond_flash"],
     )
 
 
 def _prepare_turbine_parameters(zone_config: Configuration) -> dict:
     """Load and sanitize turbine parameters from ``zone_config``."""
     return {
-        "P_in": float(zone_config.P_TURBINE_BOX),
-        "T_in": float(zone_config.T_TURBINE_BOX),
+        "P_in": float(zone_config.TURB_P_IN),
+        "T_in": float(zone_config.TURB_T_IN),
         "min_eff": float(zone_config.MIN_EFF),
-        "model": zone_config.COMBOBOX,
-        "load_frac": min(max(float(zone_config.LOAD), 0.0), 1.0),
-        "mech_eff": min(max(float(zone_config.MECH_EFF), 0.0), 1.0),
-        "flash_correction": bool(
-            getattr(zone_config, "CONDESATE_FLASH_CORRECTION", False)
-        ),
+        "model": zone_config.TURB_MODEL,
+        "load_frac": min(max(float(zone_config.LOAD_FRACTION), 0.0), 1.0),
+        "mech_eff": min(max(float(zone_config.ETA_MECH), 0.0), 1.0),
+        "is_high_p_cond_flash": bool(zone_config.IS_HIGH_P_COND_FLASH),
     }
 
 

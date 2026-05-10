@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 import OpenPinch.classes.multi_stage_steam_turbine as turbine_mod
+from OpenPinch.lib.config import Configuration
 from OpenPinch.services.power_cogeneration_analysis import (
     power_cogeneration_analysis as pca,
 )
@@ -20,20 +21,23 @@ def _make_zone_config(
     model: str = "Fixed Isentropic Turbine",
     load: float = 0.8,
     mech_eff: float = 0.9,
+    is_high_p_cond_flash: bool = False,
 ):
-    return SimpleNamespace(
-        P_TURBINE_BOX=20.0,
-        T_TURBINE_BOX=300.0,
-        MIN_EFF=0.5,
-        COMBOBOX=model,
-        LOAD=load,
-        MECH_EFF=mech_eff,
-        CONDESATE_FLASH_CORRECTION=False,
-        T_ENV=15.0,
+    return Configuration(
+        options={
+            "TURB_P_IN": 20.0,
+            "TURB_T_IN": 300.0,
+            "MIN_EFF": 0.5,
+            "TURB_MODEL": model,
+            "LOAD_FRACTION": load,
+            "ETA_MECH": mech_eff,
+            "IS_HIGH_P_COND_FLASH": is_high_p_cond_flash,
+            "T_ENV": 15.0,
+        }
     )
 
 
-def _make_zone(config: SimpleNamespace, utilities: StreamCollection | None = None):
+def _make_zone(config: Configuration, utilities: StreamCollection | None = None):
     return SimpleNamespace(
         config=config,
         hot_utilities=utilities or StreamCollection(),
@@ -82,6 +86,28 @@ def test_prepare_turbine_parameters_clamps_inputs():
     assert params["load_frac"] == 1.0
     assert params["mech_eff"] == 0.0
     assert params["model"] == "Fixed Isentropic Turbine"
+
+
+def test_prepare_turbine_parameters_reads_canonical_config_fields():
+    cfg = _make_zone_config(
+        model="Medina-Flores et al. (2010)",
+        load=0.6,
+        mech_eff=0.85,
+        is_high_p_cond_flash=True,
+    )
+    cfg.TURB_P_IN = 42.0
+    cfg.TURB_T_IN = 365.0
+    params = pca._prepare_turbine_parameters(cfg)
+
+    assert params == {
+        "P_in": 42.0,
+        "T_in": 365.0,
+        "min_eff": 0.5,
+        "model": "Medina-Flores et al. (2010)",
+        "load_frac": 0.6,
+        "mech_eff": 0.85,
+        "is_high_p_cond_flash": True,
+    }
 
 
 def test_preprocess_utilities_returns_none_when_no_viable_hot_utility(monkeypatch):

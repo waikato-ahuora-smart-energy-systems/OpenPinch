@@ -20,7 +20,7 @@ from OpenPinch.resources import copy_sample_case
 def sample_problem():
     """Return sample problem data used by this test module."""
     return {
-        "options": {"dt_min": 10},
+        "options": {"DT_CONT": 10},
         "streams": [
             {
                 "zone": "Z1",

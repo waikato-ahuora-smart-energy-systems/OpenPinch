@@ -280,19 +280,16 @@ def set_options():
     Create and set default options.
     """
     return {
-        "main": [],
-        "turbine": [
-            {"key": "PROP_TOP_0", "value": 450},
-            {"key": "PROP_TOP_1", "value": 90},
-            {"key": "PROP_TOP_2", "value": 0.1},
-            {"key": "PROP_TOP_3", "value": 100},
-            {"key": "PROP_TOP_4", "value": 1},
-            {"key": "PROP_TOP_5", "value": 1},
-            {"key": "PROP_TOP_6", "value": "Medina-Flores et al. (2010)"},
-            {"key": "PROP_TOP_7", "value": True},
-            {"key": "PROP_TOP_8", "value": False},
-            {"key": "PROP_TOP_9", "value": False},
-        ],
+        "TURB_T_IN": 450,
+        "TURB_P_IN": 90,
+        "MIN_EFF": 0.1,
+        "ELE_PRICE": 100,
+        "LOAD_FRACTION": 1,
+        "ETA_MECH": 1,
+        "TURB_MODEL": "Medina-Flores et al. (2010)",
+        "DO_TURBINE_TARGETING": True,
+        "DO_TURBINE_WORK": False,
+        "IS_HIGH_P_COND_FLASH": False,
     }
 
 
