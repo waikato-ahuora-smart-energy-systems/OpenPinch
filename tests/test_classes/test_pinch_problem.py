@@ -9,10 +9,8 @@ from pathlib import Path
 import pytest
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.enums import TT, HPRcycle
-from OpenPinch.lib.schemas.io import HeatPumpIntegrationComparison
+from OpenPinch.lib.enums import TT
 from OpenPinch.resources import copy_sample_case
 
 
@@ -379,96 +377,6 @@ def test_init_accepts_problem_filepath_and_run(monkeypatch, tmp_path: Path):
 
     assert called["load"] == case_path
     assert called["run"] == 1
-
-
-def test_evaluate_heat_pump_integration_builds_integrated_problem(monkeypatch):
-    class _Payload:
-        def model_dump(self, mode="python"):
-            return {"streams": [], "utilities": []}
-
-    target = type("Target", (), {"name": "Plant/Direct Integration"})()
-    zone = type(
-        "ZoneStub",
-        (),
-        {
-            "name": "Plant",
-            "address": "Site/Plant",
-            "targets": {TT.DI.value: target},
-        },
-    )()
-
-    comparison_frame = __import__("pandas").DataFrame(
-        [
-            {
-                "Target": "Plant/Direct Integration",
-                "Hot Utility Target": 750.0,
-                "Cold Utility Target": 1000.0,
-                "Heat Recovery": 5150.0,
-                "Hot Pinch": None,
-                "Cold Pinch": 145.0,
-            },
-            {
-                "Target": "Plant/Direct Integration",
-                "Hot Utility Target": 500.0,
-                "Cold Utility Target": 850.0,
-                "Heat Recovery": 5800.0,
-                "Hot Pinch": None,
-                "Cold Pinch": 170.0,
-            },
-            {
-                "Target": "Plant/Direct Integration",
-                "Hot Utility Target": -250.0,
-                "Cold Utility Target": -150.0,
-                "Heat Recovery": 650.0,
-                "Hot Pinch": None,
-                "Cold Pinch": 25.0,
-            },
-        ],
-        index=["Base case", "Integrated scenario", "Change"],
-    )
-
-    def fake_load(self, source=None):
-        self._problem_data = source
-        return zone
-
-    monkeypatch.setattr(PinchProblem, "load", fake_load)
-    monkeypatch.setattr(PinchProblem, "run", lambda self: {"ok": True})
-    monkeypatch.setattr(PinchProblem, "validate", lambda self: _Payload())
-    monkeypatch.setattr(
-        PinchProblem,
-        "_resolve_target_zone",
-        lambda self, application_zone=None: zone,
-    )
-    monkeypatch.setattr(
-        PinchProblem,
-        "compare_to",
-        lambda self, other_problem, **kwargs: comparison_frame,
-    )
-
-    obj = PinchProblem()
-    obj._problem_data = {"streams": [], "utilities": []}
-
-    evaluation = obj.evaluate_heat_pump_integration(
-        {
-            "zone": "Plant",
-            "condenser_temperature": 170.0,
-            "condenser_duty": 500.0,
-            "evaporator_temperature": 90.0,
-            "evaporator_duty": 400.0,
-        }
-    )
-
-    integrated_streams = evaluation.integrated_problem.problem_data["streams"]
-
-    assert isinstance(evaluation.comparison, HeatPumpIntegrationComparison)
-    assert integrated_streams[-2]["name"] == "HP Condenser"
-    assert integrated_streams[-1]["name"] == "HP Evaporator"
-    assert evaluation.comparison.approximate_power == 100.0
-    assert list(evaluation.comparison_frame.index) == [
-        "Base case",
-        "Integrated scenario",
-        "Change",
-    ]
 
 
 def test_target_accessor_supports_named_workflow(monkeypatch):

@@ -11,8 +11,6 @@ from .turbine import *
 __all__ = [
     "DataPoint",
     "GetInputOutputData",
-    "HeatPumpIntegrationComparison",
-    "HeatPumpIntegrationComparisonRow",
     "Graph",
     "GraphSet",
     "HPRMetric",

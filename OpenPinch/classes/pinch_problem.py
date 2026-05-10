@@ -18,9 +18,6 @@ from pydantic import ValidationError
 
 from ..lib.enums import GT, ST, TT
 from ..lib.schemas.io import (
-    HeatPumpIntegrationComparison,
-    HeatPumpIntegrationComparisonRow,
-    HeatPumpIntegrationScenario,
     TargetInput,
     TargetOutput,
 )
@@ -64,16 +61,6 @@ JsonDict = Dict[str, Any]
 PathLike = Union[str, Path]
 GraphPayload = Dict[str, Dict[str, Any]]
 ZoneService = Callable[["Zone"], "Zone"]
-
-
-@dataclass
-class HeatPumpIntegrationEvaluation:
-    """Bundle returned by :meth:`PinchProblem.evaluate_heat_pump_integration`."""
-
-    scenario: HeatPumpIntegrationScenario
-    integrated_problem: "PinchProblem"
-    comparison: HeatPumpIntegrationComparison
-    comparison_frame: pd.DataFrame
 
 
 _GRAPH_TYPE_ALIASES = {
@@ -819,71 +806,6 @@ class PinchProblem:
         comparison.loc["Change", "Target"] = str(base_row["Target"])
         return comparison
 
-    def evaluate_heat_pump_integration(
-        self,
-        scenario: HeatPumpIntegrationScenario | dict[str, Any],
-        *,
-        target_name: Optional[str] = None,
-    ) -> HeatPumpIntegrationEvaluation:
-        """Screen a candidate integrated condenser/evaporator scenario.
-
-        The scenario is represented as two additional process streams:
-
-        - a hot condenser stream delivering ``condenser_duty`` at
-          ``condenser_temperature``
-        - a cold evaporator stream removing ``evaporator_duty`` at
-          ``evaporator_temperature``
-
-        The method returns both the solved integrated problem and a structured
-        before/after comparison against the current base case.
-        """
-        scenario_model = HeatPumpIntegrationScenario.model_validate(scenario)
-        if scenario_model.dt_phase_change <= 0.0:
-            raise ValueError("dt_phase_change must be positive.")
-        if scenario_model.condenser_duty <= 0.0:
-            raise ValueError("condenser_duty must be positive.")
-        if scenario_model.evaporator_duty <= 0.0:
-            raise ValueError("evaporator_duty must be positive.")
-
-        self.run()
-        target_zone = self._resolve_target_zone(scenario_model.zone)
-        default_target = target_zone.targets.get(TT.DI.value)
-        resolved_target_name = target_name or (
-            default_target.name
-            if default_target is not None
-            else f"{target_zone.name}/{TT.DI.value}"
-        )
-
-        payload = deepcopy(self.validate().model_dump(mode="python"))
-        payload.setdefault("streams", []).extend(
-            _build_heat_pump_integration_stream_payloads(
-                zone_name=target_zone.address,
-                scenario=scenario_model,
-            )
-        )
-
-        integrated_problem = PinchProblem(
-            source=payload,
-            project_name=self.project_name,
-        )
-        integrated_problem.run()
-        comparison_frame = self.compare_to(
-            integrated_problem,
-            target_name=resolved_target_name,
-            other_label="Integrated scenario",
-        )
-        comparison = _build_heat_pump_integration_comparison(
-            comparison_frame=comparison_frame,
-            scenario=scenario_model,
-            target_name=str(comparison_frame.iloc[0]["Target"]),
-        )
-        return HeatPumpIntegrationEvaluation(
-            scenario=scenario_model,
-            integrated_problem=integrated_problem,
-            comparison=comparison,
-            comparison_frame=comparison_frame,
-        )
-
     def _data_preprocessing(self) -> "Zone":
         if isinstance(self._validated_data, TargetInput) and isinstance(
             self._project_name, str
@@ -1237,68 +1159,6 @@ def _format_utility(name: str, heat_flow) -> str:
     if value is None:
         return f"{name}: n/a"
     return f"{name}: {value:.2f}"
-
-
-def _optional_float(value: Any) -> Optional[float]:
-    if value is None or pd.isna(value):
-        return None
-    return float(value)
-
-
-def _build_heat_pump_integration_stream_payloads(
-    *,
-    zone_name: str,
-    scenario: HeatPumpIntegrationScenario,
-) -> list[dict[str, Any]]:
-    dt_phase_change = float(scenario.dt_phase_change)
-    return [
-        {
-            "zone": zone_name,
-            "name": scenario.condenser_name,
-            "t_supply": float(scenario.condenser_temperature),
-            "t_target": float(scenario.condenser_temperature) - dt_phase_change,
-            "heat_flow": float(scenario.condenser_duty),
-            "dt_cont": float(scenario.dt_cont),
-            "htc": float(scenario.htc),
-            "active": True,
-        },
-        {
-            "zone": zone_name,
-            "name": scenario.evaporator_name,
-            "t_supply": float(scenario.evaporator_temperature) - dt_phase_change,
-            "t_target": float(scenario.evaporator_temperature),
-            "heat_flow": float(scenario.evaporator_duty),
-            "dt_cont": float(scenario.dt_cont),
-            "htc": float(scenario.htc),
-            "active": True,
-        },
-    ]
-
-
-def _build_heat_pump_integration_comparison(
-    *,
-    comparison_frame: pd.DataFrame,
-    scenario: HeatPumpIntegrationScenario,
-    target_name: str,
-) -> HeatPumpIntegrationComparison:
-    rows = [
-        HeatPumpIntegrationComparisonRow(
-            label=str(label),
-            target=str(row["Target"]),
-            hot_utility_target=_optional_float(row.get("Hot Utility Target")),
-            cold_utility_target=_optional_float(row.get("Cold Utility Target")),
-            heat_recovery=_optional_float(row.get("Heat Recovery")),
-            hot_pinch=_optional_float(row.get("Hot Pinch")),
-            cold_pinch=_optional_float(row.get("Cold Pinch")),
-        )
-        for label, row in comparison_frame.iterrows()
-    ]
-    return HeatPumpIntegrationComparison(
-        scenario=scenario,
-        target_name=target_name,
-        approximate_power=float(scenario.condenser_duty - scenario.evaporator_duty),
-        rows=rows,
-    )
 
 
 def _locate_summary_row(
