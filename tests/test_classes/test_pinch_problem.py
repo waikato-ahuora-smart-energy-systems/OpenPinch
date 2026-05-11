@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from OpenPinch.classes.pinch_problem import PinchProblem
+from OpenPinch.classes.accessors.plot_accessor import _PlotAccessor
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.enums import TT
 from OpenPinch.resources import copy_sample_case
@@ -350,33 +351,21 @@ def test_render_streamlit_dashboard_requires_available_zone():
         obj.render_streamlit_dashboard()
 
 
-def test_run_is_alias_for_target(monkeypatch):
-    monkeypatch.setattr(PinchProblem, "target", lambda self: {"ok": True})
-    obj = PinchProblem()
-    assert obj.run() == {"ok": True}
-
-
 def test_init_accepts_problem_filepath_and_run(monkeypatch, tmp_path: Path):
-    called = {"load": None, "run": 0}
+    called = {"load": None}
 
     def fake_load(self, source=None):
         called["load"] = source
         return {"zone": "ok"}
 
-    def fake_run(self):
-        called["run"] += 1
-        return {"ok": True}
-
     monkeypatch.setattr(PinchProblem, "load", fake_load)
-    monkeypatch.setattr(PinchProblem, "run", fake_run)
 
     case_path = tmp_path / "case.json"
     case_path.write_text("{}", encoding="utf-8")
 
-    PinchProblem(problem_filepath=case_path, run=True)
+    PinchProblem(source=case_path)
 
     assert called["load"] == case_path
-    assert called["run"] == 1
 
 
 def test_target_accessor_supports_named_workflow(monkeypatch):
@@ -610,7 +599,7 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
         },
     )()
     monkeypatch.setattr(PinchProblem, "target", lambda self: obj._results)
-    assert obj.graph_data() == {
+    assert obj.plot.get_graph_data() == {
         "Plant": {
             "name": "Plant/Direct Integration",
             "zone_name": "Plant",
@@ -622,12 +611,12 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
     obj._results = type("Results", (), {"graphs": None})()
     obj._master_zone = {"zone": "ok"}
     monkeypatch.setattr(
-        sys.modules[PinchProblem.__module__],
+        sys.modules[_PlotAccessor.__module__],
         "get_output_graph_data",
         lambda zone: {"Fallback": {"graphs": [{"type": "Grand Composite Curve"}]}},
         raising=True,
     )
-    assert obj.graph_data()["Fallback"]["graphs"][0]["type"] == "Grand Composite Curve"
+    assert obj.plot.get_graph_data()["Fallback"]["graphs"][0]["type"] == "Grand Composite Curve"
 
 
 def test_graph_catalog_and_plot_helpers(monkeypatch):
@@ -643,16 +632,16 @@ def test_graph_catalog_and_plot_helpers(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
     monkeypatch.setattr(
-        sys.modules[PinchProblem.__module__],
+        sys.modules[_PlotAccessor.__module__],
         "_build_plotly_graph",
         lambda graph: {"built": graph["name"]},
         raising=True,
     )
 
     obj = PinchProblem()
-    catalog = obj.graph_catalog()
+    catalog = obj.plot()
     fig = obj.plot.grand_composite_curve(zone_name="Plant/DI")
 
     assert set(catalog["Graph Name"]) == {"Composite", "GCC"}
@@ -677,9 +666,9 @@ def test_plot_helper_executes_display_hook_when_available(monkeypatch):
         def show(self):
             shown["count"] += 1
 
-    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
     monkeypatch.setattr(
-        sys.modules[PinchProblem.__module__],
+        sys.modules[_PlotAccessor.__module__],
         "_build_plotly_graph",
         lambda graph: FakeFigure(),
         raising=True,
@@ -703,7 +692,7 @@ def test_plot_helper_uses_default_notebook_dimensions(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
 
     obj = PinchProblem()
     fig = obj.plot.composite_curve(zone_name="Plant/DI")
@@ -725,9 +714,9 @@ def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypat
             ],
         }
     }
-    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
     monkeypatch.setattr(
-        sys.modules[PinchProblem.__module__],
+        sys.modules[_PlotAccessor.__module__],
         "_build_plotly_graph",
         lambda graph: {"built": graph["name"]},
         raising=True,
@@ -760,9 +749,9 @@ def test_plot_helpers_match_zone_address_when_target_types_repeat(monkeypatch):
             ],
         },
     }
-    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
     monkeypatch.setattr(
-        sys.modules[PinchProblem.__module__],
+        sys.modules[_PlotAccessor.__module__],
         "_build_plotly_graph",
         lambda graph: {"built": graph["name"]},
         raising=True,
@@ -789,21 +778,21 @@ def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
             ],
         }
     }
-    monkeypatch.setattr(PinchProblem, "graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
 
     class FakeFigure:
         def write_html(self, path):
             Path(path).write_text("<html></html>", encoding="utf-8")
 
     monkeypatch.setattr(
-        sys.modules[PinchProblem.__module__],
+        sys.modules[_PlotAccessor.__module__],
         "_build_plotly_graph",
         lambda graph: FakeFigure(),
         raising=True,
     )
 
     obj = PinchProblem()
-    written = obj.export_graphs(tmp_path)
+    written = obj.plot.export(tmp_path)
 
     assert len(written) == 1
     assert written[0].exists()

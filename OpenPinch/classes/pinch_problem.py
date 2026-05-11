@@ -16,29 +16,14 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 import pandas as pd
 from pydantic import ValidationError
 
-from ..lib.enums import GT, ST, TT
-from ..lib.schemas.io import (
-    TargetInput,
-    TargetOutput,
-)
+from ..lib.enums import ST
+from ..lib.schemas.io import TargetInput, TargetOutput
 from ..lib.schemas.targets import BaseTargetModel
-from ..services import (
-    area_cost_targeting_service,
-    data_preprocessing_service,
-    direct_heat_integration_service,
-    direct_heat_pump_service,
-    direct_refrigeration_service,
-    indirect_heat_integration_service,
-    indirect_heat_pump_service,
-    indirect_refrigeration_service,
-    power_cogeneration_service,
-)
+from ..services import data_preprocessing_service
+from .accessors.target_accessor import _TargetAccessorDescriptor
+from .accessors.plot_accessor import _PlotAccessorDescriptor
 from ..services.input_data_processing.data_preparation import (
     _validate_zone_tree_structure,
-)
-from ..services.common.graph_data import get_output_graph_data
-from ..streamlit_webviewer.web_graphing import (
-    _build_plotly_graph,
 )
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
@@ -59,304 +44,7 @@ from .zone import Zone
 
 JsonDict = Dict[str, Any]
 PathLike = Union[str, Path]
-GraphPayload = Dict[str, Dict[str, Any]]
 ZoneService = Callable[["Zone"], "Zone"]
-
-
-_GRAPH_TYPE_ALIASES = {
-    "cc": GT.CC.value,
-    "composite": GT.CC.value,
-    "composite curve": GT.CC.value,
-    "composite curves": GT.CC.value,
-    "scc": GT.SCC.value,
-    "shifted": GT.SCC.value,
-    "shifted composite": GT.SCC.value,
-    "shifted composite curve": GT.SCC.value,
-    "shifted composite curves": GT.SCC.value,
-    "bcc": GT.BCC.value,
-    "balanced": GT.BCC.value,
-    "balanced composite": GT.BCC.value,
-    "balanced composite curve": GT.BCC.value,
-    "balanced composite curves": GT.BCC.value,
-    "gcc": GT.GCC.value,
-    "grand composite": GT.GCC.value,
-    "grand composite curve": GT.GCC.value,
-    "nlc": GT.NLP.value,
-    "net load": GT.NLP.value,
-    "net load curve": GT.NLP.value,
-    "net load curves": GT.NLP.value,
-    "net load profile": GT.NLP.value,
-    "net load profiles": GT.NLP.value,
-    "net_load": GT.NLP.value,
-    "net_load curve": GT.NLP.value,
-    "net_load curves": GT.NLP.value,
-    "net_load profile": GT.NLP.value,
-    "net_load profiles": GT.NLP.value,
-    "tsp": GT.TSP.value,
-    "total site": GT.TSP.value,
-    "total site profiles": GT.TSP.value,
-    "sugcc": GT.SUGCC.value,
-    "site utility grand composite curve": GT.SUGCC.value,
-}
-
-
-class _PlotAccessor:
-    """Callable graph helper that also exposes common named plot shortcuts."""
-
-    def __init__(self, problem: "PinchProblem") -> None:
-        self._problem = problem
-
-    def __call__(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
-        index: int = 0,
-        show: bool = False,
-    ):
-        return self._problem._plot_graph(
-            zone_name=zone_name,
-            graph_type=graph_type,
-            index=index,
-            show=show,
-        )
-
-    def composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
-    ):
-        """Build the first matching composite-curve figure."""
-        return self(
-            zone_name=zone_name,
-            graph_type=GT.CC.value,
-            index=index,
-            show=show,
-        )
-
-    def shifted_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
-    ):
-        """Build the first matching shifted-composite-curve figure."""
-        return self(
-            zone_name=zone_name,
-            graph_type=GT.SCC.value,
-            index=index,
-            show=show,
-        )
-
-    def balanced_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
-    ):
-        """Build the first matching balanced-composite-curve figure."""
-        return self(
-            zone_name=zone_name,
-            graph_type=GT.BCC.value,
-            index=index,
-            show=show,
-        )
-
-    def grand_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
-    ):
-        """Build the first matching grand-composite-curve figure."""
-        return self(
-            zone_name=zone_name,
-            graph_type=GT.GCC.value,
-            index=index,
-            show=show,
-        )
-
-    def grand_composite_curve_with_heat_pump(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
-    ):
-        """Build the first matching GCC-with-heat-pump overlay figure."""
-        return self(
-            zone_name=zone_name,
-            graph_type=GT.GCC_HP.value,
-            index=index,
-            show=show,
-        )
-
-    def net_load_profiles(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
-    ):
-        """Build the first matching net-load-profile figure."""
-        return self(
-            zone_name=zone_name,
-            graph_type=GT.NLP.value,
-            index=index,
-            show=show,
-        )
-
-
-class _PlotAccessorDescriptor:
-    """Non-data descriptor exposing a callable plot accessor on instances."""
-
-    def __get__(self, obj: Optional["PinchProblem"], owner=None):
-        if obj is None:
-            return self
-        return _PlotAccessor(obj)
-
-
-class _TargetAccessor:
-    """Callable targeting helper that also exposes named targeting workflows."""
-
-    def __init__(self, problem: "PinchProblem") -> None:
-        self._problem = problem
-
-    def __call__(self):
-        return self._problem._run_targeting(
-            zone=self._problem._master_zone,
-            direct_service_func=direct_heat_integration_service,
-            indirect_service_func=indirect_heat_integration_service,
-        )
-
-    def direct_heat_integration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run direct integration targeting for one zone or sub-tree."""
-        return self._problem._execute_targeting(
-            target_id=TT.DI.value,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=direct_heat_integration_service,
-            direct_service_func=direct_heat_integration_service,
-        )
-
-    def indirect_heat_integration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run indirect / total-site targeting for one zone or sub-tree."""
-        return self._problem._execute_targeting(
-            target_id=TT.TS.value,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=indirect_heat_integration_service,
-            indirect_service_func=indirect_heat_integration_service,
-        )
-
-    def direct_heat_pump(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run direct heat-pump targeting for one zone or sub-tree."""
-        return self._problem._execute_targeting(
-            target_id=TT.DHP.value,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=direct_heat_pump_service,
-            direct_service_func=direct_heat_pump_service,
-        )
-
-    def indirect_heat_pump(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run indirect heat-pump targeting for one zone or sub-tree."""
-        return self._problem._execute_targeting(
-            target_id=TT.IHP.value,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=indirect_heat_pump_service,
-            indirect_service_func=indirect_heat_pump_service,
-        )
-
-    def direct_refrigeration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run direct refrigeration targeting for one zone or sub-tree."""
-        return self._problem._execute_targeting(
-            target_id=TT.DR.value,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=direct_refrigeration_service,
-            direct_service_func=direct_refrigeration_service,
-        )
-
-    def indirect_refrigeration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run indirect refrigeration targeting for one zone or sub-tree."""
-        return self._problem._execute_targeting(
-            target_id=TT.IR.value,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=indirect_refrigeration_service,
-            indirect_service_func=indirect_refrigeration_service,
-        )
-
-    def cogeneration(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run turbine cogeneration post-processing on a compatible target."""
-        target_id = TT.DI.value
-        if options and "base_target_type" in options:
-            target_id = str(options["base_target_type"])
-        return self._problem._execute_targeting(
-            target_id=target_id,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=power_cogeneration_service,
-            direct_service_func=power_cogeneration_service,
-        )
-
-    def area_cost(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        include_subzones: bool = False,
-    ) -> BaseTargetModel:
-        """Run area and capital-cost targeting for one zone or sub-tree."""
-        return self._problem._execute_targeting(
-            target_id=TT.DI.value,
-            application_zone=zone_name,
-            options=options,
-            include_subzones=include_subzones,
-            single_zone_service=area_cost_targeting_service,
-            direct_service_func=area_cost_targeting_service,
-        )
-
-
-class _TargetAccessorDescriptor:
-    """Non-data descriptor exposing a callable target accessor on instances."""
-
-    def __get__(self, obj: Optional["PinchProblem"], owner=None):
-        if obj is None:
-            return self
-        return _TargetAccessor(obj)
 
 
 @dataclass
@@ -394,10 +82,6 @@ class PinchProblem:
         ] = None,
         *,
         project_name: Optional[str] = "Site",
-        problem_filepath: Optional[PathLike] = None,
-        results_dir: Optional[PathLike] = None,
-        problem_data: Optional[TargetInput | JsonDict] = None,
-        run: bool = False,
     ) -> None:
         """Initialise the orchestrator and optionally load and solve a case.
 
@@ -408,17 +92,6 @@ class PinchProblem:
             ``(streams.csv, utilities.csv)`` tuple to pass through :meth:`load`.
         project_name:
             Root zone / project label used in generated results.
-        problem_filepath:
-            Backward-compatible alias for ``source`` when loading from a single
-            JSON, Excel, or CSV-bundle path.
-        results_dir:
-            Optional default export directory for :meth:`export_excel`.
-        problem_data:
-            Backward-compatible alias for passing an in-memory mapping or
-            :class:`TargetInput`.
-        run:
-            When ``True``, execute the targeting workflow immediately after
-            loading the supplied source.
         """
         self._project_name = project_name
         self._input_source_kind = "unknown"
@@ -426,19 +99,10 @@ class PinchProblem:
         self._problem_filepath = None
         self._problem_data = None
         self._results = None
-        self.results_dir = Path(results_dir) if results_dir is not None else None
-
-        if source is not None and problem_filepath is not None:
-            raise TypeError("Provide either source or problem_filepath, not both.")
-        if source is None and problem_filepath is not None:
-            source = problem_filepath
-        if source is None and problem_data is not None:
-            source = problem_data
+        self.results_dir = None
 
         if source is not None:
             self.load(source=source)
-            if run:
-                self.run()
 
     # ----------------------------------------------------------------------------
     # Public API
@@ -580,16 +244,12 @@ class PinchProblem:
         self._validated_data = self.validate()
         self._master_zone = self._data_preprocessing()
         return self._master_zone
-
-    def run(self) -> TargetOutput:
-        """Execute the default targeting workflow and cache the solved results."""
-        return self.target()
-
-    def _run_targeting(
+    
+    def _run_targeting_for_zone_and_subzones(
         self,
         zone: Zone = None,
-        direct_service_func: Callable = None,
-        indirect_service_func: Callable = None,
+        direct_service_func: Optional[ZoneService] = None,
+        indirect_service_func: Optional[ZoneService] = None,
     ) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
         if self._master_zone is None:
@@ -599,9 +259,6 @@ class PinchProblem:
                 self.load(self._problem_data)
         if not isinstance(zone, Zone):
             zone = self._master_zone
-        if direct_service_func is None and indirect_service_func is None:
-            direct_service_func = direct_heat_integration_service
-            indirect_service_func = indirect_heat_integration_service
         # Perform advanced targeting analysis on the master zone and all subzones
         get_targets_for_zone_and_sub_zones(
             zone=zone,
@@ -613,6 +270,46 @@ class PinchProblem:
         # Validate response data
         self._results = TargetOutput.model_validate(return_data)
         return self._results
+
+    def _execute_targeting(
+        self,
+        *,
+        target_id: str,
+        application_zone: Optional[str | Zone],
+        options: Optional[dict[str, Any]],
+        include_subzones: bool,
+        direct_service_func: Optional[ZoneService] = None,
+        indirect_service_func: Optional[ZoneService] = None,
+    ) -> BaseTargetModel:
+        zone = self._resolve_target_zone(application_zone)
+        if include_subzones:
+            self._run_targeting_for_zone_and_subzones(
+                zone=zone,
+                direct_service_func=direct_service_func,
+                indirect_service_func=indirect_service_func,
+            )
+        else:
+            if direct_service_func is not None:
+                direct_service_func(zone, options)
+            if indirect_service_func is not None:
+                indirect_service_func(zone, options)
+            self._refresh_results_from_master_zone()
+
+        try:
+            return zone.targets[target_id]
+        except KeyError as exc:
+            raise RuntimeError(
+                f"Targeting did not produce target {target_id!r} for zone {zone.name!r}."
+            ) from exc
+
+    def _resolve_target_zone(self, application_zone: Optional[str] = None) -> "Zone":
+        if self._master_zone is None:
+            raise RuntimeError("Load source first before targeting.")
+        if isinstance(application_zone, Zone):
+            return application_zone
+        if application_zone is None:
+            return self._master_zone
+        return self._master_zone.get_subzone(application_zone)
 
     def validate(self) -> TargetInput:
         """Validate the currently loaded problem data without running targeting."""
@@ -662,84 +359,6 @@ class PinchProblem:
                 }
             )
         return pd.DataFrame(rows)
-
-    def graph_data(self) -> GraphPayload:
-        """Return the serialized graph payload for the solved problem."""
-        self.target()
-
-        graphs = getattr(self._results, "graphs", None)
-        if graphs:
-            return {
-                key: value.model_dump() if hasattr(value, "model_dump") else dict(value)
-                for key, value in graphs.items()
-            }
-
-        if self._master_zone is None:
-            raise RuntimeError("No analysed zone is available. Run target() first.")
-
-        return get_output_graph_data(self._master_zone)
-
-    def graph_catalog(self) -> pd.DataFrame:
-        """Return a table describing the available graph outputs."""
-        rows = []
-        for graph_key, graph_set in self.graph_data().items():
-            graph_zone_name = graph_set.get("zone_name", graph_key)
-            graph_zone_address = graph_set.get("zone_address", graph_zone_name)
-            target_name = graph_set.get("name", graph_key)
-            target_type = graph_set.get("target_type")
-            for index, graph in enumerate(graph_set.get("graphs", [])):
-                rows.append(
-                    {
-                        "Zone": graph_zone_name,
-                        "Zone Address": graph_zone_address,
-                        "Target": target_name,
-                        "Target Type": target_type,
-                        "Graph Type": graph.get("type"),
-                        "Graph Name": graph.get("name", f"Graph {index + 1}"),
-                        "Index": index,
-                    }
-                )
-        return pd.DataFrame(rows)
-
-    def _plot_graph(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
-        index: int = 0,
-        show: bool = False,
-    ):
-        """Build a Plotly figure for one graph from the solved result set."""
-        graph = self._select_graph(
-            zone_name=zone_name,
-            graph_type=graph_type,
-            index=index,
-        )
-        figure = _build_plotly_graph(graph)
-        if hasattr(figure, "show") and show:
-            figure.show()
-        return figure
-
-    def export_graphs(
-        self,
-        output_dir: PathLike,
-        *,
-        zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
-    ) -> list[Path]:
-        """Write selected graph outputs as standalone HTML files."""
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        selected = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
-        written_paths = []
-        for idx, (graph_zone_name, graph) in enumerate(selected, start=1):
-            figure = _build_plotly_graph(graph)
-            stem = _slugify(f"{graph_zone_name}_{graph.get('type', 'graph')}_{idx}")
-            destination = output_path / f"{stem}.html"
-            figure.write_html(destination)
-            written_paths.append(destination)
-        return written_paths
 
     def export_to_Excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Export the solved target summary and problem tables to an Excel file."""
@@ -999,153 +618,11 @@ class PinchProblem:
             value_rounding=value_rounding,
         )
 
-    def _execute_targeting(
-        self,
-        *,
-        target_id: str,
-        application_zone: Optional[str | Zone],
-        options: Optional[dict[str, Any]],
-        include_subzones: bool,
-        single_zone_service: ZoneService,
-        direct_service_func: Optional[Callable] = None,
-        indirect_service_func: Optional[Callable] = None,
-    ) -> BaseTargetModel:
-        if self._master_zone is None:
-            self.target()
-
-        zone = self._resolve_target_zone(application_zone)
-        if include_subzones:
-            self._run_targeting(
-                zone=zone,
-                direct_service_func=direct_service_func,
-                indirect_service_func=indirect_service_func,
-            )
-        else:
-            single_zone_service(zone, options)
-            self._refresh_results_from_master_zone()
-
-        try:
-            return zone.targets[target_id]
-        except KeyError as exc:
-            raise RuntimeError(
-                f"Targeting did not produce target {target_id!r} for zone {zone.name!r}."
-            ) from exc
-
-    def _resolve_target_zone(self, application_zone: Optional[str] = None) -> "Zone":
-        if isinstance(application_zone, Zone):
-            return application_zone
-        if self._master_zone is None:
-            raise RuntimeError("No analysed zone is available. Run target() first.")
-        if application_zone is None:
-            return self._master_zone
-        return self._master_zone.get_subzone(application_zone)
-
     def _refresh_results_from_master_zone(self) -> TargetOutput:
         if self._master_zone is None:
             raise RuntimeError("No analysed zone is available. Run target() first.")
         self._results = TargetOutput.model_validate(extract_results(self._master_zone))
         return self._results
-
-    # ----------------------------------------------------------------------------
-    # Internal graph helpers
-    # ----------------------------------------------------------------------------
-
-    def _select_graph(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
-        index: int = 0,
-    ) -> dict:
-        graphs = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
-        if not graphs:
-            raise ValueError("No graphs matched the requested selection.")
-        try:
-            return graphs[index][1]
-        except IndexError as exc:
-            raise IndexError(
-                f"Graph index {index} is out of range for the selected graphs."
-            ) from exc
-
-    def _select_graphs(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
-    ) -> list[tuple[str, dict]]:
-        payload = self.graph_data()
-        selected_graph_type = _normalise_graph_type_selector(graph_type)
-
-        zone_items = payload.items()
-        if zone_name is not None:
-            matched_zone_items = [
-                (graph_key, graph_set)
-                for graph_key, graph_set in payload.items()
-                if _graph_set_matches_zone_selector(
-                    selector=str(zone_name),
-                    graph_key=graph_key,
-                    graph_set=graph_set,
-                )
-            ]
-            if not matched_zone_items:
-                raise KeyError(
-                    f"Unknown zone {zone_name!r}. Available zones: {', '.join(payload)}"
-                )
-            zone_items = matched_zone_items
-
-        selected = []
-        for graph_key, graph_set in zone_items:
-            zone_identifier = graph_set.get("zone_address") or graph_set.get(
-                "zone_name", graph_key
-            )
-            for graph in graph_set.get("graphs", []):
-                if (
-                    selected_graph_type is not None
-                    and graph.get("type") != selected_graph_type
-                ):
-                    continue
-                selected.append((zone_identifier, graph))
-        return selected
-
-
-def _normalise_graph_type_selector(graph_type: Optional[str]) -> Optional[str]:
-    if graph_type is None:
-        return None
-    text = str(graph_type).strip()
-    return _GRAPH_TYPE_ALIASES.get(text.lower(), text)
-
-
-def _graph_set_matches_zone_selector(
-    *,
-    selector: str,
-    graph_key: str,
-    graph_set: dict[str, Any],
-) -> bool:
-    text = str(selector).strip()
-    suffix = text.split("/", 1)[-1]
-    candidates = (
-        graph_key,
-        graph_set.get("name"),
-        graph_set.get("zone_name"),
-        graph_set.get("zone_address"),
-        graph_set.get("target_type"),
-    )
-    for candidate in candidates:
-        if not candidate:
-            continue
-        candidate_text = str(candidate)
-        if text == candidate_text or suffix == candidate_text:
-            return True
-        if "/" in candidate_text and suffix == candidate_text.split("/", 1)[-1]:
-            return True
-    return False
-
-
-def _slugify(value: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else "_" for ch in value)
-    while "__" in cleaned:
-        cleaned = cleaned.replace("__", "_")
-    return cleaned.strip("_") or "graph"
 
 
 def _maybe_get_value(value):
