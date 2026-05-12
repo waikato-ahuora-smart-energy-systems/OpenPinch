@@ -23,9 +23,9 @@ def get_example_problem_filepaths():
     test_data_dir = Path(__file__).resolve().parents[2] / "examples" / "stream_data"
     return sorted(
         [
-        filepath
-        for filepath in test_data_dir.iterdir()
-        if filepath.name.startswith("p_") and filepath.name.endswith(".json")
+            filepath
+            for filepath in test_data_dir.iterdir()
+            if filepath.name.startswith("p_") and filepath.name.endswith(".json")
         ],
         key=lambda filepath: filepath.name,
     )

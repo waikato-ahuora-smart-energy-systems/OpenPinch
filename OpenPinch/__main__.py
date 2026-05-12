@@ -15,8 +15,7 @@ from .resources import (
     list_sample_cases,
 )
 
-_COMMANDS = {"run", "graph", "validate", "sample", "notebook", "heat-pump"}
-_DEFAULT_HEAT_PUMP_GRAPH_TYPE = "gcc"
+_COMMANDS = {"run", "validate", "sample", "notebook"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -68,31 +67,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Launch the Streamlit dashboard after running the analysis.",
     )
 
-    graph_parser = subparsers.add_parser(
-        "graph",
-        help="Run a pinch analysis and export graph HTML files.",
-    )
-    _add_problem_input_argument(graph_parser)
-    graph_parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=Path("graphs"),
-        help="Output directory for graph HTML files.",
-    )
-    graph_parser.add_argument(
-        "--zone",
-        type=str,
-        default=None,
-        help="Optional zone/target key to export.",
-    )
-    graph_parser.add_argument(
-        "--graph-type",
-        type=str,
-        default=None,
-        help="Optional graph selector such as 'gcc', 'composite', or 'tsp'.",
-    )
-
     validate_parser = subparsers.add_parser(
         "validate",
         help="Validate a workbook, JSON file, or CSV bundle without targeting.",
@@ -139,67 +113,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("."),
         help="Destination filepath or directory.",
     )
-
-    heat_pump_parser = subparsers.add_parser(
-        "heat-pump",
-        help="Evaluate a candidate heat pump integration scenario against a case.",
-    )
-    _add_problem_input_argument(heat_pump_parser)
-    heat_pump_parser.add_argument(
-        "--zone",
-        type=str,
-        default="Plant",
-        help="Zone name for the integrated condenser and evaporator streams.",
-    )
-    heat_pump_parser.add_argument(
-        "--target",
-        type=str,
-        default=None,
-        help="Optional summary target row to compare, for example 'Plant/Direct Integration'.",
-    )
-    heat_pump_parser.add_argument(
-        "--condenser-temperature",
-        type=float,
-        required=True,
-        help="Condenser temperature in degC.",
-    )
-    heat_pump_parser.add_argument(
-        "--condenser-duty",
-        type=float,
-        required=True,
-        help="Condenser duty in kW.",
-    )
-    heat_pump_parser.add_argument(
-        "--evaporator-temperature",
-        type=float,
-        required=True,
-        help="Evaporator temperature in degC.",
-    )
-    heat_pump_parser.add_argument(
-        "--evaporator-duty",
-        type=float,
-        required=True,
-        help="Evaporator duty in kW.",
-    )
-    heat_pump_parser.add_argument(
-        "--graph-output",
-        type=Path,
-        default=None,
-        help="Optional directory for integrated-scenario graph HTML files.",
-    )
-    heat_pump_parser.add_argument(
-        "--graph-type",
-        type=str,
-        default=_DEFAULT_HEAT_PUMP_GRAPH_TYPE,
-        help="Graph type to export for the integrated scenario when --graph-output is used.",
-    )
-    heat_pump_parser.add_argument(
-        "--json-output",
-        type=Path,
-        default=None,
-        help="Optional path for the compact comparison JSON payload.",
-    )
-
     return parser
 
 
@@ -214,16 +127,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "run":
             return _run_command(_openpinch.PinchProblem, args)
-        if args.command == "graph":
-            return _graph_command(_openpinch.PinchProblem, args)
         if args.command == "validate":
             return _validate_command(_openpinch.PinchProblem, args)
         if args.command == "sample":
             return _sample_command(args)
         if args.command == "notebook":
             return _notebook_command(args)
-        if args.command == "heat-pump":
-            return _heat_pump_command(_openpinch.PinchProblem, args)
     except Exception as exc:
         if args.debug:
             raise
@@ -281,21 +190,6 @@ def _run_command(problem_cls, args: argparse.Namespace) -> int:
     return 0
 
 
-def _graph_command(problem_cls, args: argparse.Namespace) -> int:
-    problem = problem_cls()
-    problem.load(args.problem_path)
-    if hasattr(problem, "validate"):
-        problem.validate()
-    problem.target()
-    written = problem.export_graphs(
-        args.output,
-        zone_name=args.zone,
-        graph_type=args.graph_type,
-    )
-    print(f"Wrote {len(written)} graph file(s) to {args.output}")
-    return 0
-
-
 def _validate_command(problem_cls, args: argparse.Namespace) -> int:
     problem = problem_cls()
     payload = problem.load(args.problem_path)
@@ -328,42 +222,6 @@ def _notebook_command(args: argparse.Namespace) -> int:
     for name in list_notebooks():
         copy_notebook(name, output_dir / name)
     print(f"Copied {len(list_notebooks())} notebook(s) to {output_dir}")
-    return 0
-
-
-def _heat_pump_command(problem_cls, args: argparse.Namespace) -> int:
-    problem = problem_cls()
-    problem.load(args.problem_path)
-    if hasattr(problem, "validate"):
-        problem.validate()
-
-    evaluation = problem.evaluate_heat_pump_integration(
-        {
-            "zone": args.zone,
-            "condenser_temperature": args.condenser_temperature,
-            "condenser_duty": args.condenser_duty,
-            "evaporator_temperature": args.evaporator_temperature,
-            "evaporator_duty": args.evaporator_duty,
-        },
-        target_name=args.target,
-    )
-    print(evaluation.comparison_frame.to_string())
-
-    if args.json_output is not None:
-        args.json_output.parent.mkdir(parents=True, exist_ok=True)
-        args.json_output.write_text(
-            json.dumps(evaluation.comparison.model_dump(), indent=2),
-            encoding="utf-8",
-        )
-        print(f"Wrote heat pump comparison JSON to {args.json_output}")
-
-    if args.graph_output is not None:
-        written = evaluation.integrated_problem.export_graphs(
-            args.graph_output,
-            graph_type=args.graph_type,
-        )
-        print(f"Wrote {len(written)} graph file(s) to {args.graph_output}")
-
     return 0
 
 

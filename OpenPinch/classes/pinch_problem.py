@@ -244,7 +244,7 @@ class PinchProblem:
         self._validated_data = self.validate()
         self._master_zone = self._data_preprocessing()
         return self._master_zone
-    
+
     def _run_targeting_for_zone_and_subzones(
         self,
         zone: Zone = None,

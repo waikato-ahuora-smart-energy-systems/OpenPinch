@@ -154,11 +154,7 @@ class Configuration:
     @classmethod
     def _known_option_keys(cls) -> set[str]:
         """Return the supported configuration keys accepted by ``options``."""
-        return {
-            key
-            for key in cls.__annotations__
-            if not key.startswith("_")
-        }
+        return {key for key in cls.__annotations__ if not key.startswith("_")}
 
     @classmethod
     def _validate_option_keys(cls, options: dict) -> dict:
@@ -191,8 +187,7 @@ class Configuration:
         unknown_keys = sorted(key for key in options if key not in known_keys)
         if unknown_keys:
             raise ValueError(
-                "Unknown configuration option(s): "
-                f"{', '.join(unknown_keys)}."
+                f"Unknown configuration option(s): {', '.join(unknown_keys)}."
             )
 
         return options

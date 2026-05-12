@@ -169,4 +169,3 @@ class _TargetAccessorDescriptor:
         if obj is None:
             return self
         return _TargetAccessor(obj)
-

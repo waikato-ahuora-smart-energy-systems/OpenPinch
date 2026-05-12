@@ -616,7 +616,10 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
         lambda zone: {"Fallback": {"graphs": [{"type": "Grand Composite Curve"}]}},
         raising=True,
     )
-    assert obj.plot.get_graph_data()["Fallback"]["graphs"][0]["type"] == "Grand Composite Curve"
+    assert (
+        obj.plot.get_graph_data()["Fallback"]["graphs"][0]["type"]
+        == "Grand Composite Curve"
+    )
 
 
 def test_graph_catalog_and_plot_helpers(monkeypatch):

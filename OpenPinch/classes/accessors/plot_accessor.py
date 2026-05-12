@@ -51,6 +51,7 @@ _GRAPH_TYPE_ALIASES = {
     "site utility grand composite curve": GT.SUGCC.value,
 }
 
+
 class _PlotAccessor:
     """Callable graph helper that also exposes common named plot shortcuts."""
 
@@ -59,7 +60,7 @@ class _PlotAccessor:
 
     def __call__(self):
         return self.catalog()
-    
+
     def catalog(self) -> pd.DataFrame:
         """Return a table describing the available graph outputs."""
         rows = []
@@ -164,7 +165,7 @@ class _PlotAccessor:
             self._problem.target()
 
         graphs = getattr(self._problem._results, "graphs", None)
-            
+
         if graphs:
             return {
                 key: value.model_dump() if hasattr(value, "model_dump") else dict(value)
@@ -280,6 +281,7 @@ class _PlotAccessor:
             index=index,
             show=show,
         )
+
 
 class _PlotAccessorDescriptor:
     """Non-data descriptor exposing a callable plot accessor on instances."""
