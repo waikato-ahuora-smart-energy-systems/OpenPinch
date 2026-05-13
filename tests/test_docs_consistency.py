@@ -33,12 +33,11 @@ def test_docs_highlight_current_pinchproblem_methods():
             _read(INTERPRETING_RESULTS),
         ]
     )
-    assert "run()" in combined
+    assert "target()" in combined
     assert "summary_frame()" in combined
     assert "export_excel" in combined
     assert "show_dashboard()" in combined
     assert "plot.grand_composite_curve" in combined
-    assert "evaluate_heat_pump_integration" in combined
     assert "problem.target.direct_heat_pump" in combined
 
 
@@ -66,7 +65,7 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
         ]
     )
     assert "Interpreting Results" in combined
-    assert "heat pump integration" in combined
+    assert "heat pump" in combined
     assert "heat_pump_targeting.json" in combined
     assert "03_carnot_hpr_comparison.ipynb" in combined
 

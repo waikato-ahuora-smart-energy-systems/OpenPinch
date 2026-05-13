@@ -61,6 +61,7 @@ class Zone:
 
     @name.setter
     def name(self, value):
+        """Set the display name used for this zone and its address."""
         self._name = value
 
     @property
@@ -70,6 +71,7 @@ class Zone:
 
     @type.setter
     def type(self, value):
+        """Set the zone classification used by hierarchical targeting logic."""
         self._type = value
 
     @property
@@ -79,6 +81,7 @@ class Zone:
 
     @config.setter
     def config(self, value):
+        """Replace the runtime configuration attached to this zone."""
         self._config = value
 
     @property
@@ -88,6 +91,7 @@ class Zone:
 
     @parent_zone.setter
     def parent_zone(self, value):
+        """Attach the zone to a different parent in the hierarchy."""
         self._parent_zone = value
 
     @property
@@ -97,6 +101,7 @@ class Zone:
 
     @active.setter
     def active(self, value: bool):
+        """Activate or deactivate the zone for subsequent analysis passes."""
         self._active = bool(value)
 
     @property
@@ -113,6 +118,7 @@ class Zone:
 
     @dt_cont_multiplier.setter
     def dt_cont_multiplier(self, value: float):
+        """Set the active ``dt_cont`` multiplier when the zone is still mutable."""
         if self._lock_dt_cont_multiplier:
             raise RuntimeError(
                 "Direct mutation of dt_cont_multiplier on prepared analysis zones is not supported. "
@@ -127,6 +133,7 @@ class Zone:
 
     @hot_streams.setter
     def hot_streams(self, data):
+        """Replace the zone hot-stream collection."""
         self._hot_streams = data
 
     @property
@@ -136,6 +143,7 @@ class Zone:
 
     @cold_streams.setter
     def cold_streams(self, data):
+        """Replace the zone cold-stream collection."""
         self._cold_streams = data
 
     @property
@@ -145,6 +153,7 @@ class Zone:
 
     @net_hot_streams.setter
     def net_hot_streams(self, data):
+        """Replace the aggregated net hot-stream collection."""
         self._net_hot_streams = data
 
     @property
@@ -154,6 +163,7 @@ class Zone:
 
     @net_cold_streams.setter
     def net_cold_streams(self, data):
+        """Replace the aggregated net cold-stream collection."""
         self._net_cold_streams = data
 
     @property
@@ -163,6 +173,7 @@ class Zone:
 
     @hot_utilities.setter
     def hot_utilities(self, data):
+        """Replace the zone hot-utility collection."""
         self._hot_utilities = data
 
     @property
@@ -172,6 +183,7 @@ class Zone:
 
     @cold_utilities.setter
     def cold_utilities(self, data):
+        """Replace the zone cold-utility collection."""
         self._cold_utilities = data
 
     @property
@@ -181,6 +193,7 @@ class Zone:
 
     @graphs.setter
     def graphs(self, data):
+        """Replace the graph payloads cached on this zone."""
         self._graphs = data
 
     @property
@@ -344,6 +357,7 @@ class Zone:
                 cs_dst.add(s, key)
 
     def get_target_zone(self, zone_name: Optional[str | list]) -> "Zone":
+        """Resolve ``zone_name`` to the concrete zone that should receive a target."""
         if zone_name is None:
             return self
         resolved = str(zone_name).strip()

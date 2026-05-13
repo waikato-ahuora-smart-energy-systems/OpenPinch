@@ -116,6 +116,7 @@ class Value:
 
     @value.setter
     def value(self, data):
+        """Set the scalar magnitude or per-state magnitudes in-place."""
         if self._is_stateful():
             magnitudes = self._coerce_magnitude_array(
                 data,
@@ -161,6 +162,7 @@ class Value:
 
     @unit.setter
     def unit(self, unit_str):
+        """Convert the stored quantity to ``unit_str`` in-place."""
         self._set_storage(
             Q_(self._magnitude_array(), unit_str),
             self._copy_state_ids(),

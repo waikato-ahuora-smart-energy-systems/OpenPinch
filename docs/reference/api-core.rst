@@ -15,7 +15,7 @@ For new code, prefer one of these two patterns:
    :func:`~OpenPinch.main.pinch_analysis_service`.
 2. Load a problem file into
    :class:`~OpenPinch.classes.pinch_problem.PinchProblem`, call
-   :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.run`, and inspect or
+   :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target`, and inspect or
    export the cached results.
 
 The lower-level helpers documented on this page are still useful when you want
@@ -73,9 +73,6 @@ Package Entrypoints
 .. autoclass:: OpenPinch.classes.pinch_problem.PinchProblem
    :members:
 
-.. autoclass:: OpenPinch.classes.pinch_problem.HeatPumpIntegrationEvaluation
-   :members:
-
 Core Service Functions
 ----------------------
 
@@ -111,14 +108,12 @@ Use it when you want:
 
 The main user-facing methods are:
 
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.run`
+- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.validate`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.summary_frame`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot.composite_curve`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot.grand_composite_curve`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.compare_to`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_graphs`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_excel`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.show_dashboard`
 

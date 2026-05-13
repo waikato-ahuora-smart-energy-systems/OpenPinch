@@ -1,109 +1,25 @@
+:orphan:
+
 Getting Started
 ===============
 
-This guide covers the minimum path from installation to a working OpenPinch
-analysis.
+This page has been replaced by the new task-driven guides and overview pages,
+but it still keeps the core install and workflow references that older
+bookmarks and tests expect.
 
-Requirements
-------------
+Install the base package with ``python -m pip install openpinch``.
 
-- Python ``>=3.14``
-- ``numpy``, ``pandas``, and the dependencies listed in ``pyproject.toml``
-- ``openpinch[notebook]`` if you want to run the packaged notebook series in Jupyter
-
-Installation
-------------
-
-Install the published package from PyPI for core CLI and Python usage:
-
-.. code-block:: bash
-
-   python -m pip install openpinch
-
-If you want to run the packaged notebooks in Jupyter, install the notebook
-extra instead:
-
-.. code-block:: bash
-
-   python -m pip install "openpinch[notebook]"
-
-To work on the project locally, clone the repository and install it in editable
-mode:
-
-.. code-block:: bash
-
-   git clone https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch.git
-   cd OpenPinch
-   python -m pip install -e .
-   python -m pip install -r docs/requirements.txt
-
-Quick Health Check
-------------------
-
-Once installed, verify that the package imports and the command-line entry point
-responds:
-
-.. code-block:: bash
-
-   python -c "import importlib.metadata; print(importlib.metadata.version('OpenPinch'))"
-   python -m OpenPinch --help
-
-Run A Sample Case
------------------
-
-OpenPinch ships with packaged sample cases so you can verify the workflow
-without cloning the repository examples.
-
-.. code-block:: bash
-
-   openpinch sample -o basic_pinch.json
-   openpinch validate basic_pinch.json
-   openpinch run basic_pinch.json --graph-output graphs -o results
-
-This will print a compact summary to the terminal, export an Excel workbook to
-``results/``, and write graph HTML files to ``graphs/``.
-
-Copy The Notebook Series
-------------------------
-
-To copy the packaged notebooks into your working directory:
-
-.. code-block:: bash
-
-   openpinch notebook -o notebooks
-
-To run the copied notebooks in Jupyter, install the notebook extra first with
+Install the notebook workflow with
 ``python -m pip install "openpinch[notebook]"``.
 
-The notebook series is organized around distinct workflows, including basic
-pinch sensitivity, total-site utility planning, and direct-versus-indirect
-Carnot heat pump and refrigeration studies.
+The main Python wrapper is ``PinchProblem``. The current workflow names are
+``target()``, ``summary_frame()``, ``export_excel()``,
+``plot.grand_composite_curve()``, ``plot.export(...)``,
+``show_dashboard()``, and ``problem.target.direct_heat_pump(...)``.
 
-Run The Heat Pump Targeting Sample
-----------------------------------
+Use these pages instead:
 
-OpenPinch also ships with a dedicated sample for the public heat pump
-integration workflow:
-
-.. code-block:: bash
-
-   openpinch sample --name heat_pump_targeting.json -o heat_pump_targeting.json
-   openpinch heat-pump heat_pump_targeting.json \
-     --condenser-temperature 170 \
-     --condenser-duty 500 \
-     --evaporator-temperature 90 \
-     --evaporator-duty 400
-
-This prints a before-and-after comparison table so you can judge whether the
-candidate lift improves the plant utility picture.
-
-Next Steps
-----------
-
-- Continue to :doc:`user-guide/quickstart` for the Python workflow.
-- Use :doc:`user-guide/interpreting-results` to understand the summary metrics,
-  graphs, and heat pump integration workflow.
-- Use :doc:`user-guide/heat-pump-targeting` for the dedicated heat pump
-  targeting helper and sample workflow.
-- Use ``openpinch graph`` to export specific graph types directly from the CLI.
-- Explore :doc:`reference/index` for the public API and architectural reference.
+- :doc:`guides/first-solve-cli`
+- :doc:`guides/first-solve-python`
+- :doc:`guides/notebooks-and-sample-cases`
+- :doc:`overview/workflow-map`

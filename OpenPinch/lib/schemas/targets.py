@@ -85,9 +85,11 @@ class BaseTargetModel(BaseModel):
         return data
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        """Convert the runtime target into the exported reporting schema."""
         raise NotImplementedError
 
     def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
+        """Serialise the reporting-schema view of this target to plain Python."""
         return self.to_target_results(isTotal=isTotal).model_dump(mode="python")
 
 
@@ -97,6 +99,7 @@ class GraphBackedTarget(BaseTargetModel):
     graphs: dict[str, Any] = Field(default_factory=dict)
 
     def add_graph(self, name: str, result: Any) -> None:
+        """Attach one graph payload under ``name`` for later export."""
         self.graphs[name] = result
 
 
@@ -116,9 +119,11 @@ class UtilitySummaryTarget(BaseTargetModel):
 
     @property
     def utility_streams(self) -> StreamCollection:
+        """Return hot and cold utilities as one combined collection."""
         return self.hot_utilities + self.cold_utilities
 
     def calc_utility_cost(self) -> float:
+        """Calculate and cache the total utility cost across attached utilities."""
         self.utility_cost = sum(u.ut_cost for u in self.utility_streams)
         return float(self.utility_cost)
 
@@ -141,6 +146,7 @@ class UtilitySummaryTarget(BaseTargetModel):
         )
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        """Return the common reporting payload for utility-summary targets."""
         return self._base_target_results(isTotal=isTotal)
 
 
@@ -163,6 +169,7 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     turbine_efficiency_target: Optional[float] = None
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        """Return the reporting payload including DI-only cost and work fields."""
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={
@@ -196,6 +203,7 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
     turbine_efficiency_target: Optional[float] = None
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        """Return the reporting payload including total-site work fields."""
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={
@@ -225,6 +233,7 @@ class HeatPumpTargetBase(GraphBackedTarget):
     hpr_details: Any
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
+        """Return the reporting payload for explicit HPR target results."""
         return TargetResults(
             name=self.name,
             degree_of_integration=None,

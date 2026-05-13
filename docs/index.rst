@@ -1,71 +1,57 @@
-OpenPinch Toolkit
+OpenPinch Documentation
 =======================
 
-OpenPinch provides advanced Pinch Analysis and Total Site Integration tooling
-in Python. These pages describe the core concepts, how to run analyses, how to
-use the packaged notebooks and sample cases, and the public API.
+OpenPinch is a Python toolkit for advanced pinch analysis, direct and indirect
+heat integration targeting, total-site utility studies, graph generation,
+heat-pump integration screening, and cogeneration post-processing.
 
-Source code: GitHub_
+This documentation is organized to answer three different kinds of questions:
 
-Pinch Analysis
---------------
-Pinch analysis is a systematic framework for minimising energy consumption in
-industrial processes by matching heat sources and sinks to maximise heat
-recovery. It identifies the "pinch" temperature where the process is most
-constrained, guiding engineers to redesign heat exchanger networks, set
-realistic utility targets, and prioritise retrofits that deliver the largest
-energy efficiency gains.
+- What thermodynamic and workflow model does the package implement?
+- Which user-facing workflow should I use for my study?
+- Which exact API surface, schema, or class should I call in code?
 
-Total Site Integration
-----------------------
-Total site integration extends pinch principles across an entire industrial
-complex, coordinating the heat recovery potential of multiple process units,
-utilities, and energy storage systems. By viewing the site as a single thermal
-ecosystem, engineers can balance steam levels, share surplus heat between
-plants, and cut overall fuel demand without compromising production targets.
-OpenPinch provides the tools to identify cross-unit heat matches, quantify
-utility interactions, and prioritize integration projects that deliver the
-largest system-wide savings. A key difference between pinch analysis and 
-total site integration is the method of heat recovery: direct (process-to-process)
-versus indirect (process-to-utility-to-process).
+Start with the overview if you need the package map, the fundamentals if you
+need the technical grounding, or the guides if you want a runnable workflow
+immediately.
 
+What OpenPinch Covers
+---------------------
 
-Highlights
-----------
-- Multi-scale targeting for process, site, and regional studies
-- Multiple utility targeting (isothermal and non-isothermal) with assisted heat
-  integration options
-- Composite-curve and grand-composite-curve graph generation
-- Imports established Excel data templates and exports detailed reports
-- Packaged sample cases and notebook workflows for first-time users
-- Pydantic schema models for validated programmatic workflows
+- classical direct pinch targeting for process zones
+- indirect, total-process, and total-site style targeting through utility
+  systems
+- multi-utility studies and graph generation
+- hierarchical zone modeling from unit operation to site scope
+- integrated heat-pump and refrigeration screening workflows
+- above-pinch and below-pinch turbine cogeneration analysis
+- Excel, JSON, CSV-bundle, CLI, notebook, and programmatic Python workflows
 
+Recommended Reading Paths
+-------------------------
 
-History of OpenPinch
---------------------
-OpenPinch started as part of Tim Walmsley's PhD research at the University of
-Waikato and has continued evolving through industrial projects and community
-contributions. This implementation brings the capabilities of the long-running 
-Excel/VBA workbook into a modern Python API so engineers can automate targeting 
-studies, integrate with other software tools and projects, and embed results 
-into wider optimisation workflows.
+New users
+   Read :doc:`overview/what-is-openpinch`, then
+   :doc:`guides/first-solve-cli` or :doc:`guides/first-solve-python`.
 
-The packaged user workflow is now organized around:
+Process integration practitioners
+   Read :doc:`fundamentals/pinch-analysis`,
+   :doc:`fundamentals/direct-vs-indirect-integration`, and
+   :doc:`fundamentals/graphs-and-interpretation` before diving into workflow
+   guides.
 
-- ``openpinch sample`` and ``openpinch run`` for the first solve
-- ``openpinch graph`` for graph export
-- ``openpinch notebook`` for guided notebook workflows
-- :class:`OpenPinch.PinchProblem` for Python and notebook usage
-
-.. _GitHub: https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/
+Package integrators and advanced users
+   Read :doc:`api/pinchproblem`, :doc:`api/service-layer`, and
+   :doc:`api/schemas-and-config`, then use :doc:`api/generated-index` for the
+   exhaustive package reference.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents
+   :caption: Documentation
 
-   getting-started
-   user-guide/quickstart
-   user-guide/heat-pump-targeting
-   user-guide/interpreting-results
-   user-guide/notebooks
-   reference/index
+   overview/index
+   fundamentals/index
+   guides/index
+   api/index
+   examples/index
+   developer/index

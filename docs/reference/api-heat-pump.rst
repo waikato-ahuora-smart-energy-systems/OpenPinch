@@ -12,7 +12,6 @@ Where To Start
 Most users should still begin with the higher-level surfaces documented in
 :doc:`api-core`:
 
-- :meth:`OpenPinch.classes.pinch_problem.PinchProblem.evaluate_heat_pump_integration`
 - ``problem.target.direct_heat_pump(...)``
 - ``problem.target.indirect_heat_pump(...)``
 - ``problem.target.direct_refrigeration(...)``

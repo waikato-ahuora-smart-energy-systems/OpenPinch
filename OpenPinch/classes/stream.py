@@ -59,6 +59,7 @@ class Stream:
 
     @name.setter
     def name(self, value: str):
+        """Set the display name used for reporting and graph labels."""
         self._name = value
 
     @property
@@ -68,6 +69,7 @@ class Stream:
 
     @is_process_stream.setter
     def is_process_stream(self, value: bool):
+        """Mark whether the stream is treated as process-side or utility-side."""
         self._is_process_stream = value
 
     @property
@@ -77,6 +79,7 @@ class Stream:
 
     @type.setter
     def type(self, value: str):
+        """Override the inferred stream thermal type."""
         self._type = value
 
     @property
@@ -86,6 +89,7 @@ class Stream:
 
     @t_supply.setter
     def t_supply(self, value: float):
+        """Set the supply temperature and refresh derived stream attributes."""
         self._t_supply = value
         self._update_attributes()
 
@@ -96,6 +100,7 @@ class Stream:
 
     @t_target.setter
     def t_target(self, value: float):
+        """Set the target temperature and refresh derived stream attributes."""
         self._t_target = value
         self._update_attributes()
 
@@ -106,6 +111,7 @@ class Stream:
 
     @P_supply.setter
     def P_supply(self, value: float):
+        """Set the supply pressure and refresh derived stream attributes."""
         self._P_supply = value
         self._update_attributes()
 
@@ -116,6 +122,7 @@ class Stream:
 
     @P_target.setter
     def P_target(self, value: float):
+        """Set the target pressure and refresh derived stream attributes."""
         self._P_target = value
         self._update_attributes()
 
@@ -126,6 +133,7 @@ class Stream:
 
     @h_supply.setter
     def h_supply(self, value: float):
+        """Set the supply enthalpy and refresh derived stream attributes."""
         self._h_supply = value
         self._update_attributes()
 
@@ -136,6 +144,7 @@ class Stream:
 
     @h_target.setter
     def h_target(self, value: float):
+        """Set the target enthalpy and refresh derived stream attributes."""
         self._h_target = value
         self._update_attributes()
 
@@ -146,6 +155,7 @@ class Stream:
 
     @dt_cont.setter
     def dt_cont(self, value: float):
+        """Set the base contribution to shifted-temperature calculations."""
         self._dt_cont = value
         self._dt_cont_act = value
         self._update_attributes()
@@ -157,6 +167,7 @@ class Stream:
 
     @dt_cont_act.setter
     def dt_cont_act(self, value: float):
+        """Set the effective shifted-temperature contribution in active use."""
         self._dt_cont_act = value
         self._update_attributes()
 
@@ -167,6 +178,7 @@ class Stream:
 
     @heat_flow.setter
     def heat_flow(self, value: float):
+        """Set the stream duty and refresh derived heat-capacity quantities."""
         self._heat_flow = value
         self._update_attributes()
 
@@ -177,6 +189,7 @@ class Stream:
 
     @htc.setter
     def htc(self, value: float):
+        """Set the heat-transfer coefficient and refresh derived resistance."""
         self._htc = value
         self._update_attributes()
 
@@ -187,6 +200,7 @@ class Stream:
 
     @htr.setter
     def htr(self, value: float):
+        """Set the stored heat-transfer resistance explicitly."""
         self._htr = value
 
     @property
@@ -196,6 +210,7 @@ class Stream:
 
     @price.setter
     def price(self, value: float):
+        """Set the unit energy price used in utility-cost calculations."""
         self._price = value
 
     @property
@@ -205,6 +220,7 @@ class Stream:
 
     @ut_cost.setter
     def ut_cost(self, value: float):
+        """Set the cached utility-cost figure for the stream."""
         self._ut_cost = value
 
     @property
@@ -214,6 +230,7 @@ class Stream:
 
     @CP.setter
     def CP(self, value: float):
+        """Set the cached heat-capacity flow rate."""
         self._CP = value
 
     @property
@@ -223,6 +240,7 @@ class Stream:
 
     @rCP.setter
     def rCP(self, value: float):
+        """Set the cached resistance-capacity product."""
         self._RCP_prod = value
 
     @property
@@ -232,6 +250,7 @@ class Stream:
 
     @active.setter
     def active(self, value: bool):
+        """Activate or deactivate the stream for downstream analysis."""
         self._active = value
 
     # === Computed Temperature Bounds ===
@@ -243,6 +262,7 @@ class Stream:
 
     @t_min.setter
     def t_min(self, value: float):
+        """Set the unshifted lower temperature bound."""
         self._t_min = value
 
     @property
@@ -252,6 +272,7 @@ class Stream:
 
     @t_max.setter
     def t_max(self, value: float):
+        """Set the unshifted upper temperature bound."""
         self._t_max = value
 
     @property
@@ -261,6 +282,7 @@ class Stream:
 
     @t_min_star.setter
     def t_min_star(self, value: float):
+        """Set the shifted lower temperature bound."""
         self._t_min_star = value
 
     @property
@@ -270,6 +292,7 @@ class Stream:
 
     @t_max_star.setter
     def t_max_star(self, value: float):
+        """Set the shifted upper temperature bound."""
         self._t_max_star = value
 
     # === Methods ===
@@ -309,6 +332,7 @@ class Stream:
         self._calc_htr_and_cp_product()
 
     def invert(self) -> None:
+        """Flip a utility stream into its generating process-stream analogue."""
         if self._is_process_stream:
             raise ValueError(
                 "Logic error: Process streams cannot be inverted, only utility streams for their generation."

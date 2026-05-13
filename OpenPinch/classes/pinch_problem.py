@@ -462,6 +462,7 @@ class PinchProblem:
 
     @project_name.setter
     def project_name(self, value: str):
+        """Update the root project label and mirror it onto the loaded root zone."""
         self._project_name = value
         if isinstance(self._master_zone, Zone):
             self._master_zone.name = value
