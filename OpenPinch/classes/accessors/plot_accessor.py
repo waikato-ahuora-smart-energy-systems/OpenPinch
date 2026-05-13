@@ -1,3 +1,5 @@
+"""Graph-accessor helpers for selecting, rendering, and exporting solved plots."""
+
 import pandas as pd
 
 from typing import Optional, Any, Union, Dict, TYPE_CHECKING
@@ -13,7 +15,8 @@ if TYPE_CHECKING:
     from ...classes.pinch_problem import PinchProblem
 
 PathLike = Union[str, Path]
-GraphPayload = Dict[str, Dict[str, Any]]
+GraphRecord = Dict[str, Any]
+GraphPayload = Dict[str, GraphRecord]
 
 _GRAPH_TYPE_ALIASES = {
     "cc": GT.CC.value,
@@ -56,9 +59,11 @@ class _PlotAccessor:
     """Callable graph helper that also exposes common named plot shortcuts."""
 
     def __init__(self, problem: "PinchProblem") -> None:
+        """Bind the accessor to one solved or solveable :class:`PinchProblem`."""
         self._problem = problem
 
     def __call__(self):
+        """Return the same graph inventory table as :meth:`catalog`."""
         return self.catalog()
 
     def catalog(self) -> pd.DataFrame:
@@ -90,14 +95,30 @@ class _PlotAccessor:
         graph_type: Optional[str] = None,
         index: int = 0,
         show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build a Plotly figure for one graph from the solved result set."""
-        graph = self._select_graph(
+        """Select one graph and return either its figure or raw payload."""
+        graph_data = self._select_graph(
             zone_name=zone_name,
             graph_type=graph_type,
             index=index,
         )
-        figure = _build_plotly_graph(graph)
+        if return_graph_data:
+            if show:
+                raise ValueError(
+                    "show=True is only supported when returning a Plotly figure."
+                )
+            return graph_data
+        return self._build_graph_figure(graph_data, show=show)
+
+    def _build_graph_figure(
+        self,
+        graph_data: GraphRecord,
+        *,
+        show: bool = False,
+    ):
+        """Build a Plotly figure from serialized graph data."""
+        figure = _build_plotly_graph(graph_data)
         if hasattr(figure, "show") and show:
             figure.show()
         return figure
@@ -108,7 +129,8 @@ class _PlotAccessor:
         zone_name: Optional[str] = None,
         graph_type: Optional[str] = None,
         index: int = 0,
-    ) -> dict:
+    ) -> GraphRecord:
+        """Return one graph payload from the filtered graph selection."""
         graphs = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
         if not graphs:
             raise ValueError("No graphs matched the requested selection.")
@@ -124,7 +146,8 @@ class _PlotAccessor:
         *,
         zone_name: Optional[str] = None,
         graph_type: Optional[str] = None,
-    ) -> list[tuple[str, dict]]:
+    ) -> list[tuple[str, GraphRecord]]:
+        """Return all graph payloads matching the optional zone and type filters."""
         payload = self.get_graph_data()
         selected_graph_type = _normalise_graph_type_selector(graph_type)
 
@@ -187,7 +210,7 @@ class _PlotAccessor:
         selected = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
         written_paths = []
         for idx, (graph_zone_name, graph) in enumerate(selected, start=1):
-            figure = _build_plotly_graph(graph)
+            figure = self._build_graph_figure(graph)
             stem = _slugify(f"{graph_zone_name}_{graph.get('type', 'graph')}_{idx}")
             destination = output_path / f"{stem}.html"
             figure.write_html(destination)
@@ -195,91 +218,173 @@ class _PlotAccessor:
         return written_paths
 
     def composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching composite-curve figure."""
+        """Return the first matching composite-curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.CC.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
         )
 
     def shifted_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching shifted-composite-curve figure."""
+        """Return the first matching shifted-composite-curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.SCC.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
         )
 
     def balanced_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching balanced-composite-curve figure."""
+        """Return the first matching balanced-composite-curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.BCC.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
         )
 
     def grand_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching grand-composite-curve figure."""
+        """Return the first matching grand-composite-curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
         )
 
     def real_grand_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching grand-composite-curve figure."""
+        """Return the first matching real-temperature GCC payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC_R.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
         )
 
     def grand_composite_curve_with_heat_pump(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching GCC-with-heat-pump overlay figure."""
+        """Return the first matching GCC-with-heat-pump payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC_HP.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
         )
 
     def net_load_profiles(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching net-load-profile figure."""
+        """Return the first matching net-load-profile payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.NLP.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
         )
 
-    def real_grand_composite_curve(
-        self, *, zone_name: Optional[str] = None, index: float = 0, show: bool = False
+    def total_site_profiles(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
     ):
-        """Build the first matching grand-composite-curve figure."""
+        """Return the first matching total-site-profiles payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.GCC_R.value,
+            graph_type=GT.TSP.value,
             index=index,
             show=show,
+            return_graph_data=return_graph_data,
+        )
+
+    def site_utility_load_profiles(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
+    ):
+        """Return the first matching site-utility-load payload or figure."""
+        return self._plot_graph(
+            zone_name=zone_name,
+            graph_type=GT.TSU.value,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
+
+    def site_utility_grand_composite_curve(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
+    ):
+        """Return the first matching site-utility GCC payload or figure."""
+        return self._plot_graph(
+            zone_name=zone_name,
+            graph_type=GT.SUGCC.value,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
         )
 
 
@@ -287,12 +392,14 @@ class _PlotAccessorDescriptor:
     """Non-data descriptor exposing a callable plot accessor on instances."""
 
     def __get__(self, obj: Optional["PinchProblem"], owner=None):
+        """Return the bound accessor on instances and the descriptor on classes."""
         if obj is None:
             return self
         return _PlotAccessor(obj)
 
 
 def _normalise_graph_type_selector(graph_type: Optional[str]) -> Optional[str]:
+    """Normalize short graph-type aliases to their canonical enum label."""
     if graph_type is None:
         return None
     text = str(graph_type).strip()
@@ -305,6 +412,7 @@ def _graph_set_matches_zone_selector(
     graph_key: str,
     graph_set: dict[str, Any],
 ) -> bool:
+    """Return ``True`` when one graph set matches a user-facing zone selector."""
     text = str(selector).strip()
     suffix = text.split("/", 1)[-1]
     candidates = (
@@ -326,6 +434,7 @@ def _graph_set_matches_zone_selector(
 
 
 def _slugify(value: str) -> str:
+    """Convert a graph-derived label into a filesystem-friendly HTML stem."""
     cleaned = "".join(ch.lower() if ch.isalnum() else "_" for ch in value)
     while "__" in cleaned:
         cleaned = cleaned.replace("__", "_")

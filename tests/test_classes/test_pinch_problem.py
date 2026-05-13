@@ -684,6 +684,65 @@ def test_plot_helper_executes_display_hook_when_available(monkeypatch):
     assert shown["count"] == 1
 
 
+def test_plot_helper_can_return_selected_graph_data(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [
+                {"type": "Composite Curves", "name": "Composite"},
+                {"type": "Grand Composite Curve", "name": "GCC"},
+            ],
+        }
+    }
+    build_calls = {"count": 0}
+
+    def fake_build(graph):
+        build_calls["count"] += 1
+        return {"built": graph["name"]}
+
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[_PlotAccessor.__module__],
+        "_build_plotly_graph",
+        fake_build,
+        raising=True,
+    )
+
+    obj = PinchProblem()
+    graph = obj.plot.grand_composite_curve(
+        zone_name="Plant/DI",
+        return_graph_data=True,
+    )
+
+    assert graph == {"type": "Grand Composite Curve", "name": "GCC"}
+    assert build_calls["count"] == 0
+
+
+def test_plot_helper_rejects_show_when_returning_graph_data(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [
+                {"type": "Composite Curves", "name": "Composite"},
+            ],
+        }
+    }
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+
+    obj = PinchProblem()
+
+    with pytest.raises(ValueError, match="show=True"):
+        obj.plot.composite_curve(
+            zone_name="Plant/DI",
+            show=True,
+            return_graph_data=True,
+        )
+
+
 def test_plot_helper_uses_default_notebook_dimensions(monkeypatch):
     payload = {
         "Plant/DI": {
