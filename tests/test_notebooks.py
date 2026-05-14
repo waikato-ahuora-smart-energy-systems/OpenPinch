@@ -44,10 +44,25 @@ def test_notebook_2_covers_total_site_graph_payloads_and_cogeneration(
 
     assert "total site" in lead_markdown.lower()
     assert "pulp_mill.json" in combined_source
-    assert "problem.plot.catalog()" in combined_source
-    assert "problem.plot.get_graph_data()" in combined_source
-    assert "figure_from_graph_payload" in combined_source
+    assert 'workspace = PinchWorkspace(' in combined_source
+    assert 'catalog = baseline.plot.catalog()' in combined_source
+    assert "baseline.plot.get_graph_data()" in combined_source
+    assert "baseline.plot.total_site_profiles" in combined_source
+    assert "baseline.plot.site_utility_grand_composite_curve" in combined_source
     assert "Total Site Profiles" in combined_source
     assert "Site Utility Grand Composite Curve" in combined_source
     assert '"base_target_type": "Total Site Target"' in combined_source
     assert "Power Cogeneration Target" in combined_source
+
+
+def test_packaged_notebooks_use_pinch_workspace_without_local_helpers(tmp_path: Path):
+    """The packaged notebooks should use the library API directly."""
+    for notebook_name in EXPECTED_NOTEBOOKS:
+        notebook_path = copy_notebook(notebook_name, tmp_path / notebook_name)
+        notebook = _load_notebook(notebook_path)
+        combined_source = _combined_source(notebook)
+
+        assert "PinchWorkspace" in combined_source
+        assert "read_sample_case" not in combined_source
+        assert "json.loads(" not in combined_source
+        assert "def " not in combined_source

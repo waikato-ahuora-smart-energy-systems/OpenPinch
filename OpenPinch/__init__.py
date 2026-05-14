@@ -3,6 +3,7 @@
 import warnings as _warnings
 
 from .classes.pinch_problem import PinchProblem
+from .classes.pinch_workspace import PinchWorkspace
 from .lib import *  # noqa: F401,F403
 from .main import pinch_analysis_service
 from .utils.stream_linearisation import get_piecewise_linearisation_for_streams

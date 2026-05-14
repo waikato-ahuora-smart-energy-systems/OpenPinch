@@ -7,6 +7,7 @@ from .io import *
 from .reporting import *
 from .targets import *
 from .turbine import *
+from .workspace import *
 
 __all__ = [
     "DataPoint",
@@ -36,6 +37,24 @@ __all__ = [
     "ValueWithUnit",
     "VisualiseInput",
     "VisualiseOutput",
+    "ConfigurationFieldMetadata",
+    "GraphCatalogEntry",
+    "GraphPayloadEntry",
+    "PayloadRecordView",
+    "ProblemTableDiffView",
+    "ProblemTableView",
+    "ScenarioComparisonView",
+    "ScenarioVariantBundleEntry",
+    "ScenarioVariantView",
+    "ScenarioWorkflowConfig",
+    "PinchWorkspaceBundle",
+    "SummaryCard",
+    "TableView",
+    "ValidationIssue",
+    "ValidationReport",
+    "VariantMetricDelta",
+    "VariantPayloadView",
+    "ZoneNodeView",
     "ZoneTreeSchema",
     "AnyTargetModel",
     "BaseTargetModel",

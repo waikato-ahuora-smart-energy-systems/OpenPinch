@@ -28,6 +28,7 @@ from ..services.input_data_processing.data_preparation import (
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
 )
+from ..resources import list_sample_cases, read_sample_case
 from ..utils.csv_to_json import get_problem_from_csv
 from ..utils.export import (
     build_summary_dataframe,
@@ -182,8 +183,12 @@ class PinchProblem:
             # 1. JSON
             if src_path.suffix.lower() == ".json":
                 try:
-                    with src_path.open("r", encoding="utf-8") as f:
-                        self._problem_data = json.load(f)
+                    sample_case_name = _packaged_sample_case_name(source, src_path)
+                    if sample_case_name is not None:
+                        self._problem_data = json.loads(read_sample_case(sample_case_name))
+                    else:
+                        with src_path.open("r", encoding="utf-8") as f:
+                            self._problem_data = json.load(f)
                 except (OSError, json.JSONDecodeError) as e:
                     raise ValueError(
                         f"Failed to parse JSON from {src_path}: {e}"
@@ -334,7 +339,7 @@ class PinchProblem:
 
     def summary_frame(self, *, detailed: bool = False) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
-        results = self.target()
+        results = self._results if self._results is not None else self.target()
         if detailed:
             return build_summary_dataframe(results.targets)
 
@@ -495,13 +500,27 @@ class PinchProblem:
         )
         return obj
 
-    def to_problem_json(self) -> JsonDict:
-        """Return the currently loaded problem payload in its canonical mapping form."""
+    def to_problem_json(self, *, canonical: bool = False) -> JsonDict:
+        """Return the currently loaded problem payload.
+
+        Parameters
+        ----------
+        canonical:
+            When ``True``, synthesise a canonical payload with an explicit
+            ``zone_tree`` and normalised stream zone addresses. When ``False``,
+            return the currently loaded raw payload as-is.
+        """
         if self._problem_data is None:
             raise RuntimeError(
                 "No problem_data available. Did you call load(...) or from_json(...)?"
             )
+        if canonical:
+            return self._canonical_problem_payload()
         return self._problem_data
+
+    def canonical_problem_json(self) -> JsonDict:
+        """Return a canonical mutable payload including an explicit zone tree."""
+        return self.to_problem_json(canonical=True)
 
     def set_dt_cont_multiplier(
         self,
@@ -522,6 +541,34 @@ class PinchProblem:
         target_zone = zone_name or str(zone_tree.get("name") or self.project_name)
         zone_node = _find_zone_tree_node(zone_tree, target_zone)
         zone_node["dt_cont_multiplier"] = resolved_value
+
+        self._problem_data = payload
+        self._validation_context = _build_validation_context(
+            self._problem_data,
+            source_kind=self._input_source_kind,
+        )
+        self._validated_data = self.validate()
+        self._master_zone = self._data_preprocessing()
+        self._results = None
+        return self._master_zone
+
+    def update_options(
+        self,
+        options: Dict[str, Any],
+        *,
+        replace: bool = False,
+    ) -> Zone:
+        """Update the problem options in-place and rebuild the analysis state."""
+        if not isinstance(options, dict):
+            raise TypeError("options must be provided as a dict.")
+
+        payload = self.canonical_problem_json()
+        current_options = payload.get("options") or {}
+        payload["options"] = (
+            deepcopy(options)
+            if replace
+            else {**deepcopy(current_options), **deepcopy(options)}
+        )
 
         self._problem_data = payload
         self._validation_context = _build_validation_context(
@@ -672,6 +719,22 @@ def _locate_summary_row(
     if not direct_match.empty:
         return direct_match.iloc[0]
     return frame.iloc[0]
+
+
+def _packaged_sample_case_name(
+    source: PathLike,
+    src_path: Path,
+) -> Optional[str]:
+    source_text = str(source)
+    if src_path.exists():
+        return None
+    if src_path.name != source_text:
+        return None
+    if src_path.suffix.lower() != ".json":
+        return None
+    if src_path.name not in set(list_sample_cases()):
+        return None
+    return src_path.name
 
 
 def _find_zone_tree_node(

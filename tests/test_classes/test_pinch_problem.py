@@ -1005,6 +1005,21 @@ def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
     assert len(validated.utilities) == 5
 
 
+def test_packaged_sample_case_name_can_be_loaded_directly():
+    problem = PinchProblem(
+        source="crude_preheat_train.json",
+        project_name="crude_preheat_train",
+    )
+
+    validated = problem.validate()
+    canonical = problem.to_problem_json(canonical=True)
+
+    assert problem.problem_filepath == Path("crude_preheat_train.json")
+    assert validated.zone_tree is None
+    assert canonical["zone_tree"] is not None
+    assert len(validated.streams) > 0
+
+
 def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path):
     case_path = copy_sample_case(
         "crude_preheat_train.json",
