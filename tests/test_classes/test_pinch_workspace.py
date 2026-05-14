@@ -122,7 +122,10 @@ def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
     target = case.target.direct_heat_pump()
 
     assert target.name.endswith("Direct Heat Pump")
-    assert workspace.get_case_payload("direct_hp_full_load")["options"]["HPR_LOAD_VALUE"] == 1.0
+    assert (
+        workspace.get_case_payload("direct_hp_full_load")["options"]["HPR_LOAD_VALUE"]
+        == 1.0
+    )
     assert not case.plot.catalog().empty
 
 

@@ -43,6 +43,7 @@ from ._workspace_support import (
     zone_tree_view,
 )
 from .pinch_problem import PinchProblem
+
 PathLike = str | Path
 
 
@@ -51,7 +52,11 @@ class PinchWorkspace:
 
     def __init__(
         self,
-        source: TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | None = None,
+        source: TargetInput
+        | JsonDict
+        | PathLike
+        | tuple[PathLike, PathLike]
+        | None = None,
         *,
         project_name: Optional[str] = "Site",
         baseline_name: str = "baseline",
@@ -142,7 +147,12 @@ class PinchWorkspace:
 
     def load(
         self,
-        source: TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | PinchProblem | None,
+        source: TargetInput
+        | JsonDict
+        | PathLike
+        | tuple[PathLike, PathLike]
+        | PinchProblem
+        | None,
         *,
         case_name: Optional[str] = None,
         activate: bool = True,
@@ -584,8 +594,12 @@ class PinchWorkspace:
                     label=name.replace("_", " ").title(),
                     field_type=field_type,
                     group=group,
-                    support_level="stable" if group in {"general", "targeting"} else "advanced",
-                    enum_choices=[str(item.value) for item in enum_cls] if enum_cls else [],
+                    support_level="stable"
+                    if group in {"general", "targeting"}
+                    else "advanced",
+                    enum_choices=[str(item.value) for item in enum_cls]
+                    if enum_cls
+                    else [],
                     numeric_min=_CONFIG_MINIMUMS.get(name),
                     multiple=multiple,
                 )
@@ -601,9 +615,7 @@ class PinchWorkspace:
 
         if name not in self._variant_payloads:
             available = ", ".join(self.list_cases())
-            raise KeyError(
-                f"Unknown case {name!r}. Available cases: {available}"
-            )
+            raise KeyError(f"Unknown case {name!r}. Available cases: {available}")
         return name
 
     def _default_case_name(self) -> Optional[str]:
@@ -630,7 +642,9 @@ class PinchWorkspace:
         if name in self._cached_views:
             view = self._cached_views[name]
         else:
-            workflow_config = self._variant_workflows.get(name, ScenarioWorkflowConfig())
+            workflow_config = self._variant_workflows.get(
+                name, ScenarioWorkflowConfig()
+            )
             view = self.solve_variant(
                 name,
                 workflow=workflow_config.workflow,
@@ -646,7 +660,11 @@ class PinchWorkspace:
 
     def _canonical_payload_from_source(
         self,
-        source: TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | PinchProblem,
+        source: TargetInput
+        | JsonDict
+        | PathLike
+        | tuple[PathLike, PathLike]
+        | PinchProblem,
         *,
         project_name: Optional[str] = None,
     ) -> tuple[JsonDict, str]:

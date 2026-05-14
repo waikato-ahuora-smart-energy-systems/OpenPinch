@@ -44,8 +44,8 @@ def test_notebook_2_covers_total_site_graph_payloads_and_cogeneration(
 
     assert "total site" in lead_markdown.lower()
     assert "pulp_mill.json" in combined_source
-    assert 'workspace = PinchWorkspace(' in combined_source
-    assert 'catalog = baseline.plot.catalog()' in combined_source
+    assert "workspace = PinchWorkspace(" in combined_source
+    assert "catalog = baseline.plot.catalog()" in combined_source
     assert "baseline.plot.get_graph_data()" in combined_source
     assert "baseline.plot.total_site_profiles" in combined_source
     assert "baseline.plot.site_utility_grand_composite_curve" in combined_source

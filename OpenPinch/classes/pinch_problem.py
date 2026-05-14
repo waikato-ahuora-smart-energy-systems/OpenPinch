@@ -185,7 +185,9 @@ class PinchProblem:
                 try:
                     sample_case_name = _packaged_sample_case_name(source, src_path)
                     if sample_case_name is not None:
-                        self._problem_data = json.loads(read_sample_case(sample_case_name))
+                        self._problem_data = json.loads(
+                            read_sample_case(sample_case_name)
+                        )
                     else:
                         with src_path.open("r", encoding="utf-8") as f:
                             self._problem_data = json.load(f)

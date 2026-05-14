@@ -30,7 +30,10 @@ from ..lib.schemas.workspace import (
     VariantPayloadView,
     ZoneNodeView,
 )
-from ..streamlit_webviewer.web_graphing import collect_targets, problem_table_to_dataframe
+from ..streamlit_webviewer.web_graphing import (
+    collect_targets,
+    problem_table_to_dataframe,
+)
 from .pinch_problem import PinchProblem, _build_validation_context, _maybe_get_value
 
 JsonDict = Dict[str, Any]
@@ -600,7 +603,9 @@ def summary_metric_deltas(
     for target_id in target_ids:
         base_row = base_rows.get(target_id, {})
         variant_row = variant_rows.get(target_id, {})
-        target_name = str(base_row.get("Target") or variant_row.get("Target") or target_id)
+        target_name = str(
+            base_row.get("Target") or variant_row.get("Target") or target_id
+        )
         for metric in _SUMMARY_METRIC_COLUMNS:
             base_value = json_safe(base_row.get(metric))
             variant_value = json_safe(variant_row.get(metric))
@@ -667,11 +672,15 @@ def problem_table_diffs(
                 base_rows=base_rows,
                 variant_rows=variant_rows,
                 shared_columns=shared_columns,
-                changed_cells=count_changed_cells(base_table, variant_table, shared_columns),
+                changed_cells=count_changed_cells(
+                    base_table, variant_table, shared_columns
+                ),
                 shape_changed=base_rows != variant_rows
                 or (
                     (base_table.table.columns if base_table is not None else [])
-                    != (variant_table.table.columns if variant_table is not None else [])
+                    != (
+                        variant_table.table.columns if variant_table is not None else []
+                    )
                 ),
             )
         )
@@ -808,7 +817,7 @@ def maybe_float(value: Any) -> Optional[float]:
         return None
     try:
         value = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not math.isfinite(value):
         return None
