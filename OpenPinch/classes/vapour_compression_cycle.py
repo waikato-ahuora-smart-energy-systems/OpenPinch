@@ -70,6 +70,7 @@ class VapourCompressionCycle:
 
     @state.setter
     def state(self, value) -> None:
+        """Set the working-fluid state object and refresh critical properties."""
         self._state = process_fluid_state(value)
         self._solved = False
         self._p_crit = self._state.keyed_output(CoolProp.iP_critical)
@@ -83,6 +84,7 @@ class VapourCompressionCycle:
 
     @cycle_states.setter
     def cycle_states(self, value: StateContainer) -> None:
+        """Replace the full state container with a validated six-point cycle."""
         if len(value) != self.STATECOUNT:
             raise ValueError(f"Expected exactly {self.STATECOUNT} state points.")
         value.units = self._system
@@ -209,6 +211,7 @@ class VapourCompressionCycle:
 
     @dtcont.setter
     def dtcont(self, value: float):
+        """Set the minimum approach used when building derived stream profiles."""
         self._dtcont = value
 
     @property

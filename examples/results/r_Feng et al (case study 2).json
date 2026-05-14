@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Feng et al (case study 2)/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 238.0,
@@ -205,14 +205,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Feng et al (case study 2)/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 238.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 238.0,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -256,7 +256,7 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Feng et al (case study 2)/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 20.0,

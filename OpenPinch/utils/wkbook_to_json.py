@@ -233,7 +233,7 @@ def _parse_options_sheet(
         if hasattr(val, "item"):
             try:
                 return val.item()
-            except (AttributeError, RuntimeError, TypeError, ValueError):
+            except AttributeError, RuntimeError, TypeError, ValueError:
                 pass
         return val
 

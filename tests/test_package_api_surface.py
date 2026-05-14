@@ -13,6 +13,7 @@ EXPECTED_EXPORTS = {
     "OpenPinch": {
         "Configuration",
         "PinchProblem",
+        "PinchWorkspace",
         "StreamSchema",
         "StreamType",
         "TargetInput",
@@ -49,6 +50,7 @@ EXPECTED_EXPORTS = {
         "MultiStageSteamTurbine",
         "ParallelVapourCompressionCycles",
         "PinchProblem",
+        "PinchWorkspace",
         "ProblemTable",
         "SimpleBraytonHeatPumpCycle",
         "Stream",

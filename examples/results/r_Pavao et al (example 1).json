@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Pavao et al (example 1)/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 151.85000000000002,
@@ -115,7 +115,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 55249.7967759636,
+                "value": 55249.79677596361,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -345,14 +345,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Pavao et al (example 1)/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 121.85000000000002,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 121.85000000000002,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -431,7 +431,7 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Pavao et al (example 1)/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 147.8,

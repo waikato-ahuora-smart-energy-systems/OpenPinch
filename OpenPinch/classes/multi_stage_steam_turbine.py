@@ -119,6 +119,7 @@ class _TurbineState:
         self.mass_flow_out = [0.0] * self.s
 
     def max_mass_flow(self, mass_flow: float) -> float:
+        """Return the load-fraction-adjusted maximum inlet flow for one stage."""
         return mass_flow / self.load_frac if self.load_frac > tol else 0.0
 
 

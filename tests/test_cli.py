@@ -18,7 +18,6 @@ def test_validate_command_accepts_packaged_sample(tmp_path: Path):
 def test_run_command_writes_summary_excel_json_and_graphs(tmp_path: Path, capsys):
     case_path = copy_sample_case("basic_pinch.json", tmp_path / "basic_pinch.json")
     json_path = tmp_path / "results.json"
-    graph_dir = tmp_path / "graphs"
     excel_dir = tmp_path / "excel"
 
     assert (
@@ -30,8 +29,6 @@ def test_run_command_writes_summary_excel_json_and_graphs(tmp_path: Path, capsys
                 str(excel_dir),
                 "--json-output",
                 str(json_path),
-                "--graph-output",
-                str(graph_dir),
             ]
         )
         == 0
@@ -40,31 +37,7 @@ def test_run_command_writes_summary_excel_json_and_graphs(tmp_path: Path, capsys
     captured = capsys.readouterr()
     assert "Hot Utility Target" in captured.out
     assert json.loads(json_path.read_text(encoding="utf-8"))["name"]
-    assert any(graph_dir.glob("*.html"))
     assert any(excel_dir.glob("*.xlsx"))
-
-
-def test_graph_command_filters_and_exports_html(tmp_path: Path):
-    case_path = copy_sample_case("basic_pinch.json", tmp_path / "basic_pinch.json")
-    graph_dir = tmp_path / "graphs"
-
-    assert (
-        cli.main(
-            [
-                "graph",
-                str(case_path),
-                "--graph-type",
-                "gcc",
-                "-o",
-                str(graph_dir),
-            ]
-        )
-        == 0
-    )
-
-    written = list(graph_dir.glob("*.html"))
-    assert written
-    assert all("grand_composite_curve" in path.stem for path in written)
 
 
 def test_sample_and_notebook_commands_copy_packaged_assets(tmp_path: Path):

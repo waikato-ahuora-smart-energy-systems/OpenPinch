@@ -1,31 +1,15 @@
+:orphan:
+
 Reference Guide
 ===============
 
-The reference pages provide architecture context, complete API documentation,
-and local build instructions.
+The reference structure has been reorganized.
 
-Use :doc:`architecture` to understand how zones, problem tables, and targeting
-stages fit together. Use :doc:`api` when you need callable signatures,
-configuration objects, schema definitions, or lower-level analysis modules.
+To rebuild the docs from the current toolchain, use
+``uv run scripts/build_docs.py``.
 
-.. toctree::
-   :maxdepth: 1
+Use these sections instead:
 
-   architecture
-   api
-
-.. _docs-build:
-
-Building the Documentation
---------------------------
-
-Build the HTML pages locally with ``uv``:
-
-.. code-block:: bash
-
-   uv run scripts/build_docs.py
-
-The helper script installs the local Sphinx requirements declared in
-``scripts/build_docs.py`` and writes the output to ``docs/_build/html``.
-Read the Docs uses the environment defined in ``.readthedocs.yaml`` and builds
-the same ``docs/conf.py`` configuration.
+- :doc:`../api/index` for the curated public API and exhaustive appendix
+- :doc:`../fundamentals/index` for the technical and architectural grounding
+- :doc:`../developer/index` for docs build and maintenance notes

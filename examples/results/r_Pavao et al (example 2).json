@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Pavao et al (example 2)/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 166.85000000000002,
@@ -21,22 +21,22 @@
                 "units": "kW"
             },
             "Qr": {
-                "value": 1536.8933053888884,
+                "value": 1536.8933053888882,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 96.51274618076509,
+                "value": 96.51274618076508,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 11192.845573720102,
+                "value": 11192.845573720113,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "HPS",
                     "heat_flow": {
-                        "value": 12.85424360000026,
+                        "value": 12.854243600000316,
                         "units": "kW"
                     }
                 },
@@ -85,7 +85,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -178,7 +178,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -271,7 +271,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -308,7 +308,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 385789219.46764517,
+                "value": 65357.39839515007,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -364,7 +364,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 139.99926032888897,
                         "units": "kW"
@@ -457,7 +457,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -550,7 +550,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -559,14 +559,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Pavao et al (example 2)/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": -58.150000000000006,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": -58.150000000000006,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -587,7 +587,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 385974028.63517547,
+                "value": 250166.5659254992,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -643,7 +643,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 139.99926032888897,
                         "units": "kW"
@@ -652,7 +652,7 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Pavao et al (example 2)/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 32.2,
@@ -672,15 +672,15 @@
                 "units": "kW"
             },
             "Qr": {
-                "value": 358.0217201631126,
+                "value": 358.0217201631124,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 22.48279648570666,
+                "value": 22.482796485706647,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 385907868.99635875,
+                "value": 184006.92710884413,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -736,7 +736,7 @@
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "FRZ",
                     "heat_flow": {
                         "value": 139.99926032888897,
                         "units": "kW"

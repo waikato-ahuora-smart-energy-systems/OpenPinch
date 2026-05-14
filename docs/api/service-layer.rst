@@ -1,0 +1,68 @@
+Service Layer
+=============
+
+The service layer is the boundary between validated input payloads and the
+prepared/solved in-memory model. It is the right integration surface when you
+want more control than :class:`~OpenPinch.classes.pinch_problem.PinchProblem`
+provides but do not want to invoke individual low-level algorithms directly.
+
+Layering
+--------
+
+The service stack is designed in three steps:
+
+1. validate or receive a typed request payload
+2. prepare the payload into a :class:`~OpenPinch.classes.zone.Zone` hierarchy
+3. dispatch direct, indirect, HPR, cogeneration, or area/cost targeting
+
+Use Cases
+---------
+
+Use the service layer when you need to:
+
+- embed OpenPinch in another application with a stable request/response
+  boundary
+- prepare a zone hierarchy once and run multiple advanced studies against it
+- inspect the prepared model before solving
+- bypass file handling entirely and work with typed payloads
+
+Main Service Surface
+--------------------
+
+.. automodule:: OpenPinch.services
+   :members:
+   :no-index:
+
+Preparation Entry Point
+-----------------------
+
+The preparation stage is the key boundary between external payloads and the
+internal model. It validates configuration choices, builds the zone tree,
+applies ``dt_cont`` multipliers, instantiates process and utility streams, and
+produces the ``Zone`` object consumed by the solver stack.
+
+.. autofunction:: OpenPinch.services.input_data_processing.data_preparation.prepare_problem
+   :no-index:
+
+Direct High-Level Orchestration
+-------------------------------
+
+For callers that want one function rather than an object wrapper, the root
+orchestration helper remains available:
+
+.. automodule:: OpenPinch.main
+   :members:
+   :no-index:
+
+Choosing Between Interfaces
+---------------------------
+
+- Use :func:`OpenPinch.main.pinch_analysis_service` when you want a typed
+  request/response contract.
+- Use :mod:`OpenPinch.services` when you want to prepare a zone once and run
+  several advanced analyses against the same prepared state.
+- Use :class:`~OpenPinch.classes.pinch_problem.PinchProblem` when you want a
+  notebook- and file-oriented convenience wrapper with summaries and exports.
+
+The service layer is also the best place to look when you are trying to
+understand how the narrative workflow maps onto the actual analysis pipeline.

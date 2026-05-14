@@ -57,7 +57,7 @@ def get_piecewise_data_points(
         return _get_piecewise_breakpoints(
             curve=curve, epsilon=dt_diff_max, is_hot_stream=is_hot_stream
         )
-    except (FloatingPointError, RuntimeError, ValueError):
+    except FloatingPointError, RuntimeError, ValueError:
         try:
             return _rdp(
                 curve=curve,

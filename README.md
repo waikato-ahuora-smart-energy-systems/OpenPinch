@@ -47,14 +47,14 @@ from pathlib import Path
 
 from OpenPinch import PinchProblem
 
-problem = PinchProblem(problem_filepath=Path("basic_pinch.json"))
-problem.run()
+problem = PinchProblem(Path("basic_pinch.json"))
+problem.target()
 
 summary = problem.summary_frame()
 print(summary)
 
 problem.export_excel("results")
-problem.export_graphs("graphs", graph_type="gcc")
+problem.plot.export("graphs", graph_type="gcc")
 ```
 
 You can also build a payload directly from the validated schema models:

@@ -9,6 +9,7 @@ from .stream_collection import StreamCollection
 from .vapour_compression_cycle import VapourCompressionCycle
 from .multi_stage_steam_turbine import MultiStageSteamTurbine
 from .pinch_problem import PinchProblem
+from .pinch_workspace import PinchWorkspace
 from .value import Value
 from .zone import Zone
 
@@ -19,6 +20,7 @@ __all__ = [
     "Value",
     "Zone",
     "PinchProblem",
+    "PinchWorkspace",
     "VapourCompressionCycle",
     "ParallelVapourCompressionCycles",
     "SimpleBraytonHeatPumpCycle",

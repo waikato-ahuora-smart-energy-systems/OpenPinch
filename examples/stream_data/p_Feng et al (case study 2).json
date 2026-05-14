@@ -20,7 +20,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -46,7 +46,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -72,7 +72,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -98,7 +98,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -124,7 +124,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -150,7 +150,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -176,7 +176,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -202,7 +202,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -228,7 +228,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -254,7 +254,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -280,7 +280,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -306,7 +306,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -332,7 +332,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -358,7 +358,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -384,7 +384,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -410,7 +410,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -436,7 +436,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -462,7 +462,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -488,7 +488,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -514,7 +514,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -540,7 +540,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -566,7 +566,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -592,7 +592,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -618,7 +618,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -644,7 +644,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -670,7 +670,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -696,7 +696,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -722,7 +722,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -748,7 +748,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -774,7 +774,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -800,7 +800,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -826,7 +826,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -852,7 +852,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -878,7 +878,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -904,7 +904,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -930,7 +930,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -956,7 +956,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -982,7 +982,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1008,7 +1008,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1034,7 +1034,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1060,7 +1060,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1086,7 +1086,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1112,7 +1112,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1138,7 +1138,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1164,7 +1164,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1190,7 +1190,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1216,7 +1216,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1242,7 +1242,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1268,7 +1268,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1294,7 +1294,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1320,7 +1320,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1346,7 +1346,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1372,7 +1372,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1398,7 +1398,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1424,7 +1424,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1450,7 +1450,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1476,7 +1476,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1502,7 +1502,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1528,7 +1528,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1554,7 +1554,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1580,7 +1580,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1606,7 +1606,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1632,7 +1632,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1658,7 +1658,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1684,7 +1684,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1710,7 +1710,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1736,7 +1736,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1762,7 +1762,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1788,7 +1788,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1814,7 +1814,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1840,7 +1840,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1866,7 +1866,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1892,7 +1892,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1918,7 +1918,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1944,7 +1944,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1970,7 +1970,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,
@@ -1996,7 +1996,7 @@
                 "units": "degC"
             },
             "htc": {
-                "value": null,
+                "value": 1.0,
                 "units": "kW/m^2/degC"
             },
             "loc": 0,

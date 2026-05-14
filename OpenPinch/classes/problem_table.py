@@ -6,7 +6,7 @@ import numbers
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Mapping, Sequence, Tuple, Union
+from typing import List, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd

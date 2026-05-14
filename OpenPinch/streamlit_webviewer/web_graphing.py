@@ -358,7 +358,7 @@ def _build_download(
                 st.error(f"Failed to save file: {exc}")
 
 
-def _build_plotly_graph(graph: Mapping[str, object]) -> go.Figure:
+def _build_plotly_graph(graph: Mapping[str, object]):
     """Create a Plotly figure for the provided graph payload."""
     plotly_go = _require_plotly()
     fig = plotly_go.Figure()
@@ -375,7 +375,7 @@ def _segment_trace(
     segment: Mapping[str, object],
     graph: Mapping[str, object],
     legend_seen: Dict[str, bool],
-) -> Tuple[List[go.Scatter], Optional[dict]]:
+) -> tuple:
     x_vals, y_vals = _extract_segment_xy(segment)
     if not x_vals or not y_vals:
         return [], None
@@ -505,7 +505,7 @@ def _hover_template(
     )
 
 
-def _apply_default_layout(fig: go.Figure) -> None:
+def _apply_default_layout(fig) -> None:
     fig.update_layout(
         width=720,
         height=540,
