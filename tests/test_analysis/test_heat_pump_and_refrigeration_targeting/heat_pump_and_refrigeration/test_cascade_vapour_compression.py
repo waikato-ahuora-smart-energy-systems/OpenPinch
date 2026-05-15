@@ -8,7 +8,13 @@ from OpenPinch.services.heat_pump_integration.cycles import (
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 
-from ..helpers import _base_args, _pt_with_hnet, _sc, _stream
+from ..helpers import (
+    _base_args,
+    _patch_output_model_validate,
+    _pt_with_hnet,
+    _sc,
+    _stream,
+)
 
 
 def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
@@ -176,3 +182,26 @@ def test_cascade_x0_branch_for_single_stage():
 
     x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init_res, args=args)
     assert x0.shape == (6,)
+
+
+def test_cascade_optimiser_allows_missing_initial_seed(monkeypatch):
+    captured = {}
+    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=False)
+    _patch_output_model_validate(monkeypatch)
+
+    monkeypatch.setattr(
+        hp_cascade,
+        "validate_vapour_hp_refrigerant_ls",
+        lambda num_stages, args: ["R134A"] * num_stages,
+    )
+
+    def fake_solve_hpr_placement(*, f_obj, x0_ls, bnds, args):
+        captured["x0_ls"] = x0_ls
+        return {"success": True}
+
+    monkeypatch.setattr(hp_cascade, "solve_hpr_placement", fake_solve_hpr_placement)
+
+    out = hp_cascade.optimise_cascade_heat_pump_placement(args)
+
+    assert captured["x0_ls"] is None
+    assert out["success"] is True

@@ -8,7 +8,7 @@ from OpenPinch.services.heat_pump_integration.cycles import (
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 
-from ..helpers import _base_args
+from ..helpers import _base_args, _patch_output_model_validate
 
 
 def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
@@ -111,3 +111,30 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
         np.array([0.9] * 10), args
     )
     assert np.isinf(out_bad["obj"])
+
+
+def test_multi_single_optimiser_allows_missing_initial_seed(monkeypatch):
+    captured = {}
+    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=False)
+    _patch_output_model_validate(monkeypatch)
+
+    monkeypatch.setattr(
+        hp_multi_simple_vapour,
+        "validate_vapour_hp_refrigerant_ls",
+        lambda num_stages, args: ["R134A"] * num_stages,
+    )
+
+    def fake_solve_hpr_placement(*, f_obj, x0_ls, bnds, args):
+        captured["x0_ls"] = x0_ls
+        return {"success": True}
+
+    monkeypatch.setattr(
+        hp_multi_simple_vapour,
+        "solve_hpr_placement",
+        fake_solve_hpr_placement,
+    )
+
+    out = hp_multi_simple_vapour.optimise_multi_simple_heat_pump_placement(args)
+
+    assert captured["x0_ls"] is None
+    assert out["success"] is True

@@ -139,6 +139,23 @@ def _require_plotly():
     return go
 
 
+def _verify_x0_ls(x0_ls: list | float | None) -> np.ndarray | None:
+    if x0_ls is None:
+        return None
+
+    if isinstance(x0_ls, (int, float)):
+        x0_ls = [x0_ls]
+
+    x0_arr = np.asarray(x0_ls, dtype=np.float64)
+    if x0_arr.size == 0:
+        return None
+    if x0_arr.ndim == 0:
+        return x0_arr.reshape(1, 1)
+    if x0_arr.ndim == 1:
+        return x0_arr.reshape(1, -1)
+    return x0_arr
+
+
 def solve_hpr_placement(
     f_obj: Callable,
     x0_ls: list | float,
@@ -146,16 +163,10 @@ def solve_hpr_placement(
     args: HeatPumpTargetInputs,
 ) -> dict:
     """Run the configured multistart optimiser and post-process the best result."""
-    if isinstance(x0_ls, (int, float)):
-        x0_ls = [x0_ls]
-    x0_ls = np.asarray(x0_ls, dtype=np.float64)
-    if len(x0_ls.shape) == 1:
-        x0_ls = [x0_ls]
-
     local_minima_x = multiminima(
         func=f_obj,
         func_kwargs=args,
-        x0_ls=x0_ls,
+        x0_ls=_verify_x0_ls(x0_ls),
         bounds=bnds,
         optimiser_handle=args.bb_minimiser,
         opt_kwargs={"n_runs": max(1, int(args.max_multi_start))},

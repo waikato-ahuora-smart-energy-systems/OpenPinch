@@ -169,6 +169,40 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     ) == pytest.approx(0.21)
 
 
+@pytest.mark.parametrize("x0_ls", [None, [], np.array([])])
+def test_solve_hpr_placement_preserves_missing_initial_guesses(monkeypatch, x0_ls):
+    captured = {}
+
+    def fake_multiminima(**kwargs):
+        captured["x0_ls"] = kwargs["x0_ls"]
+        return np.array([[0.25]])
+
+    monkeypatch.setattr(hp_shared, "multiminima", fake_multiminima)
+
+    args = _base_args()
+    result = hp_shared.solve_hpr_placement(
+        f_obj=lambda x, args, debug=False: {
+            "obj": 0.0,
+            "utility_tot": 0.0,
+            "w_net": 0.0,
+            "Q_ext": 0.0,
+            "Q_amb_hot": 0.0,
+            "Q_amb_cold": 0.0,
+            "cop_h": 1.0,
+            "success": True,
+            "hpr_hot_streams": StreamCollection(),
+            "hpr_cold_streams": StreamCollection(),
+        },
+        x0_ls=x0_ls,
+        bnds=[(0.0, 1.0)],
+        args=args,
+    )
+
+    assert captured["x0_ls"] is None
+    assert result["success"] is True
+    assert isinstance(result["amb_streams"], StreamCollection)
+
+
 def test_get_heat_pump_cascade_helper(monkeypatch):
     hot = _sc(_stream("H", 120.0, 110.0, 5.0, is_process_stream=False))
     cold = _sc(_stream("C", 70.0, 80.0, 5.0, is_process_stream=False))
