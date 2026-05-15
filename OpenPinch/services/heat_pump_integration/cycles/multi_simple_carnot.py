@@ -242,7 +242,7 @@ def _compute_multi_simple_carnot_hp_opt_obj(
 
     return {
         "obj": obj,
-        "utility_tot": work.sum() + Q_ext_heat,
+        "utility_tot": work + Q_ext_heat + Q_ext_cold,
         "w_net": work,
         "w_hpr": cycle_results["w_hpr"],
         "w_he": cycle_results["w_he"],

@@ -118,3 +118,34 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
     assert np.isfinite(res["obj"])
     assert np.isfinite(res["utility_tot"])
     assert res["Q_cond"].shape == (2,)
+
+
+def test_compute_multi_simple_carnot_utility_total_includes_residual_cold_utility(
+    monkeypatch,
+):
+    args = SimpleNamespace(
+        n_cond=1,
+        n_evap=1,
+        T_cold=np.array([100.0, 50.0]),
+        H_cold=np.array([200.0, 0.0]),
+        T_hot=np.array([90.0, 40.0]),
+        H_hot=np.array([0.0, -20.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.0,
+        Q_hpr_target=200.0,
+        Q_heat_max=200.0,
+        Q_cool_max=20.0,
+        heat_to_power_ratio=1.0,
+        cold_to_power_ratio=1.0,
+        rho_penalty=10.0,
+    )
+    monkeypatch.setattr(
+        hp_multi_simple_carnot, "g_ineq_penalty", lambda *args, **kwargs: 0.0
+    )
+
+    res = _compute_multi_simple_carnot_hp_opt_obj(np.array([0.5, 0.5, 0.0]), args)
+
+    assert res["Q_ext"] > 0.0
+    assert np.isclose(res["utility_tot"], res["w_net"] + res["Q_ext"])
