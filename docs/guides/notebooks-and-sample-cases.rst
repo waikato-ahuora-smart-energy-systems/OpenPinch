@@ -5,6 +5,12 @@ The packaged notebooks and sample cases are part of the supported OpenPinch
 learning surface. They are the fastest way to move from a blank environment to
 an end-to-end workflow.
 
+Install the notebook runtime first:
+
+.. code-block:: bash
+
+   python -m pip install "openpinch[notebook]"
+
 Packaged Sample Cases
 ---------------------
 
@@ -25,6 +31,10 @@ Copy one into your working directory with:
 
 Packaged Notebook Series
 ------------------------
+
+The current packaged notebooks load bundled sample cases directly with
+``PinchWorkspace(source="sample_case.json", ...)`` and then work against real
+``PinchProblem`` cases inside the workspace.
 
 Copy the full series with:
 
@@ -51,8 +61,11 @@ Recommended Learning Path
    interpretation
 2. `zonal_site.json` or `pulp_mill.json` and notebook 02 for total-site and
    SUGCC workflows
-3. `heat_pump_targeting.json` and notebook 03 for HPR comparison and utility
-   displacement logic
+3. `chocolate_factory.json` and notebook 03 for direct-versus-indirect HPR and
+   refrigeration comparison
+4. `heat_pump_targeting.json` for a smaller direct HPR screening payload when
+   you want to test the advanced `problem.target.*` surface without the full
+   notebook comparison flow
 
 Why These Assets Matter
 -----------------------

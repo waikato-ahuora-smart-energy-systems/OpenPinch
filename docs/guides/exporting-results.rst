@@ -59,14 +59,22 @@ Use Excel when:
 - you want a reviewable report artifact
 - the audience prefers spreadsheet consumption
 
+These workbook-oriented outputs require the ``openpinch[notebook]`` or
+``openpinch[dashboard]`` extra.
+
 Use HTML graphs when:
 
 - you want portable visual output
 - you do not need the live Python object
 
+These rendered graph exports require the ``openpinch[notebook]`` or
+``openpinch[dashboard]`` extra.
+
 Use the dashboard when:
 
 - you want an interactive review after solving
+
+This surface requires ``openpinch[dashboard]``.
 
 Next Steps
 ----------

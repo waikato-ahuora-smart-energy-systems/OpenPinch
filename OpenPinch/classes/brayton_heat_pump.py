@@ -32,7 +32,7 @@ def _require_tespy() -> None:
         return
     raise ImportError(
         "TESPy is required for Brayton-cycle tooling. "
-        "Install it with 'pip install openpinch[cycles]'."
+        "Install it with 'pip install openpinch[brayton_cycle]'."
     ) from _TESPY_IMPORT_ERROR
 
 

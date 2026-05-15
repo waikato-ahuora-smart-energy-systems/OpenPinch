@@ -10,7 +10,8 @@ Included Notebooks
 
 ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
    Baseline direct-integration workflow, summary reading, graph inspection, and
-   ``dt_cont`` sensitivity using the public ``PinchProblem`` API.
+   ``dt_cont`` sensitivity using ``PinchWorkspace`` plus real
+   ``PinchProblem`` cases.
 
 ``02_total_site_targets_and_sugcc.ipynb``
    Zonal and total-site workflow on a pulp-mill style case, including indirect
@@ -49,6 +50,6 @@ Why These Matter
 ----------------
 
 The notebooks do more than demonstrate commands. They reveal the practical
-power of the package: scenario comparison, hierarchical targeting, graph-based
+power of the package: named case comparison, hierarchical targeting, graph-based
 interpretation, and advanced thermal integration studies on top of the same
 prepared data model.

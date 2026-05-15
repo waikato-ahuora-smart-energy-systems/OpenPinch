@@ -12,6 +12,8 @@ QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
 NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
 HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
 INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
+API_PINCHWORKSPACE = REPO_ROOT / "docs" / "api" / "pinchworkspace.rst"
+API_PACKAGE_ROOT = REPO_ROOT / "docs" / "api" / "package-root.rst"
 API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
 API_LIB = REPO_ROOT / "docs" / "reference" / "api-lib.rst"
 API_ANALYSIS = REPO_ROOT / "docs" / "reference" / "api-analysis.rst"
@@ -93,7 +95,28 @@ def test_docs_explain_base_and_notebook_installs():
 
     notebook_guides = "\n".join([readme, getting_started, quickstart, notebooks])
     assert notebook_guides.count('python -m pip install "openpinch[notebook]"') >= 4
+    assert 'python -m pip install "openpinch[dashboard]"' in readme
+    assert 'python -m pip install "openpinch[dashboard]"' in getting_started
+    assert 'python -m pip install "openpinch[dashboard]"' in quickstart
+    assert 'python -m pip install "openpinch[brayton_cycle]"' in readme
+    assert 'python -m pip install "openpinch[brayton_cycle]"' in getting_started
     assert "Optional: Jupyter" not in getting_started
+
+
+def test_docs_expose_pinchworkspace_as_the_named_study_surface():
+    combined = "\n".join(
+        [
+            _read(README),
+            _read(GETTING_STARTED),
+            _read(API_PACKAGE_ROOT),
+            _read(API_PINCHWORKSPACE),
+        ]
+    )
+
+    assert "PinchWorkspace" in combined
+    assert 'source="crude_preheat_train.json"' in combined
+    assert 'project_name="crude_preheat_train"' in combined
+    assert "compare_cases" in combined
 
 
 def test_reference_docs_match_current_heat_pump_and_schema_surface():

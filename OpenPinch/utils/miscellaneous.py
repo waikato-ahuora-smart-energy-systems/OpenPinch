@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import numpy as np
-import plotly.graph_objects as go
 
 from ..lib.config import tol
 
@@ -28,9 +27,9 @@ class _PlotlyShowProxy:
     """Compatibility shim preserving the historical ``plt.show()`` test hook."""
 
     def __init__(self) -> None:
-        self._current_figure: go.Figure | None = None
+        self._current_figure: Any | None = None
 
-    def set_current_figure(self, figure: go.Figure) -> None:
+    def set_current_figure(self, figure: Any) -> None:
         """Remember the figure to be shown by the compatibility ``show`` hook."""
         self._current_figure = figure
 
@@ -42,6 +41,18 @@ class _PlotlyShowProxy:
 
 
 plt = _PlotlyShowProxy()
+
+
+def _require_plotly():
+    try:
+        import plotly.graph_objects as go
+    except ImportError as exc:  # pragma: no cover - optional dependency guard
+        raise ImportError(
+            "Plotly is required for graph_simple_cc_plot. "
+            "Install it directly or reinstall OpenPinch with "
+            "'pip install openpinch[notebook]' or 'pip install openpinch[dashboard]'."
+        ) from exc
+    return go
 
 
 def get_value(
@@ -213,6 +224,7 @@ def clean_composite_curve(
 
 def graph_simple_cc_plot(Tc, Hc, Th, Hh):
     """Render a quick Plotly plot of hot/cold composite curves for debugging."""
+    go = _require_plotly()
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(

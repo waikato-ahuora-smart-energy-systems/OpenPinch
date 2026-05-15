@@ -28,6 +28,13 @@ Packaged Resources
 The resources module exposes the packaged sample cases and notebooks used
 throughout the guides and examples.
 
+The current optional install split is:
+
+- ``openpinch[notebook]`` for Jupyter, Plotly graph rendering, and Excel I/O
+- ``openpinch[dashboard]`` for Streamlit plus the same plotting/export stack
+- ``openpinch[brayton_cycle]`` for TESPy-backed Brayton-cycle tooling
+- ``openpinch[full]`` for the combined optional surface
+
 .. automodule:: OpenPinch.resources
    :members:
    :no-index:
@@ -51,7 +58,8 @@ Dashboard Surface
 -----------------
 
 OpenPinch also includes a Streamlit-oriented graphing and dashboard path for
-interactive exploration after solving a problem.
+interactive exploration after solving a problem. Install
+``openpinch[dashboard]`` before using this surface.
 
 .. automodule:: streamlit_app
    :members:

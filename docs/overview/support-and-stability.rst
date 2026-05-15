@@ -26,6 +26,7 @@ Stable Public Surfaces
 ----------------------
 
 - :class:`OpenPinch.PinchProblem`
+- :class:`OpenPinch.PinchWorkspace`
 - :func:`OpenPinch.main.pinch_analysis_service`
 - root package imports from :mod:`OpenPinch`
 - `TargetInput`, `TargetOutput`, and the main I/O schema models

@@ -860,26 +860,42 @@ wheels = [
 
 [[package]]
 name = "openpinch"
-version = "0.1.21"
+version = "0.1.22"
 source = { editable = "." }
 dependencies = [
     { name = "coolprop" },
     { name = "numpy" },
-    { name = "openpyxl" },
     { name = "pandas" },
     { name = "pint" },
-    { name = "plotly" },
     { name = "pydantic" },
-    { name = "pyxlsb" },
     { name = "scipy" },
-    { name = "streamlit" },
-    { name = "tespy" },
 ]
 
 [package.optional-dependencies]
+brayton-cycle = [
+    { name = "tespy" },
+]
+dashboard = [
+    { name = "openpyxl" },
+    { name = "plotly" },
+    { name = "pyxlsb" },
+    { name = "streamlit" },
+]
+full = [
+    { name = "ipykernel" },
+    { name = "nbformat" },
+    { name = "openpyxl" },
+    { name = "plotly" },
+    { name = "pyxlsb" },
+    { name = "streamlit" },
+    { name = "tespy" },
+]
 notebook = [
     { name = "ipykernel" },
     { name = "nbformat" },
+    { name = "openpyxl" },
+    { name = "plotly" },
+    { name = "pyxlsb" },
 ]
 
 [package.dev-dependencies]
@@ -889,29 +905,44 @@ dev = [
     { name = "hatchling" },
     { name = "ipykernel" },
     { name = "nbformat" },
+    { name = "openpyxl" },
+    { name = "plotly" },
     { name = "pytest" },
+    { name = "pyxlsb" },
     { name = "ruff" },
     { name = "sphinx" },
     { name = "sphinx-rtd-theme" },
+    { name = "streamlit" },
+    { name = "tespy" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "coolprop" },
+    { name = "ipykernel", marker = "extra == 'full'", specifier = ">=7.2.0" },
     { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=7.2.0" },
+    { name = "nbformat", marker = "extra == 'full'", specifier = ">=5.10.4" },
     { name = "nbformat", marker = "extra == 'notebook'", specifier = ">=5.10.4" },
     { name = "numpy" },
-    { name = "openpyxl" },
+    { name = "openpyxl", marker = "extra == 'dashboard'" },
+    { name = "openpyxl", marker = "extra == 'full'" },
+    { name = "openpyxl", marker = "extra == 'notebook'" },
     { name = "pandas" },
     { name = "pint" },
-    { name = "plotly" },
+    { name = "plotly", marker = "extra == 'dashboard'" },
+    { name = "plotly", marker = "extra == 'full'" },
+    { name = "plotly", marker = "extra == 'notebook'" },
     { name = "pydantic" },
-    { name = "pyxlsb" },
+    { name = "pyxlsb", marker = "extra == 'dashboard'" },
+    { name = "pyxlsb", marker = "extra == 'full'" },
+    { name = "pyxlsb", marker = "extra == 'notebook'" },
     { name = "scipy" },
-    { name = "streamlit" },
-    { name = "tespy" },
+    { name = "streamlit", marker = "extra == 'dashboard'" },
+    { name = "streamlit", marker = "extra == 'full'" },
+    { name = "tespy", marker = "extra == 'brayton-cycle'" },
+    { name = "tespy", marker = "extra == 'full'" },
 ]
-provides-extras = ["notebook"]
+provides-extras = ["dashboard", "brayton-cycle", "notebook", "full"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -920,11 +951,16 @@ dev = [
     { name = "hatchling", specifier = ">=1.26" },
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "nbformat", specifier = ">=5.10.4" },
+    { name = "openpyxl" },
+    { name = "plotly" },
     { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pyxlsb" },
     { name = "ruff", specifier = ">=0.1.8" },
     { name = "ruff", specifier = ">=0.15.8" },
     { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
+    { name = "streamlit" },
+    { name = "tespy" },
 ]
 
 [[package]]

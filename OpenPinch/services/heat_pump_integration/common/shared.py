@@ -3,8 +3,15 @@
 from typing import Callable, Tuple
 
 import numpy as np
-import plotly.graph_objects as go
 from CoolProp.CoolProp import PropsSI
+
+try:
+    import plotly.graph_objects as go
+except ImportError as exc:  # pragma: no cover - optional dependency guard
+    go = None
+    _PLOTLY_IMPORT_ERROR = exc
+else:
+    _PLOTLY_IMPORT_ERROR = None
 
 from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
@@ -55,8 +62,9 @@ def plot_multi_hp_profiles_from_results(
     hpr_hot_streams: StreamCollection = None,
     hpr_cold_streams: StreamCollection = None,
     title: str = None,
-) -> go.Figure:
+) -> "go.Figure":
     """Plot background source/sink profiles alongside solved HPR cycle streams."""
+    go = _require_plotly()
     fig = go.Figure()
 
     if T_hot is not None and H_hot is not None:
@@ -119,6 +127,16 @@ def plot_multi_hp_profiles_from_results(
     fig.add_vline(x=0.0, line_color="black", line_width=2)
     fig.show()
     return fig
+
+
+def _require_plotly():
+    if _PLOTLY_IMPORT_ERROR is not None:
+        raise ImportError(
+            "Plotly is required for HPR profile plotting. "
+            "Install it directly or reinstall OpenPinch with "
+            "'pip install openpinch[notebook]' or 'pip install openpinch[dashboard]'."
+        ) from _PLOTLY_IMPORT_ERROR
+    return go
 
 
 def solve_hpr_placement(

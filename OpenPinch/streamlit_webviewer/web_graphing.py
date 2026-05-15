@@ -14,7 +14,6 @@ import math
 from io import BytesIO
 from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tuple
 
-import openpyxl as xl_writer
 import pandas as pd
 
 try:
@@ -78,6 +77,18 @@ def _require_streamlit():
         "Streamlit is required for 'render_streamlit_dashboard'. "
         "Reinstall OpenPinch or install it directly with 'pip install streamlit'."
     ) from _STREAMLIT_IMPORT_ERROR
+
+
+def _require_openpyxl():
+    try:
+        import openpyxl
+    except ImportError as exc:  # pragma: no cover - optional dependency guard
+        raise ImportError(
+            "OpenPyXL is required for dashboard Excel downloads. "
+            "Install it directly or reinstall OpenPinch with "
+            "'pip install openpinch[dashboard]' or 'pip install openpinch[notebook]'."
+        ) from exc
+    return openpyxl
 
 
 @dataclass(slots=True)
@@ -348,7 +359,8 @@ def _build_download(
             st.error("Please provide a file path to save the table.")
         else:
             buffer = BytesIO()
-            with pd.ExcelWriter(buffer, engine=xl_writer.__name__) as writer:
+            engine_name = _require_openpyxl().__name__
+            with pd.ExcelWriter(buffer, engine=engine_name) as writer:
                 df.to_excel(writer, index=False, sheet_name="Problem Table")
             try:
                 with open(destination, "wb") as out_file:

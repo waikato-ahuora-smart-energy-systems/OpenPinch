@@ -44,7 +44,10 @@ Current Recommendation
 For supported advanced heat-pump and refrigeration work today, prefer the
 ``problem.target.direct_heat_pump(...)``,
 ``problem.target.indirect_heat_pump(...)``, and refrigeration companion
-methods.
+methods. Use ``chocolate_factory.json`` plus notebook 03 when the question is
+direct-versus-indirect comparison over a study range, and use
+``heat_pump_targeting.json`` when you want a smaller direct HPR screening
+payload.
 
 What To Compare
 ---------------

@@ -11,7 +11,8 @@ Recommended Imports
 
 Use the package root when you want the supported front door:
 
-- :class:`OpenPinch.PinchProblem` for file-backed or notebook-driven workflows
+- :class:`OpenPinch.PinchProblem` for single-case file-backed or notebook-driven workflows
+- :class:`OpenPinch.PinchWorkspace` for named multi-case studies and notebook workflows
 - :func:`OpenPinch.pinch_analysis_service` for typed programmatic execution
 - :func:`OpenPinch.get_piecewise_linearisation_for_streams` for nonlinear
   stream segmentation utilities
@@ -23,11 +24,19 @@ Typical Pattern
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem, pinch_analysis_service
+   from OpenPinch import PinchProblem, PinchWorkspace, pinch_analysis_service
    from OpenPinch.lib.schemas.io import TargetInput
 
    problem = PinchProblem("basic_pinch.json")
    result = problem.target()
+
+   workspace = PinchWorkspace(
+       source="crude_preheat_train.json",
+       project_name="crude_preheat_train",
+   )
+   workspace.copy_case("baseline", "wide_dt", activate=False)
+   workspace.set_dt_cont_multiplier(0.5, case_name="wide_dt")
+   comparison = workspace.compare_cases("baseline", "wide_dt")
 
 The package root is intentionally small. If your workflow starts depending on
 prepared zones, direct service orchestration, or lower-level targeting

@@ -56,11 +56,12 @@ Python Pattern
 
 .. code-block:: python
 
-   problem = PinchProblem("zonal_site.json")
-   problem.target()
+   from OpenPinch import PinchWorkspace
 
-   summary = problem.summary_frame()
-   total_site = problem.target.indirect_heat_integration()
+   workspace = PinchWorkspace(source="pulp_mill.json", project_name="Site")
+   baseline = workspace.case("baseline")
+   summary = baseline.summary_frame()
+   total_site = baseline.target.indirect_heat_integration()
 
 What To Compare
 ---------------

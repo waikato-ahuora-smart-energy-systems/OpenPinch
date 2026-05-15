@@ -1,7 +1,7 @@
 First Solve with Python
 =======================
 
-The main Python front door is :class:`OpenPinch.PinchProblem`.
+The main Python single-case front door is :class:`OpenPinch.PinchProblem`.
 
 Question This Guide Answers
 ---------------------------
@@ -14,13 +14,9 @@ Step 1. Load a Known-Good Sample
 
 .. code-block:: python
 
-   from pathlib import Path
-
    from OpenPinch import PinchProblem
-   from OpenPinch.resources import copy_sample_case
 
-   case_path = copy_sample_case("basic_pinch.json", Path("basic_pinch.json"))
-   problem = PinchProblem(case_path)
+   problem = PinchProblem("basic_pinch.json", project_name="basic_pinch")
 
 Step 2. Validate and Run
 ------------------------
@@ -57,7 +53,8 @@ Step 4. Inspect Graphs
    cc = problem.plot.composite_curve()
 
 Use the GCC first when utility placement or heat-pump opportunity is the main
-question.
+question. These rendered Plotly figures require the ``openpinch[notebook]`` or
+``openpinch[dashboard]`` extra.
 
 Step 5. Export Artifacts
 ------------------------
@@ -66,6 +63,9 @@ Step 5. Export Artifacts
 
    workbook_path = problem.export_excel("results")
    graph_paths = problem.plot.export("graphs", graph_type="gcc")
+
+These Excel and Plotly export hooks require the ``openpinch[notebook]`` or
+``openpinch[dashboard]`` extra.
 
 Step 6. Use the Richer Workflow Hooks
 -------------------------------------
@@ -82,6 +82,25 @@ Step 6. Use the Richer Workflow Hooks
 
 These are best treated as explicit advanced workflows after you understand the
 base case.
+
+Named Multi-Case Alternative
+----------------------------
+
+When you want one notebook or script to keep named study cases together, use
+``PinchWorkspace``:
+
+.. code-block:: python
+
+   from OpenPinch import PinchWorkspace
+
+   workspace = PinchWorkspace(
+       source="crude_preheat_train.json",
+       project_name="crude_preheat_train",
+   )
+   baseline = workspace.case("baseline")
+   workspace.copy_case("baseline", "wide_dt", activate=False)
+   workspace.set_dt_cont_multiplier(0.5, case_name="wide_dt")
+   comparison = workspace.compare_cases("baseline", "wide_dt")
 
 Schema-First Alternative
 ------------------------
@@ -118,5 +137,6 @@ Next Steps
 ----------
 
 - For input modeling guidance, see :doc:`input-formats-and-validation`.
+- For named study-case orchestration, see :doc:`../api/pinchworkspace`.
 - For zonal and site workflows, see :doc:`zonal-and-total-site-workflows`.
 - For the exact `PinchProblem` API, see :doc:`../api/pinchproblem`.

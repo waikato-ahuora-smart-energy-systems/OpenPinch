@@ -9,6 +9,7 @@ links to the exhaustive module-level appendix.
 
    package-root
    pinchproblem
+   pinchworkspace
    service-layer
    schemas-and-config
    domain-model
