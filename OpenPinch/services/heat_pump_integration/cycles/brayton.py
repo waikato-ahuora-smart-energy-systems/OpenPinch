@@ -32,12 +32,13 @@ def optimise_brayton_heat_pump_placement(
     """Optimise a single-stage Brayton heat-pump placement against the background."""
     args.n_cond = args.n_evap = 1
     args.refrigerant_ls = ["air"]
+    x0, bnds = _get_brayton_hp_opt_setup(args)
 
     opt = minimize(
         fun=lambda x: _compute_brayton_hp_system_obj(x, args)["obj"],
-        x0=_get_x0_for_brayton_hp_opt(args),
+        x0=x0,
         method="SLSQP",
-        bounds=_get_bounds_for_brayton_hp_opt(args),
+        bounds=bnds,
         options={"disp": False, "maxiter": 1000},
         tol=1e-7,
     )
@@ -50,27 +51,25 @@ def optimise_brayton_heat_pump_placement(
     return HeatPumpTargetOutputs.model_validate(res)
 
 
-def _get_x0_for_brayton_hp_opt(args: HeatPumpTargetInputs) -> list:
+def _get_brayton_hp_opt_setup(
+    args: HeatPumpTargetInputs,
+) -> tuple[list, list]:
     return [
         0.0,
         abs(args.T_cold[0] - args.T_hot[0]) / args.dt_range_max,
         abs(args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max,
         1.0,
+    ], [
+        (-0.2, 1.0),
+        (0.01, 1.5),
+        (0.01, 1.5),
+        (0.01, 1.0),
     ]
 
 
 #######################################################################################################
 # Helper Functions
 #######################################################################################################
-
-
-def _get_bounds_for_brayton_hp_opt(args: HeatPumpTargetInputs) -> list:
-    return [
-        (-0.2, 1.0),
-        (0.01, 1.5),
-        (0.01, 1.5),
-        (0.01, 1.0),
-    ]
 
 
 def _parse_brayton_hp_state_variables(

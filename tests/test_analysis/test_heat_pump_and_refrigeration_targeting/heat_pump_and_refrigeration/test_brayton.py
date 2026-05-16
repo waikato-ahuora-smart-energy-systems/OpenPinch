@@ -53,8 +53,7 @@ def test_brayton_x0_and_bounds_shapes_are_consistent():
         dt_range_max=130.0,
     )
 
-    x0 = hp_brayton._get_x0_for_brayton_hp_opt(args)
-    bnds = hp_brayton._get_bounds_for_brayton_hp_opt(args)
+    x0, bnds = hp_brayton._get_brayton_hp_opt_setup(args)
 
     assert len(x0) == 4
     assert len(bnds) == 4

@@ -16,6 +16,7 @@ from ..common.encoding import (
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
 )
+from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
     _append_unspecified_final_cascade_cooling_duty,
     calc_hpr_obj,
@@ -53,10 +54,11 @@ def optimise_cascade_heat_pump_placement(
     )
 
     args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(num_stages, args)
+    x0_ls, bnds = _get_cascade_hp_opt_setup(init_res, args)
     res = solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_obj,
-        x0_ls=_get_x0_for_cascade_hp_opt(init_res, args),
-        bnds=_get_bounds_for_cascade_hp_opt(args),
+        x0_ls=x0_ls,
+        bnds=bnds,
         args=args,
     )
     return HeatPumpTargetOutputs.model_validate(res)
@@ -67,12 +69,31 @@ def optimise_cascade_heat_pump_placement(
 #######################################################################################################
 
 
-def _get_x0_for_cascade_hp_opt(
+def _get_cascade_hp_opt_setup(
     init_res: HeatPumpTargetOutputs,
     args: HeatPumpTargetInputs,
-) -> np.ndarray:
+) -> tuple[np.ndarray | None, list]:
+    n_cond = int(args.n_cond)
+    n_evap = int(args.n_evap)
+    layout = HPRoptVectorLayout(
+        n_cond=n_cond,
+        n_evap=n_evap,
+        n_subcool=n_cond,
+        n_heat=n_cond,
+        n_cool=max(n_evap - 1, 0),
+        n_ihx=n_cond + n_evap - 1,
+    )
+    bnds = layout.build_bounds(
+        x_amb=(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS),
+        x_cond=(0.0, 1.0),
+        x_evap=(0.0, 1.0),
+        x_subcool=(0.0, 1.0),
+        x_heat=(0.0, 1.0),
+        x_cool=(0.0, 1.0),
+        x_ihx=(0.0, 1.0),
+    )
     if init_res is None:
-        return None
+        return None, bnds
 
     n_cool = max(int(args.n_evap) - 1, 0)
     Q_cool_ex = args.Q_cool_max + init_res.Q_amb_hot
@@ -86,50 +107,45 @@ def _get_x0_for_cascade_hp_opt(
     x_cond = map_T_arr_to_x_arr(
         init_res.T_cond, args.T_cold[0], args.T_cold[-1]
     ).tolist()
-    x_evap = map_T_arr_to_x_arr(init_res.T_evap, args.T_hot[-1], args.T_hot[0]).tolist()
+    x_evap = map_T_arr_to_x_arr(
+        init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
+    ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     x_heat = map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
     x_cool = map_Q_arr_to_x_arr(init_res.Q_evap[:n_cool], Q_cool_ex).tolist()
     x_ihx = [0.0] * (int(args.n_cond) + int(args.n_evap) - 1)
-    return np.asarray(
-        [x_amb] + x_cond + x_evap + x_subcool + x_heat + x_cool + x_ihx,
-        dtype=np.float64,
-    )
-
-
-def _get_bounds_for_cascade_hp_opt(args: HeatPumpTargetInputs) -> list:
-    n_cond = n_heat = int(args.n_cond)
-    n_evap = int(args.n_evap)
-    n_cool = n_evap - 1
-    n_units = n_cond + n_evap - 1
-    return (
-        [(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)]
-        + [(0.0, 1.0)] * n_cond
-        + [(0.0, 1.0)] * n_evap
-        + [(0.0, 1.0)] * n_cond
-        + [(0.0, 1.0)] * n_heat
-        + [(0.0, 1.0)] * n_cool
-        + [(0.0, 1.0)] * n_units
-    )
+    return layout.pack(
+        x_amb=x_amb,
+        x_cond=x_cond,
+        x_evap=x_evap,
+        x_subcool=x_subcool,
+        x_heat=x_heat,
+        x_cool=x_cool,
+        x_ihx=x_ihx,
+    ), bnds
 
 
 def _parse_cascade_hp_state_variables(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> dict:
-    x_amb = x[0]
-    a = 1 + int(args.n_cond)
-    x_cond = x[1:a]
-    b = a + int(args.n_evap)
-    x_evap = x[a:b]
-    c = b + int(args.n_cond)
-    x_subcool = x[b:c]
-    d = c + int(args.n_cond)
-    x_heat = x[c:d]
-    e = d + int(args.n_evap) - 1
-    x_cool = x[d:e]
-    f = e + (int(args.n_cond) + int(args.n_evap) - 1)
-    x_ihx = x[e:f]
+    n_cond = int(args.n_cond)
+    n_evap = int(args.n_evap)
+    parts = HPRoptVectorLayout(
+        n_cond=n_cond,
+        n_evap=n_evap,
+        n_subcool=n_cond,
+        n_heat=n_cond,
+        n_cool=max(n_evap - 1, 0),
+        n_ihx=n_cond + n_evap - 1,
+    ).unpack(x)
+    x_amb = parts["x_amb"]
+    x_cond = parts["x_cond"]
+    x_evap = parts["x_evap"]
+    x_subcool = parts["x_subcool"]
+    x_heat = parts["x_heat"]
+    x_cool = parts["x_cool"]
+    x_ihx = parts["x_ihx"]
 
     Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
     T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])

@@ -1,6 +1,6 @@
 """Common helpers shared across heat pump targeting models."""
 
-from . import encoding, preprocessing, shared
+from . import encoding, layout, preprocessing, shared
 from .encoding import (
     MAX_AMBIENT_X_ABS,
     map_DT_arr_to_x_arr,
@@ -12,6 +12,7 @@ from .encoding import (
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
 )
+from .layout import HPRoptVectorLayout
 from .preprocessing import construct_HPRTargetInputs
 from .shared import (
     calc_carnot_heat_engine_eta,
@@ -38,7 +39,9 @@ __all__ = [
     "get_Q_vals_at_T_hpr_from_bckgrd_profile",
     "get_ambient_air_stream",
     "get_carnot_hpr_cycle_streams",
+    "HPRoptVectorLayout",
     "MAX_AMBIENT_X_ABS",
+    "layout",
     "map_DT_arr_to_x_arr",
     "map_Q_amb_to_x",
     "map_Q_arr_to_x_arr",

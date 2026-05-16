@@ -41,8 +41,7 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
         Q_amb_cold=0.0,
     )
 
-    bnds = hp_cascade._get_bounds_for_cascade_hp_opt(args)
-    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init, args=args)
+    x0, bnds = hp_cascade._get_cascade_hp_opt_setup(init_res=init, args=args)
 
     assert x0.shape == (13,)
     assert x0[0] == pytest.approx(0.0)
@@ -64,10 +63,11 @@ def test_cascade_x0_round_trips_with_ambient_cooling_seed():
         Q_amb_cold=20.0,
     )
 
-    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init_res, args=args)
+    x0, _ = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
     vars = hp_cascade._parse_cascade_hp_state_variables(x0, args)
 
     assert abs(x0[0]) < 1.0
+    np.testing.assert_allclose(vars["T_evap"], init_res.T_evap)
     assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
     assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
     np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
@@ -85,7 +85,7 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         Q_amb_hot=0.0,
         Q_amb_cold=0.0,
     )
-    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init_res, args=args)
+    x0, bnds = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
     assert x0.shape[0] == 13
     assert np.all(x0[0] >= 0.0)
 
@@ -94,7 +94,6 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         "PropsSI",
         lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0,
     )
-    bnds = hp_cascade._get_bounds_for_cascade_hp_opt(args)
     assert len(bnds) == 13
 
     vars = hp_cascade._parse_cascade_hp_state_variables(
@@ -205,7 +204,7 @@ def test_cascade_x0_branch_for_single_stage():
         Q_amb_cold=0.0,
     )
 
-    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init_res, args=args)
+    x0, _ = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
     assert x0.shape == (6,)
 
 

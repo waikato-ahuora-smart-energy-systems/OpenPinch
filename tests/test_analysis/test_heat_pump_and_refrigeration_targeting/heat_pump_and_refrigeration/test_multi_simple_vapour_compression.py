@@ -34,8 +34,9 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
         Q_amb_cold=0.0,
     )
 
-    bnds = hp_multi_simple_vapour._get_bounds_for_multi_single_hp_opt(args)
-    x0 = hp_multi_simple_vapour._get_x0_for_multi_single_hp_opt(init_results, args)
+    x0, bnds = hp_multi_simple_vapour._get_multi_single_hp_opt_setup(
+        init_results, args
+    )
 
     assert x0.shape == (11,)
     assert len(bnds) == len(x0)
@@ -55,13 +56,14 @@ def test_multi_single_x0_round_trips_with_ambient_cooling_seed():
         Q_amb_cold=20.0,
     )
 
-    x0 = hp_multi_simple_vapour._get_x0_for_multi_single_hp_opt(
+    x0, _ = hp_multi_simple_vapour._get_multi_single_hp_opt_setup(
         init_res=init_res,
         args=args,
     )
     vars = hp_multi_simple_vapour._parse_multi_simple_hp_state_temperatures(x0, args)
 
     assert abs(x0[0]) < 1.0
+    np.testing.assert_allclose(vars["T_evap"], init_res.T_evap)
     assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
     assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
     np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
@@ -77,7 +79,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
         Q_amb_cold=0.0,
     )
     args = _base_args(n_cond=2, n_evap=2)
-    x0 = hp_multi_simple_vapour._get_x0_for_multi_single_hp_opt(
+    x0, bnds = hp_multi_simple_vapour._get_multi_single_hp_opt_setup(
         init_res=init_res,
         args=args,
     )
@@ -88,7 +90,6 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
         "PropsSI",
         lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0,
     )
-    bnds = hp_multi_simple_vapour._get_bounds_for_multi_single_hp_opt(args)
     assert len(bnds) == 11
 
     vars = hp_multi_simple_vapour._parse_multi_simple_hp_state_temperatures(
@@ -97,7 +98,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     assert vars["T_cond"].shape == (2,)
     assert vars["dT_subcool"].shape == (2,)
     assert vars["Q_heat"].shape == (2,)
-    assert vars["T_evap"].shape == (2,)
+    np.testing.assert_allclose(vars["T_evap"], np.array([59.0, 50.0]))
     assert vars["dT_ihx_gas_side"].shape == (2,)
     assert vars["Q_amb_hot"] == pytest.approx(0.0)
     assert vars["Q_amb_cold"] == pytest.approx(

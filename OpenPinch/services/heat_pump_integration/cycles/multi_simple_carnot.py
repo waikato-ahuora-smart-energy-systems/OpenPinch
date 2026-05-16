@@ -7,6 +7,7 @@ import numpy as np
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 from ..common.encoding import MAX_AMBIENT_X_ABS, map_x_arr_to_T_arr, map_x_to_Q_amb
+from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
     calc_carnot_heat_engine_eta,
     calc_carnot_heat_pump_cop,
@@ -35,11 +36,11 @@ def optimise_multi_simple_carnot_heat_pump_placement(
 ) -> HeatPumpTargetOutputs:
     """Optimise parallel simple Carnot stages for a screening-level HPR solve."""
     args.n_cond = args.n_evap = max(args.n_cond, args.n_evap)
+    x0_ls, bnds = _get_multi_simple_carnot_hp_opt_setup(args)
     res = solve_hpr_placement(
         f_obj=_compute_multi_simple_carnot_hp_opt_obj,
-        x0_ls=[0.0 for _ in range(args.n_cond + args.n_evap + 1)],
-        bnds=[(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
-        + [(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)],
+        x0_ls=x0_ls,
+        bnds=bnds,
         args=args,
     )
     res.update(
@@ -55,16 +56,32 @@ def optimise_multi_simple_carnot_heat_pump_placement(
 #######################################################################################################
 
 
+def _get_multi_simple_carnot_hp_opt_setup(
+    args: HeatPumpTargetInputs,
+) -> tuple[np.ndarray, list]:
+    layout = HPRoptVectorLayout(n_cond=int(args.n_cond), n_evap=int(args.n_evap))
+    return layout.pack(
+        x_amb=0.0,
+        x_cond=[0.0] * layout.n_cond,
+        x_evap=[0.0] * layout.n_evap,
+    ), layout.build_bounds(
+        x_amb=(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS),
+        x_cond=(0.0, 1.0),
+        x_evap=(0.0, 1.0),
+    )
+
+
 def _parse_multi_simple_carnot_hp_state_variables(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    T_cond = map_x_arr_to_T_arr(x[: args.n_cond], args.T_cold[0], args.T_cold[-1])
-    T_evap = args.T_hot[-1] - np.array(x[args.n_cond : -1]) * (
-        args.T_hot[-1] - args.T_hot[0]
-    )
+    parts = HPRoptVectorLayout(
+        n_cond=int(args.n_cond), n_evap=int(args.n_evap)
+    ).unpack(x)
+    T_cond = map_x_arr_to_T_arr(parts["x_cond"], args.T_cold[0], args.T_cold[-1])
+    T_evap = map_x_arr_to_T_arr(parts["x_evap"], args.T_hot[-1], args.T_hot[0])
     Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
-        x[-1], max(args.Q_heat_max, args.Q_cool_max)
+        parts["x_amb"], max(args.Q_heat_max, args.Q_cool_max)
     )
     return {
         "T_cond": T_cond,

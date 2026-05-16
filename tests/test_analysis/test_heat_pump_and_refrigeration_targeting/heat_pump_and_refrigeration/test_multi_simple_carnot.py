@@ -113,7 +113,7 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
     )
 
     res = _compute_multi_simple_carnot_hp_opt_obj(
-        np.array([0.0, 0.0, 0.25, 0.25, 0.0]), args
+        np.array([0.0, 0.0, 0.0, 0.25, 0.25]), args
     )
 
     assert np.isfinite(res["obj"])
@@ -146,7 +146,7 @@ def test_compute_multi_simple_carnot_utility_total_includes_residual_cold_utilit
         hp_multi_simple_carnot, "g_ineq_penalty", lambda *args, **kwargs: 0.0
     )
 
-    res = _compute_multi_simple_carnot_hp_opt_obj(np.array([0.5, 0.5, 0.0]), args)
+    res = _compute_multi_simple_carnot_hp_opt_obj(np.array([0.0, 0.5, 0.5]), args)
 
     assert res["Q_ext"] > 0.0
     assert np.isclose(res["utility_tot"], res["w_net"] + res["Q_ext"])
@@ -167,5 +167,7 @@ def test_parse_multi_simple_carnot_state_variables_uses_bounded_ambient_mapping(
         args,
     )
 
+    np.testing.assert_allclose(vars["T_cond"], np.array([75.0]))
+    np.testing.assert_allclose(vars["T_evap"], np.array([65.0]))
     assert vars["Q_amb_hot"] == 0.0
     assert np.isclose(vars["Q_amb_cold"], 200.0 * np.arctanh(0.5))
