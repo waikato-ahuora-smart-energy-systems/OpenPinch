@@ -7,7 +7,7 @@ from scipy.optimize import minimize_scalar
 
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
-from ..common.encoding import map_x_arr_to_T_arr, map_x_to_Q_amb
+from ..common.encoding import MAX_AMBIENT_X_ABS, map_x_arr_to_T_arr, map_x_to_Q_amb
 from ..common.shared import (
     calc_carnot_heat_engine_eta,
     calc_carnot_heat_pump_cop,
@@ -66,7 +66,9 @@ def _get_bounds_for_multi_temperature_carnot_hp_opt(
     args: HeatPumpTargetInputs,
 ) -> list:
     n_cond, n_evap = int(args.n_cond), int(args.n_evap)
-    return [(-1.0, 10.0)] + [(0.0, 1.0)] * n_cond + [(0.0, 1.0)] * n_evap
+    return [(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)] + [(0.0, 1.0)] * n_cond + [
+        (0.0, 1.0)
+    ] * n_evap
 
 
 def _parse_multi_temperature_carnot_cycle_state_variables(

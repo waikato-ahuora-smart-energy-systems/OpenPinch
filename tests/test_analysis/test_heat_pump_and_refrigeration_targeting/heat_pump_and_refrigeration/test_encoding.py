@@ -1,7 +1,10 @@
 import numpy as np
+import pytest
 
 from OpenPinch.services.heat_pump_integration.common.encoding import (
+    map_Q_amb_to_x,
     map_T_arr_to_x_arr,
+    map_x_to_Q_amb,
     map_x_arr_to_T_arr,
 )
 
@@ -27,3 +30,18 @@ def test_map_x_to_T_output_is_monotonically_descending():
 
     assert result.size == x.size
     assert np.all(np.diff(result) <= 0.0)
+
+
+@pytest.mark.parametrize(
+    ("Q_amb_hot", "Q_amb_cold"),
+    [(0.0, 400.0), (150.0, 0.0), (0.0, 0.0)],
+)
+def test_ambient_mapping_round_trips_with_bounded_x(Q_amb_hot, Q_amb_cold):
+    scale = 200.0
+
+    x_amb = map_Q_amb_to_x(Q_amb_hot, Q_amb_cold, scale)
+    mapped_hot, mapped_cold = map_x_to_Q_amb(x_amb, scale)
+
+    assert abs(x_amb) < 1.0
+    assert mapped_hot == pytest.approx(Q_amb_hot)
+    assert mapped_cold == pytest.approx(Q_amb_cold)

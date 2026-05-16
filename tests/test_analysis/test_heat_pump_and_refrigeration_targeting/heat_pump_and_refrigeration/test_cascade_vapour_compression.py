@@ -53,6 +53,28 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
     )
 
 
+def test_cascade_x0_round_trips_with_ambient_cooling_seed():
+    args = _base_args(n_cond=2, n_evap=2)
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0, 90.0]),
+        Q_cond=np.array([120.0, 80.0]),
+        T_evap=np.array([70.0, 50.0]),
+        Q_evap=np.array([90.0, 60.0]),
+        Q_amb_hot=0.0,
+        Q_amb_cold=20.0,
+    )
+
+    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init_res, args=args)
+    vars = hp_cascade._parse_cascade_hp_state_variables(x0, args)
+
+    assert abs(x0[0]) < 1.0
+    assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
+    assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
+    np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
+    np.testing.assert_allclose(vars["Q_cool"][:-1], init_res.Q_evap[:-1])
+    assert np.isnan(vars["Q_cool"][-1])
+
+
 def test_cascade_x0_bounds_and_parse(monkeypatch):
     args = _base_args(n_cond=2, n_evap=2)
     init_res = SimpleNamespace(
@@ -82,12 +104,15 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
     np.testing.assert_allclose(vars["T_cond"], np.array([110.0, 78.0]))
     np.testing.assert_allclose(vars["T_evap"], np.array([105.0, 70.0]))
     np.testing.assert_allclose(vars["dT_subcool"], np.array([0.2, 1.04]))
-    np.testing.assert_allclose(vars["Q_heat"], np.array([120.0, 140.0]))
-    np.testing.assert_allclose(vars["Q_cool"][:-1], np.array([144.0]))
+    np.testing.assert_allclose(
+        vars["Q_heat"],
+        np.array([132.04024184, 154.04694881]),
+    )
+    np.testing.assert_allclose(vars["Q_cool"][:-1], np.array([128.0]))
     assert np.isnan(vars["Q_cool"][-1])
     assert vars["Q_amb_hot"] == pytest.approx(0.0)
     assert vars["Q_amb_cold"] == pytest.approx(
-        0.1 * max(args.Q_heat_max, args.Q_cool_max)
+        max(args.Q_heat_max, args.Q_cool_max) * np.arctanh(0.1)
     )
 
 

@@ -9,6 +9,7 @@ from ....lib.enums import PT
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
+    MAX_AMBIENT_X_ABS,
     map_Q_amb_to_x,
     map_Q_arr_to_x_arr,
     map_T_arr_to_x_arr,
@@ -70,7 +71,9 @@ def _get_x0_for_multi_single_hp_opt(
     Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
 
     x_amb = map_Q_amb_to_x(
-        init_res.Q_amb_hot, init_res.Q_amb_cold, max(Q_heat_ex, Q_cool_ex)
+        init_res.Q_amb_hot,
+        init_res.Q_amb_cold,
+        max(args.Q_heat_max, args.Q_cool_max),
     )
     x_cond = map_T_arr_to_x_arr(
         init_res.T_cond, args.T_cold[0], args.T_cold[-1]
@@ -95,7 +98,7 @@ def _get_x0_for_multi_single_hp_opt(
 def _get_bounds_for_multi_single_hp_opt(args: HeatPumpTargetInputs) -> list:
     n_units = int(args.n_cond)
     return (
-        [(-1.0, 10.0)]
+        [(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)]
         + [(0.0, 1.0)] * n_units
         + [(0.0, 1.0)] * n_units
         + [(0.0, 1.0)] * n_units

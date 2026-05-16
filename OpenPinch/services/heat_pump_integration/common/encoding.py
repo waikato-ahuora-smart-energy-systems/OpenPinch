@@ -5,6 +5,7 @@ from typing import Tuple
 import numpy as np
 
 __all__ = [
+    "MAX_AMBIENT_X_ABS",
     "map_x_arr_to_T_arr",
     "map_T_arr_to_x_arr",
     "map_x_arr_to_DT_arr",
@@ -14,6 +15,8 @@ __all__ = [
     "map_x_to_Q_amb",
     "map_Q_amb_to_x",
 ]
+
+MAX_AMBIENT_X_ABS = 0.999
 
 
 def map_x_arr_to_T_arr(
@@ -84,10 +87,21 @@ def map_x_to_Q_amb(
     x: float,
     scale: float,
 ) -> Tuple[float, float]:
-    """Split one signed ambient-exchange variable into hot and cold duties."""
-    Q_amb_hot = max(-scale * x, 0.0)
-    Q_amb_cold = max(scale * x, 0.0)
-    return Q_amb_hot, Q_amb_cold
+    """Split one signed bounded ambient variable into hot and cold duties.
+
+    ``x`` is interpreted on the open interval ``(-1, 1)`` and decoded through
+    ``atanh`` so the mapping stays close to linear around zero while ambient
+    duties remain unbounded.
+    """
+    if scale <= 0.0:
+        return 0.0, 0.0
+
+    x_arr = np.asarray(x, dtype=float)
+    x_clip = np.clip(x_arr, -MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)
+    q_signed = scale * np.arctanh(x_clip)
+    q_hot = np.maximum(-q_signed, 0.0)
+    q_cold = np.maximum(q_signed, 0.0)
+    return float(q_hot), float(q_cold)
 
 
 def map_Q_amb_to_x(
@@ -95,5 +109,9 @@ def map_Q_amb_to_x(
     Q_amb_cold: float,
     scale: float,
 ) -> float:
-    """Encode hot/cold ambient duties back into one signed decision variable."""
-    return (Q_amb_cold - Q_amb_hot) / scale
+    """Encode ambient duties back into one bounded signed decision variable."""
+    if scale <= 0.0:
+        return 0.0
+
+    q_signed = float(Q_amb_cold) - float(Q_amb_hot)
+    return float(np.tanh(q_signed / scale))

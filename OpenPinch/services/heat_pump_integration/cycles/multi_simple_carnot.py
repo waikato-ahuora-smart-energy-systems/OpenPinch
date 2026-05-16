@@ -6,7 +6,7 @@ import numpy as np
 
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
 from ....utils.decorators import timing_decorator
-from ..common.encoding import map_x_arr_to_T_arr
+from ..common.encoding import MAX_AMBIENT_X_ABS, map_x_arr_to_T_arr, map_x_to_Q_amb
 from ..common.shared import (
     calc_carnot_heat_engine_eta,
     calc_carnot_heat_pump_cop,
@@ -38,7 +38,8 @@ def optimise_multi_simple_carnot_heat_pump_placement(
     res = solve_hpr_placement(
         f_obj=_compute_multi_simple_carnot_hp_opt_obj,
         x0_ls=[0.0 for _ in range(args.n_cond + args.n_evap + 1)],
-        bnds=[(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)] + [(-1.0, 4.0)],
+        bnds=[(0.0, 1.0) for _ in range(args.n_cond + args.n_evap)]
+        + [(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)],
         args=args,
     )
     res.update(
@@ -62,9 +63,9 @@ def _parse_multi_simple_carnot_hp_state_variables(
     T_evap = args.T_hot[-1] - np.array(x[args.n_cond : -1]) * (
         args.T_hot[-1] - args.T_hot[0]
     )
-    scale = max(args.Q_heat_max, args.Q_cool_max)
-    Q_amb_hot = min(scale * x[-1], 0.0) * -1
-    Q_amb_cold = max(scale * x[-1], 0.0)
+    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
+        x[-1], max(args.Q_heat_max, args.Q_cool_max)
+    )
     return {
         "T_cond": T_cond,
         "T_evap": T_evap,

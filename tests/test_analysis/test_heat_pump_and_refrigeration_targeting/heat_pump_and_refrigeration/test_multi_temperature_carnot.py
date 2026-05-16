@@ -257,7 +257,7 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_returns_expected_p
     np.testing.assert_allclose(vars["T_cond"], np.array([80.0, 60.0]), atol=0.01)
     np.testing.assert_allclose(vars["T_evap"], np.array([105.0, 60.0]), atol=0.01)
     assert vars["Q_amb_hot"] == 0.0
-    assert vars["Q_amb_cold"] == pytest.approx(150.0, abs=0.01)
+    assert vars["Q_amb_cold"] == pytest.approx(300.0 * np.arctanh(0.5), abs=0.01)
 
 
 def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap_split_sizes():
@@ -280,7 +280,7 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap
     assert vars["T_cond"].shape == (1,)
     assert vars["T_evap"].shape == (3,)
     assert np.all(np.diff(vars["T_evap"]) <= 0.0)
-    assert vars["Q_amb_hot"] == pytest.approx(30.0)
+    assert vars["Q_amb_hot"] == pytest.approx(300.0 * np.arctanh(0.1))
     assert vars["Q_amb_cold"] == 0.0
 
 

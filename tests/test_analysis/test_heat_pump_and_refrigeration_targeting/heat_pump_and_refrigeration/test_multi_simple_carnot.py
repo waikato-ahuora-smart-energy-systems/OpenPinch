@@ -8,6 +8,7 @@ from OpenPinch.services.heat_pump_integration.cycles import (
 from OpenPinch.services.heat_pump_integration.cycles.multi_simple_carnot import (
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_multi_simple_carnot_stage_duties_and_work,
+    _parse_multi_simple_carnot_hp_state_variables,
 )
 from OpenPinch.services.heat_pump_integration.common.shared import (
     get_Q_vals_at_T_hpr_from_bckgrd_profile,
@@ -149,3 +150,22 @@ def test_compute_multi_simple_carnot_utility_total_includes_residual_cold_utilit
 
     assert res["Q_ext"] > 0.0
     assert np.isclose(res["utility_tot"], res["w_net"] + res["Q_ext"])
+
+
+def test_parse_multi_simple_carnot_state_variables_uses_bounded_ambient_mapping():
+    args = SimpleNamespace(
+        n_cond=1,
+        n_evap=1,
+        T_cold=np.array([100.0, 50.0]),
+        T_hot=np.array([90.0, 40.0]),
+        Q_heat_max=200.0,
+        Q_cool_max=160.0,
+    )
+
+    vars = _parse_multi_simple_carnot_hp_state_variables(
+        np.array([0.5, 0.5, 0.5]),
+        args,
+    )
+
+    assert vars["Q_amb_hot"] == 0.0
+    assert np.isclose(vars["Q_amb_cold"], 200.0 * np.arctanh(0.5))

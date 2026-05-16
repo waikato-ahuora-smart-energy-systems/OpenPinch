@@ -44,6 +44,29 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
     )
 
 
+def test_multi_single_x0_round_trips_with_ambient_cooling_seed():
+    args = _base_args(n_cond=2, n_evap=2)
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0, 90.0]),
+        Q_cond=np.array([120.0, 80.0]),
+        T_evap=np.array([70.0, 50.0]),
+        Q_evap=np.array([90.0, 60.0]),
+        Q_amb_hot=0.0,
+        Q_amb_cold=20.0,
+    )
+
+    x0 = hp_multi_simple_vapour._get_x0_for_multi_single_hp_opt(
+        init_res=init_res,
+        args=args,
+    )
+    vars = hp_multi_simple_vapour._parse_multi_simple_hp_state_temperatures(x0, args)
+
+    assert abs(x0[0]) < 1.0
+    assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
+    assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
+    np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
+
+
 def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     init_res = SimpleNamespace(
         T_cond=np.array([120.0, 90.0]),
@@ -78,7 +101,7 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
     assert vars["dT_ihx_gas_side"].shape == (2,)
     assert vars["Q_amb_hot"] == pytest.approx(0.0)
     assert vars["Q_amb_cold"] == pytest.approx(
-        0.1 * max(args.Q_heat_max, args.Q_cool_max)
+        max(args.Q_heat_max, args.Q_cool_max) * np.arctanh(0.1)
     )
 
     monkeypatch.setattr(
