@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 
 __all__ = [
-    "MAX_AMBIENT_X_ABS",
+    "AMBIENT_X_BOUNDS",
     "map_x_arr_to_T_arr",
     "map_T_arr_to_x_arr",
     "map_x_arr_to_DT_arr",
@@ -17,6 +17,7 @@ __all__ = [
 ]
 
 MAX_AMBIENT_X_ABS = 0.999
+AMBIENT_X_BOUNDS = (-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)
 
 
 def map_x_arr_to_T_arr(

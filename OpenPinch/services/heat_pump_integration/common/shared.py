@@ -1,6 +1,6 @@
 """Shared helpers for heat pump and refrigeration targeting."""
 
-from typing import Callable, Tuple
+from typing import Any, Callable, Tuple
 
 import numpy as np
 from CoolProp.CoolProp import PropsSI
@@ -17,7 +17,12 @@ from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
 from ....lib.config import tol
 from ....lib.enums import PT
-from ....lib.schemas.hpr import HeatPumpTargetInputs
+from ....lib.schemas.hpr import (
+    HPRBackendResult,
+    HPRParsedState,
+    HPRThermoArtifacts,
+    HeatPumpTargetInputs,
+)
 from ....utils.blackbox_minimisers import multiminima
 from ....utils.miscellaneous import (
     clean_composite_curve_ends,
@@ -46,6 +51,8 @@ __all__ = [
     "_build_latent_streams",
     "get_ambient_air_stream",
     "calc_hpr_obj",
+    "evaluate_carnot_hpr_result",
+    "evaluate_vapour_hpr_result",
     "plot_multi_hp_profiles_from_results",
     "get_process_heat_cascade",
     "get_utility_heat_cascade",
@@ -125,7 +132,6 @@ def plot_multi_hp_profiles_from_results(
     fig.update_xaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.2)", zeroline=True)
     fig.update_yaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.2)")
     fig.add_vline(x=0.0, line_color="black", line_width=2)
-    fig.show()
     return fig
 
 
@@ -161,7 +167,7 @@ def solve_hpr_placement(
     x0_ls: list | float,
     bnds: list,
     args: HeatPumpTargetInputs,
-) -> dict:
+) -> HPRBackendResult:
     """Run the configured multistart optimiser and post-process the best result."""
     local_minima_x = multiminima(
         func=f_obj,
@@ -176,16 +182,253 @@ def solve_hpr_placement(
             f"Heat pump and refrigeration targeting ({args.hpr_type}) failed to return any local minima."
         )
 
-    res = f_obj(local_minima_x[0], args, debug=args.debug)
-    if not res.get("success", True):
+    result = f_obj(local_minima_x[0], args, debug=args.debug)
+    if not isinstance(result, HPRBackendResult):
+        raise TypeError(
+            "Heat pump and refrigeration objective functions must return HPRBackendResult."
+        )
+    if not result.success:
         raise ValueError(
             f"Heat pump and refrigeration targeting ({args.hpr_type}) failed to return an optimal result."
         )
-    res["success"] = True
-    res["amb_streams"] = get_ambient_air_stream(
-        res["Q_amb_hot"], res["Q_amb_cold"], args
+    return result.with_updates(
+        success=True,
+        amb_streams=get_ambient_air_stream(result.Q_amb_hot, result.Q_amb_cold, args),
     )
-    return res
+
+
+def _normalise_positive_scalar(value: Any) -> float:
+    arr = np.asarray(value, dtype=float)
+    if arr.size == 0:
+        return 0.0
+    return max(float(arr.reshape(-1)[0]), 0.0)
+
+
+def _build_hpr_accounting(
+    *,
+    work: float,
+    Q_ext_heat: float,
+    Q_ext_cold: float,
+    args: HeatPumpTargetInputs,
+    penalty_terms: Any = None,
+    penalise_external_cold_when_refrigerating: bool = False,
+) -> tuple[float, float, float, float]:
+    """Standardize external-utility, penalty, and objective semantics."""
+    Q_ext_heat = _normalise_positive_scalar(Q_ext_heat)
+    Q_ext_cold = _normalise_positive_scalar(Q_ext_cold)
+    penalty_terms = (
+        np.asarray([], dtype=float)
+        if penalty_terms is None
+        else np.asarray(penalty_terms, dtype=float).reshape(-1)
+    )
+    positive_penalty_terms = np.maximum(penalty_terms, 0.0)
+    eta_penalty = float(getattr(args, "eta_penalty", 0.01))
+    rho_penalty = float(getattr(args, "rho_penalty", 10.0))
+    penalty = (
+        float(
+            g_ineq_penalty(
+                positive_penalty_terms,
+                eta=eta_penalty,
+                rho=rho_penalty,
+                form="square",
+            )
+        )
+        if positive_penalty_terms.size
+        else 0.0
+    )
+    if penalise_external_cold_when_refrigerating and not getattr(
+        args, "is_heat_pumping", True
+    ):
+        penalty += float(g_ineq_penalty(g=Q_ext_cold, rho=rho_penalty, form="square"))
+
+    utility_tot = float(work + Q_ext_heat + Q_ext_cold)
+    obj = float(
+        calc_hpr_obj(
+            work=work,
+            Q_ext_heat=Q_ext_heat,
+            Q_ext_cold=Q_ext_cold,
+            Q_hpr_target=args.Q_hpr_target,
+            heat_to_power_ratio=args.heat_to_power_ratio,
+            cold_to_power_ratio=args.cold_to_power_ratio,
+            penalty=penalty,
+        )
+    )
+    return Q_ext_heat, Q_ext_cold, penalty, obj
+
+
+def evaluate_carnot_hpr_result(
+    *,
+    args: HeatPumpTargetInputs,
+    state: HPRParsedState,
+    w_net: float,
+    w_hpr: float | list | np.ndarray,
+    Q_cond_total: np.ndarray,
+    Q_evap_total: np.ndarray,
+    w_he: float | list | np.ndarray | None = None,
+    heat_recovery: float | list | np.ndarray | None = None,
+    cop_h: float | list | np.ndarray | None = None,
+    eta_he: float | list | np.ndarray | None = None,
+    Q_cond: np.ndarray | None = None,
+    Q_evap: np.ndarray | None = None,
+    Q_cond_he: np.ndarray | None = None,
+    Q_evap_he: np.ndarray | None = None,
+    penalty_terms: Any = None,
+    debug: bool = False,
+) -> HPRBackendResult:
+    """Shared Carnot-family accounting, plotting, and result assembly."""
+    H_cold_with_amb = args.H_cold + args.z_amb_cold * state.Q_amb_cold
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * state.Q_amb_hot
+
+    Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(
+        work=float(w_net),
+        Q_ext_heat=np.abs(H_cold_with_amb[0])
+        - np.asarray(Q_cond_total, dtype=float).sum(),
+        Q_ext_cold=np.abs(H_hot_with_amb[-1])
+        - np.asarray(Q_evap_total, dtype=float).sum(),
+        args=args,
+        penalty_terms=penalty_terms,
+        penalise_external_cold_when_refrigerating=True,
+    )
+    hpr_streams = get_carnot_hpr_cycle_streams(
+        state.T_cond,
+        Q_cond_total,
+        state.T_evap,
+        Q_evap_total,
+        args,
+    )
+    debug_figure = None
+    if debug:
+        debug_figure = plot_multi_hp_profiles_from_results(
+            args.T_hot,
+            H_hot_with_amb,
+            args.T_cold,
+            H_cold_with_amb,
+            hpr_streams.get_hot_utility_streams(),
+            hpr_streams.get_cold_utility_streams(),
+            title=(
+                f"Obj {obj:.5f} = {(float(w_net) / args.Q_hpr_target):.5f} + "
+                f"{(Q_ext_heat / args.Q_hpr_target):.5f} + "
+                f"{(Q_ext_cold / args.Q_hpr_target):.5f} + "
+                f"{(penalty / args.Q_hpr_target):.5f}"
+            ),
+        )
+
+    return HPRBackendResult(
+        obj=obj,
+        utility_tot=float(w_net + Q_ext_heat + Q_ext_cold),
+        w_net=float(w_net),
+        w_hpr=w_hpr,
+        w_he=w_he,
+        heat_recovery=heat_recovery,
+        Q_ext_heat=Q_ext_heat,
+        Q_ext_cold=Q_ext_cold,
+        Q_amb_hot=state.Q_amb_hot,
+        Q_amb_cold=state.Q_amb_cold,
+        cop_h=cop_h,
+        eta_he=eta_he,
+        T_cond=state.T_cond,
+        T_evap=state.T_evap,
+        Q_cond=Q_cond_total if Q_cond is None else Q_cond,
+        Q_evap=Q_evap_total if Q_evap is None else Q_evap,
+        Q_cond_he=Q_cond_he,
+        Q_evap_he=Q_evap_he,
+        artifacts=HPRThermoArtifacts(
+            hpr_streams=hpr_streams, debug_figure=debug_figure
+        ),
+    )
+
+
+def evaluate_vapour_hpr_result(
+    *,
+    args: HeatPumpTargetInputs,
+    state: HPRParsedState,
+    work: float,
+    work_arr: float | list | np.ndarray,
+    Q_heat: np.ndarray,
+    Q_cool: np.ndarray,
+    cop_h: float,
+    hpr_streams: StreamCollection,
+    model: Any = None,
+    penalty_terms: Any = None,
+    dT_subcool: np.ndarray | None = None,
+    dT_superheat: np.ndarray | None = None,
+    debug: bool = False,
+) -> HPRBackendResult:
+    """Shared simulated-vapour accounting, plotting, and result assembly."""
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * state.Q_amb_hot
+    H_cold_with_amb = args.H_cold + args.z_amb_cold * state.Q_amb_cold
+
+    pt_cond = get_process_heat_cascade(
+        hot_streams=hpr_streams.get_hot_utility_streams(),
+        cold_streams=args.bckgrd_cold_streams
+        + get_ambient_air_stream(Q_amb_cold=state.Q_amb_cold, args=args),
+        is_shifted=True,
+    )
+    pt_evap = get_process_heat_cascade(
+        hot_streams=args.bckgrd_hot_streams
+        + get_ambient_air_stream(Q_amb_hot=state.Q_amb_hot, args=args),
+        cold_streams=hpr_streams.get_cold_utility_streams(),
+        is_shifted=True,
+    )
+
+    Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(
+        work=float(work),
+        Q_ext_heat=pt_cond.col[PT.H_NET.value][0],
+        Q_ext_cold=pt_evap.col[PT.H_NET.value][-1],
+        args=args,
+        penalty_terms=np.concatenate(
+            [
+                np.array(
+                    [pt_cond.col[PT.H_NET.value][-1], pt_evap.col[PT.H_NET.value][0]],
+                    dtype=float,
+                ),
+                np.asarray(
+                    [] if penalty_terms is None else penalty_terms, dtype=float
+                ).reshape(-1),
+            ]
+        ),
+        penalise_external_cold_when_refrigerating=True,
+    )
+
+    debug_figure = None
+    if debug:
+        debug_figure = plot_multi_hp_profiles_from_results(
+            args.T_hot,
+            H_hot_with_amb,
+            args.T_cold,
+            H_cold_with_amb,
+            hpr_streams.get_hot_utility_streams(),
+            hpr_streams.get_cold_utility_streams(),
+            title=(
+                f"Obj {obj:.5f} = {(float(work) / args.Q_hpr_target):.5f} + "
+                f"{(Q_ext_heat / args.Q_hpr_target):.5f} + "
+                f"{(Q_ext_cold / args.Q_hpr_target):.5f} + "
+                f"{(penalty / args.Q_hpr_target):.5f}"
+            ),
+        )
+
+    return HPRBackendResult(
+        obj=obj,
+        utility_tot=float(work + Q_ext_heat + Q_ext_cold),
+        w_net=float(work),
+        w_hpr=work_arr,
+        Q_ext_heat=Q_ext_heat,
+        Q_ext_cold=Q_ext_cold,
+        Q_amb_hot=state.Q_amb_hot,
+        Q_amb_cold=state.Q_amb_cold,
+        cop_h=float(cop_h),
+        T_cond=state.T_cond,
+        T_evap=state.T_evap,
+        dT_subcool=dT_subcool,
+        dT_superheat=dT_superheat,
+        Q_heat=Q_heat,
+        Q_cool=Q_cool,
+        artifacts=HPRThermoArtifacts(
+            hpr_streams=hpr_streams,
+            model=model,
+            debug_figure=debug_figure,
+        ),
+    )
 
 
 def create_stream_collection_of_background_profile(
@@ -324,17 +567,13 @@ def get_carnot_hpr_cycle_streams(
     Q_cond: np.ndarray,
     T_evap: np.ndarray,
     Q_evap: np.ndarray,
-    args,
-) -> dict:
-    """Build latent condenser and evaporator streams for Carnot-cycle summaries."""
-    return {
-        "hpr_hot_streams": _build_latent_streams(
-            T_cond, args.dt_phase_change, Q_cond, is_hot=True
-        ),
-        "hpr_cold_streams": _build_latent_streams(
-            T_evap, args.dt_phase_change, Q_evap, is_hot=False
-        ),
-    }
+    args: HeatPumpTargetInputs,
+) -> StreamCollection:
+    """Build one combined HPR utility stream collection for Carnot-cycle summaries."""
+    dt_phase_change = float(getattr(args, "dt_phase_change", 1.0))
+    return _build_latent_streams(
+        T_cond, dt_phase_change, Q_cond, is_hot=True
+    ) + _build_latent_streams(T_evap, dt_phase_change, Q_evap, is_hot=False)
 
 
 def get_ambient_air_stream(

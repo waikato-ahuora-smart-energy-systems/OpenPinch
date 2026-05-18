@@ -5,19 +5,16 @@ from typing import Tuple
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HeatPumpTargetInputs
 from ....utils.decorators import timing_decorator
-from ..common.encoding import MAX_AMBIENT_X_ABS, map_x_arr_to_T_arr, map_x_to_Q_amb
+from ..common.encoding import AMBIENT_X_BOUNDS, map_x_arr_to_T_arr, map_x_to_Q_amb
 from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
     calc_carnot_heat_engine_eta,
     calc_carnot_heat_pump_cop,
-    calc_hpr_obj,
     compute_entropic_mean_temperature,
-    g_ineq_penalty,
-    get_carnot_hpr_cycle_streams,
+    evaluate_carnot_hpr_result,
     get_Q_vals_at_T_hpr_from_bckgrd_profile,
-    plot_multi_hp_profiles_from_results,
     solve_hpr_placement,
     tol,
 )
@@ -35,21 +32,15 @@ __all__ = [
 @timing_decorator
 def optimise_multi_temperature_carnot_heat_pump_placement(
     args: HeatPumpTargetInputs,
-) -> HeatPumpTargetOutputs:
+) -> HPRBackendResult:
     """Optimise multi-temperature Carnot stages for the prepared HPR case."""
     x0_ls, bnds = _get_multi_temperature_carnot_hp_opt_setup(args)
-    res = solve_hpr_placement(
+    return solve_hpr_placement(
         f_obj=_compute_multi_temperature_carnot_cycle_obj,
         x0_ls=x0_ls,
         bnds=bnds,
         args=args,
     )
-    res.update(
-        get_carnot_hpr_cycle_streams(
-            res["T_cond"], res["Q_cond"], res["T_evap"], res["Q_evap"], args
-        )
-    )
-    return HeatPumpTargetOutputs.model_validate(res)
 
 
 #######################################################################################################
@@ -66,7 +57,7 @@ def _get_multi_temperature_carnot_hp_opt_setup(
         x_cond=[0.0] * layout.n_cond,
         x_evap=[0.0] * layout.n_evap,
     ), layout.build_bounds(
-        x_amb=(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS),
+        x_amb=AMBIENT_X_BOUNDS,
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
     )
@@ -75,10 +66,8 @@ def _get_multi_temperature_carnot_hp_opt_setup(
 def _parse_multi_temperature_carnot_cycle_state_variables(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
-) -> dict:
-    parts = HPRoptVectorLayout(
-        n_cond=int(args.n_cond), n_evap=int(args.n_evap)
-    ).unpack(x)
+) -> HPRParsedState:
+    parts = HPRoptVectorLayout(n_cond=args.n_cond, n_evap=args.n_evap).unpack(x)
     x_amb = parts["x_amb"]
     x_cond = parts["x_cond"]
     x_evap = parts["x_evap"]
@@ -86,12 +75,12 @@ def _parse_multi_temperature_carnot_cycle_state_variables(
     Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
     T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
-    return {
-        "T_cond": T_cond,
-        "T_evap": T_evap,
-        "Q_amb_hot": Q_amb_hot,
-        "Q_amb_cold": Q_amb_cold,
-    }
+    return HPRParsedState(
+        T_cond=T_cond,
+        T_evap=T_evap,
+        Q_amb_hot=Q_amb_hot,
+        Q_amb_cold=Q_amb_cold,
+    )
 
 
 def _get_unique_idx_mtc(is_on: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -271,84 +260,36 @@ def _compute_multi_temperature_carnot_cycle_obj(
     args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
-) -> dict:
+) -> HPRBackendResult:
     state_vars = _parse_multi_temperature_carnot_cycle_state_variables(x, args)
+    if not isinstance(state_vars, HPRParsedState):
+        state_vars = HPRParsedState.model_validate(state_vars)
 
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * state_vars["Q_amb_cold"]
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * state_vars["Q_amb_hot"]
+    H_cold_with_amb = args.H_cold + args.z_amb_cold * state_vars.Q_amb_cold
+    H_hot_with_amb = args.H_hot + args.z_amb_hot * state_vars.Q_amb_hot
 
     cycle_results = _get_multi_temperature_carnot_stage_duties_and_work(
-        T_cond=state_vars["T_cond"],
-        T_evap=state_vars["T_evap"],
+        T_cond=state_vars.T_cond,
+        T_evap=state_vars.T_evap,
         H_hot_with_amb=H_hot_with_amb,
         H_cold_with_amb=H_cold_with_amb,
         args=args,
     )
 
     work = cycle_results["w_hpr"] - cycle_results["w_he"]
-    Q_ext_heat = max(
-        np.abs(H_cold_with_amb[0])
-        - cycle_results["Qc_hpr"].sum()
-        - cycle_results["Qc_he"].sum(),
-        0.0,
+    return evaluate_carnot_hpr_result(
+        args=args,
+        state=state_vars,
+        w_net=work,
+        w_hpr=cycle_results["w_hpr"],
+        w_he=cycle_results["w_he"],
+        heat_recovery=cycle_results["heat_recovery"],
+        cop_h=cycle_results["cop"],
+        Q_cond_total=cycle_results["Qc_hpr"] + cycle_results["Qc_he"],
+        Q_evap_total=cycle_results["Qe_hpr"] + cycle_results["Qe_he"],
+        Q_cond=cycle_results["Qc_hpr"],
+        Q_evap=cycle_results["Qe_hpr"],
+        Q_cond_he=cycle_results["Qc_he"],
+        Q_evap_he=cycle_results["Qe_he"],
+        debug=debug,
     )
-    Q_ext_cold = max(
-        np.abs(H_hot_with_amb[-1])
-        - cycle_results["Qe_hpr"].sum()
-        - cycle_results["Qe_he"].sum(),
-        0.0,
-    )
-
-    p = (
-        g_ineq_penalty(g=Q_ext_cold, rho=args.rho_penalty, form="square")
-        if not args.is_heat_pumping
-        else 0.0
-    )
-    obj = calc_hpr_obj(
-        work=work,
-        Q_ext_heat=Q_ext_heat,
-        Q_ext_cold=Q_ext_cold,
-        Q_hpr_target=args.Q_hpr_target,
-        heat_to_power_ratio=args.heat_to_power_ratio,
-        cold_to_power_ratio=args.cold_to_power_ratio,
-        penalty=p,
-    )
-
-    if debug:
-        res = get_carnot_hpr_cycle_streams(
-            state_vars["T_cond"],
-            cycle_results["Qc_hpr"] + cycle_results["Qc_he"],
-            state_vars["T_evap"],
-            cycle_results["Qe_hpr"] + cycle_results["Qe_he"],
-            args,
-        )
-        plot_multi_hp_profiles_from_results(
-            args.T_hot,
-            H_hot_with_amb,
-            args.T_cold,
-            H_cold_with_amb,
-            res["hpr_hot_streams"],
-            res["hpr_cold_streams"],
-            title=f"Obj {float(obj):.5f} = {(work / args.Q_hpr_target):.5f} + {(Q_ext_heat / args.Q_hpr_target):.5f} + {(Q_ext_cold / args.Q_hpr_target):.5f} + {(p / args.Q_hpr_target):.5f}",
-        )
-        pass
-
-    return {
-        "obj": obj,
-        "utility_tot": work + Q_ext_heat + Q_ext_cold,
-        "w_net": work,
-        "w_hpr": cycle_results["w_hpr"],
-        "w_he": cycle_results["w_he"],
-        "heat_recovery": cycle_results["heat_recovery"],
-        "Q_ext": Q_ext_heat + Q_ext_cold,
-        "T_cond": state_vars["T_cond"],
-        "Q_cond": cycle_results["Qc_hpr"],
-        "Q_cond_he": cycle_results["Qc_he"],
-        "T_evap": state_vars["T_evap"],
-        "Q_evap": cycle_results["Qe_hpr"],
-        "Q_evap_he": cycle_results["Qe_he"],
-        "cop_h": cycle_results["cop"],
-        "Q_amb_hot": state_vars["Q_amb_hot"],
-        "Q_amb_cold": state_vars["Q_amb_cold"],
-        "success": True,
-    }

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from OpenPinch.lib.schemas.hpr import HPRBackendResult
 from OpenPinch.services.heat_pump_integration.cycles import (
     multi_temperature_carnot as hp_multi_temp_carnot,
 )
@@ -19,7 +20,6 @@ from OpenPinch.classes.stream_collection import StreamCollection
 from ..helpers import (
     _base_args,
     _build_multi_temperature_profiles,
-    _patch_output_model_validate,
 )
 
 
@@ -286,46 +286,38 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap
 
 def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
     args = _base_args(n_cond=1, n_evap=1)
-    _patch_output_model_validate(monkeypatch)
     monkeypatch.setattr(
         hp_shared, "multiminima", lambda **_kwargs: np.array([[0.2, 0.6]])
     )
     monkeypatch.setattr(
         hp_multi_temp_carnot,
         "_compute_multi_temperature_carnot_cycle_obj",
-        lambda x, args, debug=False: {
-            "obj": 0.1,
-            "utility_tot": 1.0,
-            "net_work": 0.5,
-            "Q_ext": 0.0,
-            "Q_amb_hot": 0.0,
-            "Q_amb_cold": 0.0,
-            "cop_h": 3.0,
-            "success": True,
-            "T_cond": np.array([100.0]),
-            "Q_cond": np.array([50.0]),
-            "T_evap": np.array([60.0]),
-            "Q_evap": np.array([40.0]),
-        },
-    )
-    monkeypatch.setattr(
-        hp_multi_temp_carnot,
-        "get_carnot_hpr_cycle_streams",
-        lambda *_args, **_kwargs: {
-            "hpr_hot_streams": StreamCollection(),
-            "hpr_cold_streams": StreamCollection(),
-        },
+        lambda x, args, debug=False: HPRBackendResult(
+            obj=0.1,
+            utility_tot=1.0,
+            w_net=0.5,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            cop_h=3.0,
+            T_cond=np.array([100.0]),
+            Q_cond=np.array([50.0]),
+            T_evap=np.array([60.0]),
+            Q_evap=np.array([40.0]),
+        ),
     )
 
     out = hp_multi_temp_carnot.optimise_multi_temperature_carnot_heat_pump_placement(
         args
     )
-    assert out["success"] is True
+    assert out.success is True
+    assert isinstance(out.amb_streams, StreamCollection)
 
     monkeypatch.setattr(
         hp_multi_temp_carnot,
         "_compute_multi_temperature_carnot_cycle_obj",
-        lambda x, args, debug=False: {"success": False},
+        lambda x, args, debug=False: HPRBackendResult.failure(),
     )
     with pytest.raises(ValueError, match="failed to return an optimal result"):
         hp_multi_temp_carnot.optimise_multi_temperature_carnot_heat_pump_placement(args)
@@ -335,7 +327,7 @@ def test_multi_temp_carnot_objective_debug_branch(monkeypatch):
     args = _base_args(n_cond=1, n_evap=1)
     called = {"plot": 0}
     monkeypatch.setattr(
-        hp_multi_temp_carnot,
+        hp_shared,
         "plot_multi_hp_profiles_from_results",
         lambda *args, **kwargs: called.__setitem__("plot", called["plot"] + 1),
     )

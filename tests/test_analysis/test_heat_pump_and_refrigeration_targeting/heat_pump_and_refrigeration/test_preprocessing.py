@@ -4,6 +4,7 @@ import pytest
 from OpenPinch.services.heat_pump_integration.common import (
     preprocessing as hp_pre,
 )
+from OpenPinch.classes.stream_collection import StreamCollection
 
 
 def test_get_reduced_bckgrd_cascade_till_Q_target_returns_full_profile_when_target_matches_peak():
@@ -76,3 +77,29 @@ def test_temperature_shift_and_h_column_edge_branches():
             np.array([100.0, 90.0, 80.0]),
             np.array([1.0, 0.5, 0.1]),
         )
+
+
+def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
+    zone_config = type(
+        "Cfg",
+        (),
+        {
+            "T_ENV": 20.0,
+            "DT_ENV_CONT": 5.0,
+            "DT_CONT_HP": 5.0,
+            "DT_PHASE_CHANGE": 1.0,
+        },
+    )()
+
+    T_out, H_out, z_amb, streams = hp_pre._prepare_hpr_background_profile(
+        Q_hpr_target=150.0,
+        T_vals=np.array([120.0, 100.0, 80.0]),
+        H_vals=np.array([200.0, 150.0, 0.0]),
+        zone_config=zone_config,
+        is_heat_pumping=True,
+        is_cold=True,
+    )
+
+    assert np.max(H_out) <= 150.0
+    assert z_amb.shape == T_out.shape
+    assert isinstance(streams, StreamCollection)

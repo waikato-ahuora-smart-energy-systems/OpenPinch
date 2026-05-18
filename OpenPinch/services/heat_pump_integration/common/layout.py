@@ -1,6 +1,6 @@
 """Shared optimisation-vector layout helpers for HPR targeting backends."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 import numpy as np
@@ -20,6 +20,15 @@ class HPRoptVectorLayout:
     n_cool: int = 0
     n_ihx: int = 0
     n_misc: int = 0
+    _size: int = field(init=False, repr=False)
+    _amb_slice: slice = field(init=False, repr=False)
+    _cond_slice: slice = field(init=False, repr=False)
+    _evap_slice: slice = field(init=False, repr=False)
+    _subcool_slice: slice = field(init=False, repr=False)
+    _heat_slice: slice = field(init=False, repr=False)
+    _cool_slice: slice = field(init=False, repr=False)
+    _ihx_slice: slice = field(init=False, repr=False)
+    _misc_slice: slice = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         for name in (
@@ -35,32 +44,8 @@ class HPRoptVectorLayout:
             if getattr(self, name) < 0:
                 raise ValueError(f"{name} must be non-negative.")
 
-    @property
-    def size(self) -> int:
-        return sum(
-            (
-                self.n_amb,
-                self.n_cond,
-                self.n_evap,
-                self.n_subcool,
-                self.n_heat,
-                self.n_cool,
-                self.n_ihx,
-                self.n_misc,
-            )
-        )
-
-    def _slice_for(self, section: str) -> slice:
         start = 0
-        for name, count in self._section_sizes():
-            stop = start + count
-            if name == section:
-                return slice(start, stop)
-            start = stop
-        raise KeyError(section)
-
-    def _section_sizes(self) -> tuple[tuple[str, int], ...]:
-        return (
+        for section_name, count in (
             ("amb", self.n_amb),
             ("cond", self.n_cond),
             ("evap", self.n_evap),
@@ -69,39 +54,48 @@ class HPRoptVectorLayout:
             ("cool", self.n_cool),
             ("ihx", self.n_ihx),
             ("misc", self.n_misc),
-        )
+        ):
+            stop = start + count
+            object.__setattr__(self, f"_{section_name}_slice", slice(start, stop))
+            start = stop
+
+        object.__setattr__(self, "_size", start)
+
+    @property
+    def size(self) -> int:
+        return self._size
 
     @property
     def amb_slice(self) -> slice:
-        return self._slice_for("amb")
+        return self._amb_slice
 
     @property
     def cond_slice(self) -> slice:
-        return self._slice_for("cond")
+        return self._cond_slice
 
     @property
     def evap_slice(self) -> slice:
-        return self._slice_for("evap")
+        return self._evap_slice
 
     @property
     def subcool_slice(self) -> slice:
-        return self._slice_for("subcool")
+        return self._subcool_slice
 
     @property
     def heat_slice(self) -> slice:
-        return self._slice_for("heat")
+        return self._heat_slice
 
     @property
     def cool_slice(self) -> slice:
-        return self._slice_for("cool")
+        return self._cool_slice
 
     @property
     def ihx_slice(self) -> slice:
-        return self._slice_for("ihx")
+        return self._ihx_slice
 
     @property
     def misc_slice(self) -> slice:
-        return self._slice_for("misc")
+        return self._misc_slice
 
     def pack(
         self,
@@ -205,5 +199,7 @@ class HPRoptVectorLayout:
 
         bounds_ls = [tuple(float(v) for v in bound) for bound in bounds]
         if len(bounds_ls) != size:
-            raise ValueError(f"{name} bounds must have size {size}, got {len(bounds_ls)}.")
+            raise ValueError(
+                f"{name} bounds must have size {size}, got {len(bounds_ls)}."
+            )
         return bounds_ls

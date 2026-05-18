@@ -1,8 +1,9 @@
 """Common helpers shared across heat pump targeting models."""
 
+from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HPRThermoArtifacts
 from . import encoding, layout, preprocessing, shared
 from .encoding import (
-    MAX_AMBIENT_X_ABS,
+    AMBIENT_X_BOUNDS,
     map_DT_arr_to_x_arr,
     map_Q_amb_to_x,
     map_Q_arr_to_x_arr,
@@ -36,11 +37,14 @@ __all__ = [
     "construct_HPRTargetInputs",
     "create_stream_collection_of_background_profile",
     "encoding",
+    "AMBIENT_X_BOUNDS",
     "get_Q_vals_at_T_hpr_from_bckgrd_profile",
     "get_ambient_air_stream",
     "get_carnot_hpr_cycle_streams",
+    "HPRBackendResult",
+    "HPRParsedState",
+    "HPRThermoArtifacts",
     "HPRoptVectorLayout",
-    "MAX_AMBIENT_X_ABS",
     "layout",
     "map_DT_arr_to_x_arr",
     "map_Q_amb_to_x",

@@ -3,11 +3,10 @@
 import numpy as np
 
 from ....classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
-from ....lib.enums import PT
-from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HeatPumpTargetInputs
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
-    MAX_AMBIENT_X_ABS,
+    AMBIENT_X_BOUNDS,
     map_Q_amb_to_x,
     map_Q_arr_to_x_arr,
     map_T_arr_to_x_arr,
@@ -19,11 +18,7 @@ from ..common.encoding import (
 from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
     _append_unspecified_final_cascade_cooling_duty,
-    calc_hpr_obj,
-    g_ineq_penalty,
-    get_ambient_air_stream,
-    get_process_heat_cascade,
-    plot_multi_hp_profiles_from_results,
+    evaluate_vapour_hpr_result,
     solve_hpr_placement,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -44,7 +39,7 @@ __all__ = [
 @timing_decorator
 def optimise_cascade_heat_pump_placement(
     args: HeatPumpTargetInputs,
-) -> HeatPumpTargetOutputs:
+) -> HPRBackendResult:
     """Optimise a cascade vapour-compression placement for the prepared HPR case."""
     num_stages = int(args.n_cond + args.n_evap - 1)
     init_res = (
@@ -55,13 +50,12 @@ def optimise_cascade_heat_pump_placement(
 
     args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(num_stages, args)
     x0_ls, bnds = _get_cascade_hp_opt_setup(init_res, args)
-    res = solve_hpr_placement(
+    return solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_obj,
         x0_ls=x0_ls,
         bnds=bnds,
         args=args,
     )
-    return HeatPumpTargetOutputs.model_validate(res)
 
 
 #######################################################################################################
@@ -70,7 +64,7 @@ def optimise_cascade_heat_pump_placement(
 
 
 def _get_cascade_hp_opt_setup(
-    init_res: HeatPumpTargetOutputs,
+    init_res: HPRBackendResult | None,
     args: HeatPumpTargetInputs,
 ) -> tuple[np.ndarray | None, list]:
     n_cond = int(args.n_cond)
@@ -84,7 +78,7 @@ def _get_cascade_hp_opt_setup(
         n_ihx=n_cond + n_evap - 1,
     )
     bnds = layout.build_bounds(
-        x_amb=(-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS),
+        x_amb=AMBIENT_X_BOUNDS,
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
         x_subcool=(0.0, 1.0),
@@ -128,7 +122,7 @@ def _get_cascade_hp_opt_setup(
 def _parse_cascade_hp_state_variables(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
-) -> dict:
+) -> HPRParsedState:
     n_cond = int(args.n_cond)
     n_evap = int(args.n_evap)
     parts = HPRoptVectorLayout(
@@ -158,16 +152,16 @@ def _parse_cascade_hp_state_variables(
     T_cond_all = np.sort(np.concatenate([T_cond - dT_subcool, T_evap[:-1]]))[::-1]
     T_evap_all = np.sort(np.concatenate([(T_cond - dT_subcool)[1:], T_evap]))[::-1]
     dT_ihx_gas_side = map_x_arr_to_DT_arr(x_ihx, T_cond_all, T_evap_all)
-    return {
-        "T_cond": T_cond,
-        "dT_subcool": dT_subcool,
-        "Q_heat": Q_heat,
-        "T_evap": T_evap,
-        "Q_cool": Q_cool,
-        "Q_amb_hot": Q_amb_hot,
-        "Q_amb_cold": Q_amb_cold,
-        "dT_ihx_gas_side": dT_ihx_gas_side,
-    }
+    return HPRParsedState(
+        T_cond=T_cond,
+        dT_subcool=dT_subcool,
+        Q_heat=Q_heat,
+        T_evap=T_evap,
+        Q_cool=Q_cool,
+        Q_amb_hot=Q_amb_hot,
+        Q_amb_cold=Q_amb_cold,
+        dT_ihx_gas_side=dT_ihx_gas_side,
+    )
 
 
 def _compute_cascade_hp_system_obj(
@@ -175,95 +169,56 @@ def _compute_cascade_hp_system_obj(
     args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
-) -> dict:
+) -> HPRBackendResult:
     state_vars = _parse_cascade_hp_state_variables(x, args)
+    if not isinstance(state_vars, HPRParsedState):
+        state_vars = HPRParsedState.model_validate(state_vars)
 
-    hp = CascadeVapourCompressionCycle()
-    hp.solve(
-        T_evap=state_vars["T_evap"],
-        T_cond=state_vars["T_cond"],
-        Q_heat=state_vars["Q_heat"],
-        Q_cool=state_vars["Q_cool"],
-        dT_subcool=state_vars["dT_subcool"],
-        dT_ihx_gas_side=state_vars["dT_ihx_gas_side"],
-        eta_comp=args.eta_comp,
-        refrigerant=args.refrigerant_ls,
-        dt_cascade_hx=args.dt_cascade_hx,
-    )
-    if not hp.solved:
-        return {"obj": np.inf, "success": False}
-
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * state_vars["Q_amb_hot"]
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * state_vars["Q_amb_cold"]
-
-    hpr_hot_streams = hp.build_stream_collection(
-        include_cond=True,
-        is_process_stream=False,
-        dtcont=args.dtcont_hp,
-    )
-    hpr_cold_streams = hp.build_stream_collection(
-        include_evap=True,
-        is_process_stream=False,
-        dtcont=args.dtcont_hp,
-    )
-
-    pt_cond = get_process_heat_cascade(
-        hot_streams=hpr_hot_streams,
-        cold_streams=args.bckgrd_cold_streams
-        + get_ambient_air_stream(Q_amb_cold=state_vars["Q_amb_cold"], args=args),
-        is_shifted=True,
-    )
-    pt_evap = get_process_heat_cascade(
-        hot_streams=args.bckgrd_hot_streams
-        + get_ambient_air_stream(Q_amb_hot=state_vars["Q_amb_hot"], args=args),
-        cold_streams=hpr_cold_streams,
-        is_shifted=True,
-    )
-
-    w_hpr = hp.work
-    cop = hp.Q_heat_arr.sum() / w_hpr if w_hpr > 0 else 1.0
-
-    Q_ext_heat = pt_cond.col[PT.H_NET.value][0]
-    Q_ext_cold = pt_evap.col[PT.H_NET.value][-1]
-    g = [pt_cond.col[PT.H_NET.value][-1], pt_evap.col[PT.H_NET.value][0], hp.penalty]
-    p = g_ineq_penalty(g, eta=args.eta_penalty, rho=args.rho_penalty, form="square")
-
-    obj = calc_hpr_obj(
-        work=w_hpr,
-        Q_ext_heat=Q_ext_heat,
-        Q_ext_cold=Q_ext_cold,
-        Q_hpr_target=args.Q_hpr_target,
-        heat_to_power_ratio=args.heat_to_power_ratio,
-        cold_to_power_ratio=args.cold_to_power_ratio,
-        penalty=p,
-    )
-
-    if debug:
-        plot_multi_hp_profiles_from_results(
-            args.T_hot,
-            H_hot_with_amb,
-            args.T_cold,
-            H_cold_with_amb,
-            hpr_hot_streams,
-            hpr_cold_streams,
-            title=f"Obj {float(obj):.5f} = {(w_hpr / args.Q_hpr_target):.5f} + {(Q_ext_heat / args.Q_hpr_target):.5f} + {(Q_ext_cold / args.Q_hpr_target):.5f} + {(p / args.Q_hpr_target):.5f}",
+    try:
+        hp = CascadeVapourCompressionCycle()
+        hp.solve(
+            T_evap=state_vars.T_evap,
+            T_cond=state_vars.T_cond,
+            Q_heat=state_vars.Q_heat,
+            Q_cool=state_vars.Q_cool,
+            dT_subcool=state_vars.dT_subcool,
+            dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
+            eta_comp=args.eta_comp,
+            refrigerant=args.refrigerant_ls,
+            dt_cascade_hx=args.dt_cascade_hx,
         )
+        if not hp.solved:
+            return HPRBackendResult.failure(
+                reason="Cascade vapour-compression cycle failed to solve.",
+                Q_amb_hot=state_vars.Q_amb_hot,
+                Q_amb_cold=state_vars.Q_amb_cold,
+            )
 
-    return {
-        "obj": obj,
-        "utility_tot": w_hpr + Q_ext_heat + Q_ext_cold,
-        "w_net": w_hpr,
-        "w_hpr": hp.work_arr,
-        "Q_ext": Q_ext_heat + Q_ext_cold,
-        "T_cond": state_vars["T_cond"],
-        "dT_subcool": state_vars["dT_subcool"],
-        "Q_heat": hp.Q_heat_arr,
-        "T_evap": state_vars["T_evap"],
-        "Q_cool": hp.Q_cool_arr,
-        "cop_h": cop,
-        "Q_amb_hot": state_vars["Q_amb_hot"],
-        "Q_amb_cold": state_vars["Q_amb_cold"],
-        "hpr_hot_streams": hpr_hot_streams,
-        "hpr_cold_streams": hpr_cold_streams,
-        "model": hp,
-    }
+        hpr_streams = hp.build_stream_collection(
+            include_cond=True,
+            include_evap=True,
+            is_process_stream=False,
+            dtcont=args.dtcont_hp,
+        )
+        w_hpr = hp.work
+        cop = hp.Q_heat_arr.sum() / w_hpr if w_hpr > 0 else 1.0
+        return evaluate_vapour_hpr_result(
+            args=args,
+            state=state_vars,
+            work=w_hpr,
+            work_arr=hp.work_arr,
+            Q_heat=hp.Q_heat_arr,
+            Q_cool=hp.Q_cool_arr,
+            cop_h=cop,
+            hpr_streams=hpr_streams,
+            model=hp,
+            penalty_terms=[hp.penalty],
+            dT_subcool=state_vars.dT_subcool,
+            debug=debug,
+        )
+    except Exception as exc:
+        return HPRBackendResult.failure(
+            reason=str(exc),
+            Q_amb_hot=state_vars.Q_amb_hot,
+            Q_amb_cold=state_vars.Q_amb_cold,
+        )

@@ -34,9 +34,7 @@ def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
         Q_amb_cold=0.0,
     )
 
-    x0, bnds = hp_multi_simple_vapour._get_multi_single_hp_opt_setup(
-        init_results, args
-    )
+    x0, bnds = hp_multi_simple_vapour._get_multi_single_hp_opt_setup(init_results, args)
 
     assert x0.shape == (11,)
     assert len(bnds) == len(x0)

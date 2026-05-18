@@ -2,9 +2,6 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from OpenPinch.services.heat_pump_integration.cycles import (
-    multi_simple_carnot as hp_multi_simple_carnot,
-)
 from OpenPinch.services.heat_pump_integration.cycles.multi_simple_carnot import (
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_multi_simple_carnot_stage_duties_and_work,
@@ -85,9 +82,7 @@ def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across
     assert cycle_results["Qe"].sum() == available_total
 
 
-def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambiguous_truth(
-    monkeypatch,
-):
+def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambiguous_truth():
     args = SimpleNamespace(
         n_cond=2,
         n_evap=2,
@@ -108,9 +103,6 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         rho_penalty=10,
         allow_integrated_expander=False,
     )
-    monkeypatch.setattr(
-        hp_multi_simple_carnot, "g_ineq_penalty", lambda *args, **kwargs: 0.0
-    )
 
     res = _compute_multi_simple_carnot_hp_opt_obj(
         np.array([0.0, 0.0, 0.0, 0.25, 0.25]), args
@@ -121,9 +113,7 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
     assert res["Q_cond"].shape == (2,)
 
 
-def test_compute_multi_simple_carnot_utility_total_includes_residual_cold_utility(
-    monkeypatch,
-):
+def test_compute_multi_simple_carnot_utility_total_includes_residual_cold_utility():
     args = SimpleNamespace(
         n_cond=1,
         n_evap=1,
@@ -141,9 +131,6 @@ def test_compute_multi_simple_carnot_utility_total_includes_residual_cold_utilit
         heat_to_power_ratio=1.0,
         cold_to_power_ratio=1.0,
         rho_penalty=10.0,
-    )
-    monkeypatch.setattr(
-        hp_multi_simple_carnot, "g_ineq_penalty", lambda *args, **kwargs: 0.0
     )
 
     res = _compute_multi_simple_carnot_hp_opt_obj(np.array([0.0, 0.5, 0.5]), args)

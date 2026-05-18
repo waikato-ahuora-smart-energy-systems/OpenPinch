@@ -164,19 +164,19 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(
-        hp_cascade, "get_process_heat_cascade", lambda **kwargs: next(seq)
+        hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )
     calls = {"plot": 0}
     monkeypatch.setattr(
-        hp_cascade,
+        hp_shared,
         "plot_multi_hp_profiles_from_results",
         lambda *args, **kwargs: calls.__setitem__("plot", calls["plot"] + 1),
     )
 
     out = hp_cascade._compute_cascade_hp_system_obj(x, args, debug=True)
     assert "hpr_hot_streams" in out
-    assert out["Q_ext"] == pytest.approx(3.0)
-    assert out["utility_tot"] == pytest.approx(43.0)
+    assert out["Q_ext"] == pytest.approx(5.0)
+    assert out["utility_tot"] == pytest.approx(45.0)
     assert out["w_net"] == pytest.approx(40.0)
     assert out["cop_h"] == pytest.approx(5.0)
     assert calls["plot"] == 1

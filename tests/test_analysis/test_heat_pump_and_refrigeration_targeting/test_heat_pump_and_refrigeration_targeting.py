@@ -6,11 +6,15 @@ import pytest
 from OpenPinch.services.heat_pump_integration import (
     heat_pump_and_refrigeration_entry as hp,
 )
+from OpenPinch.lib.schemas.hpr import (
+    HPRBackendResult,
+    HPRThermoArtifacts,
+)
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.lib.enums import PT
+from OpenPinch.lib.enums import HPRcycle, PT
 
 from .helpers import _base_args, _pt_with_hnet
 
@@ -126,7 +130,7 @@ def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
         title="HP Profile",
     )
 
-    assert shown["called"] is True
+    assert shown["called"] is False
     assert figure.layout.title.text == "HP Profile"
     assert [trace.name for trace in figure.data] == [
         "Sink",
@@ -134,3 +138,55 @@ def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
         "Condenser",
         "Evaporator",
     ]
+
+
+@pytest.mark.parametrize(
+    "hpr_type",
+    [
+        HPRcycle.MultiTempCarnot.value,
+        HPRcycle.MultiSimpleCarnot.value,
+        HPRcycle.MultiSimpleVapourComp.value,
+        HPRcycle.CascadeVapourComp.value,
+    ],
+)
+def test_get_hpr_targets_validates_supported_non_brayton_backend_results(
+    monkeypatch, hpr_type
+):
+    monkeypatch.setattr(
+        hp,
+        "construct_HPRTargetInputs",
+        lambda **kwargs: SimpleNamespace(hpr_type=hpr_type),
+    )
+    monkeypatch.setitem(
+        hp._HP_PLACEMENT_HANDLERS,
+        hpr_type,
+        lambda args: HPRBackendResult(
+            obj=0.1,
+            utility_tot=1.0,
+            w_net=0.5,
+            Q_ext_heat=0.25,
+            Q_ext_cold=0.25,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
+            amb_streams=StreamCollection(),
+        ),
+    )
+
+    out = hp._get_hpr_targets(
+        Q_hpr_target=10.0,
+        T_vals=np.array([120.0, 80.0]),
+        H_hot=np.array([0.0, -10.0]),
+        H_cold=np.array([10.0, 0.0]),
+        zone_config=SimpleNamespace(HPR_TYPE=hpr_type),
+        is_heat_pumping=True,
+    )
+
+    assert isinstance(out, hp.HeatPumpTargetOutputs)
+    assert out.success is True
+    assert out.Q_ext == pytest.approx(0.5)
+
+
+def test_hpr_handler_registry_includes_brayton():
+    handler = hp._HP_PLACEMENT_HANDLERS[HPRcycle.Brayton.value]
+    assert handler is hp.optimise_brayton_heat_pump_placement

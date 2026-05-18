@@ -168,9 +168,12 @@ def _validate_hpr_required(
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
     zone_name: str = None,
-    zone_config: Configuration = Configuration(),
+    zone_config: Configuration | None = None,
     r: dict | float | int = None,
 ) -> float:
+    if zone_config is None:
+        raise ValueError("zone_config must be provided for HPR targeting.")
+
     if is_heat_pumping:
         Q_max = np.abs(pt.col[PT.H_NET_COLD.value]).max()
     elif is_refrigeration:
@@ -206,9 +209,6 @@ def _get_hpr_targets(
     zone_config: Configuration,
     is_heat_pumping: bool,
 ) -> HeatPumpTargetOutputs:
-    # zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
-    # zone_config.N_COND = 2
-    # zone_config.N_EVAP = 2
     args = construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -221,7 +221,8 @@ def _get_hpr_targets(
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
-    return HeatPumpTargetOutputs.model_validate(handler(args))
+    result = handler(args)
+    return HeatPumpTargetOutputs.model_validate(result.to_output_payload())
 
 
 def _get_hpr_target_summary(
