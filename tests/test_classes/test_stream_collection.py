@@ -127,6 +127,17 @@ def test_dynamic_sort_after_adding(sample_streams):
     assert temps_in_order == [180, 160, 150]
 
 
+def test_reset_heat_flows_zeros_all_streams_in_place():
+    sc = StreamCollection()
+    sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=15.0))
+    sc.add(Stream(name="C1", t_supply=60, t_target=140, heat_flow=25.0))
+
+    returned = sc.reset_heat_flows()
+
+    assert returned is sc
+    assert all(stream.heat_flow == 0.0 for stream in sc)
+
+
 def test_get_hot_streams_filters_and_preserves_sort_settings():
     sc = StreamCollection()
     sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1))

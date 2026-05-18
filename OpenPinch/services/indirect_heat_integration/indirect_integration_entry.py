@@ -11,7 +11,6 @@ from typing import Dict, Tuple
 import numpy as np
 
 from ...classes.problem_table import ProblemTable
-from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import tol
@@ -40,11 +39,8 @@ def compute_total_subzone_utility_targets(zone: Zone) -> TotalProcessTarget:
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = num_units = area = capital_cost = total_cost = 0.0
 
-    hot_utilities = deepcopy(zone.hot_utilities)
-    cold_utilities = deepcopy(zone.cold_utilities)
-    hot_utilities, cold_utilities = _reset_utility_heat_flows(
-        hot_utilities, cold_utilities
-    )
+    hot_utilities = deepcopy(zone.hot_utilities).reset_heat_flows()
+    cold_utilities = deepcopy(zone.cold_utilities).reset_heat_flows()
     for subzone in zone.subzones.values():
         t = subzone.targets[TT.DI.value]
         hot_utility_target += t.hot_utility_target
@@ -185,19 +181,6 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
 #######################################################################################################
 # Helper Functions
 #######################################################################################################
-
-
-def _reset_utility_heat_flows(
-    hot_utilities: StreamCollection, cold_utilities: StreamCollection
-) -> Tuple[StreamCollection, StreamCollection]:
-    """Zero out utility heat flows prior to accumulating site-level demands."""
-    hu: Stream
-    for hu in hot_utilities:
-        hu.heat_flow = 0.0
-    cu: Stream
-    for cu in cold_utilities:
-        cu.heat_flow = 0.0
-    return hot_utilities, cold_utilities
 
 
 def _match_utility_gen_and_use_at_same_level(
