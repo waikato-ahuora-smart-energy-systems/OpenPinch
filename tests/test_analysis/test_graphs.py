@@ -52,6 +52,16 @@ def test_graph_gcc_creates_segments():
     assert all("data_points" in seg for seg in segments)
 
 
+def test_graph_gcc_vertical_segments_use_neutral_colour():
+    x_vals = [10, 6, 6, 0]
+    y_vals = [100, 90, 80, 70]
+    segments = _graph_gcc(y_vals, x_vals)
+
+    vertical_segments = [seg for seg in segments if seg.get("is_vertical")]
+    assert vertical_segments
+    assert all(seg["colour"] == LineColour.Black.value for seg in vertical_segments)
+
+
 def test_classify_segment_utility_profile_colours():
     assert _classify_segment(5, is_utility_profile=False) == StreamLoc.ColdS
     assert _classify_segment(-5, is_utility_profile=False) == StreamLoc.HotS

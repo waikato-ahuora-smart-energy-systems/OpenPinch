@@ -450,7 +450,7 @@ def _segment_trace(
 
 
 def _segment_colour(segment: Mapping[str, object]) -> str:
-    if segment.get("is_vertical") and segment.get("is_utility_stream"):
+    if segment.get("is_vertical"):
         return _SEGMENT_COLOUR_MAP[LineColour.Black.value]
     colour_idx = segment.get("colour")
     return _SEGMENT_COLOUR_MAP.get(colour_idx, "#333333")

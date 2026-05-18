@@ -298,7 +298,11 @@ def _build_gcc_segments(
     ):
         counts[stream_loc] += 1
         title = _format_segment_title(meta, counts[stream_loc])
-        colour = LineColour.Black.value if decolour else _streamloc_colour(stream_loc)
+        colour = (
+            LineColour.Black.value
+            if is_vertical or decolour
+            else _streamloc_colour(stream_loc)
+        )
         segments.append(
             _create_curve(
                 title=title,
