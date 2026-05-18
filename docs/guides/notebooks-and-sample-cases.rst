@@ -56,9 +56,9 @@ Current packaged notebooks:
 2. `02_total_site_targets_and_sugcc.ipynb`
 3. `03_carnot_hpr_comparison.ipynb`
 
-Notebook 03 also uses the public
-``OpenPinch.services.heat_pump_integration.plot_multi_hp_profiles_from_results``
-helper when it needs a dedicated HPR stream-profile figure.
+Notebook 03 also shows the post-target HPR graph surfaces directly through
+``problem.plot.net_load_profiles(zone_name="Direct Heat Pump")`` and
+``problem.plot.grand_composite_curve_with_heat_pump(...)``.
 
 Recommended Learning Path
 -------------------------

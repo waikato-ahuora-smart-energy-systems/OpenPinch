@@ -37,8 +37,10 @@ The packaged notebook:
 
 This is the best single packaged learning asset for the broader direct-versus-
 indirect HPR comparison workflow. It keeps the study orchestration on
-``PinchWorkspace`` and uses the public HPR profile plotting helper rather than
-reaching into private implementation modules.
+``PinchWorkspace`` and inspects the resulting HPR target through the standard
+plot accessor surfaces, especially
+``problem.plot.net_load_profiles(zone_name="Direct Heat Pump")`` and
+``problem.plot.grand_composite_curve_with_heat_pump(...)``.
 
 Current Recommendation
 ----------------------

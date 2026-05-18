@@ -7,7 +7,6 @@ from pathlib import Path
 
 from OpenPinch.resources import copy_notebook, list_notebooks
 
-
 EXPECTED_NOTEBOOKS = [
     "01_basic_pinch_and_dtcont_sensitivity.ipynb",
     "02_total_site_targets_and_sugcc.ipynb",
@@ -66,3 +65,22 @@ def test_packaged_notebooks_use_pinch_workspace_without_local_helpers(tmp_path: 
         assert "read_sample_case" not in combined_source
         assert "json.loads(" not in combined_source
         assert "def " not in combined_source
+
+
+def test_notebook_3_uses_standard_hpr_plot_accessors(tmp_path: Path):
+    """Notebook 03 should demonstrate the public HPR graph surfaces."""
+    notebook_path = copy_notebook(
+        "03_carnot_hpr_comparison.ipynb",
+        tmp_path / "03_carnot_hpr_comparison.ipynb",
+    )
+    notebook = _load_notebook(notebook_path)
+    combined_source = _combined_source(notebook)
+
+    assert "plot_multi_hp_profiles_from_results" not in combined_source
+    assert (
+        'profile_problem.plot.net_load_profiles(zone_name="Direct Heat Pump")'
+        in combined_source
+    )
+    assert (
+        "profile_problem.plot.grand_composite_curve_with_heat_pump(" in combined_source
+    )

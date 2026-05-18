@@ -1,40 +1,21 @@
 """Graph construction helpers for composite curves and related plots."""
 
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
+
+import numpy as np
 
 from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
-from ...lib.enums import ArrowHead, GT, LegendSeries, LineColour, PT, StreamLoc
+from ...lib.config import tol
+from ...lib.enums import GT, PT, ArrowHead, LineColour, StreamLoc
 from ...lib.schemas.targets import BaseTargetModel
 from ...utils.miscellaneous import clean_composite_curve
-from ...lib.config import tol
+from .graph_series_meta import GRAPH_SERIES_META, GraphSeriesMeta
 
 DECIMAL_PLACES = 2
 GCC_VERTICAL_TOL = 1e-3
 
-
-@dataclass(frozen=True)
-class GCCSeriesMeta:
-    """Legend metadata for a GCC-related data series rendered in output graphs."""
-
-    label: str
-    description: str
-    preferred_stream_loc: Optional[StreamLoc] = None
-
-
-GCC_SERIES_LEGEND: dict[str, GCCSeriesMeta] = {
-    PT.H_NET.value: GCCSeriesMeta(LegendSeries.GCC.name, LegendSeries.GCC.value),
-    PT.H_NET_NP.value: GCCSeriesMeta(LegendSeries.GCC_N.name, LegendSeries.GCC_N.value),
-    PT.H_NET_V.value: GCCSeriesMeta(LegendSeries.GCC_V.name, LegendSeries.GCC_V.value),
-    PT.H_NET_A.value: GCCSeriesMeta(LegendSeries.GCC_A.name, LegendSeries.GCC_A.value),
-    PT.H_NET_UT.value: GCCSeriesMeta(
-        LegendSeries.GCC_U.name,
-        LegendSeries.GCC_U.value,
-        StreamLoc.HotU,
-    ),
-}
 
 __all__ = ["get_output_graph_data"]
 
@@ -79,9 +60,9 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 graph_title=graph_title,
                 key=GT.CC.value,
                 data=target_graphs[GT.CC.value],
-                col_keys=[PT.H_HOT.value, PT.H_COLD.value],
-                stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Composite Curve",
+                value_field=[PT.H_HOT.value, PT.H_COLD.value],
+                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
             )
         )
 
@@ -91,9 +72,9 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 graph_title=graph_title,
                 key=GT.SCC.value,
                 data=target_graphs[GT.SCC.value],
-                col_keys=[PT.H_HOT.value, PT.H_COLD.value],
-                stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Shifted Composite Curve",
+                value_field=[PT.H_HOT.value, PT.H_COLD.value],
+                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
             )
         )
 
@@ -103,9 +84,9 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 graph_title=graph_title,
                 key=GT.BCC.value,
                 data=target_graphs[GT.BCC.value],
-                col_keys=[PT.H_HOT_BAL.value, PT.H_COLD_BAL.value],
-                stream_types=[StreamLoc.HotS, StreamLoc.ColdS],
                 label="Balanced Composite Curve",
+                value_field=[PT.H_HOT_BAL.value, PT.H_COLD_BAL.value],
+                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
                 include_arrows=True,
             )
         )
@@ -134,19 +115,23 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 graph_title=graph_title,
                 key=GT.NLP.value,
                 data=target_graphs[GT.NLP.value],
-                col_keys=[
+                label="Net Load Curves",
+                value_field=[
                     PT.H_NET_HOT.value,
                     PT.H_NET_COLD.value,
                     PT.H_HOT_UT.value,
                     PT.H_COLD_UT.value,
+                    PT.H_HOT_HP.value,
+                    PT.H_COLD_HP.value,
                 ],
-                stream_types=[
+                stream_type=[
                     StreamLoc.HotS,
                     StreamLoc.ColdS,
                     StreamLoc.HotU,
                     StreamLoc.ColdU,
+                    StreamLoc.HotU,
+                    StreamLoc.ColdU,
                 ],
-                label="Net Load Curves",
                 include_arrows=True,
             )
         )
@@ -157,13 +142,13 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 graph_title=graph_title,
                 key=GT.TSP.value,
                 data=target_graphs[GT.TSP.value],
-                col_keys=[
+                value_field=[
                     PT.H_NET_HOT.value,
                     PT.H_NET_COLD.value,
                     PT.H_HOT_UT.value,
                     PT.H_COLD_UT.value,
                 ],
-                stream_types=[
+                stream_type=[
                     StreamLoc.HotS,
                     StreamLoc.ColdS,
                     StreamLoc.HotU,
@@ -212,22 +197,33 @@ def _make_composite_graph(
     key: str,
     data,
     label: str,
-    col_keys: list,
-    stream_types: list,
     *,
+    value_field,
+    stream_type,
     name: Optional[str] = None,
     include_arrows: bool = True,
     decolour: bool = False,
 ):
     temperatures = _column_to_list(data, PT.T.value)
+    fields = _normalise_graph_fields(value_field)
+    stream_types = _normalise_graph_values(
+        stream_type,
+        len(fields),
+        "`value_field` and `stream_type` must have the same length.",
+    )
     segments: List[dict] = []
-    for stream_loc, col_key in zip(stream_types, col_keys):
+    for field, stream_loc in zip(fields, stream_types):
+        column_key = _column_key(field)
+        x_vals = _column_to_list(data, column_key)
+        if not _should_plot_series(x_vals):
+            continue
         segments.extend(
             _graph_cc(
                 key,
                 stream_loc,
                 temperatures,
-                _column_to_list(data, col_key),
+                x_vals,
+                column_key=column_key,
                 include_arrows=include_arrows,
                 decolour=decolour,
             )
@@ -239,33 +235,46 @@ def _make_composite_graph(
     }
 
 
-def _normalise_gcc_fields(value_field) -> List:
+def _normalise_graph_fields(value_field) -> List:
     if isinstance(value_field, str) or not hasattr(value_field, "__iter__"):
         return [value_field]
     return list(value_field)
 
 
+def _normalise_graph_values(value, count: int, mismatch_message: str) -> List:
+    if isinstance(value, str) or not hasattr(value, "__iter__"):
+        values = [value] * count
+    else:
+        values = list(value)
+    if len(values) != count:
+        raise ValueError(mismatch_message)
+    return values
+
+
 def _normalise_gcc_flags(flag, count: int) -> List[bool]:
-    if isinstance(flag, bool) or flag is None:
-        return [bool(flag)] * count
-    flags = list(flag)
-    if len(flags) != count:
+    flags = _normalise_graph_values(
+        flag if flag is not None else False,
+        count,
+        "`value_field` and `is_utility_profile` must have the same length.",
+    )
+    try:
+        return [bool(item) for item in flags]
+    except TypeError as exc:
         raise ValueError(
-            "`value_field` and `is_utility_profile` must have the same length."
-        )
-    return [bool(item) for item in flags]
+            "`is_utility_profile` values must be coercible to bool."
+        ) from exc
 
 
 def _column_key(field) -> str:
     return getattr(field, "value", field)
 
 
-def _series_meta_from_key(column_key: str) -> GCCSeriesMeta:
-    meta = GCC_SERIES_LEGEND.get(column_key)
+def _series_meta_from_key(column_key: str) -> GraphSeriesMeta:
+    meta = GRAPH_SERIES_META.get(column_key)
     if meta is not None:
         return meta
     label = str(column_key)
-    return GCCSeriesMeta(label, label)
+    return GraphSeriesMeta(label, label)
 
 
 def _build_gcc_segments(
@@ -273,7 +282,7 @@ def _build_gcc_segments(
     x_vals: Iterable[float],
     *,
     series_id: str,
-    meta: GCCSeriesMeta,
+    meta: GraphSeriesMeta,
     is_utility_profile: bool,
     decolour: bool,
 ) -> List[dict]:
@@ -349,7 +358,7 @@ def _segment_bounds(x_vals: List[float]) -> Tuple[int, int]:
     return start, end
 
 
-def _format_segment_title(meta: GCCSeriesMeta, index: int) -> str:
+def _format_segment_title(meta: GraphSeriesMeta, index: int) -> str:
     base = meta.description or meta.label or "Segment"
     return f"{base} {index}"
 
@@ -366,7 +375,7 @@ def _graph_gcc(
     decolour: bool = False,
 ) -> List[dict]:
     """Backward-compatible wrapper retained for tests and legacy callers."""
-    meta = GCCSeriesMeta(
+    meta = GraphSeriesMeta(
         label=series_label,
         description=series_description or series_label,
         preferred_stream_loc=preferred_stream_loc,
@@ -393,16 +402,19 @@ def _make_gcc_graph(
     decolour: bool = False,
 ):
     temperatures = _column_to_list(data, PT.T.value)
-    fields = _normalise_gcc_fields(value_field)
+    fields = _normalise_graph_fields(value_field)
     flags = _normalise_gcc_flags(is_utility_profile, len(fields))
     segments: List[dict] = []
     for field, utility_flag in zip(fields, flags):
         column_key = _column_key(field)
+        x_vals = _column_to_list(data, column_key)
+        if not _should_plot_series(x_vals):
+            continue
         meta = _series_meta_from_key(column_key)
         segments.extend(
             _build_gcc_segments(
                 temperatures,
-                _column_to_list(data, column_key),
+                x_vals,
                 series_id=f"{key}:{column_key}",
                 meta=meta,
                 is_utility_profile=utility_flag,
@@ -423,6 +435,7 @@ def _graph_cc(
     y_vals: List[float],
     x_vals: List[float],
     *,
+    column_key: Optional[str] = None,
     include_arrows: bool = True,
     decolour: bool = False,
 ) -> List[dict]:
@@ -475,16 +488,58 @@ def _graph_cc(
     base_colour = _streamloc_colour(stream_loc)
     colour = LineColour.Black.value if decolour else base_colour
     arrow = arrow_map[stream_loc] if include_arrows else ArrowHead.NO_ARROW.value
+    meta = _composite_series_meta(stream_loc, column_key)
 
     return [
         _create_curve(
-            title=title_map[stream_loc],
+            title=meta.composite_title,
             colour=colour,
             arrow=arrow,
             x_vals=x_vals,
             y_vals=y_vals,
+            series_label=meta.label if column_key is not None else None,
+            series_id=f"{key}:{column_key}" if column_key is not None else None,
+            series_description=meta.description if column_key is not None else None,
         )
     ]
+
+
+def _composite_series_meta(
+    stream_loc: StreamLoc,
+    column_key: Optional[str],
+) -> GraphSeriesMeta:
+    """Return the display metadata for one composite-curve series."""
+    if column_key is not None:
+        meta = _series_meta_from_key(column_key)
+        if meta.composite_title is not None:
+            return meta
+    title_map = {
+        StreamLoc.HotS: "Hot CC",
+        StreamLoc.ColdS: "Cold CC",
+        StreamLoc.HotU: "Hot Utility",
+        StreamLoc.ColdU: "Cold Utility",
+    }
+    default_title = title_map[stream_loc]
+    return GraphSeriesMeta(
+        label=default_title,
+        description=default_title,
+        composite_title=default_title,
+    )
+
+
+def _should_plot_series(values: List[float]) -> bool:
+    """Return ``True`` when a graph series contains meaningful non-zero values."""
+    try:
+        numeric = np.asarray(values, dtype=float)
+    except (TypeError, ValueError):
+        numeric = np.array(
+            [float(value) for value in values if value is not None],
+            dtype=float,
+        )
+    finite = numeric[np.isfinite(numeric)]
+    if finite.size == 0:
+        return False
+    return bool(np.any(np.abs(finite) > tol))
 
 
 def _column_to_list(data, column_key: str) -> List[float]:
@@ -582,7 +637,7 @@ def _create_curve(
     curve["data_points"] = [
         {"x": round(x, DECIMAL_PLACES), "y": round(y, DECIMAL_PLACES)}
         for x, y in zip(x_vals, y_vals)
-        if x != None and y != None
+        if x is not None and y is not None
     ]
     return curve
 

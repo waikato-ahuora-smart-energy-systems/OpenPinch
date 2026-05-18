@@ -21,8 +21,8 @@ Included Notebooks
 
 ``03_carnot_hpr_comparison.ipynb``
    Direct and indirect Carnot HPR and refrigeration comparison using the
-   advanced ``problem.target.*`` entry points plus the public HPR profile
-   plotting helper.
+   advanced ``problem.target.*`` entry points plus the standard HPR-aware
+   net-load and GCC plot accessors.
 
 How To Use Them
 ---------------

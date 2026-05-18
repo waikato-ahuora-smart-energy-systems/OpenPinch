@@ -3,18 +3,20 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from OpenPinch.services.heat_pump_integration import (
-    heat_pump_and_refrigeration_entry as hp,
-)
+import OpenPinch.services.heat_pump_integration as hp_pkg
+from OpenPinch.classes.problem_table import ProblemTable
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.lib.enums import GT, PT, HPRcycle
 from OpenPinch.lib.schemas.hpr import (
     HPRBackendResult,
     HPRThermoArtifacts,
 )
+from OpenPinch.services.common.graph_data import _create_graph_set
+from OpenPinch.services.heat_pump_integration import (
+    heat_pump_and_refrigeration_entry as hp,
+)
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.problem_table import ProblemTable
-from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.lib.enums import HPRcycle, PT
 
 from .helpers import _base_args, _pt_with_hnet
 
@@ -138,6 +140,53 @@ def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
         "Condenser",
         "Evaporator",
     ]
+
+
+def test_public_heat_pump_service_package_does_not_export_profile_helper():
+    assert not hasattr(hp_pkg, "plot_multi_hp_profiles_from_results")
+
+
+def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
+    pt = ProblemTable(
+        {
+            PT.T.value: [120.0, 80.0],
+            PT.H_NET_HOT.value: [8.0, 2.0],
+            PT.H_NET_COLD.value: [1.0, 6.0],
+            PT.H_HOT_UT.value: [0.0, 3.0],
+            PT.H_COLD_UT.value: [4.0, 0.0],
+            PT.H_HOT_HP.value: [0.0, 5.0],
+            PT.H_COLD_HP.value: [3.0, 0.0],
+            PT.H_NET_W_AIR.value: [4.0, 1.0],
+            PT.H_NET_HP.value: [2.0, -2.0],
+        }
+    )
+
+    graphs = hp._get_hpr_graphs(pt, is_direct=True, is_heat_pumping=True)
+
+    assert set(graphs) == {GT.NLP.value, GT.GCC_HP.value}
+    assert list(graphs[GT.NLP.value].columns) == [
+        PT.T.value,
+        PT.H_NET_HOT.value,
+        PT.H_NET_COLD.value,
+        PT.H_HOT_UT.value,
+        PT.H_COLD_UT.value,
+        PT.H_HOT_HP.value,
+        PT.H_COLD_HP.value,
+    ]
+
+    graph_set = _create_graph_set(
+        SimpleNamespace(
+            name="Direct Heat Pump",
+            type="Direct Heat Pump",
+            graphs=graphs,
+        )
+    )
+    nlp_graph = next(
+        graph for graph in graph_set["graphs"] if graph["type"] == GT.NLP.value
+    )
+    segment_titles = {segment["title"] for segment in nlp_graph["segments"]}
+    assert "Heat Pump Condenser" in segment_titles
+    assert "Heat Pump Evaporator" in segment_titles
 
 
 @pytest.mark.parametrize(

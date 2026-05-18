@@ -106,6 +106,8 @@ def test_create_graph_set_includes_net_load_curves():
             PT.H_NET_COLD.value: MagicMock(to_list=lambda: [30, 10, 0]),
             PT.H_HOT_UT.value: MagicMock(to_list=lambda: [5, 5, 5]),
             PT.H_COLD_UT.value: MagicMock(to_list=lambda: [25, 15, 5]),
+            PT.H_HOT_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
+            PT.H_COLD_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
         }
     }
     mock_zone = MagicMock(spec=Zone)

@@ -24,7 +24,6 @@ from .common.preprocessing import (
 from .common.shared import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
-    plot_multi_hp_profiles_from_results,
 )
 from .cycles.brayton import (
     optimise_brayton_heat_pump_placement,
@@ -45,7 +44,6 @@ from .cycles.multi_temperature_carnot import (
 __all__ = [
     "compute_direct_heat_pump_or_refrigeration_target",
     "compute_indirect_heat_pump_or_refrigeration_target",
-    "plot_multi_hp_profiles_from_results",
 ]
 
 
@@ -256,7 +254,18 @@ def _get_hpr_graphs(
 
     if is_direct:
         return {
-            GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]]
+            GT.NLP.value: pt[
+                [
+                    PT.T.value,
+                    PT.H_NET_HOT.value,
+                    PT.H_NET_COLD.value,
+                    PT.H_HOT_UT.value,
+                    PT.H_COLD_UT.value,
+                    PT.H_HOT_HP.value,
+                    PT.H_COLD_HP.value,
+                ]
+            ],
+            GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]],
         }
 
     return {GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]}
@@ -327,7 +336,9 @@ def _calc_hpr_cascade(
 
 _HP_PLACEMENT_HANDLERS = {
     HPRcycle.Brayton.value: optimise_brayton_heat_pump_placement,
-    HPRcycle.MultiTempCarnot.value: optimise_multi_temperature_carnot_heat_pump_placement,
+    HPRcycle.MultiTempCarnot.value: (
+        optimise_multi_temperature_carnot_heat_pump_placement
+    ),
     HPRcycle.MultiSimpleVapourComp.value: optimise_multi_simple_heat_pump_placement,
     HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
     HPRcycle.MultiSimpleCarnot.value: optimise_multi_simple_carnot_heat_pump_placement,
