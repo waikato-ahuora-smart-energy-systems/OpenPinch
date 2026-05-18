@@ -36,7 +36,9 @@ The packaged notebook:
    openpinch notebook --name 03_carnot_hpr_comparison.ipynb -o notebooks
 
 This is the best single packaged learning asset for the broader direct-versus-
-indirect HPR comparison workflow.
+indirect HPR comparison workflow. It keeps the study orchestration on
+``PinchWorkspace`` and uses the public HPR profile plotting helper rather than
+reaching into private implementation modules.
 
 Current Recommendation
 ----------------------

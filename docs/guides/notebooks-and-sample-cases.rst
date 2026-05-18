@@ -34,7 +34,9 @@ Packaged Notebook Series
 
 The current packaged notebooks load bundled sample cases directly with
 ``PinchWorkspace(source="sample_case.json", ...)`` and then work against real
-``PinchProblem`` cases inside the workspace.
+``PinchProblem`` cases inside the workspace. They are packaged as clean sources:
+no stored Plotly payloads, no cached execution counts, and no stale traceback
+output.
 
 Copy the full series with:
 
@@ -53,6 +55,10 @@ Current packaged notebooks:
 1. `01_basic_pinch_and_dtcont_sensitivity.ipynb`
 2. `02_total_site_targets_and_sugcc.ipynb`
 3. `03_carnot_hpr_comparison.ipynb`
+
+Notebook 03 also uses the public
+``OpenPinch.services.heat_pump_integration.plot_multi_hp_profiles_from_results``
+helper when it needs a dedicated HPR stream-profile figure.
 
 Recommended Learning Path
 -------------------------

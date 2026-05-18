@@ -28,6 +28,10 @@ Packaged Resources
 The resources module exposes the packaged sample cases and notebooks used
 throughout the guides and examples.
 
+The packaged notebooks are intended to be copied as clean source assets. They
+ship without stored execution output and rely on the same public
+``PinchWorkspace`` and plotting surfaces documented elsewhere in RTD.
+
 The current optional install split is:
 
 - ``openpinch[notebook]`` for Jupyter, Plotly graph rendering, and Excel I/O
