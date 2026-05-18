@@ -280,6 +280,7 @@ class HPRBackendResult(BaseModel):
             failure_reason=reason,
         )
 
+
 __all__ = [
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",

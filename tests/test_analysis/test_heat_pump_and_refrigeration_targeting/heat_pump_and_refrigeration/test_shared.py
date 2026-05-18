@@ -230,6 +230,7 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
     out = hp_shared._get_hpr_cascade(hot, cold)
     assert len(out) == 3
 
+
 def test_hpr_backend_result_derives_hot_and_cold_stream_views_from_combined_streams():
     hot_stream = _stream("cond", 120.0, 100.0, 10.0, is_process_stream=False)
     cold_stream = _stream("evap", 20.0, 40.0, 8.0, is_process_stream=False)

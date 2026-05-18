@@ -2,12 +2,12 @@
 
 # from __future__ import annotations
 
-from typing import List, Optional, Sequence
+import re
+from typing import Any, List, Optional, Sequence
 
 import CoolProp
-from CoolProp.Plots.Common import PropertyDict, SIunits, process_fluid_state
-from CoolProp.Plots.SimpleCycles import StateContainer
 import numpy as np
+from scipy.optimize import brentq
 
 from .stream import Stream
 from .stream_collection import StreamCollection
@@ -22,10 +22,15 @@ class VapourCompressionCycle:
 
     STATECOUNT = 6
 
+    @staticmethod
+    def _new_cycle_states() -> list[dict[str, float]]:
+        """Return empty storage for the six thermodynamic state points."""
+        return [{} for _ in range(VapourCompressionCycle.STATECOUNT)]
+
     def __init__(self):
         """Initialise an unsolved cycle with default operating assumptions."""
-        self._system = SIunits()
-        self._cycle_states = StateContainer(unit_system=self._system)
+        self._system: dict[str, str] = {"temperature": "K"}
+        self._cycle_states = self._new_cycle_states()
 
         self._dT_superheat: float = 0.0
         self._dT_subcool: float = 0.0
@@ -58,9 +63,52 @@ class VapourCompressionCycle:
         self._T_cond: Optional[float] = None
         self.temperature_unit = "K"
 
+    @staticmethod
+    def _get_fluid_state(value: str | Any):
+        """Build a CoolProp abstract state from a refrigerant spec or return the state unchanged."""
+        if not isinstance(value, str):
+            return value
+
+        backend, fluid = value.split("::", 1) if "::" in value else ("HEOS", value)
+        fluid = fluid.strip()
+
+        if "[" not in fluid and "]" not in fluid:
+            return CoolProp.AbstractState(backend, fluid)
+
+        fluid_names = []
+        mole_fractions = []
+
+        for component_spec in fluid.split("&"):
+            match = re.fullmatch(r"\s*([^\[\]&]+)\[([^\]]+)\]\s*", component_spec)
+            if match is None:
+                raise ValueError(
+                    "Explicit refrigerant mixtures must use '<component>[<mole_fraction>]' syntax."
+                )
+
+            component_name, mole_fraction = match.groups()
+            mole_fraction = float(mole_fraction)
+
+            if not np.isfinite(mole_fraction) or mole_fraction < 0.0:
+                raise ValueError(
+                    "Refrigerant mole fractions must be finite and non-negative."
+                )
+
+            fluid_names.append(component_name.strip())
+            mole_fractions.append(mole_fraction)
+
+        mole_fraction_total = sum(mole_fractions)
+        if mole_fraction_total <= 0.0:
+            raise ValueError("Refrigerant mole fractions must sum to a positive value.")
+
+        state = CoolProp.AbstractState(backend, "&".join(fluid_names))
+        state.set_mole_fractions(
+            [mole_fraction / mole_fraction_total for mole_fraction in mole_fractions]
+        )
+        return state
+
     @property
-    def system(self) -> PropertyDict:
-        """CoolProp unit-system definition used by stored state points."""
+    def system(self) -> dict[str, str]:
+        """Unit metadata associated with stored cycle-state values."""
         return self._system
 
     @property
@@ -71,32 +119,31 @@ class VapourCompressionCycle:
     @state.setter
     def state(self, value) -> None:
         """Set the working-fluid state object and refresh critical properties."""
-        self._state = process_fluid_state(value)
+        self._state = self._get_fluid_state(value)
         self._solved = False
         self._p_crit = self._state.keyed_output(CoolProp.iP_critical)
         self._t_crit = self._state.keyed_output(CoolProp.iT_critical)
         self._d_crit = self._state.keyed_output(CoolProp.irhomass_critical)
 
     @property
-    def cycle_states(self) -> StateContainer:
+    def cycle_states(self) -> list[dict[str, float]]:
         """Container holding the six solved cycle states."""
         return self._cycle_states
 
     @cycle_states.setter
-    def cycle_states(self, value: StateContainer) -> None:
+    def cycle_states(self, value: list[dict[str, float]]) -> None:
         """Replace the full state container with a validated six-point cycle."""
         if len(value) != self.STATECOUNT:
             raise ValueError(f"Expected exactly {self.STATECOUNT} state points.")
-        value.units = self._system
         self._cycle_states = value
 
     @property
-    def states(self) -> StateContainer:
+    def states(self) -> list[dict[str, float]]:
         """Expose state container for compatibility with plotting API."""
         return self._cycle_states
 
     @property
-    def state_points(self) -> StateContainer:
+    def state_points(self) -> list[dict[str, float]]:
         """State points around the cycle."""
         return self._cycle_states
 
@@ -104,25 +151,25 @@ class VapourCompressionCycle:
     def Hs(self) -> Sequence[float]:
         """Specific enthalpies for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, "H"] for i in self._cycle_states]
+        return [self._cycle_states[i]["H"] for i in range(self.STATECOUNT)]
 
     @property
     def Ss(self) -> Sequence[float]:
         """Specific entropies for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, "S"] for i in self._cycle_states]
+        return [self._cycle_states[i]["S"] for i in range(self.STATECOUNT)]
 
     @property
     def Ts(self) -> Sequence[float]:
         """Temperatures for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, "T"] for i in self._cycle_states]
+        return [self._cycle_states[i]["T"] for i in range(self.STATECOUNT)]
 
     @property
     def Ps(self) -> Sequence[float]:
         """Pressures for the solved state points."""
         self._require_solution()
-        return [self._cycle_states[i, "P"] for i in self._cycle_states]
+        return [self._cycle_states[i]["P"] for i in range(self.STATECOUNT)]
 
     @property
     def q_evap(self) -> Optional[float]:
@@ -315,7 +362,7 @@ class VapourCompressionCycle:
         refrigerant: str = None,
     ) -> bool:
         if refrigerant is not None:
-            self.state = process_fluid_state(refrigerant)
+            self.state = self._get_fluid_state(refrigerant)
         if self._state is None:
             raise ValueError("A fluid must be specified before solving the cycle.")
         return True
@@ -325,7 +372,7 @@ class VapourCompressionCycle:
         T: float,
         Q: float = None,
     ):
-        s = process_fluid_state(self._refrigerant)
+        s = self._get_fluid_state(self._refrigerant)
         if (T > self._t_crit - 1) or (Q is None):
             s.update(CoolProp.DmassT_INPUTS, self._d_crit, T)
         else:
@@ -339,40 +386,128 @@ class VapourCompressionCycle:
         *,
         phase: str = 1.0,
     ) -> CoolProp.AbstractState:
-        s = process_fluid_state(self._refrigerant)
+        s = self._get_fluid_state(self._refrigerant)
         try:
             s.update(CoolProp.PT_INPUTS, P, T)
         except ValueError:
             s.update(CoolProp.PQ_INPUTS, P, phase)  # Close to saturated liquid/vapour
         return s
 
+    def _solve_single_phase_state_from_pressure_target(
+        self,
+        P: float,
+        target: float,
+        property_name: str,
+        T_low: float,
+        T_high: float,
+        *,
+        expand: str = "high",
+    ) -> CoolProp.AbstractState:
+        """Solve a single-phase state from pressure and a target thermodynamic property."""
+        epsilon = 1e-6
+        T_low = max(T_low, epsilon)
+        T_high = max(T_high, T_low + 1.0)
+
+        def residual(T: float) -> float:
+            state = self._get_fluid_state(self._refrigerant)
+            state.update(CoolProp.PT_INPUTS, P, T)
+            return getattr(state, property_name)() - target
+
+        low_res = residual(T_low)
+        high_res = residual(T_high)
+        step = max(T_high - T_low, 10.0)
+
+        for _ in range(25):
+            if np.isclose(low_res, 0.0):
+                return self._compute_state_from_pressure_temperature(P=P, T=T_low)
+            if np.isclose(high_res, 0.0):
+                return self._compute_state_from_pressure_temperature(P=P, T=T_high)
+            if low_res * high_res < 0.0:
+                break
+
+            if expand == "low":
+                T_low = max(T_low - step, epsilon)
+                low_res = residual(T_low)
+            else:
+                T_high += step
+                high_res = residual(T_high)
+
+            step *= 1.5
+        else:
+            raise ValueError(
+                f"Could not bracket a temperature solution for {property_name} at pressure {P}."
+            )
+
+        T = brentq(residual, T_low, T_high)
+        return self._compute_state_from_pressure_temperature(P=P, T=T)
+
     def _compute_state_from_pressure_quality(
         self,
         P: float,
         Q: float,
     ) -> CoolProp.AbstractState:
-        s = process_fluid_state(self._refrigerant)
+        s = self._get_fluid_state(self._refrigerant)
         s.update(CoolProp.PQ_INPUTS, P, Q)
         return s
 
     def _compute_compressor_outlet_state(
         self, h_in: float, s_in: float, P_out: float
     ) -> CoolProp.AbstractState:
-        s = process_fluid_state(self._refrigerant)
-        s.update(CoolProp.PSmass_INPUTS, P_out, s_in)
+        s = self._get_fluid_state(self._refrigerant)
+        try:
+            s.update(CoolProp.PSmass_INPUTS, P_out, s_in)
+        except ValueError:
+            sat_vapour = self._compute_state_from_pressure_quality(P_out, 1.0)
+            s = self._solve_single_phase_state_from_pressure_target(
+                P=P_out,
+                target=s_in,
+                property_name="smass",
+                T_low=sat_vapour.T() + 1e-6,
+                T_high=sat_vapour.T() + 200.0,
+                expand="high",
+            )
+
         h_out_isentropic = s.hmass()
         h_out = h_in + (h_out_isentropic - h_in) / self._eta_comp
-        s.update(CoolProp.HmassP_INPUTS, h_out, P_out)
-        return s
+        return self._compute_state_from_pressure_enthalpy(P=P_out, h=h_out)
 
     def _compute_state_from_pressure_enthalpy(
         self,
         P: float,
         h: float,
     ):
-        s = process_fluid_state(self._refrigerant)
-        s.update(CoolProp.HmassP_INPUTS, h, P)
-        return s
+        s = self._get_fluid_state(self._refrigerant)
+        try:
+            s.update(CoolProp.HmassP_INPUTS, h, P)
+            return s
+        except ValueError:
+            sat_liquid = self._compute_state_from_pressure_quality(P, 0.0)
+            sat_vapour = self._compute_state_from_pressure_quality(P, 1.0)
+            h_liquid = sat_liquid.hmass()
+            h_vapour = sat_vapour.hmass()
+
+            if h_liquid <= h <= h_vapour:
+                quality = (h - h_liquid) / (h_vapour - h_liquid)
+                return self._compute_state_from_pressure_quality(P=P, Q=quality)
+
+            if h < h_liquid:
+                return self._solve_single_phase_state_from_pressure_target(
+                    P=P,
+                    target=h,
+                    property_name="hmass",
+                    T_low=max(sat_liquid.T() - 200.0, 1e-6),
+                    T_high=sat_liquid.T() - 1e-6,
+                    expand="low",
+                )
+
+            return self._solve_single_phase_state_from_pressure_target(
+                P=P,
+                target=h,
+                property_name="hmass",
+                T_low=sat_vapour.T() + 1e-6,
+                T_high=sat_vapour.T() + 200.0,
+                expand="high",
+            )
 
     def _convert_C_to_K(
         self,
@@ -391,10 +526,12 @@ class VapourCompressionCycle:
         state: CoolProp.AbstractState,
         i: int,
     ):
-        self._cycle_states[i, "H"] = float(state.hmass())
-        self._cycle_states[i, "S"] = float(state.smass())
-        self._cycle_states[i, "P"] = float(state.p())
-        self._cycle_states[i, "T"] = float(state.T())
+        self._cycle_states[i] = {
+            "H": float(state.hmass()),
+            "S": float(state.smass()),
+            "P": float(state.p()),
+            "T": float(state.T()),
+        }
 
     def solve(
         self,
@@ -453,6 +590,7 @@ class VapourCompressionCycle:
         self.temperature_unit = "K"
         self._validate_solve_inputs(refrigerant)
         self._penalty = []
+        self._cycle_states = self._new_cycle_states()
 
         self._refrigerant = refrigerant
         self._T_evap = self._convert_C_to_K(T_evap)
@@ -486,8 +624,8 @@ class VapourCompressionCycle:
             0.0,
         )
 
-        P_lo = self._get_P_sat_from_T(self._T_evap)
-        P_hi = self._get_P_sat_from_T(self._T_cond)
+        P_lo = self._get_P_sat_from_T(self._T_evap, Q=1.0)
+        P_hi = self._get_P_sat_from_T(self._T_cond, Q=0.0)
 
         if P_lo > P_hi:
             raise ValueError("Evaporator pressure must be below condenser pressure.")
@@ -561,7 +699,7 @@ class VapourCompressionCycle:
             # Penalise excessive subcooling beyond the maximum allowed
             self._penalty.append(h_cond_out_min - h_cond_out_tar)
 
-        if self._cycle_states[1, "H"] <= self._cycle_states[2, "H"]:
+        if self._cycle_states[1]["H"] <= self._cycle_states[2]["H"]:
             raise ValueError(
                 "Condenser cannot have a negative or zero enthalpy change."
             )
@@ -721,37 +859,41 @@ class VapourCompressionCycle:
 
         if p_high < self._p_crit and H[4] > H[2]:
             # Saturated vapor at condenser pressure
-            self._state.update(CoolProp.PQ_INPUTS, p_high, 1.0)
-            h_sat_vapor = self._state.hmass()
+            h_sat_vapor = self._compute_state_from_pressure_quality(p_high, 1.0).hmass()
 
             # Saturated liquid at condenser pressure
-            self._state.update(CoolProp.PQ_INPUTS, p_high, 0.0)
-            h_sat_liquid = self._state.hmass()
+            h_sat_liquid = self._compute_state_from_pressure_quality(
+                p_high, 0.0
+            ).hmass()
 
             if H[4] > h_sat_vapor:
                 for h in np.linspace(H[4], max(h_sat_vapor, H[2]), 21):
-                    self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
-                    t_h_curve_points.append([h, float(self._state.T())])
+                    state = self._compute_state_from_pressure_enthalpy(P=p_high, h=h)
+                    t_h_curve_points.append([h, float(state.T())])
 
             if H[4] > h_sat_liquid and not (H[2] > h_sat_vapor):
                 for h in np.linspace(
                     min(h_sat_vapor, H[4]), max(h_sat_liquid, H[2]), 21
                 ):
                     if h != h_sat_vapor or H[4] < h_sat_vapor:
-                        self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
-                        t_h_curve_points.append([h, float(self._state.T())])
+                        state = self._compute_state_from_pressure_enthalpy(
+                            P=p_high, h=h
+                        )
+                        t_h_curve_points.append([h, float(state.T())])
 
             if H[2] < h_sat_liquid:
                 for h in np.linspace(min(h_sat_liquid, H[4]), H[2], 21):
                     if h != h_sat_liquid or H[4] < h_sat_liquid:
-                        self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
-                        t_h_curve_points.append([h, float(self._state.T())])
+                        state = self._compute_state_from_pressure_enthalpy(
+                            P=p_high, h=h
+                        )
+                        t_h_curve_points.append([h, float(state.T())])
 
         else:
             # Determine supercritical gas cooler profile
             for h in np.linspace(H[4], H[2], 61):
-                self._state.update(CoolProp.HmassP_INPUTS, h, p_high)
-                t_h_curve_points.append([h, float(self._state.T())])
+                state = self._compute_state_from_pressure_enthalpy(P=p_high, h=h)
+                t_h_curve_points.append([h, float(state.T())])
 
         t_h_curve_points = np.array(t_h_curve_points)
 
@@ -791,37 +933,35 @@ class VapourCompressionCycle:
 
         if p_low < self._p_crit and H[5] > H[3]:
             # Saturated vapor at condenser pressure
-            self._state.update(CoolProp.PQ_INPUTS, p_low, 1.0)
-            h_sat_vapor = self._state.hmass()
+            h_sat_vapor = self._compute_state_from_pressure_quality(p_low, 1.0).hmass()
 
             # Saturated liquid at condenser pressure
-            self._state.update(CoolProp.PQ_INPUTS, p_low, 0.0)
-            h_sat_liquid = self._state.hmass()
+            h_sat_liquid = self._compute_state_from_pressure_quality(p_low, 0.0).hmass()
 
             if H[3] < h_sat_liquid:
                 for h in np.linspace(H[3], min(h_sat_liquid, H[5]), 21):
-                    self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
-                    t_h_curve_points.append([h, float(self._state.T())])
+                    state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
+                    t_h_curve_points.append([h, float(state.T())])
 
             if H[3] < h_sat_vapor and not (H[5] < h_sat_liquid):
                 for h in np.linspace(
                     max(h_sat_liquid, H[3]), min(h_sat_vapor, H[5]), 21
                 ):
                     if h != h_sat_liquid or H[3] > h_sat_liquid:
-                        self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
-                        t_h_curve_points.append([h, float(self._state.T())])
+                        state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
+                        t_h_curve_points.append([h, float(state.T())])
 
             if H[5] > h_sat_vapor:
                 for h in np.linspace(max(h_sat_vapor, H[3]), H[5], 21):
                     if h != h_sat_vapor or H[3] > h_sat_vapor:
-                        self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
-                        t_h_curve_points.append([h, float(self._state.T())])
+                        state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
+                        t_h_curve_points.append([h, float(state.T())])
 
         else:
             # Determine supercritical gas heater profile
             for h in np.linspace(H[3], H[5], 61):
-                self._state.update(CoolProp.HmassP_INPUTS, h, p_low)
-                t_h_curve_points.append([h, float(self._state.T())])
+                state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
+                t_h_curve_points.append([h, float(state.T())])
 
         t_h_curve_points = np.array(t_h_curve_points)
 
