@@ -44,9 +44,9 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     )
     expected_h_net_ut = utility_pt.col[PT.H_HOT.value] - utility_pt.col[PT.H_COLD.value]
     expected_h_net_ut = expected_h_net_ut - expected_h_net_ut.min()
-    expected_h_cold_ut = utility_pt.col[PT.H_COLD.value] - utility_pt.col[
-        PT.H_COLD.value
-    ].max()
+    expected_h_cold_ut = (
+        utility_pt.col[PT.H_COLD.value] - utility_pt.col[PT.H_COLD.value].max()
+    )
 
     calls = {"count": 0}
 
@@ -54,7 +54,9 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
         calls["count"] += 1
         return site_pt.copy if calls["count"] == 1 else utility_pt.copy
 
-    monkeypatch.setattr(indirect, "get_process_heat_cascade", fake_get_process_heat_cascade)
+    monkeypatch.setattr(
+        indirect, "get_process_heat_cascade", fake_get_process_heat_cascade
+    )
     monkeypatch.setattr(
         indirect,
         "_match_utility_gen_and_use_at_same_level",

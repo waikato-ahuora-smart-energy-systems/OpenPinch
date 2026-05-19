@@ -100,7 +100,7 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     pt = get_process_heat_cascade(
         hot_streams=zone.net_hot_streams,
         cold_streams=zone.net_cold_streams,
-        is_shifted=True, # Second shift of process streams to align with the real utility scale
+        is_shifted=True,  # Second shift of process streams to align with the real utility scale
     )
     pt.update(
         **_shift_site_process_profiles(

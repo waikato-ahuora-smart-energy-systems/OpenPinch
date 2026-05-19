@@ -58,9 +58,7 @@ class ProblemTable:
             return col_name.value
         if isinstance(col_name, str):
             return col_name
-        raise TypeError(
-            "Column labels must be strings or ProblemTableLabel values."
-        )
+        raise TypeError("Column labels must be strings or ProblemTableLabel values.")
 
     @classmethod
     def _validate_column_names(
@@ -412,7 +410,9 @@ class ProblemTable:
             raise TypeError("`other` must be a ProblemTable instance.")
 
         inserted_self = self.insert_temperature_interval(other.col[PT.T.value].tolist())
-        inserted_other = other.insert_temperature_interval(self.col[PT.T.value].tolist())
+        inserted_other = other.insert_temperature_interval(
+            self.col[PT.T.value].tolist()
+        )
         return inserted_self, inserted_other
 
     def insert_temperature_interval(self, T_ls: List[float] | float) -> int:
@@ -898,7 +898,9 @@ class ProblemTable:
         try:
             return T_col.astype(float, copy=False)
         except (TypeError, ValueError) as exc:
-            raise ValueError("`T_col` must contain numeric temperature values.") from exc
+            raise ValueError(
+                "`T_col` must contain numeric temperature values."
+            ) from exc
 
     def _validate_updates(
         self, updates: ProblemTableColumnUpdates, T_col: np.ndarray
@@ -972,9 +974,7 @@ class ProblemTable:
         """Remove a row at ``index`` from the buffer."""
         self.data = np.delete(self.data, index, axis=0)
 
-    def sort_by_column(
-        self, column: str | ProblemTableLabel, ascending: bool = True
-    ):
+    def sort_by_column(self, column: str | ProblemTableLabel, ascending: bool = True):
         """Sort rows in-place by the given column."""
         column = self._validate_column_name(column)
         if column not in self.col_index:
