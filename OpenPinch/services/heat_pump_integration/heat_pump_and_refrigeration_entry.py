@@ -278,20 +278,16 @@ def _calc_hpr_cascade(
     is_heat_pumping: bool = True,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
-    T_ls = (
-        create_problem_table_with_t_int(
-            streams=(
-                res.hpr_hot_streams
-                + res.hpr_cold_streams
-                + res.amb_streams.get_hot_streams()
-                + res.amb_streams.get_cold_streams()
-            ),
-            is_shifted=is_T_vals_shifted,
-        )
-        .col[PT.T.value]
-        .tolist()
+    pt_hpr_grid = create_problem_table_with_t_int(
+        streams=(
+            res.hpr_hot_streams
+            + res.hpr_cold_streams
+            + res.amb_streams.get_hot_streams()
+            + res.amb_streams.get_cold_streams()
+        ),
+        is_shifted=is_T_vals_shifted,
     )
-    pt.insert_temperature_interval(T_ls)
+    pt.share_temperature_intervals(pt_hpr_grid)
 
     # Ambient air addition to the process stream set
     pt.col[PT.H_NET_W_AIR.value] = pt.col[PT.H_NET_A.value]
@@ -300,9 +296,9 @@ def _calc_hpr_cascade(
             hot_streams=res.amb_streams.get_hot_streams(),
             cold_streams=res.amb_streams.get_cold_streams(),
             is_shifted=is_T_vals_shifted,
-            extra_T_intervals=pt.col[PT.T.value].tolist(),
             is_full_analysis=True,
         )
+        pt.share_temperature_intervals(pt_air)
         pt.col[PT.H_NET_W_AIR.value] += pt_air.col[PT.H_NET.value]
         pt.col[PT.H_NET_HOT.value] += pt_air.col[PT.H_NET_HOT.value]
         pt.col[PT.H_NET_COLD.value] += pt_air.col[PT.H_NET_COLD.value]

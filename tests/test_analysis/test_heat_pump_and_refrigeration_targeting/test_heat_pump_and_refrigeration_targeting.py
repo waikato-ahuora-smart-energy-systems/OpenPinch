@@ -107,6 +107,68 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
     np.testing.assert_allclose(out.col[PT.H_NET_W_AIR.value], expected_w_air)
 
 
+def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
+    monkeypatch,
+):
+    pt = ProblemTable(
+        {
+            PT.T.value: [120.0, 60.0],
+            PT.H_NET_A.value: [1.0, 1.0],
+            PT.H_NET_HOT.value: [2.0, 2.0],
+            PT.H_NET_COLD.value: [3.0, 3.0],
+        }
+    )
+
+    monkeypatch.setattr(
+        hp,
+        "create_problem_table_with_t_int",
+        lambda streams, is_shifted=True: ProblemTable({PT.T.value: [120.0, 100.0, 60.0]}),
+    )
+    monkeypatch.setattr(
+        hp,
+        "get_process_heat_cascade",
+        lambda **_kwargs: ProblemTable(
+            {
+                PT.T.value: [120.0, 90.0, 60.0],
+                PT.H_NET.value: [6.0, 3.0, 0.0],
+                PT.H_NET_HOT.value: [0.0, 3.0, 6.0],
+                PT.H_NET_COLD.value: [6.0, 3.0, 0.0],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        hp,
+        "get_utility_heat_cascade",
+        lambda **kwargs: {
+            PT.H_NET_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+            PT.H_HOT_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+            PT.H_COLD_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+        },
+    )
+
+    amb_streams = StreamCollection()
+    amb_streams.add(Stream(name="Air", t_supply=50.0, t_target=80.0, heat_flow=10.0))
+    res = SimpleNamespace(
+        hpr_hot_streams=StreamCollection(),
+        hpr_cold_streams=StreamCollection(),
+        Q_amb_hot=10.0,
+        Q_amb_cold=0.0,
+        amb_streams=amb_streams,
+    )
+
+    out = hp._calc_hpr_cascade(
+        pt,
+        res,
+        is_T_vals_shifted=True,
+        is_heat_pumping=True,
+    )
+
+    np.testing.assert_allclose(out.col[PT.T.value], np.array([120.0, 100.0, 90.0, 60.0]))
+    np.testing.assert_allclose(out.col[PT.H_NET_W_AIR.value], np.array([7.0, 5.0, 4.0, 1.0]))
+    np.testing.assert_allclose(out.col[PT.H_NET_HOT.value], np.array([2.0, 4.0, 5.0, 8.0]))
+    np.testing.assert_allclose(out.col[PT.H_NET_COLD.value], np.array([9.0, 7.0, 6.0, 3.0]))
+
+
 def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
     shown = {"called": False}
     monkeypatch.setattr(

@@ -103,3 +103,16 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
     assert np.max(H_out) <= 150.0
     assert z_amb.shape == T_out.shape
     assert isinstance(streams, StreamCollection)
+
+
+def test_add_t_amb_interval_aligns_profile_to_ambient_breakpoints():
+    T_out, H_out = hp_pre._add_T_amb_interval(
+        T_vals=np.array([120.0, 80.0]),
+        H_vals=np.array([10.0, 0.0]),
+        T_amb=100.0,
+        dt_phase_change=5.0,
+        is_cold=True,
+    )
+
+    np.testing.assert_allclose(T_out, np.array([120.0, 105.0, 100.0, 80.0]))
+    np.testing.assert_allclose(H_out, np.array([10.0, 6.25, 5.0, 0.0]))

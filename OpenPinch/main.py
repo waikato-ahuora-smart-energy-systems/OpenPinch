@@ -39,7 +39,9 @@ def pinch_analysis_service(
         Validated response payload containing solved targets and graph data.
     """
     input_data = TargetInput.model_validate(data)
-    problem = PinchProblem(project_name=project_name)
-    problem.load(input_data)
+    problem = PinchProblem(
+        project_name=project_name,
+        source=input_data,
+    )
     problem.target()
     return TargetOutput.model_validate(problem.results)
