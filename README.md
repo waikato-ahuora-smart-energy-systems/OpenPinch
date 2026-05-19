@@ -10,10 +10,30 @@ Install the published package from PyPI for core CLI and Python usage:
 python -m pip install openpinch
 ```
 
-If you plan to run the packaged Jupyter notebooks, install the notebook extra:
+If you plan to run the packaged Jupyter notebooks, graph rendering, or Excel
+I/O, install the notebook extra:
 
 ```bash
 python -m pip install "openpinch[notebook]"
+```
+
+If you plan to launch the Streamlit dashboard, install the dashboard extra:
+
+```bash
+python -m pip install "openpinch[dashboard]"
+```
+
+If you need TESPy-backed Brayton-cycle tooling, install the Brayton-cycle
+extra:
+
+```bash
+python -m pip install "openpinch[brayton_cycle]"
+```
+
+If you want the full optional surface in one install:
+
+```bash
+python -m pip install "openpinch[full]"
 ```
 
 OpenPinch currently requires Python `>=3.14`.
@@ -40,14 +60,13 @@ These notebooks are intended to be the main learning path for new users.
 
 ## Python Workflow
 
-For script and notebook usage, the main front door is `PinchProblem`.
+For script and notebook usage, the main single-case front door is
+`PinchProblem`.
 
 ```python
-from pathlib import Path
-
 from OpenPinch import PinchProblem
 
-problem = PinchProblem(Path("basic_pinch.json"))
+problem = PinchProblem("basic_pinch.json", project_name="basic_pinch")
 problem.target()
 
 summary = problem.summary_frame()
@@ -55,6 +74,20 @@ print(summary)
 
 problem.export_excel("results")
 problem.plot.export("graphs", graph_type="gcc")
+```
+
+For named study cases and bundle save/load, use `PinchWorkspace`:
+
+```python
+from OpenPinch import PinchWorkspace
+
+workspace = PinchWorkspace(
+    source="crude_preheat_train.json",
+    project_name="crude_preheat_train",
+)
+workspace.copy_case("baseline", "wide_dt", activate=False)
+workspace.set_dt_cont_multiplier(0.5, case_name="wide_dt")
+comparison = workspace.compare_cases("baseline", "wide_dt")
 ```
 
 You can also build a payload directly from the validated schema models:
@@ -104,14 +137,16 @@ result = pinch_analysis_service(payload, project_name="Example")
 
 ## Graphing and Dashboard
 
-For graph generation in Python:
+With the notebook or dashboard extra installed, graph generation in Python
+looks like:
 
 ```python
 figure = problem.plot.grand_composite_curve()
 figure.show()
 ```
 
-To launch the Streamlit dashboard after solving:
+To launch the Streamlit dashboard after solving, install
+`openpinch[dashboard]` and call:
 
 ```python
 problem.show_dashboard()

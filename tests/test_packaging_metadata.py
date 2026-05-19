@@ -33,6 +33,37 @@ def test_notebook_extra_declares_jupyter_runtime_dependencies():
     assert _extract_array(optional_deps, "notebook") == [
         "ipykernel>=7.2.0",
         "nbformat>=5.10.4",
+        "plotly",
+        "openpyxl",
+        "pyxlsb",
+    ]
+
+
+def test_dashboard_and_brayton_cycle_extras_are_declared():
+    optional_deps = _extract_table(_read_pyproject(), "project.optional-dependencies")
+
+    assert _extract_array(optional_deps, "dashboard") == [
+        "streamlit",
+        "plotly",
+        "openpyxl",
+        "pyxlsb",
+    ]
+    assert _extract_array(optional_deps, "brayton_cycle") == [
+        "tespy",
+    ]
+
+
+def test_full_extra_aggregates_optional_runtime_surfaces():
+    optional_deps = _extract_table(_read_pyproject(), "project.optional-dependencies")
+
+    assert _extract_array(optional_deps, "full") == [
+        "streamlit",
+        "plotly",
+        "openpyxl",
+        "pyxlsb",
+        "tespy",
+        "ipykernel>=7.2.0",
+        "nbformat>=5.10.4",
     ]
 
 

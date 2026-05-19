@@ -52,6 +52,16 @@ def test_graph_gcc_creates_segments():
     assert all("data_points" in seg for seg in segments)
 
 
+def test_graph_gcc_vertical_segments_use_neutral_colour():
+    x_vals = [10, 6, 6, 0]
+    y_vals = [100, 90, 80, 70]
+    segments = _graph_gcc(y_vals, x_vals)
+
+    vertical_segments = [seg for seg in segments if seg.get("is_vertical")]
+    assert vertical_segments
+    assert all(seg["colour"] == LineColour.Black.value for seg in vertical_segments)
+
+
 def test_classify_segment_utility_profile_colours():
     assert _classify_segment(5, is_utility_profile=False) == StreamLoc.ColdS
     assert _classify_segment(-5, is_utility_profile=False) == StreamLoc.HotS
@@ -106,6 +116,8 @@ def test_create_graph_set_includes_net_load_curves():
             PT.H_NET_COLD.value: MagicMock(to_list=lambda: [30, 10, 0]),
             PT.H_HOT_UT.value: MagicMock(to_list=lambda: [5, 5, 5]),
             PT.H_COLD_UT.value: MagicMock(to_list=lambda: [25, 15, 5]),
+            PT.H_HOT_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
+            PT.H_COLD_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
         }
     }
     mock_zone = MagicMock(spec=Zone)

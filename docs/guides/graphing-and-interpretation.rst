@@ -50,7 +50,8 @@ Recommended Interpretation Order
 Exporting Graphs
 ----------------
 
-Use Python when you want direct `plotly` figures.
+Use Python when you want direct `plotly` figures. Install
+``openpinch[notebook]`` or ``openpinch[dashboard]`` first.
 
 Use `problem.plot.export(...)` or `openpinch graph` when you want portable
 HTML output for sharing or review outside Python.

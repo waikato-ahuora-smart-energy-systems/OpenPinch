@@ -450,3 +450,13 @@ def test_segment_trace_vertical_colour_zero_length_and_arrow_fallbacks():
     assert wg._arrow_indices([1.0, 1.0], [2.0, 2.0], ArrowHead.START.value) == (0, 1)
     assert wg._arrow_indices([1.0, 1.0], [2.0, 2.0], ArrowHead.END.value) == (1, 0)
     assert wg._legend_group_name("") == "Segment"
+    assert (
+        wg._segment_colour(
+            {
+                "is_vertical": True,
+                "is_utility_stream": False,
+                "colour": 0,
+            }
+        )
+        == "#111111"
+    )

@@ -8,4 +8,5 @@ inputs programmatically.
 
 from .config import *
 from .enums import *
+from .problem_table_types import *
 from .schemas import *

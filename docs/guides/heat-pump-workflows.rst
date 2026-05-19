@@ -36,7 +36,11 @@ The packaged notebook:
    openpinch notebook --name 03_carnot_hpr_comparison.ipynb -o notebooks
 
 This is the best single packaged learning asset for the broader direct-versus-
-indirect HPR comparison workflow.
+indirect HPR comparison workflow. It keeps the study orchestration on
+``PinchWorkspace`` and inspects the resulting HPR target through the standard
+plot accessor surfaces, especially
+``problem.plot.net_load_profiles(zone_name="Direct Heat Pump")`` and
+``problem.plot.grand_composite_curve_with_heat_pump(...)``.
 
 Current Recommendation
 ----------------------
@@ -44,7 +48,10 @@ Current Recommendation
 For supported advanced heat-pump and refrigeration work today, prefer the
 ``problem.target.direct_heat_pump(...)``,
 ``problem.target.indirect_heat_pump(...)``, and refrigeration companion
-methods.
+methods. Use ``chocolate_factory.json`` plus notebook 03 when the question is
+direct-versus-indirect comparison over a study range, and use
+``heat_pump_targeting.json`` when you want a smaller direct HPR screening
+payload.
 
 What To Compare
 ---------------

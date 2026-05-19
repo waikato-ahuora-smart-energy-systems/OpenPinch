@@ -8,6 +8,7 @@ surface is still:
 
 - install with ``python -m pip install openpinch``
 - add notebook support with ``python -m pip install "openpinch[notebook]"``
+- add dashboard support with ``python -m pip install "openpinch[dashboard]"``
 - solve with ``PinchProblem.target()``
 - inspect ``summary_frame()``
 - graph with ``plot.grand_composite_curve()``
@@ -15,6 +16,7 @@ surface is still:
 - review advanced heat pump and refrigeration routes with
   ``problem.target.direct_heat_pump(...)``
 - use ``show_dashboard()`` for the Streamlit dashboard
+- use ``PinchWorkspace`` for named baseline-versus-variant studies
 
 Packaged notebooks:
 

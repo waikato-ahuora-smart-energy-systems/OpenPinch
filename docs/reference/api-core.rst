@@ -2,7 +2,7 @@ Core API
 ========
 
 The core API is the supported front door to OpenPinch. It is intentionally
-small: one high-level service function, one convenience wrapper class, and a
+small: one high-level service function, two convenience wrapper classes, and a
 small number of lower-level orchestration helpers for callers that need to
 operate on prepared zone trees directly.
 
@@ -17,6 +17,9 @@ For new code, prefer one of these two patterns:
    :class:`~OpenPinch.classes.pinch_problem.PinchProblem`, call
    :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target`, and inspect or
    export the cached results.
+3. Use :class:`~OpenPinch.classes.pinch_workspace.PinchWorkspace` when the
+   study needs named baseline and variant cases rather than one case at a
+   time.
 
 The lower-level helpers documented on this page are still useful when you want
 to separate validation, preparation, targeting, and result extraction into
@@ -57,6 +60,7 @@ the full package layout.
 In particular, the package root exposes:
 
 - :class:`~OpenPinch.classes.pinch_problem.PinchProblem`
+- :class:`~OpenPinch.classes.pinch_workspace.PinchWorkspace`
 - :func:`~OpenPinch.main.pinch_analysis_service`
 - :func:`~OpenPinch.utils.multiscale_targeting.get_targets_for_zone_and_sub_zones`
 - :func:`~OpenPinch.utils.multiscale_targeting.extract_results`
@@ -71,6 +75,9 @@ Package Entrypoints
 .. autofunction:: OpenPinch.main.pinch_analysis_service
 
 .. autoclass:: OpenPinch.classes.pinch_problem.PinchProblem
+   :members:
+
+.. autoclass:: OpenPinch.classes.pinch_workspace.PinchWorkspace
    :members:
 
 Core Service Functions
@@ -98,6 +105,9 @@ PinchProblem Convenience Wrapper
 :class:`~OpenPinch.classes.pinch_problem.PinchProblem` adds file loading,
 cached execution state, tabular summaries, graph generation, Excel export, and
 Streamlit dashboard integration on top of the core service layer.
+
+Those rendered graph, Excel, and dashboard surfaces require the
+``openpinch[notebook]`` or ``openpinch[dashboard]`` extra.
 
 Use it when you want:
 

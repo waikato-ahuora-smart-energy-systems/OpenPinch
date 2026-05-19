@@ -44,7 +44,6 @@ def _make_target(zone: Zone, target_type: str) -> BaseTargetModel:
             parent_zone=zone.parent_zone,
             config=zone.config,
             pt=_dummy_problem_table(),
-            pt_real=_dummy_problem_table(),
             hot_utility_target=0.0,
             cold_utility_target=0.0,
             heat_recovery_target=0.0,

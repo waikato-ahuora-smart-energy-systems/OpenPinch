@@ -8,7 +8,13 @@ from OpenPinch.services.heat_pump_integration.cycles import (
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 
-from ..helpers import _base_args, _pt_with_hnet, _sc, _stream
+from ..helpers import (
+    _base_args,
+    _patch_output_model_validate,
+    _pt_with_hnet,
+    _sc,
+    _stream,
+)
 
 
 def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
@@ -35,8 +41,7 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
         Q_amb_cold=0.0,
     )
 
-    bnds = hp_cascade._get_bounds_for_cascade_hp_opt(args)
-    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init, args=args)
+    x0, bnds = hp_cascade._get_cascade_hp_opt_setup(init_res=init, args=args)
 
     assert x0.shape == (13,)
     assert x0[0] == pytest.approx(0.0)
@@ -45,6 +50,29 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
         (x0[0] >= np.array([b[0] for b in bnds]))
         & (x0[0] <= np.array([b[1] for b in bnds]))
     )
+
+
+def test_cascade_x0_round_trips_with_ambient_cooling_seed():
+    args = _base_args(n_cond=2, n_evap=2)
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0, 90.0]),
+        Q_cond=np.array([120.0, 80.0]),
+        T_evap=np.array([70.0, 50.0]),
+        Q_evap=np.array([90.0, 60.0]),
+        Q_amb_hot=0.0,
+        Q_amb_cold=20.0,
+    )
+
+    x0, _ = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
+    vars = hp_cascade._parse_cascade_hp_state_variables(x0, args)
+
+    assert abs(x0[0]) < 1.0
+    np.testing.assert_allclose(vars["T_evap"], init_res.T_evap)
+    assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
+    assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
+    np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
+    np.testing.assert_allclose(vars["Q_cool"][:-1], init_res.Q_evap[:-1])
+    assert np.isnan(vars["Q_cool"][-1])
 
 
 def test_cascade_x0_bounds_and_parse(monkeypatch):
@@ -57,7 +85,7 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         Q_amb_hot=0.0,
         Q_amb_cold=0.0,
     )
-    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init_res, args=args)
+    x0, bnds = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
     assert x0.shape[0] == 13
     assert np.all(x0[0] >= 0.0)
 
@@ -66,7 +94,6 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         "PropsSI",
         lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0,
     )
-    bnds = hp_cascade._get_bounds_for_cascade_hp_opt(args)
     assert len(bnds) == 13
 
     vars = hp_cascade._parse_cascade_hp_state_variables(
@@ -76,12 +103,15 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
     np.testing.assert_allclose(vars["T_cond"], np.array([110.0, 78.0]))
     np.testing.assert_allclose(vars["T_evap"], np.array([105.0, 70.0]))
     np.testing.assert_allclose(vars["dT_subcool"], np.array([0.2, 1.04]))
-    np.testing.assert_allclose(vars["Q_heat"], np.array([120.0, 140.0]))
-    np.testing.assert_allclose(vars["Q_cool"][:-1], np.array([144.0]))
+    np.testing.assert_allclose(
+        vars["Q_heat"],
+        np.array([132.04024184, 154.04694881]),
+    )
+    np.testing.assert_allclose(vars["Q_cool"][:-1], np.array([128.0]))
     assert np.isnan(vars["Q_cool"][-1])
     assert vars["Q_amb_hot"] == pytest.approx(0.0)
     assert vars["Q_amb_cold"] == pytest.approx(
-        0.1 * max(args.Q_heat_max, args.Q_cool_max)
+        max(args.Q_heat_max, args.Q_cool_max) * np.arctanh(0.1)
     )
 
 
@@ -134,19 +164,19 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
     seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
     monkeypatch.setattr(
-        hp_cascade, "get_process_heat_cascade", lambda **kwargs: next(seq)
+        hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )
     calls = {"plot": 0}
     monkeypatch.setattr(
-        hp_cascade,
+        hp_shared,
         "plot_multi_hp_profiles_from_results",
         lambda *args, **kwargs: calls.__setitem__("plot", calls["plot"] + 1),
     )
 
     out = hp_cascade._compute_cascade_hp_system_obj(x, args, debug=True)
     assert "hpr_hot_streams" in out
-    assert out["Q_ext"] == pytest.approx(3.0)
-    assert out["utility_tot"] == pytest.approx(43.0)
+    assert out["Q_ext"] == pytest.approx(5.0)
+    assert out["utility_tot"] == pytest.approx(45.0)
     assert out["w_net"] == pytest.approx(40.0)
     assert out["cop_h"] == pytest.approx(5.0)
     assert calls["plot"] == 1
@@ -174,5 +204,28 @@ def test_cascade_x0_branch_for_single_stage():
         Q_amb_cold=0.0,
     )
 
-    x0 = hp_cascade._get_x0_for_cascade_hp_opt(init_res=init_res, args=args)
+    x0, _ = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
     assert x0.shape == (6,)
+
+
+def test_cascade_optimiser_allows_missing_initial_seed(monkeypatch):
+    captured = {}
+    args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=False)
+    _patch_output_model_validate(monkeypatch)
+
+    monkeypatch.setattr(
+        hp_cascade,
+        "validate_vapour_hp_refrigerant_ls",
+        lambda num_stages, args: ["R134A"] * num_stages,
+    )
+
+    def fake_solve_hpr_placement(*, f_obj, x0_ls, bnds, args):
+        captured["x0_ls"] = x0_ls
+        return {"success": True}
+
+    monkeypatch.setattr(hp_cascade, "solve_hpr_placement", fake_solve_hpr_placement)
+
+    out = hp_cascade.optimise_cascade_heat_pump_placement(args)
+
+    assert captured["x0_ls"] is None
+    assert out["success"] is True

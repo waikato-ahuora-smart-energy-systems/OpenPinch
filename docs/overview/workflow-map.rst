@@ -16,6 +16,11 @@ CLI workflow
    Use this for notebooks and scripts when you want one object that owns the
    problem definition, solved result, graph accessors, summaries, and exports.
 
+``PinchWorkspace`` workflow
+   Use this for notebooks and scripts when you want named study cases,
+   baseline-versus-variant comparison, and bundle save/load on top of real
+   ``PinchProblem`` cases.
+
 Service-layer workflow
    Use :func:`OpenPinch.main.pinch_analysis_service` when you want a typed
    request/response boundary for another application or automation layer.
@@ -37,8 +42,14 @@ Use the CLI when:
 Use `PinchProblem` when:
 
 - you are working in notebooks or scripts
-- you want summaries, graphs, exports, and scenario helpers on one object
+- you want summaries, graphs, exports, and advanced targeting on one object
 - you want access to `problem.plot.*` and `problem.target.*`
+
+Use `PinchWorkspace` when:
+
+- you need named baseline and variant cases in one session
+- you want to compare cases without rebuilding payload management helpers
+- you want to keep using real `PinchProblem` cases inside that study
 
 Use `pinch_analysis_service` when:
 
@@ -60,7 +71,7 @@ Workflow Layering
    CLI / notebooks / scripts / external app
                     |
                     v
-        PinchProblem or pinch_analysis_service
+    PinchWorkspace / PinchProblem / pinch_analysis_service
                     |
                     v
             data_preprocessing_service
@@ -81,7 +92,7 @@ First-time user
    `sample case -> validate -> run -> summary -> graph`
 
 Notebook user
-   `copy sample case -> PinchProblem -> run -> summary_frame -> plot`
+   `PinchWorkspace(source="crude_preheat_train.json") -> copy_case -> compare_cases`
 
 Advanced HPR study
    `base case -> problem.target.direct_heat_pump(...) -> compare targets and GCC`

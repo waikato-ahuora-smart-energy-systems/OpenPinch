@@ -12,10 +12,18 @@ Install the base package with ``python -m pip install openpinch``.
 Install the notebook workflow with
 ``python -m pip install "openpinch[notebook]"``.
 
-The main Python wrapper is ``PinchProblem``. The current workflow names are
-``target()``, ``summary_frame()``, ``export_excel()``,
+Install the dashboard workflow with
+``python -m pip install "openpinch[dashboard]"``.
+
+Install the TESPy-backed Brayton-cycle workflow with
+``python -m pip install "openpinch[brayton_cycle]"``.
+
+The main Python wrappers are ``PinchProblem`` for single cases and
+``PinchWorkspace`` for named multi-case studies. The current workflow names
+include ``target()``, ``summary_frame()``, ``export_excel()``,
 ``plot.grand_composite_curve()``, ``plot.export(...)``,
-``show_dashboard()``, and ``problem.target.direct_heat_pump(...)``.
+``show_dashboard()``, ``problem.target.direct_heat_pump(...)``, and
+``workspace.compare_cases(...)``.
 
 Use these pages instead:
 

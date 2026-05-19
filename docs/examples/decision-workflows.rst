@@ -22,10 +22,10 @@ Which Workflow Should I Use?
 
 ``Would an integrated heat pump improve the utility picture of my plant?``
    Use ``heat_pump_targeting.json`` with
-   :doc:`../guides/heat-pump-workflows`. The dedicated
-   explicit ``problem.target.direct_heat_pump(...)`` /
-   ``problem.target.indirect_heat_pump(...)`` workflows
-   route should currently be treated as experimental/partial.
+   :doc:`../guides/heat-pump-workflows`. The dedicated explicit
+   ``problem.target.direct_heat_pump(...)`` /
+   ``problem.target.indirect_heat_pump(...)`` workflows are the supported
+   advanced route.
 
 ``How do I compare direct and indirect HPR or refrigeration targets?``
    Use ``chocolate_factory.json`` and
@@ -46,7 +46,7 @@ Regardless of workflow, the recommended decision sequence is:
 1. compare the hot and cold utility targets first
 2. compare heat recovery and pinch temperatures second
 3. inspect the most relevant graph family third
-4. only then move into advanced scenario or equipment interpretation
+4. only then move into advanced study-case or equipment interpretation
 
 That order keeps the package grounded in thermodynamic decision support rather
 than graph-first exploration.

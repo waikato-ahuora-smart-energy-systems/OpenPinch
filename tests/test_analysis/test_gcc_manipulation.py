@@ -87,23 +87,28 @@ def test_get_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
 
     pt_copy = pt.copy
     result = get_GCC_with_vertical_heat_transfer(
-        pt_copy.col[PT.H_COLD.value],
-        pt_copy.col[PT.H_HOT.value],
-        pt_copy.col[PT.H_NET.value],
+        T_col=pt_copy.col[PT.T.value],
+        h_cold=pt_copy.col[PT.H_COLD.value],
+        h_hot=pt_copy.col[PT.H_HOT.value],
+        h_net=pt_copy.col[PT.H_NET.value],
     )
 
-    assert PT.H_NET_V.value in result
-    assert result[PT.H_NET_V.value][0] == 250  # Top value nonzero
-    assert result[PT.H_NET_V.value][-1] == 50  # Bottom-out should zero
+    assert np.allclose(result["T_col"], pt_copy.col[PT.T.value])
+    assert PT.H_NET_V.value in result["updates"]
+    assert result["updates"][PT.H_NET_V.value][0] == 250  # Top value nonzero
+    assert result["updates"][PT.H_NET_V.value][-1] == 50  # Bottom-out should zero
 
 
 def test_get_GCC_needing_utility_combines_columns():
     pt = ProblemTable({PT.H_NET_NP.value: [100, 200, 300]})
 
-    result = get_GCC_needing_utility(pt.col[PT.H_NET_NP.value])
+    result = get_GCC_needing_utility(
+        T_col=np.array([300.0, 200.0, 100.0]),
+        h_net=pt.col[PT.H_NET_NP.value],
+    )
 
     expected = [100, 200, 300]
-    assert (result[PT.H_NET_A.value] == expected).all()
+    assert (result["updates"][PT.H_NET_A.value] == expected).all()
 
 
 def test_get_gcc_without_pockets_updates_pinch_after_insertions():
@@ -163,9 +168,13 @@ def test_get_separated_heat_profiles_categorises_correctly():
         }
     )
 
-    result_cols = get_seperated_gcc_heat_load_profiles(pt.col[PT.H_NET_A.value])
+    result_cols = get_seperated_gcc_heat_load_profiles(
+        T_col=pt.col[PT.T.value],
+        H_net=pt.col[PT.H_NET_A.value],
+    )
 
-    assert PT.H_NET_HOT.value in result_cols
-    assert PT.H_NET_COLD.value in result_cols
-    assert result_cols[PT.H_NET_HOT.value][-1] == -100
-    assert result_cols[PT.H_NET_COLD.value][0] == 300
+    assert np.allclose(result_cols["T_col"], pt.col[PT.T.value])
+    assert PT.H_NET_HOT.value in result_cols["updates"]
+    assert PT.H_NET_COLD.value in result_cols["updates"]
+    assert result_cols["updates"][PT.H_NET_HOT.value][-1] == -100
+    assert result_cols["updates"][PT.H_NET_COLD.value][0] == 300

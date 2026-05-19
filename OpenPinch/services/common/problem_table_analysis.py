@@ -6,15 +6,16 @@ deriving zonal targets and plotting data for composite curves.
 """
 
 import math
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 
-from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
-from ...services.common.gcc_manipulation import get_additional_GCCs
+from ...classes.problem_table import ProblemTable
 from ...lib.config import tol
 from ...lib.enums import PT
+from ...lib.problem_table_types import ProblemTableUpdateKwargs
+from ...services.common.gcc_manipulation import get_additional_GCCs
 from ...utils.miscellaneous import delta_with_zero_at_start, linear_interpolation
 
 
@@ -70,9 +71,9 @@ def get_process_heat_cascade(
     if isinstance(known_heat_recovery, float):
         # Correct the location of the cold composite curve and limiting GCC (real temperatures)
         _shift_pt_to_set_heat_recovery(
-            pt,
-            known_heat_recovery,
-            get_heat_recovery_target_from_pt(pt),
+            pt=pt,
+            heat_recovery_target=known_heat_recovery,
+            current_heat_recovery=get_heat_recovery_target_from_pt(pt),
         )
 
     heat_recovery_target = get_heat_recovery_target_from_pt(pt)
@@ -91,7 +92,7 @@ def get_utility_heat_cascade(
     hot_utilities: StreamCollection = None,
     cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
-) -> Dict[str, np.ndarray]:
+) -> ProblemTableUpdateKwargs:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
     pt_ut = ProblemTable({PT.T.value: T_int_vals})
     problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
@@ -103,25 +104,33 @@ def get_utility_heat_cascade(
     c_ut_cc = pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max()
 
     return {
-        PT.H_NET_UT.value: H_NET_UT,
-        PT.H_HOT_UT.value: h_ut_cc,
-        PT.H_COLD_UT.value: c_ut_cc,
-        PT.RCP_HOT_UT.value: pt_ut.col[PT.RCP_HOT.value],
-        PT.RCP_COLD_UT.value: pt_ut.col[PT.RCP_COLD.value],
-        PT.RCP_UT_NET.value: pt_ut.col[PT.RCP_HOT.value] + pt_ut.col[PT.RCP_COLD.value],
+        "T_col": T_int_vals,
+        "updates": {
+            PT.H_NET_UT.value: H_NET_UT,
+            PT.H_HOT_UT.value: h_ut_cc,
+            PT.H_COLD_UT.value: c_ut_cc,
+            PT.RCP_HOT_UT.value: pt_ut.col[PT.RCP_HOT.value],
+            PT.RCP_COLD_UT.value: pt_ut.col[PT.RCP_COLD.value],
+            PT.RCP_UT_NET.value: pt_ut.col[PT.RCP_HOT.value]
+            + pt_ut.col[PT.RCP_COLD.value],
+        },
     }
 
 
 def create_problem_table_with_t_int(
     streams: StreamCollection = None,
     is_shifted: bool = True,
-    extra_T_intervals: list = None,
+    extra_T_intervals: list | float | np.ndarray = None,
 ) -> ProblemTable:
     """Return a problem table populated with ordered unique temperature intervals."""
     if streams is None:
         streams = StreamCollection()
     if extra_T_intervals is None:
         extra_T_intervals = []
+    if isinstance(extra_T_intervals, (int, float)):
+        extra_T_intervals = [extra_T_intervals]
+    elif isinstance(extra_T_intervals, np.ndarray):
+        extra_T_intervals = extra_T_intervals.tolist()
 
     T_vals = [
         t

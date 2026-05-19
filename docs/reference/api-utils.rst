@@ -88,6 +88,10 @@ Plotting and Instrumentation
 These helpers cover quick standalone plotting, execution-time measurement, and
 the richer Streamlit dashboard components used by ``streamlit_app.py``.
 
+Install ``openpinch[notebook]`` for the standalone Plotly plotting helpers and
+Excel-oriented utility modules. Install ``openpinch[dashboard]`` for the
+Streamlit dashboard path.
+
 .. automodule:: OpenPinch.utils.plots
    :members:
 

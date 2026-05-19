@@ -1,8 +1,8 @@
 PinchProblem
 ============
 
-:class:`OpenPinch.classes.pinch_problem.PinchProblem` is the most powerful
-single-object interface in the package. It owns the source payload, validated
+:class:`OpenPinch.classes.pinch_problem.PinchProblem` is the primary
+single-case interface in the package. It owns the source payload, validated
 problem data, prepared zone tree, solved targets, graph exports, and several
 advanced post-processing helpers.
 
@@ -18,6 +18,9 @@ Use ``PinchProblem`` when you want:
 - notebook-friendly advanced workflows such as HPR screening or
   ``dt_cont`` sensitivity studies
 
+Use :doc:`pinchworkspace` instead when the study itself needs to keep multiple
+named cases and compare them over time.
+
 Lifecycle
 ---------
 
@@ -28,6 +31,10 @@ The typical lifecycle is:
 3. call :meth:`validate` if you want a preflight check
 4. call :meth:`target`
 5. inspect summaries, graphs, exports, or the prepared ``master_zone``
+
+When the source is a bare ``*.json`` filename and no local file exists,
+``PinchProblem`` also resolves packaged sample cases such as
+``basic_pinch.json`` or ``crude_preheat_train.json`` directly.
 
 Core Workflow Members
 ---------------------
@@ -63,10 +70,9 @@ PinchProblem API
 Heat Pump Integration Comparison
 --------------------------------
 
-Older examples and CLI code paths refer to a helper-backed heat-pump
-comparison workflow on ``PinchProblem``. The current object surface instead
-exposes the explicit advanced HPR routines on ``problem.target.*``, described
-above and in :doc:`service-layer`.
+Older examples sometimes refer to broader helper-backed HPR comparison flows.
+The current object surface instead exposes the explicit advanced HPR routines
+on ``problem.target.*``, described above and in :doc:`service-layer`.
 
 Relationship To Lower Layers
 ----------------------------

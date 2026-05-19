@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from OpenPinch.lib.schemas.hpr import HPRBackendResult, HPRThermoArtifacts
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.services.heat_pump_integration.cycles.brayton import (
     _build_simulated_hpr_streams,
@@ -169,6 +170,39 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     ) == pytest.approx(0.21)
 
 
+@pytest.mark.parametrize("x0_ls", [None, [], np.array([])])
+def test_solve_hpr_placement_preserves_missing_initial_guesses(monkeypatch, x0_ls):
+    captured = {}
+
+    def fake_multiminima(**kwargs):
+        captured["x0_ls"] = kwargs["x0_ls"]
+        return np.array([[0.25]])
+
+    monkeypatch.setattr(hp_shared, "multiminima", fake_multiminima)
+
+    args = _base_args()
+    result = hp_shared.solve_hpr_placement(
+        f_obj=lambda x, args, debug=False: HPRBackendResult(
+            obj=0.0,
+            utility_tot=0.0,
+            w_net=0.0,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            cop_h=1.0,
+            artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
+        ),
+        x0_ls=x0_ls,
+        bnds=[(0.0, 1.0)],
+        args=args,
+    )
+
+    assert captured["x0_ls"] is None
+    assert result.success is True
+    assert isinstance(result.amb_streams, StreamCollection)
+
+
 def test_get_heat_pump_cascade_helper(monkeypatch):
     hot = _sc(_stream("H", 120.0, 110.0, 5.0, is_process_stream=False))
     cold = _sc(_stream("C", 70.0, 80.0, 5.0, is_process_stream=False))
@@ -188,10 +222,34 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         hp_shared,
         "get_utility_heat_cascade",
         lambda *args, **kwargs: {
-            PT.H_HOT_UT.value: np.array([5.0, 0.0]),
-            PT.H_COLD_UT.value: np.array([3.0, 0.0]),
+            "T_col": np.array([120.0, 80.0]),
+            "updates": {
+                PT.H_HOT_UT.value: np.array([5.0, 0.0]),
+                PT.H_COLD_UT.value: np.array([3.0, 0.0]),
+            },
         },
     )
 
     out = hp_shared._get_hpr_cascade(hot, cold)
     assert len(out) == 3
+
+
+def test_hpr_backend_result_derives_hot_and_cold_stream_views_from_combined_streams():
+    hot_stream = _stream("cond", 120.0, 100.0, 10.0, is_process_stream=False)
+    cold_stream = _stream("evap", 20.0, 40.0, 8.0, is_process_stream=False)
+    hpr_streams = _sc(hot_stream, cold_stream)
+
+    res = HPRBackendResult(
+        obj=1.0,
+        utility_tot=2.0,
+        w_net=1.0,
+        Q_ext_heat=0.5,
+        Q_ext_cold=0.25,
+        Q_amb_hot=0.0,
+        Q_amb_cold=0.0,
+        artifacts=HPRThermoArtifacts(hpr_streams=hpr_streams),
+    )
+
+    assert res.hpr_streams is hpr_streams
+    assert len(res.hpr_hot_streams) == 1
+    assert len(res.hpr_cold_streams) == 1

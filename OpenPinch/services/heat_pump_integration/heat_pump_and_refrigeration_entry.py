@@ -24,7 +24,6 @@ from .common.preprocessing import (
 from .common.shared import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
-    plot_multi_hp_profiles_from_results,
 )
 from .cycles.brayton import (
     optimise_brayton_heat_pump_placement,
@@ -45,7 +44,6 @@ from .cycles.multi_temperature_carnot import (
 __all__ = [
     "compute_direct_heat_pump_or_refrigeration_target",
     "compute_indirect_heat_pump_or_refrigeration_target",
-    "plot_multi_hp_profiles_from_results",
 ]
 
 
@@ -168,9 +166,12 @@ def _validate_hpr_required(
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
     zone_name: str = None,
-    zone_config: Configuration = Configuration(),
+    zone_config: Configuration | None = None,
     r: dict | float | int = None,
 ) -> float:
+    if zone_config is None:
+        raise ValueError("zone_config must be provided for HPR targeting.")
+
     if is_heat_pumping:
         Q_max = np.abs(pt.col[PT.H_NET_COLD.value]).max()
     elif is_refrigeration:
@@ -206,9 +207,6 @@ def _get_hpr_targets(
     zone_config: Configuration,
     is_heat_pumping: bool,
 ) -> HeatPumpTargetOutputs:
-    # zone_config.HPR_TYPE = HPRcycle.MultiTempCarnot.value
-    # zone_config.N_COND = 2
-    # zone_config.N_EVAP = 2
     args = construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -221,7 +219,8 @@ def _get_hpr_targets(
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
-    return HeatPumpTargetOutputs.model_validate(handler(args))
+    result = handler(args)
+    return HeatPumpTargetOutputs.model_validate(result.to_output_payload())
 
 
 def _get_hpr_target_summary(
@@ -255,10 +254,21 @@ def _get_hpr_graphs(
 
     if is_direct:
         return {
-            GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]]
+            GT.NLP.value: pt.slice(
+                [
+                    PT.T,
+                    PT.H_NET_HOT,
+                    PT.H_NET_COLD,
+                    PT.H_HOT_UT,
+                    PT.H_COLD_UT,
+                    PT.H_HOT_HP,
+                    PT.H_COLD_HP,
+                ]
+            ),
+            GT.GCC_HP.value: pt.slice([PT.T, PT.H_NET_W_AIR, PT.H_NET_HP]),
         }
 
-    return {GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]}
+    return {GT.SUGCC.value: pt.slice([PT.T, PT.H_NET_UT, PT.H_NET_HP])}
 
 
 def _calc_hpr_cascade(
@@ -268,20 +278,16 @@ def _calc_hpr_cascade(
     is_heat_pumping: bool = True,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
-    T_ls = (
-        create_problem_table_with_t_int(
-            streams=(
-                res.hpr_hot_streams
-                + res.hpr_cold_streams
-                + res.amb_streams.get_hot_streams()
-                + res.amb_streams.get_cold_streams()
-            ),
-            is_shifted=is_T_vals_shifted,
-        )
-        .col[PT.T.value]
-        .tolist()
+    pt_hpr_grid = create_problem_table_with_t_int(
+        streams=(
+            res.hpr_hot_streams
+            + res.hpr_cold_streams
+            + res.amb_streams.get_hot_streams()
+            + res.amb_streams.get_cold_streams()
+        ),
+        is_shifted=is_T_vals_shifted,
     )
-    pt.insert_temperature_interval(T_ls)
+    pt.share_temperature_intervals(pt_hpr_grid)
 
     # Ambient air addition to the process stream set
     pt.col[PT.H_NET_W_AIR.value] = pt.col[PT.H_NET_A.value]
@@ -290,35 +296,38 @@ def _calc_hpr_cascade(
             hot_streams=res.amb_streams.get_hot_streams(),
             cold_streams=res.amb_streams.get_cold_streams(),
             is_shifted=is_T_vals_shifted,
-            extra_T_intervals=pt.col[PT.T.value].tolist(),
             is_full_analysis=True,
         )
+        pt.share_temperature_intervals(pt_air)
         pt.col[PT.H_NET_W_AIR.value] += pt_air.col[PT.H_NET.value]
         pt.col[PT.H_NET_HOT.value] += pt_air.col[PT.H_NET_HOT.value]
         pt.col[PT.H_NET_COLD.value] += pt_air.col[PT.H_NET_COLD.value]
 
     # Heat pump or refrigeration cascade
-    pt_hpr = get_utility_heat_cascade(
+    hpr_profile = get_utility_heat_cascade(
         T_int_vals=pt.col[PT.T.value],
         hot_utilities=res.hpr_hot_streams,
         cold_utilities=res.hpr_cold_streams,
         is_shifted=is_T_vals_shifted,
     )
+    hpr_updates = hpr_profile["updates"]
     if is_heat_pumping:
         pt.update(
-            {
-                PT.H_NET_HP.value: pt_hpr[PT.H_NET_UT.value],
-                PT.H_HOT_HP.value: pt_hpr[PT.H_HOT_UT.value],
-                PT.H_COLD_HP.value: pt_hpr[PT.H_COLD_UT.value],
-            }
+            T_col=hpr_profile["T_col"],
+            updates={
+                PT.H_NET_HP.value: hpr_updates[PT.H_NET_UT.value],
+                PT.H_HOT_HP.value: hpr_updates[PT.H_HOT_UT.value],
+                PT.H_COLD_HP.value: hpr_updates[PT.H_COLD_UT.value],
+            },
         )
     else:
         pt.update(
-            {
-                PT.H_NET_RFRG.value: pt_hpr[PT.H_NET_UT.value],
-                PT.H_HOT_RFRG.value: pt_hpr[PT.H_HOT_UT.value],
-                PT.H_COLD_RFRG.value: pt_hpr[PT.H_COLD_UT.value],
-            }
+            T_col=hpr_profile["T_col"],
+            updates={
+                PT.H_NET_RFRG.value: hpr_updates[PT.H_NET_UT.value],
+                PT.H_HOT_RFRG.value: hpr_updates[PT.H_HOT_UT.value],
+                PT.H_COLD_RFRG.value: hpr_updates[PT.H_COLD_UT.value],
+            },
         )
 
     return pt
@@ -326,7 +335,9 @@ def _calc_hpr_cascade(
 
 _HP_PLACEMENT_HANDLERS = {
     HPRcycle.Brayton.value: optimise_brayton_heat_pump_placement,
-    HPRcycle.MultiTempCarnot.value: optimise_multi_temperature_carnot_heat_pump_placement,
+    HPRcycle.MultiTempCarnot.value: (
+        optimise_multi_temperature_carnot_heat_pump_placement
+    ),
     HPRcycle.MultiSimpleVapourComp.value: optimise_multi_simple_heat_pump_placement,
     HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
     HPRcycle.MultiSimpleCarnot.value: optimise_multi_simple_carnot_heat_pump_placement,

@@ -83,9 +83,14 @@ The main graph surfaces are:
 - `problem.plot.shifted_composite_curve()`
 - `problem.plot.balanced_composite_curve()`
 - `problem.plot.grand_composite_curve()`
+- `problem.plot.grand_composite_curve_with_heat_pump()`
 - `problem.plot.net_load_profiles()`
 - `problem.plot.export(...)`
 - CLI `openpinch graph`
+
+After direct HPR targeting, the target-specific net-load-profile graph includes
+the heat-pump condenser and evaporator overlays, and the dedicated GCC-with-
+heat-pump view exposes the HPR cascade directly.
 
 Recommended Follow-On Pages
 ---------------------------

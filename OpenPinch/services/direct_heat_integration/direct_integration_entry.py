@@ -78,24 +78,26 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     )
     if zone.config.DO_BALANCED_CC or zone.config.DO_AREA_TARGETING:
         pt.update(
-            get_balanced_CC(
-                pt.col[PT.H_HOT.value],
-                pt.col[PT.H_COLD.value],
-                pt.col[PT.H_HOT_UT.value],
-                pt.col[PT.H_COLD_UT.value],
+            **get_balanced_CC(
+                T_col=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_HOT.value],
+                H_cold=pt.col[PT.H_COLD.value],
+                H_hot_ut=pt.col[PT.H_HOT_UT.value],
+                H_cold_ut=pt.col[PT.H_COLD_UT.value],
             )
         )
         pt_real.update(
-            get_balanced_CC(
-                pt_real.col[PT.H_HOT.value],
-                pt_real.col[PT.H_COLD.value],
-                pt_real.col[PT.H_HOT_UT.value],
-                pt_real.col[PT.H_COLD_UT.value],
-                pt_real.col[PT.DELTA_T.value],
-                pt_real.col[PT.RCP_HOT.value],
-                pt_real.col[PT.RCP_COLD.value],
-                pt_real.col[PT.RCP_HOT_UT.value],
-                pt_real.col[PT.RCP_COLD_UT.value],
+            **get_balanced_CC(
+                T_col=pt_real.col[PT.T.value],
+                H_hot=pt_real.col[PT.H_HOT.value],
+                H_cold=pt_real.col[PT.H_COLD.value],
+                H_hot_ut=pt_real.col[PT.H_HOT_UT.value],
+                H_cold_ut=pt_real.col[PT.H_COLD_UT.value],
+                dT_vals=pt_real.col[PT.DELTA_T.value],
+                RCP_hot=pt_real.col[PT.RCP_HOT.value],
+                RCP_cold=pt_real.col[PT.RCP_COLD.value],
+                RCP_hot_ut=pt_real.col[PT.RCP_HOT_UT.value],
+                RCP_cold_ut=pt_real.col[PT.RCP_COLD_UT.value],
             )
         )
         # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC
@@ -170,10 +172,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
 
-    if (
-        sum([u.heat_flow for u in hot_utilities])
-        + sum([u.heat_flow for u in cold_utilities])
-    ) < tol:
+    if hot_utilities.sum_heat_flow() + cold_utilities.sum_heat_flow() < tol:
         # If no utility is needed, there is no net streams for indirect integration.
         return net_hot_streams, net_cold_streams
 
@@ -195,25 +194,25 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     for i, dh in enumerate(dh_vals):
         if dh > tol and hu_idx >= 0:
             hu_idx, k = _add_net_segment_stateful(
-                T_vals[i],
-                T_vals[i + 1],
-                hu_idx,
-                dh,
-                hot_utilities_seq,
-                hot_remaining,
-                net_cold_streams,
-                k,
+                T_ub=T_vals[i],
+                T_lb=T_vals[i + 1],
+                curr_idx=hu_idx,
+                dh_req=dh,
+                utilities=hot_utilities_seq,
+                remaining=hot_remaining,
+                net_streams=net_cold_streams,
+                k=k,
             )
         elif -dh > tol and cu_idx >= 0:
             cu_idx, k = _add_net_segment_stateful(
-                T_vals[i],
-                T_vals[i + 1],
-                cu_idx,
-                abs(dh),
-                cold_utilities_seq,
-                cold_remaining,
-                net_hot_streams,
-                k,
+                T_ub=T_vals[i],
+                T_lb=T_vals[i + 1],
+                curr_idx=cu_idx,
+                dh_req=abs(dh),
+                utilities=cold_utilities_seq,
+                remaining=cold_remaining,
+                net_streams=net_hot_streams,
+                k=k,
             )
 
     return net_hot_streams, net_cold_streams
@@ -229,7 +228,7 @@ def _add_net_segment_stateful(
     net_streams: StreamCollection,
     k: int,
     j: int = 0,
-):
+) -> Tuple[int, int]:
     """Adds a net utility segment and recursively handles segmentation if needed."""
     if curr_idx < 0 or not utilities or dh_req <= tol:
         return curr_idx, k
@@ -242,15 +241,15 @@ def _add_net_segment_stateful(
         if next_idx == curr_idx:
             return curr_idx, k
         return _add_net_segment_stateful(
-            T_ub,
-            T_lb,
-            next_idx,
-            dh_req,
-            utilities,
-            remaining,
-            net_streams,
-            k,
-            j,
+            T_ub=T_ub,
+            T_lb=T_lb,
+            curr_idx=next_idx,
+            dh_req=dh_req,
+            utilities=utilities,
+            remaining=remaining,
+            net_streams=net_streams,
+            k=k,
+            j=j,
         )
 
     dh_curr = min(dh_req, available)
@@ -278,15 +277,15 @@ def _add_net_segment_stateful(
         if next_idx == curr_idx:
             return curr_idx, k + 1
         return _add_net_segment_stateful(
-            T_i,
-            T_lb,
-            next_idx,
-            dh_next,
-            utilities,
-            remaining,
-            net_streams,
-            k,
-            j + 1,
+            T_ub=T_i,
+            T_lb=T_lb,
+            curr_idx=next_idx,
+            dh_req=dh_next,
+            utilities=utilities,
+            remaining=remaining,
+            net_streams=net_streams,
+            k=k,
+            j=j + 1,
         )
 
     next_idx = (
@@ -319,33 +318,28 @@ def _find_next_available_utility(
     return len(utilities) - 1
 
 
-def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> Zone:
+def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
     """Assemble the problem-table slices required for composite/comparison plots."""
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {
-        GT.CC.value: pt_real[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
-        GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
-        GT.BCC.value: pt_real[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
-        GT.GCC.value: pt[
+        GT.CC.value: pt_real.slice([PT.T, PT.H_HOT, PT.H_COLD]),
+        GT.SCC.value: pt.slice([PT.T, PT.H_HOT, PT.H_COLD]),
+        GT.BCC.value: pt_real.slice([PT.T, PT.H_HOT_BAL, PT.H_COLD_BAL]),
+        GT.GCC.value: pt.slice(
+            [PT.T, PT.H_NET, PT.H_NET_NP, PT.H_NET_V, PT.H_NET_A, PT.H_NET_UT]
+        ),
+        GT.GCC_R.value: pt_real.slice([PT.T, PT.H_NET, PT.H_NET_UT]),
+        GT.NLP.value: pt.slice(
             [
-                PT.T.value,
-                PT.H_NET.value,
-                PT.H_NET_NP.value,
-                PT.H_NET_V.value,
-                PT.H_NET_A.value,
-                PT.H_NET_UT.value,
+                PT.T,
+                PT.H_NET_HOT,
+                PT.H_NET_COLD,
+                PT.H_HOT_UT,
+                PT.H_COLD_UT,
+                PT.H_HOT_HP,
+                PT.H_COLD_HP,
             ]
-        ],
-        GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_NET_UT.value]],
-        GT.NLP.value: pt[
-            [
-                PT.T.value,
-                PT.H_NET_HOT.value,
-                PT.H_NET_COLD.value,
-                PT.H_HOT_UT.value,
-                PT.H_COLD_UT.value,
-            ]
-        ],
-        GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]],
+        ),
+        GT.GCC_HP.value: pt.slice([PT.T, PT.H_NET_W_AIR, PT.H_NET_HP]),
     }

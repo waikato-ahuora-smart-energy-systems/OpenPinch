@@ -70,33 +70,35 @@ def get_utility_targets(
         )
 
     pt.update(
-        get_utility_heat_cascade(
-            pt.col[PT.T.value],
-            hot_utilities,
-            cold_utilities,
+        **get_utility_heat_cascade(
+            T_int_vals=pt.col[PT.T.value],
+            hot_utilities=hot_utilities,
+            cold_utilities=cold_utilities,
             is_shifted=True,
         )
     )
     pt.update(
-        get_seperated_gcc_heat_load_profiles(
-            pt.col[PT.H_NET_UT.value],
-            pt.col[PT.RCP_UT_NET.value],
+        **get_seperated_gcc_heat_load_profiles(
+            T_col=pt.col[PT.T.value],
+            H_net=pt.col[PT.H_NET_UT.value],
+            rcp_net=pt.col[PT.RCP_UT_NET.value],
             is_process_stream=False,
         )
     )
     if isinstance(pt_real, ProblemTable):
         pt_real.update(
-            get_utility_heat_cascade(
-                pt_real.col[PT.T.value],
-                hot_utilities,
-                cold_utilities,
+            **get_utility_heat_cascade(
+                T_int_vals=pt_real.col[PT.T.value],
+                hot_utilities=hot_utilities,
+                cold_utilities=cold_utilities,
                 is_shifted=False,
             )
         )
         pt_real.update(
-            get_seperated_gcc_heat_load_profiles(
-                pt_real.col[PT.H_NET_UT.value],
-                pt_real.col[PT.RCP_UT_NET.value],
+            **get_seperated_gcc_heat_load_profiles(
+                T_col=pt_real.col[PT.T.value],
+                H_net=pt_real.col[PT.H_NET_UT.value],
+                rcp_net=pt_real.col[PT.RCP_UT_NET.value],
                 is_process_stream=False,
             )
         )

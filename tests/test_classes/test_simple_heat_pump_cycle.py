@@ -1,10 +1,7 @@
 """Regression tests for the simple heat pump cycle classes."""
 
-import math
 import numpy as np
 import pytest
-from CoolProp.CoolProp import PropsSI
-from CoolProp.Plots.SimpleCycles import StateContainer
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 from OpenPinch.lib.enums import *
 import CoolProp
@@ -343,6 +340,46 @@ def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
     assert all(abs(s.t_supply - s.t_target) > 0.05 for s in evap_streams)
 
 
+def test_heat_pump_cycle_accepts_binary_mole_fraction_refrigerant_string():
+    refrigerant = "HEOS::R32[0.5]&R125[0.5]"
+
+    cycle = VapourCompressionCycle()
+    cycle.state = refrigerant
+
+    assert cycle.state.fluid_names() == ["R32", "R125"]
+    assert np.allclose(cycle.state.get_mole_fractions(), [0.5, 0.5])
+
+
+def test_heat_pump_cycle_with_binary_mole_fraction_refrigerant_solves():
+    refrigerant = "HEOS::R32[0.5]&R125[0.5]"
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        T_evap=0.0,
+        T_cond=35.0,
+        dT_superheat=5.0,
+        dT_subcool=3.0,
+        dT_ihx_gas_side=5.0,
+        eta_comp=0.75,
+        refrigerant=refrigerant,
+        Q_heat=1000.0,
+        is_heat_pump=True,
+    )
+
+    cond_streams = cycle.build_stream_collection(include_cond=True)
+    evap_streams = cycle.build_stream_collection(include_evap=True)
+
+    assert cycle.solved is True
+    assert cycle.refrigerant == refrigerant
+    assert cycle.state.fluid_names() == ["R32", "R125"]
+    assert np.allclose(cycle.state.get_mole_fractions(), [0.5, 0.5])
+    assert len(cycle.Hs) == VapourCompressionCycle.STATECOUNT
+    assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0.0)
+    assert np.isclose(cycle.Q_cond - cycle.Q_heat - cycle.Q_cas_heat, 0.0)
+    assert np.isclose(sum(s.heat_flow for s in cond_streams), cycle.Q_heat, 0.0)
+    assert np.isclose(sum(s.heat_flow for s in evap_streams), cycle.Q_cool, 0.0)
+    assert cycle.COP_h > 1.0
+
+
 def test_refrigeration_cycle_uses_q_cool_as_primary_duty():
     T_evap = -15  # degC, evaporator saturation temperature
     T_cond = 35  # degC, condenser saturation temperature
@@ -406,39 +443,6 @@ def test_refrigeration_cycle_caps_q_heat_to_available_q_cond():
 """Additional branch coverage tests for VapourCompressionCycle."""
 
 
-class _DummyState:
-    def __init__(self):
-        self._h = 1.0
-        self._T = 300.0
-        self.calls = []
-
-    def update(self, *args):
-        self.calls.append(args)
-        input_key = args[0]
-        if input_key == CoolProp.PQ_INPUTS and args[2] == 1.0:
-            self._h = 4.0
-        elif input_key == CoolProp.PQ_INPUTS and args[2] == 0.0:
-            self._h = 2.0
-        elif input_key == CoolProp.HmassP_INPUTS:
-            self._h = float(args[1])
-        self._T = 273.15 + self._h
-
-    def keyed_output(self, _key):
-        return 10.0
-
-    def hmass(self):
-        return self._h
-
-    def smass(self):
-        return 1.0
-
-    def T(self):
-        return self._T
-
-    def p(self):
-        return 1.0
-
-
 class _CycleStore(dict):
     def __getitem__(self, key):
         return super().get(key, 0.0)
@@ -493,9 +497,18 @@ def test_validate_solve_inputs_and_get_psat_high_temperature_branch():
 
 
 def test_build_evaporator_profile_subcooled_segment_branch(monkeypatch):
+    class _ProfileState:
+        def __init__(self, h):
+            self._h = float(h)
+
+        def hmass(self):
+            return self._h
+
+        def T(self):
+            return 273.15 + self._h
+
     hp = VapourCompressionCycle()
     hp._solved = True
-    hp._state = _DummyState()
     hp._p_crit = 10.0
     hp._dt_diff_max = 0.5
 
@@ -509,6 +522,16 @@ def test_build_evaporator_profile_subcooled_segment_branch(monkeypatch):
         shp_mod,
         "get_piecewise_data_points",
         lambda curve, is_hot_stream, dt_diff_max: curve,
+    )
+    monkeypatch.setattr(
+        VapourCompressionCycle,
+        "_compute_state_from_pressure_quality",
+        lambda self, P, Q: _ProfileState(4.0 if Q == 1.0 else 2.0),
+    )
+    monkeypatch.setattr(
+        VapourCompressionCycle,
+        "_compute_state_from_pressure_enthalpy",
+        lambda self, P, h: _ProfileState(h),
     )
 
     out = hp._build_evaporator_profile()
@@ -524,17 +547,17 @@ def test_simple_heat_pump_state_and_cycle_state_setters():
     assert hp.state is not None
     assert hp.solved is False
 
-    bad = StateContainer(unit_system=hp.system)
-    bad[0, "H"] = 1.0
+    bad = [{}]
+    bad[0]["H"] = 1.0
     with pytest.raises(ValueError, match="Expected exactly"):
         hp.cycle_states = bad
 
-    good = StateContainer(unit_system=hp.system)
+    good = [{} for _ in range(hp.STATECOUNT)]
     for i in range(hp.STATECOUNT):
-        good[i, "H"] = 1_000.0 + i
-        good[i, "S"] = 10.0 + i
-        good[i, "P"] = 100_000.0 + i
-        good[i, "T"] = 300.0 + i
+        good[i]["H"] = 1_000.0 + i
+        good[i]["S"] = 10.0 + i
+        good[i]["P"] = 100_000.0 + i
+        good[i]["T"] = 300.0 + i
     hp.cycle_states = good
     hp._solved = True
 
@@ -563,8 +586,8 @@ def test_simple_heat_pump_cop_zero_division_and_misc_helpers(monkeypatch):
     assert hp._convert_C_to_K(10.0) == pytest.approx(283.15)
     assert hp._convert_K_to_C(283.15) == pytest.approx(10.0)
 
-    hp._cycle_states = StateContainer(unit_system=hp.system)
+    hp._cycle_states = hp._new_cycle_states()
     state = hp._compute_state_from_pressure_temperature(100_000.0, 300.0, phase=1)
     hp._save_cycle_state(state, 0)
 
-    assert hp._cycle_states[0, "H"] == pytest.approx(112653.67968857559)
+    assert hp._cycle_states[0]["H"] == pytest.approx(112653.67968857559)

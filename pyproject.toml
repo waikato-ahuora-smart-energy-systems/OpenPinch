@@ -32,14 +32,9 @@ dependencies=[
   "pandas",
   "coolprop",
   "pydantic",
-  "openpyxl",
-  "pyxlsb",
   "scipy",
-  "streamlit",
-  "plotly",
-  "tespy",
 ]
-version = "0.1.22"
+version = "0.1.23"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -61,7 +56,28 @@ Issues = "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/issue
 openpinch = "OpenPinch.__main__:main"
 
 [project.optional-dependencies]
+dashboard = [
+  "streamlit",
+  "plotly",
+  "openpyxl",
+  "pyxlsb",
+]
+brayton_cycle = [
+  "tespy",
+]
 notebook = [
+  "ipykernel>=7.2.0",
+  "nbformat>=5.10.4",
+  "plotly",
+  "openpyxl",
+  "pyxlsb",
+]
+full = [
+  "streamlit",
+  "plotly",
+  "openpyxl",
+  "pyxlsb",
+  "tespy",
   "ipykernel>=7.2.0",
   "nbformat>=5.10.4",
 ]
@@ -78,6 +94,11 @@ dev = [
     "sphinx-rtd-theme>=3.1.0",
     "black>=23.9",
     "ruff>=0.1.8",    
+    "streamlit",
+    "plotly",
+    "openpyxl",
+    "pyxlsb",
+    "tespy",    
 ]
 
 [tool.black]

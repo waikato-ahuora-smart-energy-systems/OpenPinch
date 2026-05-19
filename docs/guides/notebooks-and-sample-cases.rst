@@ -5,6 +5,12 @@ The packaged notebooks and sample cases are part of the supported OpenPinch
 learning surface. They are the fastest way to move from a blank environment to
 an end-to-end workflow.
 
+Install the notebook runtime first:
+
+.. code-block:: bash
+
+   python -m pip install "openpinch[notebook]"
+
 Packaged Sample Cases
 ---------------------
 
@@ -26,6 +32,12 @@ Copy one into your working directory with:
 Packaged Notebook Series
 ------------------------
 
+The current packaged notebooks load bundled sample cases directly with
+``PinchWorkspace(source="sample_case.json", ...)`` and then work against real
+``PinchProblem`` cases inside the workspace. They are packaged as clean sources:
+no stored Plotly payloads, no cached execution counts, and no stale traceback
+output.
+
 Copy the full series with:
 
 .. code-block:: bash
@@ -44,6 +56,10 @@ Current packaged notebooks:
 2. `02_total_site_targets_and_sugcc.ipynb`
 3. `03_carnot_hpr_comparison.ipynb`
 
+Notebook 03 also shows the post-target HPR graph surfaces directly through
+``problem.plot.net_load_profiles(zone_name="Direct Heat Pump")`` and
+``problem.plot.grand_composite_curve_with_heat_pump(...)``.
+
 Recommended Learning Path
 -------------------------
 
@@ -51,8 +67,11 @@ Recommended Learning Path
    interpretation
 2. `zonal_site.json` or `pulp_mill.json` and notebook 02 for total-site and
    SUGCC workflows
-3. `heat_pump_targeting.json` and notebook 03 for HPR comparison and utility
-   displacement logic
+3. `chocolate_factory.json` and notebook 03 for direct-versus-indirect HPR and
+   refrigeration comparison
+4. `heat_pump_targeting.json` for a smaller direct HPR screening payload when
+   you want to test the advanced `problem.target.*` surface without the full
+   notebook comparison flow
 
 Why These Assets Matter
 -----------------------

@@ -26,7 +26,7 @@ def construct_HPRTargetInputs(
     H_cold: np.ndarray,
     *,
     is_heat_pumping: bool = True,
-    zone_config: Configuration = Configuration(),
+    zone_config: Configuration,
     debug: bool = False,
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
@@ -35,70 +35,100 @@ def construct_HPRTargetInputs(
         T_vals, zone_config.DT_CONT_HP
     )
 
-    for T_arr, H_arr, is_cold in [(T_hot, H_hot, False), (T_cold, H_cold, True)]:
-        if (is_cold and is_heat_pumping) or (not is_cold and not is_heat_pumping):
-            T_arr, H_arr = _get_reduced_bckgrd_cascade_till_Q_target(
-                Q_hpr_target, T_arr, H_arr, is_cold=is_cold
-            )
-        T_arr, H_arr, z_amb_arr = _get_simplified_bckgrd_cascade_and_z_amb(
-            T_vals=T_arr,
-            H_vals=H_arr,
-            zone_config=zone_config,
-            is_cold=is_cold,
-        )
-        s = create_stream_collection_of_background_profile(T_arr, H_arr)
-        if is_cold:
-            T_cold, H_cold, z_amb_cold, s_cold = T_arr, H_arr, z_amb_arr, s
-        else:
-            T_hot, H_hot, z_amb_hot, s_hot = T_arr, H_arr, z_amb_arr, s
+    T_hot, H_hot, z_amb_hot, s_hot = _prepare_hpr_background_profile(
+        Q_hpr_target=Q_hpr_target,
+        T_vals=T_hot,
+        H_vals=H_hot,
+        zone_config=zone_config,
+        is_heat_pumping=is_heat_pumping,
+        is_cold=False,
+    )
+    T_cold, H_cold, z_amb_cold, s_cold = _prepare_hpr_background_profile(
+        Q_hpr_target=Q_hpr_target,
+        T_vals=T_cold,
+        H_vals=H_cold,
+        zone_config=zone_config,
+        is_heat_pumping=is_heat_pumping,
+        is_cold=True,
+    )
 
-    inputs = {
-        "Q_hpr_target": Q_hpr_target,
-        "Q_heat_max": H_cold[0],
-        "Q_cool_max": -H_hot[-1],
-        "T_hot": T_hot,
-        "H_hot": H_hot,
-        "z_amb_hot": z_amb_hot,
-        "T_cold": T_cold,
-        "H_cold": H_cold,
-        "z_amb_cold": z_amb_cold,
-        "dt_range_max": max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
-        "is_heat_pumping": bool(is_heat_pumping),
-        "eta_penalty": 0.001,
-        "rho_penalty": 10,
-        "bckgrd_hot_streams": s_hot,
-        "bckgrd_cold_streams": s_cold,
-        "debug": debug,
-        "hpr_type": zone_config.HPR_TYPE,
-        "n_cond": zone_config.N_COND,
-        "n_evap": zone_config.N_EVAP,
-        "eta_comp": zone_config.ETA_COMP,
-        "eta_exp": zone_config.ETA_EXP,
-        "eta_ii_hpr_carnot": zone_config.ETA_II_HPR_CARNOT,
-        "eta_ii_he_carnot": zone_config.ETA_II_HE_CARNOT
+    return HeatPumpTargetInputs(
+        Q_hpr_target=Q_hpr_target,
+        Q_heat_max=H_cold[0],
+        Q_cool_max=-H_hot[-1],
+        T_hot=T_hot,
+        H_hot=H_hot,
+        z_amb_hot=z_amb_hot,
+        T_cold=T_cold,
+        H_cold=H_cold,
+        z_amb_cold=z_amb_cold,
+        dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
+        is_heat_pumping=bool(is_heat_pumping),
+        eta_penalty=0.001,
+        rho_penalty=10,
+        bckgrd_hot_streams=s_hot,
+        bckgrd_cold_streams=s_cold,
+        debug=debug,
+        hpr_type=zone_config.HPR_TYPE,
+        n_cond=zone_config.N_COND,
+        n_evap=zone_config.N_EVAP,
+        eta_comp=zone_config.ETA_COMP,
+        eta_exp=zone_config.ETA_EXP,
+        eta_ii_hpr_carnot=zone_config.ETA_II_HPR_CARNOT,
+        eta_ii_he_carnot=zone_config.ETA_II_HE_CARNOT
         if zone_config.ALLOW_INTEGRATED_EXPANDER
         else 0.0,
-        "dtcont_hp": zone_config.DT_CONT_HP,
-        "dt_hp_ihx": zone_config.DT_HPR_IHX,
-        "dt_cascade_hx": zone_config.DT_HPR_CASCADE_HX,
-        "T_env": zone_config.T_ENV,
-        "dt_env_cont": zone_config.DT_ENV_CONT,
-        "dt_phase_change": zone_config.DT_PHASE_CHANGE,
-        "refrigerant_ls": [r.strip().upper() for r in zone_config.REFRIGERANTS],
-        "do_refrigerant_sort": zone_config.DO_REFRIGERANT_SORT,
-        "heat_to_power_ratio": zone_config.PRICE_RATIO_HEAT_TO_ELE,
-        "cold_to_power_ratio": zone_config.PRICE_RATIO_COLD_TO_ELE,
-        "max_multi_start": zone_config.MAX_HP_MULTISTART,
-        "bb_minimiser": zone_config.BB_MINIMISER,
-        "allow_integrated_expander": zone_config.ALLOW_INTEGRATED_EXPANDER,
-        "initialise_simulated_cycle": zone_config.INITIALISE_SIMULATED_CYCLE,
-    }
-    return HeatPumpTargetInputs(**inputs)
+        dtcont_hp=zone_config.DT_CONT_HP,
+        dt_hp_ihx=zone_config.DT_HPR_IHX,
+        dt_cascade_hx=zone_config.DT_HPR_CASCADE_HX,
+        T_env=zone_config.T_ENV,
+        dt_env_cont=zone_config.DT_ENV_CONT,
+        dt_phase_change=zone_config.DT_PHASE_CHANGE,
+        refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
+        do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
+        heat_to_power_ratio=zone_config.PRICE_RATIO_HEAT_TO_ELE,
+        cold_to_power_ratio=zone_config.PRICE_RATIO_COLD_TO_ELE,
+        max_multi_start=zone_config.MAX_HP_MULTISTART,
+        bb_minimiser=zone_config.BB_MINIMISER,
+        allow_integrated_expander=zone_config.ALLOW_INTEGRATED_EXPANDER,
+        initialise_simulated_cycle=zone_config.INITIALISE_SIMULATED_CYCLE,
+    )
 
 
 #######################################################################################################
 # Helper Functions
 #######################################################################################################
+
+
+def _prepare_hpr_background_profile(
+    *,
+    Q_hpr_target: float,
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+    zone_config: Configuration,
+    is_heat_pumping: bool,
+    is_cold: bool,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, object]:
+    should_trim_to_target = ((is_cold) and (is_heat_pumping)) or (
+        (not is_cold) and (not is_heat_pumping)
+    )
+    if should_trim_to_target:
+        T_vals, H_vals = _get_reduced_bckgrd_cascade_till_Q_target(
+            Q_hpr_target, T_vals, H_vals, is_cold=is_cold
+        )
+
+    T_vals, H_vals, z_amb = _get_simplified_bckgrd_cascade_and_z_amb(
+        T_vals=T_vals,
+        H_vals=H_vals,
+        zone_config=zone_config,
+        is_cold=is_cold,
+    )
+    return (
+        T_vals,
+        H_vals,
+        z_amb,
+        create_stream_collection_of_background_profile(T_vals, H_vals),
+    )
 
 
 def _apply_temperature_shift_for_hpr_stream_dtmin_cont(

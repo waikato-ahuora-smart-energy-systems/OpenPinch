@@ -82,7 +82,7 @@ When To Leave the CLI
 
 Move to the Python workflow when you need:
 
-- repeated scenario studies in one session
+- repeated named study cases in one session
 - direct access to summary frames and graph objects
 - `problem.target.*` workflows
 - `problem.plot.*` workflows

@@ -2,12 +2,10 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from OpenPinch.services.heat_pump_integration.cycles import (
-    multi_simple_carnot as hp_multi_simple_carnot,
-)
 from OpenPinch.services.heat_pump_integration.cycles.multi_simple_carnot import (
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_multi_simple_carnot_stage_duties_and_work,
+    _parse_multi_simple_carnot_hp_state_variables,
 )
 from OpenPinch.services.heat_pump_integration.common.shared import (
     get_Q_vals_at_T_hpr_from_bckgrd_profile,
@@ -84,9 +82,7 @@ def test_get_multi_simple_carnot_stage_duties_and_work_shares_hot_profile_across
     assert cycle_results["Qe"].sum() == available_total
 
 
-def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambiguous_truth(
-    monkeypatch,
-):
+def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambiguous_truth():
     args = SimpleNamespace(
         n_cond=2,
         n_evap=2,
@@ -107,14 +103,58 @@ def test_compute_multi_simple_carnot_objective_handles_mixed_lift_without_ambigu
         rho_penalty=10,
         allow_integrated_expander=False,
     )
-    monkeypatch.setattr(
-        hp_multi_simple_carnot, "g_ineq_penalty", lambda *args, **kwargs: 0.0
-    )
 
     res = _compute_multi_simple_carnot_hp_opt_obj(
-        np.array([0.0, 0.0, 0.25, 0.25, 0.0]), args
+        np.array([0.0, 0.0, 0.0, 0.25, 0.25]), args
     )
 
     assert np.isfinite(res["obj"])
     assert np.isfinite(res["utility_tot"])
     assert res["Q_cond"].shape == (2,)
+
+
+def test_compute_multi_simple_carnot_utility_total_includes_residual_cold_utility():
+    args = SimpleNamespace(
+        n_cond=1,
+        n_evap=1,
+        T_cold=np.array([100.0, 50.0]),
+        H_cold=np.array([200.0, 0.0]),
+        T_hot=np.array([90.0, 40.0]),
+        H_hot=np.array([0.0, -20.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.0,
+        Q_hpr_target=200.0,
+        Q_heat_max=200.0,
+        Q_cool_max=20.0,
+        heat_to_power_ratio=1.0,
+        cold_to_power_ratio=1.0,
+        rho_penalty=10.0,
+    )
+
+    res = _compute_multi_simple_carnot_hp_opt_obj(np.array([0.0, 0.5, 0.5]), args)
+
+    assert res["Q_ext"] > 0.0
+    assert np.isclose(res["utility_tot"], res["w_net"] + res["Q_ext"])
+
+
+def test_parse_multi_simple_carnot_state_variables_uses_bounded_ambient_mapping():
+    args = SimpleNamespace(
+        n_cond=1,
+        n_evap=1,
+        T_cold=np.array([100.0, 50.0]),
+        T_hot=np.array([90.0, 40.0]),
+        Q_heat_max=200.0,
+        Q_cool_max=160.0,
+    )
+
+    vars = _parse_multi_simple_carnot_hp_state_variables(
+        np.array([0.5, 0.5, 0.5]),
+        args,
+    )
+
+    np.testing.assert_allclose(vars["T_cond"], np.array([75.0]))
+    np.testing.assert_allclose(vars["T_evap"], np.array([65.0]))
+    assert vars["Q_amb_hot"] == 0.0
+    assert np.isclose(vars["Q_amb_cold"], 200.0 * np.arctanh(0.5))

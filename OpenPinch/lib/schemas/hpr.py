@@ -92,8 +92,206 @@ class HeatPumpTargetOutputs(BaseModel):
     model: Optional[Any] = None
 
 
-__all__ = ["HeatPumpTargetInputs", "HeatPumpTargetOutputs"]
+class HPRParsedState(BaseModel):
+    """Internal parsed optimisation-state payload across HPR backends."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    Q_amb_hot: float = 0.0
+    Q_amb_cold: float = 0.0
+    T_cond: np.ndarray | None = None
+    T_evap: np.ndarray | None = None
+    dT_subcool: np.ndarray | None = None
+    dT_superheat: np.ndarray | None = None
+    dT_ihx_gas_side: np.ndarray | None = None
+    T_comp_out: np.ndarray | None = None
+    dT_gc: np.ndarray | None = None
+    dT_comp: np.ndarray | None = None
+    Q_heat: np.ndarray | None = None
+    Q_cool: np.ndarray | None = None
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except AttributeError:
+            return default
+
+
+class HPRThermoArtifacts(BaseModel):
+    """Optional solved thermodynamic artefacts attached to a backend result."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    hpr_streams: StreamCollection | None = None
+    model: Any = None
+    debug_figure: Any = None
+
+
+class HPRBackendResult(BaseModel):
+    """Internal backend result before public schema validation."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    obj: float
+    utility_tot: float
+    w_net: float | list | np.ndarray
+    Q_ext_heat: float
+    Q_ext_cold: float
+    Q_amb_hot: float
+    Q_amb_cold: float
+    success: bool = True
+    w_hpr: float | list | np.ndarray | None = None
+    w_he: float | list | np.ndarray | None = None
+    heat_recovery: float | list | np.ndarray | None = None
+    cop_h: float | list | np.ndarray | None = None
+    eta_he: float | list | np.ndarray | None = None
+    amb_streams: StreamCollection | None = None
+    T_cond: np.ndarray | None = None
+    T_evap: np.ndarray | None = None
+    Q_cond: np.ndarray | None = None
+    Q_evap: np.ndarray | None = None
+    Q_cond_he: np.ndarray | None = None
+    Q_evap_he: np.ndarray | None = None
+    dT_subcool: np.ndarray | None = None
+    dT_superheat: np.ndarray | None = None
+    T_comp_out: np.ndarray | None = None
+    dT_gc: np.ndarray | None = None
+    dT_comp: np.ndarray | None = None
+    Q_heat: np.ndarray | None = None
+    Q_cool: np.ndarray | None = None
+    failure_reason: str | None = None
+    artifacts: HPRThermoArtifacts | None = None
+
+    @property
+    def Q_ext(self) -> float:
+        return float(self.Q_ext_heat + self.Q_ext_cold)
+
+    @property
+    def hpr_streams(self) -> StreamCollection | None:
+        return None if self.artifacts is None else self.artifacts.hpr_streams
+
+    @property
+    def hpr_hot_streams(self) -> StreamCollection | None:
+        if self.hpr_streams is None:
+            return None
+        return self.hpr_streams.get_hot_utility_streams()
+
+    @property
+    def hpr_cold_streams(self) -> StreamCollection | None:
+        return (
+            None
+            if self.hpr_streams is None
+            else self.hpr_streams.get_cold_utility_streams()
+        )
+
+    @property
+    def model(self) -> Any:
+        return None if self.artifacts is None else self.artifacts.model
+
+    def with_updates(self, **kwargs) -> "HPRBackendResult":
+        return self.model_copy(update=kwargs)
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "Q_ext":
+            return self.Q_ext
+        if key == "hpr_streams":
+            return self.hpr_streams
+        if key == "hpr_hot_streams":
+            return self.hpr_hot_streams
+        if key == "hpr_cold_streams":
+            return self.hpr_cold_streams
+        if key == "model":
+            return self.model
+        return getattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except AttributeError:
+            return default
+
+    def __contains__(self, key: str) -> bool:
+        if not isinstance(key, str):
+            return False
+        if key in {
+            "Q_ext",
+            "hpr_streams",
+            "hpr_hot_streams",
+            "hpr_cold_streams",
+            "model",
+        }:
+            return True
+        return hasattr(self, key)
+
+    def to_output_payload(self) -> dict[str, Any]:
+        payload = {
+            "utility_tot": self.utility_tot,
+            "w_net": self.w_net,
+            "w_hpr": self.w_hpr,
+            "w_he": self.w_he,
+            "heat_recovery": self.heat_recovery,
+            "Q_ext": self.Q_ext,
+            "Q_amb_hot": self.Q_amb_hot,
+            "Q_amb_cold": self.Q_amb_cold,
+            "cop_h": self.cop_h,
+            "eta_he": self.eta_he,
+            "obj": self.obj,
+            "success": self.success,
+            "hpr_hot_streams": self.hpr_hot_streams,
+            "hpr_cold_streams": self.hpr_cold_streams,
+            "amb_streams": self.amb_streams,
+            "T_cond": self.T_cond,
+            "T_evap": self.T_evap,
+            "Q_cond": self.Q_cond,
+            "Q_evap": self.Q_evap,
+            "Q_cond_he": self.Q_cond_he,
+            "Q_evap_he": self.Q_evap_he,
+            "dT_subcool": self.dT_subcool,
+            "dT_superheat": self.dT_superheat,
+            "T_comp_out": self.T_comp_out,
+            "dT_gc": self.dT_gc,
+            "dT_comp": self.dT_comp,
+            "Q_heat": self.Q_heat,
+            "Q_cool": self.Q_cool,
+            "model": self.model,
+        }
+        return {key: value for key, value in payload.items() if value is not None}
+
+    @classmethod
+    def failure(
+        cls,
+        *,
+        reason: str | None = None,
+        Q_amb_hot: float = 0.0,
+        Q_amb_cold: float = 0.0,
+    ) -> "HPRBackendResult":
+        return cls(
+            obj=float(np.inf),
+            utility_tot=float(np.inf),
+            w_net=0.0,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=Q_amb_hot,
+            Q_amb_cold=Q_amb_cold,
+            success=False,
+            failure_reason=reason,
+        )
+
+
+__all__ = [
+    "HeatPumpTargetInputs",
+    "HeatPumpTargetOutputs",
+    "HPRParsedState",
+    "HPRThermoArtifacts",
+    "HPRBackendResult",
+]
 
 
 HeatPumpTargetInputs.model_rebuild()
 HeatPumpTargetOutputs.model_rebuild()
+HPRParsedState.model_rebuild()
+HPRThermoArtifacts.model_rebuild()
+HPRBackendResult.model_rebuild()

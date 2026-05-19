@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from ....classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ....classes.stream_collection import StreamCollection
 from ....lib.enums import PT
-from ....lib.schemas.hpr import HeatPumpTargetInputs, HeatPumpTargetOutputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs
 from ....utils.decorators import timing_decorator
 from ..common.shared import (
     calc_hpr_obj,
@@ -28,49 +28,51 @@ __all__ = [
 @timing_decorator
 def optimise_brayton_heat_pump_placement(
     args: HeatPumpTargetInputs,
-) -> HeatPumpTargetOutputs:
+) -> None:
     """Optimise a single-stage Brayton heat-pump placement against the background."""
-    args.n_cond = args.n_evap = 1
-    args.refrigerant_ls = ["air"]
-
-    opt = minimize(
-        fun=lambda x: _compute_brayton_hp_system_obj(x, args)["obj"],
-        x0=_get_x0_for_brayton_hp_opt(args),
-        method="SLSQP",
-        bounds=_get_bounds_for_brayton_hp_opt(args),
-        options={"disp": False, "maxiter": 1000},
-        tol=1e-7,
+    raise NotImplementedError(
+        "Brayton HPR targeting is currently unsupported pending contract and solver repair."
     )
+    # args.n_cond = args.n_evap = 1
+    # args.refrigerant_ls = ["air"]
+    # x0, bnds = _get_brayton_hp_opt_setup(args)
 
-    if not opt.success:
-        raise ValueError(f"Brayton heat pump targeting failed: {opt.message}")
+    # opt = minimize(
+    #     fun=lambda x: _compute_brayton_hp_system_obj(x, args)["obj"],
+    #     x0=x0,
+    #     method="SLSQP",
+    #     bounds=bnds,
+    #     options={"disp": False, "maxiter": 1000},
+    #     tol=1e-7,
+    # )
 
-    res = _compute_brayton_hp_system_obj(opt.x, args)
-    res["success"] = opt.success
-    return HeatPumpTargetOutputs.model_validate(res)
+    # if not opt.success:
+    #     raise ValueError(f"Brayton heat pump targeting failed: {opt.message}")
+
+    # res = _compute_brayton_hp_system_obj(opt.x, args)
+    # res["success"] = opt.success
+    # return HeatPumpTargetOutputs.model_validate(res)
 
 
-def _get_x0_for_brayton_hp_opt(args: HeatPumpTargetInputs) -> list:
+def _get_brayton_hp_opt_setup(
+    args: HeatPumpTargetInputs,
+) -> tuple[list, list]:
     return [
         0.0,
         abs(args.T_cold[0] - args.T_hot[0]) / args.dt_range_max,
         abs(args.T_cold[0] - args.T_cold[-1]) / args.dt_range_max,
         1.0,
+    ], [
+        (-0.2, 1.0),
+        (0.01, 1.5),
+        (0.01, 1.5),
+        (0.01, 1.0),
     ]
 
 
 #######################################################################################################
 # Helper Functions
 #######################################################################################################
-
-
-def _get_bounds_for_brayton_hp_opt(args: HeatPumpTargetInputs) -> list:
-    return [
-        (-0.2, 1.0),
-        (0.01, 1.5),
-        (0.01, 1.5),
-        (0.01, 1.0),
-    ]
 
 
 def _parse_brayton_hp_state_variables(
