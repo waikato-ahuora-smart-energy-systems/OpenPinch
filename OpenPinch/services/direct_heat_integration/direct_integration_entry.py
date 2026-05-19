@@ -198,7 +198,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
                 dh_req=dh,
                 utilities=hot_utilities_seq,
                 remaining=hot_remaining,
-                net_cold_streams=net_cold_streams,
+                net_streams=net_cold_streams,
                 k=k,
             )
         elif -dh > tol and cu_idx >= 0:
@@ -209,7 +209,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
                 dh_req=abs(dh),
                 utilities=cold_utilities_seq,
                 remaining=cold_remaining,
-                net_hot_streams=net_hot_streams,
+                net_streams=net_hot_streams,
                 k=k,
             )
 
