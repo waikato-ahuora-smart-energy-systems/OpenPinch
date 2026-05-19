@@ -78,24 +78,26 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     )
     if zone.config.DO_BALANCED_CC or zone.config.DO_AREA_TARGETING:
         pt.update(
-            get_balanced_CC(
-                pt.col[PT.H_HOT.value],
-                pt.col[PT.H_COLD.value],
-                pt.col[PT.H_HOT_UT.value],
-                pt.col[PT.H_COLD_UT.value],
+            **get_balanced_CC(
+                T_col=pt.col[PT.T.value],
+                H_hot=pt.col[PT.H_HOT.value],
+                H_cold=pt.col[PT.H_COLD.value],
+                H_hot_ut=pt.col[PT.H_HOT_UT.value],
+                H_cold_ut=pt.col[PT.H_COLD_UT.value],
             )
         )
         pt_real.update(
-            get_balanced_CC(
-                pt_real.col[PT.H_HOT.value],
-                pt_real.col[PT.H_COLD.value],
-                pt_real.col[PT.H_HOT_UT.value],
-                pt_real.col[PT.H_COLD_UT.value],
-                pt_real.col[PT.DELTA_T.value],
-                pt_real.col[PT.RCP_HOT.value],
-                pt_real.col[PT.RCP_COLD.value],
-                pt_real.col[PT.RCP_HOT_UT.value],
-                pt_real.col[PT.RCP_COLD_UT.value],
+            **get_balanced_CC(
+                T_col=pt_real.col[PT.T.value],
+                H_hot=pt_real.col[PT.H_HOT.value],
+                H_cold=pt_real.col[PT.H_COLD.value],
+                H_hot_ut=pt_real.col[PT.H_HOT_UT.value],
+                H_cold_ut=pt_real.col[PT.H_COLD_UT.value],
+                dT_vals=pt_real.col[PT.DELTA_T.value],
+                RCP_hot=pt_real.col[PT.RCP_HOT.value],
+                RCP_cold=pt_real.col[PT.RCP_COLD.value],
+                RCP_hot_ut=pt_real.col[PT.RCP_HOT_UT.value],
+                RCP_cold_ut=pt_real.col[PT.RCP_COLD_UT.value],
             )
         )
         # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC

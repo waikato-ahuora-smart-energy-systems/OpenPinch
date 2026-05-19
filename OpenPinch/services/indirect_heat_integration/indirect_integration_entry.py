@@ -6,7 +6,7 @@ utility balances after feasible inter-zone heat recovery.
 """
 
 from copy import deepcopy
-from typing import Dict, Tuple
+from typing import Tuple
 
 import numpy as np
 
@@ -15,6 +15,7 @@ from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import GT, PT, TT
+from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
 from ..common.problem_table_analysis import (
     get_heat_recovery_target_from_pt,
@@ -102,24 +103,19 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
         is_shifted=True, # Second shift of process streams to align with the real utility scale
     )
     pt.update(
-        _shift_site_process_profiles(
+        **_shift_site_process_profiles(
+            T_col=pt.col[PT.T.value],
             H_hot=pt.col[PT.H_HOT.value],
             H_cold=pt.col[PT.H_COLD.value],
         )
     )
     # Apply the problem table algorithm to subzone utility use
-    pt_ut = get_process_heat_cascade(
-        hot_streams=s_tzt.hot_utilities,
-        cold_streams=s_tzt.cold_utilities,
-        is_shifted=False,
-    )
-    pt.share_temperature_intervals(pt_ut)
     pt.update(
-        {
-            PT.H_NET_UT.value: (pt_ut.col[PT.H_HOT.value] - pt_ut.col[PT.H_COLD.value]) - (pt_ut.col[PT.H_HOT.value] - pt_ut.col[PT.H_COLD.value]).min(),
-            PT.H_HOT_UT.value: pt_ut.col[PT.H_HOT.value],
-            PT.H_COLD_UT.value: pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max(),
-        }
+        **_build_site_utility_profile(
+            hot_utilities=s_tzt.hot_utilities,
+            cold_utilities=s_tzt.cold_utilities,
+            is_shifted=False,
+        )
     )
 
     # Extract overall heat integration targets
@@ -191,12 +187,38 @@ def _compute_utility_cost(
 
 
 def _shift_site_process_profiles(
+    T_col: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
-) -> dict:
+) -> ProblemTableUpdateKwargs:
     return {
-        PT.H_HOT.value: H_hot - H_hot[0],
-        PT.H_COLD.value: H_cold - H_cold[-1],
+        "T_col": T_col,
+        "updates": {
+            PT.H_HOT.value: H_hot - H_hot[0],
+            PT.H_COLD.value: H_cold - H_cold[-1],
+        },
+    }
+
+
+def _build_site_utility_profile(
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    is_shifted: bool = False,
+) -> ProblemTableUpdateKwargs:
+    pt_ut = get_process_heat_cascade(
+        hot_streams=hot_utilities,
+        cold_streams=cold_utilities,
+        is_shifted=is_shifted,
+    )
+    h_net_ut = pt_ut.col[PT.H_HOT.value] - pt_ut.col[PT.H_COLD.value]
+    return {
+        "T_col": pt_ut.col[PT.T.value],
+        "updates": {
+            PT.H_NET_UT.value: h_net_ut - h_net_ut.min(),
+            PT.H_HOT_UT.value: pt_ut.col[PT.H_HOT.value],
+            PT.H_COLD_UT.value: pt_ut.col[PT.H_COLD.value]
+            - pt_ut.col[PT.H_COLD.value].max(),
+        },
     }
 
 

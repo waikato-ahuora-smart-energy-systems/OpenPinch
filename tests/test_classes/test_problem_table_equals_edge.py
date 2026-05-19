@@ -278,7 +278,10 @@ def test_row_mutation_update_sort_and_export_errors():
     assert pt.update({}) is pt
 
     with pytest.raises(ValueError, match="uninitialised"):
-        ProblemTable().update({PT.T.value: [1.0]})
+        ProblemTable().update(
+            {PT.H_NET.value: np.array([1.0])},
+            T_col=np.array([1.0]),
+        )
 
     pt.delete_row(1)
     assert len(pt) == n_before
@@ -291,3 +294,82 @@ def test_row_mutation_update_sort_and_export_errors():
 
     with pytest.raises(ValueError, match="uninitialised"):
         ProblemTable().export("x")
+
+
+def test_update_requires_T_col_for_non_empty_updates():
+    pt = _default_table()
+
+    with pytest.raises(TypeError, match="T_col"):
+        pt.update({PT.H_NET.value: np.array([1.0, 2.0])})
+
+
+@pytest.mark.parametrize(
+    ("T_col", "exc_type"),
+    [
+        ([200.0, 100.0], TypeError),
+        (np.array([[200.0, 100.0]]), ValueError),
+    ],
+)
+def test_update_rejects_invalid_T_col(T_col, exc_type):
+    pt = _default_table()
+
+    with pytest.raises(exc_type, match="1D numpy.ndarray"):
+        pt.update(
+            {PT.H_NET.value: np.array([1.0, 2.0])},
+            T_col=T_col,
+        )
+
+
+@pytest.mark.parametrize(
+    ("values", "exc_type"),
+    [
+        ([1.0, 2.0], TypeError),
+        (np.array([[1.0, 2.0]]), ValueError),
+    ],
+)
+def test_update_rejects_non_vector_numpy_column_values(values, exc_type):
+    pt = _default_table()
+
+    with pytest.raises(exc_type, match="1D numpy.ndarray"):
+        pt.update(
+            {PT.H_NET.value: values},
+            T_col=np.array([200.0, 100.0]),
+        )
+
+
+def test_update_rejects_unknown_or_temperature_columns():
+    pt = _default_table()
+
+    with pytest.raises(KeyError, match="not found"):
+        pt.update(
+            {"not_a_column": np.array([1.0, 2.0])},
+            T_col=np.array([200.0, 100.0]),
+        )
+
+    with pytest.raises(ValueError, match="temperature column"):
+        pt.update(
+            {PT.T.value: np.array([200.0, 100.0])},
+            T_col=np.array([200.0, 100.0]),
+        )
+
+
+def test_update_rejects_length_mismatch_against_T_col():
+    pt = _default_table()
+
+    with pytest.raises(ValueError, match="T_col"):
+        pt.update(
+            {PT.H_NET.value: np.array([1.0])},
+            T_col=np.array([200.0, 100.0]),
+        )
+
+
+def test_update_assigns_directly_when_temperature_grids_match():
+    pt = _default_table()
+
+    out = pt.update(
+        {PT.H_NET.value: np.array([3.0, 4.0])},
+        T_col=np.array([200.0 + 1e-7, 100.0 - 1e-7]),
+    )
+
+    assert out is pt
+    assert pt.col[PT.H_NET.value].tolist() == [3.0, 4.0]

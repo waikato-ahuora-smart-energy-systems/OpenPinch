@@ -68,9 +68,12 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
         hp,
         "get_utility_heat_cascade",
         lambda **_kwargs: {
-            PT.H_NET_UT.value: np.array([0.0, 0.0]),
-            PT.H_HOT_UT.value: np.array([0.0, 0.0]),
-            PT.H_COLD_UT.value: np.array([0.0, 0.0]),
+            "T_col": np.array([120.0, 60.0]),
+            "updates": {
+                PT.H_NET_UT.value: np.array([0.0, 0.0]),
+                PT.H_HOT_UT.value: np.array([0.0, 0.0]),
+                PT.H_COLD_UT.value: np.array([0.0, 0.0]),
+            },
         },
     )
     ambient_hot = np.array([-4.0, 1.0]) if q_amb_hot > 0.0 else np.zeros(2)
@@ -140,9 +143,12 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
         hp,
         "get_utility_heat_cascade",
         lambda **kwargs: {
-            PT.H_NET_UT.value: np.zeros(len(kwargs["T_int_vals"])),
-            PT.H_HOT_UT.value: np.zeros(len(kwargs["T_int_vals"])),
-            PT.H_COLD_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+            "T_col": np.array(kwargs["T_int_vals"], dtype=float),
+            "updates": {
+                PT.H_NET_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+                PT.H_HOT_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+                PT.H_COLD_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+            },
         },
     )
 

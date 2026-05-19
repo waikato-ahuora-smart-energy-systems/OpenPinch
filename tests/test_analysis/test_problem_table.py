@@ -418,6 +418,38 @@ def test_share_temperature_intervals_rejects_non_problem_table():
         pt.share_temperature_intervals("not-a-problem-table")
 
 
+def test_update_expands_target_to_union_of_source_temperature_intervals():
+    pt = ProblemTable({PT.T.value: [300.0, 100.0]})
+
+    pt.update(
+        {
+            PT.H_NET_UT.value: np.array([0.0, 40.0, 100.0]),
+            PT.RCP_HOT_UT.value: np.array([0.0, 3.0, 5.0]),
+        },
+        T_col=np.array([300.0, 200.0, 100.0]),
+    )
+
+    assert pt.col[PT.T.value].tolist() == [300.0, 200.0, 100.0]
+    assert np.allclose(pt.col[PT.H_NET_UT.value], np.array([0.0, 40.0, 100.0]))
+    assert np.allclose(pt.col[PT.RCP_HOT_UT.value], np.array([0.0, 3.0, 5.0]))
+
+
+def test_update_interpolates_cumulative_columns_and_splits_interval_properties():
+    pt = ProblemTable({PT.T.value: [300.0, 200.0, 100.0]})
+
+    pt.update(
+        {
+            PT.H_NET_UT.value: np.array([0.0, 100.0]),
+            PT.RCP_HOT_UT.value: np.array([0.0, 5.0]),
+        },
+        T_col=np.array([300.0, 100.0]),
+    )
+
+    assert pt.col[PT.T.value].tolist() == [300.0, 200.0, 100.0]
+    assert np.allclose(pt.col[PT.H_NET_UT.value], np.array([0.0, 50.0, 100.0]))
+    assert np.allclose(pt.col[PT.RCP_HOT_UT.value], np.array([0.0, 5.0, 5.0]))
+
+
 @pytest.mark.parametrize(
     "input_vals, expected",
     [

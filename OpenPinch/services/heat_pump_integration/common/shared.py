@@ -703,7 +703,7 @@ def _get_hpr_cascade(
         is_shifted=False,
     )
     pt.update(
-        get_utility_heat_cascade(
+        **get_utility_heat_cascade(
             pt.col[PT.T.value],
             hot_streams,
             cold_streams,

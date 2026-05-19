@@ -304,27 +304,30 @@ def _calc_hpr_cascade(
         pt.col[PT.H_NET_COLD.value] += pt_air.col[PT.H_NET_COLD.value]
 
     # Heat pump or refrigeration cascade
-    pt_hpr = get_utility_heat_cascade(
+    hpr_profile = get_utility_heat_cascade(
         T_int_vals=pt.col[PT.T.value],
         hot_utilities=res.hpr_hot_streams,
         cold_utilities=res.hpr_cold_streams,
         is_shifted=is_T_vals_shifted,
     )
+    hpr_updates = hpr_profile["updates"]
     if is_heat_pumping:
         pt.update(
-            {
-                PT.H_NET_HP.value: pt_hpr[PT.H_NET_UT.value],
-                PT.H_HOT_HP.value: pt_hpr[PT.H_HOT_UT.value],
-                PT.H_COLD_HP.value: pt_hpr[PT.H_COLD_UT.value],
-            }
+            T_col=hpr_profile["T_col"],
+            updates={
+                PT.H_NET_HP.value: hpr_updates[PT.H_NET_UT.value],
+                PT.H_HOT_HP.value: hpr_updates[PT.H_HOT_UT.value],
+                PT.H_COLD_HP.value: hpr_updates[PT.H_COLD_UT.value],
+            },
         )
     else:
         pt.update(
-            {
-                PT.H_NET_RFRG.value: pt_hpr[PT.H_NET_UT.value],
-                PT.H_HOT_RFRG.value: pt_hpr[PT.H_HOT_UT.value],
-                PT.H_COLD_RFRG.value: pt_hpr[PT.H_COLD_UT.value],
-            }
+            T_col=hpr_profile["T_col"],
+            updates={
+                PT.H_NET_RFRG.value: hpr_updates[PT.H_NET_UT.value],
+                PT.H_HOT_RFRG.value: hpr_updates[PT.H_HOT_UT.value],
+                PT.H_COLD_RFRG.value: hpr_updates[PT.H_COLD_UT.value],
+            },
         )
 
     return pt

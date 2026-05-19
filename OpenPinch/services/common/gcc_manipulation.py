@@ -1,12 +1,13 @@
 """Determine various forms of the grand composite curve."""
 
-from typing import Dict, Tuple
+from typing import Tuple
 
 import numpy as np
 
 from ...classes.problem_table import ProblemTable
 from ...lib.config import tol
 from ...lib.enums import PT
+from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...utils.miscellaneous import delta_with_zero_at_start, linear_interpolation
 
 
@@ -54,20 +55,28 @@ def get_additional_GCCs(
 
     if do_vert_cc_calc:
         pt.update(
-            get_GCC_with_vertical_heat_transfer(
-                pt.col[PT.H_COLD.value],
-                pt.col[PT.H_HOT.value],
-                pt.col[PT.H_NET.value],
+            **get_GCC_with_vertical_heat_transfer(
+                T_col=pt.col[PT.T.value],
+                h_cold=pt.col[PT.H_COLD.value],
+                h_hot=pt.col[PT.H_HOT.value],
+                h_net=pt.col[PT.H_NET.value],
             )
         )
 
     if do_assisted_ht_calc:
-        pt.update(get_GGC_pockets(pt))
+        pt.update(**get_GGC_pockets(pt))
 
-    pt.update(get_GCC_needing_utility(pt.col[PT.H_NET_NP.value]))
     pt.update(
-        get_seperated_gcc_heat_load_profiles(
-            pt.col[PT.H_NET_A.value], is_process_stream=is_process_stream
+        **get_GCC_needing_utility(
+            T_col=pt.col[PT.T.value],
+            h_net=pt.col[PT.H_NET_NP.value],
+        )
+    )
+    pt.update(
+        **get_seperated_gcc_heat_load_profiles(
+            T_col=pt.col[PT.T.value],
+            H_net=pt.col[PT.H_NET_A.value],
+            is_process_stream=is_process_stream,
         )
     )
     return pt
@@ -129,10 +138,11 @@ def get_GCC_with_partial_pockets(
 
 
 def get_GCC_with_vertical_heat_transfer(
+    T_col: np.ndarray,
     h_cold: np.ndarray,
     h_hot: np.ndarray,
     h_net: np.ndarray,
-) -> Dict[str, np.ndarray]:
+) -> ProblemTableUpdateKwargs:
     """Return the extreme GCC where heat transfer on the composite curves is vertical."""
     h_cold = np.asarray(h_cold)
     h_hot = np.asarray(h_hot)
@@ -147,30 +157,31 @@ def get_GCC_with_vertical_heat_transfer(
         cu_tar - h_hot,
         base,
     )
-    return {PT.H_NET_V.value: h_net_v}
+    return {"T_col": T_col, "updates": {PT.H_NET_V.value: h_net_v}}
 
 
 def get_GCC_needing_utility(
+    T_col: np.ndarray,
     h_net: np.ndarray,
-) -> Dict[str, np.ndarray]:
+) -> ProblemTableUpdateKwargs:
     """Return the actual GCC."""
-    return {PT.H_NET_A.value: h_net}
+    return {"T_col": T_col, "updates": {PT.H_NET_A.value: h_net}}
 
 
-def get_GGC_pockets(pt: ProblemTable) -> Dict[str, np.ndarray]:
+def get_GGC_pockets(pt: ProblemTable) -> ProblemTableUpdateKwargs:
     """Store GCC pocket contribution (difference between real and pocket-free profiles)."""
     h_net_pk = np.subtract(pt.col[PT.H_NET.value], pt.col[PT.H_NET_NP.value])
     pt.col[PT.H_NET_PK.value] = h_net_pk
-    return {PT.H_NET_PK.value: h_net_pk}
+    return {"T_col": pt.col[PT.T.value], "updates": {PT.H_NET_PK.value: h_net_pk}}
 
 
 def get_seperated_gcc_heat_load_profiles(
+    T_col: np.ndarray,
     H_net,
     rcp_net: np.ndarray = None,
     is_process_stream: bool = True,
-) -> Dict[str, np.ndarray]:
+) -> ProblemTableUpdateKwargs:
     """Determines the net required heating or cooling profile of a system from the GCC."""
-
     # Calculate ΔH differences
     dh_diff = delta_with_zero_at_start(H_net)
 
@@ -201,7 +212,7 @@ def get_seperated_gcc_heat_load_profiles(
         hut_max = -hot_profile[-1]
         hot_profile = hot_profile + hut_max
 
-    return (
+    updates = (
         {
             PT.H_NET_HOT.value: hot_profile,
             PT.H_NET_COLD.value: cold_profile,
@@ -214,6 +225,7 @@ def get_seperated_gcc_heat_load_profiles(
             PT.RCP_COLD_UT.value: rcp_cold,
         }
     )
+    return {"T_col": T_col, "updates": updates}
 
 
 #######################################################################################################

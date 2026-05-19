@@ -222,8 +222,11 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         hp_shared,
         "get_utility_heat_cascade",
         lambda *args, **kwargs: {
-            PT.H_HOT_UT.value: np.array([5.0, 0.0]),
-            PT.H_COLD_UT.value: np.array([3.0, 0.0]),
+            "T_col": np.array([120.0, 80.0]),
+            "updates": {
+                PT.H_HOT_UT.value: np.array([5.0, 0.0]),
+                PT.H_COLD_UT.value: np.array([3.0, 0.0]),
+            },
         },
     )
 

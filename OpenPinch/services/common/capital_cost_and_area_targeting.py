@@ -1,11 +1,10 @@
 """Area targeting methods."""
 
 import numpy as np
-
-from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
 from ...lib.config import Configuration, tol
 from ...lib.enums import PT
+from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...utils.costing import compute_annual_capital_cost, compute_capital_cost
 from ...utils.heat_exchanger import compute_LMTD_from_dts
 from ...utils.miscellaneous import clean_composite_curve_ends
@@ -62,6 +61,7 @@ def get_capital_cost_targets(
 
 
 def get_balanced_CC(
+    T_col: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
     H_hot_ut: np.ndarray,
@@ -71,7 +71,7 @@ def get_balanced_CC(
     RCP_cold: np.ndarray = None,
     RCP_hot_ut: np.ndarray = None,
     RCP_cold_ut: np.ndarray = None,
-) -> ProblemTable:
+) -> ProblemTableUpdateKwargs:
     """Creates the balanced Composite Curve (CC) using both process and utility streams."""
     H_hot_bal = H_hot + H_hot_ut
     H_cold_bal = H_cold + H_cold_ut
@@ -122,7 +122,7 @@ def get_balanced_CC(
                 PT.R_COLD_BAL.value: R_cold_bal,
             }
         )
-    return res
+    return {"T_col": T_col, "updates": res}
 
 
 def get_area_targets(

@@ -11,47 +11,12 @@ from typing import List, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 
+from ._problem_table_constants import HEAT_CAPACITY_PAIRS, INTERPOLATION_KEYS
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
+from ..lib.problem_table_types import ProblemTableColumnUpdates
 
 PT = ProblemTableLabel
-INTERPOLATION_KEYS = (
-    PT.H_HOT.value,
-    PT.H_COLD.value,
-    PT.H_NET.value,
-    PT.H_NET_NP.value,
-    PT.H_NET_A.value,
-    PT.H_NET_V.value,
-    PT.H_NET_PK.value,
-    PT.H_NET_AI.value,
-    PT.H_NET_UT.value,
-    PT.H_NET_HOT.value,
-    PT.H_NET_COLD.value,
-    PT.H_NET_W_AIR.value,
-    PT.H_NET_HP.value,
-    PT.H_NET_RFRG.value,
-    PT.H_HOT_UT.value,
-    PT.H_COLD_UT.value,
-    PT.H_HOT_BAL.value,
-    PT.H_COLD_BAL.value,
-    PT.H_HOT_HP.value,
-    PT.H_COLD_HP.value,
-    PT.H_NET_HOT_AFTR_HP.value,
-    PT.H_NET_COLD_AFTR_HP.value,
-    PT.H_NET_HOT_UT_AFTR_HP.value,
-    PT.H_NET_COLD_UT_AFTR_HP.value,
-    PT.H_HOT_RFRG.value,
-    PT.H_COLD_RFRG.value,
-    PT.H_NET_HOT_AFTR_RFRG.value,
-    PT.H_NET_COLD_AFTR_RFRG.value,
-    PT.H_NET_HOT_UT_AFTR_RFRG.value,
-    PT.H_NET_COLD_UT_AFTR_RFRG.value,
-)
-HEAT_CAPACITY_PAIRS = (
-    (PT.CP_HOT.value, PT.DELTA_H_HOT.value),
-    (PT.CP_COLD.value, PT.DELTA_H_COLD.value),
-    (PT.CP_NET.value, PT.DELTA_H_NET.value),
-)
 
 
 class ProblemTable:
@@ -874,18 +839,82 @@ class ProblemTable:
             if key in self.col_index:
                 self.data[index, self.col_index[key]] = value
 
+    def _validate_T_col(self, T_col: np.ndarray | None) -> np.ndarray:
+        """Validate and cast the source temperature column used to align updates."""
+        if T_col is None:
+            raise TypeError("`T_col` is required when updates are provided.")
+        if not isinstance(T_col, np.ndarray):
+            raise TypeError("`T_col` must be a 1D numpy.ndarray.")
+        if T_col.ndim != 1:
+            raise ValueError("`T_col` must be a 1D numpy.ndarray.")
+        try:
+            return T_col.astype(float, copy=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("`T_col` must contain numeric temperature values.") from exc
+
+    def _validate_updates(
+        self, updates: ProblemTableColumnUpdates, T_col: np.ndarray
+    ) -> ProblemTableColumnUpdates:
+        """Validate update payloads and normalise keys to canonical column names."""
+        if not isinstance(updates, dict):
+            raise TypeError("`updates` must be a dictionary of ProblemTable columns.")
+
+        expected_len = T_col.shape[0]
+        normalised: ProblemTableColumnUpdates = {}
+
+        for key, values in updates.items():
+            col_name = key.value if isinstance(key, ProblemTableLabel) else key
+            if col_name == PT.T.value:
+                raise ValueError(
+                    "`ProblemTable.update()` does not accept updates to the "
+                    "temperature column. Use interval helpers or construct a "
+                    "new ProblemTable instead."
+                )
+            if col_name not in self.col_index:
+                raise KeyError(f"Column {col_name} not found")
+            if not isinstance(values, np.ndarray):
+                raise TypeError(
+                    f"Update for column {col_name} must be a 1D numpy.ndarray."
+                )
+            if values.ndim != 1:
+                raise ValueError(
+                    f"Update for column {col_name} must be a 1D numpy.ndarray."
+                )
+            if values.shape[0] != expected_len:
+                raise ValueError(
+                    f"Update for column {col_name} has length {values.shape[0]} but "
+                    f"`T_col` has length {expected_len}."
+                )
+            normalised[col_name] = values
+
+        return normalised
     def update(
         self,
-        updates: dict,
+        updates: ProblemTableColumnUpdates | None = None,
+        T_col: np.ndarray | None = None,
     ) -> "ProblemTable":
-        """Assign column values in-place using a mapping of ``column -> iterable``."""
+        """Assign aligned column values in-place using an explicit source T column."""
         if not updates:
             return self
         if self.data is None:
             raise ValueError("Cannot update columns on an uninitialised ProblemTable.")
 
-        for key, values in updates.items():
-            col_name = key.value if isinstance(key, ProblemTableLabel) else key
+        T_col = self._validate_T_col(T_col)
+        updates = self._validate_updates(updates, T_col)
+        target_temperatures = np.asarray(self.col[PT.T.value], dtype=float)
+
+        if target_temperatures.shape != T_col.shape or not np.allclose(
+            a=target_temperatures,
+            b=T_col,
+            atol=tol,
+            rtol=tol,
+        ):
+            source_pt = ProblemTable({PT.T.value: T_col, **updates})
+            self.share_temperature_intervals(source_pt)
+            for col_name in updates:
+                updates[col_name] = source_pt.col[col_name]
+
+        for col_name, values in updates.items():
             self.col[col_name] = values
 
         return self
