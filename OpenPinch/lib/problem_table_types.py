@@ -4,7 +4,10 @@ from typing import TypeAlias, TypedDict
 
 import numpy as np
 
-ProblemTableColumnUpdates: TypeAlias = dict[str, np.ndarray]
+from .enums import ProblemTableLabel
+
+ProblemTableColumnKey: TypeAlias = str | ProblemTableLabel
+ProblemTableColumnUpdates: TypeAlias = dict[ProblemTableColumnKey, np.ndarray]
 
 
 class ProblemTableUpdateKwargs(TypedDict):

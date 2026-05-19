@@ -142,10 +142,8 @@ def _compute_brayton_hp_system_obj(
     )
 
     w_hpr = sum([hp.work_net for hp in hp_list])
-    c = (
-        pt_gas_cooler.col[PT.H_NET.value][-1] + pt_gas_heater.col[PT.H_NET.value][0]
-    ) * 10
-    Q_ext = pt_gas_cooler.col[PT.H_NET.value][0]
+    c = (pt_gas_cooler[PT.H_NET][-1] + pt_gas_heater[PT.H_NET][0]) * 10
+    Q_ext = pt_gas_cooler[PT.H_NET][0]
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     cop = (args.Q_hpr_target - Q_ext) / (w_hpr + 1e-9)
     # Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)

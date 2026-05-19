@@ -89,9 +89,9 @@ def _make_problem_table(values):
     """Small ProblemTable with a few populated numeric columns."""
     return ProblemTable(
         {
-            PT.T.value: values,
-            PT.H_HOT.value: [v * 1.1 for v in values],
-            PT.H_COLD.value: [v * 2.2 for v in values],
+            PT.T: values,
+            PT.H_HOT: [v * 1.1 for v in values],
+            PT.H_COLD: [v * 2.2 for v in values],
         }
     )
 

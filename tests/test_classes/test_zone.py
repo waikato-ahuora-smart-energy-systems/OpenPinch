@@ -9,7 +9,7 @@ from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 
 def _dummy_problem_table():
-    return ProblemTable({PT.T.value: [0.0]})
+    return ProblemTable({PT.T: [0.0]})
 
 
 @pytest.fixture

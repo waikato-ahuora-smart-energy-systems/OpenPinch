@@ -52,17 +52,17 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
 ):
     pt = ProblemTable(
         {
-            PT.T.value: [120.0, 60.0],
-            PT.H_NET_A.value: [1.0, 1.0],
-            PT.H_NET_HOT.value: [2.0, 2.0],
-            PT.H_NET_COLD.value: [3.0, 3.0],
+            PT.T: [120.0, 60.0],
+            PT.H_NET_A: [1.0, 1.0],
+            PT.H_NET_HOT: [2.0, 2.0],
+            PT.H_NET_COLD: [3.0, 3.0],
         }
     )
 
     monkeypatch.setattr(
         hp,
         "create_problem_table_with_t_int",
-        lambda streams, is_shifted=True: ProblemTable({PT.T.value: [120.0, 60.0]}),
+        lambda streams, is_shifted=True: ProblemTable({PT.T: [120.0, 60.0]}),
     )
     monkeypatch.setattr(
         hp,
@@ -70,9 +70,9 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
         lambda **_kwargs: {
             "T_col": np.array([120.0, 60.0]),
             "updates": {
-                PT.H_NET_UT.value: np.array([0.0, 0.0]),
-                PT.H_HOT_UT.value: np.array([0.0, 0.0]),
-                PT.H_COLD_UT.value: np.array([0.0, 0.0]),
+                PT.H_NET_UT: np.array([0.0, 0.0]),
+                PT.H_HOT_UT: np.array([0.0, 0.0]),
+                PT.H_COLD_UT: np.array([0.0, 0.0]),
             },
         },
     )
@@ -105,9 +105,9 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
         is_heat_pumping=True,
     )
     assert isinstance(out, ProblemTable)
-    np.testing.assert_allclose(out.col[PT.H_NET_HOT.value], expected_hot)
-    np.testing.assert_allclose(out.col[PT.H_NET_COLD.value], expected_cold)
-    np.testing.assert_allclose(out.col[PT.H_NET_W_AIR.value], expected_w_air)
+    np.testing.assert_allclose(out[PT.H_NET_HOT], expected_hot)
+    np.testing.assert_allclose(out[PT.H_NET_COLD], expected_cold)
+    np.testing.assert_allclose(out[PT.H_NET_W_AIR], expected_w_air)
 
 
 def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
@@ -115,29 +115,27 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
 ):
     pt = ProblemTable(
         {
-            PT.T.value: [120.0, 60.0],
-            PT.H_NET_A.value: [1.0, 1.0],
-            PT.H_NET_HOT.value: [2.0, 2.0],
-            PT.H_NET_COLD.value: [3.0, 3.0],
+            PT.T: [120.0, 60.0],
+            PT.H_NET_A: [1.0, 1.0],
+            PT.H_NET_HOT: [2.0, 2.0],
+            PT.H_NET_COLD: [3.0, 3.0],
         }
     )
 
     monkeypatch.setattr(
         hp,
         "create_problem_table_with_t_int",
-        lambda streams, is_shifted=True: ProblemTable(
-            {PT.T.value: [120.0, 100.0, 60.0]}
-        ),
+        lambda streams, is_shifted=True: ProblemTable({PT.T: [120.0, 100.0, 60.0]}),
     )
     monkeypatch.setattr(
         hp,
         "get_process_heat_cascade",
         lambda **_kwargs: ProblemTable(
             {
-                PT.T.value: [120.0, 90.0, 60.0],
-                PT.H_NET.value: [6.0, 3.0, 0.0],
-                PT.H_NET_HOT.value: [0.0, 3.0, 6.0],
-                PT.H_NET_COLD.value: [6.0, 3.0, 0.0],
+                PT.T: [120.0, 90.0, 60.0],
+                PT.H_NET: [6.0, 3.0, 0.0],
+                PT.H_NET_HOT: [0.0, 3.0, 6.0],
+                PT.H_NET_COLD: [6.0, 3.0, 0.0],
             }
         ),
     )
@@ -147,9 +145,9 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
         lambda **kwargs: {
             "T_col": np.array(kwargs["T_int_vals"], dtype=float),
             "updates": {
-                PT.H_NET_UT.value: np.zeros(len(kwargs["T_int_vals"])),
-                PT.H_HOT_UT.value: np.zeros(len(kwargs["T_int_vals"])),
-                PT.H_COLD_UT.value: np.zeros(len(kwargs["T_int_vals"])),
+                PT.H_NET_UT: np.zeros(len(kwargs["T_int_vals"])),
+                PT.H_HOT_UT: np.zeros(len(kwargs["T_int_vals"])),
+                PT.H_COLD_UT: np.zeros(len(kwargs["T_int_vals"])),
             },
         },
     )
@@ -171,18 +169,10 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
         is_heat_pumping=True,
     )
 
-    np.testing.assert_allclose(
-        out.col[PT.T.value], np.array([120.0, 100.0, 90.0, 60.0])
-    )
-    np.testing.assert_allclose(
-        out.col[PT.H_NET_W_AIR.value], np.array([7.0, 5.0, 4.0, 1.0])
-    )
-    np.testing.assert_allclose(
-        out.col[PT.H_NET_HOT.value], np.array([2.0, 4.0, 5.0, 8.0])
-    )
-    np.testing.assert_allclose(
-        out.col[PT.H_NET_COLD.value], np.array([9.0, 7.0, 6.0, 3.0])
-    )
+    np.testing.assert_allclose(out[PT.T], np.array([120.0, 100.0, 90.0, 60.0]))
+    np.testing.assert_allclose(out[PT.H_NET_W_AIR], np.array([7.0, 5.0, 4.0, 1.0]))
+    np.testing.assert_allclose(out[PT.H_NET_HOT], np.array([2.0, 4.0, 5.0, 8.0]))
+    np.testing.assert_allclose(out[PT.H_NET_COLD], np.array([9.0, 7.0, 6.0, 3.0]))
 
 
 def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
@@ -227,15 +217,15 @@ def test_public_heat_pump_service_package_does_not_export_profile_helper():
 def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
     pt = ProblemTable(
         {
-            PT.T.value: [120.0, 80.0],
-            PT.H_NET_HOT.value: [8.0, 2.0],
-            PT.H_NET_COLD.value: [1.0, 6.0],
-            PT.H_HOT_UT.value: [0.0, 3.0],
-            PT.H_COLD_UT.value: [4.0, 0.0],
-            PT.H_HOT_HP.value: [0.0, 5.0],
-            PT.H_COLD_HP.value: [3.0, 0.0],
-            PT.H_NET_W_AIR.value: [4.0, 1.0],
-            PT.H_NET_HP.value: [2.0, -2.0],
+            PT.T: [120.0, 80.0],
+            PT.H_NET_HOT: [8.0, 2.0],
+            PT.H_NET_COLD: [1.0, 6.0],
+            PT.H_HOT_UT: [0.0, 3.0],
+            PT.H_COLD_UT: [4.0, 0.0],
+            PT.H_HOT_HP: [0.0, 5.0],
+            PT.H_COLD_HP: [3.0, 0.0],
+            PT.H_NET_W_AIR: [4.0, 1.0],
+            PT.H_NET_HP: [2.0, -2.0],
         }
     )
 

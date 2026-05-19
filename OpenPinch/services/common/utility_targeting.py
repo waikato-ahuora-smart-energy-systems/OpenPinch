@@ -54,16 +54,16 @@ def get_utility_targets(
         is_real_temperatures = False
         _target_utility(
             hot_utilities,
-            pt.col[PT.T.value],
-            pt.col[PT.H_NET_COLD.value],
+            pt[PT.T],
+            pt[PT.H_NET_COLD],
             hot_pinch_row,
             cold_pinch_row,
             is_real_temperatures,
         )
         _target_utility(
             cold_utilities,
-            pt.col[PT.T.value],
-            pt.col[PT.H_NET_HOT.value],
+            pt[PT.T],
+            pt[PT.H_NET_HOT],
             hot_pinch_row,
             cold_pinch_row,
             is_real_temperatures,
@@ -71,7 +71,7 @@ def get_utility_targets(
 
     pt.update(
         **get_utility_heat_cascade(
-            T_int_vals=pt.col[PT.T.value],
+            T_int_vals=pt[PT.T],
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             is_shifted=True,
@@ -79,16 +79,16 @@ def get_utility_targets(
     )
     pt.update(
         **get_seperated_gcc_heat_load_profiles(
-            T_col=pt.col[PT.T.value],
-            H_net=pt.col[PT.H_NET_UT.value],
-            rcp_net=pt.col[PT.RCP_UT_NET.value],
+            T_col=pt[PT.T],
+            H_net=pt[PT.H_NET_UT],
+            rcp_net=pt[PT.RCP_UT_NET],
             is_process_stream=False,
         )
     )
     if isinstance(pt_real, ProblemTable):
         pt_real.update(
             **get_utility_heat_cascade(
-                T_int_vals=pt_real.col[PT.T.value],
+                T_int_vals=pt_real[PT.T],
                 hot_utilities=hot_utilities,
                 cold_utilities=cold_utilities,
                 is_shifted=False,
@@ -96,9 +96,9 @@ def get_utility_targets(
         )
         pt_real.update(
             **get_seperated_gcc_heat_load_profiles(
-                T_col=pt_real.col[PT.T.value],
-                H_net=pt_real.col[PT.H_NET_UT.value],
-                rcp_net=pt_real.col[PT.RCP_UT_NET.value],
+                T_col=pt_real[PT.T],
+                H_net=pt_real[PT.H_NET_UT],
+                rcp_net=pt_real[PT.RCP_UT_NET],
                 is_process_stream=False,
             )
         )

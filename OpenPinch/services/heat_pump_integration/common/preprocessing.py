@@ -221,15 +221,15 @@ def _add_T_amb_interval(
     dt_phase_change: float,
     is_cold: bool,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    H_label = PT.H_NET_COLD.value if is_cold else PT.H_NET_HOT.value
-    pt = ProblemTable({PT.T.value: T_vals, H_label: H_vals})
+    H_label = PT.H_NET_COLD if is_cold else PT.H_NET_HOT
+    pt = ProblemTable({PT.T: T_vals, H_label: H_vals})
     T_amb_ls = (
         [T_amb, T_amb + dt_phase_change]
         if is_cold
         else [T_amb, T_amb - dt_phase_change]
     )
     pt.insert_temperature_interval(T_amb_ls)
-    return pt.col[PT.T.value], pt.col[H_label]
+    return pt[PT.T], pt[H_label]
 
 
 def _extend_profile_with_temperature_margin(

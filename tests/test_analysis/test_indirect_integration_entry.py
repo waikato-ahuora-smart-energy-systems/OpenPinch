@@ -30,23 +30,21 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
 
     site_pt = ProblemTable(
         {
-            PT.T.value: [300.0, 100.0],
-            PT.H_HOT.value: [30.0, 10.0],
-            PT.H_COLD.value: [5.0, 0.0],
+            PT.T: [300.0, 100.0],
+            PT.H_HOT: [30.0, 10.0],
+            PT.H_COLD: [5.0, 0.0],
         }
     )
     utility_pt = ProblemTable(
         {
-            PT.T.value: [300.0, 200.0, 100.0],
-            PT.H_HOT.value: [40.0, 25.0, 10.0],
-            PT.H_COLD.value: [8.0, 4.0, 1.0],
+            PT.T: [300.0, 200.0, 100.0],
+            PT.H_HOT: [40.0, 25.0, 10.0],
+            PT.H_COLD: [8.0, 4.0, 1.0],
         }
     )
-    expected_h_net_ut = utility_pt.col[PT.H_HOT.value] - utility_pt.col[PT.H_COLD.value]
+    expected_h_net_ut = utility_pt[PT.H_HOT] - utility_pt[PT.H_COLD]
     expected_h_net_ut = expected_h_net_ut - expected_h_net_ut.min()
-    expected_h_cold_ut = (
-        utility_pt.col[PT.H_COLD.value] - utility_pt.col[PT.H_COLD.value].max()
-    )
+    expected_h_cold_ut = utility_pt[PT.H_COLD] - utility_pt[PT.H_COLD].max()
 
     calls = {"count": 0}
 
@@ -72,7 +70,7 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     target = indirect.compute_indirect_integration_targets(zone)
 
     assert calls["count"] == 2
-    assert target.pt.col[PT.T.value].tolist() == [300.0, 200.0, 100.0]
-    assert np.allclose(target.pt.col[PT.H_NET_UT.value], expected_h_net_ut)
-    assert np.allclose(target.pt.col[PT.H_HOT_UT.value], utility_pt.col[PT.H_HOT.value])
-    assert np.allclose(target.pt.col[PT.H_COLD_UT.value], expected_h_cold_ut)
+    assert target.pt[PT.T].tolist() == [300.0, 200.0, 100.0]
+    assert np.allclose(target.pt[PT.H_NET_UT], expected_h_net_ut)
+    assert np.allclose(target.pt[PT.H_HOT_UT], utility_pt[PT.H_HOT])
+    assert np.allclose(target.pt[PT.H_COLD_UT], expected_h_cold_ut)

@@ -61,7 +61,7 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.CC.value,
                 data=target_graphs[GT.CC.value],
                 label="Composite Curve",
-                value_field=[PT.H_HOT.value, PT.H_COLD.value],
+                value_field=[PT.H_HOT, PT.H_COLD],
                 stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
             )
         )
@@ -73,7 +73,7 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.SCC.value,
                 data=target_graphs[GT.SCC.value],
                 label="Shifted Composite Curve",
-                value_field=[PT.H_HOT.value, PT.H_COLD.value],
+                value_field=[PT.H_HOT, PT.H_COLD],
                 stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
             )
         )
@@ -85,7 +85,7 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.BCC.value,
                 data=target_graphs[GT.BCC.value],
                 label="Balanced Composite Curve",
-                value_field=[PT.H_HOT_BAL.value, PT.H_COLD_BAL.value],
+                value_field=[PT.H_HOT_BAL, PT.H_COLD_BAL],
                 stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
                 include_arrows=True,
             )
@@ -99,11 +99,11 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 data=target_graphs[GT.GCC.value],
                 label="Grand Composite Curve",
                 value_field=[
-                    PT.H_NET.value,
-                    PT.H_NET_NP.value,
-                    PT.H_NET_V.value,
-                    PT.H_NET_A.value,
-                    PT.H_NET_UT.value,
+                    PT.H_NET,
+                    PT.H_NET_NP,
+                    PT.H_NET_V,
+                    PT.H_NET_A,
+                    PT.H_NET_UT,
                 ],
                 is_utility_profile=[False, False, False, False, True],
             )
@@ -117,12 +117,12 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 data=target_graphs[GT.NLP.value],
                 label="Net Load Curves",
                 value_field=[
-                    PT.H_NET_HOT.value,
-                    PT.H_NET_COLD.value,
-                    PT.H_HOT_UT.value,
-                    PT.H_COLD_UT.value,
-                    PT.H_HOT_HP.value,
-                    PT.H_COLD_HP.value,
+                    PT.H_NET_HOT,
+                    PT.H_NET_COLD,
+                    PT.H_HOT_UT,
+                    PT.H_COLD_UT,
+                    PT.H_HOT_HP,
+                    PT.H_COLD_HP,
                 ],
                 stream_type=[
                     StreamLoc.HotS,
@@ -143,10 +143,10 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.TSP.value,
                 data=target_graphs[GT.TSP.value],
                 value_field=[
-                    PT.H_HOT.value,
-                    PT.H_COLD.value,
-                    PT.H_HOT_UT.value,
-                    PT.H_COLD_UT.value,
+                    PT.H_HOT,
+                    PT.H_COLD,
+                    PT.H_HOT_UT,
+                    PT.H_COLD_UT,
                 ],
                 stream_type=[
                     StreamLoc.HotS,
@@ -166,7 +166,7 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.SUGCC.value,
                 data=target_graphs[GT.SUGCC.value],
                 label="Site Utility Grand Composite Curve",
-                value_field=[PT.H_NET_UT.value],
+                value_field=[PT.H_NET_UT],
                 is_utility_profile=[True],
             )
         )
@@ -178,7 +178,7 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.GCC_HP.value,
                 data=target_graphs[GT.GCC_HP.value],
                 label="Grand Composite Curve with Heat Pump",
-                value_field=[PT.H_NET_W_AIR.value, PT.H_NET_HP.value],
+                value_field=[PT.H_NET_W_AIR, PT.H_NET_HP],
                 is_utility_profile=[False, True],
             )
         )
@@ -204,7 +204,7 @@ def _make_composite_graph(
     include_arrows: bool = True,
     decolour: bool = False,
 ):
-    temperatures = _column_to_list(data, PT.T.value)
+    temperatures = _column_to_list(data, PT.T)
     fields = _normalise_graph_fields(value_field)
     stream_types = _normalise_graph_values(
         stream_type,
@@ -405,7 +405,7 @@ def _make_gcc_graph(
     is_utility_profile: bool = False,
     decolour: bool = False,
 ):
-    temperatures = _column_to_list(data, PT.T.value)
+    temperatures = _column_to_list(data, PT.T)
     fields = _normalise_graph_fields(value_field)
     flags = _normalise_gcc_flags(is_utility_profile, len(fields))
     segments: List[dict] = []
@@ -553,7 +553,7 @@ def _column_to_list(data, column_key: str) -> List[float]:
 
     try:
         if isinstance(data, ProblemTable):
-            column = data.col[column_key]
+            column = data[column_key]
         elif (
             hasattr(data, "col")
             and hasattr(data, "columns")

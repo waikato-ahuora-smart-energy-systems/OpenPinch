@@ -212,9 +212,9 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         "create_problem_table_with_t_int",
         lambda streams, is_shifted: ProblemTable(
             {
-                PT.T.value: [120.0, 80.0],
-                PT.H_HOT_UT.value: [0.0, 0.0],
-                PT.H_COLD_UT.value: [0.0, 0.0],
+                PT.T: [120.0, 80.0],
+                PT.H_HOT_UT: [0.0, 0.0],
+                PT.H_COLD_UT: [0.0, 0.0],
             }
         ),
     )
@@ -224,8 +224,8 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         lambda *args, **kwargs: {
             "T_col": np.array([120.0, 80.0]),
             "updates": {
-                PT.H_HOT_UT.value: np.array([5.0, 0.0]),
-                PT.H_COLD_UT.value: np.array([3.0, 0.0]),
+                PT.H_HOT_UT: np.array([5.0, 0.0]),
+                PT.H_COLD_UT: np.array([3.0, 0.0]),
             },
         },
     )

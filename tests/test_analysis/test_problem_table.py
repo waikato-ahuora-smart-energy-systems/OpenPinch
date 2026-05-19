@@ -44,20 +44,20 @@ def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
 def _make_problem_table_for_interval_tests():
     """Build problem table for interval tests data used by this test module."""
     data = {
-        PT.T.value: [300.0, 200.0, 100.0],
-        PT.DELTA_T.value: [0.0, 100.0, 100.0],
-        PT.CP_HOT.value: [0.0, 1.0, 0.5],
-        PT.DELTA_H_HOT.value: [0.0, 100.0, 50.0],
-        PT.CP_COLD.value: [0.0, 0.5, 1.0],
-        PT.DELTA_H_COLD.value: [0.0, 50.0, 100.0],
-        PT.CP_NET.value: [0.0, -0.5, 0.5],
-        PT.DELTA_H_NET.value: [0.0, -50.0, 50.0],
-        PT.H_HOT.value: [200.0, 100.0, 50.0],
-        PT.H_COLD.value: [20.0, 10.0, 5.0],
-        PT.H_NET.value: [50.0, 0.0, 50.0],
-        PT.H_NET_NP.value: [50.0, 0.0, 50.0],
-        PT.H_NET_A.value: [50.0, 0.0, 50.0],
-        PT.H_NET_V.value: [50.0, 0.0, 50.0],
+        PT.T: [300.0, 200.0, 100.0],
+        PT.DELTA_T: [0.0, 100.0, 100.0],
+        PT.CP_HOT: [0.0, 1.0, 0.5],
+        PT.DELTA_H_HOT: [0.0, 100.0, 50.0],
+        PT.CP_COLD: [0.0, 0.5, 1.0],
+        PT.DELTA_H_COLD: [0.0, 50.0, 100.0],
+        PT.CP_NET: [0.0, -0.5, 0.5],
+        PT.DELTA_H_NET: [0.0, -50.0, 50.0],
+        PT.H_HOT: [200.0, 100.0, 50.0],
+        PT.H_COLD: [20.0, 10.0, 5.0],
+        PT.H_NET: [50.0, 0.0, 50.0],
+        PT.H_NET_NP: [50.0, 0.0, 50.0],
+        PT.H_NET_A: [50.0, 0.0, 50.0],
+        PT.H_NET_V: [50.0, 0.0, 50.0],
     }
     return ProblemTable(data)
 
@@ -78,7 +78,7 @@ def test_no_overlap_streams_are_skipped():
 
 
 def test_export_writes_to_results_dir_and_uses_filename_stem():
-    table = ProblemTable({PT.T.value: [100], PT.H_NET.value: [50]})
+    table = ProblemTable({PT.T: [100], PT.H_NET: [50]})
     unique_name = f"problem_table_test_{uuid.uuid4().hex}"
     expected_dir = Path(__file__).resolve().parents[2] / "results"
     output_path = table.export(unique_name)
@@ -149,17 +149,17 @@ def test_empty_stream_lists_returns_zero():
 def make_simple_problem_table():
     """Build simple problem table data used by this test module."""
     data = {
-        PT.T.value: [400, 300, 200],
-        PT.CP_HOT.value: [0, 2.0, 1.0],
-        PT.CP_COLD.value: [0, 1.0, 2.0],
-        PT.DELTA_T.value: [0, 0, 0],
-        PT.CP_NET.value: [0, 0, 0],
-        PT.DELTA_H_HOT.value: [0, 0, 0],
-        PT.DELTA_H_COLD.value: [0, 0, 0],
-        PT.DELTA_H_NET.value: [0, 0, 0],
-        PT.H_HOT.value: [0, 0, 0],
-        PT.H_COLD.value: [0, 0, 0],
-        PT.H_NET.value: [0, 0, 0],
+        PT.T: [400, 300, 200],
+        PT.CP_HOT: [0, 2.0, 1.0],
+        PT.CP_COLD: [0, 1.0, 2.0],
+        PT.DELTA_T: [0, 0, 0],
+        PT.CP_NET: [0, 0, 0],
+        PT.DELTA_H_HOT: [0, 0, 0],
+        PT.DELTA_H_COLD: [0, 0, 0],
+        PT.DELTA_H_NET: [0, 0, 0],
+        PT.H_HOT: [0, 0, 0],
+        PT.H_COLD: [0, 0, 0],
+        PT.H_NET: [0, 0, 0],
     }
     return ProblemTable(data)
 
@@ -169,14 +169,14 @@ def test_calc_problem_table_cascade_correct():
     result = problem_table_algorithm(pt_real.copy)
 
     # Check composite curves calculated
-    assert result.loc[0, PT.H_NET.value] == 0  # GCC starts at 0
-    assert round(result.col[PT.H_NET.value].min(), 7) == 0  # GCC min shift
+    assert result.loc[0, PT.H_NET] == 0  # GCC starts at 0
+    assert round(result[PT.H_NET].min(), 7) == 0  # GCC min shift
 
 
 def test_delta_t_computation():
     pt_real = make_simple_problem_table()
     result = problem_table_algorithm(pt_real.copy)
-    assert result.col[PT.DELTA_T.value].tolist() == [0, 100, 100]
+    assert result[PT.DELTA_T].tolist() == [0, 100, 100]
 
 
 def test_net_mcp_and_delta_h():
@@ -184,16 +184,16 @@ def test_net_mcp_and_delta_h():
     result = problem_table_algorithm(pt_real.copy)
     expected_CP_NET = [0, 0, 0]
     expected_delta_h_net = [0, 0, 0]
-    assert result.col[PT.CP_NET.value].tolist() == expected_CP_NET
-    assert result.col[PT.DELTA_H_NET.value].tolist() == expected_delta_h_net
+    assert result[PT.CP_NET].tolist() == expected_CP_NET
+    assert result[PT.DELTA_H_NET].tolist() == expected_delta_h_net
 
 
 def test_shifting_behavior():
     pt_real = make_simple_problem_table()
     result = problem_table_algorithm(pt_real.copy)
-    assert result.col[PT.H_NET.value].min() == 0
+    assert result[PT.H_NET].min() == 0
     assert (
-        abs(result.loc[-1, PT.H_COLD.value] - result.loc[-1, PT.H_HOT.value]) < 1e-6
+        abs(result.loc[-1, PT.H_COLD] - result.loc[-1, PT.H_HOT]) < 1e-6
     )  # Should be nearly equal after shift
 
 
@@ -291,13 +291,9 @@ def test_insert_temperature_interval_adds_top_interval_with_zero_heat():
 
     assert inserted == 1
     assert pt.shape[0] == 4
-    assert pt.loc[0, PT.T.value] == pytest.approx(350.0)
-    assert pt.loc[0, PT.DELTA_T.value] == pytest.approx(
-        pt.loc[0, PT.T.value] - pt.loc[1, PT.T.value]
-    )
-    assert pt.loc[1, PT.DELTA_T.value] == pytest.approx(
-        pt.loc[0, PT.T.value] - pt.loc[1, PT.T.value]
-    )
+    assert pt.loc[0, PT.T] == pytest.approx(350.0)
+    assert pt.loc[0, PT.DELTA_T] == pytest.approx(pt.loc[0, PT.T] - pt.loc[1, PT.T])
+    assert pt.loc[1, PT.DELTA_T] == pytest.approx(pt.loc[0, PT.T] - pt.loc[1, PT.T])
 
     for label in (PT.CP_HOT.value, PT.CP_COLD.value, PT.CP_NET.value):
         assert pt.loc[0, label] == pytest.approx(0.0)
@@ -325,7 +321,7 @@ def test_insert_temperature_interval_appends_bottom_interval_with_zero_heat():
         PT.H_NET_V.value,
     ]
     last_idx_before = pt.shape[0] - 1
-    last_temperature = pt.loc[last_idx_before, PT.T.value]
+    last_temperature = pt.loc[last_idx_before, PT.T]
     original_last = {label: pt.loc[last_idx_before, label] for label in labels}
 
     inserted = pt.insert_temperature_interval(50.0)
@@ -334,12 +330,12 @@ def test_insert_temperature_interval_appends_bottom_interval_with_zero_heat():
     assert pt.shape[0] == 4
 
     last_idx = pt.shape[0] - 1
-    assert pt.loc[last_idx, PT.T.value] == pytest.approx(50.0)
-    assert pt.loc[last_idx, PT.DELTA_T.value] == pytest.approx(
-        pt.loc[last_idx - 1, PT.T.value] - pt.loc[last_idx, PT.T.value]
+    assert pt.loc[last_idx, PT.T] == pytest.approx(50.0)
+    assert pt.loc[last_idx, PT.DELTA_T] == pytest.approx(
+        pt.loc[last_idx - 1, PT.T] - pt.loc[last_idx, PT.T]
     )
-    assert pt.loc[last_idx, PT.DELTA_T.value] == pytest.approx(
-        last_temperature - pt.loc[last_idx, PT.T.value]
+    assert pt.loc[last_idx, PT.DELTA_T] == pytest.approx(
+        last_temperature - pt.loc[last_idx, PT.T]
     )
 
     for label in (PT.CP_HOT.value, PT.CP_COLD.value, PT.CP_NET.value):
@@ -364,7 +360,7 @@ def test_insert_temperature_interval_vectorises_across_top_middle_and_bottom():
 
     assert inserted == 3
     assert pt.shape[0] == 6
-    assert pt.col[PT.T.value].tolist() == [350.0, 300.0, 250.0, 200.0, 100.0, 50.0]
+    assert pt[PT.T].tolist() == [350.0, 300.0, 250.0, 200.0, 100.0, 50.0]
 
     zero_columns = (
         PT.CP_HOT.value,
@@ -378,22 +374,18 @@ def test_insert_temperature_interval_vectorises_across_top_middle_and_bottom():
         for label in zero_columns:
             assert pt.loc[idx, label] == pytest.approx(0.0)
 
-    mid_idx = int(np.where(np.isclose(pt.col[PT.T.value], 250.0))[0][0])
-    assert pt.loc[mid_idx, PT.CP_HOT.value] == pytest.approx(
-        pt.loc[mid_idx + 1, PT.CP_HOT.value]
+    mid_idx = int(np.where(np.isclose(pt[PT.T], 250.0))[0][0])
+    assert pt.loc[mid_idx, PT.CP_HOT] == pytest.approx(pt.loc[mid_idx + 1, PT.CP_HOT])
+    assert pt.loc[mid_idx, PT.CP_COLD] == pytest.approx(pt.loc[mid_idx + 1, PT.CP_COLD])
+    assert pt.loc[mid_idx, PT.DELTA_T] == pytest.approx(
+        pt.loc[mid_idx - 1, PT.T] - pt.loc[mid_idx, PT.T]
     )
-    assert pt.loc[mid_idx, PT.CP_COLD.value] == pytest.approx(
-        pt.loc[mid_idx + 1, PT.CP_COLD.value]
+    assert pt.loc[mid_idx, PT.DELTA_H_HOT] == pytest.approx(
+        pt.loc[mid_idx, PT.DELTA_T] * pt.loc[mid_idx, PT.CP_HOT]
     )
-    assert pt.loc[mid_idx, PT.DELTA_T.value] == pytest.approx(
-        pt.loc[mid_idx - 1, PT.T.value] - pt.loc[mid_idx, PT.T.value]
-    )
-    assert pt.loc[mid_idx, PT.DELTA_H_HOT.value] == pytest.approx(
-        pt.loc[mid_idx, PT.DELTA_T.value] * pt.loc[mid_idx, PT.CP_HOT.value]
-    )
-    assert pt.loc[mid_idx, PT.H_HOT.value] == pytest.approx(150.0)
-    assert pt.loc[mid_idx, PT.H_COLD.value] == pytest.approx(15.0)
-    assert pt.loc[mid_idx, PT.H_NET.value] == pytest.approx(25.0)
+    assert pt.loc[mid_idx, PT.H_HOT] == pytest.approx(150.0)
+    assert pt.loc[mid_idx, PT.H_COLD] == pytest.approx(15.0)
+    assert pt.loc[mid_idx, PT.H_NET] == pytest.approx(25.0)
 
 
 def test_share_temperature_intervals_aligns_both_tables_to_same_pattern():
@@ -406,8 +398,8 @@ def test_share_temperature_intervals_aligns_both_tables_to_same_pattern():
     inserted_left, inserted_right = left.share_temperature_intervals(right)
 
     assert (inserted_left, inserted_right) == (1, 1)
-    assert left.col[PT.T.value].tolist() == [300.0, 250.0, 200.0, 150.0, 100.0]
-    assert right.col[PT.T.value].tolist() == [300.0, 250.0, 200.0, 150.0, 100.0]
+    assert left[PT.T].tolist() == [300.0, 250.0, 200.0, 150.0, 100.0]
+    assert right[PT.T].tolist() == [300.0, 250.0, 200.0, 150.0, 100.0]
     assert left == right
 
 
@@ -419,35 +411,35 @@ def test_share_temperature_intervals_rejects_non_problem_table():
 
 
 def test_update_expands_target_to_union_of_source_temperature_intervals():
-    pt = ProblemTable({PT.T.value: [300.0, 100.0]})
+    pt = ProblemTable({PT.T: [300.0, 100.0]})
 
     pt.update(
         {
-            PT.H_NET_UT.value: np.array([0.0, 40.0, 100.0]),
-            PT.RCP_HOT_UT.value: np.array([0.0, 3.0, 5.0]),
+            PT.H_NET_UT: np.array([0.0, 40.0, 100.0]),
+            PT.RCP_HOT_UT: np.array([0.0, 3.0, 5.0]),
         },
         T_col=np.array([300.0, 200.0, 100.0]),
     )
 
-    assert pt.col[PT.T.value].tolist() == [300.0, 200.0, 100.0]
-    assert np.allclose(pt.col[PT.H_NET_UT.value], np.array([0.0, 40.0, 100.0]))
-    assert np.allclose(pt.col[PT.RCP_HOT_UT.value], np.array([0.0, 3.0, 5.0]))
+    assert pt[PT.T].tolist() == [300.0, 200.0, 100.0]
+    assert np.allclose(pt[PT.H_NET_UT], np.array([0.0, 40.0, 100.0]))
+    assert np.allclose(pt[PT.RCP_HOT_UT], np.array([0.0, 3.0, 5.0]))
 
 
 def test_update_interpolates_cumulative_columns_and_splits_interval_properties():
-    pt = ProblemTable({PT.T.value: [300.0, 200.0, 100.0]})
+    pt = ProblemTable({PT.T: [300.0, 200.0, 100.0]})
 
     pt.update(
         {
-            PT.H_NET_UT.value: np.array([0.0, 100.0]),
-            PT.RCP_HOT_UT.value: np.array([0.0, 5.0]),
+            PT.H_NET_UT: np.array([0.0, 100.0]),
+            PT.RCP_HOT_UT: np.array([0.0, 5.0]),
         },
         T_col=np.array([300.0, 100.0]),
     )
 
-    assert pt.col[PT.T.value].tolist() == [300.0, 200.0, 100.0]
-    assert np.allclose(pt.col[PT.H_NET_UT.value], np.array([0.0, 50.0, 100.0]))
-    assert np.allclose(pt.col[PT.RCP_HOT_UT.value], np.array([0.0, 5.0, 5.0]))
+    assert pt[PT.T].tolist() == [300.0, 200.0, 100.0]
+    assert np.allclose(pt[PT.H_NET_UT], np.array([0.0, 50.0, 100.0]))
+    assert np.allclose(pt[PT.RCP_HOT_UT], np.array([0.0, 5.0, 5.0]))
 
 
 @pytest.mark.parametrize(
@@ -462,7 +454,7 @@ def test_update_interpolates_cumulative_columns_and_splits_interval_properties()
     ],
 )
 def test_get_pinch_loc(input_vals, expected):
-    table = ProblemTable({PT.H_NET.value: input_vals})
+    table = ProblemTable({PT.H_NET: input_vals})
     assert table.pinch_idx() == expected
 
 
@@ -477,21 +469,21 @@ def test_get_pinch_loc(input_vals, expected):
     ],
 )
 def test_get_pinch_temperatures(case, h_vals, t_vals, expected):
-    table = ProblemTable({PT.T.value: t_vals, PT.H_NET.value: h_vals})
+    table = ProblemTable({PT.T: t_vals, PT.H_NET: h_vals})
     assert table.pinch_temperatures() == expected, case
 
 
 def test_shift_heat_cascade_with_enum_col():
-    table = ProblemTable({PT.H_NET.value: [0, 100, 200], PT.H_HOT.value: [0, 50, 150]})
-    shifted = table.shift_heat_cascade(10.0, PT.H_NET.value)
+    table = ProblemTable({PT.H_NET: [0, 100, 200], PT.H_HOT: [0, 50, 150]})
+    shifted = table.shift_heat_cascade(10.0, PT.H_NET)
 
     assert shifted[PT.H_NET].tolist() == [10.0, 110.0, 210.0]
     assert shifted[PT.H_HOT].tolist() == [0, 50, 150]
 
 
 def test_shift_heat_cascade_with_str_col():
-    table = ProblemTable({PT.H_NET.value: [0, 100, 200], PT.H_HOT.value: [0, 50, 150]})
-    shifted = table.shift_heat_cascade(-25.0, PT.H_NET.value)
+    table = ProblemTable({PT.H_NET: [0, 100, 200], PT.H_HOT: [0, 50, 150]})
+    shifted = table.shift_heat_cascade(-25.0, PT.H_NET)
 
     assert shifted[PT.H_NET].tolist() == [-25.0, 75.0, 175.0]
     assert shifted[PT.H_HOT].tolist() == [0, 50, 150]
@@ -948,10 +940,10 @@ def dummy_problem_table():
     """Return dummy problem table data used by this test module."""
     return ProblemTable(
         {
-            PT.T.value: [400, 300, 200],
-            PT.H_HOT.value: [1000, 600, 0],
-            PT.H_COLD.value: [0, 400, 800],
-            PT.H_NET.value: [200, 300, 400],
+            PT.T: [400, 300, 200],
+            PT.H_HOT: [1000, 600, 0],
+            PT.H_COLD: [0, 400, 800],
+            PT.H_NET: [200, 300, 400],
         }
     )
 
@@ -962,10 +954,10 @@ def dummy_problem_table_star():
     """Return dummy problem table star data used by this test module."""
     return ProblemTable(
         {
-            PT.T.value: [400, 300, 200],
-            PT.H_HOT.value: [950, 550, 0],
-            PT.H_COLD.value: [0, 350, 750],
-            PT.H_NET.value: [150, 300, 450],
+            PT.T: [400, 300, 200],
+            PT.H_HOT: [950, 550, 0],
+            PT.H_COLD: [0, 350, 750],
+            PT.H_NET: [150, 300, 450],
         }
     )
 
@@ -991,14 +983,12 @@ def test_zonal_targets_computed_correctly(
 def test_zero_heat_recovery_limit_sets_degree_to_one(dummy_zone):
     pt_real = ProblemTable(
         {
-            PT.T.value: [400, 300],
-            PT.H_HOT.value: [100, 100],  # No change → ΔH = 0
-            PT.H_NET.value: [0, 100],  # Forces negative limit
+            PT.T: [400, 300],
+            PT.H_HOT: [100, 100],  # No change → ΔH = 0
+            PT.H_NET: [0, 100],  # Forces negative limit
         }
     )
-    pt = ProblemTable(
-        {PT.T.value: [400, 300], PT.H_HOT.value: [200, 100], PT.H_NET.value: [50, 100]}
-    )
+    pt = ProblemTable({PT.T: [400, 300], PT.H_HOT: [200, 100], PT.H_NET: [50, 100]})
     z = set_zonal_targets(pt, pt_real)
 
     assert z["heat_recovery_limit"] == 0
@@ -1006,14 +996,12 @@ def test_zero_heat_recovery_limit_sets_degree_to_one(dummy_zone):
 
 
 def test_negative_heat_recovery_target():
-    pt_real = ProblemTable(
-        {PT.T.value: [400, 300], PT.H_HOT.value: [500, 300], PT.H_NET.value: [0, 200]}
-    )
+    pt_real = ProblemTable({PT.T: [400, 300], PT.H_HOT: [500, 300], PT.H_NET: [0, 200]})
     pt = ProblemTable(
         {
-            PT.T.value: [400, 300],
-            PT.H_HOT.value: [450, 250],
-            PT.H_NET.value: [600, 700],  # H_net ends higher than H_HOT start
+            PT.T: [400, 300],
+            PT.H_HOT: [450, 250],
+            PT.H_NET: [600, 700],  # H_net ends higher than H_HOT start
         }
     )
 
@@ -1026,16 +1014,16 @@ def test_negative_heat_recovery_target():
 def test_single_row_problem_table():
     pt_real = ProblemTable(
         {
-            PT.T.value: [400],
-            PT.H_HOT.value: [100],
-            PT.H_NET.value: [50],
+            PT.T: [400],
+            PT.H_HOT: [100],
+            PT.H_NET: [50],
         }
     )
     pt = ProblemTable(
         {
-            PT.T.value: [400],
-            PT.H_HOT.value: [90],
-            PT.H_NET.value: [40],
+            PT.T: [400],
+            PT.H_HOT: [90],
+            PT.H_NET: [40],
         }
     )
 
@@ -1084,13 +1072,13 @@ def test_problem_table_algorithm_executes():
 
 
 def test_correct_pt_composite_curves_shifts_columns():
-    pt = ProblemTable({PT.H_COLD.value: [10, 20], PT.H_NET.value: [5, 15]})
+    pt = ProblemTable({PT.H_COLD: [10, 20], PT.H_NET: [5, 15]})
     corrected: ProblemTable = _shift_pt_to_set_heat_recovery(
         pt.copy, heat_recovery_target=30, current_heat_recovery=50
     )
 
-    assert (corrected.col[PT.H_COLD.value] == [30, 40]).all()
-    assert (corrected.col[PT.H_NET.value] == [25, 35]).all()
+    assert (corrected[PT.H_COLD] == [30, 40]).all()
+    assert (corrected[PT.H_NET] == [25, 35]).all()
 
 
 """Tests for the create_problem_table_with_t_int function."""
