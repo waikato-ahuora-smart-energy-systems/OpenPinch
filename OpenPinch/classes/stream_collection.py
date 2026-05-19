@@ -223,6 +223,10 @@ class StreamCollection:
             stream.set_heat_flow(0.0)
         return self
 
+    def sum_heat_flow(self) -> float:
+        """Return the total heat flow across all streams in the collection."""
+        return sum(stream.heat_flow for stream in self._streams.values())
+
     def set_sort_key(self, key: Union[str, List[str], Callable], reverse: bool = False):
         """Set the sorting key. Supports attribute names or custom lambdas."""
         self._sort_reverse = reverse
