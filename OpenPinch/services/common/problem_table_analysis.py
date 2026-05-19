@@ -70,9 +70,9 @@ def get_process_heat_cascade(
     if isinstance(known_heat_recovery, float):
         # Correct the location of the cold composite curve and limiting GCC (real temperatures)
         _shift_pt_to_set_heat_recovery(
-            pt,
-            known_heat_recovery,
-            get_heat_recovery_target_from_pt(pt),
+            pt=pt,
+            heat_recovery_target=known_heat_recovery,
+            current_heat_recovery=get_heat_recovery_target_from_pt(pt),
         )
 
     heat_recovery_target = get_heat_recovery_target_from_pt(pt)
@@ -115,13 +115,17 @@ def get_utility_heat_cascade(
 def create_problem_table_with_t_int(
     streams: StreamCollection = None,
     is_shifted: bool = True,
-    extra_T_intervals: list = None,
+    extra_T_intervals: list | float | np.ndarray = None,
 ) -> ProblemTable:
     """Return a problem table populated with ordered unique temperature intervals."""
     if streams is None:
         streams = StreamCollection()
     if extra_T_intervals is None:
         extra_T_intervals = []
+    if isinstance(extra_T_intervals, (int, float)):
+        extra_T_intervals = [extra_T_intervals]
+    elif isinstance(extra_T_intervals, np.ndarray):
+        extra_T_intervals = extra_T_intervals.tolist()
 
     T_vals = [
         t

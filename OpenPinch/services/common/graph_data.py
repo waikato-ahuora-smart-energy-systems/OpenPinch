@@ -143,8 +143,8 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.TSP.value,
                 data=target_graphs[GT.TSP.value],
                 value_field=[
-                    PT.H_NET_HOT.value,
-                    PT.H_NET_COLD.value,
+                    PT.H_HOT.value,
+                    PT.H_COLD.value,
                     PT.H_HOT_UT.value,
                     PT.H_COLD_UT.value,
                 ],
@@ -535,7 +535,7 @@ def _should_plot_series(values: List[float]) -> bool:
     """Return ``True`` when a graph series contains meaningful non-zero values."""
     try:
         numeric = np.asarray(values, dtype=float)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         numeric = np.array(
             [float(value) for value in values if value is not None],
             dtype=float,

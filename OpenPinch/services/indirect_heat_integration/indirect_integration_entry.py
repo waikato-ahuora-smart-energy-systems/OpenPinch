@@ -93,56 +93,34 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     stream cascades, performs utility-to-utility balancing, and records the
     resulting total-site style target on ``zone`` before returning it.
     """
+    s_tzt = zone.targets[TT.TZ.value]
+
     # Total site profiles - process side
     pt = get_process_heat_cascade(
         hot_streams=zone.net_hot_streams,
         cold_streams=zone.net_cold_streams,
-        all_streams=zone.all_net_streams,
-        is_shifted=True,
+        is_shifted=True, # Second shift of process streams to align with the real utility scale
     )
-    pt_real = get_process_heat_cascade(
-        hot_streams=zone.net_hot_streams,
-        cold_streams=zone.net_cold_streams,
-        all_streams=zone.all_net_streams,
+    pt.update(
+        _shift_site_process_profiles(
+            H_hot=pt.col[PT.H_HOT.value],
+            H_cold=pt.col[PT.H_COLD.value],
+        )
+    )
+    # Apply the problem table algorithm to subzone utility use
+    pt_ut = get_process_heat_cascade(
+        hot_streams=s_tzt.hot_utilities,
+        cold_streams=s_tzt.cold_utilities,
         is_shifted=False,
-        known_heat_recovery=get_heat_recovery_target_from_pt(pt),
     )
+    pt.share_temperature_intervals(pt_ut)
     pt.update(
-        _get_site_process_heat_load_profiles(
-            pt.col[PT.H_HOT.value], pt.col[PT.H_COLD.value]
-        )
+        {
+            PT.H_NET_UT.value: (pt_ut.col[PT.H_HOT.value] - pt_ut.col[PT.H_COLD.value]) - (pt_ut.col[PT.H_HOT.value] - pt_ut.col[PT.H_COLD.value]).min(),
+            PT.H_HOT_UT.value: pt_ut.col[PT.H_HOT.value],
+            PT.H_COLD_UT.value: pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max(),
+        }
     )
-    pt_real.update(
-        _get_site_process_heat_load_profiles(
-            pt_real.col[PT.H_HOT.value], pt_real.col[PT.H_COLD.value]
-        )
-    )
-
-    # Get utility duties based on the summation of subzones
-    s_tzt = zone.targets[TT.TZ.value]
-    hot_utilities = deepcopy(s_tzt.hot_utilities)
-    cold_utilities = deepcopy(s_tzt.cold_utilities)
-
-    # Apply the problem table algorithm to the simple sum of subzone utility use
-    pt.update(
-        _get_site_utility_heat_cascade(
-            pt.col[PT.T.value],
-            hot_utilities,
-            cold_utilities,
-            is_shifted=True,
-        )
-    )
-    pt_real.update(
-        _get_site_utility_heat_cascade(
-            pt_real.col[PT.T.value],
-            hot_utilities,
-            cold_utilities,
-            is_shifted=False,
-        )
-    )
-
-    # Apply the utility targeting method to determine the net utility use and generation
-    _match_utility_gen_and_use_at_same_level(hot_utilities, cold_utilities)
 
     # Extract overall heat integration targets
     hot_utility_target = pt.loc[0, PT.H_NET_UT.value]
@@ -152,14 +130,19 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
 
+    # Apply the utility targeting method to determine the net utility use and generation
+    hot_utilities, cold_utilities = _match_utility_gen_and_use_at_same_level(
+        hot_utilities=deepcopy(s_tzt.hot_utilities),
+        cold_utilities=deepcopy(s_tzt.cold_utilities),
+    )
+
     payload = {
         "zone_name": zone.name,
         "type": TT.TS.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "pt": pt,
-        "pt_real": pt_real,
-        "graphs": _save_graph_data(pt, pt_real),
+        "graphs": _save_graph_data(pt),
         "hot_pinch": hot_pinch,
         "cold_pinch": cold_pinch,
         "hot_utilities": hot_utilities,
@@ -207,63 +190,30 @@ def _compute_utility_cost(
     return utility_cost
 
 
-def _get_site_process_heat_load_profiles(
+def _shift_site_process_profiles(
     H_hot: np.ndarray,
     H_cold: np.ndarray,
 ) -> dict:
     return {
-        PT.H_NET_HOT.value: H_hot - H_hot[0],
-        PT.H_NET_COLD.value: H_cold - H_cold[-1],
-    }
-
-
-def _get_site_utility_heat_cascade(
-    T_int_vals: np.ndarray,
-    hot_utilities: StreamCollection = None,
-    cold_utilities: StreamCollection = None,
-    is_shifted: bool = True,
-) -> Dict[str, np.ndarray]:
-    """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
-    pt_ut_hot = ProblemTable({PT.T.value: T_int_vals})
-    problem_table_algorithm(pt_ut_hot, hot_streams=hot_utilities, is_shifted=is_shifted)
-
-    pt_ut_cld = ProblemTable({PT.T.value: T_int_vals})
-    problem_table_algorithm(
-        pt_ut_cld, cold_streams=cold_utilities, is_shifted=is_shifted
-    )
-
-    pt_ut = ProblemTable({PT.T.value: T_int_vals})
-    problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted=is_shifted)
-
-    h_net_values = pt_ut.col[PT.H_NET.value]
-    H_NET_UT = h_net_values.max() - h_net_values
-
-    h_ut_cc = pt_ut_hot.col[PT.H_HOT.value]
-    c_ut_cc = pt_ut_cld.col[PT.H_COLD.value] - pt_ut_cld.col[PT.H_COLD.value].max()
-
-    return {
-        PT.H_NET_UT.value: H_NET_UT,
-        PT.H_HOT_UT.value: h_ut_cc,
-        PT.H_COLD_UT.value: c_ut_cc,
+        PT.H_HOT.value: H_hot - H_hot[0],
+        PT.H_COLD.value: H_cold - H_cold[-1],
     }
 
 
 def _save_graph_data(
     pt: ProblemTable,
-    pt_real: ProblemTable,
 ) -> Zone:
     """Prepare graph-ready tables capturing site-level utility composite curves."""
     pt.round(decimals=4)
-    pt_real.round(decimals=4)
     return {
         GT.TSP.value: pt[
             [
                 PT.T.value,
-                PT.H_NET_HOT.value,
-                PT.H_NET_COLD.value,
+                PT.H_HOT.value,
+                PT.H_COLD.value,
                 PT.H_HOT_UT.value,
                 PT.H_COLD_UT.value,
             ]
         ],
-        GT.SUGCC.value: pt_real[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]],
+        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]],
     }

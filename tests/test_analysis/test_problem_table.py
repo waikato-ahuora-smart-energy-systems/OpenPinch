@@ -396,6 +396,28 @@ def test_insert_temperature_interval_vectorises_across_top_middle_and_bottom():
     assert pt.loc[mid_idx, PT.H_NET.value] == pytest.approx(25.0)
 
 
+def test_share_temperature_intervals_aligns_both_tables_to_same_pattern():
+    left = _make_problem_table_for_interval_tests()
+    right = _make_problem_table_for_interval_tests()
+
+    left.insert_temperature_interval([250.0])
+    right.insert_temperature_interval([150.0])
+
+    inserted_left, inserted_right = left.share_temperature_intervals(right)
+
+    assert (inserted_left, inserted_right) == (1, 1)
+    assert left.col[PT.T.value].tolist() == [300.0, 250.0, 200.0, 150.0, 100.0]
+    assert right.col[PT.T.value].tolist() == [300.0, 250.0, 200.0, 150.0, 100.0]
+    assert left == right
+
+
+def test_share_temperature_intervals_rejects_non_problem_table():
+    pt = _make_problem_table_for_interval_tests()
+
+    with pytest.raises(TypeError, match="ProblemTable"):
+        pt.share_temperature_intervals("not-a-problem-table")
+
+
 @pytest.mark.parametrize(
     "input_vals, expected",
     [

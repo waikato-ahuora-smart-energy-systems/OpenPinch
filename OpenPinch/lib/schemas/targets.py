@@ -198,7 +198,6 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
     """Total-site / indirect-integration target with site problem tables and graphs."""
 
     pt: ProblemTable
-    pt_real: ProblemTable
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
 

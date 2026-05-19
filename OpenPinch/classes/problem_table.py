@@ -391,6 +391,18 @@ class ProblemTable:
             self.icol[col] += dh
         return self.copy
 
+    def share_temperature_intervals(self, other: "ProblemTable") -> Tuple[int, int]:
+        """Mutate both tables so they use the union of their temperature intervals.
+
+        Returns a tuple containing ``(rows_inserted_into_self, rows_inserted_into_other)``.
+        """
+        if not isinstance(other, ProblemTable):
+            raise TypeError("`other` must be a ProblemTable instance.")
+
+        inserted_self = self.insert_temperature_interval(other.col[PT.T.value].tolist())
+        inserted_other = other.insert_temperature_interval(self.col[PT.T.value].tolist())
+        return inserted_self, inserted_other
+
     def insert_temperature_interval(self, T_ls: List[float] | float) -> int:
         """Insert any missing temperature intervals and return count inserted."""
         if self.data is None or self.data.shape[0] < 2 == 0:
