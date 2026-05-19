@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import numbers
 from collections import defaultdict
+from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Sequence, Tuple, Union
+from typing import List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,7 @@ PT = ProblemTableLabel
 
 
 class ProblemTable:
-    """NumPy-backed representation of the pinch problem table with pandas-like accessors."""
+    """NumPy-backed representation of the pinch problem table with enum-friendly accessors."""
 
     _DEFAULT_ATOL = 1e-6
 
@@ -50,6 +51,65 @@ class ProblemTable:
         else:
             self.data = None
 
+    @staticmethod
+    def _validate_column_name(col_name: str | ProblemTableLabel) -> str:
+        """Return the canonical string label for a supported column key."""
+        if isinstance(col_name, ProblemTableLabel):
+            return col_name.value
+        if isinstance(col_name, str):
+            return col_name
+        raise TypeError(
+            "Column labels must be strings or ProblemTableLabel values."
+        )
+
+    @classmethod
+    def _validate_column_names(
+        cls, col_names: str | ProblemTableLabel | Sequence[str | ProblemTableLabel]
+    ) -> list[str]:
+        """Return canonical string labels for one or more supported column keys."""
+        if isinstance(col_names, (str, ProblemTableLabel)):
+            return [cls._validate_column_name(col_names)]
+        if not isinstance(col_names, Sequence):
+            raise TypeError(
+                "Column labels must be strings, ProblemTableLabel values, or "
+                "sequences of those values."
+            )
+        return [cls._validate_column_name(col_name) for col_name in col_names]
+
+    def _initialise_named_column(self, col_name: str, values) -> None:
+        """Initialise the table data from a single named column payload."""
+        data_input = {col_name: values}
+        self.data = np.array(
+            [
+                data_input.get(col, [np.nan] * len(next(iter(data_input.values()))))
+                for col in self.columns
+            ]
+        ).T
+
+    def _get_column_by_name(self, col_name: str | ProblemTableLabel):
+        """Return a raw NumPy column view for the given label."""
+        col_name = self._validate_column_name(col_name)
+        idx = self.col_index[col_name]
+        return self.data[:, idx]
+
+    def _set_column_by_name(self, col_name: str | ProblemTableLabel, values) -> None:
+        """Assign values to a named column, initialising the table if needed."""
+        col_name = self._validate_column_name(col_name)
+        idx = self.col_index[col_name]
+        if self.data is not None:
+            self.data[:, idx] = values
+        else:
+            self._initialise_named_column(col_name, values)
+
+    def _slice_columns(
+        self, keys: str | ProblemTableLabel | Sequence[str | ProblemTableLabel]
+    ) -> "ProblemTable":
+        """Build a new ProblemTable containing only the requested columns."""
+        data_input = {}
+        for key in self._validate_column_names(keys):
+            data_input[key] = self.col[key]
+        return ProblemTable(data_input, add_default_labels=False)
+
     class ColumnViewByIndex:
         """Expose read/write access to columns addressed by integer index."""
 
@@ -68,65 +128,40 @@ class ProblemTable:
         return self.ColumnViewByIndex(self)
 
     class ColumnViewByName:
-        """Expose read/write access to columns addressed by column label."""
+        """Expose read/write access to columns addressed by label or enum."""
 
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
         def __getitem__(self, col_name):
-            idx = self.parent.col_index[col_name]
-            return self.parent.data[:, idx]
+            return self.parent._get_column_by_name(col_name)
 
         def __setitem__(self, col_name, values):
-            idx = self.parent.col_index[col_name]
-            if self.parent.data is not None:
-                self.parent.data[:, idx] = values
-            else:
-                data_input = {col_name: values}
-                self.data = np.array(
-                    [
-                        data_input.get(
-                            col, [np.nan] * len(next(iter(data_input.values())))
-                        )
-                        for col in self.parent.columns
-                    ]
-                ).T
+            self.parent._set_column_by_name(col_name, values)
 
     @property
     def col(self):
-        """Return a view for column access by label."""
+        """Return a view for column access by string label or ProblemTableLabel."""
         return self.ColumnViewByName(self)
 
     class ColumnsViewByName:
-        """Vectorised view over multiple labelled columns."""
+        """Vectorised view over multiple labelled columns or enums."""
 
         def __init__(self, parent: "ProblemTable"):
             self.parent = parent
 
         def __getitem__(self, col_names):
             idxs = []
-            for col_name in col_names:
+            for col_name in self.parent._validate_column_names(col_names):
                 idxs.append(self.parent.col_index[col_name])
             return self.parent.data[:, idxs]
 
         def __setitem__(self, col_name, values):
-            idx = self.parent.col_index[col_name]
-            if self.parent.data is not None:
-                self.parent.data[:, idx] = values
-            else:
-                data_input = {col_name: values}
-                self.data = np.array(
-                    [
-                        data_input.get(
-                            col, [np.nan] * len(next(iter(data_input.values())))
-                        )
-                        for col in self.parent.columns
-                    ]
-                ).T
+            self.parent._set_column_by_name(col_name, values)
 
     @property
     def cols(self):
-        """Return a vectorised view that reads multiple labelled columns."""
+        """Return a vectorised view over multiple labelled columns or enums."""
         return self.ColumnsViewByName(self)
 
     class LocationByRowByColName:
@@ -137,11 +172,13 @@ class ProblemTable:
 
         def __getitem__(self, key):
             row_idx, col_key = key
+            col_key = self.parent._validate_column_name(col_key)
             col_idx = self.parent.col_index[col_key]
             return self.parent.data[row_idx, col_idx]
 
         def __setitem__(self, key, value):
             row_idx, col_key = key
+            col_key = self.parent._validate_column_name(col_key)
             col_idx = self.parent.col_index[col_key]
             self.parent.data[row_idx, col_idx] = value
 
@@ -178,14 +215,29 @@ class ProblemTable:
         else:
             return 0
 
-    def __getitem__(self, keys):
-        """Extract a subset of columns and return them as a new ``ProblemTable``."""
-        data_input = {}
-        if isinstance(keys, str):
-            keys = [keys]
-        for key in keys:
-            data_input[key] = self.col[key]
-        return ProblemTable(data_input, add_default_labels=False)
+    def __getitem__(self, key: str | ProblemTableLabel):
+        """Return a raw NumPy column view; use ``slice(...)`` for subtable extraction."""
+        if isinstance(key, Sequence) and not isinstance(key, (str, ProblemTableLabel)):
+            raise TypeError(
+                "ProblemTable[...] only supports single-column access. "
+                "Use `pt.slice([...])` for subtable extraction."
+            )
+        return self._get_column_by_name(key)
+
+    def __setitem__(self, key: str | ProblemTableLabel, values) -> None:
+        """Assign values to a single column by string label or ProblemTableLabel."""
+        if isinstance(key, Sequence) and not isinstance(key, (str, ProblemTableLabel)):
+            raise TypeError(
+                "ProblemTable[...] only supports single-column assignment. "
+                "Use `pt.slice([...])` for subtable extraction."
+            )
+        self._set_column_by_name(key, values)
+
+    def slice(
+        self, keys: str | ProblemTableLabel | Sequence[str | ProblemTableLabel]
+    ) -> "ProblemTable":
+        """Return a new ProblemTable containing only the requested columns."""
+        return self._slice_columns(keys)
 
     def _equals(self, other: "ProblemTable", *, atol: float | None = None) -> bool:
         """Return True when two tables match within ``atol`` absolute tolerance."""
@@ -281,11 +333,11 @@ class ProblemTable:
             data_input += padding
         return data_input
 
-    def to_list(self, col: str = None):
+    def to_list(self, col: str | ProblemTableLabel | None = None):
         """Return table data as Python lists; optionally restrict to a single column."""
-        if isinstance(col, str):
-            ls = self.col[col].T.tolist()
-        elif col == None:
+        if col is not None:
+            ls = self.col[self._validate_column_name(col)].T.tolist()
+        elif col is None:
             ls = self.data.T.tolist()
         return ls[0] if len(ls) == 1 else ls
 
@@ -297,12 +349,10 @@ class ProblemTable:
         self, col: Union[int, str, ProblemTableLabel] = PT.H_NET.value
     ) -> Tuple[int, int, bool]:
         """Return the row indices of the hot and cold pinch temperatures."""
-        column = col.value if isinstance(col, ProblemTableLabel) else col
-        h_net = (
-            np.asarray(self.col[column])
-            if isinstance(column, str)
-            else np.asarray(self.icol[column])
-        )
+        if isinstance(col, int):
+            h_net = np.asarray(self.icol[col])
+        else:
+            h_net = np.asarray(self[col])
         n = h_net.size
 
         abs_arr = np.abs(h_net)
@@ -347,11 +397,8 @@ class ProblemTable:
         self, dh: float, col: Union[int, str, ProblemTableLabel]
     ) -> "ProblemTable":
         """Shift a column in the heat cascade by ``dh`` and return a copy of the table."""
-        if isinstance(col, ProblemTableLabel):
-            target = col.value
-            self.col[target] += dh
-        elif isinstance(col, str):
-            self.col[col] += dh
+        if isinstance(col, (ProblemTableLabel, str)):
+            self[col] += dh
         else:
             self.icol[col] += dh
         return self.copy
@@ -829,15 +876,16 @@ class ProblemTable:
         """Insert a single row (dict of column: value) at the specified index."""
         new_row = np.full(self.data.shape[1], np.nan)
         for key, value in row_dict.items():
-            # if key in self.col_index:
-            new_row[self.col_index[key]] = value
+            col_name = self._validate_column_name(key)
+            new_row[self.col_index[col_name]] = value
         self.data = np.insert(self.data, index, new_row, axis=0)
 
     def update_row(self, index: int, row_dict: dict):
         """Update selected columns for the row at ``index`` using values from ``row_dict``."""
         for key, value in row_dict.items():
-            if key in self.col_index:
-                self.data[index, self.col_index[key]] = value
+            col_name = self._validate_column_name(key)
+            if col_name in self.col_index:
+                self.data[index, self.col_index[col_name]] = value
 
     def _validate_T_col(self, T_col: np.ndarray | None) -> np.ndarray:
         """Validate and cast the source temperature column used to align updates."""
@@ -863,7 +911,7 @@ class ProblemTable:
         normalised: ProblemTableColumnUpdates = {}
 
         for key, values in updates.items():
-            col_name = key.value if isinstance(key, ProblemTableLabel) else key
+            col_name = self._validate_column_name(key)
             if col_name == PT.T.value:
                 raise ValueError(
                     "`ProblemTable.update()` does not accept updates to the "
@@ -888,6 +936,7 @@ class ProblemTable:
             normalised[col_name] = values
 
         return normalised
+
     def update(
         self,
         updates: ProblemTableColumnUpdates | None = None,
@@ -923,8 +972,11 @@ class ProblemTable:
         """Remove a row at ``index`` from the buffer."""
         self.data = np.delete(self.data, index, axis=0)
 
-    def sort_by_column(self, column: str, ascending: bool = True):
+    def sort_by_column(
+        self, column: str | ProblemTableLabel, ascending: bool = True
+    ):
         """Sort rows in-place by the given column."""
+        column = self._validate_column_name(column)
         if column not in self.col_index:
             raise KeyError(f"Column {column} not found")
         col_data = self.data[:, self.col_index[column]]

@@ -323,30 +323,23 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {
-        GT.CC.value: pt_real[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
-        GT.SCC.value: pt[[PT.T.value, PT.H_HOT.value, PT.H_COLD.value]],
-        GT.BCC.value: pt_real[[PT.T.value, PT.H_HOT_BAL.value, PT.H_COLD_BAL.value]],
-        GT.GCC.value: pt[
+        GT.CC.value: pt_real.slice([PT.T, PT.H_HOT, PT.H_COLD]),
+        GT.SCC.value: pt.slice([PT.T, PT.H_HOT, PT.H_COLD]),
+        GT.BCC.value: pt_real.slice([PT.T, PT.H_HOT_BAL, PT.H_COLD_BAL]),
+        GT.GCC.value: pt.slice(
+            [PT.T, PT.H_NET, PT.H_NET_NP, PT.H_NET_V, PT.H_NET_A, PT.H_NET_UT]
+        ),
+        GT.GCC_R.value: pt_real.slice([PT.T, PT.H_NET, PT.H_NET_UT]),
+        GT.NLP.value: pt.slice(
             [
-                PT.T.value,
-                PT.H_NET.value,
-                PT.H_NET_NP.value,
-                PT.H_NET_V.value,
-                PT.H_NET_A.value,
-                PT.H_NET_UT.value,
+                PT.T,
+                PT.H_NET_HOT,
+                PT.H_NET_COLD,
+                PT.H_HOT_UT,
+                PT.H_COLD_UT,
+                PT.H_HOT_HP,
+                PT.H_COLD_HP,
             ]
-        ],
-        GT.GCC_R.value: pt_real[[PT.T.value, PT.H_NET.value, PT.H_NET_UT.value]],
-        GT.NLP.value: pt[
-            [
-                PT.T.value,
-                PT.H_NET_HOT.value,
-                PT.H_NET_COLD.value,
-                PT.H_HOT_UT.value,
-                PT.H_COLD_UT.value,
-                PT.H_HOT_HP.value,
-                PT.H_COLD_HP.value,
-            ]
-        ],
-        GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]],
+        ),
+        GT.GCC_HP.value: pt.slice([PT.T, PT.H_NET_W_AIR, PT.H_NET_HP]),
     }

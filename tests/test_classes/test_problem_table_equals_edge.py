@@ -75,16 +75,53 @@ def test_uninitialised_column_setters_and_len_zero():
     pt = ProblemTable()
     assert len(pt) == 0
 
-    pt.col[PT.T.value] = [100.0, 90.0]
-    pt.cols[PT.T.value] = [110.0, 95.0]
+    pt.col[PT.T] = [100.0, 90.0]
+    pt.cols[PT.T] = [110.0, 95.0]
+    pt[PT.H_NET] = [5.0, 4.0]
+    assert pt.col[PT.T].tolist() == [110.0, 95.0]
+    assert pt[PT.H_NET].tolist() == [5.0, 4.0]
 
 
 def test_cols_view_get_and_set_on_initialised_table():
     pt = _default_table()
-    values = pt.cols[[PT.T.value, PT.H_NET.value]]
+    values = pt.cols[[PT.T, PT.H_NET]]
     assert values.shape == (2, 2)
-    pt.cols[PT.H_NET.value] = [5.0, 4.0]
-    assert pt.col[PT.H_NET.value].tolist() == [5.0, 4.0]
+    mixed_values = pt.cols[[PT.T, PT.H_NET.value]]
+    assert mixed_values.shape == (2, 2)
+    pt.cols[PT.H_NET] = [5.0, 4.0]
+    assert pt.col[PT.H_NET].tolist() == [5.0, 4.0]
+
+
+def test_problem_table_getitem_setitem_and_slice_enum_paths():
+    pt = _default_table()
+
+    assert np.array_equal(pt[PT.T], pt.col[PT.T])
+
+    pt[PT.H_NET] = [8.0, 7.0]
+    assert pt.col[PT.H_NET].tolist() == [8.0, 7.0]
+
+    single = pt.slice(PT.T)
+    assert isinstance(single, ProblemTable)
+    assert single.to_list() == [200.0, 100.0]
+
+    subset = pt.slice([PT.T, PT.H_NET])
+    assert isinstance(subset, ProblemTable)
+    assert subset.columns == [PT.T.value, PT.H_NET.value]
+    assert subset.to_list() == [[200.0, 100.0], [8.0, 7.0]]
+
+    mixed_subset = pt.slice([PT.T, PT.H_NET.value])
+    assert mixed_subset.columns == [PT.T.value, PT.H_NET.value]
+
+    with pytest.raises(TypeError, match="pt\\.slice"):
+        _ = pt[[PT.T, PT.H_NET]]
+
+
+def test_loc_accepts_enum_column_keys():
+    pt = _default_table()
+
+    assert pt.loc[0, PT.T] == pytest.approx(200.0)
+    pt.loc[1, PT.H_NET] = 3.5
+    assert pt.loc[1, PT.H_NET] == pytest.approx(3.5)
 
 
 def test_equals_object_and_shape_branches():
@@ -161,7 +198,7 @@ def test_equals_fallback_numeric_pair_continue_path():
 
 def test_to_list_and_shift_heat_cascade_branches():
     pt = _default_table()
-    _ = pt.to_list(col=PT.T.value)
+    _ = pt.to_list(col=PT.T)
     shifted_enum = pt.shift_heat_cascade(5.0, PT.H_NET)
     assert shifted_enum.col[PT.H_NET.value][0] == pytest.approx(15.0)
 

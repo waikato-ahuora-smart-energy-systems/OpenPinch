@@ -485,16 +485,16 @@ def test_shift_heat_cascade_with_enum_col():
     table = ProblemTable({PT.H_NET.value: [0, 100, 200], PT.H_HOT.value: [0, 50, 150]})
     shifted = table.shift_heat_cascade(10.0, PT.H_NET.value)
 
-    assert shifted[PT.H_NET.value].to_list() == [10.0, 110.0, 210.0]
-    assert shifted[PT.H_HOT.value].to_list() == [0, 50, 150]
+    assert shifted[PT.H_NET].tolist() == [10.0, 110.0, 210.0]
+    assert shifted[PT.H_HOT].tolist() == [0, 50, 150]
 
 
 def test_shift_heat_cascade_with_str_col():
     table = ProblemTable({PT.H_NET.value: [0, 100, 200], PT.H_HOT.value: [0, 50, 150]})
     shifted = table.shift_heat_cascade(-25.0, PT.H_NET.value)
 
-    assert shifted[PT.H_NET.value].to_list() == [-25.0, 75.0, 175.0]
-    assert shifted[PT.H_HOT.value].to_list() == [0, 50, 150]
+    assert shifted[PT.H_NET].tolist() == [-25.0, 75.0, 175.0]
+    assert shifted[PT.H_HOT].tolist() == [0, 50, 150]
 
 
 """Test cases for the _insert_temperature_interval_into_pt_at_constant_h function."""
@@ -1118,8 +1118,8 @@ def test_returns_correct_intervals_basic():
 
     assert PT.T.value in T_star.columns
     assert PT.T.value in T.columns
-    assert T_star[PT.T.value].to_list() == [390, 290, 210, 110]
-    assert T[PT.T.value].to_list() == [400, 300, 200, 100]
+    assert T_star.slice(PT.T).to_list() == [390, 290, 210, 110]
+    assert T.slice(PT.T).to_list() == [400, 300, 200, 100]
 
 
 def test_includes_utilities():
@@ -1130,8 +1130,8 @@ def test_includes_utilities():
     T_star = create_problem_table_with_t_int(streams=hu + cu, is_shifted=True)
     T = create_problem_table_with_t_int(streams=hu + cu, is_shifted=False)
 
-    assert T_star[PT.T.value].to_list() == [540, 490, 80, 40]
-    assert T[PT.T.value].to_list() == [550, 500, 70, 30]
+    assert T_star.slice(PT.T).to_list() == [540, 490, 80, 40]
+    assert T.slice(PT.T).to_list() == [550, 500, 70, 30]
 
 
 def test_deduplicates_shared_interval_boundaries():
@@ -1142,7 +1142,7 @@ def test_deduplicates_shared_interval_boundaries():
 
     pt = create_problem_table_with_t_int(streams=streams, is_shifted=True)
 
-    assert pt[PT.T.value].to_list() == [390, 290, 190]
+    assert pt.slice(PT.T).to_list() == [390, 290, 190]
 
 
 def test_empty_inputs():

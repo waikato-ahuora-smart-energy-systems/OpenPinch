@@ -228,14 +228,6 @@ def _save_graph_data(
     """Prepare graph-ready tables capturing site-level utility composite curves."""
     pt.round(decimals=4)
     return {
-        GT.TSP.value: pt[
-            [
-                PT.T.value,
-                PT.H_HOT.value,
-                PT.H_COLD.value,
-                PT.H_HOT_UT.value,
-                PT.H_COLD_UT.value,
-            ]
-        ],
-        GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]],
+        GT.TSP.value: pt.slice([PT.T, PT.H_HOT, PT.H_COLD, PT.H_HOT_UT, PT.H_COLD_UT]),
+        GT.SUGCC.value: pt.slice([PT.T, PT.H_NET_UT, PT.H_NET_HP]),
     }

@@ -254,21 +254,21 @@ def _get_hpr_graphs(
 
     if is_direct:
         return {
-            GT.NLP.value: pt[
+            GT.NLP.value: pt.slice(
                 [
-                    PT.T.value,
-                    PT.H_NET_HOT.value,
-                    PT.H_NET_COLD.value,
-                    PT.H_HOT_UT.value,
-                    PT.H_COLD_UT.value,
-                    PT.H_HOT_HP.value,
-                    PT.H_COLD_HP.value,
+                    PT.T,
+                    PT.H_NET_HOT,
+                    PT.H_NET_COLD,
+                    PT.H_HOT_UT,
+                    PT.H_COLD_UT,
+                    PT.H_HOT_HP,
+                    PT.H_COLD_HP,
                 ]
-            ],
-            GT.GCC_HP.value: pt[[PT.T.value, PT.H_NET_W_AIR.value, PT.H_NET_HP.value]],
+            ),
+            GT.GCC_HP.value: pt.slice([PT.T, PT.H_NET_W_AIR, PT.H_NET_HP]),
         }
 
-    return {GT.SUGCC.value: pt[[PT.T.value, PT.H_NET_UT.value, PT.H_NET_HP.value]]}
+    return {GT.SUGCC.value: pt.slice([PT.T, PT.H_NET_UT, PT.H_NET_HP])}
 
 
 def _calc_hpr_cascade(
