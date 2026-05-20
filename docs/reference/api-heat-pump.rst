@@ -1,7 +1,7 @@
 Heat Pump and Refrigeration
 ===========================
 
-The heat-pump and refrigeration stack is the most specialised part of the
+The Heat Pump and refrigeration stack is the most specialised part of the
 OpenPinch codebase. It combines preprocessing of background cascades,
 thermodynamic cycle models, and black-box optimisation to screen direct and
 indirect integration opportunities.

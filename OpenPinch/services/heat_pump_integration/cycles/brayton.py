@@ -29,7 +29,7 @@ __all__ = [
 def optimise_brayton_heat_pump_placement(
     args: HeatPumpTargetInputs,
 ) -> None:
-    """Optimise a single-stage Brayton heat-pump placement against the background."""
+    """Optimise a single-stage Brayton Heat Pump placement against the background."""
     raise NotImplementedError(
         "Brayton HPR targeting is currently unsupported pending contract and solver repair."
     )

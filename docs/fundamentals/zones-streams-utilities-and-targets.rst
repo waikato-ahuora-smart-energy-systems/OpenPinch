@@ -52,7 +52,7 @@ A zone owns:
 - solved target models
 
 This is what allows OpenPinch to move from a single process-zone problem to a
-total-site style aggregation workflow.
+Total Site aggregation workflow.
 
 Targets
 -------
@@ -100,7 +100,7 @@ The main in-memory hierarchy can be sketched as:
    |  |- hot / cold utilities
    |  `- targets
    |     |- Direct Integration
-   |     |- Indirect / Total-Site views
+   |     |- Indirect / Total Site views
    |     |- HPR / refrigeration targets
    |     `- cogeneration / area-cost post-processing
    `- Subzones

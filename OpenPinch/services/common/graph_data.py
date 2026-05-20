@@ -512,7 +512,7 @@ def _composite_series_meta(
     stream_loc: StreamLoc,
     column_key: Optional[str],
 ) -> GraphSeriesMeta:
-    """Return the display metadata for one composite-curve series."""
+    """Return the display metadata for one Composite Curve series."""
     if column_key is not None:
         meta = _series_meta_from_key(column_key)
         if meta.composite_title is not None:

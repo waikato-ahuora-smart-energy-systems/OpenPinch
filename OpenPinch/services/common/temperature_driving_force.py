@@ -1,4 +1,4 @@
-"""Temperature-driving-force calculations for composite-curve analysis."""
+"""Temperature-driving-force calculations for Composite Curve analysis."""
 
 import math
 

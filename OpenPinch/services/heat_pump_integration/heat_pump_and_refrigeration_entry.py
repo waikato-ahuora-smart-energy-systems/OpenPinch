@@ -56,7 +56,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
 ) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
-    """Solve an explicit direct heat-pump or refrigeration target for one zone."""
+    """Solve an explicit direct Heat Pump or refrigeration target for one zone."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.DI.value].pt)
     target_load = _validate_hpr_required(
@@ -103,7 +103,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
 ) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
-    """Solve an indirect / utility-system heat-pump or refrigeration target."""
+    """Solve an indirect / utility system Heat Pump or refrigeration target."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.TS.value].pt)
     # Create problem table based on inverted utility streams

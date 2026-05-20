@@ -1,4 +1,4 @@
-"""Problem-table generation and cascade utilities for pinch analysis.
+"""Problem Table generation and cascade utilities for pinch analysis.
 
 This module collects the vectorised implementations of the temperature
 interval problem table, cascade shifting logic, and helper routines used when

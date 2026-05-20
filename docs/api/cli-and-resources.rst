@@ -16,7 +16,7 @@ The CLI supports:
 - ``validate`` for payload preflight checks
 - ``sample`` for copying packaged sample cases
 - ``notebook`` for copying packaged example notebooks
-- ``heat-pump`` for evaluating an integrated heat-pump scenario against a case
+- ``heat-pump`` for evaluating an integrated Heat Pump scenario against a case
 
 .. automodule:: OpenPinch.__main__
    :members:

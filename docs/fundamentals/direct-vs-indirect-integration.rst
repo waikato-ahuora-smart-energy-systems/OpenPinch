@@ -26,7 +26,7 @@ Indirect integration operates one level up:
 - utility-to-utility balancing is used to recover heat across zones through the
   wider utility system rather than only by direct process-to-process exchange
 
-This is the foundation for total-process and total-site style workflows.
+This is the foundation for Total Process and Total Site workflows.
 
 Why The Answers Differ
 ----------------------

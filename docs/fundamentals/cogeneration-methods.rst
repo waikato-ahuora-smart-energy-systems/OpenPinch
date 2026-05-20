@@ -4,10 +4,10 @@ Cogeneration Methods
 OpenPinch includes turbine cogeneration analysis as a post-processing workflow
 on top of the thermal targeting results.
 
-Above-Pinch Logic
+Above Pinch Logic
 -----------------
 
-Above-pinch cogeneration interprets suitable hot utility demands as candidate
+Above Pinch cogeneration interprets suitable hot utility demands as candidate
 steam extraction levels in a multistage turbine train. The workflow estimates:
 
 - turbine work target
@@ -17,12 +17,12 @@ steam extraction levels in a multistage turbine train. The workflow estimates:
 This is a thermodynamic screening and targeting workflow, not a full plant
 equipment design package.
 
-Below-Pinch Logic
+Below Pinch Logic
 -----------------
 
-Below-pinch cogeneration interprets suitable thermal loads against an
+Below Pinch cogeneration interprets suitable thermal loads against an
 environmental sink as a condensing turbine opportunity. It answers a different
-question from the above-pinch extraction path, even though the same turbine
+question from the above Pinch extraction path, even though the same turbine
 solver family is reused.
 
 Important Configuration Ideas

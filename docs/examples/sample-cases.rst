@@ -17,14 +17,14 @@ Included Cases
    sensitivity studies.
 
 ``zonal_site.json``
-   Hierarchical zone-tree case for multi-zone and aggregated total-site style
+   Hierarchical zone-tree case for multi-zone and aggregated Total Site
    workflows.
 
 ``pulp_mill.json``
-   Larger site-style example used in the packaged total-site notebook.
+   Larger site-style example used in the packaged Total Site notebook.
 
 ``heat_pump_targeting.json``
-   Compact HPR screening payload for direct heat-pump experimentation without
+   Compact HPR screening payload for direct Heat Pump experimentation without
    the larger multi-case notebook flow.
 
 ``chocolate_factory.json``

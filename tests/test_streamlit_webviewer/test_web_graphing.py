@@ -418,7 +418,7 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
 
     assert any("No graphs available" in msg for msg in st.infos)
     assert any("No shifted problem table data" in msg for msg in st.infos)
-    assert any("No real-temperature problem table data" in msg for msg in st.infos)
+    assert any("No real temperature Problem Table data" in msg for msg in st.infos)
 
 
 def test_segment_trace_vertical_colour_zero_length_and_arrow_fallbacks():

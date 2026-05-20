@@ -1,7 +1,7 @@
 """Streamlit helpers for visualising OpenPinch outputs.
 
 The functions in this module provide a lightweight dashboard scaffold that
-renders the composite-curve style graphs emitted by :mod:`OpenPinch.services`
+renders the Composite Curve style graphs emitted by :mod:`OpenPinch.services`
 alongside the corresponding problem tables.  The dashboard is intentionally
 minimal so user projects can layer additional controls as needed.
 """
@@ -318,7 +318,7 @@ def render_streamlit_dashboard(
             target.pt_real, round_decimals=value_rounding
         )
         if pt_real_df.empty:
-            st.info("No real-temperature problem table data available.")
+            st.info("No real temperature Problem Table data available.")
         else:
             st.badge(
                 "Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns."

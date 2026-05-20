@@ -92,7 +92,7 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     The routine assumes the relevant child zones have already been solved for
     direct integration. It then sums subzone targets, builds site-level net
     stream cascades, performs utility-to-utility balancing, and records the
-    resulting total-site style target on ``zone`` before returning it.
+    resulting Total Site target on ``zone`` before returning it.
     """
     s_tzt = zone.targets[TT.TZ.value]
 

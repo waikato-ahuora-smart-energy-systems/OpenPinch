@@ -1,7 +1,7 @@
 Heat Pump and Refrigeration Methods
 ===================================
 
-OpenPinch treats heat-pump and refrigeration work as an integration question
+OpenPinch treats Heat Pump and refrigeration work as an integration question
 first and a cycle question second.
 
 Primary Question
@@ -22,7 +22,7 @@ Two Main Workflow Shapes
 ------------------------
 
 Scenario comparison workflow
-   Heat-pump studies are framed in the docs as before/after integration
+   Heat Pump studies are framed in the docs as before/after integration
    questions, but the current package surface exposes that work through the
    explicit HPR targeting methods rather than a dedicated wrapper helper.
 

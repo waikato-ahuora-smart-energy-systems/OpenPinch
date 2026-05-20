@@ -211,7 +211,7 @@ def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> No
 def _write_problem_tables(
     master_zone: Optional["Zone"], writer: pd.ExcelWriter
 ) -> None:
-    """Emit shifted and real-temperature problem tables for every solved zone."""
+    """Emit shifted and real temperature Problem Tables for every solved zone."""
     if master_zone is None:
         return
 

@@ -39,7 +39,7 @@ def get_additional_GCCs(
     Parameters
     ----------
     pt:
-        Problem table containing baseline ``H_net`` and composite-curve columns.
+        Problem table containing baseline ``H_net`` and Composite Curve columns.
     do_vert_cc_calc:
         Enable vertical heat-transfer transformation for assisted integration.
     do_assisted_ht_calc:

@@ -52,7 +52,7 @@ Step 4. Inspect Graphs
    gcc = problem.plot.grand_composite_curve()
    cc = problem.plot.composite_curve()
 
-Use the GCC first when utility placement or heat-pump opportunity is the main
+Use the GCC first when utility placement or Heat Pump opportunity is the main
 question. These rendered Plotly figures require the ``openpinch[notebook]`` or
 ``openpinch[dashboard]`` extra.
 

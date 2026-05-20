@@ -82,7 +82,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
 
 
 def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
-    """Run direct heat-pump targeting after ensuring a base DI target exists."""
+    """Run direct Heat Pump targeting after ensuring a base DI target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
         direct_heat_integration_service(zone)
@@ -96,7 +96,7 @@ def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
 
 
 def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
-    """Run indirect heat-pump targeting after ensuring a base TS target exists."""
+    """Run indirect Heat Pump targeting after ensuring a base TS target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
         indirect_heat_integration_service(zone)
@@ -138,7 +138,7 @@ def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone
 
 
 def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
-    """Post-process an existing target to recover above-pinch cogeneration work."""
+    """Post-process an existing target to recover above Pinch cogeneration work."""
     _apply_zone_config_overrides(zone, args)
     target_type = [
         TT.IHP.value,

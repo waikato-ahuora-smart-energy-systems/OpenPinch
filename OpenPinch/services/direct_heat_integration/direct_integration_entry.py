@@ -1,4 +1,4 @@
-"""Direct heat-integration entry point for process and unit-level targeting."""
+"""Direct heat integration entry point for process and unit-level targeting."""
 
 from typing import List, Tuple
 
@@ -37,7 +37,7 @@ __all__ = ["compute_direct_integration_targets"]
 def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     """Populate a ``Zone`` with detailed direct heat integration pinch targets.
 
-    The function aggregates problem-table calculations, multi-utility targeting,
+    The function aggregates Problem Table calculations, multi-utility targeting,
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
@@ -319,7 +319,7 @@ def _find_next_available_utility(
 
 
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
-    """Assemble the problem-table slices required for composite/comparison plots."""
+    """Assemble the Problem Table slices required for composite/comparison plots."""
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {

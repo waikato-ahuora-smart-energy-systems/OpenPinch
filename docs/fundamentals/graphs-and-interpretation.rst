@@ -47,21 +47,21 @@ thinking about:
 
 - utility selection
 - utility level placement
-- heat-pump opportunity screening
+- Heat Pump opportunity screening
 - residual heating or cooling pockets
 
 It is often the best visual companion to the hot and cold utility targets.
 
-Total-Site Profiles and SUGCC
+Total Site Profiles and SUGCC
 -----------------------------
 
 At larger system scope, OpenPinch also supports:
 
-- total-site style profiles
+- Total Site profiles
 - site utility grand composite curves
 
 These views are especially relevant when direct and indirect integration
-answers differ and you need to understand utility-system interaction across
+answers differ and you need to understand utility system interaction across
 subzones.
 
 Common Interpretation Errors
@@ -88,9 +88,9 @@ The main graph surfaces are:
 - `problem.plot.export(...)`
 - CLI `openpinch graph`
 
-After direct HPR targeting, the target-specific net-load-profile graph includes
-the heat-pump condenser and evaporator overlays, and the dedicated GCC-with-
-heat-pump view exposes the HPR cascade directly.
+After direct HPR targeting, the target-specific net load profile graph includes
+the Heat Pump condenser and evaporator overlays, and the dedicated GCC with
+Heat Pump view exposes the HPR cascade directly.
 
 Recommended Follow-On Pages
 ---------------------------

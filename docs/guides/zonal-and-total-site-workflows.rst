@@ -1,4 +1,4 @@
-Zonal and Total-Site Workflows
+Zonal and Total Site Workflows
 ==============================
 
 OpenPinch becomes substantially more powerful once you move beyond a single
@@ -26,14 +26,14 @@ At larger scale, zones can be aggregated into:
 - a site
 
 Direct integration usually answers the local question. Indirect integration
-usually answers the higher-level utility-system question.
+usually answers the higher-level utility system question.
 
 Practical Workflow
 ------------------
 
 1. define a zone hierarchy explicitly when the study is multiscale
 2. solve the local or process-zone picture
-3. compare it to the aggregated total-process or total-site picture
+3. compare it to the aggregated Total Process or Total Site picture
 4. use higher-level graph views to understand what changed
 
 Useful Assets
@@ -80,7 +80,7 @@ Useful Graphs
 For multiscale workflows, the most useful views are often:
 
 - grand composite curves
-- total-site profiles
+- Total Site profiles
 - site utility grand composite curves
 
 Next Steps
