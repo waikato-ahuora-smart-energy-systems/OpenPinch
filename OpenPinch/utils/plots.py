@@ -1,7 +1,7 @@
 """Plotly helper routines for quick temperature-enthalpy visual checks."""
 
-import plotly.graph_objects as go
 import numpy as np
+import plotly.graph_objects as go
 
 
 def plot_t_h_curve(points, title: str = "Temperature vs. Enthalpy") -> None:

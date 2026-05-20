@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
-from ..config import Configuration, tol
+from ..config import Configuration
 from ..enums import SummaryRowType
 from .reporting import HeatUtility, TargetResults, TempPinch
 

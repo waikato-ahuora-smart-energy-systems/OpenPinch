@@ -1,6 +1,7 @@
 """Area targeting methods."""
 
 import numpy as np
+
 from ...classes.stream_collection import StreamCollection
 from ...lib.config import Configuration, tol
 from ...lib.enums import PT

@@ -18,9 +18,7 @@ from ...lib.enums import GT, PT, TT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
 from ..common.problem_table_analysis import (
-    get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
-    problem_table_algorithm,
 )
 
 __all__ = [

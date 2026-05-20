@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import List, Optional
+
 import numpy as np
 
 from .stream_collection import StreamCollection
 from .vapour_compression_cycle import VapourCompressionCycle
-
 
 __all__ = ["CascadeVapourCompressionCycle"]
 

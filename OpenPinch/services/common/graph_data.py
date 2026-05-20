@@ -117,7 +117,7 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 data=target_graphs[GT.GCC_R.value],
                 label="Grand Composite Curve (Real)",
                 value_field=[
-                    PT.H_NET, 
+                    PT.H_NET,
                     PT.H_NET_UT,
                 ],
                 is_utility_profile=[False, True],

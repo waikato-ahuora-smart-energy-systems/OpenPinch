@@ -12,9 +12,9 @@ from typing import Optional, Sequence
 import numpy as np
 
 try:
-    from tespy.networks import Network
-    from tespy.components import CycleCloser, Compressor, Turbine, SimpleHeatExchanger
+    from tespy.components import Compressor, CycleCloser, SimpleHeatExchanger, Turbine
     from tespy.connections import Connection
+    from tespy.networks import Network
 except ImportError as exc:  # pragma: no cover - optional dependency guard
     Network = None
     CycleCloser = Compressor = Turbine = SimpleHeatExchanger = Connection = None

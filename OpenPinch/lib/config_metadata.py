@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, List
 
-from .enums import BB_Minimiser, HPRcycle, TurbineModel, ZT
+from .enums import ZT, BB_Minimiser, HPRcycle, TurbineModel
 
 
 @dataclass(frozen=True)

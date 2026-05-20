@@ -6,12 +6,12 @@ from typing import IO, Union
 import pandas as pd
 from pandas.errors import EmptyDataError, ParserError
 
+from .input_validation import validate_stream_data, validate_utility_data
 from .wkbook_to_json import (
     _get_column_names_and_units,
     _write_problem_to_dict_and_list,
     _write_targets_to_dict_and_list,
 )
-from .input_validation import validate_stream_data, validate_utility_data
 
 __all__ = ["get_problem_from_csv", "get_results_from_csv"]
 

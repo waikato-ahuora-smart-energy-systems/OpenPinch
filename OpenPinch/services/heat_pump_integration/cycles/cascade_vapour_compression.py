@@ -3,7 +3,7 @@
 import numpy as np
 
 from ....classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
-from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HeatPumpTargetInputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,

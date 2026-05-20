@@ -1,10 +1,9 @@
 """Multiple simple Carnot HP targeting."""
 
-from typing import Tuple
 
 import numpy as np
 
-from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HeatPumpTargetInputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
 from ..common.encoding import AMBIENT_X_BOUNDS, map_x_arr_to_T_arr, map_x_to_Q_amb
 from ..common.layout import HPRoptVectorLayout

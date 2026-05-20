@@ -1,6 +1,7 @@
 """Heat-exchanger performance correlations used by area targeting routines."""
 
 import math
+
 import numpy as np
 
 from ..lib.enums import HeatExchangerTypes as HX
@@ -73,7 +74,7 @@ def compute_LMTD_from_ts(
 
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
     """Return heat exchanger effectiveness for the specified arrangement/NTU/c ratio."""
-    if Passes == None:
+    if Passes is None:
         Passes = 1
 
     Ntu = Ntu / Passes
@@ -92,7 +93,7 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
             eff = (1 - math.exp(-Ntu * (1 + c))) / (1 + c)
         # Cross Flow - Both Streams Unmixed Effectiveness
         elif Arrangement == HX.CrFUU:
-            if Rows == None or Cmin_Phase == None:
+            if Rows is None or Cmin_Phase is None:
                 eff = CrossflowUnmixedEff1(Ntu, c)
             else:
                 eff = CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_Phase)
@@ -128,7 +129,7 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
 
 def HX_NTU(Arrangement, eff, c, Passes=None):
     """Compute the NTU corresponding to a target effectiveness for a given arrangement."""
-    if Passes == None:
+    if Passes is None:
         Passes = 1
 
     if Passes > 1:

@@ -15,3 +15,10 @@ class ProblemTableUpdateKwargs(TypedDict):
 
     T_col: np.ndarray
     updates: ProblemTableColumnUpdates
+
+
+__all__ = [
+    "ProblemTableColumnKey",
+    "ProblemTableColumnUpdates",
+    "ProblemTableUpdateKwargs",
+]

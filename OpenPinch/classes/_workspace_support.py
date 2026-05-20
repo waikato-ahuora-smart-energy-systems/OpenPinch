@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 from enum import Enum
-import math
 from pathlib import Path
 from typing import Any, Dict, Optional
 

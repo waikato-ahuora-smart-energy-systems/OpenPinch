@@ -18,10 +18,10 @@ from ....classes.stream_collection import StreamCollection
 from ....lib.config import tol
 from ....lib.enums import PT
 from ....lib.schemas.hpr import (
+    HeatPumpTargetInputs,
     HPRBackendResult,
     HPRParsedState,
     HPRThermoArtifacts,
-    HeatPumpTargetInputs,
 )
 from ....utils.blackbox_minimisers import multiminima
 from ....utils.miscellaneous import (

@@ -15,7 +15,7 @@ from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.config import Configuration
-from ...lib.enums import StreamLoc, ST, ZT
+from ...lib.enums import ST, ZT, StreamLoc
 from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ...utils.miscellaneous import get_value
 

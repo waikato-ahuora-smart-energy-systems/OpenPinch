@@ -8,8 +8,8 @@ minimal so user projects can layer additional controls as needed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import sys
+from dataclasses import dataclass
 from io import BytesIO
 from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tuple
 
@@ -32,7 +32,6 @@ else:
     _STREAMLIT_IMPORT_ERROR = None
 
 from ..classes.problem_table import ProblemTable
-from ..classes.stream import Stream
 from ..classes.zone import Zone
 from ..lib.enums import LineColour
 from ..lib.schemas.targets import BaseTargetModel
@@ -192,7 +191,7 @@ def render_streamlit_dashboard(
     st.sidebar.divider()
     st.sidebar.write("Targets")
     st.sidebar.markdown(
-        f"<div class='op-utility-title'>Overview</div>",
+        "<div class='op-utility-title'>Overview</div>",
         unsafe_allow_html=True,
     )
     st.sidebar.markdown(

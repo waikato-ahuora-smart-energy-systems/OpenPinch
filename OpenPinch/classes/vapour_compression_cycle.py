@@ -9,10 +9,9 @@ import CoolProp
 import numpy as np
 from scipy.optimize import brentq
 
+from ..utils.stream_linearisation import get_piecewise_data_points
 from .stream import Stream
 from .stream_collection import StreamCollection
-from ..utils.stream_linearisation import get_piecewise_data_points
-
 
 __all__ = ["VapourCompressionCycle"]
 
@@ -739,7 +738,7 @@ class VapourCompressionCycle:
             self._save_cycle_state(state4, 4)
 
             # 5 - Hot side of cascade heat exchanger outlet (otherwise state 5 == 3)
-            if self._Q_cool == None or np.isnan(self._Q_cool):
+            if self._Q_cool is None or np.isnan(self._Q_cool):
                 self._Q_cool = self._Q_evap
             elif self._Q_cool > self._Q_evap:
                 self._Q_cool = self._Q_evap
@@ -769,7 +768,7 @@ class VapourCompressionCycle:
             self._save_cycle_state(state5, 5)
 
             # 4 - Hot side of cascade heat exchanger outlet (otherwise state 4 == 1)
-            if self._Q_heat == None or np.isnan(self._Q_heat):
+            if self._Q_heat is None or np.isnan(self._Q_heat):
                 self._Q_heat = self._Q_cond
             elif self._Q_heat > self._Q_cond:
                 self._Q_heat = self._Q_cond

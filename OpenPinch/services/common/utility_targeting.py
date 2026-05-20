@@ -8,10 +8,8 @@ from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
 from ...lib.config import tol
 from ...lib.enums import PT, ST
-
-from .problem_table_analysis import get_utility_heat_cascade
 from .gcc_manipulation import get_seperated_gcc_heat_load_profiles
-
+from .problem_table_analysis import get_utility_heat_cascade
 
 __all__ = ["get_utility_targets"]
 

@@ -26,10 +26,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install --group dev
+      - name: Run staged package lint
+        run: ruff check OpenPinch --select F401,F403,F405,E711,F541,W291,I001
       - name: Run tests
         run: pytest -q
-      - name: Build docs
-        run: python -m sphinx -b html docs docs/_build/html
 
   bump-version:
     name: Bump version on PR head branch (no tags)

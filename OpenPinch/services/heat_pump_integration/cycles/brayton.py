@@ -3,7 +3,6 @@
 from typing import List, Tuple
 
 import numpy as np
-from scipy.optimize import minimize
 
 from ....classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ....classes.stream_collection import StreamCollection

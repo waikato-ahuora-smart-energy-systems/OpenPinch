@@ -3,8 +3,8 @@
 import csv
 import pickle
 from copy import copy
-from pathlib import Path
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
 
 from ..lib.enums import ST
@@ -73,7 +73,7 @@ class StreamCollection:
 
     def add_many(self, streams, keys=None, prevent_overwrite: bool = True):
         """Insert several streams, optionally using explicit keys for each stream."""
-        if keys == None:
+        if keys is None:
             for stream in streams:
                 self.add(stream, prevent_overwrite=prevent_overwrite)
         else:

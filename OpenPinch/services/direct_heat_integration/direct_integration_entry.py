@@ -4,12 +4,12 @@ from typing import List, Tuple
 
 import numpy as np
 
+from ...classes.problem_table import ProblemTable
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
-from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...lib.config import tol
-from ...lib.enums import GT, PT, ST, TT, ZT
+from ...lib.enums import GT, PT, ST, TT
 from ...lib.schemas.targets import DirectIntegrationTarget
 from ...utils.miscellaneous import delta_vals
 from ..common.capital_cost_and_area_targeting import (
@@ -25,7 +25,6 @@ from ..common.problem_table_analysis import (
     set_zonal_targets,
 )
 from ..common.utility_targeting import get_utility_targets
-
 
 __all__ = ["compute_direct_integration_targets"]
 

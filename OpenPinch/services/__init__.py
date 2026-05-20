@@ -12,7 +12,6 @@ from .common.capital_cost_and_area_targeting import (
 )
 from .common.graph_data import get_output_graph_data
 from .common.utility_targeting import get_utility_targets
-from .input_data_processing.data_preparation import prepare_problem
 
 if TYPE_CHECKING:
     from types import ModuleType

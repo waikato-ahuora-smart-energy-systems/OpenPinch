@@ -5,7 +5,7 @@ import numpy as np
 from ....classes.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
-from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HeatPumpTargetInputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
