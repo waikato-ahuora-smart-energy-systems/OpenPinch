@@ -1,9 +1,9 @@
 """Targeted edge-path tests for ProblemTable equality internals."""
 
 import numpy as np
-from OpenPinch.classes.problem_table import ProblemTable
-import pandas as pd
 import pytest
+
+from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.lib.enums import ProblemTableLabel as PT
 
 

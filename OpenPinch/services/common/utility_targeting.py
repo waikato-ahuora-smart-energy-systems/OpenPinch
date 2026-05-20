@@ -1,4 +1,4 @@
-"""Target multiple utilities over a heating or cooler profile starting from the pinch temperature."""
+"""Target multiple utilities over a heating or cooling profile from the pinch."""
 
 from typing import Tuple
 
@@ -13,9 +13,9 @@ from .problem_table_analysis import get_utility_heat_cascade
 
 __all__ = ["get_utility_targets"]
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_utility_targets(
@@ -103,9 +103,9 @@ def get_utility_targets(
     return pt, pt_real, hot_utilities, cold_utilities
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _target_utility(
@@ -166,7 +166,8 @@ def _assign_utility(
 
     if len(np.where(H_segment < tol)) != 1:
         raise ValueError(
-            "Error in utility targeting. Please report the the data that produced this error."
+            "Error in utility targeting. Please report the data that produced "
+            "this error."
         )
 
     Q_assigned = 0.0
@@ -211,7 +212,7 @@ def _maximise_utility_duty(
     is_hot_ut: bool,
     Q_assigned: float,
 ) -> float:
-    """Determine remaining heat duty a utility can serve given temperature limits and prior assignments."""
+    """Determine remaining heat duty within temperature and assignment limits."""
     if T_segment.size < 2:
         return 0.0
 

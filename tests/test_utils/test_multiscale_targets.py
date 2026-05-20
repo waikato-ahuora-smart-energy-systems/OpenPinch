@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import pytest
-from types import SimpleNamespace
 
 from OpenPinch import *
-from OpenPinch.utils import multiscale_targeting as ms
-from OpenPinch.lib import *
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
+from OpenPinch.lib import *
 from OpenPinch.lib.enums import ZT
+from OpenPinch.utils import multiscale_targeting as ms
 
 
 class _DummyTarget:
@@ -56,7 +55,9 @@ def _utility_collection():
 
 def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     calls = []
-    direct = lambda z: calls.append(z.name)
+
+    def direct(z):
+        calls.append(z.name)
 
     valid = Zone(name="UO", type=ZT.O.value)
     valid.config.DO_DIRECT_OPERATION_TARGETING = True
@@ -80,8 +81,13 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
         ms._get_process_targets(invalid)
 
     calls = []
-    direct = lambda z: calls.append(f"direct:{z.name}")
-    indirect = lambda z: calls.append(f"indirect:{z.name}")
+
+    def direct(z):
+        calls.append(f"direct:{z.name}")
+
+    def indirect(z):
+        calls.append(f"indirect:{z.name}")
+
     monkeypatch.setattr(
         ms,
         "_get_unit_operation_targets",
@@ -117,8 +123,13 @@ def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
         ms._get_site_targets(invalid)
 
     calls = []
-    direct = lambda z: calls.append(f"direct:{z.name}")
-    indirect = lambda z: calls.append(f"indirect:{z.name}")
+
+    def direct(z):
+        calls.append(f"direct:{z.name}")
+
+    def indirect(z):
+        calls.append(f"indirect:{z.name}")
+
     monkeypatch.setattr(
         ms,
         "_get_unit_operation_targets",

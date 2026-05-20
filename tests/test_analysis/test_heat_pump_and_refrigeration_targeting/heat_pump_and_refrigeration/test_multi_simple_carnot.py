@@ -2,13 +2,13 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from OpenPinch.services.heat_pump_integration.common.shared import (
+    get_Q_vals_at_T_hpr_from_bckgrd_profile,
+)
 from OpenPinch.services.heat_pump_integration.cycles.multi_simple_carnot import (
     _compute_multi_simple_carnot_hp_opt_obj,
     _get_multi_simple_carnot_stage_duties_and_work,
     _parse_multi_simple_carnot_hp_state_variables,
-)
-from OpenPinch.services.heat_pump_integration.common.shared import (
-    get_Q_vals_at_T_hpr_from_bckgrd_profile,
 )
 
 

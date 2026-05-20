@@ -1,15 +1,16 @@
 """Regression tests for the cascade heat pump cycle classes."""
 
 from types import SimpleNamespace
+
 import numpy as np
 import pytest
+
 import OpenPinch.classes.cascade_vapour_compression_cycle as cascade_mod
-from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.cascade_vapour_compression_cycle import (
     CascadeVapourCompressionCycle,
 )
+from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
-
 
 pytest.importorskip("CoolProp")
 
@@ -55,7 +56,7 @@ def test_cascade_rejects_invalid_temperature_order():
         T_cond=np.array([30.0, 20.0]),
         refrigerant="R134a",
     )
-    assert cycle.solved == False
+    assert not cycle.solved
 
 
 def test_cascade_num_cycles_matches_network_definition():

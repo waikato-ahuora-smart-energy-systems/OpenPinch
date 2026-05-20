@@ -1,13 +1,14 @@
 """Regression tests for the stream collection classes."""
 
-import pytest
-from OpenPinch.classes import *
-from OpenPinch.lib import *
 import csv
 from uuid import uuid4
+
+import pytest
+
+from OpenPinch.classes import *
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
-
+from OpenPinch.lib import *
 
 """Tests for StreamCollection."""
 

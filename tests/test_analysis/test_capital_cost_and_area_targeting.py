@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
+from OpenPinch.classes import Stream, StreamCollection
 from OpenPinch.services.common.capital_cost_and_area_targeting import (
     get_area_targets,
     get_min_number_hx,
 )
-from OpenPinch.classes import Stream, StreamCollection
 
 
 def _make_stream(

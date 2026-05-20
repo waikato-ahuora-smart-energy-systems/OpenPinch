@@ -1,15 +1,16 @@
 """Regression tests for miscellaneous utility helpers."""
 
 import math
+
+import numpy as np
 import pytest
-from OpenPinch.utils.miscellaneous import *
+
 from OpenPinch.classes import *
 from OpenPinch.lib import *
-from OpenPinch.utils import *
 from OpenPinch.services.exergy_analysis.exergy_targeting_entry import *
-import numpy as np
+from OpenPinch.utils import *
 from OpenPinch.utils import miscellaneous
-
+from OpenPinch.utils.miscellaneous import *
 
 """Test cases for the get_value function."""
 
@@ -202,9 +203,9 @@ def test_get_value_val2_fallback_does_not_mutate_payload():
 
 
 def test_get_value_none_raises_type_error():
-    assert get_value(None) == None
-    assert get_value({"value": None}) == None
-    assert get_value({"zone-a": None}, zone_name="zone-a") == None
+    assert get_value(None) is None
+    assert get_value({"value": None}) is None
+    assert get_value({"zone-a": None}, zone_name="zone-a") is None
 
 
 @pytest.mark.parametrize(

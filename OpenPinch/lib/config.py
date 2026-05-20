@@ -11,10 +11,6 @@ from copy import deepcopy
 
 from .config_metadata import CONFIG_FIELD_SPECS
 
-# TODO: This file needs a refactor once the purpose of it is well defined.
-# At present, the config includes many options corresponding to the Excel
-# workbook, but they are not considered during analysis.
-
 C_to_K: float = 273.15  # degrees
 tol: float = 1e-6
 T_CRIT: float = 373.9  # C

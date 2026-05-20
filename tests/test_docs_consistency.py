@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 README = REPO_ROOT / "README.md"
 GETTING_STARTED = REPO_ROOT / "docs" / "getting-started.rst"
@@ -15,7 +14,9 @@ INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results
 GUIDE_FIRST_SOLVE_CLI = REPO_ROOT / "docs" / "guides" / "first-solve-cli.rst"
 GUIDE_EXPORTING_RESULTS = REPO_ROOT / "docs" / "guides" / "exporting-results.rst"
 GUIDE_GRAPHING = REPO_ROOT / "docs" / "guides" / "graphing-and-interpretation.rst"
-FUNDAMENTALS_GRAPHS = REPO_ROOT / "docs" / "fundamentals" / "graphs-and-interpretation.rst"
+FUNDAMENTALS_GRAPHS = (
+    REPO_ROOT / "docs" / "fundamentals" / "graphs-and-interpretation.rst"
+)
 OVERVIEW_CAPABILITY_MATRIX = REPO_ROOT / "docs" / "overview" / "capability-matrix.rst"
 API_PINCHWORKSPACE = REPO_ROOT / "docs" / "api" / "pinchworkspace.rst"
 API_PACKAGE_ROOT = REPO_ROOT / "docs" / "api" / "package-root.rst"

@@ -60,10 +60,12 @@ def get_value(
     val2: Union[float, int, str, None] = None,
     zone_name: str = None,
 ) -> float:
-    """Extract a numeric value from supported scalars, dict payloads, or :class:`ValueWithUnit`."""
+    """Extract a numeric value from supported scalars and payload wrappers."""
     if isinstance(val, bool):
         raise TypeError(
-            f"Unsupported type: {type(val)}. Expected float, int, numeric string, dict, or ValueWithUnit."
+            "Unsupported type: "
+            f"{type(val)}. Expected float, int, numeric string, dict, "
+            "or ValueWithUnit."
         )
     elif isinstance(val, float | int):
         return float(val)
@@ -79,7 +81,10 @@ def get_value(
 
         if len(payload) > 2:
             raise ValueError(
-                "Invalid payload: more than one operation specified. Payload must contain only 'value' and at most one of 'multiplier', 'multiply', 'add', 'subtract', 'divide', 'power', 'log', 'exp', 'abs', 'min', or 'max'."
+                "Invalid payload: more than one operation specified. Payload "
+                "must contain only 'value' and at most one of "
+                "'multiplier', 'multiply', 'add', 'subtract', 'divide', "
+                "'power', 'log', 'exp', 'abs', 'min', or 'max'."
             )
 
         value = get_value(payload["value"])
@@ -135,7 +140,7 @@ def _is_value_with_unit(val: Any) -> bool:
 def linear_interpolation(
     xi: float, x1: float, x2: float, y1: float, y2: float
 ) -> float:
-    """Performs linear interpolation to estimate y at a given x, using two known points (x1, y1) and (x2, y2)."""
+    """Estimate ``y`` at ``xi`` using two known points and linear interpolation."""
     if x1 == x2:
         raise ValueError(
             "Cannot perform interpolation when x1 == x2 (undefined slope)."
@@ -147,7 +152,7 @@ def linear_interpolation(
 
 
 def delta_with_zero_at_start(x: np.ndarray) -> np.ndarray:
-    """Compute difference between successive entries in a column and include a zero in the first entry."""
+    """Compute successive differences and prepend a zero entry."""
     return np.insert(delta_vals(x), 0, 0.0)
 
 
@@ -262,7 +267,7 @@ def interp_with_plateaus(
     side: str,
     tol: float = 1e-6,
 ) -> np.ndarray:
-    """Interpolate temperatures while respecting vertical segments in the composite curves."""
+    """Interpolate temperatures while respecting vertical curve segments."""
     if side not in {"left", "right"}:
         raise ValueError("side must be 'left' or 'right'")
 
@@ -278,7 +283,7 @@ def interp_with_plateaus(
 
 
 def make_monotonic(h_vals: np.ndarray, side: str, tol: float = 1e-6) -> np.ndarray:
-    """Adjust an array so repeated values become strictly increasing for interpolation."""
+    """Adjust repeated values to become strictly increasing for interpolation."""
     adjusted = np.asarray(h_vals, dtype=float).copy()
     if adjusted.size <= 1:
         return adjusted

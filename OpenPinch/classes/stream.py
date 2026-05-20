@@ -31,7 +31,7 @@ class Stream:
         price: float = 0.0,
         is_process_stream: bool = True,
     ):
-        """Initialise a stream and determine hot/cold classification from temperatures."""
+        """Initialise a stream and infer hot/cold classification."""
         self._name: str = name
         self._type: str = None
         self._t_supply: Optional[float] = t_supply
@@ -319,7 +319,8 @@ class Stream:
                     self._t_target = self._t_supply - 0.01
                     self._set_hot_stream_min_max_temperatures()
                 else:
-                    # Zero-duty isothermal stream: keep temperatures unchanged and classify as neutral.
+                    # Zero-duty isothermal streams stay neutral and keep their
+                    # temperatures.
                     self._set_neutral_stream_min_max_temperatures()
 
         if isinstance(self._heat_flow, float | int):
@@ -335,7 +336,8 @@ class Stream:
         """Flip a utility stream into its generating process-stream analogue."""
         if self._is_process_stream:
             raise ValueError(
-                "Logic error: Process streams cannot be inverted, only utility streams for their generation."
+                "Logic error: Process streams cannot be inverted; only utility "
+                "streams may be inverted for generation."
             )
 
         ts = self._t_supply

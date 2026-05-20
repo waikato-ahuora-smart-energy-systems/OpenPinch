@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from OpenPinch.classes import Zone
+from OpenPinch.lib import *
 from OpenPinch.services.common.graph_data import (
     _classify_segment,
     _create_curve,
@@ -13,8 +15,6 @@ from OpenPinch.services.common.graph_data import (
     _graph_gcc,
     get_output_graph_data,
 )
-from OpenPinch.classes import Zone
-from OpenPinch.lib import *
 
 # ----------------------------------------------------------------------------------------------------
 # Unit Tests for Helper Functions

@@ -1,15 +1,16 @@
 """Regression tests for the multi simple heat pump cycle classes."""
 
 from types import SimpleNamespace
+
 import numpy as np
 import pytest
+
 import OpenPinch.classes.parallel_vapour_compression_cycles as multi_mod
-from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
+from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
-
 
 pytest.importorskip("CoolProp")
 
@@ -526,4 +527,4 @@ def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
     )
 
     assert isinstance(work, float)
-    assert hp.solved == True
+    assert hp.solved

@@ -7,16 +7,28 @@ maintenance and hardening backlog based on the current repository state.
 
 ## Verified Baseline
 
-- `uv run pytest -q` passes: `833 passed in 32.21s`.
-- `uv run python -m build --wheel --sdist --no-isolation` passes.
-- `uv run ruff check OpenPinch --select F401,F403,F405,E711,F541,W291,I001`
+- `uv run pytest -q` passes: `833 passed in 30.90s`.
+- `uv run pytest -q tests/test_release_artifacts.py tests/test_docs_build.py`
   passes.
-- Docs build smoke and release artifact boundary checks are now covered by the
-  default test suite.
+- `uv run python -m build --wheel --sdist --no-isolation` passes.
+- `uv run ruff check .` passes.
+- Docs build smoke and release artifact boundary checks are covered by the
+  default test suite and now tolerate either direct tool availability or the
+  `uv` dev environment.
+- Package barrel modules now use direct named imports rather than dynamic
+  helper-based re-export logic.
 
-The package is currently green for the restored verification gates, staged
-package lint, and build flow, but the sweep still shows substantial structural
-debt in the public orchestration layer and several partial subsystems.
+## Current Debt Snapshot
+
+- There is no active Ruff backlog at the repository level; the current lint
+  baseline is clean.
+- A small number of targeted Ruff `per-file-ignores` now exist for intentional
+  wildcard-import test patterns and a handful of data-heavy or placeholder
+  files. Those exceptions should be revisited if those files are refactored.
+
+The package is currently green for the restored verification gates, full-repo
+lint, and build flow, but the sweep still shows substantial structural debt in
+the public orchestration layer and several partial subsystems.
 
 ## High-Risk Hotspots
 
@@ -39,9 +51,8 @@ Why this matters:
 - `PinchProblem` currently mixes loading, validation, source normalization,
   zone-tree preparation, targeting orchestration, comparison helpers, Excel
   export, dashboard launch, and error formatting.
-- It is declared as a `@dataclass` but also has a custom `__init__`, mutable
-  internal state, and fields shadowed by properties.
-- Ruff already flags field/property collisions in this file.
+- The earlier partial-dataclass/property-collision state has been removed, but
+  the class still owns too many responsibilities and too much mutable state.
 
 What to do:
 
@@ -49,8 +60,7 @@ What to do:
 - Split schema/semantic validation and message formatting into dedicated
   helpers.
 - Split export and dashboard integration away from core solve orchestration.
-- Remove the current partial-dataclass pattern and make state ownership
-  explicit.
+- Keep state ownership explicit as the class is broken into smaller units.
 
 Done when:
 

@@ -77,12 +77,12 @@ class SimpleBraytonHeatPumpCycle:
         self._conns = {}
         self._work: Optional[float] = None
 
-        # simple storage for 4 states: each state will be a dict with keys 'T', 'p', 'h', 's', 'm'
+        # Store 4 states with keys ``T``, ``p``, ``h``, ``s``, and ``m``.
         self._states = [
             dict(T=None, p=None, h=None, s=None, m=None) for _ in range(self.STATECOUNT)
         ]
 
-    # -- Properties to mimic HeatPumpCycle API -------------------------------------------------
+    # -- Properties to mimic the HeatPumpCycle API --------------------------------
     @property
     def cycle_states(self):
         """Return cycle state data in a compatibility-oriented list structure.
@@ -189,7 +189,7 @@ class SimpleBraytonHeatPumpCycle:
         """
         return self._work_net
 
-    # -- Solver API ---------------------------------------------------------------------------
+    # -- Solver API ---------------------------------------------------------------
     def solve(
         self,
         T_comp_in: float,
@@ -335,7 +335,7 @@ class SimpleBraytonHeatPumpCycle:
         self._require_solution()
         H = self.Hs
         T = self.Ts
-        # create a conservative 4 point: compressor outlet -> (same) -> (same) -> turbine inlet
+        # Create a conservative 4-point compressor-to-turbine profile.
         profile = np.array(
             [
                 [H[1], T[1]],

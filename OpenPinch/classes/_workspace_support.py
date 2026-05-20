@@ -55,6 +55,7 @@ _WORKFLOW_SUPPORT_LEVELS = {
     "area_cost": "advanced",
 }
 
+
 def normalise_payload(payload: TargetInput | JsonDict) -> JsonDict:
     if isinstance(payload, TargetInput):
         return payload.model_dump(mode="python")
@@ -306,7 +307,8 @@ def workflow_support_level(workflow: str) -> str:
 def workflow_warnings(workflow: str, support_level: str) -> list[str]:
     if support_level == "advanced":
         return [
-            f"Workflow '{workflow}' should be treated as an advanced PinchWorkspace workflow."
+            f"Workflow '{workflow}' should be treated as an advanced "
+            "PinchWorkspace workflow."
         ]
     if support_level == "unsupported":
         return [f"Workflow '{workflow}' is not a supported PinchWorkspace workflow."]

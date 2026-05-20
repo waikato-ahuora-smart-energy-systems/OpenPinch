@@ -1,17 +1,19 @@
 """Regression tests for optimiser handles utility helpers."""
 
+import time
+
 import numpy as np
 import pytest
-import OpenPinch.utils.blackbox_minimisers as optimiser_module
-from OpenPinch.lib.enums import BB_Minimiser
-from OpenPinch.utils.blackbox_minimisers import multiminima
-import OpenPinch.utils.blackbox_minimisers as bb
+
 import OpenPinch.utils.bb_optimisers.bayesian_optimisation as bb_bo
 import OpenPinch.utils.bb_optimisers.cmaes as bb_cma
 import OpenPinch.utils.bb_optimisers.common as bb_common
 import OpenPinch.utils.bb_optimisers.dual_annealing as bb_da
 import OpenPinch.utils.bb_optimisers.rbf_surrogate as bb_rbf
-import time
+import OpenPinch.utils.blackbox_minimisers as bb
+import OpenPinch.utils.blackbox_minimisers as optimiser_module
+from OpenPinch.lib.enums import BB_Minimiser
+from OpenPinch.utils.blackbox_minimisers import multiminima
 
 
 def _convex_quadratic(x, _):

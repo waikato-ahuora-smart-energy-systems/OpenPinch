@@ -13,7 +13,6 @@ import pytest
 import OpenPinch
 from OpenPinch.resources import list_notebooks
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

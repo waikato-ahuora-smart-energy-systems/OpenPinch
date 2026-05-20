@@ -1,15 +1,17 @@
 """Regression tests for wkbook to json utility helpers."""
 
 from pathlib import Path
+
+import numpy as np
 import pandas as pd
 import pytest
+
+from OpenPinch.utils import wkbook_to_json
 from OpenPinch.utils.wkbook_to_json import (
     _validate_stream_data,
     get_problem_from_excel,
     get_results_from_excel,
 )
-import numpy as np
-from OpenPinch.utils import wkbook_to_json
 
 
 def _write_test_workbook(path: Path):

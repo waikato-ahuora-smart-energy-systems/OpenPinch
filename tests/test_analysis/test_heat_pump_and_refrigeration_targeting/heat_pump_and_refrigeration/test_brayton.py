@@ -6,7 +6,6 @@ import pytest
 from OpenPinch.services.heat_pump_integration.cycles import (
     brayton as hp_brayton,
 )
-from OpenPinch.classes.stream_collection import StreamCollection
 
 from ..helpers import _base_args
 

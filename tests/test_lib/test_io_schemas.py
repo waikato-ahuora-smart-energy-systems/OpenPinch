@@ -4,8 +4,8 @@ from OpenPinch.lib.schemas.io import (
     GetInputOutputData,
     ProblemTableDataSchema,
     StreamSchema,
-    THSchema,
     TargetInput,
+    THSchema,
     UtilitySchema,
 )
 

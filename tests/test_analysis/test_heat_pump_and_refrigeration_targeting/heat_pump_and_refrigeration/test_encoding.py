@@ -4,8 +4,8 @@ import pytest
 from OpenPinch.services.heat_pump_integration.common.encoding import (
     map_Q_amb_to_x,
     map_T_arr_to_x_arr,
-    map_x_to_Q_amb,
     map_x_arr_to_T_arr,
+    map_x_to_Q_amb,
 )
 
 

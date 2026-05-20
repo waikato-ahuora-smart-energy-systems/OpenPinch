@@ -1,12 +1,12 @@
 """Regression tests for input validation utility helpers."""
 
 import pandas as pd
+
+import OpenPinch.utils.input_validation as iv
 from OpenPinch.utils.input_validation import (
     validate_stream_data,
     validate_utility_data,
 )
-from OpenPinch.utils.input_validation import validate_stream_data, validate_utility_data
-import OpenPinch.utils.input_validation as iv
 
 
 def test_validate_stream_data_none_returns_empty_list():

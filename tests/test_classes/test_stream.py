@@ -1,9 +1,10 @@
 """Regression tests for the stream classes."""
 
 import pytest
+
 from OpenPinch.classes import *
-from OpenPinch.lib import *
 from OpenPinch.classes.stream import Stream
+from OpenPinch.lib import *
 from OpenPinch.lib.enums import ST
 
 

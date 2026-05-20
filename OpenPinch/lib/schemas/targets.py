@@ -215,7 +215,7 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
 
 
 class HeatPumpTargetBase(GraphBackedTarget):
-    """Base contract for advanced HPR targets returned by explicit `target_*` methods."""
+    """Base contract for advanced HPR targets from explicit ``target_*`` methods."""
 
     pt: ProblemTable
     hpr_cycle: str

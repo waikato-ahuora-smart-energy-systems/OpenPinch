@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
@@ -16,7 +15,6 @@ from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
 from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.streamlit_webviewer import web_graphing as wg
-import sys
 
 
 class _CtxExtra:

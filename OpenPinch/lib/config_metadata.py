@@ -204,4 +204,3 @@ def configuration_group(name: str) -> str:
     if spec is None:
         return "general"
     return spec.group
-

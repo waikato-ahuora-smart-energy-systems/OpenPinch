@@ -1,12 +1,12 @@
 """Regression tests for direct integration entry analysis routines."""
 
-from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.services.direct_heat_integration.direct_integration_entry import (
     _add_net_segment_stateful,
     _initialise_utility_index,
 )
+from OpenPinch.utils.miscellaneous import *
 
 
 def test_initialise_utility_index_returns_first_available():

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import OpenPinch
-import OpenPinch.services
 import OpenPinch.classes
 import OpenPinch.lib
+import OpenPinch.services
 import OpenPinch.utils
-
 
 EXPECTED_EXPORTS = {
     "OpenPinch": {

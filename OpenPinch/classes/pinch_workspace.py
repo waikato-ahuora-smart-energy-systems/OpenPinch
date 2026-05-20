@@ -154,7 +154,7 @@ class PinchWorkspace:
         activate: bool = True,
         project_name: Optional[str] = None,
     ) -> Optional[PinchProblem]:
-        """Load or replace one named case and return a live case when the payload is valid."""
+        """Load or replace a named case and return a live validated case."""
         if source is None:
             return self.case(case_name)
 
@@ -631,7 +631,8 @@ class PinchWorkspace:
             return self._variant_payloads[name]
         except KeyError as exc:
             raise KeyError(
-                f"Unknown variant {name!r}. Available variants: {', '.join(self.list_variants())}"
+                f"Unknown variant {name!r}. Available variants: "
+                f"{', '.join(self.list_variants())}"
             ) from exc
 
     def _ensure_solved_view(self, name: str) -> ScenarioVariantView:

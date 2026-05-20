@@ -24,9 +24,9 @@ __all__ = [
 ]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 @timing_decorator
@@ -43,9 +43,9 @@ def optimise_multi_temperature_carnot_heat_pump_placement(
     )
 
 
-#######################################################################################################
+################################################################################
 # Helper Functions
-#######################################################################################################
+################################################################################
 
 
 def _get_multi_temperature_carnot_hp_opt_setup(
@@ -197,17 +197,20 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
     )
 
     if np.any(~is_hp):
-        fun = lambda x: _opt_wrapper_for_heat_pump(
-            x=x,
-            is_on=is_hp,
-            T_cond=T_cond,
-            T_evap=T_evap,
-            Q_cond=Q_cond,
-            Q_evap=Q_evap,
-            Qc_he=Qc_he,
-            Qe_he=Qe_he,
-            args=args,
-        )
+
+        def fun(x: float) -> float:
+            return _opt_wrapper_for_heat_pump(
+                x=x,
+                is_on=is_hp,
+                T_cond=T_cond,
+                T_evap=T_evap,
+                Q_cond=Q_cond,
+                Q_evap=Q_evap,
+                Qc_he=Qc_he,
+                Qe_he=Qe_he,
+                args=args,
+            )
+
         res = minimize_scalar(
             fun=fun,
             bounds=(0, 1),
@@ -238,7 +241,8 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
         Qc_he.sum() + Qc_hpr.sum() + w_he, Qe_he.sum() + Qe_hpr.sum() + w_hpr, atol=tol
     ):
         raise ValueError(
-            "Energy balance not satisfied in multi-temperature Carnot cycle calculation."
+            "Energy balance not satisfied in multi-temperature Carnot "
+            "cycle calculation."
         )
 
     return {

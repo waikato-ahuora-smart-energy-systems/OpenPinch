@@ -123,7 +123,5 @@ def test_release_artifacts_exclude_repo_only_assets(tmp_path: Path):
     _, wheel_names, sdist_names = _build_artifacts(tmp_path)
     _assert_common_release_boundary(wheel_names)
 
-    sdist_root = next(
-        name.split("/", 1)[0] for name in sdist_names if "/" in name
-    )
+    sdist_root = next(name.split("/", 1)[0] for name in sdist_names if "/" in name)
     _assert_common_release_boundary(sdist_names, root_prefix=sdist_root)

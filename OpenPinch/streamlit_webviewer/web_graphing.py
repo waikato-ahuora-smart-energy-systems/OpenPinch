@@ -154,12 +154,16 @@ def render_streamlit_dashboard(
 
     _apply_dashboard_theme(st)
 
+    resolved_title = page_title or f"{zone.name} Pinch Dashboard"
+
     st.markdown(
         f"""
         <div class="op-header">
             <div>
-                <div class="op-title">{page_title or f"{zone.name} Pinch Dashboard"}</div>
-                <div class="op-subtitle">Energy targeting summary with composite curve visualisation</div>
+                <div class="op-title">{resolved_title}</div>
+                <div class="op-subtitle">
+                    Energy targeting summary with composite curve visualisation
+                </div>
             </div>
         </div>
         """,
@@ -199,23 +203,33 @@ def render_streamlit_dashboard(
         <div class="op-metric-grid">
             <div class="op-metric">
                 <div class="op-metric-label">Cold pinch</div>
-                <div class="op-metric-value">{target.cold_pinch:.1f}&nbsp;\N{DEGREE SIGN}C</div>
+                <div class="op-metric-value">
+                    {target.cold_pinch:.1f}&nbsp;\N{DEGREE SIGN}C
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot pinch</div>
-                <div class="op-metric-value">{target.hot_pinch:.1f}&nbsp;\N{DEGREE SIGN}C</div>
+                <div class="op-metric-value">
+                    {target.hot_pinch:.1f}&nbsp;\N{DEGREE SIGN}C
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot utility</div>
-                <div class="op-metric-value">{target.hot_utility_target:,.0f}&nbsp;kW</div>
+                <div class="op-metric-value">
+                    {target.hot_utility_target:,.0f}&nbsp;kW
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Cold utility</div>
-                <div class="op-metric-value">{target.cold_utility_target:,.0f}&nbsp;kW</div>
+                <div class="op-metric-value">
+                    {target.cold_utility_target:,.0f}&nbsp;kW
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Heat recovery</div>
-                <div class="op-metric-value">{target.heat_recovery_target:,.0f}&nbsp;kW</div>
+                <div class="op-metric-value">
+                    {target.heat_recovery_target:,.0f}&nbsp;kW
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Degree of integration</div>
@@ -295,7 +309,9 @@ def render_streamlit_dashboard(
             st.info("No shifted problem table data available.")
         else:
             st.badge(
-                "Extended problem table based on shifted process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns."
+                "Extended problem table based on shifted process temperatures. "
+                "Note: interval delta values are shown with zeros at the top "
+                "of the columns."
             )
             st.dataframe(pt_df, width="stretch")
             default_loc = (
@@ -319,7 +335,9 @@ def render_streamlit_dashboard(
             st.info("No real temperature Problem Table data available.")
         else:
             st.badge(
-                "Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns."
+                "Extended problem table based on real process temperatures. "
+                "Note: interval delta values are shown with zeros at the top "
+                "of the columns."
             )
             st.dataframe(pt_real_df, width="stretch")
             default_loc = f"results/{selected_target_name.replace('/', '-')}_real.xlsx"
@@ -553,7 +571,12 @@ def _apply_dashboard_theme(st) -> None:
             }
 
             .stApp {
-                background: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 60%, #f8fafc 100%);
+                background: linear-gradient(
+                    180deg,
+                    #f5f7fb 0%,
+                    #eef2f7 60%,
+                    #f8fafc 100%
+                );
                 color: var(--op-ink);
                 font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
             }

@@ -47,9 +47,7 @@ def test_notebook_command_copies_named_notebook_to_existing_directory(
     destination.mkdir()
     notebook_name = list_notebooks()[0]
 
-    assert (
-        cli.main(["notebook", "--name", notebook_name, "-o", str(destination)]) == 0
-    )
+    assert cli.main(["notebook", "--name", notebook_name, "-o", str(destination)]) == 0
 
     captured = capsys.readouterr()
     assert "Copied notebook to" in captured.out
@@ -62,9 +60,7 @@ def test_notebook_command_copies_named_notebook_to_explicit_file(
     notebook_name = list_notebooks()[0]
     destination = tmp_path / "custom-name.ipynb"
 
-    assert (
-        cli.main(["notebook", "--name", notebook_name, "-o", str(destination)]) == 0
-    )
+    assert cli.main(["notebook", "--name", notebook_name, "-o", str(destination)]) == 0
 
     captured = capsys.readouterr()
     assert "Copied notebook to" in captured.out

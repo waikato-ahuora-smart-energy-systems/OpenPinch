@@ -3,21 +3,22 @@
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+
+import openpyxl
 import pandas as pd
 import pytest
+from openpyxl import Workbook
+
+import OpenPinch.utils.export as export_mod
+from OpenPinch.classes import ProblemTable, Zone
+from OpenPinch.lib.enums import ProblemTableLabel as PT
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.utils.export import (
     _autosize_columns,
     _safe_name,
     _split_vu,
     export_target_summary_to_excel_with_units,
 )
-from OpenPinch.classes import ProblemTable, Zone
-from OpenPinch.lib.enums import ProblemTableLabel as PT
-from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
-import OpenPinch.utils.export as export_mod
-import openpyxl
-from openpyxl import Workbook
-
 
 # --------------------------------------------------------------------------------------
 # Fixtures & tiny helpers

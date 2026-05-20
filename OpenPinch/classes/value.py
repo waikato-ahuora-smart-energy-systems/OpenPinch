@@ -27,7 +27,7 @@ def _is_bool_like(data: Any) -> bool:
 
 
 class Value:
-    """Thin wrapper around a Pint ``Quantity`` with helpers for serialisation and arithmetic."""
+    """Thin wrapper around a Pint ``Quantity`` with serialization helpers."""
 
     def __init__(
         self,

@@ -1,14 +1,16 @@
 """End-to-end tests for main."""
 
 from __future__ import annotations
+
 import json
 import warnings
 from pathlib import Path
-import pytest
-from OpenPinch import *
-from OpenPinch.utils.miscellaneous import get_value
-from OpenPinch.lib import *
 
+import pytest
+
+from OpenPinch import *
+from OpenPinch.lib import *
+from OpenPinch.utils.miscellaneous import get_value
 
 EXPECTED_VALIDATION_WARNINGS = {
     "p_Sorsak and Kravanja.json": "Input validation reported 8 warning(s):",

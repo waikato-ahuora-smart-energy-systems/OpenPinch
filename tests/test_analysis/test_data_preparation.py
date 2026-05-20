@@ -3,7 +3,8 @@ Tests for `prepare_problem` in OpenPinch.
 
 This test suite validates the core functionality and edge behavior of the
 prepare_problem function, which transforms raw stream and utility input
-data into structured Zone objects with zones, utilities, and heat integration attributes.
+data into structured Zone objects with zones, utilities, and heat integration
+attributes.
 
 Test Categories:
 ----------------
@@ -40,32 +41,25 @@ Fixtures:
 
 Note:
 -----
-All edge cases aim to test both robustness and realistic behavior. Some tests intentionally include borderline inputs
-(e.g. zero values or mismatched heat flow directions) to verify internal fallbacks or fail-safes.
+All edge cases aim to test both robustness and realistic behavior. Some tests
+intentionally include borderline inputs (e.g. zero values or mismatched heat
+flow directions) to verify internal fallbacks or fail-safes.
 
 """
 
 import pytest
 from pydantic import ValidationError
-from OpenPinch.services.input_data_processing.data_preparation import (
-    _validate_input_data,
-    prepare_problem,
-)
+
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.services.input_data_processing.data_preparation import (
-    _validate_zone_tree_structure,
-)
-from OpenPinch.services.input_data_processing.data_preparation import (
-    _validate_config_data_completed,
-)
-from OpenPinch.services.input_data_processing.data_preparation import (
-    _get_validated_zone_info,
-)
-from OpenPinch.services.input_data_processing.data_preparation import (
     _create_nested_zones,
+    _get_validated_zone_info,
+    _validate_config_data_completed,
+    _validate_input_data,
+    _validate_zone_tree_structure,
+    prepare_problem,
 )
-
 
 # ---------------- Fixtures ---------------- #
 
@@ -212,11 +206,6 @@ def test_zone_names_and_ordering(dummy_streams):
     site = prepare_problem(streams=dummy_streams)
     zone_names = list(site.subzones.keys())
     expected_subzones = {"Z1"}
-    expected_this_zone = {
-        f"{TT.DI.value}",
-        f"{TT.TS.value}",
-        f"{TT.TZ.value}",
-    }
     assert expected_subzones == set(zone_names)
 
 

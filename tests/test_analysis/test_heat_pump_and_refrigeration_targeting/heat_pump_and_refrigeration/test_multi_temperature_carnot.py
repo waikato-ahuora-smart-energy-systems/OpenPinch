@@ -3,19 +3,19 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.schemas.hpr import HPRBackendResult
+from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
+from OpenPinch.services.heat_pump_integration.common.shared import (
+    compute_entropic_mean_temperature,
+)
 from OpenPinch.services.heat_pump_integration.cycles import (
     multi_temperature_carnot as hp_multi_temp_carnot,
 )
-from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.services.heat_pump_integration.cycles.multi_temperature_carnot import (
     _get_multi_temperature_carnot_stage_duties_and_work,
     _parse_multi_temperature_carnot_cycle_state_variables,
 )
-from OpenPinch.services.heat_pump_integration.common.shared import (
-    compute_entropic_mean_temperature,
-)
-from OpenPinch.classes.stream_collection import StreamCollection
 
 from ..helpers import (
     _base_args,

@@ -121,8 +121,10 @@ class Zone:
         """Set the active ``dt_cont`` multiplier when the zone is still mutable."""
         if self._lock_dt_cont_multiplier:
             raise RuntimeError(
-                "Direct mutation of dt_cont_multiplier on prepared analysis zones is not supported. "
-                "Use PinchProblem.set_dt_cont_multiplier(...) to rebuild the active stream state."
+                "Direct mutation of dt_cont_multiplier on prepared analysis "
+                "zones is not supported. "
+                "Use PinchProblem.set_dt_cont_multiplier(...) to rebuild "
+                "the active stream state."
             )
         self._dt_cont_multiplier = float(value)
 
@@ -247,7 +249,8 @@ class Zone:
 
         if not isinstance(base_name, str):
             raise ValueError(
-                f"Zone must have a string 'name' attribute, got: {type(base_name).__name__}"
+                "Zone must have a string 'name' attribute, got: "
+                f"{type(base_name).__name__}"
             )
 
         if sub:
@@ -321,7 +324,7 @@ class Zone:
         is_n_zone_depth: bool = True,
         is_new_stream_collection: bool = True,
     ):
-        """Get hot and cold streams from multiple subzones into two separate lists, maintaining references."""
+        """Get referenced hot and cold streams across multiple subzones."""
         z: Zone
         s: Stream
         if not get_net_streams:

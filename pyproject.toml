@@ -114,6 +114,22 @@ extend-exclude = ["docs/_build", "dist", "OpenPinch/data/notebooks"]
 select = ["E", "F", "W", "I"]
 ignore = ["E203"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["F403", "F405"]
+"OpenPinch/services/energy_transfer_analysis/energy_transfer_analysis.py" = ["E501"]
+"OpenPinch/services/exergy_analysis/exergy_targeting_entry.py" = ["E501"]
+"tests/e2e/test_main.py" = ["E501"]
+"tests/test_analysis/test_capital_cost_and_area_targeting.py" = ["E501"]
+"tests/test_analysis/test_graphs.py" = ["E501"]
+"tests/test_analysis/test_heat_pump_and_refrigeration_targeting/heat_pump_and_refrigeration/test_multi_simple_carnot.py" = ["E501"]
+"tests/test_analysis/test_heat_pump_and_refrigeration_targeting/heat_pump_and_refrigeration/test_multi_temperature_carnot.py" = ["E501"]
+"tests/test_analysis/test_heat_pump_and_refrigeration_targeting/heat_pump_and_refrigeration/test_preprocessing.py" = ["E501"]
+"tests/test_analysis/test_problem_table.py" = ["E501"]
+"tests/test_analysis/test_utility_targeting_data/wkbook_to_json_ut_targeting.py" = ["E501"]
+"tests/test_classes/test_value.py" = ["E501"]
+"tests/test_utils/test_export.py" = ["E501"]
+"tests/test_utils/test_wkbook_to_json.py" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

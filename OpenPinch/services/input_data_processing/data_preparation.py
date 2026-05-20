@@ -22,9 +22,9 @@ from ...utils.miscellaneous import get_value
 __all__ = ["prepare_problem"]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def prepare_problem(
@@ -34,24 +34,28 @@ def prepare_problem(
     project_name: str = "Site",
     zone_tree: ZoneTreeSchema = None,
 ) -> Zone:
-    """Build the top-level :class:`OpenPinch.classes.zone.Zone` hierarchy for analysis.
+    """Build the top-level zone hierarchy for analysis.
 
     Parameters
     ----------
     streams:
-        Iterable of validated :class:`OpenPinch.lib.schemas.io.StreamSchema` objects describing
-        the process streams to analyse.
+        Iterable of validated
+        :class:`OpenPinch.lib.schemas.io.StreamSchema` objects describing the
+        process streams to analyse.
     utilities:
-        Iterable of :class:`OpenPinch.lib.schemas.io.UtilitySchema` describing candidate hot
-        and cold utilities.
+        Iterable of :class:`OpenPinch.lib.schemas.io.UtilitySchema`
+        describing candidate hot and cold utilities.
     options:
-        Optional :class:`OpenPinch.lib.config.Configuration` instance or canonical option
-        dictionary. When omitted the defaults from ``Configuration()`` are used.
+        Optional :class:`OpenPinch.lib.config.Configuration` instance or
+        canonical option dictionary. When omitted the defaults from
+        ``Configuration()`` are used.
     project_name:
-        Human-friendly label applied to the root zone when no explicit zone tree is supplied.
+        Human-friendly label applied to the root zone when no explicit zone tree
+        is supplied.
     zone_tree:
-        Optional :class:`OpenPinch.lib.schemas.io.ZoneTreeSchema` describing the desired zone
-        hierarchy (i.e., Zone A encompasses Zones B and C).
+        Optional :class:`OpenPinch.lib.schemas.io.ZoneTreeSchema`
+        describing the desired zone hierarchy (i.e., Zone A encompasses Zones B
+        and C).
 
     Returns
     -------
@@ -88,9 +92,9 @@ def prepare_problem(
     return master_zone
 
 
-#######################################################################################################
+################################################################################
 # Helper Functions
-#######################################################################################################
+################################################################################
 
 
 def _build_zone_config(
@@ -169,7 +173,7 @@ def _validate_input_data(
     utilities: Optional[List[UtilitySchema]] = None,
     zone_config: Optional[Configuration] = None,
 ):
-    """Checks for logic and completeness of the input data. Where possible, fills in the gaps with general assumptions."""
+    """Check and complete input data where safe defaults are available."""
     streams_list = [] if streams is None else list(streams)
     utilities_list = [] if utilities is None else list(utilities)
     cfg = zone_config or Configuration()
@@ -210,7 +214,7 @@ def _create_nested_zones(
 def _get_process_streams_in_each_subzone(
     master_zone: Zone, streams: List[StreamSchema]
 ) -> Zone:
-    """Extracts all stream data into class instances, creates the required subzones and adds these to the parent zone."""
+    """Create stream objects, subzones, and zone attachments for the hierarchy."""
 
     streams_by_full_path = defaultdict(list)
     streams_by_relative_path = defaultdict(list)
@@ -232,7 +236,7 @@ def _get_process_streams_in_each_subzone(
             yield from _iter_zones(subzone)
 
     def _get_zone_path_from_child(child_zone: Zone, delimiter="/") -> str:
-        """Constructs the zone path from a child Zone back to the master zone using parent_zone links."""
+        """Construct the zone path from a child Zone back to the master zone."""
         path_parts = []
         current = child_zone
         while current is not None:
@@ -360,7 +364,7 @@ def _complete_utility_data(
     CU_T_max: float,
     dt_cont_multiplier: float = 1.0,
 ) -> Tuple[List[UtilitySchema], bool, bool]:
-    """Completes the utility data with default values and adds default utilities if needed."""
+    """Complete utility data and add default utilities where needed."""
     utility: UtilitySchema
 
     # Fill in any missing data
@@ -526,7 +530,7 @@ def _set_utilities_for_zone_and_subzones(
     zone: Zone,
     utilities: List[UtilitySchema],
 ) -> Zone:
-    """Adds utilities to the zone and each subzone using each zone's effective multiplier."""
+    """Add utilities to a zone and its subzones using effective multipliers."""
     hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
         utilities,
         zone.hot_streams,
@@ -557,7 +561,7 @@ def _resolve_zone_dt_cont_multiplier(
 def _rewrite_stream_zones_from_tree(
     zone_tree: ZoneTreeSchema, streams: Optional[List[StreamSchema]]
 ) -> None:
-    """Rewrite stream.zone values to the fully-qualified path defined by the zone tree."""
+    """Rewrite stream.zone values to the fully-qualified zone-tree path."""
     if not streams:
         return
 
@@ -668,7 +672,7 @@ def _validate_zone_tree_structure(
     stream_iter = [stream for stream in (streams or []) if stream.zone]
 
     def _split_zone_name(name: str):
-        """Split hierarchical zone strings ("Site/Area/Unit") into clean path components."""
+        """Split hierarchical zone strings into clean path components."""
         if "/" in name:
             return [z.strip() for z in name.split("/") if z.strip()]
         return [name]
@@ -713,7 +717,7 @@ def _validate_zone_tree_structure(
         stream.zone = _build_full_path(path_components, subzone_name)
 
     def _build_tree(node_dict):
-        """Recursively convert the intermediate dict representation into Pydantic models."""
+        """Convert the intermediate dict representation into Pydantic models."""
         children = [_build_tree(child) for child in node_dict["children"].values()]
         return ZoneTreeSchema(
             name=node_dict["name"],

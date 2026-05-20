@@ -1,20 +1,20 @@
 """Property and edge-branch tests for class-level data models."""
 
 from __future__ import annotations
+
 from pathlib import Path
-from types import SimpleNamespace
+
 import pytest
+from pydantic import ValidationError
+
+from OpenPinch.classes import stream_collection as sc_mod
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.value import Value
 from OpenPinch.classes.zone import Zone
-from OpenPinch.classes import stream_collection as sc_mod
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import ProblemTableLabel as PT
-from OpenPinch.lib.schemas.common import ValueWithUnit
 from OpenPinch.lib.schemas.targets import BaseTargetModel, DirectIntegrationTarget
-from pydantic import ValidationError
 
 
 def _dummy_problem_table():

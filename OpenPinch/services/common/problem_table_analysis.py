@@ -28,9 +28,9 @@ __all__ = [
 ]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_process_heat_cascade(
@@ -42,7 +42,7 @@ def get_process_heat_cascade(
     extra_T_intervals: list = None,
     is_full_analysis: bool = False,
 ) -> ProblemTable:
-    """Prepare, calculate and analyse the problem table for a given set of hot and cold streams."""
+    """Prepare, calculate, and analyse the problem table for given streams."""
     if hot_streams is None:
         hot_streams = StreamCollection()
     if cold_streams is None:
@@ -50,7 +50,7 @@ def get_process_heat_cascade(
     if extra_T_intervals is None:
         extra_T_intervals = []
 
-    # Get all possible temperature intervals, remove duplicates and order from high to low
+    # Get all possible temperature intervals, remove duplicates, and order high to low.
     if all_streams is None:
         all_streams = hot_streams + cold_streams
 
@@ -68,7 +68,7 @@ def get_process_heat_cascade(
     )
 
     if isinstance(known_heat_recovery, float):
-        # Correct the location of the cold composite curve and limiting GCC (real temperatures)
+        # Correct the cold composite curve and limiting GCC at real temperatures.
         _shift_pt_to_set_heat_recovery(
             pt=pt,
             heat_recovery_target=known_heat_recovery,
@@ -92,7 +92,7 @@ def get_utility_heat_cascade(
     cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
 ) -> ProblemTableUpdateKwargs:
-    """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
+    """Prepare and calculate the utility heat cascade for a utility set."""
     pt_ut = ProblemTable({PT.T: T_int_vals})
     problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
 
@@ -159,7 +159,7 @@ def problem_table_algorithm(
         pt[PT.CP_HOT].fill(0.0)
         pt[PT.RCP_HOT].fill(0.0)
 
-    # Sum m_dot*Cp contributions from cold streams per interval (sets CP_COLD and rCP_COLD)
+    # Sum m_dot*Cp contributions from cold streams per interval.
     if cold_streams is not None:
         sum_cp_cold, sum_rcp_cold = _sum_mcp_between_temperature_boundaries(
             pt[PT.T], cold_streams, is_shifted
@@ -194,7 +194,7 @@ def problem_table_algorithm(
     # H_net = -Σ ΔH_net
     pt[PT.H_NET] = -np.cumsum(pt[PT.DELTA_H_NET])
 
-    # Shift cascades so the minimum H_net equals zero, aligning hot/cold composites at the pinch
+    # Shift cascades so minimum H_net is zero and the curves align at the pinch.
     min_H = pt[PT.H_NET].min()
     shift = pt[PT.H_NET][-1] - min_H
 
@@ -227,7 +227,7 @@ def set_zonal_targets(
     pt: ProblemTable,
     pt_real: ProblemTable,
 ) -> dict:
-    """Assign thermal targets and integration degree to the zone based on process table data."""
+    """Assign thermal targets and integration degree from process-table data."""
     return {
         "hot_utility_target": pt.loc[0, PT.H_NET],
         "cold_utility_target": pt.loc[-1, PT.H_NET],
@@ -242,9 +242,9 @@ def set_zonal_targets(
     }
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _sum_mcp_between_temperature_boundaries(
@@ -293,7 +293,7 @@ def _shift_pt_to_set_heat_recovery(
 def _insert_temperature_interval_into_pt_at_constant_h(
     pt: ProblemTable,
 ) -> ProblemTable:
-    """Insert temperature intervals into the process table where HCC and CCC intersect at constant enthalpy."""
+    """Insert temperature intervals where HCC and CCC intersect at constant enthalpy."""
     T_new = []
     # --- HCC to CCC projection ---
     if pt[PT.H_HOT][0] > 0.0:
@@ -313,7 +313,7 @@ def _get_T_start_on_opposite_cc(
     col_CC: str | PT,
     col_T: str | PT = PT.T,
 ) -> float:
-    """Find and insert the temperature value where composite curves intersect at constant enthalpy."""
+    """Find the temperature where composite curves intersect at constant enthalpy."""
 
     temp_cc = pt[col_CC] - h0
 

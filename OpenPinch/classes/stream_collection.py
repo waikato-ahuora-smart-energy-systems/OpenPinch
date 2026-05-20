@@ -281,7 +281,8 @@ class StreamCollection:
                 return self._sorted_cache[key]
             except IndexError as exc:
                 raise IndexError(
-                    f"Stream index {key} out of range for collection of size {len(self._sorted_cache)}."
+                    f"Stream index {key} out of range for collection of size "
+                    f"{len(self._sorted_cache)}."
                 ) from exc
         elif isinstance(key, str):
             # Allow accessing by stream name

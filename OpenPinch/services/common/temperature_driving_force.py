@@ -9,9 +9,9 @@ from ...utils.miscellaneous import interp_with_plateaus
 
 __all__ = ["get_temperature_driving_forces"]
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_temperature_driving_forces(
@@ -60,7 +60,8 @@ def get_temperature_driving_forces(
         raise ValueError("Composite curve arrays cannot be empty.")
     if abs((np.max(H_hot) - np.min(H_hot)) - (np.max(H_cold) - np.min(H_cold))) > tol:
         raise ValueError(
-            "The temperature driving force plot requires the inputted composite curves to be balanced."
+            "The temperature driving force plot requires the inputted "
+            "composite curves to be balanced."
         )
 
     H_hot, T_hot = _normalise_curve(H_hot, T_hot)
@@ -102,9 +103,9 @@ def get_temperature_driving_forces(
     }
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _build_h_grid(h_hot: np.ndarray, h_cold: np.ndarray) -> np.ndarray:

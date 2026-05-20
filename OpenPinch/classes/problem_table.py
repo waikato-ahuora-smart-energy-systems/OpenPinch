@@ -21,7 +21,7 @@ PT = ProblemTableLabel
 
 
 class ProblemTable:
-    """NumPy-backed representation of the pinch problem table with enum-friendly accessors."""
+    """NumPy-backed pinch problem table with enum-friendly accessors."""
 
     _DEFAULT_ATOL = 1e-6
 
@@ -30,7 +30,7 @@ class ProblemTable:
         data_input: dict[str | ProblemTableLabel, object] | list | None = None,
         add_default_labels: bool = True,
     ):
-        """Initialise the table from a dictionary (column keyed) or list-of-columns structure."""
+        """Initialise the table from a dictionary or list-of-columns structure."""
         if isinstance(data_input, dict):
             data_input = self._validate_column_mapping(data_input)
 
@@ -91,7 +91,8 @@ class ProblemTable:
             col_name = cls._validate_column_name(key)
             if col_name in validated:
                 raise ValueError(
-                    f"Duplicate column label {col_name!r} found after key normalisation."
+                    f"Duplicate column label {col_name!r} found after "
+                    "key normalisation."
                 )
             validated[col_name] = values
         return validated
@@ -245,7 +246,10 @@ class ProblemTable:
             return 0
 
     def __getitem__(self, key: str | ProblemTableLabel):
-        """Return a raw NumPy column view; use ``slice(...)`` for subtable extraction."""
+        """Return a raw NumPy column view.
+
+        Use ``slice(...)`` for subtable extraction.
+        """
         if isinstance(key, Sequence) and not isinstance(key, (str, ProblemTableLabel)):
             raise TypeError(
                 "ProblemTable[...] only supports single-column access. "
@@ -425,7 +429,7 @@ class ProblemTable:
     def shift_heat_cascade(
         self, dh: float, col: Union[int, str, ProblemTableLabel]
     ) -> "ProblemTable":
-        """Shift a column in the heat cascade by ``dh`` and return a copy of the table."""
+        """Shift a heat-cascade column by ``dh`` and return a table copy."""
         if isinstance(col, (ProblemTableLabel, str)):
             self[col] += dh
         else:
@@ -435,7 +439,8 @@ class ProblemTable:
     def share_temperature_intervals(self, other: "ProblemTable") -> Tuple[int, int]:
         """Mutate both tables so they use the union of their temperature intervals.
 
-        Returns a tuple containing ``(rows_inserted_into_self, rows_inserted_into_other)``.
+        Returns a tuple containing
+        ``(rows_inserted_into_self, rows_inserted_into_other)``.
         """
         if not isinstance(other, ProblemTable):
             raise TypeError("`other` must be a ProblemTable instance.")
@@ -532,7 +537,7 @@ class ProblemTable:
         top_temps: np.ndarray,
         bottom_temps: np.ndarray,
     ) -> Tuple[np.ndarray, int]:
-        """Insert grouped temperatures (top, middle, bottom) and return expanded array."""
+        """Insert grouped temperatures and return the expanded array."""
         n_rows, n_cols = self.data.shape
         total_new = (
             top_temps.size
@@ -571,7 +576,7 @@ class ProblemTable:
             new_data, row_meta, next_row, bottom_temps, label="bottom"
         )
 
-        # 4) Sort rows by descending temperature so indices align with the final ordering.
+        # 4) Sort rows by descending temperature so indices align with final order.
         order = np.argsort(new_data[:, T_idx])[::-1]
         new_data = new_data[order]
         row_meta = [row_meta[idx] for idx in order]
@@ -610,7 +615,7 @@ class ProblemTable:
     def _build_mid_block(
         self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Construct interpolated rows between existing bounds and return updated neighbours."""
+        """Construct interpolated rows and return updated neighbour rows."""
         rows, (t_idx, delta_idx) = self._initialise_insert_rows(
             row_top, row_bot, T_vals
         )
@@ -911,7 +916,7 @@ class ProblemTable:
         self.data = np.insert(self.data, index, new_row, axis=0)
 
     def update_row(self, index: int, row_dict: dict):
-        """Update selected columns for the row at ``index`` using values from ``row_dict``."""
+        """Update selected columns for one row using values from ``row_dict``."""
         for key, value in row_dict.items():
             col_name = self._validate_column_name(key)
             if col_name in self.col_index:

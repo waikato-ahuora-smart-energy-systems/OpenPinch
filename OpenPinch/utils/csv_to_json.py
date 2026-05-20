@@ -16,9 +16,9 @@ from .wkbook_to_json import (
 __all__ = ["get_problem_from_csv", "get_results_from_csv"]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_problem_from_csv(
@@ -31,7 +31,7 @@ def get_problem_from_csv(
     encoding: str = "utf-8-sig",
 ):
     """
-    Reads two CSV files (streams & utilities) with the same structure as the Excel template:
+    Read two CSV files with the same structure as the Excel template:
       - Row 1 = column names
       - Row 2 = column units
       - Row 3 onward = stream data
@@ -107,7 +107,7 @@ def get_results_from_csv(
       - Row 2 = column units
       - Row 3 onward = data
 
-    (Defaults to mirror the Excel Workbook call where units are on row 2 and data starts at row 4.)
+    Defaults mirror the Excel workbook call: units on row 2 and data at row 4.
 
     Parameters
     ----------
@@ -154,9 +154,9 @@ def get_results_from_csv(
     return output_dict
 
 
-#######################################################################################################
+################################################################################
 # Helpers
-#######################################################################################################
+################################################################################
 
 
 def _parse_csv_with_units(
