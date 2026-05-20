@@ -9,7 +9,6 @@ import json
 import math
 import warnings
 from copy import deepcopy
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
@@ -19,16 +18,14 @@ from pydantic import ValidationError
 from ..lib.enums import ST
 from ..lib.schemas.io import TargetInput, TargetOutput
 from ..lib.schemas.targets import BaseTargetModel
+from ..resources import list_sample_cases, read_sample_case
 from ..services import data_preprocessing_service
-from .accessors.target_accessor import _TargetAccessorDescriptor
-from .accessors.plot_accessor import _PlotAccessorDescriptor
 from ..services.input_data_processing.data_preparation import (
     _validate_zone_tree_structure,
 )
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
 )
-from ..resources import list_sample_cases, read_sample_case
 from ..utils.csv_to_json import get_problem_from_csv
 from ..utils.export import (
     build_summary_dataframe,
@@ -41,6 +38,8 @@ from ..utils.multiscale_targeting import (
     get_targets_for_zone_and_sub_zones,
 )
 from ..utils.wkbook_to_json import get_problem_from_excel
+from .accessors.plot_accessor import _PlotAccessorDescriptor
+from .accessors.target_accessor import _TargetAccessorDescriptor
 from .zone import Zone
 
 JsonDict = Dict[str, Any]
@@ -48,9 +47,8 @@ PathLike = Union[str, Path]
 ZoneService = Callable[["Zone"], "Zone"]
 
 
-@dataclass
 class PinchProblem:
-    """Typed orchestrator for loading input data, running targeting, and exporting results.
+    """Typed orchestrator for loading input data and running targeting.
 
     Supports the following input formats out of the box:
 
@@ -64,15 +62,15 @@ class PinchProblem:
     rerun the numerical workflow unless the inputs change.
     """
 
-    problem_filepath: Optional[Path] = None
-    results_dir: Optional[Path] = None
-    problem_data: Optional[JsonDict] = None
-    _project_name: str = "Site"
-    _results: Optional[TargetOutput] = None
-    _validated_data: TargetInput = None
-    _master_zone: Optional["Zone"] = None
-    _input_source_kind: str = "unknown"
-    _validation_context: Optional[dict[str, list[dict[str, Any]]]] = None
+    problem_filepath: Optional[Path]
+    results_dir: Optional[Path]
+    problem_data: Optional[JsonDict]
+    _project_name: str
+    _results: Optional[TargetOutput]
+    _validated_data: TargetInput
+    _master_zone: Optional["Zone"]
+    _input_source_kind: str
+    _validation_context: Optional[dict[str, list[dict[str, Any]]]]
     plot = _PlotAccessorDescriptor()
     target = _TargetAccessorDescriptor()
 
@@ -100,6 +98,8 @@ class PinchProblem:
         self._problem_filepath = None
         self._problem_data = None
         self._results = None
+        self._validated_data = None
+        self._master_zone = None
         self.results_dir = None
 
         if source is not None:
@@ -231,7 +231,8 @@ class PinchProblem:
                 utilities_csv = src_path / "utilities.csv"
                 if not streams_csv.exists() or not utilities_csv.exists():
                     raise FileNotFoundError(
-                        f"CSV directory '{src_path}' must contain 'streams.csv' and 'utilities.csv'."
+                        f"CSV directory '{src_path}' must contain "
+                        "'streams.csv' and 'utilities.csv'."
                     )
                 self._problem_data = get_problem_from_csv(
                     streams_csv, utilities_csv, output_json=None
@@ -246,7 +247,8 @@ class PinchProblem:
             else:
                 raise ValueError(
                     f"Unrecognized source '{src_path}'. Provide a JSON/Excel file, "
-                    f"a directory with 'streams.csv' and 'utilities.csv', or a (streams, utilities) tuple."
+                    "a directory with 'streams.csv' and 'utilities.csv', "
+                    "or a (streams, utilities) tuple."
                 )
         self._validated_data = self.validate()
         self._master_zone = self._data_preprocessing()
@@ -306,7 +308,8 @@ class PinchProblem:
             return zone.targets[target_id]
         except KeyError as exc:
             raise RuntimeError(
-                f"Targeting did not produce target {target_id!r} for zone {zone.name!r}."
+                f"Targeting did not produce target {target_id!r} "
+                f"for zone {zone.name!r}."
             ) from exc
 
     def _resolve_target_zone(self, application_zone: Optional[str] = None) -> "Zone":
@@ -604,7 +607,7 @@ class PinchProblem:
         return payload
 
     def __repr__(self) -> str:
-        """Machine-readable summary capturing source, export target, and result cache state."""
+        """Return a compact summary of the source and cached result state."""
         src = (
             str(self._problem_filepath)
             if self._problem_filepath is not None
@@ -910,7 +913,8 @@ def _validate_problem_semantics(
                     "streams",
                     index,
                     context,
-                    "field 't_supply/t_target' - supply and target temperatures must differ.",
+                    "field 't_supply/t_target' - supply and target "
+                    "temperatures must differ.",
                 )
             )
 
@@ -962,7 +966,8 @@ def _validate_problem_semantics(
                     "utilities",
                     index,
                     context,
-                    "field 't_supply/t_target' - hot utilities should have t_supply >= t_target.",
+                    "field 't_supply/t_target' - hot utilities should have "
+                    "t_supply >= t_target.",
                 )
             )
         if (
@@ -976,7 +981,8 @@ def _validate_problem_semantics(
                     "utilities",
                     index,
                     context,
-                    "field 't_supply/t_target' - cold utilities should have t_supply <= t_target.",
+                    "field 't_supply/t_target' - cold utilities should have "
+                    "t_supply <= t_target.",
                 )
             )
 

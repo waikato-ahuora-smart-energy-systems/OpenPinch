@@ -15,12 +15,12 @@ from .capital_cost_and_area_targeting import (
     get_min_number_hx,
 )
 from .gcc_manipulation import (
+    get_additional_GCCs,
     get_GCC_needing_utility,
     get_GCC_with_partial_pockets,
     get_GCC_with_vertical_heat_transfer,
     get_GCC_without_pockets,
     get_GGC_pockets,
-    get_additional_GCCs,
     get_seperated_gcc_heat_load_profiles,
 )
 from .graph_data import get_output_graph_data

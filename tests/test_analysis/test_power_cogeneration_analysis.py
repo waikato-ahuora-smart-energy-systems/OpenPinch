@@ -8,12 +8,12 @@ import numpy as np
 import pytest
 
 import OpenPinch.classes.multi_stage_steam_turbine as turbine_mod
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.config import Configuration
 from OpenPinch.services.power_cogeneration_analysis import (
     power_cogeneration_analysis as pca,
 )
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.stream_collection import StreamCollection
 
 
 def _make_zone_config(

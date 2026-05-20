@@ -5,13 +5,109 @@ helpers, numerical shortcuts, and the timing decorator used to measure
 performance critical routines.
 """
 
-from .costing import *
-from .csv_to_json import *
+from .blackbox_minimisers import multiminima
+from .costing import (
+    compute_annual_capital_cost,
+    compute_capital_cost,
+    compute_capital_recovery_factor,
+)
+from .csv_to_json import get_problem_from_csv, get_results_from_csv
 from .decorators import timing_decorator
-from .export import *
-from .heat_exchanger import *
-from .input_validation import *
-from .miscellaneous import *
-from .blackbox_minimisers import *
-from .water_properties import *
-from .wkbook_to_json import *
+from .export import export_target_summary_to_excel_with_units
+from .heat_exchanger import (
+    HX_NTU,
+    CalcAreaUE,
+    Coth,
+    CrossflowUnmixedEff1,
+    CrossflowUnmixedEff2,
+    HX_Eff,
+    HX_NTU_Numerical,
+    MultiPassEff,
+    MultiPassNTU,
+    compute_LMTD_from_dts,
+    compute_LMTD_from_ts,
+    eNTU_slope_Numerical,
+)
+from .input_validation import validate_stream_data, validate_utility_data
+from .miscellaneous import (
+    clean_composite_curve,
+    clean_composite_curve_ends,
+    delta_vals,
+    delta_with_zero_at_start,
+    g_ineq_penalty,
+    get_value,
+    graph_simple_cc_plot,
+    interp_with_plateaus,
+    linear_interpolation,
+    make_monotonic,
+)
+from .water_properties import (
+    Tsat_p,
+    fromSIunit_h,
+    fromSIunit_p,
+    fromSIunit_s,
+    fromSIunit_T,
+    h_ps,
+    h_pT,
+    hL_p,
+    hV_p,
+    psat_T,
+    s_ph,
+    toSIunit_h,
+    toSIunit_p,
+    toSIunit_s,
+    toSIunit_T,
+)
+from .wkbook_to_json import get_problem_from_excel, get_results_from_excel
+
+__all__ = [
+    "compute_capital_recovery_factor",
+    "compute_capital_cost",
+    "compute_annual_capital_cost",
+    "get_problem_from_csv",
+    "get_results_from_csv",
+    "timing_decorator",
+    "export_target_summary_to_excel_with_units",
+    "CalcAreaUE",
+    "Coth",
+    "CrossflowUnmixedEff1",
+    "CrossflowUnmixedEff2",
+    "HX_Eff",
+    "HX_NTU",
+    "HX_NTU_Numerical",
+    "MultiPassEff",
+    "MultiPassNTU",
+    "compute_LMTD_from_dts",
+    "compute_LMTD_from_ts",
+    "eNTU_slope_Numerical",
+    "validate_stream_data",
+    "validate_utility_data",
+    "clean_composite_curve",
+    "clean_composite_curve_ends",
+    "delta_vals",
+    "delta_with_zero_at_start",
+    "g_ineq_penalty",
+    "get_value",
+    "graph_simple_cc_plot",
+    "interp_with_plateaus",
+    "linear_interpolation",
+    "make_monotonic",
+    "multiminima",
+    "Tsat_p",
+    "fromSIunit_T",
+    "fromSIunit_h",
+    "fromSIunit_p",
+    "fromSIunit_s",
+    "hL_p",
+    "hV_p",
+    "h_pT",
+    "h_ps",
+    "psat_T",
+    "s_ph",
+    "toSIunit_T",
+    "toSIunit_h",
+    "toSIunit_p",
+    "toSIunit_s",
+    "get_problem_from_excel",
+    "get_results_from_excel",
+]

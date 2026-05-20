@@ -1,12 +1,13 @@
 """Regression tests for heat exchanger eq utility helpers."""
 
 import math
-import pytest
-from OpenPinch.lib import *
-from OpenPinch.utils.heat_exchanger import *
-import OpenPinch.utils.heat_exchanger as hx
-from OpenPinch.lib.enums import HeatExchangerTypes as HX
 
+import pytest
+
+import OpenPinch.utils.heat_exchanger as hx
+from OpenPinch.lib import *
+from OpenPinch.lib.enums import HeatExchangerTypes as HX
+from OpenPinch.utils.heat_exchanger import *
 
 """Test cases for the find_LMTD function."""
 

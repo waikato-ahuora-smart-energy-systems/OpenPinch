@@ -10,9 +10,9 @@ from ..lib.schemas.io import NonLinearStream
 __all__ = ["get_piecewise_linearisation_for_streams", "get_piecewise_data_points"]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_piecewise_linearisation_for_streams(
@@ -20,10 +20,11 @@ def get_piecewise_linearisation_for_streams(
     t_h_data: list,
     dt_diff_max: float = 0.1,
 ) -> np.array:
-    """Generate piecewise-linear T-H profiles for each non-linear stream using a tolerance cap."""
+    """Generate piecewise-linear T-H profiles for non-linear streams."""
     if len(streams) != len(t_h_data):
         raise ValueError(
-            "Piecewise linearisation failed due to a different number of streams and temperature-enthalpy datasets."
+            "Piecewise linearisation failed due to a different number of "
+            "streams and temperature-enthalpy datasets."
         )
 
     return_data = {"t_h_points": []}
@@ -46,10 +47,10 @@ def get_piecewise_data_points(
     dt_diff_max: float = 0.1,
 ) -> np.array:
     """
-    Performs piecewise linearisation on a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
+    Perform piecewise linearisation with the Ramer-Douglas-Peucker algorithm.
 
     :param curve: Numpy array of plot points for th curve
-    :param dt_diff_max: Maximum allowed temperature differential (dt_diff_max, tolerance etc)
+    :param dt_diff_max: Maximum allowed temperature differential tolerance
     :returns: Numpy array of new curve points
     """
     curve = np.array(curve)
@@ -67,9 +68,9 @@ def get_piecewise_data_points(
             raise ValueError("Piecewise linearisation failed.") from exc
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _rdp(curve: np.array, epsilon: float) -> np.array:
@@ -77,7 +78,7 @@ def _rdp(curve: np.array, epsilon: float) -> np.array:
     Linearize and simplify a curve using the Ramer-Douglas-Peucker (_rdp) algorithm.
 
     :param curve: Array of points (N, 2).
-    :param epsilon: Maximum allowed perpendicular distance for simplification. Can be considered the deviation tolerance or (dt_diff_max)
+    :param epsilon: Maximum allowed perpendicular distance for simplification
     :returns: Simplified array of points.
     """
     n = len(curve)
@@ -97,7 +98,7 @@ def _rdp(curve: np.array, epsilon: float) -> np.array:
         # Get point with max distance from line
         for i in range(start + 1, end):
             point_vector = curve[i] - curve[start]
-            # 2D cross-product magnitude via determinant to avoid NumPy 2D cross deprecation.
+            # Use a determinant form to avoid NumPy 2D cross deprecation.
             cross_magnitude = (
                 line_vector[0] * point_vector[1] - line_vector[1] * point_vector[0]
             )
@@ -120,9 +121,7 @@ def _refine_pw_points_for_heating_or_cooling(
     curve: np.array, pw_points: np.array, eps_lb: float = 0.0, hot_stream: bool = True
 ) -> np.array:
     """
-    Refines a piecewise linear approximation of a T-h profile to ensure feasibility as a hot or cold stream within eps.
-    The refinement is done by optimising the piecewise points to minimise the L2 norm of the difference between the
-    data and the piecewise points.
+    Refine a piecewise T-h approximation to preserve hot/cold stream integrity.
 
     :param curve: Array of points (N, 2).
     :param eps_lb: Maximum allowed hot or cold stream violation.
@@ -144,8 +143,8 @@ def _refine_pw_points_for_heating_or_cooling(
     }
 
     def delta_pw_and_data(x, args):
-        """Returns the difference between the data and the piecewise points"""
-        # Reshape the piecewise points such that the first half are the x values and the second half are the y values
+        """Return the difference between the data and the piecewise points."""
+        # Reshape so the first half are x values and the second half are y values.
         new_pw_points = np.vstack(
             (args["first_point"], x.reshape(-1, 2), args["last_point"])
         )
@@ -156,14 +155,20 @@ def _refine_pw_points_for_heating_or_cooling(
 
     # Define the constraints for the optimisation
     if hot_stream:
-        con = lambda x: np.max(delta_pw_and_data(x, args))
+
+        def con(x):
+            return np.max(delta_pw_and_data(x, args))
+
         nlc = NonlinearConstraint(con, -np.inf, eps_lb)
     else:
-        con = lambda x: np.min(delta_pw_and_data(x, args))
+
+        def con(x):
+            return np.min(delta_pw_and_data(x, args))
+
         nlc = NonlinearConstraint(con, -eps_lb, np.inf)
 
     def obj(x, args):
-        """Returns the L2 norm of the difference between the data and the piecewise points"""
+        """Return the L2 norm between the data and the piecewise points."""
         return np.sum(np.square(delta_pw_and_data(x, args)))
 
     # Perform the optimisation
@@ -178,11 +183,10 @@ def _get_piecewise_breakpoints(
     curve: np.array, epsilon: float, is_hot_stream: bool = True
 ) -> np.array:
     """
-    Get the piecewise breakpoints for a curve using the Ramer-Douglas-Peucker (_rdp) algorithm followed
-    by an optimisation-based refinement to ensure hot and cold stream integrity for Pinch Analysis.
+    Get piecewise breakpoints using RDP plus an integrity refinement step.
 
     :param curve: Array of points (N, 2).
-    :param epsilon: Maximum allowed perpendicular distance for simplification; the deviation tolerance or delta_t_dev.
+    :param epsilon: Maximum allowed perpendicular distance for simplification.
     :param hot_stream: True if the stream is hot, False if the stream is cold.
     :returns: Simplified array of breakpoints that define the piecewise linearisation.
     """

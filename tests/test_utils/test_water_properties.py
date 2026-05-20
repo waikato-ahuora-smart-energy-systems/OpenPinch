@@ -1,7 +1,7 @@
 """Regression tests for water properties utility helpers."""
 
-from OpenPinch.utils.water_properties import *
 from OpenPinch.utils import water_properties as wp
+from OpenPinch.utils.water_properties import *
 
 
 def test_unit_conversions():

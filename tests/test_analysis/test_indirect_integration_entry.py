@@ -10,7 +10,8 @@ from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import ProblemTableLabel as PT, TT, ZT
+from OpenPinch.lib.enums import TT, ZT
+from OpenPinch.lib.enums import ProblemTableLabel as PT
 from OpenPinch.services.indirect_heat_integration import (
     indirect_integration_entry as indirect,
 )

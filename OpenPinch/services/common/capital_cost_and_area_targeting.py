@@ -1,6 +1,7 @@
 """Area targeting methods."""
 
 import numpy as np
+
 from ...classes.stream_collection import StreamCollection
 from ...lib.config import Configuration, tol
 from ...lib.enums import PT
@@ -18,9 +19,9 @@ __all__ = [
 ]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_capital_cost_targets(
@@ -72,7 +73,7 @@ def get_balanced_CC(
     RCP_hot_ut: np.ndarray = None,
     RCP_cold_ut: np.ndarray = None,
 ) -> ProblemTableUpdateKwargs:
-    """Creates the balanced Composite Curve (CC) using both process and utility streams."""
+    """Create the balanced composite curve using process and utility streams."""
     H_hot_bal = H_hot + H_hot_ut
     H_cold_bal = H_cold + H_cold_ut
     res = {
@@ -132,11 +133,12 @@ def get_area_targets(
     R_hot_bal: np.ndarray,
     R_cold_bal: np.ndarray,
 ) -> dict:
-    """Estimates a heat transfer area target based on counter-current heat transfer using vectorized numpy operations."""
+    """Estimate heat-transfer area targets with vectorised counter-current logic."""
     if abs((H_hot_bal[0] - H_hot_bal[-1]) - (H_cold_bal[0] - H_cold_bal[-1])) > tol:
-        # Raise an error due to heat flow imbalance, which is a requirement for this analysis.
+        # Raise an error because heat-flow balance is required for this analysis.
         raise ValueError(
-            "The temperature driving force plot requires the inputted composite curves to be balanced."
+            "The temperature driving force plot requires the inputted "
+            "composite curves to be balanced."
         )
 
     # Shift the hot and cold cascades to start from zero at the lowest temperature.
@@ -180,7 +182,7 @@ def get_min_number_hx(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
 ) -> int:
-    """Estimates the minimum number of heat exchangers required for the pinch problem using vectorized interval logic."""
+    """Estimate the minimum number of exchangers using vectorised interval logic."""
     num_hx: int = 0
     H_net_bal = H_cold_bal - H_hot_bal
     mask = np.isclose(H_net_bal, 0.0, atol=tol)
@@ -200,9 +202,9 @@ def get_min_number_hx(
     return int(num_hx - len(idx_pairs))
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _map_interval_resistances_to_tdf(
@@ -215,12 +217,14 @@ def _map_interval_resistances_to_tdf(
     t_c2: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Align total hot/cold resistances with temperature-driving-force intervals using a vectorised mask.
+    Align total resistances with temperature-driving-force intervals.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: (total_resistance, mask) where total_resistance has the same
-        length as the temperature driving force intervals and mask is a boolean matrix that maps
-        each interval to the corresponding temperature band in ``T_vals``.
+        tuple[np.ndarray, np.ndarray]:
+            ``(total_resistance, mask)`` where ``total_resistance`` has the
+            same length as the temperature-driving-force intervals and
+            ``mask`` maps each interval to a corresponding temperature band in
+            ``T_vals``.
     """
     interval_lower = T_vals[1:]
     interval_upper = T_vals[:-1]
@@ -239,7 +243,7 @@ def _map_interval_resistances_to_tdf(
 
 
 def _count_crossing(T_low: float, T_high: float, streams: StreamCollection):
-    """Count process streams whose adjusted temperatures intersect interval [T_low, T_high]."""
+    """Count process streams intersecting interval ``[T_low, T_high]``."""
     t_max = np.array([s.t_max_star for s in streams])
     t_min = np.array([s.t_min_star for s in streams])
     return np.sum(
@@ -252,7 +256,7 @@ def _count_crossing(T_low: float, T_high: float, streams: StreamCollection):
 def _count_utility_range_container(
     T_low: float, T_high: float, utilities: StreamCollection
 ):
-    """Count utility streams whose adjusted temperatures intersect interval [T_low, T_high]."""
+    """Count utility streams intersecting interval ``[T_low, T_high]``."""
     t_max = np.array([u.t_max_star for u in utilities])
     t_min = np.array([u.t_min_star for u in utilities])
     active = np.array([1 if u.heat_flow > tol else 0 for u in utilities])

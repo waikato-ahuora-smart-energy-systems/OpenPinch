@@ -1,28 +1,24 @@
-"""Command-line entry points for running OpenPinch workflows."""
+"""Command-line helpers for packaged OpenPinch notebook assets."""
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
-import OpenPinch as _openpinch
 from .resources import (
     copy_notebook,
-    copy_sample_case,
     list_notebooks,
-    list_sample_cases,
 )
 
-_COMMANDS = {"run", "validate", "sample", "notebook"}
+_COMMANDS = {"notebook"}
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="openpinch",
-        description="Run OpenPinch analyses, export graphs, and copy learning assets.",
+        description="Copy packaged OpenPinch example notebooks.",
     )
     parser.add_argument(
         "--debug",
@@ -31,70 +27,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    run_parser = subparsers.add_parser(
-        "run",
-        help="Run a pinch analysis and optionally export results.",
-    )
-    _add_problem_input_argument(run_parser)
-    run_parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=None,
-        help="Directory for exported Excel results.",
-    )
-    run_parser.add_argument(
-        "--json-output",
-        type=Path,
-        default=None,
-        help="Optional path for the serialized TargetOutput JSON.",
-    )
-    run_parser.add_argument(
-        "--graph-output",
-        type=Path,
-        default=None,
-        help="Optional directory for exported graph HTML files.",
-    )
-    run_parser.add_argument(
-        "--detailed-summary",
-        action="store_true",
-        help="Print the wide summary table instead of the compact one.",
-    )
-    run_parser.add_argument(
-        "--dashboard",
-        action="store_true",
-        help="Launch the Streamlit dashboard after running the analysis.",
-    )
-
-    validate_parser = subparsers.add_parser(
-        "validate",
-        help="Validate a workbook, JSON file, or CSV bundle without targeting.",
-    )
-    _add_problem_input_argument(validate_parser)
-    validate_parser.add_argument(
-        "--quiet",
-        action="store_true",
-        help="Suppress success output and rely on the exit code.",
-    )
-
-    sample_parser = subparsers.add_parser(
-        "sample",
-        help="Copy a packaged sample case into the working directory.",
-    )
-    sample_parser.add_argument(
-        "--name",
-        choices=list_sample_cases(),
-        default=list_sample_cases()[0],
-        help="Sample case to copy.",
-    )
-    sample_parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=Path("."),
-        help="Destination filepath or directory.",
-    )
 
     notebook_parser = subparsers.add_parser(
         "notebook",
@@ -120,94 +52,15 @@ def main(argv: list[str] | None = None) -> int:
     """Execute the OpenPinch CLI."""
     parser = build_parser()
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] not in _COMMANDS and not argv[0].startswith("-"):
-        argv = ["run", *argv]
 
     args = parser.parse_args(argv)
     try:
-        if args.command == "run":
-            return _run_command(_openpinch.PinchProblem, args)
-        if args.command == "validate":
-            return _validate_command(_openpinch.PinchProblem, args)
-        if args.command == "sample":
-            return _sample_command(args)
         if args.command == "notebook":
             return _notebook_command(args)
     except Exception as exc:
         if args.debug:
             raise
         parser.exit(status=1, message=f"OpenPinch error: {exc}\n")
-    return 0
-
-
-def _add_problem_input_argument(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "problem_path",
-        type=Path,
-        help="Path to the source workbook, JSON problem file, or CSV bundle directory.",
-    )
-
-
-def _run_command(problem_cls, args: argparse.Namespace) -> int:
-    problem = problem_cls()
-    problem.load(args.problem_path)
-    if hasattr(problem, "validate"):
-        problem.validate()
-    problem.target()
-
-    summary = (
-        problem.summary_frame(detailed=args.detailed_summary)
-        if hasattr(problem, "summary_frame")
-        else None
-    )
-    if summary is not None:
-        print(summary.to_string(index=False))
-
-    if args.output is not None:
-        output_path = problem.export_to_Excel(args.output)
-        print(f"Wrote Excel summary to {output_path}")
-
-    if args.json_output is not None:
-        payload = (
-            problem.results.model_dump()
-            if hasattr(problem.results, "model_dump")
-            else problem.results
-        )
-        args.json_output.parent.mkdir(parents=True, exist_ok=True)
-        args.json_output.write_text(
-            json.dumps(payload, indent=2, default=str),
-            encoding="utf-8",
-        )
-        print(f"Wrote JSON summary to {args.json_output}")
-
-    if args.graph_output is not None:
-        written = problem.export_graphs(args.graph_output)
-        print(f"Wrote {len(written)} graph file(s) to {args.graph_output}")
-
-    if args.dashboard:
-        problem.render_streamlit_dashboard()
-
-    return 0
-
-
-def _validate_command(problem_cls, args: argparse.Namespace) -> int:
-    problem = problem_cls()
-    payload = problem.load(args.problem_path)
-    validated = problem.validate()
-
-    if not args.quiet:
-        num_streams = len(validated.streams)
-        num_utilities = len(validated.utilities)
-        print(
-            f"Validation successful: {num_streams} stream(s), "
-            f"{num_utilities} utilit(y/ies) loaded from {args.problem_path}"
-        )
-    return 0
-
-
-def _sample_command(args: argparse.Namespace) -> int:
-    destination = copy_sample_case(args.name, args.output)
-    print(f"Copied sample case to {destination}")
     return 0
 
 

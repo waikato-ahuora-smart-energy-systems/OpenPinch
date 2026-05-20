@@ -3,7 +3,6 @@
 from typing import List, Tuple
 
 import numpy as np
-from scipy.optimize import minimize
 
 from ....classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ....classes.stream_collection import StreamCollection
@@ -20,9 +19,9 @@ __all__ = [
 ]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 @timing_decorator
@@ -31,7 +30,8 @@ def optimise_brayton_heat_pump_placement(
 ) -> None:
     """Optimise a single-stage Brayton Heat Pump placement against the background."""
     raise NotImplementedError(
-        "Brayton HPR targeting is currently unsupported pending contract and solver repair."
+        "Brayton HPR targeting is currently unsupported pending contract "
+        "and solver repair."
     )
     # args.n_cond = args.n_evap = 1
     # args.refrigerant_ls = ["air"]
@@ -70,9 +70,9 @@ def _get_brayton_hp_opt_setup(
     ]
 
 
-#######################################################################################################
+################################################################################
 # Helper Functions
-#######################################################################################################
+################################################################################
 
 
 def _parse_brayton_hp_state_variables(
@@ -146,6 +146,7 @@ def _compute_brayton_hp_system_obj(
     Q_ext = pt_gas_cooler[PT.H_NET][0]
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     cop = (args.Q_hpr_target - Q_ext) / (w_hpr + 1e-9)
+    Q_amb = 0.0
     # Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
     obj = calc_hpr_obj(
         work=w_hpr,

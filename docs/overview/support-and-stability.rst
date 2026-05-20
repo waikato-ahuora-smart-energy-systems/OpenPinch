@@ -30,8 +30,7 @@ Stable Public Surfaces
 - :func:`OpenPinch.main.pinch_analysis_service`
 - root package imports from :mod:`OpenPinch`
 - `TargetInput`, `TargetOutput`, and the main I/O schema models
-- the core ``openpinch`` CLI commands for ``run``, ``graph``, ``validate``,
-  ``sample``, and ``notebook``
+- the ``openpinch notebook`` CLI command
 - packaged sample-case and notebook resource helpers
 
 Advanced Public Surfaces

@@ -3,8 +3,8 @@
 import csv
 import pickle
 from copy import copy
-from pathlib import Path
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
 
 from ..lib.enums import ST
@@ -73,7 +73,7 @@ class StreamCollection:
 
     def add_many(self, streams, keys=None, prevent_overwrite: bool = True):
         """Insert several streams, optionally using explicit keys for each stream."""
-        if keys == None:
+        if keys is None:
             for stream in streams:
                 self.add(stream, prevent_overwrite=prevent_overwrite)
         else:
@@ -281,7 +281,8 @@ class StreamCollection:
                 return self._sorted_cache[key]
             except IndexError as exc:
                 raise IndexError(
-                    f"Stream index {key} out of range for collection of size {len(self._sorted_cache)}."
+                    f"Stream index {key} out of range for collection of size "
+                    f"{len(self._sorted_cache)}."
                 ) from exc
         elif isinstance(key, str):
             # Allow accessing by stream name

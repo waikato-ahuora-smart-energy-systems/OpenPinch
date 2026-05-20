@@ -57,7 +57,7 @@ class HeatPumpTargetInputs(BaseModel):
 
 
 class HeatPumpTargetOutputs(BaseModel):
-    """Normalized output requirement for heat pump and refrigeration targeting routines."""
+    """Normalized output contract for HPR targeting routines."""
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 

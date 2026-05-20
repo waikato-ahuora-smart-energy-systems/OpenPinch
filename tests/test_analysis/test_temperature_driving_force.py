@@ -1,7 +1,6 @@
 """Regression tests for temperature driving force analysis routines."""
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from OpenPinch.services.common.temperature_driving_force import (

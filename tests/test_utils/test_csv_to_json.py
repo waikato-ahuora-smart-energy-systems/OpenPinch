@@ -1,12 +1,14 @@
 """Regression tests for csv to json utility helpers."""
 
-from pathlib import Path
-import pandas as pd
-import pytest
-from OpenPinch.utils.csv_to_json import get_problem_from_csv
 import io
 import json
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
 from OpenPinch.utils import csv_to_json
+from OpenPinch.utils.csv_to_json import get_problem_from_csv
 
 
 def _write_stream_csv(path: Path) -> None:

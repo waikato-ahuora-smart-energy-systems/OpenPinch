@@ -8,9 +8,8 @@ minimal so user projects can layer additional controls as needed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import sys
-import math
+from dataclasses import dataclass
 from io import BytesIO
 from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tuple
 
@@ -33,9 +32,8 @@ else:
     _STREAMLIT_IMPORT_ERROR = None
 
 from ..classes.problem_table import ProblemTable
-from ..classes.stream import Stream
 from ..classes.zone import Zone
-from ..lib.enums import ArrowHead, LineColour
+from ..lib.enums import LineColour
 from ..lib.schemas.targets import BaseTargetModel
 from ..services.common.graph_data import get_output_graph_data
 
@@ -156,12 +154,16 @@ def render_streamlit_dashboard(
 
     _apply_dashboard_theme(st)
 
+    resolved_title = page_title or f"{zone.name} Pinch Dashboard"
+
     st.markdown(
         f"""
         <div class="op-header">
             <div>
-                <div class="op-title">{page_title or f"{zone.name} Pinch Dashboard"}</div>
-                <div class="op-subtitle">Energy targeting summary with composite curve visualisation</div>
+                <div class="op-title">{resolved_title}</div>
+                <div class="op-subtitle">
+                    Energy targeting summary with composite curve visualisation
+                </div>
             </div>
         </div>
         """,
@@ -193,7 +195,7 @@ def render_streamlit_dashboard(
     st.sidebar.divider()
     st.sidebar.write("Targets")
     st.sidebar.markdown(
-        f"<div class='op-utility-title'>Overview</div>",
+        "<div class='op-utility-title'>Overview</div>",
         unsafe_allow_html=True,
     )
     st.sidebar.markdown(
@@ -201,23 +203,33 @@ def render_streamlit_dashboard(
         <div class="op-metric-grid">
             <div class="op-metric">
                 <div class="op-metric-label">Cold pinch</div>
-                <div class="op-metric-value">{target.cold_pinch:.1f}&nbsp;\N{DEGREE SIGN}C</div>
+                <div class="op-metric-value">
+                    {target.cold_pinch:.1f}&nbsp;\N{DEGREE SIGN}C
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot pinch</div>
-                <div class="op-metric-value">{target.hot_pinch:.1f}&nbsp;\N{DEGREE SIGN}C</div>
+                <div class="op-metric-value">
+                    {target.hot_pinch:.1f}&nbsp;\N{DEGREE SIGN}C
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot utility</div>
-                <div class="op-metric-value">{target.hot_utility_target:,.0f}&nbsp;kW</div>
+                <div class="op-metric-value">
+                    {target.hot_utility_target:,.0f}&nbsp;kW
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Cold utility</div>
-                <div class="op-metric-value">{target.cold_utility_target:,.0f}&nbsp;kW</div>
+                <div class="op-metric-value">
+                    {target.cold_utility_target:,.0f}&nbsp;kW
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Heat recovery</div>
-                <div class="op-metric-value">{target.heat_recovery_target:,.0f}&nbsp;kW</div>
+                <div class="op-metric-value">
+                    {target.heat_recovery_target:,.0f}&nbsp;kW
+                </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Degree of integration</div>
@@ -297,7 +309,9 @@ def render_streamlit_dashboard(
             st.info("No shifted problem table data available.")
         else:
             st.badge(
-                "Extended problem table based on shifted process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns."
+                "Extended problem table based on shifted process temperatures. "
+                "Note: interval delta values are shown with zeros at the top "
+                "of the columns."
             )
             st.dataframe(pt_df, width="stretch")
             default_loc = (
@@ -321,7 +335,9 @@ def render_streamlit_dashboard(
             st.info("No real temperature Problem Table data available.")
         else:
             st.badge(
-                "Extended problem table based on real process temperatures. Note: Interval delta values shown in line with zeros at the top of the coloumns."
+                "Extended problem table based on real process temperatures. "
+                "Note: interval delta values are shown with zeros at the top "
+                "of the columns."
             )
             st.dataframe(pt_real_df, width="stretch")
             default_loc = f"results/{selected_target_name.replace('/', '-')}_real.xlsx"
@@ -376,7 +392,7 @@ def _build_plotly_graph(graph: Mapping[str, object]):
     fig = plotly_go.Figure()
     legend_seen: Dict[str, bool] = {}
     for segment in graph.get("segments", []):
-        traces, _arrow_annotation = _segment_trace(segment, graph, legend_seen)
+        traces = _segment_trace(segment, graph, legend_seen)
         for trace in traces:
             fig.add_trace(trace)
     _apply_default_layout(fig)
@@ -387,26 +403,19 @@ def _segment_trace(
     segment: Mapping[str, object],
     graph: Mapping[str, object],
     legend_seen: Dict[str, bool],
-) -> tuple:
+) -> list:
     x_vals, y_vals = _extract_segment_xy(segment)
     if not x_vals or not y_vals:
-        return [], None
+        return []
     title = segment.get("title") or graph.get("type") or "Segment"
     graph_type = graph.get("type")
     colour = _segment_colour(segment)
     legend_label, series_id, show = _legend_details(segment, title, legend_seen)
-    arrow = segment.get("arrow")
 
     if graph_type in {"Site Utility Grand Composite Curve"} and _is_vertical_segment(
         x_vals
     ):
         colour = _SEGMENT_COLOUR_MAP[LineColour.Other.value]
-
-    if graph_type in {"Total Site Profiles", "Site Utility Grand Composite Curve"}:
-        if arrow == ArrowHead.START.value:
-            arrow = ArrowHead.END.value
-        elif arrow == ArrowHead.END.value:
-            arrow = ArrowHead.START.value
 
     plotly_go = _require_plotly()
     line_trace = plotly_go.Scatter(
@@ -419,34 +428,7 @@ def _segment_trace(
         legendgroup=series_id,
         showlegend=show,
     )
-    if arrow not in {ArrowHead.END.value, ArrowHead.START.value} or len(x_vals) < 2:
-        return [line_trace], None
-
-    tip_idx, ref_idx = _arrow_indices(x_vals, y_vals, arrow)
-    dx = x_vals[tip_idx] - x_vals[ref_idx]
-    dy = y_vals[tip_idx] - y_vals[ref_idx]
-    length = math.hypot(dx, dy)
-    if length == 0:
-        return [line_trace], None
-    ux, uy = dx / length, dy / length
-    tail_offset = 0.2 * length
-    arrow_annotation = {
-        "x": x_vals[tip_idx],
-        "y": y_vals[tip_idx],
-        "xref": "x",
-        "yref": "y",
-        "ax": x_vals[tip_idx] - ux * tail_offset,
-        "ay": y_vals[tip_idx] - uy * tail_offset,
-        "axref": "x",
-        "ayref": "y",
-        "text": "",
-        "showarrow": True,
-        "arrowhead": 2,
-        "arrowsize": 0.9,
-        "arrowwidth": 1.8,
-        "arrowcolor": colour,
-    }
-    return [line_trace], arrow_annotation
+    return [line_trace]
 
 
 def _segment_colour(segment: Mapping[str, object]) -> str:
@@ -476,27 +458,6 @@ def _legend_details(
     show = not legend_seen.get(series_id, False)
     legend_seen[series_id] = True
     return legend_label, series_id, show
-
-
-def _arrow_indices(
-    x_vals: List[float], y_vals: List[float], arrow: str
-) -> Tuple[int, int]:
-    length = len(x_vals)
-    if arrow == ArrowHead.START.value:
-        tip_idx = 0
-        candidates = range(1, length)
-    else:
-        tip_idx = length - 1
-        candidates = range(length - 2, -1, -1)
-
-    for idx in candidates:
-        if x_vals[idx] != x_vals[tip_idx] or y_vals[idx] != y_vals[tip_idx]:
-            return tip_idx, idx
-
-    # Fallback to adjacent point (caller handles zero-length vectors)
-    if arrow == ArrowHead.START.value:
-        return 0, min(1, length - 1)
-    return length - 1, max(length - 2, 0)
 
 
 def _line_style(segment: Mapping[str, object], colour: str) -> dict:
@@ -610,7 +571,12 @@ def _apply_dashboard_theme(st) -> None:
             }
 
             .stApp {
-                background: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 60%, #f8fafc 100%);
+                background: linear-gradient(
+                    180deg,
+                    #f5f7fb 0%,
+                    #eef2f7 60%,
+                    #f8fafc 100%
+                );
                 color: var(--op-ink);
                 font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
             }

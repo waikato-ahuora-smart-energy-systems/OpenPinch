@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 README = REPO_ROOT / "README.md"
 GETTING_STARTED = REPO_ROOT / "docs" / "getting-started.rst"
@@ -12,8 +11,17 @@ QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
 NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
 HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
 INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
+GUIDE_FIRST_SOLVE_CLI = REPO_ROOT / "docs" / "guides" / "first-solve-cli.rst"
+GUIDE_EXPORTING_RESULTS = REPO_ROOT / "docs" / "guides" / "exporting-results.rst"
+GUIDE_GRAPHING = REPO_ROOT / "docs" / "guides" / "graphing-and-interpretation.rst"
+FUNDAMENTALS_GRAPHS = (
+    REPO_ROOT / "docs" / "fundamentals" / "graphs-and-interpretation.rst"
+)
+OVERVIEW_CAPABILITY_MATRIX = REPO_ROOT / "docs" / "overview" / "capability-matrix.rst"
+OVERVIEW_SUPPORT = REPO_ROOT / "docs" / "overview" / "support-and-stability.rst"
 API_PINCHWORKSPACE = REPO_ROOT / "docs" / "api" / "pinchworkspace.rst"
 API_PACKAGE_ROOT = REPO_ROOT / "docs" / "api" / "package-root.rst"
+API_CLI_RESOURCES = REPO_ROOT / "docs" / "api" / "cli-and-resources.rst"
 API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
 API_LIB = REPO_ROOT / "docs" / "reference" / "api-lib.rst"
 API_ANALYSIS = REPO_ROOT / "docs" / "reference" / "api-analysis.rst"
@@ -50,10 +58,34 @@ def test_docs_do_not_reference_stale_workflow_names():
             _read(GETTING_STARTED),
             _read(QUICKSTART),
             _read(NOTEBOOKS),
+            _read(GUIDE_FIRST_SOLVE_CLI),
+            _read(GUIDE_EXPORTING_RESULTS),
+            _read(GUIDE_GRAPHING),
+            _read(FUNDAMENTALS_GRAPHS),
+            _read(OVERVIEW_CAPABILITY_MATRIX),
+            _read(OVERVIEW_SUPPORT),
+            _read(API_CLI_RESOURCES),
         ]
     )
     assert "problem.export(" not in combined
+    assert "openpinch graph" not in combined
+    assert "openpinch run" not in combined
+    assert "openpinch validate" not in combined
+    assert "openpinch sample" not in combined
     assert "Python 3.11 or newer" not in combined
+    assert "openpinch notebook -o notebooks" in combined
+
+
+def test_support_and_cli_docs_match_the_current_command_surface():
+    combined = "\n".join([_read(OVERVIEW_SUPPORT), _read(API_CLI_RESOURCES)])
+
+    assert "openpinch notebook" in combined
+    assert "``notebook`` for copying packaged example notebooks" in combined
+    assert "``run`` for end-to-end analysis" not in combined
+    assert "``graph`` for HTML graph export" not in combined
+    assert "``validate`` for payload preflight checks" not in combined
+    assert "``sample`` for copying packaged sample cases" not in combined
+    assert "``heat-pump`` for evaluating" not in combined
 
 
 def test_docs_highlight_interpretation_and_heat_pump_integration():
@@ -138,6 +170,18 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "HeatPumpTargetOutputs" in api_lib
     assert "OpenPinch.services.input_data_processing.data_preparation" in api_analysis
     assert "OpenPinch.services.data_preparation" not in api_analysis
+
+
+def test_reference_docs_mark_partial_analysis_modules_as_partial():
+    api_analysis = _read(API_ANALYSIS)
+
+    assert "Experimental or Partial Analysis Modules" in api_analysis
+    assert "they should not be read as stable production workflows" in api_analysis
+    assert "OpenPinch.services.exergy_analysis.exergy_targeting_entry" in api_analysis
+    assert (
+        "OpenPinch.services.energy_transfer_analysis.energy_transfer_analysis"
+        in api_analysis
+    )
 
 
 def test_reference_docs_show_uv_docs_build_command():

@@ -1,8 +1,10 @@
 """Excel workbook ingestion helpers for OpenPinch problem/result payloads."""
 
 import json
+
 import pandas as pd
 from pandas.errors import EmptyDataError
+
 from .input_validation import validate_stream_data, validate_utility_data
 
 __all__ = [
@@ -10,9 +12,9 @@ __all__ = [
     "get_results_from_excel",
 ]
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_problem_from_excel(excel_file, output_json=None):
@@ -38,7 +40,7 @@ def get_problem_from_excel(excel_file, output_json=None):
     except (ValueError, EmptyDataError) as exc:
         raise ValueError(f"Failed to read workbook problem inputs: {exc}") from exc
 
-    # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
+    # Build the final dictionary. Read more sections here if needed.
     output_dict = {
         "streams": streams_data,
         "utilities": utilities_data,
@@ -68,7 +70,7 @@ def get_results_from_excel(excel_file, output_json, project_name):
     except (ValueError, EmptyDataError) as exc:
         raise ValueError(f"Failed to read workbook summary inputs: {exc}") from exc
 
-    # Build the final dictionary. If you have more sections (e.g. "options"), read them similarly.
+    # Build the final dictionary. Read more sections here if needed.
     output_dict = {
         "targets": results_data,
     }
@@ -81,9 +83,9 @@ def get_results_from_excel(excel_file, output_json, project_name):
     return output_dict
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _get_column_names_and_units(df_full, sheet_name, row_units=1):
@@ -275,7 +277,7 @@ def _write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> l
 def _write_targets_to_dict_and_list(
     df_data: pd.DataFrame, units_map: dict, project_name: str
 ) -> list:
-    """Convert summary worksheet into structured target records, including utility splits."""
+    """Convert a summary worksheet into structured target records."""
     if df_data.empty:
         return []
 

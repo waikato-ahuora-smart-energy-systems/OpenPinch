@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import List, Optional
+
 import numpy as np
 
 from .stream_collection import StreamCollection
 from .vapour_compression_cycle import VapourCompressionCycle
-
 
 __all__ = ["CascadeVapourCompressionCycle"]
 
@@ -22,7 +22,8 @@ class CascadeVapourCompressionCycle:
         self._subcycles = []
         self._num_cycles = 1
         self._dtcont: float = 0.0
-        self._dt_diff_max: float = 0.5  # Default value, used in piecewise approximation of non linear T-h profiles
+        # Default value used in piecewise approximation of non-linear T-h profiles.
+        self._dt_diff_max: float = 0.5
         self._solved: bool = False
         self._max_work: float = 0.0
 
@@ -446,7 +447,8 @@ class CascadeVapourCompressionCycle:
         Q_cool : np.ndarray, optional
             Cooling delivered to the process [W].
         dt_cascade_hx : float, optional
-            Temperature difference between condensing and evaporating temperatures in the cascade heat exchanger.
+            Temperature difference between condensing and evaporating
+            temperatures in the cascade heat exchanger.
         is_heat_pump : bool, optional
             Flag to indicate if the cycle is in heat pump or refrigeration mode.
 
@@ -496,7 +498,8 @@ class CascadeVapourCompressionCycle:
                 refrigerant_all = refrigerant * self._num_cycles
             else:
                 raise ValueError(
-                    f"Number of refrigerants must match the number of heat pumps, {self._num_cycles}."
+                    "Number of refrigerants must match the number of heat pumps, "
+                    f"{self._num_cycles}."
                 )
         else:
             refrigerant_all = [refrigerant] * self._num_cycles

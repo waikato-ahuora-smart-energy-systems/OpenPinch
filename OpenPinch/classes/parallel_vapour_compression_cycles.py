@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import List, Optional
+
 import numpy as np
 
 from .stream_collection import StreamCollection
 from .vapour_compression_cycle import VapourCompressionCycle
-
 
 __all__ = ["ParallelVapourCompressionCycles"]
 
@@ -20,7 +20,8 @@ class ParallelVapourCompressionCycles:
         self._subcycles = []
         self._num_cycles = 1
         self._dtcont: float = 0.0
-        self._dt_diff_max: float = 0.5  # Default value, used in piecewise approximation of non linear T-h profiles
+        # Default value used in piecewise approximation of non-linear T-h profiles.
+        self._dt_diff_max: float = 0.5
         self._solved: bool = False
 
     @property
@@ -289,7 +290,7 @@ class ParallelVapourCompressionCycles:
             arr_out = np.full(n_cycles, arr.item(), dtype=float)
         else:
             raise ValueError(
-                "Incompatible Q_heat input to solving a multiple simple heat pump system."
+                "Incompatible Q_heat input for solving a multi-cycle heat pump system."
             )
 
         nan_mask = np.isnan(arr_out)
@@ -311,7 +312,7 @@ class ParallelVapourCompressionCycles:
             arr = arr.reshape(1)
         if arr.ndim != 1:
             raise ValueError(
-                "Incompatible Q_cool input to solving a multiple simple heat pump system."
+                "Incompatible Q_cool input for solving a multi-cycle heat pump system."
             )
 
         if arr.size == 1:
@@ -324,7 +325,7 @@ class ParallelVapourCompressionCycles:
             arr = arr.copy()
         else:
             raise ValueError(
-                "Incompatible Q_cool input to solving a multiple simple heat pump system."
+                "Incompatible Q_cool input for solving a multi-cycle heat pump system."
             )
 
         for i in range(n_cycles):
@@ -353,7 +354,8 @@ class ParallelVapourCompressionCycles:
             if len(refrigerant) == 1:
                 return refrigerant * n_cycles
             raise ValueError(
-                f"Number of refrigerants must match the number of heat pumps, {n_cycles}."
+                "Number of refrigerants must match the number of heat pumps, "
+                f"{n_cycles}."
             )
         return [refrigerant] * n_cycles
 

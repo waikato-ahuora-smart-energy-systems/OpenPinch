@@ -18,10 +18,10 @@ from ....classes.stream_collection import StreamCollection
 from ....lib.config import tol
 from ....lib.enums import PT
 from ....lib.schemas.hpr import (
+    HeatPumpTargetInputs,
     HPRBackendResult,
     HPRParsedState,
     HPRThermoArtifacts,
-    HeatPumpTargetInputs,
 )
 from ....utils.blackbox_minimisers import multiminima
 from ....utils.miscellaneous import (
@@ -179,17 +179,20 @@ def solve_hpr_placement(
     )
     if local_minima_x.size == 0:
         raise ValueError(
-            f"Heat pump and refrigeration targeting ({args.hpr_type}) failed to return any local minima."
+            "Heat pump and refrigeration targeting "
+            f"({args.hpr_type}) failed to return any local minima."
         )
 
     result = f_obj(local_minima_x[0], args, debug=args.debug)
     if not isinstance(result, HPRBackendResult):
         raise TypeError(
-            "Heat pump and refrigeration objective functions must return HPRBackendResult."
+            "Heat pump and refrigeration objective functions must return "
+            "HPRBackendResult."
         )
     if not result.success:
         raise ValueError(
-            f"Heat pump and refrigeration targeting ({args.hpr_type}) failed to return an optimal result."
+            "Heat pump and refrigeration targeting "
+            f"({args.hpr_type}) failed to return an optimal result."
         )
     return result.with_updates(
         success=True,
@@ -241,7 +244,6 @@ def _build_hpr_accounting(
     ):
         penalty += float(g_ineq_penalty(g=Q_ext_cold, rho=rho_penalty, form="square"))
 
-    utility_tot = float(work + Q_ext_heat + Q_ext_cold)
     obj = float(
         calc_hpr_obj(
             work=work,
@@ -624,9 +626,9 @@ def calc_hpr_obj(
     ) / Q_hpr_target
 
 
-#######################################################################################################
+################################################################################
 # Helper Functions
-#######################################################################################################
+################################################################################
 
 
 def _build_latent_streams(

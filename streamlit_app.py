@@ -20,7 +20,9 @@ PROBLEM_FILE = Path("examples/OpenPinchWkbs/Ziyatdinov et al (example 2).xlsb")
 @st.cache_resource
 def _load_problem(problem_path: str) -> PinchProblem:
     """Load and solve the pinch problem once per Streamlit session."""
-    return PinchProblem(problem_path, run=True)
+    problem = PinchProblem(source=problem_path)
+    problem.target()
+    return problem
 
 
 def validate_problem_path(problem_path) -> None:

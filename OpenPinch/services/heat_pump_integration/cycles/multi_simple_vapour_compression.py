@@ -5,7 +5,7 @@ import numpy as np
 from ....classes.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
-from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HeatPumpTargetInputs
+from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
@@ -30,9 +30,9 @@ __all__ = [
 ]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 @timing_decorator
@@ -79,7 +79,6 @@ def _get_multi_single_hp_opt_setup(
     if init_res is None:
         return None, bnds
 
-    Q_cool_ex = args.Q_cool_max + init_res.Q_amb_hot
     Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
 
     x_amb = map_Q_amb_to_x(
@@ -106,9 +105,9 @@ def _get_multi_single_hp_opt_setup(
     ), bnds
 
 
-#######################################################################################################
+################################################################################
 # Helper Functions
-#######################################################################################################
+################################################################################
 
 
 def _parse_multi_simple_hp_state_temperatures(

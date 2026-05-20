@@ -1,11 +1,12 @@
 """Regression tests for the zone classes."""
 
 import pytest
+
 from OpenPinch.classes import *
-from OpenPinch.lib import *
 from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
+from OpenPinch.lib import *
 from OpenPinch.lib.enums import ProblemTableLabel as PT
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 
 
 def _dummy_problem_table():

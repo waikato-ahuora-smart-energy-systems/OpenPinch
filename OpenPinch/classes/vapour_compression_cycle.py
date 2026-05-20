@@ -3,22 +3,24 @@
 # from __future__ import annotations
 
 import re
-from typing import Any, List, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import CoolProp
 import numpy as np
 from scipy.optimize import brentq
 
+from ..utils.stream_linearisation import get_piecewise_data_points
 from .stream import Stream
 from .stream_collection import StreamCollection
-from ..utils.stream_linearisation import get_piecewise_data_points
-
 
 __all__ = ["VapourCompressionCycle"]
 
 
 class VapourCompressionCycle:
-    """Single vapour-compression heat pump cycle with optional internal heat exchange."""
+    """Single vapour-compression heat pump cycle.
+
+    Supports an optional internal heat exchanger.
+    """
 
     STATECOUNT = 6
 
@@ -37,7 +39,8 @@ class VapourCompressionCycle:
         self._eta_comp: float = 1.0
         self._ihx_gas_dt: float = 0.0
         self._dtcont: float = 0.0
-        self._dt_diff_max: float = 0.5  # Default value, used in piecewise approximation of non linear T-h profiles
+        # Default value used in piecewise approximation of non-linear T-h profiles.
+        self._dt_diff_max: float = 0.5
         self._solved: bool = False
 
         self._state = None
@@ -65,7 +68,7 @@ class VapourCompressionCycle:
 
     @staticmethod
     def _get_fluid_state(value: str | Any):
-        """Build a CoolProp abstract state from a refrigerant spec or return the state unchanged."""
+        """Build a CoolProp abstract state from a refrigerant spec."""
         if not isinstance(value, str):
             return value
 
@@ -82,7 +85,8 @@ class VapourCompressionCycle:
             match = re.fullmatch(r"\s*([^\[\]&]+)\[([^\]]+)\]\s*", component_spec)
             if match is None:
                 raise ValueError(
-                    "Explicit refrigerant mixtures must use '<component>[<mole_fraction>]' syntax."
+                    "Explicit refrigerant mixtures must use "
+                    "'<component>[<mole_fraction>]' syntax."
                 )
 
             component_name, mole_fraction = match.groups()
@@ -352,11 +356,6 @@ class VapourCompressionCycle:
         """Flag if the cycle has been solved or not."""
         return self._solved
 
-    @property
-    def penalty(self) -> List[float] | np.ndarray:
-        """List of penalties for cycle optimisation."""
-        return self._penalty
-
     def _validate_solve_inputs(
         self,
         refrigerant: str = None,
@@ -403,7 +402,7 @@ class VapourCompressionCycle:
         *,
         expand: str = "high",
     ) -> CoolProp.AbstractState:
-        """Solve a single-phase state from pressure and a target thermodynamic property."""
+        """Solve a single-phase state from pressure and target property."""
         epsilon = 1e-6
         T_low = max(T_low, epsilon)
         T_high = max(T_high, T_low + 1.0)
@@ -435,7 +434,8 @@ class VapourCompressionCycle:
             step *= 1.5
         else:
             raise ValueError(
-                f"Could not bracket a temperature solution for {property_name} at pressure {P}."
+                "Could not bracket a temperature solution for "
+                f"{property_name} at pressure {P}."
             )
 
         T = brentq(residual, T_low, T_high)
@@ -569,12 +569,14 @@ class VapourCompressionCycle:
         dT_ihx_gas_side : float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : float, optional
-            Heat delivered to the process [W]. Heat pump and cascade configurations only.
+            Heat delivered to the process [W]. Used for heat-pump and cascade
+            configurations only.
         Q_cas_heat : float, optional
             Extra condenser heat transferred to the next cascade cycle [W].
             Used only for cascade heat pump configurations.
         Q_cool : float, optional
-            Cooling delivered to the process [W]. Refrigeration and cascade configurations only.
+            Cooling delivered to the process [W]. Used for refrigeration and
+            cascade configurations only.
         Q_cas_cool : float, optional
             Extra evaporator cooling transferred to the next cascade cycle [W].
             Used only for cascade refrigeration configurations.
@@ -630,7 +632,7 @@ class VapourCompressionCycle:
         if P_lo > P_hi:
             raise ValueError("Evaporator pressure must be below condenser pressure.")
 
-        """Solve a basic four-state cycle given inlet/outlet temperatures and pressures."""
+        """Solve a basic four-state cycle from temperatures and pressures."""
         # 0 - Evaporator outlet / IHX inlet
         self._T_evap_sat_vap = self._compute_state_from_pressure_quality(P_lo, 1.0).T()
         state0 = self._compute_state_from_pressure_temperature(
@@ -664,9 +666,7 @@ class VapourCompressionCycle:
         )
         self._save_cycle_state(state1, 1)
 
-        """self._penalty.append(
-            max(self._compute_state_from_pressure_quality(P_hi, 0.0).hmass() - state1.hmass(), 0.0) # Penalise wet compression
-        )  """
+        # Historical wet-compression penalty hook retained for future tuning.
 
         # 2 - Condenser outlet / IHX inlet (source)
         h_cond_out_min = (
@@ -739,7 +739,7 @@ class VapourCompressionCycle:
             self._save_cycle_state(state4, 4)
 
             # 5 - Hot side of cascade heat exchanger outlet (otherwise state 5 == 3)
-            if self._Q_cool == None or np.isnan(self._Q_cool):
+            if self._Q_cool is None or np.isnan(self._Q_cool):
                 self._Q_cool = self._Q_evap
             elif self._Q_cool > self._Q_evap:
                 self._Q_cool = self._Q_evap
@@ -769,7 +769,7 @@ class VapourCompressionCycle:
             self._save_cycle_state(state5, 5)
 
             # 4 - Hot side of cascade heat exchanger outlet (otherwise state 4 == 1)
-            if self._Q_heat == None or np.isnan(self._Q_heat):
+            if self._Q_heat is None or np.isnan(self._Q_heat):
                 self._Q_heat = self._Q_cond
             elif self._Q_heat > self._Q_cond:
                 self._Q_heat = self._Q_cond
@@ -839,7 +839,7 @@ class VapourCompressionCycle:
 
     def _build_condenser_profile(self) -> np.ndarray:
         """
-        Construct a four-point condenser T-h polyline in the VapourCompressionCycle's unit system.
+        Construct a four-point condenser T-h polyline in cycle units.
 
         Returns
         -------
@@ -902,7 +902,7 @@ class VapourCompressionCycle:
 
         self._condenser_th_curve = t_h_curve_points
 
-        # Calculate a piece-wise linear approximation of the condenser or gas cooler profile
+        # Calculate a piecewise-linear approximation of the condenser profile.
         condenser_profile = get_piecewise_data_points(
             curve=t_h_curve_points,
             is_hot_stream=True,
@@ -913,7 +913,7 @@ class VapourCompressionCycle:
 
     def _build_evaporator_profile(self) -> np.ndarray:
         """
-        Construct a three-point evaporator T-h polyline in the VapourCompressionCycle's unit system.
+        Construct a three-point evaporator T-h polyline in cycle units.
 
         Returns
         -------
@@ -970,7 +970,7 @@ class VapourCompressionCycle:
 
         self._evaporator_th_curve = t_h_curve_points
 
-        # Calculate a piece-wise linear approximation of the evaporator or gas heater profile
+        # Calculate a piecewise-linear approximation of the evaporator profile.
         evaporator_profile = get_piecewise_data_points(
             curve=t_h_curve_points,
             is_hot_stream=False,

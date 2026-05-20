@@ -1,7 +1,9 @@
 """Regression tests for costing utility helpers."""
 
 import math
+
 import pytest
+
 from OpenPinch.lib import *
 from OpenPinch.utils import *
 from OpenPinch.utils.costing import (
@@ -9,7 +11,6 @@ from OpenPinch.utils.costing import (
     compute_capital_cost,
     compute_capital_recovery_factor,
 )
-
 
 """Test cases for the compute_capital_recovery_factor function."""
 

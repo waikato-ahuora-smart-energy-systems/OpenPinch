@@ -1,6 +1,7 @@
 """Heat-exchanger performance correlations used by area targeting routines."""
 
 import math
+
 import numpy as np
 
 from ..lib.enums import HeatExchangerTypes as HX
@@ -25,7 +26,7 @@ def compute_LMTD_from_dts(
     delta_T1: float | list | np.ndarray,
     delta_T2: float | list | np.ndarray,
 ) -> np.ndarray:
-    """Returns the log mean temperature difference (LMTD) for a counterflow heat exchanger."""
+    """Return the LMTD for a counterflow heat exchanger from end-point deltas."""
     # Check temperature directions for counter-current assumption
     delta_T1 = np.array(delta_T1)
     delta_T2 = np.array(delta_T2)
@@ -53,7 +54,7 @@ def compute_LMTD_from_ts(
     T_cold_in: float | list | np.ndarray,
     T_cold_out: float | list | np.ndarray,
 ) -> float:
-    """Returns the log mean temperature difference (LMTD) for a counterflow heat exchanger."""
+    """Return the LMTD for a counterflow heat exchanger from temperatures."""
     T_hot_in = np.array(T_hot_in)
     T_hot_out = np.array(T_hot_out)
     T_cold_in = np.array(T_cold_in)
@@ -73,7 +74,7 @@ def compute_LMTD_from_ts(
 
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
     """Return heat exchanger effectiveness for the specified arrangement/NTU/c ratio."""
-    if Passes == None:
+    if Passes is None:
         Passes = 1
 
     Ntu = Ntu / Passes
@@ -92,7 +93,7 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
             eff = (1 - math.exp(-Ntu * (1 + c))) / (1 + c)
         # Cross Flow - Both Streams Unmixed Effectiveness
         elif Arrangement == HX.CrFUU:
-            if Rows == None or Cmin_Phase == None:
+            if Rows is None or Cmin_Phase is None:
                 eff = CrossflowUnmixedEff1(Ntu, c)
             else:
                 eff = CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_Phase)
@@ -127,8 +128,8 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
 
 
 def HX_NTU(Arrangement, eff, c, Passes=None):
-    """Compute the NTU corresponding to a target effectiveness for a given arrangement."""
-    if Passes == None:
+    """Compute NTU for a target effectiveness and exchanger arrangement."""
+    if Passes is None:
         Passes = 1
 
     if Passes > 1:
@@ -174,7 +175,7 @@ def HX_NTU(Arrangement, eff, c, Passes=None):
 
 
 def CalcAreaUE(Arrangement, U, C_p, T_p1, T_p2, T_u1, T_u2, Passes):
-    """Estimate area*U product required for the exchanger based on duty and temperatures."""
+    """Estimate the exchanger ``area * U`` product from duty and temperatures."""
     Q = C_p * abs(T_p1 - T_p2)
     C_u = Q / abs(T_u1 - T_u2)
     if C_p < C_u:
@@ -190,7 +191,7 @@ def CalcAreaUE(Arrangement, U, C_p, T_p1, T_p2, T_u1, T_u2, Passes):
 
 
 def eNTU_slope_Numerical(Arrangement, Ntu, c, Passes):
-    """Finite-difference slope of effectiveness with respect to NTU for sensitivity analyses."""
+    """Compute a finite-difference effectiveness slope with respect to NTU."""
     dx = 1e-6
     if Ntu > 0:
         return (

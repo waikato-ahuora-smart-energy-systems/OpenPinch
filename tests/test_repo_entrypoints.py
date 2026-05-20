@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 import OpenPinch
-
+from OpenPinch.resources import list_notebooks
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -66,23 +66,35 @@ def test_root_init_script_executes():
     assert any(item.category is DeprecationWarning for item in caught)
 
 
-def test_repo_main_script_executes(monkeypatch):
-    _clear_dummy()
-    monkeypatch.setattr(OpenPinch, "PinchProblem", _DummyPinchProblem)
+def test_build_dist_script_help_executes(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["python", "--help"])
+    namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "build_dist.py"))
+
+    with pytest.raises(SystemExit, match="0"):
+        namespace["main"](["--help"])
+
+
+def test_optional_install_smoke_script_help_executes(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["python", "--help"])
+    namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "optional_install_smoke.py"))
+
+    with pytest.raises(SystemExit, match="0"):
+        namespace["main"](["--help"])
+
+
+def test_repo_main_script_executes(monkeypatch, tmp_path: Path):
+    notebook_dir = tmp_path / "notebooks"
     monkeypatch.setattr(
         sys,
         "argv",
-        ["python", "examples/stream_data/p_illustrative.json", "-o", "results"],
+        ["python", "notebook", "-o", str(notebook_dir)],
     )
 
     with pytest.raises(SystemExit, match="0"):
         runpy.run_path(str(REPO_ROOT / "__main__.py"), run_name="__main__")
 
-    assert len(_DummyPinchProblem.created) == 1
-    calls = _DummyPinchProblem.created[0].calls
-    assert calls[0] == ("load", "examples/stream_data/p_illustrative.json")
-    assert calls[1][0] == "target"
-    assert calls[2] == ("export_to_Excel", "results")
+    copied = sorted(path.name for path in notebook_dir.glob("*.ipynb"))
+    assert copied == list_notebooks()
 
 
 def test_streamlit_module_helper_functions(monkeypatch):
@@ -95,8 +107,9 @@ def test_streamlit_module_helper_functions(monkeypatch):
     _clear_dummy()
     problem = ns["_load_problem"]("dummy-path")
     assert isinstance(problem, _DummyPinchProblem)
-    assert problem.args == ("dummy-path",)
-    assert problem.kwargs == {"run": True}
+    assert problem.args == ()
+    assert problem.kwargs == {"source": "dummy-path"}
+    assert problem.calls == [("target", None)]
 
     ns["validate_problem_path"](SimpleNamespace(exists=lambda: True))
     assert fake_st.errors == []
@@ -125,4 +138,4 @@ def test_streamlit_app_main_block_executes(monkeypatch):
 
     assert len(_DummyPinchProblem.created) == 1
     calls = _DummyPinchProblem.created[0].calls
-    assert calls == [("render_streamlit_dashboard", None)]
+    assert calls == [("target", None), ("render_streamlit_dashboard", None)]

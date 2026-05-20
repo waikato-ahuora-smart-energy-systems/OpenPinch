@@ -23,11 +23,13 @@ OpenPinch currently ships with sample cases such as:
 - `crude_preheat_train.json`
 - `chocolate_factory.json`
 
-Copy one into your working directory with:
+To make a local editable copy from Python:
 
-.. code-block:: bash
+.. code-block:: python
 
-   openpinch sample --name basic_pinch.json -o basic_pinch.json
+   from OpenPinch.resources import copy_sample_case
+
+   copy_sample_case("basic_pinch.json", "basic_pinch.json")
 
 Packaged Notebook Series
 ------------------------

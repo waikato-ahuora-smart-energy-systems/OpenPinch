@@ -18,9 +18,7 @@ from ...lib.enums import GT, PT, TT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
 from ..common.problem_table_analysis import (
-    get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
-    problem_table_algorithm,
 )
 
 __all__ = [
@@ -29,16 +27,16 @@ __all__ = [
 ]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def compute_total_subzone_utility_targets(zone: Zone) -> TotalProcessTarget:
     """Sums and records zonal targets."""
     # Sum targets from subzones
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
-    utility_cost = num_units = area = capital_cost = total_cost = 0.0
+    utility_cost = num_units = area = 0.0
 
     hot_utilities = deepcopy(zone.hot_utilities).reset_heat_flows()
     cold_utilities = deepcopy(zone.cold_utilities).reset_heat_flows()
@@ -100,7 +98,7 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     pt = get_process_heat_cascade(
         hot_streams=zone.net_hot_streams,
         cold_streams=zone.net_cold_streams,
-        is_shifted=True,  # Second shift of process streams to align with the real utility scale
+        is_shifted=True,  # Align a second shift with the real utility scale.
     )
     pt.update(
         **_shift_site_process_profiles(
@@ -157,9 +155,9 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     return TotalSiteTarget.model_validate(payload)
 
 
-#######################################################################################################
+################################################################################
 # Helper Functions
-#######################################################################################################
+################################################################################
 
 
 def _match_utility_gen_and_use_at_same_level(

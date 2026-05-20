@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from OpenPinch.classes import Zone
+from OpenPinch.lib import *
 from OpenPinch.services.common.graph_data import (
     _classify_segment,
     _create_curve,
@@ -13,8 +15,6 @@ from OpenPinch.services.common.graph_data import (
     _graph_gcc,
     get_output_graph_data,
 )
-from OpenPinch.classes import Zone
-from OpenPinch.lib import *
 
 # ----------------------------------------------------------------------------------------------------
 # Unit Tests for Helper Functions
@@ -130,6 +130,32 @@ def test_create_graph_set_includes_net_load_curves():
     assert graph_set["graphs"][0]["type"] == GT.NLP.value
     assert graph_set["graphs"][0]["name"] == "Net Load Curves: ZoneA/Direct Integration"
     assert len(graph_set["graphs"][0]["segments"]) == 4
+
+
+def test_create_graph_set_includes_real_grand_composite_curve():
+    mock_target = MagicMock()
+    mock_target.name = "ZoneA/Direct Integration"
+    mock_target.type = TT.DI.value
+    mock_target.zone_name = "ZoneA"
+    mock_target.graphs = {
+        GT.GCC_R.value: {
+            PT.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
+            PT.H_NET.value: MagicMock(to_list=lambda: [0, 20, 40]),
+            PT.H_NET_UT.value: MagicMock(to_list=lambda: [0, 5, 10]),
+        }
+    }
+    mock_zone = MagicMock(spec=Zone)
+    mock_zone.name = "ZoneA"
+    mock_zone.address = "Site/ZoneA"
+
+    graph_set = _create_graph_set(mock_target, zone=mock_zone)
+
+    assert len(graph_set["graphs"]) == 1
+    assert graph_set["graphs"][0]["type"] == GT.GCC_R.value
+    assert (
+        graph_set["graphs"][0]["name"]
+        == "Grand Composite Curve (Real): ZoneA/Direct Integration"
+    )
 
 
 # ----------------------------------------------------------------------------------------------------

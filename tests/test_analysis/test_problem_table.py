@@ -1,30 +1,23 @@
 """Regression tests for problem table analysis routines."""
 
+import uuid
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
-from pathlib import Path
-import uuid
+
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.services.common.problem_table_analysis import (
-    _sum_mcp_between_temperature_boundaries,
-)
-from OpenPinch.services.common.problem_table_analysis import problem_table_algorithm
-from OpenPinch.services.common.problem_table_analysis import (
     _insert_temperature_interval_into_pt_at_constant_h,
-)
-from OpenPinch.services.common.problem_table_analysis import set_zonal_targets
-from OpenPinch.services.common.problem_table_analysis import (
-    get_process_heat_cascade,
-    get_heat_recovery_target_from_pt,
-    set_zonal_targets,
-)
-from OpenPinch.services.common.problem_table_analysis import (
     _shift_pt_to_set_heat_recovery,
-)
-from OpenPinch.services.common.problem_table_analysis import (
+    _sum_mcp_between_temperature_boundaries,
     create_problem_table_with_t_int,
+    get_heat_recovery_target_from_pt,
+    get_process_heat_cascade,
+    problem_table_algorithm,
+    set_zonal_targets,
 )
 
 
@@ -32,12 +25,12 @@ from OpenPinch.services.common.problem_table_analysis import (
 def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
     """Build stream data used by this test module."""
     return Stream(
-        name,
-        t_supply,
-        t_target,
-        dt,
-        abs(cp * (t_supply - t_target)),
-        htc if htc > 0 else 1,
+        name=name,
+        t_supply=t_supply,
+        t_target=t_target,
+        dt_cont=dt,
+        heat_flow=abs(cp * (t_supply - t_target)),
+        htc=htc if htc > 0 else 1,
     )
 
 
@@ -1082,18 +1075,6 @@ def test_correct_pt_composite_curves_shifts_columns():
 
 
 """Tests for the create_problem_table_with_t_int function."""
-
-
-def make_stream(name, t_supply, t_target, dt, cp=0, htc=0):
-    """Build stream data used by this test module."""
-    return Stream(
-        name=name,
-        t_supply=t_supply,
-        t_target=t_target,
-        dt_cont=dt,
-        heat_flow=abs(cp * (t_supply - t_target)),
-        htc=htc if htc > 0 else 1,
-    )
 
 
 def test_returns_correct_intervals_basic():

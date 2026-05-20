@@ -7,13 +7,13 @@ __all__ = [
 ]
 
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def compute_capital_recovery_factor(interest_rate: float, years: int) -> float:
-    """Calculates the Capital Recovery Factor (CRF), also known as the annualisation factor."""
+    """Calculate the capital recovery factor, also called annualisation."""
     i = interest_rate
     n = years
     return i * (1 + i) ** n / ((1 + i) ** n - 1)

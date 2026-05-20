@@ -7,7 +7,8 @@ import pytest
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.config import Configuration
-from OpenPinch.lib.enums import ProblemTableLabel as PT, TT, ZT
+from OpenPinch.lib.enums import TT, ZT
+from OpenPinch.lib.enums import ProblemTableLabel as PT
 from OpenPinch.lib.schemas.targets import (
     BaseTargetModel,
     DirectIntegrationTarget,

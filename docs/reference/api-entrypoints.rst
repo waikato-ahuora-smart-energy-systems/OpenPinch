@@ -37,7 +37,13 @@ Repository Maintenance Scripts
 .. automodule:: scripts.build_docs
    :members:
 
+.. automodule:: scripts.build_dist
+   :members:
+
 .. automodule:: scripts.format_repo
+   :members:
+
+.. automodule:: scripts.optional_install_smoke
    :members:
 
 .. automodule:: scripts.update_toolchain

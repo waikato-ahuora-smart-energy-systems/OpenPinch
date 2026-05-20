@@ -61,7 +61,7 @@ class ZoneTreeSchema(BaseModel):
 
 
 class TargetInput(BaseModel):
-    """Validated top-level input payload for :func:`OpenPinch.pinch_analysis_service`."""
+    """Validated top-level input payload for ``pinch_analysis_service``."""
 
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)

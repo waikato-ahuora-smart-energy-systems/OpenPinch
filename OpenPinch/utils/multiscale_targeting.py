@@ -36,9 +36,9 @@ def extract_results(zone: Zone) -> dict:
     }
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _get_unit_operation_targets(
@@ -56,7 +56,8 @@ def _get_unit_operation_targets(
                             direct_service_func(subzone)
                 else:
                     raise ValueError(
-                        "Invalid zone nesting. Unit operation zones can only contain other operation zones."
+                        "Invalid zone nesting. Unit operation zones can only "
+                        "contain other operation zones."
                     )
 
         if isinstance(direct_service_func, Callable):
@@ -88,7 +89,8 @@ def _get_process_targets(
                 )
             else:
                 raise ValueError(
-                    "Invalid zone nesting. Process zones can only contain other process zones and operation zones."
+                    "Invalid zone nesting. Process zones can only contain "
+                    "other process zones and operation zones."
                 )
 
         if zone.config.DO_INDIRECT_PROCESS_TARGETING:
@@ -138,7 +140,8 @@ def _get_site_targets(
                 )
             else:
                 raise ValueError(
-                    "Invalid zone nesting. Sites zones can only contain site, process and operation zones."
+                    "Invalid zone nesting. Sites zones can only contain "
+                    "site, process, and operation zones."
                 )
 
         # Calculates indirect targets based on different approaches

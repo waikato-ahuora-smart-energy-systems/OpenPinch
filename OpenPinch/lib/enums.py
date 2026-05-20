@@ -15,7 +15,7 @@ class ZoneType(Enum):
     S = "Site"
     P = "Process Zone"
     U = "Utility Zone"
-    O = "Unit Operation"
+    O = "Unit Operation"  # noqa: E741
 
     def __str__(self):
         return self.value
@@ -281,3 +281,34 @@ class BB_Minimiser(str, Enum):
     CMAES = "cmaes"
     BO = "bo"
     RBF = "rbf_surrogate"
+
+
+__all__ = [
+    "ArrowHead",
+    "BB_Minimiser",
+    "GraphType",
+    "GT",
+    "HeatExchangerTypes",
+    "HeatFlowUnits",
+    "HeatPump",
+    "HeatPumpAndRefrigerationCycle",
+    "HPRcycle",
+    "LegendSeries",
+    "LineColour",
+    "ProblemTableLabel",
+    "PT",
+    "ResultsType",
+    "SID",
+    "SD",
+    "ST",
+    "StreamDataLabel",
+    "StreamID",
+    "StreamLoc",
+    "StreamType",
+    "SummaryRowType",
+    "TargetType",
+    "TT",
+    "TurbineModel",
+    "ZoneType",
+    "ZT",
+]

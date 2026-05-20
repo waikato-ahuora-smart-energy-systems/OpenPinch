@@ -1,7 +1,8 @@
 """Utility script to regenerate JSON fixtures from bundled Excel examples."""
 
 import os
-from OpenPinch.utils import *
+
+from OpenPinch.utils import get_problem_from_excel, get_results_from_excel
 
 
 def create_problem_and_results_json():
@@ -23,8 +24,8 @@ def create_problem_and_results_json():
 
                 r_json_file = filepath_save + "/results/r_" + project_name + ".json"
                 get_results_from_excel(excel_file, r_json_file, project_name)
-            except:
-                pass
+            except Exception:
+                continue
 
 
 if __name__ == "__main__":

@@ -1,220 +1,161 @@
-# OpenPinch Frontend-Enablement Roadmap
+# OpenPinch Package Sweep Plan
 
-OpenPinch should be developed as the analysis backend for an interactive GUI,
-not as a CLI-first product surface. The first backend slice is now in place:
-`PinchWorkspace` exists as the public multi-case orchestration layer,
-`ScenarioWorkspace` has been removed, frontend-oriented schemas exist for
-validation and solved results, `PinchWorkspaceBundle` round-trips as JSON, and
-baseline-versus-variant comparison is available. The packaged notebooks now
-teach the script-native API directly, including
-`PinchWorkspace(source="sample_case.json", ...)` for bundled sample cases. The
-roadmap below focuses on hardening those contracts and extending them into a
-stable GUI backend.
+Last sweep: 2026-05-21
 
-Deep documentation restructuring can continue in `RTD_OVERHAUL_PLAN.md`, but
-the main roadmap here should stay centered on backend product shape.
+This plan replaces the previous frontend-oriented roadmap with a package-wide
+maintenance and hardening backlog based on the current repository state.
+
+## Verified Baseline
+
+- `uv run pytest -q` passes: `840 passed in 30.73s`.
+- `uv run pytest -q tests/test_release_artifacts.py tests/test_docs_build.py`
+  passes.
+- `uv run python scripts/build_dist.py` passes.
+- `uv run ruff check .` passes.
+
+## Current Debt Snapshot
+
+- There is no active Ruff backlog at the repository level; the current lint
+  baseline is clean.
+- A small number of targeted Ruff `per-file-ignores` now exist for intentional
+  wildcard-import test patterns and a handful of data-heavy or placeholder
+  files. Those exceptions should be revisited if those files are refactored.
+
+The package is currently green for the restored verification gates, full-repo
+lint, and build flow, but the sweep still shows substantial structural debt in
+the public orchestration layer and several partial subsystems.
+
+## High-Risk Hotspots
+
+- `OpenPinch/classes/pinch_problem.py` (`1028` lines)
+- `OpenPinch/classes/pinch_workspace.py` (`734` lines)
+- `OpenPinch/classes/_workspace_support.py` (`759` lines)
+- `OpenPinch/services/input_data_processing/data_preparation.py` (`755` lines)
+- `OpenPinch/services/common/graph_data.py` (`868` lines)
+- `OpenPinch/utils/wkbook_to_json.py` (`395` lines)
+
+These files are carrying too many responsibilities at once. Refactoring them
+should be treated as maintainability work, not cosmetic cleanup.
 
 ## Now
 
-### PinchWorkspace contract hardening
+### 1. Refactor `PinchProblem` into smaller components
 
-- Why: the workspace foundation now exists, but a GUI needs explicit and
-  durable semantics for case lifecycle, workflow execution, and cached result
-  invalidation.
-- Frontend user flow unlocked: create, edit, rerun, and revisit named
-  study cases with predictable behavior instead of relying on notebook-style
-  conventions.
-- Backend/public surface: keep `PinchWorkspace` as the multi-case layer above
-  `PinchProblem` and tighten the contract around the current public entry
-  points: `PinchWorkspace(source=...)`, `from_payload(...)`,
-  `from_problem(...)`, `case(...)`, `use_case(...)`, `copy_case(...)`,
-  `list_cases()`, `list_variants()`, `set_variant_payload(name, payload, *,
-  base=None)`, `solve_variant(name, *, workflow="target",
-  workflow_options=None)`, `compare_cases(...)`, `compare_variants(...)`,
-  `save_bundle(path)`, and `load_bundle(path)`. Add the missing lifecycle
-  operations a GUI will need next, such as rename, remove, and explicit cache
-  reset, while keeping full-payload editing as the primary mutation model.
+Why this matters:
 
-### Frontend-ready response stabilization
+- `PinchProblem` currently mixes loading, validation, source normalization,
+  zone-tree preparation, targeting orchestration, comparison helpers, Excel
+  export, dashboard launch, and error formatting.
+- The class still owns too many responsibilities and too much mutable state.
 
-- Why: the package now emits serializable view models, but they still need a
-  stable contract for identifiers, warnings, and workflow status before a GUI
-  can depend on them long term.
-- Frontend user flow unlocked: bind validation errors to fields, preserve graph
-  and zone selections across reruns, render solved results without bespoke
-  translation logic, and expose advanced workflows with clear support signals.
-- Backend/public surface: stabilize validation reports, summary cards and
-  tables, graph catalogs and graph payloads, and shifted and real
-  problem-table views. Standardize durable identifiers for zones, targets,
-  graphs, streams, and utilities; define a consistent warning and status
-  taxonomy for solved, invalid, error, partial, advanced, and unsupported
-  workflows; and round out configuration metadata with labels, enum choices,
-  numeric bounds when known, grouping, and support level.
+What to do:
 
-### Dashboard consumption of backend contracts
+- Split loader logic away from orchestration.
+- Split schema/semantic validation and message formatting into dedicated
+  helpers.
+- Split export and dashboard integration away from core solve orchestration.
+- Keep state ownership explicit as the class is broken into smaller units.
 
-- Why: the current Streamlit and dashboard surfaces should prove the backend
-  contracts rather than define their own data-shaping logic in parallel.
-- Frontend user flow unlocked: a demo GUI can exercise the same workspace and
-  serialized result surfaces that a future dedicated frontend will consume.
-- Backend/public surface: refactor dashboard entrypoints to consume
-  `PinchWorkspace` views and related frontend schemas directly, and remove
-  duplicate translation logic that currently lives only in presentation-layer
-  code.
+Done when:
 
-## Next
+- `PinchProblem` reads like a coordinator rather than a 1000-line utility
+  bucket.
+- Smaller units can be tested independently.
 
-### Versioned study-bundle evolution
+### 2. Refactor `PinchWorkspace` and `_workspace_support`
 
-- Why: bundle save/load now exists, but long-lived GUI usage needs explicit
-  schema guarantees, migration policy, and cache compatibility rules.
-- Frontend user flow unlocked: save a study today, reopen it after backend
-  upgrades, share it with another user, and decide when cached result snapshots
-  should be reused versus recomputed.
-- Backend/public surface: evolve the JSON-first `PinchWorkspaceBundle`
-  contract with explicit versioning rules, migration hooks, cache invalidation
-  semantics, and documented compatibility expectations.
+Why this matters:
 
-### Richer interactive comparison surfaces
+- `pinch_workspace.py` and `_workspace_support.py` currently combine storage,
+  payload normalization, validation, workflow dispatch, comparison logic,
+  serialization, and frontend-view shaping.
+- Broad exception-to-view translation hides real failure categories.
+- This layer is close to being a second product surface and deserves clearer
+  boundaries.
 
-- Why: the current comparison layer covers summary deltas and structural table
-  diffs, but GUI-driven studies need deeper and more deterministic comparison
-  payloads.
-- Frontend user flow unlocked: compare variants side by side by target, review
-  graph-set changes, inspect table-level differences in more detail, and handle
-  mixed-workflow studies without frontend aggregation code.
-- Backend/public surface: expand `compare_variants(...)` to include richer
-  target-by-target comparison tables, graph selection metadata, more detailed
-  problem-table diffs, and explicit behavior when compared variants were solved
-  with different workflows.
+What to do:
 
-### Editable form metadata and guided asset discovery
+- Split persistence/storage concerns from workflow execution.
+- Split comparison and view-model generation from case lifecycle management.
+- Narrow broad exception handling into clearer error/status taxonomies.
+- Document which methods are stable user-facing API and which are adapter code.
 
-- Why: a GUI needs more than raw payloads to build safe editors and guided
-  onboarding flows.
-- Frontend user flow unlocked: render grouped editors with the right widgets
-  and support labels, and offer packaged notebooks and sample cases as guided
-  starting points rather than opaque files.
-- Backend/public surface: extend configuration metadata into a broader editor
-  schema for payload sections and add machine-readable metadata for packaged
-  sample cases and notebooks, including descriptions, workflow tags, support
-  level, and recommended direct loader snippets such as
-  `PinchWorkspace(source="sample_case.json", ...)`.
+Done when:
 
-## Maintenance / Architecture
+- The workspace layer has clean internal boundaries.
+- Failure handling is predictable instead of broadly catch-all.
 
-### Backend-first product framing
+### 3. Simplify input preparation and workbook ingestion
 
-- Why: the package needs a stable architectural boundary so demo surfaces do
-  not accidentally define the contracts that a future GUI must inherit.
-- Frontend user flow unlocked: multiple frontend implementations can sit on the
-  same backend contracts without depending on Streamlit-specific behavior.
-- Backend/public surface: keep `PinchProblem` as the single-case compute
-  wrapper, place multi-case orchestration in `PinchWorkspace`, and treat
-  the current Streamlit/dashboard layer as a contract consumer and proving
-  ground rather than the product center.
+Why this matters:
 
-### CLI and documentation drift cleanup
+- `data_preparation.py` and `wkbook_to_json.py` are both large and highly
+  procedural.
+- `OpenPinch/lib/config.py` still carries an explicit TODO that many
+  workbook-style options exist without a well-defined runtime role.
+- The path from external payloads to canonical internal state is more complex
+  than it needs to be.
 
-- Why: CLI and documentation accuracy still matter, but they should follow the
-  backend contracts rather than drive the main product roadmap.
-- Frontend user flow unlocked: frontend teams can trust that examples, docs,
-  and demo commands reflect the same supported backend surface they are
-  integrating against.
-- Backend/public surface: keep CLI and documentation drift work as maintenance
-  only, including alignment of documented workflows, examples, and packaged
-  learning assets with the supported backend APIs. The packaged notebooks
-  should continue to prefer the direct sample-case loader path over ad hoc
-  `json.loads(read_sample_case(...))` setup.
+What to do:
 
-### Optional dependency profiles
+- Centralize canonical payload normalization.
+- Separate zone-tree validation, stream/utility normalization, and default
+  utility completion into smaller units.
+- Audit configuration fields as one of: supported, legacy alias, workbook-only,
+  experimental, or dead.
+- Keep workbook parsing but make its contract and failure modes cleaner.
 
-- Why: backend deployments, notebook usage, and frontend integrations do not
-  all need the same runtime footprint.
-- Frontend user flow unlocked: GUI-oriented deployments can install the minimal
-  backend runtime while notebook, graphing, or demo surfaces remain opt-in.
-- Backend/public surface: split optional features into extras where practical,
-  especially for notebook, dashboard, and advanced cycle workflows.
+Done when:
 
-### Docs and public-surface CI gates
+- Input preparation is understandable in layers.
+- Config options have a documented runtime status instead of mixed implicit
+  behavior.
 
-- Why: once frontend-facing contracts become explicit, drift between code,
-  docs, sample assets, and exports becomes more expensive.
-- Frontend user flow unlocked: frontend integrators can rely on documented
-  backend contracts staying synchronized with actual package behavior.
-- Backend/public surface: add CI checks for package-root exports, workspace
-  schemas, packaged assets, major `PinchProblem` workflow members, and
-  documentation pages that describe supported backend capabilities.
+### 4. Quarantine, finish, or remove partial subsystems
 
-### Public API stability metadata
+Why this matters:
 
-- Why: frontend integrations need machine-readable support signals, not support
-  status buried only in prose.
-- Frontend user flow unlocked: a GUI can distinguish stable, advanced, partial,
-  and unsupported backend surfaces before exposing them to end users.
-- Backend/public surface: add maintained metadata or a registry that identifies
-  support level for public modules, workflows, packaged assets, and
-  frontend-facing contracts.
+- `OpenPinch/services/heat_pump_integration/cycles/brayton.py` raises
+  `NotImplementedError` immediately, but still contains dormant code below it.
+- `OpenPinch/services/exergy_analysis/exergy_targeting_entry.py` is mostly a
+  small helper plus commented-out restoration stubs.
+- `OpenPinch/services/energy_transfer_analysis/energy_transfer_analysis.py` is
+  effectively a large commented-out placeholder.
+- `OpenPinch/services/common/graph_data.py` still contains a large commented
+  ETD block.
+- The API docs still present exergy and energy-transfer modules as if they are
+  normal reference surfaces.
 
-## Deferred Research / Partial Subsystems
+What to do:
 
-### Exergy targeting restoration
+- For each partial subsystem, choose one status: restore, explicitly mark
+  experimental, move under a quarantine namespace, or remove.
+- Delete large dead/commented blocks once the decision is made.
+- Stop documenting intentionally partial modules like standard production
+  workflows unless the page clearly says otherwise.
 
-- Why: exergy analysis is valuable, but it is still a partial subsystem and
-  should not compete with the core frontend-enablement roadmap.
-- Frontend user flow unlocked: none in the immediate product cycle; this should
-  remain deferred until the backend workspace and view-model contracts are
-  stable.
-- Backend/public surface: decide later whether to restore, explicitly mark
-  experimental, or remove the public surface around
-  `OpenPinch/services/exergy_analysis/exergy_targeting_entry.py`.
+Done when:
 
-### Energy-transfer analysis restoration
+- There is no ambiguity about what is supported versus merely present in the
+  repository.
 
-- Why: large commented-out or placeholder analysis modules add maintenance cost
-  and user confusion when left in an ambiguous state.
-- Frontend user flow unlocked: none in the immediate product cycle; deferred
-  research should not shape the first GUI backend contracts.
-- Backend/public surface: decide later whether to restore, explicitly mark
-  experimental, or remove the public surface around
-  `OpenPinch/services/energy_transfer_analysis/energy_transfer_analysis.py`.
+## Later
 
-### Other partial or commented-out subsystems
+### 5. Performance and memory profiling for larger studies
 
-- Why: the package still contains expert-only or unfinished surfaces that are
-  not ready to anchor frontend product design.
-- Frontend user flow unlocked: clearer separation between production-ready
-  backend contracts and research or partial capability.
-- Backend/public surface: review remaining partial, placeholder, or heavily
-  commented-out subsystems and assign each one a clear status: restore, mark
-  experimental, or retire.
+Do this after the structural refactors above. Profiling a monolith before it is
+cleanly separated tends to produce noisy results and hard-to-apply findings.
 
-## Acceptance Scenarios
+### 6. Bundle evolution and migration policy
 
-- A GUI can create a baseline study, add named variants with fully edited
-  payloads, solve them, compare them, and persist them without custom notebook
-  loops.
-- Validation responses include stable field paths and readable messages that
-  map directly onto frontend form errors.
-- Summary, graph catalog, graph payload, and problem-table outputs are stable
-  serialized contracts rather than frontend-inferred structures.
-- Study bundles round-trip cleanly with baseline, variants, workflow settings,
-  schema versioning, and optional cached results intact.
-- Multi-variant comparison outputs remain stable even when zones, target types,
-  or workflows repeat.
-- The Streamlit/dashboard layer can consume the workspace and view-model
-  contracts without bespoke translation logic.
-- Packaged sample cases and notebooks demonstrate the same supported loader and
-  orchestration APIs that frontend clients and script users are expected to
-  call directly.
+`PinchWorkspace` persistence is already functional. Once the workspace layer is
+refactored, add explicit versioning, migration rules, and cache-compatibility
+tests rather than letting bundle behavior drift implicitly.
 
-## Assumptions
+## Guiding Rule
 
-- The package should be backend-first for a separate GUI rather than centered
-  on CLI expansion.
-- Full case editing is in scope from the start, so roadmap features should
-  accept whole editable payloads rather than only parameter tweaks.
-- Study persistence is first-class, and the saved unit is a versioned
-  baseline-plus-variants bundle.
-- `PinchProblem` remains the single-case compute wrapper, while GUI-grade
-  orchestration belongs in `PinchWorkspace`.
+Do not spend the next cycle adding new feature surface area before items 1
+through 4 are under control. The package is currently functional, but the sweep
+shows that maintenance debt is concentrated in public orchestration code and
+partially restored subsystems. That is the real constraint on the next round of
+progress.

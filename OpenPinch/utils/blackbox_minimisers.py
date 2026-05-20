@@ -169,7 +169,8 @@ def _get_multiminima_handler(
         method.value for method in _get_supported_multiminima_handles()
     )
     raise ValueError(
-        f"Unsupported optimiser handle {canonical_handle!r}. Supported handles: {supported}."
+        f"Unsupported optimiser handle {canonical_handle!r}. "
+        f"Supported handles: {supported}."
     )
 
 

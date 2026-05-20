@@ -4,10 +4,10 @@ import math
 
 import pytest
 
-from OpenPinch.utils.miscellaneous import *
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.utils import *
+from OpenPinch.utils.miscellaneous import *
 
 """Test cases for the get_value function."""
 

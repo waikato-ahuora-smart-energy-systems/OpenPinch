@@ -2,13 +2,12 @@
 
 import numpy as np
 import pytest
+
+import OpenPinch.classes.vapour_compression_cycle as shp_mod
 from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
 from OpenPinch.lib.enums import *
-import CoolProp
-import OpenPinch.classes.vapour_compression_cycle as shp_mod
 
-
-CoolProp = pytest.importorskip("CoolProp")
+pytest.importorskip("CoolProp")
 
 
 def _validate_results(

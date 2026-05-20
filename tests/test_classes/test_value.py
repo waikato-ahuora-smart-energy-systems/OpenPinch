@@ -3,9 +3,10 @@
 import numpy as np
 import pandas as pd
 import pytest
+
 from OpenPinch.classes import *
-from OpenPinch.lib import *
 from OpenPinch.classes.value import Value
+from OpenPinch.lib import *
 
 
 def test_heatflow_value_behavior():

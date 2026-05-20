@@ -1,8 +1,11 @@
 """Tests for the TESPy-backed Brayton heat pump wrapper."""
 
 from __future__ import annotations
+
 from types import SimpleNamespace
+
 import pytest
+
 from OpenPinch.classes import brayton_heat_pump as br
 from OpenPinch.classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 

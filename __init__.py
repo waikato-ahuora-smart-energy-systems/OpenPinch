@@ -8,4 +8,4 @@ warnings.warn(
     stacklevel=2,
 )
 
-from OpenPinch import *  # noqa: F401,F403
+from OpenPinch import *  # noqa: E402,F401,F403

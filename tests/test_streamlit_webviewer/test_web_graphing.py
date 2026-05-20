@@ -1,20 +1,20 @@
 """Tests for Streamlit graphing helpers."""
 
 from __future__ import annotations
-from pathlib import Path
+
+import sys
 from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
-import pytest
+
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
-from OpenPinch.lib.enums import ArrowHead, ProblemTableLabel as PT
+from OpenPinch.lib.enums import ProblemTableLabel as PT
 from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.streamlit_webviewer import web_graphing as wg
-import sys
-from OpenPinch.lib.enums import ArrowHead
 
 
 class _CtxExtra:
@@ -167,7 +167,7 @@ def test_collect_targets_and_problem_table_dataframe_helpers():
     assert not df.empty
 
 
-def test_build_plotly_helpers_cover_arrow_and_legend_logic():
+def test_build_plotly_helpers_cover_legend_logic():
     graph = {
         "type": "Total Site Profiles",
         "segments": [
@@ -175,14 +175,12 @@ def test_build_plotly_helpers_cover_arrow_and_legend_logic():
                 "title": "Segment 1",
                 "series": "Process",
                 "series_id": "proc",
-                "arrow": ArrowHead.START.value,
                 "colour": 0,
                 "data_points": [{"x": 0.0, "y": 40.0}, {"x": 10.0, "y": 60.0}],
             },
             {
                 "title": "Vertical Utility",
                 "series_description": "Utility leg",
-                "arrow": ArrowHead.END.value,
                 "is_vertical": True,
                 "is_utility_stream": True,
                 "data_points": [{"x": 5.0, "y": 20.0}, {"x": 5.0, "y": 30.0}],
@@ -193,21 +191,19 @@ def test_build_plotly_helpers_cover_arrow_and_legend_logic():
     assert len(fig.data) == 2
     assert len(fig.layout.annotations) == 0
 
-    traces, ann = wg._segment_trace(
+    traces = wg._segment_trace(
         segment={"data_points": [{"x": 1.0, "y": 1.0}], "title": "Flat"},
         graph={"type": "Grand Composite Curve"},
         legend_seen={},
     )
     assert len(traces) == 1
-    assert ann is None
 
-    traces, ann = wg._segment_trace(
+    traces = wg._segment_trace(
         segment={"data_points": [], "title": "Empty"},
         graph={"type": "Grand Composite Curve"},
         legend_seen={},
     )
     assert traces == []
-    assert ann is None
 
     assert wg._is_vertical_segment([1.0, 1.0, 1.0])
     assert not wg._is_vertical_segment([1.0, 2.0])
@@ -285,7 +281,6 @@ def test_apply_dashboard_theme_and_render_dashboard_branches(monkeypatch, tmp_pa
                         {
                             "title": "Curve 1",
                             "series_id": "g1",
-                            "arrow": ArrowHead.END.value,
                             "colour": 0,
                             "data_points": [
                                 {"x": 0.0, "y": 70.0},
@@ -421,11 +416,10 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     assert any("No real temperature Problem Table data" in msg for msg in st.infos)
 
 
-def test_segment_trace_vertical_colour_zero_length_and_arrow_fallbacks():
-    traces, ann = wg._segment_trace(
+def test_segment_trace_vertical_colour_and_zero_length_cases():
+    traces = wg._segment_trace(
         segment={
             "data_points": [{"x": 1.0, "y": 1.0}, {"x": 1.0, "y": 2.0}],
-            "arrow": ArrowHead.END.value,
             "is_vertical": True,
             "is_utility_stream": True,
         },
@@ -433,22 +427,17 @@ def test_segment_trace_vertical_colour_zero_length_and_arrow_fallbacks():
         legend_seen={},
     )
     assert len(traces) == 1
-    assert ann is not None
 
-    traces2, ann2 = wg._segment_trace(
+    traces2 = wg._segment_trace(
         segment={
             "data_points": [{"x": 1.0, "y": 1.0}, {"x": 1.0, "y": 1.0}],
-            "arrow": ArrowHead.END.value,
         },
         graph={"type": "Grand Composite Curve"},
         legend_seen={},
     )
     assert len(traces2) == 1
-    assert ann2 is None
 
     assert wg._is_vertical_segment([1.0]) is False
-    assert wg._arrow_indices([1.0, 1.0], [2.0, 2.0], ArrowHead.START.value) == (0, 1)
-    assert wg._arrow_indices([1.0, 1.0], [2.0, 2.0], ArrowHead.END.value) == (1, 0)
     assert wg._legend_group_name("") == "Segment"
     assert (
         wg._segment_colour(

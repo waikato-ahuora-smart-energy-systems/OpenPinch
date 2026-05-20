@@ -1,7 +1,7 @@
 """Plotly helper routines for quick temperature-enthalpy visual checks."""
 
-import plotly.graph_objects as go
 import numpy as np
+import plotly.graph_objects as go
 
 
 def plot_t_h_curve(points, title: str = "Temperature vs. Enthalpy") -> None:
@@ -36,7 +36,7 @@ def plot_t_h_curve_with_piecewise_and_bounds(
     title: str = "Temperature vs. Enthalpy",
 ) -> None:
     """
-    Plot the TH curve, its piecewise linearization, and a shaded region ±epsilon around the TH curve.
+    Plot the TH curve, its piecewise linearization, and a shaded ±epsilon band.
     :param points: Original TH curve points.
     :param piecewise_points: Simplified piecewise linear curve points.
     :param epsilon: Epsilon value for shading.

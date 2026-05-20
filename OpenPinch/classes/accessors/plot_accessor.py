@@ -1,15 +1,15 @@
 """Graph-accessor helpers for selecting, rendering, and exporting solved plots."""
 
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+
 import pandas as pd
 
-from typing import Optional, Any, Union, Dict, TYPE_CHECKING
-from pathlib import Path
-
 from ...lib.enums import GT
+from ...services.common.graph_data import get_output_graph_data
 from ...streamlit_webviewer.web_graphing import (
     _build_plotly_graph,
 )
-from ...services.common.graph_data import get_output_graph_data
 
 if TYPE_CHECKING:
     from ...classes.pinch_problem import PinchProblem
@@ -184,7 +184,7 @@ class _PlotAccessor:
 
     def get_graph_data(self) -> GraphPayload:
         """Return the serialized graph payload for the solved problem."""
-        if getattr(self._problem._results, "graphs", None) == None:
+        if getattr(self._problem._results, "graphs", None) is None:
             self._problem.target()
 
         graphs = getattr(self._problem._results, "graphs", None)
@@ -348,23 +348,6 @@ class _PlotAccessor:
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.TSP.value,
-            index=index,
-            show=show,
-            return_graph_data=return_graph_data,
-        )
-
-    def site_utility_load_profiles(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        index: float = 0,
-        show: bool = False,
-        return_graph_data: bool = False,
-    ):
-        """Return the first matching site-utility-load payload or figure."""
-        return self._plot_graph(
-            zone_name=zone_name,
-            graph_type=GT.TSU.value,
             index=index,
             show=show,
             return_graph_data=return_graph_data,

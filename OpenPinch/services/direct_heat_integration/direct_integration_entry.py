@@ -4,12 +4,12 @@ from typing import List, Tuple
 
 import numpy as np
 
+from ...classes.problem_table import ProblemTable
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
-from ...classes.problem_table import ProblemTable
 from ...classes.zone import Zone
 from ...lib.config import tol
-from ...lib.enums import GT, PT, ST, TT, ZT
+from ...lib.enums import GT, PT, ST, TT
 from ...lib.schemas.targets import DirectIntegrationTarget
 from ...utils.miscellaneous import delta_vals
 from ..common.capital_cost_and_area_targeting import (
@@ -26,12 +26,11 @@ from ..common.problem_table_analysis import (
 )
 from ..common.utility_targeting import get_utility_targets
 
-
 __all__ = ["compute_direct_integration_targets"]
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
@@ -101,7 +100,7 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
                 RCP_cold_ut=pt_real[PT.RCP_COLD_UT],
             )
         )
-        # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC
+        # Target capital cost, area, and exchanger count from the balanced CC.
         if zone.config.DO_AREA_TARGETING:
             num_units = get_min_number_hx(
                 T_vals=pt[PT.T],
@@ -158,9 +157,9 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     return DirectIntegrationTarget.model_validate(payload)
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _create_net_hot_and_cold_stream_collections_for_site_analysis(
@@ -169,7 +168,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
 ) -> Tuple[StreamCollection, StreamCollection]:
-    """Constructs net stream segments that require utility input across temperature intervals."""
+    """Construct net stream segments requiring utility input by interval."""
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
 

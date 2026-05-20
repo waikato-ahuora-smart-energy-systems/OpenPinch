@@ -4,13 +4,13 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from OpenPinch.services.heat_pump_integration import (
-    heat_pump_and_refrigeration_entry as hp,
-)
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.lib.enums import HPRcycle, PT
+from OpenPinch.lib.enums import PT, HPRcycle
+from OpenPinch.services.heat_pump_integration import (
+    heat_pump_and_refrigeration_entry as hp,
+)
 
 
 def _build_multi_temperature_profiles(

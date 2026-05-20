@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 
 __all__ = ["export_target_summary_to_excel_with_units"]
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def export_target_summary_to_excel_with_units(
@@ -64,16 +64,16 @@ def export_target_summary_to_excel_with_units(
 
 
 def build_summary_dataframe(targets) -> pd.DataFrame:
-    """Convert TargetResults objects into a tabular dataframe with value/unit columns."""
+    """Convert ``TargetResults`` objects into a value/unit dataframe."""
     rows = []
     for target in targets:
         rows.append(_make_summary_row(target))
     return pd.DataFrame(rows)
 
 
-#######################################################################################################
+################################################################################
 # Helpers
-#######################################################################################################
+################################################################################
 
 
 def _split_vu(x: Any) -> Tuple[Optional[float], Optional[str]]:
@@ -276,6 +276,6 @@ def _unique_sheet_name(base: str, used: set[str]) -> str:
 
 
 def _sanitize_sheet_name(name: str) -> str:
-    """Replace characters Excel forbids in sheet names and strip trailing apostrophes."""
+    """Replace Excel-forbidden sheet-name characters and trailing apostrophes."""
     cleaned = re.sub(r"[:/?*\\\[\]]", "_", name).strip().rstrip("'")
     return cleaned or "Sheet"

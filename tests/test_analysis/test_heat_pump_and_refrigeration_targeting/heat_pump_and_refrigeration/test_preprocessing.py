@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
+from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.services.heat_pump_integration.common import (
     preprocessing as hp_pre,
 )
-from OpenPinch.classes.stream_collection import StreamCollection
 
 
 def test_get_reduced_bckgrd_cascade_till_Q_target_returns_full_profile_when_target_matches_peak():

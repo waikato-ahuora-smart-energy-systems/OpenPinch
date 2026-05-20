@@ -12,9 +12,18 @@ Build the HTML documentation from the repository root:
 
 .. code-block:: bash
 
-   /opt/homebrew/bin/uv run python scripts/build_docs.py
+   uv run scripts/build_docs.py
 
 The generated site is written to ``docs/_build/html``.
+
+Release Build
+-------------
+
+Build the wheel and source distribution from the repository root:
+
+.. code-block:: bash
+
+   uv run scripts/build_dist.py
 
 Alternative Direct Sphinx Build
 -------------------------------
@@ -23,7 +32,7 @@ If you need to run Sphinx directly:
 
 .. code-block:: bash
 
-   /opt/homebrew/bin/uv run python -m sphinx -b html docs docs/_build/html
+   uv run python -m sphinx -b html docs docs/_build/html
 
 Coverage Expectations
 ---------------------

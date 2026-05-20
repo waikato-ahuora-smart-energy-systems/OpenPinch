@@ -10,7 +10,6 @@ from ...lib.enums import PT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...utils.miscellaneous import delta_with_zero_at_start, linear_interpolation
 
-
 __all__ = [
     "get_additional_GCCs",
     "get_GCC_without_pockets",
@@ -23,9 +22,9 @@ __all__ = [
 
 # TODO: Implement exergy targeting through the exergetic GCC approach.
 
-#######################################################################################################
+################################################################################
 # Public API
-#######################################################################################################
+################################################################################
 
 
 def get_additional_GCCs(
@@ -329,9 +328,9 @@ def get_seperated_gcc_heat_load_profiles(
     return {"T_col": T_col, "updates": updates}
 
 
-#######################################################################################################
+################################################################################
 # Helper functions
-#######################################################################################################
+################################################################################
 
 
 def _remove_pockets_on_one_side_of_the_pinch(
