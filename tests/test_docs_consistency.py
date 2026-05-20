@@ -12,6 +12,11 @@ QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
 NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
 HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
 INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
+GUIDE_FIRST_SOLVE_CLI = REPO_ROOT / "docs" / "guides" / "first-solve-cli.rst"
+GUIDE_EXPORTING_RESULTS = REPO_ROOT / "docs" / "guides" / "exporting-results.rst"
+GUIDE_GRAPHING = REPO_ROOT / "docs" / "guides" / "graphing-and-interpretation.rst"
+FUNDAMENTALS_GRAPHS = REPO_ROOT / "docs" / "fundamentals" / "graphs-and-interpretation.rst"
+OVERVIEW_CAPABILITY_MATRIX = REPO_ROOT / "docs" / "overview" / "capability-matrix.rst"
 API_PINCHWORKSPACE = REPO_ROOT / "docs" / "api" / "pinchworkspace.rst"
 API_PACKAGE_ROOT = REPO_ROOT / "docs" / "api" / "package-root.rst"
 API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
@@ -50,10 +55,20 @@ def test_docs_do_not_reference_stale_workflow_names():
             _read(GETTING_STARTED),
             _read(QUICKSTART),
             _read(NOTEBOOKS),
+            _read(GUIDE_FIRST_SOLVE_CLI),
+            _read(GUIDE_EXPORTING_RESULTS),
+            _read(GUIDE_GRAPHING),
+            _read(FUNDAMENTALS_GRAPHS),
+            _read(OVERVIEW_CAPABILITY_MATRIX),
         ]
     )
     assert "problem.export(" not in combined
+    assert "openpinch graph" not in combined
+    assert "openpinch run" not in combined
+    assert "openpinch validate" not in combined
+    assert "openpinch sample" not in combined
     assert "Python 3.11 or newer" not in combined
+    assert "openpinch notebook -o notebooks" in combined
 
 
 def test_docs_highlight_interpretation_and_heat_pump_integration():

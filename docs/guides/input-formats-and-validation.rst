@@ -48,13 +48,7 @@ assumptions or unusual thermal conditions.
 Recommended Validation Workflow
 -------------------------------
 
-CLI:
-
-.. code-block:: bash
-
-   openpinch validate basic_pinch.json
-
-Python:
+Validation is a Python-side workflow:
 
 .. code-block:: python
 

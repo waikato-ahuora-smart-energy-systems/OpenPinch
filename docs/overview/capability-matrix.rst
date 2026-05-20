@@ -13,8 +13,7 @@ surfaces and outputs.
      - Typical Outputs
      - Status
    * - Direct heat integration targeting
-     - ``PinchProblem.target()``, ``problem.target.direct_heat_integration(...)``,
-       ``openpinch run``
+     - ``PinchProblem.target()``, ``problem.target.direct_heat_integration(...)``
      - utility targets, pinch temperatures, recovery metrics, graphs
      - Stable
    * - Indirect / Total Site targeting
@@ -23,8 +22,7 @@ surfaces and outputs.
      - Total Process / Total Site utility targets and graphs
      - Stable
    * - Graph generation
-     - ``problem.plot.*``, ``problem.plot.export(...)``,
-       ``openpinch graph``
+     - ``problem.plot.*``, ``problem.plot.export(...)``
      - composite curves, GCC, site profiles, HTML exports
      - Stable
    * - File-backed workflows
@@ -53,8 +51,7 @@ surfaces and outputs.
      - refreshed DI targets with area/cost context
      - Advanced
    * - Packaged learning assets
-     - ``openpinch sample``, ``openpinch notebook``,
-       :mod:`OpenPinch.resources`
+     - ``openpinch notebook``, :mod:`OpenPinch.resources`
      - runnable sample JSONs and notebooks
      - Stable
    * - Community / region framing

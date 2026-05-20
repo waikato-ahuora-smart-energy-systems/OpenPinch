@@ -1,130 +1,123 @@
-"""CLI integration tests for the user-facing OpenPinch workflows."""
+"""CLI integration tests for the user-facing notebook-copy workflow."""
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
 import pytest
 
 import OpenPinch.__main__ as cli
-from OpenPinch.resources import copy_sample_case, list_notebooks
+from OpenPinch.resources import list_notebooks
 
 
-def test_validate_command_accepts_packaged_sample(tmp_path: Path):
-    case_path = copy_sample_case("basic_pinch.json", tmp_path / "basic_pinch.json")
-    assert cli.main(["validate", str(case_path), "--quiet"]) == 0
-
-
-def test_run_command_writes_summary_excel_json_and_graphs(tmp_path: Path, capsys):
-    case_path = copy_sample_case("basic_pinch.json", tmp_path / "basic_pinch.json")
-    json_path = tmp_path / "results.json"
-    excel_dir = tmp_path / "excel"
-    graph_dir = tmp_path / "graphs"
-
-    assert (
-        cli.main(
-            [
-                "run",
-                str(case_path),
-                "-o",
-                str(excel_dir),
-                "--json-output",
-                str(json_path),
-                "--graph-output",
-                str(graph_dir),
-            ]
-        )
-        == 0
-    )
+@pytest.mark.parametrize(
+    ("argv", "expected"),
+    [
+        (["--help"], ["notebook"]),
+        (["notebook", "--help"], ["--name", "--output"]),
+    ],
+)
+def test_help_surfaces_supported_commands_and_flags(argv, expected, capsys):
+    with pytest.raises(SystemExit, match="0"):
+        cli.main(argv)
 
     captured = capsys.readouterr()
-    assert "Hot Utility Target" in captured.out
-    assert json.loads(json_path.read_text(encoding="utf-8"))["name"]
-    assert any(excel_dir.glob("*.xlsx"))
-    assert any(graph_dir.glob("*.html"))
+    for marker in expected:
+        assert marker in captured.out
+    assert "run" not in captured.out
+    assert "validate" not in captured.out
+    assert "sample" not in captured.out
 
 
-def test_sample_and_notebook_commands_copy_packaged_assets(tmp_path: Path):
-    sample_out = tmp_path / "sample.json"
+def test_notebook_command_copies_full_series(tmp_path: Path, capsys):
     notebook_dir = tmp_path / "notebooks"
 
-    assert (
-        cli.main(["sample", "--name", "basic_pinch.json", "-o", str(sample_out)]) == 0
-    )
-    assert sample_out.exists()
-
-    heat_pump_sample = tmp_path / "heat_pump_targeting.json"
-    assert (
-        cli.main(
-            [
-                "sample",
-                "--name",
-                "heat_pump_targeting.json",
-                "-o",
-                str(heat_pump_sample),
-            ]
-        )
-        == 0
-    )
-    assert heat_pump_sample.exists()
-
     assert cli.main(["notebook", "-o", str(notebook_dir)]) == 0
+
+    captured = capsys.readouterr()
+    assert "Copied 3 notebook(s)" in captured.out
     copied = sorted(path.name for path in notebook_dir.glob("*.ipynb"))
     assert copied == list_notebooks()
 
 
-def test_validate_command_surfaces_user_facing_error(tmp_path: Path, capsys):
-    bad_case = tmp_path / "bad.json"
-    bad_case.write_text(
-        json.dumps(
-            {
-                "streams": [
-                    {
-                        "zone": "Zone A",
-                        "name": "Hot Feed",
-                        "t_supply": 150.0,
-                        "heat_flow": 100.0,
-                        "dt_cont": 10.0,
-                        "htc": 1.0,
-                    }
-                ],
-                "utilities": [],
-                "options": {},
-            }
-        ),
-        encoding="utf-8",
+def test_notebook_command_copies_named_notebook_to_existing_directory(
+    tmp_path: Path, capsys
+):
+    destination = tmp_path / "notebooks"
+    destination.mkdir()
+    notebook_name = list_notebooks()[0]
+
+    assert (
+        cli.main(["notebook", "--name", notebook_name, "-o", str(destination)]) == 0
+    )
+
+    captured = capsys.readouterr()
+    assert "Copied notebook to" in captured.out
+    assert (destination / notebook_name).exists()
+
+
+def test_notebook_command_copies_named_notebook_to_explicit_file(
+    tmp_path: Path, capsys
+):
+    notebook_name = list_notebooks()[0]
+    destination = tmp_path / "custom-name.ipynb"
+
+    assert (
+        cli.main(["notebook", "--name", notebook_name, "-o", str(destination)]) == 0
+    )
+
+    captured = capsys.readouterr()
+    assert "Copied notebook to" in captured.out
+    assert destination.exists()
+    assert destination.name == "custom-name.ipynb"
+
+
+@pytest.mark.parametrize("removed_command", ["run", "validate", "sample"])
+def test_removed_commands_are_rejected(removed_command, capsys):
+    with pytest.raises(SystemExit, match="2"):
+        cli.main([removed_command, "--help"])
+
+    captured = capsys.readouterr()
+    assert "invalid choice" in captured.err
+
+
+def test_notebook_command_rejects_invalid_name(capsys):
+    with pytest.raises(SystemExit, match="2"):
+        cli.main(["notebook", "--name", "missing.ipynb"])
+
+    captured = capsys.readouterr()
+    assert "invalid choice" in captured.err
+
+
+def test_notebook_command_wraps_copy_errors(monkeypatch, tmp_path: Path, capsys):
+    monkeypatch.setattr(
+        cli,
+        "copy_notebook",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk full")),
     )
 
     with pytest.raises(SystemExit, match="1"):
-        cli.main(["validate", str(bad_case)])
+        cli.main(["notebook", "--name", list_notebooks()[0], "-o", str(tmp_path)])
 
     captured = capsys.readouterr()
-    assert "OpenPinch error: Input validation failed" in captured.err
-    assert "Hot Feed" in captured.err
-    assert "t_target" in captured.err
+    assert "OpenPinch error: disk full" in captured.err
 
 
-def test_validate_command_debug_raises_original_exception(tmp_path: Path):
-    bad_case = tmp_path / "bad.json"
-    bad_case.write_text(
-        json.dumps(
-            {
-                "streams": [
-                    {
-                        "zone": "Zone A",
-                        "name": "Hot Feed",
-                        "t_supply": 150.0,
-                        "heat_flow": 100.0,
-                        "dt_cont": 10.0,
-                        "htc": 1.0,
-                    }
-                ],
-                "utilities": [],
-                "options": {},
-            }
-        ),
-        encoding="utf-8",
+def test_notebook_command_debug_raises_original_exception(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        cli,
+        "copy_notebook",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk full")),
     )
 
-    with pytest.raises(ValueError, match="Input validation failed"):
-        cli.main(["--debug", "validate", str(bad_case)])
+    with pytest.raises(OSError, match="disk full"):
+        cli.main(
+            [
+                "--debug",
+                "notebook",
+                "--name",
+                list_notebooks()[0],
+                "-o",
+                str(tmp_path),
+            ]
+        )

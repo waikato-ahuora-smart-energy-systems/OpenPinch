@@ -41,10 +41,9 @@ Python Examples
 CLI Examples
 ------------
 
-.. code-block:: bash
-
-   openpinch run basic_pinch.json -o results --graph-output graphs
-   openpinch graph basic_pinch.json --graph-type composite -o graphs
+OpenPinch no longer exposes dedicated export commands through the CLI. Use the
+Python methods above when you need result workbooks, graph HTML files, or other
+post-solve artifacts.
 
 Choosing the Right Output
 -------------------------

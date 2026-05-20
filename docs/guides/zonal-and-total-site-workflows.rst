@@ -40,10 +40,8 @@ Useful Assets
 -------------
 
 Packaged sample:
-
-.. code-block:: bash
-
-   openpinch sample --name zonal_site.json -o zonal_site.json
+   Load ``zonal_site.json`` directly by name from Python, or copy it through
+   :mod:`OpenPinch.resources` when you need a local editable file.
 
 Packaged notebook:
 

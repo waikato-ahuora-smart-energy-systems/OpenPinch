@@ -109,6 +109,21 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
             )
         )
 
+    if GT.GCC_R.value in target_graphs:
+        graphs.append(
+            _make_gcc_graph(
+                graph_title=graph_title,
+                key=GT.GCC_R.value,
+                data=target_graphs[GT.GCC_R.value],
+                label="Grand Composite Curve (Real)",
+                value_field=[
+                    PT.H_NET, 
+                    PT.H_NET_UT,
+                ],
+                is_utility_profile=[False, True],
+            )
+        )
+
     if GT.NLP.value in target_graphs:
         graphs.append(
             _make_composite_graph(

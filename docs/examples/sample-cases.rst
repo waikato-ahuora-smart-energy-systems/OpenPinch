@@ -34,14 +34,15 @@ Included Cases
 How To Copy Them
 ----------------
 
-Copy one case:
+Browse or copy the packaged cases through :mod:`OpenPinch.resources` when you
+want a local editable copy:
 
-.. code-block:: bash
+.. code-block:: python
 
-   openpinch sample --name basic_pinch.json -o basic_pinch.json
+   from OpenPinch.resources import copy_sample_case, list_sample_cases
 
-List or browse the packaged cases through :mod:`OpenPinch.resources` if you are
-driving the workflow from Python.
+   print(list_sample_cases())
+   copy_sample_case("basic_pinch.json", "basic_pinch.json")
 
 You can also load a packaged case by name directly from Python when no local
 file with that name exists:

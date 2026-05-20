@@ -353,23 +353,6 @@ class _PlotAccessor:
             return_graph_data=return_graph_data,
         )
 
-    def site_utility_load_profiles(
-        self,
-        *,
-        zone_name: Optional[str] = None,
-        index: float = 0,
-        show: bool = False,
-        return_graph_data: bool = False,
-    ):
-        """Return the first matching site-utility-load payload or figure."""
-        return self._plot_graph(
-            zone_name=zone_name,
-            graph_type=GT.TSU.value,
-            index=index,
-            show=show,
-            return_graph_data=return_graph_data,
-        )
-
     def site_utility_grand_composite_curve(
         self,
         *,

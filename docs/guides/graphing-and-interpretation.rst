@@ -20,12 +20,6 @@ Python:
    gcc = problem.plot.grand_composite_curve()
    cc = problem.plot.composite_curve()
 
-CLI:
-
-.. code-block:: bash
-
-   openpinch graph basic_pinch.json --graph-type gcc -o graphs
-
 Best Default Graph
 ------------------
 
@@ -53,8 +47,8 @@ Exporting Graphs
 Use Python when you want direct `plotly` figures. Install
 ``openpinch[notebook]`` or ``openpinch[dashboard]`` first.
 
-Use `problem.plot.export(...)` or `openpinch graph` when you want portable
-HTML output for sharing or review outside Python.
+Use `problem.plot.export(...)` when you want portable HTML output for sharing
+or review outside Python.
 
 Common Mistakes
 ---------------
