@@ -10,19 +10,29 @@ from pathlib import Path
 from shutil import which
 
 
+def _has_hatchling_backend() -> bool:
+    """Return whether the active interpreter can import ``hatchling.build``."""
+    try:
+        return find_spec("hatchling.build") is not None
+    except ModuleNotFoundError:
+        return False
+
+
 def _build_command(output_dir: Path) -> list[str] | None:
     """Return the preferred build command for this environment."""
     if find_spec("build") is not None:
-        return [
+        command = [
             sys.executable,
             "-m",
             "build",
             "--wheel",
             "--sdist",
-            "--no-isolation",
             "--outdir",
             str(output_dir),
         ]
+        if _has_hatchling_backend():
+            command.insert(-2, "--no-isolation")
+        return command
 
     uv_bin = which("uv")
     if uv_bin is None:
