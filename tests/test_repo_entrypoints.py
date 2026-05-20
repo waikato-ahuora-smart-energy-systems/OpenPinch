@@ -74,6 +74,27 @@ def test_build_dist_script_help_executes(monkeypatch):
         namespace["main"](["--help"])
 
 
+def test_build_dist_uses_isolation_when_backend_is_missing(monkeypatch):
+    namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "build_dist.py"))
+    build_command = namespace["_build_command"]
+
+    def fake_find_spec(name: str):
+        if name == "build":
+            return object()
+        if name == "hatchling.build":
+            return None
+        raise AssertionError(f"unexpected module lookup: {name}")
+
+    monkeypatch.setitem(build_command.__globals__, "find_spec", fake_find_spec)
+
+    command = build_command(Path("/tmp/dist"))
+
+    assert command is not None
+    assert command[:5] == [sys.executable, "-m", "build", "--wheel", "--sdist"]
+    assert "--no-isolation" not in command
+    assert command[-2:] == ["--outdir", "/tmp/dist"]
+
+
 def test_optional_install_smoke_script_help_executes(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["python", "--help"])
     namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "optional_install_smoke.py"))
