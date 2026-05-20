@@ -181,7 +181,7 @@ def _run_command(problem_cls, args: argparse.Namespace) -> int:
         print(f"Wrote JSON summary to {args.json_output}")
 
     if args.graph_output is not None:
-        written = problem.export_graphs(args.graph_output)
+        written = problem.plot.export(args.graph_output)
         print(f"Wrote {len(written)} graph file(s) to {args.graph_output}")
 
     if args.dashboard:

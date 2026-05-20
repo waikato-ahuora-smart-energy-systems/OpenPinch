@@ -95,8 +95,9 @@ def test_streamlit_module_helper_functions(monkeypatch):
     _clear_dummy()
     problem = ns["_load_problem"]("dummy-path")
     assert isinstance(problem, _DummyPinchProblem)
-    assert problem.args == ("dummy-path",)
-    assert problem.kwargs == {"run": True}
+    assert problem.args == ()
+    assert problem.kwargs == {"source": "dummy-path"}
+    assert problem.calls == [("target", None)]
 
     ns["validate_problem_path"](SimpleNamespace(exists=lambda: True))
     assert fake_st.errors == []
@@ -125,4 +126,4 @@ def test_streamlit_app_main_block_executes(monkeypatch):
 
     assert len(_DummyPinchProblem.created) == 1
     calls = _DummyPinchProblem.created[0].calls
-    assert calls == [("render_streamlit_dashboard", None)]
+    assert calls == [("target", None), ("render_streamlit_dashboard", None)]
