@@ -17,10 +17,10 @@ surfaces and outputs.
        ``openpinch run``
      - utility targets, pinch temperatures, recovery metrics, graphs
      - Stable
-   * - Indirect / total-site targeting
+   * - Indirect / Total Site targeting
      - ``problem.target.indirect_heat_integration(...)``,
        multiscale service layer
-     - total-process / total-site utility targets and graphs
+     - Total Process / Total Site utility targets and graphs
      - Stable
    * - Graph generation
      - ``problem.plot.*``, ``problem.plot.export(...)``,

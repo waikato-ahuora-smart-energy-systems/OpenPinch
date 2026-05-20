@@ -10,7 +10,7 @@ __all__ = ["HPRoptVectorLayout"]
 
 @dataclass(frozen=True)
 class HPRoptVectorLayout:
-    """Canonical section layout for heat-pump targeting optimisation vectors."""
+    """Canonical section layout for Heat Pump targeting optimisation vectors."""
 
     n_amb: int = 1
     n_cond: int = 0

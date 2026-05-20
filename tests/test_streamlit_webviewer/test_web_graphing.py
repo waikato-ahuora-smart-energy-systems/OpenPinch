@@ -123,9 +123,9 @@ def _make_target(name: str) -> DirectIntegrationTarget:
 
     pt = ProblemTable(
         {
-            PT.T.value: [150.0, 100.0, 60.0],
-            PT.H_HOT.value: [30.0, 15.0, 0.0],
-            PT.H_COLD.value: [0.0, 10.0, 20.0],
+            PT.T: [150.0, 100.0, 60.0],
+            PT.H_HOT: [30.0, 15.0, 0.0],
+            PT.H_COLD: [0.0, 10.0, 20.0],
         }
     )
     return DirectIntegrationTarget(
@@ -403,8 +403,8 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     target = DirectIntegrationTarget(
         zone_name="Plant",
         type="DI",
-        pt=ProblemTable({PT.T.value: []}),
-        pt_real=ProblemTable({PT.T.value: []}),
+        pt=ProblemTable({PT.T: []}),
+        pt_real=ProblemTable({PT.T: []}),
         cold_pinch=80.0,
         hot_pinch=120.0,
         hot_utility_target=100.0,
@@ -418,7 +418,7 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
 
     assert any("No graphs available" in msg for msg in st.infos)
     assert any("No shifted problem table data" in msg for msg in st.infos)
-    assert any("No real-temperature problem table data" in msg for msg in st.infos)
+    assert any("No real temperature Problem Table data" in msg for msg in st.infos)
 
 
 def test_segment_trace_vertical_colour_zero_length_and_arrow_fallbacks():

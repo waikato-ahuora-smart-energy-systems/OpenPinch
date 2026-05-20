@@ -2,7 +2,7 @@ What Is OpenPinch?
 ==================
 
 OpenPinch is a process-integration toolkit for thermal targeting studies. It
-combines classical pinch-analysis workflows with total-site style utility
+combines classical pinch analysis workflows with Total Site utility
 integration, graph generation, and optional advanced workflows such as heat
 pump integration screening and turbine cogeneration analysis.
 
@@ -23,9 +23,9 @@ OpenPinch answers questions such as:
 - How does a direct process-level answer differ from an indirect site-level
   answer?
 - Which graph best explains the remaining utility load?
-- Does a candidate heat-pump integration scenario improve the plant utility
+- Does a candidate Heat Pump integration scenario improve the plant utility
   picture?
-- How much above-pinch or below-pinch turbine work is theoretically available?
+- How much above Pinch or below Pinch turbine work is theoretically available?
 
 Core Product Shape
 ------------------

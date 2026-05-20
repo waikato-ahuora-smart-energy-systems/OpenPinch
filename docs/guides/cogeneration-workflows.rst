@@ -63,7 +63,7 @@ Useful Sample
 
 The `pulp_mill.json` and `zonal_site.json` assets are good next cases once the
 basic process-level workflow is understood, especially when combined with the
-packaged total-site notebook.
+packaged Total Site notebook.
 
 Next Steps
 ----------

@@ -20,7 +20,7 @@ The analysis stack typically runs in this order:
 2. :mod:`OpenPinch.services.services_entry` selects the orchestration path used
    by the high-level service layer and ``PinchProblem.target.*`` helpers.
 3. :mod:`OpenPinch.services.common.problem_table_analysis` builds the shifted
-   and real-temperature problem tables used throughout the rest of the
+   and real temperature problem tables used throughout the rest of the
    workflow.
 4. :mod:`OpenPinch.services.direct_heat_integration.direct_integration_entry`
    computes direct integration targets for unit-operation and process zones.
@@ -58,12 +58,12 @@ Direct and Indirect Targeting Entrypoints
 These modules own the top-level targeting workflows once a zone tree has been
 constructed.
 
-- Direct integration works on process streams within a zone and applies problem
-  table analysis, utility targeting, optional heat pump targeting, and optional
+- Direct integration works on process streams within a zone and applies Problem
+  Table analysis, utility targeting, optional Heat Pump targeting, and optional
   cost/exergy add-ons.
 - Indirect integration aggregates the net thermal behaviour of solved subzones
-  and applies utility-to-utility balancing for total-site style studies.
-- Lower-level heat pump and refrigeration screening for both routes is
+  and applies utility-to-utility balancing for Total Site studies.
+- Lower-level Heat Pump and refrigeration screening for both routes is
   centralised in
   :mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`.
 
@@ -84,7 +84,7 @@ workflows depend on.
 - :mod:`OpenPinch.services.common.utility_targeting` assigns multiple utilities across
   heating and cooling deficits while respecting temperature feasibility.
 - :mod:`OpenPinch.services.common.gcc_manipulation` derives pocket-free, assisted, and
-  other grand-composite-curve variants used for interpretation and advanced
+  other Grand Composite Curve variants used for interpretation and advanced
   targeting.
 - :mod:`OpenPinch.services.common.graph_data` translates tables and targets into the
   graph structures emitted in :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
@@ -105,10 +105,10 @@ Advanced Analyses
 -----------------
 
 The modules below expose specialised calculations that sit on top of the core
-problem-table workflow. Some are used automatically when corresponding options
+Problem Table workflow. Some are used automatically when corresponding options
 are enabled, while others are better viewed as expert-level helper libraries.
 
-The heat-pump and refrigeration stack is documented separately in
+The Heat Pump and refrigeration stack is documented separately in
 :doc:`api-heat-pump` because it spans a dedicated package with multiple cycle
 optimisers and helper modules. The main low-level entrypoints remain
 ``compute_direct_heat_pump_or_refrigeration_target(...)`` and

@@ -21,7 +21,7 @@ def _make_zone() -> Zone:
 
 
 def _dummy_problem_table() -> ProblemTable:
-    return ProblemTable({PT.T.value: [0.0]})
+    return ProblemTable({PT.T: [0.0]})
 
 
 def _make_target(zone: Zone, target_type: str) -> BaseTargetModel:

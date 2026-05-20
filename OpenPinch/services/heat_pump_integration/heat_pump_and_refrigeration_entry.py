@@ -56,7 +56,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
 ) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
-    """Solve an explicit direct heat-pump or refrigeration target for one zone."""
+    """Solve an explicit direct Heat Pump or refrigeration target for one zone."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.DI.value].pt)
     target_load = _validate_hpr_required(
@@ -71,9 +71,9 @@ def compute_direct_heat_pump_or_refrigeration_target(
 
     res = _get_hpr_targets(
         Q_hpr_target=target_load,
-        T_vals=pt.col[PT.T.value],
-        H_hot=pt.col[PT.H_NET_HOT.value],
-        H_cold=pt.col[PT.H_NET_COLD.value],
+        T_vals=pt[PT.T],
+        H_hot=pt[PT.H_NET_HOT],
+        H_cold=pt[PT.H_NET_COLD],
         zone_config=zone.config,
         is_heat_pumping=is_heat_pumping,
     )
@@ -103,7 +103,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
 ) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
-    """Solve an indirect / utility-system heat-pump or refrigeration target."""
+    """Solve an indirect / utility system Heat Pump or refrigeration target."""
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.TS.value].pt)
     # Create problem table based on inverted utility streams
@@ -126,9 +126,9 @@ def compute_indirect_heat_pump_or_refrigeration_target(
 
     res = _get_hpr_targets(
         Q_hpr_target=target_load,
-        T_vals=pt_ut_gen.col[PT.T.value],
-        H_hot=pt_ut_gen.col[PT.H_NET_HOT.value],
-        H_cold=pt_ut_gen.col[PT.H_NET_COLD.value],
+        T_vals=pt_ut_gen[PT.T],
+        H_hot=pt_ut_gen[PT.H_NET_HOT],
+        H_cold=pt_ut_gen[PT.H_NET_COLD],
         zone_config=zone.config,
         is_heat_pumping=is_heat_pumping,
     )
@@ -173,9 +173,9 @@ def _validate_hpr_required(
         raise ValueError("zone_config must be provided for HPR targeting.")
 
     if is_heat_pumping:
-        Q_max = np.abs(pt.col[PT.H_NET_COLD.value]).max()
+        Q_max = np.abs(pt[PT.H_NET_COLD]).max()
     elif is_refrigeration:
-        Q_max = np.abs(pt.col[PT.H_NET_HOT.value]).max()
+        Q_max = np.abs(pt[PT.H_NET_HOT]).max()
     else:
         return 0
 
@@ -290,7 +290,7 @@ def _calc_hpr_cascade(
     pt.share_temperature_intervals(pt_hpr_grid)
 
     # Ambient air addition to the process stream set
-    pt.col[PT.H_NET_W_AIR.value] = pt.col[PT.H_NET_A.value]
+    pt[PT.H_NET_W_AIR] = pt[PT.H_NET_A]
     if len(res.amb_streams) > 0:
         pt_air = get_process_heat_cascade(
             hot_streams=res.amb_streams.get_hot_streams(),
@@ -299,13 +299,13 @@ def _calc_hpr_cascade(
             is_full_analysis=True,
         )
         pt.share_temperature_intervals(pt_air)
-        pt.col[PT.H_NET_W_AIR.value] += pt_air.col[PT.H_NET.value]
-        pt.col[PT.H_NET_HOT.value] += pt_air.col[PT.H_NET_HOT.value]
-        pt.col[PT.H_NET_COLD.value] += pt_air.col[PT.H_NET_COLD.value]
+        pt[PT.H_NET_W_AIR] += pt_air[PT.H_NET]
+        pt[PT.H_NET_HOT] += pt_air[PT.H_NET_HOT]
+        pt[PT.H_NET_COLD] += pt_air[PT.H_NET_COLD]
 
     # Heat pump or refrigeration cascade
     hpr_profile = get_utility_heat_cascade(
-        T_int_vals=pt.col[PT.T.value],
+        T_int_vals=pt[PT.T],
         hot_utilities=res.hpr_hot_streams,
         cold_utilities=res.hpr_cold_streams,
         is_shifted=is_T_vals_shifted,
@@ -315,18 +315,18 @@ def _calc_hpr_cascade(
         pt.update(
             T_col=hpr_profile["T_col"],
             updates={
-                PT.H_NET_HP.value: hpr_updates[PT.H_NET_UT.value],
-                PT.H_HOT_HP.value: hpr_updates[PT.H_HOT_UT.value],
-                PT.H_COLD_HP.value: hpr_updates[PT.H_COLD_UT.value],
+                PT.H_NET_HP: hpr_updates[PT.H_NET_UT],
+                PT.H_HOT_HP: hpr_updates[PT.H_HOT_UT],
+                PT.H_COLD_HP: hpr_updates[PT.H_COLD_UT],
             },
         )
     else:
         pt.update(
             T_col=hpr_profile["T_col"],
             updates={
-                PT.H_NET_RFRG.value: hpr_updates[PT.H_NET_UT.value],
-                PT.H_HOT_RFRG.value: hpr_updates[PT.H_HOT_UT.value],
-                PT.H_COLD_RFRG.value: hpr_updates[PT.H_COLD_UT.value],
+                PT.H_NET_RFRG: hpr_updates[PT.H_NET_UT],
+                PT.H_HOT_RFRG: hpr_updates[PT.H_HOT_UT],
+                PT.H_COLD_RFRG: hpr_updates[PT.H_COLD_UT],
             },
         )
 

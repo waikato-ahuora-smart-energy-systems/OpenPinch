@@ -71,7 +71,7 @@ class GraphPayloadEntry(BaseModel):
 
 
 class ProblemTableView(BaseModel):
-    """Serializable shifted or real problem-table view for one target."""
+    """Serializable shifted or real Problem Table view for one target."""
 
     table_id: str
     target_id: str

@@ -1,4 +1,4 @@
-"""Direct heat-integration entry point for process and unit-level targeting."""
+"""Direct heat integration entry point for process and unit-level targeting."""
 
 from typing import List, Tuple
 
@@ -37,7 +37,7 @@ __all__ = ["compute_direct_integration_targets"]
 def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     """Populate a ``Zone`` with detailed direct heat integration pinch targets.
 
-    The function aggregates problem-table calculations, multi-utility targeting,
+    The function aggregates Problem Table calculations, multi-utility targeting,
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
@@ -59,6 +59,7 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
         pt,
         do_vert_cc_calc=zone.config.DO_VERTICAL_GCC,
         do_assisted_ht_calc=zone.config.DO_ASSITED_HT,
+        assisted_ht_dt_cut=zone.config.DT_ASSISTED_HT,
     )
 
     get_utility_targets(
@@ -70,8 +71,8 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     )
     zone.net_hot_streams, zone.net_cold_streams = (
         _create_net_hot_and_cold_stream_collections_for_site_analysis(
-            T_vals=pt.col[PT.T.value],
-            H_vals=pt.col[PT.H_NET_A.value],
+            T_vals=pt[PT.T],
+            H_vals=pt[PT.H_NET_A],
             hot_utilities=zone.hot_utilities,
             cold_utilities=zone.cold_utilities,
         )
@@ -79,44 +80,44 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
     if zone.config.DO_BALANCED_CC or zone.config.DO_AREA_TARGETING:
         pt.update(
             **get_balanced_CC(
-                T_col=pt.col[PT.T.value],
-                H_hot=pt.col[PT.H_HOT.value],
-                H_cold=pt.col[PT.H_COLD.value],
-                H_hot_ut=pt.col[PT.H_HOT_UT.value],
-                H_cold_ut=pt.col[PT.H_COLD_UT.value],
+                T_col=pt[PT.T],
+                H_hot=pt[PT.H_HOT],
+                H_cold=pt[PT.H_COLD],
+                H_hot_ut=pt[PT.H_HOT_UT],
+                H_cold_ut=pt[PT.H_COLD_UT],
             )
         )
         pt_real.update(
             **get_balanced_CC(
-                T_col=pt_real.col[PT.T.value],
-                H_hot=pt_real.col[PT.H_HOT.value],
-                H_cold=pt_real.col[PT.H_COLD.value],
-                H_hot_ut=pt_real.col[PT.H_HOT_UT.value],
-                H_cold_ut=pt_real.col[PT.H_COLD_UT.value],
-                dT_vals=pt_real.col[PT.DELTA_T.value],
-                RCP_hot=pt_real.col[PT.RCP_HOT.value],
-                RCP_cold=pt_real.col[PT.RCP_COLD.value],
-                RCP_hot_ut=pt_real.col[PT.RCP_HOT_UT.value],
-                RCP_cold_ut=pt_real.col[PT.RCP_COLD_UT.value],
+                T_col=pt_real[PT.T],
+                H_hot=pt_real[PT.H_HOT],
+                H_cold=pt_real[PT.H_COLD],
+                H_hot_ut=pt_real[PT.H_HOT_UT],
+                H_cold_ut=pt_real[PT.H_COLD_UT],
+                dT_vals=pt_real[PT.DELTA_T],
+                RCP_hot=pt_real[PT.RCP_HOT],
+                RCP_cold=pt_real[PT.RCP_COLD],
+                RCP_hot_ut=pt_real[PT.RCP_HOT_UT],
+                RCP_cold_ut=pt_real[PT.RCP_COLD_UT],
             )
         )
         # Target capital cost and heat transfer area and number of exchanger units based on Balanced CC
         if zone.config.DO_AREA_TARGETING:
             num_units = get_min_number_hx(
-                T_vals=pt.col[PT.T.value],
-                H_hot_bal=pt.col[PT.H_HOT_BAL.value],
-                H_cold_bal=pt.col[PT.H_COLD_BAL.value],
+                T_vals=pt[PT.T],
+                H_hot_bal=pt[PT.H_HOT_BAL],
+                H_cold_bal=pt[PT.H_COLD_BAL],
                 hot_streams=zone.hot_streams,
                 cold_streams=zone.cold_streams,
                 hot_utilities=zone.hot_utilities,
                 cold_utilities=zone.cold_utilities,
             )
             area = get_area_targets(
-                T_vals=pt_real.col[PT.T.value],
-                H_hot_bal=pt_real.col[PT.H_HOT_BAL.value],
-                H_cold_bal=pt_real.col[PT.H_COLD_BAL.value],
-                R_hot_bal=pt_real.col[PT.R_HOT_BAL.value],
-                R_cold_bal=pt_real.col[PT.R_COLD_BAL.value],
+                T_vals=pt_real[PT.T],
+                H_hot_bal=pt_real[PT.H_HOT_BAL],
+                H_cold_bal=pt_real[PT.H_COLD_BAL],
+                R_hot_bal=pt_real[PT.R_HOT_BAL],
+                R_cold_bal=pt_real[PT.R_COLD_BAL],
             )
             capital_cost, annual_capital_cost = get_capital_cost_targets(
                 area=area,
@@ -319,7 +320,7 @@ def _find_next_available_utility(
 
 
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
-    """Assemble the problem-table slices required for composite/comparison plots."""
+    """Assemble the Problem Table slices required for composite/comparison plots."""
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {

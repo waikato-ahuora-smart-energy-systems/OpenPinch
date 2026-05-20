@@ -38,26 +38,26 @@ def test_target_utility(filename):
     )
     for plant in data.plant_profile_data:
         z: Zone = site.get_subzone(plant.name)
-        GHLP_P = ProblemTable({PT.T.value: plant.data.T})
-        GHLP_P.col[PT.H_NET_COLD.value] = plant.data.H_cold_net
-        GHLP_P.col[PT.H_NET_HOT.value] = plant.data.H_hot_net
+        GHLP_P = ProblemTable({PT.T: plant.data.T})
+        GHLP_P[PT.H_NET_COLD] = plant.data.H_cold_net
+        GHLP_P[PT.H_NET_HOT] = plant.data.H_hot_net
 
-        _, cold_pinch_row, _ = GHLP_P.pinch_idx(PT.H_NET_HOT.value)
-        hot_pinch_row, _, _ = GHLP_P.pinch_idx(PT.H_NET_COLD.value)
+        _, cold_pinch_row, _ = GHLP_P.pinch_idx(PT.H_NET_HOT)
+        hot_pinch_row, _, _ = GHLP_P.pinch_idx(PT.H_NET_COLD)
 
         is_real_temperatures = False
         z.hot_utilities = _target_utility(
             z.hot_utilities,
-            GHLP_P.col[PT.T.value],
-            GHLP_P.col[PT.H_NET_COLD.value],
+            GHLP_P[PT.T],
+            GHLP_P[PT.H_NET_COLD],
             hot_pinch_row,
             cold_pinch_row,
             is_real_temperatures,
         )
         z.cold_utilities = _target_utility(
             z.cold_utilities,
-            GHLP_P.col[PT.T.value],
-            GHLP_P.col[PT.H_NET_HOT.value],
+            GHLP_P[PT.T],
+            GHLP_P[PT.H_NET_HOT],
             hot_pinch_row,
             cold_pinch_row,
             is_real_temperatures,

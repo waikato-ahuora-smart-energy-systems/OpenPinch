@@ -35,7 +35,7 @@ Which Workflow Should I Use?
    Start from :doc:`../api/service-layer` and
    :doc:`../api/schemas-and-config`.
 
-``I need to inspect prepared streams, zones, or problem tables directly.``
+``I need to inspect prepared streams, zones, or Problem Tables directly.``
    Start from :doc:`../api/domain-model`.
 
 Interpretation Sequence

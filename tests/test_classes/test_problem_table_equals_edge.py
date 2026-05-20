@@ -50,12 +50,12 @@ def test_equals_object_nan_and_numeric_mismatch_branch():
 def _default_table() -> ProblemTable:
     return ProblemTable(
         {
-            PT.T.value: [200.0, 100.0],
-            PT.DELTA_T.value: [0.0, 100.0],
-            PT.CP_HOT.value: [1.0, 1.0],
-            PT.CP_COLD.value: [1.0, 1.0],
-            PT.CP_NET.value: [0.0, 0.0],
-            PT.H_NET.value: [10.0, 0.0],
+            PT.T: [200.0, 100.0],
+            PT.DELTA_T: [0.0, 100.0],
+            PT.CP_HOT: [1.0, 1.0],
+            PT.CP_COLD: [1.0, 1.0],
+            PT.CP_NET: [0.0, 0.0],
+            PT.H_NET: [10.0, 0.0],
         }
     )
 
@@ -66,19 +66,19 @@ def test_index_views_and_iloc_paths():
     pt.icol[0] = [300.0, 250.0]
     assert pt.icol[0][0] == pytest.approx(300.0)
 
-    _ = pt.iloc[(0, PT.T.value)]
-    pt.iloc[(1, PT.T.value)] = 150.0
-    assert pt.iloc[(1, PT.T.value)] == pytest.approx(150.0)
+    _ = pt.iloc[(0, 0)]
+    pt.iloc[(1, 0)] = 150.0
+    assert pt.iloc[(1, 0)] == pytest.approx(150.0)
 
 
 def test_uninitialised_column_setters_and_len_zero():
     pt = ProblemTable()
     assert len(pt) == 0
 
-    pt.col[PT.T] = [100.0, 90.0]
+    pt[PT.T] = [100.0, 90.0]
     pt.cols[PT.T] = [110.0, 95.0]
     pt[PT.H_NET] = [5.0, 4.0]
-    assert pt.col[PT.T].tolist() == [110.0, 95.0]
+    assert pt[PT.T].tolist() == [110.0, 95.0]
     assert pt[PT.H_NET].tolist() == [5.0, 4.0]
 
 
@@ -89,16 +89,16 @@ def test_cols_view_get_and_set_on_initialised_table():
     mixed_values = pt.cols[[PT.T, PT.H_NET.value]]
     assert mixed_values.shape == (2, 2)
     pt.cols[PT.H_NET] = [5.0, 4.0]
-    assert pt.col[PT.H_NET].tolist() == [5.0, 4.0]
+    assert pt[PT.H_NET].tolist() == [5.0, 4.0]
 
 
 def test_problem_table_getitem_setitem_and_slice_enum_paths():
     pt = _default_table()
 
-    assert np.array_equal(pt[PT.T], pt.col[PT.T])
+    assert np.array_equal(pt[PT.T], pt[PT.T])
 
     pt[PT.H_NET] = [8.0, 7.0]
-    assert pt.col[PT.H_NET].tolist() == [8.0, 7.0]
+    assert pt[PT.H_NET].tolist() == [8.0, 7.0]
 
     single = pt.slice(PT.T)
     assert isinstance(single, ProblemTable)
@@ -136,11 +136,11 @@ def test_equals_object_and_shape_branches():
     assert pt_none_a._equals(pt_none_b) is True
     assert pt._equals(pt_none_a) is False
 
-    pt_short = ProblemTable({PT.T.value: [200.0], PT.H_NET.value: [0.0]})
+    pt_short = ProblemTable({PT.T: [200.0], PT.H_NET: [0.0]})
     assert pt._equals(pt_short) is False
 
-    pt_empty_a = ProblemTable({PT.T.value: []})
-    pt_empty_b = ProblemTable({PT.T.value: []})
+    pt_empty_a = ProblemTable({PT.T: []})
+    pt_empty_b = ProblemTable({PT.T: []})
     assert pt_empty_a._equals(pt_empty_b) is True
 
 
@@ -200,11 +200,11 @@ def test_to_list_and_shift_heat_cascade_branches():
     pt = _default_table()
     _ = pt.to_list(col=PT.T)
     shifted_enum = pt.shift_heat_cascade(5.0, PT.H_NET)
-    assert shifted_enum.col[PT.H_NET.value][0] == pytest.approx(15.0)
+    assert shifted_enum[PT.H_NET][0] == pytest.approx(15.0)
 
     idx = pt.col_index[PT.H_NET.value]
     shifted_idx = pt.shift_heat_cascade(-2.0, idx)
-    assert shifted_idx.col[PT.H_NET.value][0] == pytest.approx(13.0)
+    assert shifted_idx[PT.H_NET][0] == pytest.approx(13.0)
 
 
 def test_insert_temperature_interval_helper_guard_paths():
@@ -236,8 +236,8 @@ def test_insert_temperature_interval_helper_guard_paths():
 def test_temperature_block_and_interpolation_edge_paths():
     mini = ProblemTable(
         {
-            PT.T.value: [100.0],
-            PT.DELTA_T.value: [0.0],
+            PT.T: [100.0],
+            PT.DELTA_T: [0.0],
         },
         add_default_labels=False,
     )
@@ -306,17 +306,17 @@ def test_temperature_block_and_interpolation_edge_paths():
 def test_row_mutation_update_sort_and_export_errors():
     pt = _default_table()
     n_before = len(pt)
-    pt.insert({PT.T.value: 180.0, PT.H_NET.value: 5.0}, 1)
+    pt.insert({PT.T: 180.0, PT.H_NET: 5.0}, 1)
     assert len(pt) == n_before + 1
 
-    pt.update_row(1, {PT.T.value: 175.0, "unknown": 1.0})
-    assert pt.loc[1, PT.T.value] == pytest.approx(175.0)
+    pt.update_row(1, {PT.T: 175.0, "unknown": 1.0})
+    assert pt.loc[1, PT.T] == pytest.approx(175.0)
 
     assert pt.update({}) is pt
 
     with pytest.raises(ValueError, match="uninitialised"):
         ProblemTable().update(
-            {PT.H_NET.value: np.array([1.0])},
+            {PT.H_NET: np.array([1.0])},
             T_col=np.array([1.0]),
         )
 
@@ -326,8 +326,8 @@ def test_row_mutation_update_sort_and_export_errors():
     with pytest.raises(KeyError, match="not found"):
         pt.sort_by_column("not_a_column")
 
-    pt.sort_by_column(PT.T.value, ascending=False)
-    assert pt.col[PT.T.value][0] >= pt.col[PT.T.value][-1]
+    pt.sort_by_column(PT.T, ascending=False)
+    assert pt[PT.T][0] >= pt[PT.T][-1]
 
     with pytest.raises(ValueError, match="uninitialised"):
         ProblemTable().export("x")
@@ -337,7 +337,7 @@ def test_update_requires_T_col_for_non_empty_updates():
     pt = _default_table()
 
     with pytest.raises(TypeError, match="T_col"):
-        pt.update({PT.H_NET.value: np.array([1.0, 2.0])})
+        pt.update({PT.H_NET: np.array([1.0, 2.0])})
 
 
 @pytest.mark.parametrize(
@@ -352,7 +352,7 @@ def test_update_rejects_invalid_T_col(T_col, exc_type):
 
     with pytest.raises(exc_type, match="1D numpy.ndarray"):
         pt.update(
-            {PT.H_NET.value: np.array([1.0, 2.0])},
+            {PT.H_NET: np.array([1.0, 2.0])},
             T_col=T_col,
         )
 
@@ -369,7 +369,7 @@ def test_update_rejects_non_vector_numpy_column_values(values, exc_type):
 
     with pytest.raises(exc_type, match="1D numpy.ndarray"):
         pt.update(
-            {PT.H_NET.value: values},
+            {PT.H_NET: values},
             T_col=np.array([200.0, 100.0]),
         )
 
@@ -385,7 +385,7 @@ def test_update_rejects_unknown_or_temperature_columns():
 
     with pytest.raises(ValueError, match="temperature column"):
         pt.update(
-            {PT.T.value: np.array([200.0, 100.0])},
+            {PT.T: np.array([200.0, 100.0])},
             T_col=np.array([200.0, 100.0]),
         )
 
@@ -395,7 +395,7 @@ def test_update_rejects_length_mismatch_against_T_col():
 
     with pytest.raises(ValueError, match="T_col"):
         pt.update(
-            {PT.H_NET.value: np.array([1.0])},
+            {PT.H_NET: np.array([1.0])},
             T_col=np.array([200.0, 100.0]),
         )
 
@@ -404,9 +404,9 @@ def test_update_assigns_directly_when_temperature_grids_match():
     pt = _default_table()
 
     out = pt.update(
-        {PT.H_NET.value: np.array([3.0, 4.0])},
+        {PT.H_NET: np.array([3.0, 4.0])},
         T_col=np.array([200.0 + 1e-7, 100.0 - 1e-7]),
     )
 
     assert out is pt
-    assert pt.col[PT.H_NET.value].tolist() == [3.0, 4.0]
+    assert pt[PT.H_NET].tolist() == [3.0, 4.0]

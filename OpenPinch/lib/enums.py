@@ -1,6 +1,6 @@
 """Enumerations defining canonical labels across OpenPinch.
 
-These enums standardize zone types, stream classifications, problem-table
+These enums standardize zone types, stream classifications, Problem Table
 column names, graph labels, and options keys used by configuration and schemas.
 """
 

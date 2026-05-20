@@ -113,10 +113,10 @@ def _base_args(**overrides):
 def _pt_with_hnet(h0, h1, *, h_hot=None, h_cold=None):
     return ProblemTable(
         {
-            PT.T.value: [120.0, 60.0],
-            PT.H_NET.value: [h0, h1],
-            PT.H_NET_HOT.value: [0.0, 0.0] if h_hot is None else h_hot,
-            PT.H_NET_COLD.value: [0.0, 0.0] if h_cold is None else h_cold,
+            PT.T: [120.0, 60.0],
+            PT.H_NET: [h0, h1],
+            PT.H_NET_HOT: [0.0, 0.0] if h_hot is None else h_hot,
+            PT.H_NET_COLD: [0.0, 0.0] if h_cold is None else h_cold,
         }
     )
 

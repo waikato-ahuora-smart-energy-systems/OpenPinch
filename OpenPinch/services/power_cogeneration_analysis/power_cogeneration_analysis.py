@@ -55,7 +55,7 @@ def get_power_cogeneration_below_pinch(
     zone_config: Configuration | None = None,
     T_sink: float | None = None,
 ) -> tuple[float, dict]:
-    """Solve a below-pinch turbine target against an environmental sink."""
+    """Solve a below Pinch turbine target against an environmental sink."""
     zone_config = zone_config or Configuration()
     turbine_params = _prepare_turbine_parameters(zone_config)
     sink_temperature = zone_config.T_ENV if T_sink is None else float(T_sink)

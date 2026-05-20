@@ -373,13 +373,13 @@ def evaluate_vapour_hpr_result(
 
     Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(
         work=float(work),
-        Q_ext_heat=pt_cond.col[PT.H_NET.value][0],
-        Q_ext_cold=pt_evap.col[PT.H_NET.value][-1],
+        Q_ext_heat=pt_cond[PT.H_NET][0],
+        Q_ext_cold=pt_evap[PT.H_NET][-1],
         args=args,
         penalty_terms=np.concatenate(
             [
                 np.array(
-                    [pt_cond.col[PT.H_NET.value][-1], pt_evap.col[PT.H_NET.value][0]],
+                    [pt_cond[PT.H_NET][-1], pt_evap[PT.H_NET][0]],
                     dtype=float,
                 ),
                 np.asarray(
@@ -704,10 +704,10 @@ def _get_hpr_cascade(
     )
     pt.update(
         **get_utility_heat_cascade(
-            pt.col[PT.T.value],
+            pt[PT.T],
             hot_streams,
             cold_streams,
             is_shifted=False,
         )
     )
-    return pt.col[PT.T.value], pt.col[PT.H_HOT_UT.value], pt.col[PT.H_COLD_UT.value]
+    return pt[PT.T], pt[PT.H_HOT_UT], pt[PT.H_COLD_UT]

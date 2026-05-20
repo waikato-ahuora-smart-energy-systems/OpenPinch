@@ -1,12 +1,12 @@
 Heat Pump Workflows
 ===================
 
-OpenPinch exposes two related but distinct heat-pump workflow families.
+OpenPinch exposes two related but distinct Heat Pump workflow families.
 
 Question This Guide Answers
 ---------------------------
 
-How do I use OpenPinch to evaluate heat-pump or refrigeration opportunities in
+How do I use OpenPinch to evaluate Heat Pump or refrigeration opportunities in
 the context of process integration?
 
 Direct and Indirect HPR Targeting
@@ -45,7 +45,7 @@ plot accessor surfaces, especially
 Current Recommendation
 ----------------------
 
-For supported advanced heat-pump and refrigeration work today, prefer the
+For supported advanced Heat Pump and refrigeration work today, prefer the
 ``problem.target.direct_heat_pump(...)``,
 ``problem.target.indirect_heat_pump(...)``, and refrigeration companion
 methods. Use ``chocolate_factory.json`` plus notebook 03 when the question is

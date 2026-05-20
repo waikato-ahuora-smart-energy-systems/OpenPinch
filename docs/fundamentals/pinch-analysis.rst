@@ -86,7 +86,7 @@ OpenPinch extends the workflow with:
 - hierarchical zone modeling
 - indirect / site-level targeting
 - multiple graph views
-- optional heat-pump and refrigeration workflows
+- optional Heat Pump and refrigeration workflows
 - optional turbine cogeneration post-processing
 - programmatic and file-backed workflows over the same core engine
 

@@ -16,7 +16,7 @@ Included Notebooks
    ``PinchProblem`` cases.
 
 ``02_total_site_targets_and_sugcc.ipynb``
-   Zonal and total-site workflow on a pulp-mill style case, including indirect
+   Zonal and Total Site workflow on a pulp-mill style case, including indirect
    targeting and site utility grand composite interpretation.
 
 ``03_carnot_hpr_comparison.ipynb``
@@ -44,7 +44,7 @@ Recommended Learning Order
 
 1. Start with the basic pinch and ``dt_cont`` notebook to understand the main
    process-level workflow and output interpretation.
-2. Move to the total-site notebook once you are comfortable with zonal and
+2. Move to the Total Site notebook once you are comfortable with zonal and
    indirect integration concepts.
 3. Use the Carnot HPR notebook after you understand how to read the base
    utility and graph outputs.

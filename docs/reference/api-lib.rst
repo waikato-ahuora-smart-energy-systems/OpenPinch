@@ -70,8 +70,8 @@ Heat pump integration helper models include:
 
 - :class:`~OpenPinch.lib.schemas.hpr.HeatPumpTargetOutputs`
 
-Specialised helper models also capture lower-level heat pump optimisation
-inputs/outputs, integrated heat-pump screening comparisons, piecewise stream
+Specialised helper models also capture lower-level Heat Pump optimisation
+inputs/outputs, integrated Heat Pump screening comparisons, piecewise stream
 linearisation requests, and legacy visualisation payloads.
 
 .. automodule:: OpenPinch.lib.schemas

@@ -36,7 +36,7 @@ It is usually the best graph for:
 
 - utility placement questions
 - residual thermal pocket interpretation
-- heat-pump opportunity screening
+- Heat Pump opportunity screening
 
 Recommended Interpretation Order
 --------------------------------

@@ -157,7 +157,7 @@ problem.show_dashboard()
 - Multi-scale targeting for unit operation, process, site, community, and regional studies
 - Direct heat integration and indirect integration through utility systems
 - Multiple utility targeting, including non-isothermal utilities
-- Composite-curve and grand-composite-curve graph generation
+- Composite Curve and Grand Composite Curve graph generation
 - Excel workbook import and Excel summary export
 - Packaged sample cases and notebook workflows
 - Pydantic schema models for validated programmatic usage

@@ -102,6 +102,7 @@ def test_pinch_workspace_validation_and_configuration_metadata():
     assert any(issue.path == "streams[0].t_target" for issue in report.issues)
     assert invalid_view.status == "invalid"
     assert by_name["HPR_TYPE"].field_type == "enum"
+    assert by_name["DT_ASSISTED_HT"].group == "general"
     assert by_name["ELE_PRICE"].group == "costing"
 
 

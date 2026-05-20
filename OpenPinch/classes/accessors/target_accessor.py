@@ -53,7 +53,7 @@ class _TargetAccessor:
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
     ) -> BaseTargetModel:
-        """Run indirect / total-site targeting for one zone or sub-tree."""
+        """Run indirect / Total Site targeting for one zone or sub-tree."""
         return self._problem._execute_targeting(
             target_id=TT.TS.value,
             application_zone=zone_name,
@@ -69,7 +69,7 @@ class _TargetAccessor:
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
     ) -> BaseTargetModel:
-        """Run direct heat-pump targeting for one zone or sub-tree."""
+        """Run direct Heat Pump targeting for one zone or sub-tree."""
         return self._problem._execute_targeting(
             target_id=TT.DHP.value,
             application_zone=zone_name,
@@ -85,7 +85,7 @@ class _TargetAccessor:
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
     ) -> BaseTargetModel:
-        """Run indirect heat-pump targeting for one zone or sub-tree."""
+        """Run indirect Heat Pump targeting for one zone or sub-tree."""
         return self._problem._execute_targeting(
             target_id=TT.IHP.value,
             application_zone=zone_name,

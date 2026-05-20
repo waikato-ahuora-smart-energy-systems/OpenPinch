@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 
 def _dummy_problem_table():
-    return ProblemTable({PT.T.value: [0.0]})
+    return ProblemTable({PT.T: [0.0]})
 
 
 def test_stream_property_roundtrip_and_mutation_paths():

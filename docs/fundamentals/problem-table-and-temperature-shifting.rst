@@ -1,7 +1,7 @@
 Problem Tables and Temperature Shifting
 =======================================
 
-The numerical core of OpenPinch is the problem-table style interval cascade.
+The numerical core of OpenPinch is the Problem Table style interval cascade.
 This is the bridge between raw stream temperatures and the reported utility and
 pinch targets.
 

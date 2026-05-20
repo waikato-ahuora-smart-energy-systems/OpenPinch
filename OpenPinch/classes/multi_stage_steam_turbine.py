@@ -91,7 +91,7 @@ def _predict_stage_work(
 
 
 class _TurbineState:
-    """Mutable turbine calculation state for above-pinch extraction solving."""
+    """Mutable turbine calculation state for above Pinch extraction solving."""
 
     def __init__(self, params: dict, data: dict):
         self.P_out = data["P_out"]

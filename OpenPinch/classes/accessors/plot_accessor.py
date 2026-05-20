@@ -225,7 +225,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching composite-curve figure or raw payload."""
+        """Return the first matching Composite Curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.CC.value,
@@ -242,7 +242,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching shifted-composite-curve figure or raw payload."""
+        """Return the first matching Shifted Composite Curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.SCC.value,
@@ -259,7 +259,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching balanced-composite-curve figure or raw payload."""
+        """Return the first matching Balanced Composite Curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.BCC.value,
@@ -276,7 +276,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching grand-composite-curve figure or raw payload."""
+        """Return the first matching Grand Composite Curve figure or raw payload."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC.value,
@@ -293,7 +293,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching real-temperature GCC payload or figure."""
+        """Return the first matching real temperature GCC payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC_R.value,
@@ -310,7 +310,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching GCC-with-heat-pump payload or figure."""
+        """Return the first matching GCC with Heat Pump payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC_HP.value,
@@ -327,7 +327,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching net-load-profile payload or figure."""
+        """Return the first matching net load profile payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.NLP.value,
@@ -344,7 +344,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching total-site-profiles payload or figure."""
+        """Return the first matching Total Site profiles payload or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.TSP.value,

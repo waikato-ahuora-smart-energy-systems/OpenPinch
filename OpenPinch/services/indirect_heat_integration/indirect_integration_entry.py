@@ -92,7 +92,7 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     The routine assumes the relevant child zones have already been solved for
     direct integration. It then sums subzone targets, builds site-level net
     stream cascades, performs utility-to-utility balancing, and records the
-    resulting total-site style target on ``zone`` before returning it.
+    resulting Total Site target on ``zone`` before returning it.
     """
     s_tzt = zone.targets[TT.TZ.value]
 
@@ -104,9 +104,9 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     )
     pt.update(
         **_shift_site_process_profiles(
-            T_col=pt.col[PT.T.value],
-            H_hot=pt.col[PT.H_HOT.value],
-            H_cold=pt.col[PT.H_COLD.value],
+            T_col=pt[PT.T],
+            H_hot=pt[PT.H_HOT],
+            H_cold=pt[PT.H_COLD],
         )
     )
     # Apply the problem table algorithm to subzone utility use
@@ -119,12 +119,12 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     )
 
     # Extract overall heat integration targets
-    hot_utility_target = pt.loc[0, PT.H_NET_UT.value]
-    cold_utility_target = pt.loc[-1, PT.H_NET_UT.value]
+    hot_utility_target = pt.loc[0, PT.H_NET_UT]
+    cold_utility_target = pt.loc[-1, PT.H_NET_UT]
     heat_recovery_target = s_tzt.heat_recovery_target + (
         s_tzt.hot_utility_target - hot_utility_target
     )
-    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT.value)
+    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT)
 
     # Apply the utility targeting method to determine the net utility use and generation
     hot_utilities, cold_utilities = _match_utility_gen_and_use_at_same_level(
@@ -194,8 +194,8 @@ def _shift_site_process_profiles(
     return {
         "T_col": T_col,
         "updates": {
-            PT.H_HOT.value: H_hot - H_hot[0],
-            PT.H_COLD.value: H_cold - H_cold[-1],
+            PT.H_HOT: H_hot - H_hot[0],
+            PT.H_COLD: H_cold - H_cold[-1],
         },
     }
 
@@ -210,14 +210,13 @@ def _build_site_utility_profile(
         cold_streams=cold_utilities,
         is_shifted=is_shifted,
     )
-    h_net_ut = pt_ut.col[PT.H_HOT.value] - pt_ut.col[PT.H_COLD.value]
+    h_net_ut = pt_ut[PT.H_HOT] - pt_ut[PT.H_COLD]
     return {
-        "T_col": pt_ut.col[PT.T.value],
+        "T_col": pt_ut[PT.T],
         "updates": {
-            PT.H_NET_UT.value: h_net_ut - h_net_ut.min(),
-            PT.H_HOT_UT.value: pt_ut.col[PT.H_HOT.value],
-            PT.H_COLD_UT.value: pt_ut.col[PT.H_COLD.value]
-            - pt_ut.col[PT.H_COLD.value].max(),
+            PT.H_NET_UT: h_net_ut - h_net_ut.min(),
+            PT.H_HOT_UT: pt_ut[PT.H_HOT],
+            PT.H_COLD_UT: pt_ut[PT.H_COLD] - pt_ut[PT.H_COLD].max(),
         },
     }
 

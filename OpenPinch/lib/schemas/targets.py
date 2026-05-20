@@ -195,14 +195,14 @@ class TotalProcessTarget(UtilitySummaryTarget):
 
 
 class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
-    """Total-site / indirect-integration target with site problem tables and graphs."""
+    """Total Site / indirect integration target with site Problem Tables and graphs."""
 
     pt: ProblemTable
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
-        """Return the reporting payload including total-site work fields."""
+        """Return the reporting payload including Total Site work fields."""
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={

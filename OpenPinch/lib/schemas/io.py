@@ -78,7 +78,7 @@ class TargetOutput(BaseModel):
 
 
 class THSchema(BaseModel):
-    """Temperature-enthalpy series payload used for problem-table exchange."""
+    """Temperature-enthalpy series payload used for Problem Table exchange."""
 
     T: List[float]
     H_hot: Optional[List[float]] = None

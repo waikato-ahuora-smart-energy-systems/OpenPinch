@@ -65,7 +65,7 @@ Recommended Learning Path
 
 1. `basic_pinch.json` and notebook 01 for baseline workflow and `dt_cont`
    interpretation
-2. `zonal_site.json` or `pulp_mill.json` and notebook 02 for total-site and
+2. `zonal_site.json` or `pulp_mill.json` and notebook 02 for Total Site and
    SUGCC workflows
 3. `chocolate_factory.json` and notebook 03 for direct-versus-indirect HPR and
    refrigeration comparison

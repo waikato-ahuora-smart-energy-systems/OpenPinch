@@ -1,4 +1,4 @@
-"""Problem-table generation and cascade utilities for pinch analysis.
+"""Problem Table generation and cascade utilities for pinch analysis.
 
 This module collects the vectorised implementations of the temperature
 interval problem table, cascade shifting logic, and helper routines used when
@@ -94,25 +94,24 @@ def get_utility_heat_cascade(
     is_shifted: bool = True,
 ) -> ProblemTableUpdateKwargs:
     """Prepare and calculate the utility heat cascade a given set of hot and cold utilities."""
-    pt_ut = ProblemTable({PT.T.value: T_int_vals})
+    pt_ut = ProblemTable({PT.T: T_int_vals})
     problem_table_algorithm(pt_ut, hot_utilities, cold_utilities, is_shifted)
 
-    h_net_values = pt_ut.col[PT.H_NET.value]
+    h_net_values = pt_ut[PT.H_NET]
     H_NET_UT = h_net_values.max() - h_net_values
 
-    h_ut_cc = pt_ut.col[PT.H_HOT.value]
-    c_ut_cc = pt_ut.col[PT.H_COLD.value] - pt_ut.col[PT.H_COLD.value].max()
+    h_ut_cc = pt_ut[PT.H_HOT]
+    c_ut_cc = pt_ut[PT.H_COLD] - pt_ut[PT.H_COLD].max()
 
     return {
         "T_col": T_int_vals,
         "updates": {
-            PT.H_NET_UT.value: H_NET_UT,
-            PT.H_HOT_UT.value: h_ut_cc,
-            PT.H_COLD_UT.value: c_ut_cc,
-            PT.RCP_HOT_UT.value: pt_ut.col[PT.RCP_HOT.value],
-            PT.RCP_COLD_UT.value: pt_ut.col[PT.RCP_COLD.value],
-            PT.RCP_UT_NET.value: pt_ut.col[PT.RCP_HOT.value]
-            + pt_ut.col[PT.RCP_COLD.value],
+            PT.H_NET_UT: H_NET_UT,
+            PT.H_HOT_UT: h_ut_cc,
+            PT.H_COLD_UT: c_ut_cc,
+            PT.RCP_HOT_UT: pt_ut[PT.RCP_HOT],
+            PT.RCP_COLD_UT: pt_ut[PT.RCP_COLD],
+            PT.RCP_UT_NET: pt_ut[PT.RCP_HOT] + pt_ut[PT.RCP_COLD],
         },
     }
 
@@ -139,7 +138,7 @@ def create_problem_table_with_t_int(
     ] + extra_T_intervals
     dp = int(-math.log10(tol))
     T_vals = np.array(T_vals).round(dp)
-    return ProblemTable({PT.T.value: sorted(set(T_vals), reverse=True)})
+    return ProblemTable({PT.T: sorted(set(T_vals), reverse=True)})
 
 
 def problem_table_algorithm(
@@ -153,58 +152,56 @@ def problem_table_algorithm(
     # Sum m_dot*Cp contributions from hot streams per interval (sets CP_HOT and rCP_HOT)
     if hot_streams is not None:
         sum_cp_hot, sum_rcp_hot = _sum_mcp_between_temperature_boundaries(
-            pt.col[PT.T.value], hot_streams, is_shifted
+            pt[PT.T], hot_streams, is_shifted
         )
-        pt.col[PT.CP_HOT.value] = sum_cp_hot
-        pt.col[PT.RCP_HOT.value] = sum_rcp_hot
+        pt[PT.CP_HOT] = sum_cp_hot
+        pt[PT.RCP_HOT] = sum_rcp_hot
     else:
-        pt.col[PT.CP_HOT.value].fill(0.0)
-        pt.col[PT.RCP_HOT.value].fill(0.0)
+        pt[PT.CP_HOT].fill(0.0)
+        pt[PT.RCP_HOT].fill(0.0)
 
     # Sum m_dot*Cp contributions from cold streams per interval (sets CP_COLD and rCP_COLD)
     if cold_streams is not None:
         sum_cp_cold, sum_rcp_cold = _sum_mcp_between_temperature_boundaries(
-            pt.col[PT.T.value], cold_streams, is_shifted
+            pt[PT.T], cold_streams, is_shifted
         )
-        pt.col[PT.CP_COLD.value] = sum_cp_cold
-        pt.col[PT.RCP_COLD.value] = sum_rcp_cold
+        pt[PT.CP_COLD] = sum_cp_cold
+        pt[PT.RCP_COLD] = sum_rcp_cold
     else:
-        pt.col[PT.CP_COLD.value].fill(0.0)
-        pt.col[PT.RCP_COLD.value].fill(0.0)
+        pt[PT.CP_COLD].fill(0.0)
+        pt[PT.RCP_COLD].fill(0.0)
 
     # ΔT_i = T_{i-1} - T_i
-    pt.col[PT.DELTA_T.value] = delta_with_zero_at_start(pt.col[PT.T.value])
+    pt[PT.DELTA_T] = delta_with_zero_at_start(pt[PT.T])
 
     # ΔH_hot = ΔT * CP_hot
-    pt.col[PT.DELTA_H_HOT.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_HOT.value]
+    pt[PT.DELTA_H_HOT] = pt[PT.DELTA_T] * pt[PT.CP_HOT]
 
     # H_hot = Σ ΔH_hot
-    pt.col[PT.H_HOT.value] = np.cumsum(pt.col[PT.DELTA_H_HOT.value])
+    pt[PT.H_HOT] = np.cumsum(pt[PT.DELTA_H_HOT])
 
     # ΔH_cold = ΔT * CP_cold
-    pt.col[PT.DELTA_H_COLD.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_COLD.value]
+    pt[PT.DELTA_H_COLD] = pt[PT.DELTA_T] * pt[PT.CP_COLD]
 
     # H_cold = Σ ΔH_cold
-    pt.col[PT.H_COLD.value] = np.cumsum(pt.col[PT.DELTA_H_COLD.value])
+    pt[PT.H_COLD] = np.cumsum(pt[PT.DELTA_H_COLD])
 
     # CP_NET = CP_cold - CP_hot
-    pt.col[PT.CP_NET.value] = pt.col[PT.CP_COLD.value] - pt.col[PT.CP_HOT.value]
+    pt[PT.CP_NET] = pt[PT.CP_COLD] - pt[PT.CP_HOT]
 
     # ΔH_net = ΔT * CP_NET
-    pt.col[PT.DELTA_H_NET.value] = pt.col[PT.DELTA_T.value] * pt.col[PT.CP_NET.value]
+    pt[PT.DELTA_H_NET] = pt[PT.DELTA_T] * pt[PT.CP_NET]
 
     # H_net = -Σ ΔH_net
-    pt.col[PT.H_NET.value] = -np.cumsum(pt.col[PT.DELTA_H_NET.value])
+    pt[PT.H_NET] = -np.cumsum(pt[PT.DELTA_H_NET])
 
     # Shift cascades so the minimum H_net equals zero, aligning hot/cold composites at the pinch
-    min_H = pt.col[PT.H_NET.value].min()
-    shift = pt.col[PT.H_NET.value][-1] - min_H
+    min_H = pt[PT.H_NET].min()
+    shift = pt[PT.H_NET][-1] - min_H
 
-    pt.col[PT.H_HOT.value] = pt.col[PT.H_HOT.value][-1] - pt.col[PT.H_HOT.value]
-    pt.col[PT.H_COLD.value] = (
-        pt.col[PT.H_COLD.value][-1] + shift - pt.col[PT.H_COLD.value]
-    )
-    pt.col[PT.H_NET.value] = pt.col[PT.H_NET.value] - min_H
+    pt[PT.H_HOT] = pt[PT.H_HOT][-1] - pt[PT.H_HOT]
+    pt[PT.H_COLD] = pt[PT.H_COLD][-1] + shift - pt[PT.H_COLD]
+    pt[PT.H_NET] = pt[PT.H_NET] - min_H
 
     return pt
 
@@ -224,7 +221,7 @@ def get_heat_recovery_target_from_pt(
     float
         Maximum direct heat recovery for the analysed zone.
     """
-    return pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value]
+    return pt.loc[0, PT.H_HOT] - pt.loc[-1, PT.H_NET]
 
 
 def set_zonal_targets(
@@ -233,15 +230,14 @@ def set_zonal_targets(
 ) -> dict:
     """Assign thermal targets and integration degree to the zone based on process table data."""
     return {
-        "hot_utility_target": pt.loc[0, PT.H_NET.value],
-        "cold_utility_target": pt.loc[-1, PT.H_NET.value],
-        "heat_recovery_target": pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value],
-        "heat_recovery_limit": pt_real.loc[0, PT.H_HOT.value]
-        - pt_real.loc[-1, PT.H_NET.value],
+        "hot_utility_target": pt.loc[0, PT.H_NET],
+        "cold_utility_target": pt.loc[-1, PT.H_NET],
+        "heat_recovery_target": pt.loc[0, PT.H_HOT] - pt.loc[-1, PT.H_NET],
+        "heat_recovery_limit": pt_real.loc[0, PT.H_HOT] - pt_real.loc[-1, PT.H_NET],
         "degree_of_int": (
-            (pt.loc[0, PT.H_HOT.value] - pt.loc[-1, PT.H_NET.value])
-            / (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value])
-            if (pt_real.loc[0, PT.H_HOT.value] - pt_real.loc[-1, PT.H_NET.value]) > 0
+            (pt.loc[0, PT.H_HOT] - pt.loc[-1, PT.H_NET])
+            / (pt_real.loc[0, PT.H_HOT] - pt_real.loc[-1, PT.H_NET])
+            if (pt_real.loc[0, PT.H_HOT] - pt_real.loc[-1, PT.H_NET]) > 0
             else 1.0
         ),
     }
@@ -290,8 +286,8 @@ def _shift_pt_to_set_heat_recovery(
 ) -> ProblemTable:
     """Shift H_COLD and H_NET columns to match targeted heat recovery levels."""
     delta_shift = current_heat_recovery - heat_recovery_target
-    pt.col[PT.H_COLD.value] += delta_shift
-    pt.col[PT.H_NET.value] += delta_shift
+    pt[PT.H_COLD] += delta_shift
+    pt[PT.H_NET] += delta_shift
     return pt
 
 
@@ -301,15 +297,11 @@ def _insert_temperature_interval_into_pt_at_constant_h(
     """Insert temperature intervals into the process table where HCC and CCC intersect at constant enthalpy."""
     T_new = []
     # --- HCC to CCC projection ---
-    if pt.col[PT.H_HOT.value][0] > 0.0:
-        T_new.append(
-            _get_T_start_on_opposite_cc(pt, pt.col[PT.H_HOT.value][0], PT.H_COLD.value)
-        )
+    if pt[PT.H_HOT][0] > 0.0:
+        T_new.append(_get_T_start_on_opposite_cc(pt, pt[PT.H_HOT][0], PT.H_COLD))
     # --- CCC to HCC projection ---
-    if pt.col[PT.H_COLD.value][-1] > 0.0:
-        T_new.append(
-            _get_T_start_on_opposite_cc(pt, pt.col[PT.H_COLD.value][-1], PT.H_HOT.value)
-        )
+    if pt[PT.H_COLD][-1] > 0.0:
+        T_new.append(_get_T_start_on_opposite_cc(pt, pt[PT.H_COLD][-1], PT.H_HOT))
     T_new = [t for t in T_new if t is not None]
     if len(T_new) > 0:
         pt.insert_temperature_interval(T_new)
@@ -319,12 +311,12 @@ def _insert_temperature_interval_into_pt_at_constant_h(
 def _get_T_start_on_opposite_cc(
     pt: ProblemTable,
     h0: float,
-    col_CC: str,
-    col_T: str = PT.T.value,
+    col_CC: str | PT,
+    col_T: str | PT = PT.T,
 ) -> float:
     """Find and insert the temperature value where composite curves intersect at constant enthalpy."""
 
-    temp_cc = pt.col[col_CC] - h0
+    temp_cc = pt[col_CC] - h0
 
     if temp_cc.size < 2:
         return None
@@ -340,8 +332,8 @@ def _get_T_start_on_opposite_cc(
 
     idx = int(transitions[0])
 
-    cc_vals = pt.col[col_CC]
-    T_vals = pt.col[col_T]
+    cc_vals = pt[col_CC]
+    T_vals = pt[col_T]
 
     T_new = linear_interpolation(
         h0,
