@@ -10,6 +10,7 @@ from typing import Any, Iterable, Optional
 import pandas as pd
 
 from ..lib.config import Configuration
+from ..lib.config_metadata import CONFIG_ENUMS, CONFIG_MINIMUMS, configuration_group
 from ..lib.schemas.io import TargetInput
 from ..lib.schemas.workspace import (
     ConfigurationFieldMetadata,
@@ -22,13 +23,8 @@ from ..lib.schemas.workspace import (
 )
 from ._workspace_support import (
     JsonDict,
-    _CONFIG_ENUMS,
-    _CONFIG_MINIMUMS,
     annotation_metadata,
     build_validation_report,
-    configuration_group,
-    graph_catalog_entries,
-    graph_payload_entries,
     json_safe,
     merge_payloads,
     normalise_payload,
@@ -585,7 +581,7 @@ class PinchWorkspace:
         for name, annotation in Configuration.__annotations__.items():
             if name.startswith("_"):
                 continue
-            enum_cls = _CONFIG_ENUMS.get(name)
+            enum_cls = CONFIG_ENUMS.get(name)
             field_type, multiple = annotation_metadata(annotation, enum_cls=enum_cls)
             group = configuration_group(name)
             fields.append(
@@ -600,7 +596,7 @@ class PinchWorkspace:
                     enum_choices=[str(item.value) for item in enum_cls]
                     if enum_cls
                     else [],
-                    numeric_min=_CONFIG_MINIMUMS.get(name),
+                    numeric_min=CONFIG_MINIMUMS.get(name),
                     multiple=multiple,
                 )
             )

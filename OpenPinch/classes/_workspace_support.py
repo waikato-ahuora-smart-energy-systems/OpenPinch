@@ -11,11 +11,9 @@ from typing import Any, Dict, Optional
 import pandas as pd
 from pydantic import ValidationError
 
-from ..lib.config import Configuration
-from ..lib.enums import BB_Minimiser, HPRcycle, ST, TurbineModel, ZT
+from ..lib.enums import ST
 from ..lib.schemas.io import TargetInput
 from ..lib.schemas.workspace import (
-    ConfigurationFieldMetadata,
     GraphCatalogEntry,
     GraphPayloadEntry,
     PayloadRecordView,
@@ -27,7 +25,6 @@ from ..lib.schemas.workspace import (
     ValidationIssue,
     ValidationReport,
     VariantMetricDelta,
-    VariantPayloadView,
     ZoneNodeView,
 )
 from ..streamlit_webviewer.web_graphing import (
@@ -57,119 +54,6 @@ _WORKFLOW_SUPPORT_LEVELS = {
     "cogeneration": "advanced",
     "area_cost": "advanced",
 }
-
-_CONFIG_ENUMS = {
-    "TOP_ZONE_IDENTIFIER": ZT,
-    "HPR_TYPE": HPRcycle,
-    "BB_MINIMISER": BB_Minimiser,
-    "TURB_MODEL": TurbineModel,
-}
-
-_CONFIG_GROUPS = {
-    "general": {
-        "TOP_ZONE_NAME",
-        "TOP_ZONE_IDENTIFIER",
-        "DT_CONT",
-        "DT_PHASE_CHANGE",
-        "HTC",
-        "T_ENV",
-        "DT_ENV_CONT",
-        "P_ENV",
-        "DECIMAL_PLACES",
-    },
-    "targeting": {
-        "DO_DIRECT_OPERATION_TARGETING",
-        "DO_DIRECT_SITE_TARGETING",
-        "DO_INDIRECT_PROCESS_TARGETING",
-        "DO_BALANCED_CC",
-        "DO_AREA_TARGETING",
-        "DO_PROCESS_HP_TARGETING",
-        "DO_PROCESS_RFRG_TARGETING",
-        "DO_UTILITY_HP_TARGETING",
-        "DO_UTILITY_RFRG_TARGETING",
-        "DO_TURBINE_TARGETING",
-        "DO_EXERGY_TARGETING",
-        "DO_VERTICAL_GCC",
-        "DO_ASSITED_HT",
-        "DO_TURBINE_WORK",
-    },
-    "hpr": {
-        "HPR_TYPE",
-        "HPR_LOAD_VALUE",
-        "HPR_LOAD_VALUE_TYPE",
-        "REFRIGERANTS",
-        "DO_REFRIGERANT_SORT",
-        "PRICE_RATIO_HEAT_TO_ELE",
-        "PRICE_RATIO_COLD_TO_ELE",
-        "MAX_HP_MULTISTART",
-        "N_COND",
-        "N_EVAP",
-        "ETA_COMP",
-        "ETA_EXP",
-        "ETA_MOTOR",
-        "ETA_II_HPR_CARNOT",
-        "ETA_II_HE_CARNOT",
-        "DT_CONT_HP",
-        "DT_HPR_IHX",
-        "DT_HPR_CASCADE_HX",
-        "BB_MINIMISER",
-        "INITIALISE_SIMULATED_CYCLE",
-        "ALLOW_INTEGRATED_EXPANDER",
-    },
-    "costing": {
-        "ELE_PRICE",
-        "UTILITY_PRICE",
-        "ANNUAL_OP_TIME",
-        "FIXED_COST",
-        "VARIABLE_COST",
-        "COST_EXP",
-        "DISCOUNT_RATE",
-        "SERV_LIFE",
-    },
-    "turbine": {
-        "TURB_T_IN",
-        "TURB_P_IN",
-        "MIN_EFF",
-        "LOAD_FRACTION",
-        "ETA_MECH",
-        "TURB_MODEL",
-        "IS_HIGH_P_COND_FLASH",
-    },
-}
-
-_CONFIG_MINIMUMS = {
-    "DT_CONT": 0.0,
-    "DT_PHASE_CHANGE": 0.0,
-    "HTC": 0.0,
-    "DT_ENV_CONT": 0.0,
-    "DECIMAL_PLACES": 0.0,
-    "PRICE_RATIO_HEAT_TO_ELE": 0.0,
-    "PRICE_RATIO_COLD_TO_ELE": 0.0,
-    "MAX_HP_MULTISTART": 0.0,
-    "N_COND": 0.0,
-    "N_EVAP": 0.0,
-    "ETA_COMP": 0.0,
-    "ETA_EXP": 0.0,
-    "ETA_MOTOR": 0.0,
-    "ETA_II_HPR_CARNOT": 0.0,
-    "ETA_II_HE_CARNOT": 0.0,
-    "DT_CONT_HP": 0.0,
-    "DT_HPR_IHX": 0.0,
-    "DT_HPR_CASCADE_HX": 0.0,
-    "ELE_PRICE": 0.0,
-    "UTILITY_PRICE": 0.0,
-    "ANNUAL_OP_TIME": 0.0,
-    "FIXED_COST": 0.0,
-    "VARIABLE_COST": 0.0,
-    "COST_EXP": 0.0,
-    "DISCOUNT_RATE": 0.0,
-    "SERV_LIFE": 0.0,
-    "TURB_P_IN": 0.0,
-    "MIN_EFF": 0.0,
-    "LOAD_FRACTION": 0.0,
-    "ETA_MECH": 0.0,
-}
-
 
 def normalise_payload(payload: TargetInput | JsonDict) -> JsonDict:
     if isinstance(payload, TargetInput):
@@ -785,13 +669,6 @@ def annotation_metadata(
     return "string", False
 
 
-def configuration_group(name: str) -> str:
-    for group, keys in _CONFIG_GROUPS.items():
-        if name in keys:
-            return group
-    return "general"
-
-
 def numeric_delta(base_value: Any, variant_value: Any) -> Optional[float]:
     if isinstance(base_value, bool) or isinstance(variant_value, bool):
         return None
@@ -865,7 +742,6 @@ __all__ = [
     "JsonDict",
     "annotation_metadata",
     "build_validation_report",
-    "configuration_group",
     "graph_catalog_entries",
     "graph_payload_entries",
     "json_safe",
@@ -880,6 +756,4 @@ __all__ = [
     "workflow_support_level",
     "workflow_warnings",
     "zone_tree_view",
-    "_CONFIG_ENUMS",
-    "_CONFIG_MINIMUMS",
 ]

@@ -59,6 +59,7 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
         pt,
         do_vert_cc_calc=zone.config.DO_VERTICAL_GCC,
         do_assisted_ht_calc=zone.config.DO_ASSITED_HT,
+        assisted_ht_dt_cut=zone.config.DT_ASSISTED_HT,
     )
 
     get_utility_targets(

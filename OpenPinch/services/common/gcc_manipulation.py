@@ -32,6 +32,8 @@ def get_additional_GCCs(
     pt: ProblemTable,
     do_vert_cc_calc: bool = False,
     do_assisted_ht_calc: bool = False,
+    assisted_ht_dt_cut: float = 10.0,
+    assisted_ht_dt_cut_min: float = 0.0,
     is_process_stream: bool = True,
 ) -> ProblemTable:
     """Populate derived GCC variants used by utility and integration targeting.
@@ -53,6 +55,8 @@ def get_additional_GCCs(
     # Calculate various GCC profiles
     get_GCC_without_pockets(pt)
 
+    actual_h_net = pt[PT.H_NET_NP]
+
     if do_vert_cc_calc:
         pt.update(
             **get_GCC_with_vertical_heat_transfer(
@@ -62,14 +66,36 @@ def get_additional_GCCs(
                 h_net=pt[PT.H_NET],
             )
         )
+        actual_h_net = pt[PT.H_NET_V]
 
     if do_assisted_ht_calc:
-        pt.update(**get_GGC_pockets(pt))
+        pt.update(
+            **get_GCC_with_partial_pockets(
+                T_col=pt[PT.T],
+                h_net=pt[PT.H_NET],
+                h_net_np=pt[PT.H_NET_NP],
+                dt_cut=assisted_ht_dt_cut,
+                dt_cut_min=assisted_ht_dt_cut_min,
+            )
+        )
+        actual_h_net = pt[PT.H_NET_AI]
+    else:
+        pt.update(
+            **get_GGC_pockets(
+                T_col=pt[PT.T],
+                h_net=pt[PT.H_NET],
+                h_net_np=pt[PT.H_NET_NP],
+            )
+        )
+        pt.update(
+            T_col=pt[PT.T],
+            updates={PT.H_NET_AI: np.asarray(pt[PT.H_NET_NP], dtype=float)},
+        )
 
     pt.update(
         **get_GCC_needing_utility(
             T_col=pt[PT.T],
-            h_net=pt[PT.H_NET_NP],
+            h_net=actual_h_net,
         )
     )
     pt.update(
@@ -110,31 +136,97 @@ def get_GCC_without_pockets(
 
 
 def get_GCC_with_partial_pockets(
-    pt: ProblemTable, dt_cut: float = 10, dt_cut_min: float = 0
-) -> ProblemTable:
-    """Modify PT in-place to reflect assisted GCC and return the GCC_AI result."""
+    T_col: np.ndarray,
+    h_net: np.ndarray,
+    h_net_np: np.ndarray,
+    dt_cut: float = 10,
+    dt_cut_min: float = 0,
+) -> ProblemTableUpdateKwargs:
+    """Return GCC updates for the assisted profile after partially cutting pockets."""
+    dt_cut = max(float(dt_cut), float(dt_cut_min))
 
-    # pt[PT.H_NET_PK] = pt[PT.H_NET] - pt[PT.H_NET_NP]
+    T_col = np.asarray(T_col, dtype=float)
+    h_net = np.asarray(h_net, dtype=float)
+    h_net_np = np.asarray(h_net_np, dtype=float)
+    h_net_pk = _normalise_pocket_profile(np.subtract(h_net, h_net_np))
+    pocket_pt = ProblemTable(
+        {
+            PT.T: T_col,
+            PT.H_NET: h_net,
+            PT.H_NET_NP: h_net_np,
+            PT.H_NET_PK: h_net_pk,
+            PT.H_NET_AI: h_net - h_net_pk,
+        }
+    )
+    if np.nansum(pocket_pt[PT.H_NET_PK]) <= tol * len(pocket_pt):
+        return _assisted_gcc_updates(pocket_pt)
 
-    # if np.sum(pt[PT.H_NET_PK]) < tol * len(pt):
-    #     pt[PT.H_NET_AI] = pt[PT.H_NET]
-    #     return pt
+    scan_idx = 0
+    while True:
+        h_pockets = pocket_pt[PT.H_NET_PK]
+        run_bounds = _next_positive_run(h_pockets, start_idx=scan_idx)
+        if run_bounds is None:
+            break
 
-    # i = len(pt)
-    # while i > 0:
-    #     if pt.loc[i - 1, PT.H_NET_PK] > tol:
-    #         i_lb = i
-    #         for i in range(i, 0, -1):
-    #             if pt.loc[i, PT.H_NET_PK] < tol:
-    #                 break
-    #         i_ub = i
-    #         _compute_pocket_temperature_differences
+        run_start, run_stop = run_bounds
+        if run_start == 0 or run_stop >= len(pocket_pt):
+            scan_idx = run_stop
+            continue
 
-    #     else:
-    #         i += 1
+        t_vals = pocket_pt[PT.T]
+        i_upper = run_start - 1
+        i_lower = run_stop
+        if t_vals[i_upper] - t_vals[i_lower] < dt_cut - tol:
+            scan_idx = run_stop
+            continue
 
-    # pt[PT.H_NET_AI] = pt[PT.H_NET] - pt[PT.H_NET_PK]
-    return pt
+        if i_upper + 2 < i_lower:
+            i_upper, i_lower = _shrink_pocket_to_dt_cut_zone(
+                t_vals=t_vals,
+                h_pockets=h_pockets,
+                i_upper=i_upper,
+                i_lower=i_lower,
+                dt_cut=dt_cut,
+            )
+
+        h_cut = _solve_assisted_pocket_cut_height(
+            t_vals=t_vals,
+            h_pockets=h_pockets,
+            i_upper=i_upper,
+            i_lower=i_lower,
+            dt_cut=dt_cut,
+        )
+        if h_cut is None or h_cut <= tol:
+            scan_idx = run_stop
+            continue
+
+        cut_temps = _cut_temperatures_needing_insertion(
+            t_vals=t_vals,
+            h_pockets=h_pockets,
+            i_upper=i_upper,
+            i_lower=i_lower,
+            h_cut=h_cut,
+            dt_cut=dt_cut,
+        )
+        if cut_temps.size > 0:
+            pocket_pt.insert_temperature_interval(cut_temps)
+            h_pockets = pocket_pt[PT.H_NET_PK]
+            run_bounds = _next_positive_run(h_pockets, start_idx=max(i_upper, 0))
+            if run_bounds is None:
+                break
+            run_start, run_stop = run_bounds
+
+        _apply_h_cut_to_positive_run(
+            h_pockets=pocket_pt[PT.H_NET_PK],
+            run_start=run_start,
+            run_stop=run_stop,
+            h_cut=h_cut,
+        )
+        scan_idx = run_stop
+
+    pocket_pt[PT.H_NET_PK] = _normalise_pocket_profile(pocket_pt[PT.H_NET_PK])
+    pocket_pt[PT.H_NET_AI] = pocket_pt[PT.H_NET] - pocket_pt[PT.H_NET_PK]
+    return _assisted_gcc_updates(pocket_pt)
 
 
 def get_GCC_with_vertical_heat_transfer(
@@ -143,7 +235,7 @@ def get_GCC_with_vertical_heat_transfer(
     h_hot: np.ndarray,
     h_net: np.ndarray,
 ) -> ProblemTableUpdateKwargs:
-    """Return the extreme GCC where heat transfer on the composite curves is vertical."""
+    """Return the extreme GCC with vertical heat transfer on the composite curves."""
     h_cold = np.asarray(h_cold)
     h_hot = np.asarray(h_hot)
     h_net = np.asarray(h_net)
@@ -168,11 +260,20 @@ def get_GCC_needing_utility(
     return {"T_col": T_col, "updates": {PT.H_NET_A: h_net}}
 
 
-def get_GGC_pockets(pt: ProblemTable) -> ProblemTableUpdateKwargs:
-    """Store GCC pocket contribution (difference between real and pocket-free profiles)."""
-    h_net_pk = np.subtract(pt[PT.H_NET], pt[PT.H_NET_NP])
-    pt[PT.H_NET_PK] = h_net_pk
-    return {"T_col": pt[PT.T], "updates": {PT.H_NET_PK: h_net_pk}}
+def get_GGC_pockets(
+    T_col: np.ndarray,
+    h_net: np.ndarray,
+    h_net_np: np.ndarray,
+) -> ProblemTableUpdateKwargs:
+    """Store GCC pocket contribution.
+
+    This is the difference between the real and pocket-free GCC profiles.
+    """
+    h_net_pk = _normalise_pocket_profile(np.subtract(h_net, h_net_np))
+    return {
+        "T_col": np.asarray(T_col, dtype=float),
+        "updates": {PT.H_NET_PK: h_net_pk},
+    }
 
 
 def get_seperated_gcc_heat_load_profiles(
@@ -181,7 +282,7 @@ def get_seperated_gcc_heat_load_profiles(
     rcp_net: np.ndarray = None,
     is_process_stream: bool = True,
 ) -> ProblemTableUpdateKwargs:
-    """Determines the net required heating or cooling profile of a system from the GCC."""
+    """Determine the net required heating or cooling profile from the GCC."""
     # Calculate ΔH differences
     dh_diff = delta_with_zero_at_start(H_net)
 
@@ -241,7 +342,7 @@ def _remove_pockets_on_one_side_of_the_pinch(
     cold_pinch_loc: int = None,
     is_above_pinch: bool = True,
 ) -> Tuple[ProblemTable, ProblemTable]:
-    """Iteratively eliminate pockets above or below the pinch by flattening enthalpy spans."""
+    """Iteratively eliminate pockets above or below the pinch."""
 
     # Settings for removing pocket segments for above/below the pinch
     if is_above_pinch:
@@ -312,11 +413,176 @@ def _pocket_exit_index(H_vals: np.ndarray, i_0: int, pinch_loc: int, sgn: int) -
         return pinch_loc
 
 
-# def Calc_GCC_AI(z, pt_real, GCC_N):
-#     """Returns a simplified array for the assisted integration GCC.
-#     """
-#     GCC_AI = [ [ None for j in range(len(pt_real[0]))] for i in range(2)]
-#     for i in range(len(pt_real[0])):
-#         GCC_AI[0][i] = pt_real[0][i]
-#         GCC_AI[1][i] = pt_real[PT.H_NET.value][i] - GCC_N[1][i]
-#     return GCC_AI
+def _assisted_gcc_updates(pocket_pt: ProblemTable) -> ProblemTableUpdateKwargs:
+    """Return aligned assisted GCC updates from a local pocket ProblemTable."""
+    return {
+        "T_col": pocket_pt[PT.T],
+        "updates": {
+            PT.H_NET_PK: pocket_pt[PT.H_NET_PK],
+            PT.H_NET_AI: pocket_pt[PT.H_NET_AI],
+        },
+    }
+
+
+def _normalise_pocket_profile(h_pockets: np.ndarray) -> np.ndarray:
+    """Clamp a pocket profile to non-negative values and zero near-tolerance noise."""
+    h_pockets = np.clip(np.asarray(h_pockets, dtype=float), 0.0, None)
+    h_pockets[np.abs(h_pockets) <= tol] = 0.0
+    return h_pockets
+
+
+def _next_positive_run(
+    h_pockets: np.ndarray,
+    start_idx: int = 0,
+) -> tuple[int, int] | None:
+    """Return ``(start, stop)`` for the next contiguous positive pocket run."""
+    positive_idx = np.flatnonzero(h_pockets[start_idx:] > tol)
+    if positive_idx.size == 0:
+        return None
+
+    run_start = start_idx + int(positive_idx[0])
+    non_positive_idx = np.flatnonzero(h_pockets[run_start:] <= tol)
+    run_stop = (
+        run_start + int(non_positive_idx[0])
+        if non_positive_idx.size > 0
+        else h_pockets.size
+    )
+    return run_start, run_stop
+
+
+def _shrink_pocket_to_dt_cut_zone(
+    t_vals: np.ndarray,
+    h_pockets: np.ndarray,
+    i_upper: int,
+    i_lower: int,
+    dt_cut: float,
+) -> tuple[int, int]:
+    """Restrict a pocket to the top and bottom segments that bracket the cut region."""
+    k = i_lower
+    j_top = i_upper + 1
+    for j_top in range(i_upper + 1, i_lower):
+        while k > j_top and h_pockets[j_top] - h_pockets[k] > tol:
+            k -= 1
+        if abs(t_vals[j_top] - t_vals[k]) <= dt_cut + tol or j_top + 1 >= k:
+            break
+    i_upper = j_top - 1
+
+    k = i_upper
+    j_bottom = i_lower - 1
+    for j_bottom in range(i_lower - 1, i_upper, -1):
+        while k < j_bottom and h_pockets[j_bottom] - h_pockets[k] > tol:
+            k += 1
+        if abs(t_vals[j_bottom] - t_vals[k]) <= dt_cut + tol or j_bottom <= k:
+            break
+    i_lower = j_bottom + 1
+    return i_upper, i_lower
+
+
+def _solve_assisted_pocket_cut_height(
+    t_vals: np.ndarray,
+    h_pockets: np.ndarray,
+    i_upper: int,
+    i_lower: int,
+    dt_cut: float,
+) -> float | None:
+    """Return the cut height solving ``T_hot(H) - T_cold(H) = dt_cut``."""
+    dh_top = h_pockets[i_upper] - h_pockets[i_upper + 1]
+    dh_bottom = h_pockets[i_lower - 1] - h_pockets[i_lower]
+    if abs(dh_top) <= tol or abs(dh_bottom) <= tol:
+        return None
+
+    m1 = (t_vals[i_upper] - t_vals[i_upper + 1]) / dh_top
+    c1 = t_vals[i_upper] - m1 * h_pockets[i_upper]
+    m2 = (t_vals[i_lower - 1] - t_vals[i_lower]) / dh_bottom
+    c2 = t_vals[i_lower] - m2 * h_pockets[i_lower]
+
+    denom = m2 - m1
+    if abs(denom) <= tol:
+        return None
+
+    h_cut = (c1 - c2 - dt_cut) / denom
+    if not np.isfinite(h_cut):
+        return None
+
+    hot_bounds = sorted((h_pockets[i_upper], h_pockets[i_upper + 1]))
+    cold_bounds = sorted((h_pockets[i_lower - 1], h_pockets[i_lower]))
+    h_min = max(hot_bounds[0], cold_bounds[0])
+    h_max = min(hot_bounds[1], cold_bounds[1])
+
+    if h_cut < h_min - tol or h_cut > h_max + tol:
+        return None
+    return min(max(h_cut, h_min), h_max)
+
+
+def _cut_temperatures_needing_insertion(
+    t_vals: np.ndarray,
+    h_pockets: np.ndarray,
+    i_upper: int,
+    i_lower: int,
+    h_cut: float,
+    dt_cut: float,
+) -> np.ndarray:
+    """Return new breakpoint temperatures for the residual ``h_cut`` intersections."""
+    if not (
+        i_upper < i_lower - 1
+        and t_vals[i_upper + 1] - t_vals[i_lower - 1] - dt_cut < -tol
+    ):
+        return np.empty(0, dtype=float)
+
+    cut_temps = [
+        temp
+        for temp in (
+            _segment_cut_temperature(
+                t_vals=t_vals,
+                h_pockets=h_pockets,
+                left_idx=i_upper,
+                right_idx=i_upper + 1,
+                h_cut=h_cut,
+            ),
+            _segment_cut_temperature(
+                t_vals=t_vals,
+                h_pockets=h_pockets,
+                left_idx=i_lower - 1,
+                right_idx=i_lower,
+                h_cut=h_cut,
+            ),
+        )
+        if temp is not None
+    ]
+    if not cut_temps:
+        return np.empty(0, dtype=float)
+    return np.asarray(cut_temps, dtype=float)
+
+
+def _segment_cut_temperature(
+    t_vals: np.ndarray,
+    h_pockets: np.ndarray,
+    left_idx: int,
+    right_idx: int,
+    h_cut: float,
+) -> float | None:
+    """Return the breakpoint temperature where one segment crosses ``h_cut``."""
+    if (
+        abs(h_pockets[left_idx] - h_cut) <= tol
+        or abs(h_pockets[right_idx] - h_cut) <= tol
+    ):
+        return None
+
+    return linear_interpolation(
+        h_cut,
+        h_pockets[right_idx],
+        h_pockets[left_idx],
+        t_vals[right_idx],
+        t_vals[left_idx],
+    )
+
+
+def _apply_h_cut_to_positive_run(
+    h_pockets: np.ndarray,
+    run_start: int,
+    run_stop: int,
+    h_cut: float,
+) -> None:
+    """Apply the cut height across one positive run and clip exhausted tails to zero."""
+    segment = slice(run_start, run_stop)
+    h_pockets[segment] = _normalise_pocket_profile(h_pockets[segment] - h_cut)

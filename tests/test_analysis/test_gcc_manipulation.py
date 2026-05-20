@@ -99,6 +99,56 @@ def test_get_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
     assert result["updates"][PT.H_NET_V][-1] == 50  # Bottom-out should zero
 
 
+def test_get_gcc_with_partial_pockets_cuts_pocket_and_inserts_breakpoints():
+    pt = ProblemTable(
+        {
+            PT.T: [200.0, 150.0, 100.0, 50.0, 0.0],
+            PT.H_NET: [0.0, 50.0, 100.0, 50.0, 0.0],
+            PT.H_NET_NP: [0.0, 0.0, 0.0, 0.0, 0.0],
+        }
+    )
+
+    result = get_GCC_with_partial_pockets(
+        T_col=pt[PT.T],
+        h_net=pt[PT.H_NET],
+        h_net_np=pt[PT.H_NET_NP],
+        dt_cut=60.0,
+    )
+
+    assert np.allclose(result["T_col"], [200.0, 150.0, 130.0, 100.0, 70.0, 50.0, 0.0])
+    assert np.allclose(
+        result["updates"][PT.H_NET_PK],
+        [0.0, 0.0, 0.0, 30.0, 0.0, 0.0, 0.0],
+    )
+    assert np.allclose(
+        result["updates"][PT.H_NET_AI],
+        [0.0, 50.0, 70.0, 70.0, 70.0, 50.0, 0.0],
+    )
+
+
+def test_get_additional_gccs_uses_assisted_profile_as_actual_when_enabled():
+    pt = ProblemTable(
+        {
+            PT.T: [200.0, 150.0, 100.0, 50.0, 0.0],
+            PT.H_NET: [0.0, 50.0, 100.0, 50.0, 0.0],
+        }
+    )
+
+    result = get_additional_GCCs(
+        pt,
+        do_assisted_ht_calc=True,
+        assisted_ht_dt_cut=60.0,
+    )
+
+    assert np.allclose(result[PT.T], [200.0, 150.0, 130.0, 100.0, 70.0, 50.0, 0.0])
+    assert np.allclose(result[PT.H_NET_NP], np.zeros(7))
+    assert np.allclose(result[PT.H_NET_A], result[PT.H_NET_AI])
+    assert np.allclose(
+        result[PT.H_NET_A],
+        [0.0, 50.0, 70.0, 70.0, 70.0, 50.0, 0.0],
+    )
+
+
 def test_get_GCC_needing_utility_combines_columns():
     pt = ProblemTable({PT.H_NET_NP: [100, 200, 300]})
 
