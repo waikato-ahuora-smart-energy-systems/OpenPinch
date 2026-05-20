@@ -9,14 +9,9 @@ scratch.
 Command-Line Interface
 ----------------------
 
-The CLI supports:
+The published package currently exposes one CLI subcommand:
 
-- ``run`` for end-to-end analysis and export
-- ``graph`` for HTML graph export
-- ``validate`` for payload preflight checks
-- ``sample`` for copying packaged sample cases
 - ``notebook`` for copying packaged example notebooks
-- ``heat-pump`` for evaluating an integrated Heat Pump scenario against a case
 
 .. automodule:: OpenPinch.__main__
    :members:
@@ -64,6 +59,11 @@ Dashboard Surface
 OpenPinch also includes a Streamlit-oriented graphing and dashboard path for
 interactive exploration after solving a problem. Install
 ``openpinch[dashboard]`` before using this surface.
+
+The repository-level ``streamlit_app.py`` module is documented here as a local
+demo entrypoint for contributors. It is not part of the published wheel. For
+installed package usage, prefer :meth:`OpenPinch.PinchProblem.show_dashboard`
+or :func:`OpenPinch.streamlit_webviewer.web_graphing.render_streamlit_dashboard`.
 
 .. automodule:: streamlit_app
    :members:

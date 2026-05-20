@@ -5,62 +5,29 @@ from __future__ import annotations
 import subprocess
 import sys
 import tarfile
-from importlib.util import find_spec
 from pathlib import Path
-from shutil import which
 from zipfile import ZipFile
 
 import pytest
-
-
-def _build_command(out_dir: Path) -> list[str] | None:
-    """Return a build command for the active interpreter or the uv dev env."""
-    if find_spec("build") is not None:
-        return [
-            sys.executable,
-            "-m",
-            "build",
-            "--wheel",
-            "--sdist",
-            "--no-isolation",
-            "--outdir",
-            str(out_dir),
-        ]
-
-    uv_bin = which("uv")
-    if uv_bin is None:
-        return None
-
-    return [
-        uv_bin,
-        "run",
-        "--group",
-        "dev",
-        "python",
-        "-m",
-        "build",
-        "--wheel",
-        "--sdist",
-        "--no-isolation",
-        "--outdir",
-        str(out_dir),
-    ]
 
 
 def _build_artifacts(tmp_path: Path) -> tuple[Path, list[str], list[str]]:
     repo_root = Path(__file__).resolve().parents[1]
     out_dir = tmp_path / "dist"
     out_dir.mkdir()
-    command = _build_command(out_dir)
-    if command is None:
-        pytest.skip("release artifact build requires the 'build' module or uv")
-
     proc = subprocess.run(
-        command,
+        [
+            sys.executable,
+            "scripts/build_dist.py",
+            "--output-dir",
+            str(out_dir),
+        ],
         cwd=repo_root,
         capture_output=True,
         text=True,
     )
+    if proc.returncode != 0 and "Unable to build distributions" in proc.stderr:
+        pytest.skip("release artifact build requires the 'build' module or uv")
     assert proc.returncode == 0, proc.stderr
 
     wheel_paths = sorted(out_dir.glob("*.whl"))

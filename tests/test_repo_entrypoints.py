@@ -66,6 +66,22 @@ def test_root_init_script_executes():
     assert any(item.category is DeprecationWarning for item in caught)
 
 
+def test_build_dist_script_help_executes(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["python", "--help"])
+    namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "build_dist.py"))
+
+    with pytest.raises(SystemExit, match="0"):
+        namespace["main"](["--help"])
+
+
+def test_optional_install_smoke_script_help_executes(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["python", "--help"])
+    namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "optional_install_smoke.py"))
+
+    with pytest.raises(SystemExit, match="0"):
+        namespace["main"](["--help"])
+
+
 def test_repo_main_script_executes(monkeypatch, tmp_path: Path):
     notebook_dir = tmp_path / "notebooks"
     monkeypatch.setattr(

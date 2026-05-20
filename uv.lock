@@ -955,7 +955,6 @@ dev = [
     { name = "plotly" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pyxlsb" },
-    { name = "ruff", specifier = ">=0.1.8" },
     { name = "ruff", specifier = ">=0.15.8" },
     { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },

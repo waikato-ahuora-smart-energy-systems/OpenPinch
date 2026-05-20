@@ -101,8 +101,8 @@ workflows depend on.
 .. automodule:: OpenPinch.services.common.graph_data
    :members:
 
-Advanced Analyses
------------------
+Advanced Add-On Analyses
+------------------------
 
 The modules below expose specialised calculations that sit on top of the core
 Problem Table workflow. Some are used automatically when corresponding options
@@ -124,11 +124,19 @@ optimisers and helper modules. The main low-level entrypoints remain
 .. automodule:: OpenPinch.services.power_cogeneration_analysis
    :members:
 
+Experimental or Partial Analysis Modules
+----------------------------------------
+
+The modules below remain visible for codebase orientation and restoration work,
+but they should not be read as stable production workflows. They are present in
+the repository with partial implementations, commented stubs, or incomplete
+workflow documentation.
+
 .. automodule:: OpenPinch.services.exergy_analysis
    :no-members:
 
 .. automodule:: OpenPinch.services.exergy_analysis.exergy_targeting_entry
-   :members:
+   :no-members:
 
 .. automodule:: OpenPinch.services.energy_transfer_analysis
    :no-members:

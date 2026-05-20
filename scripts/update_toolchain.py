@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import tomllib
 from pathlib import Path
 from shutil import which
 
@@ -13,11 +14,24 @@ def _run(cmd: list[str], *, cwd: Path) -> None:
         raise SystemExit(proc.returncode)
 
 
+def _read_python_minor(repo_root: Path) -> str:
+    """Read the pinned Python minor version from ``pyproject.toml``."""
+    with (repo_root / "pyproject.toml").open("rb") as handle:
+        data = tomllib.load(handle)
+
+    requires_python = data["project"]["requires-python"]
+    if not requires_python.startswith(">="):
+        raise ValueError(
+            "Expected project.requires-python to start with '>=' for toolchain sync."
+        )
+    return requires_python.removeprefix(">=")
+
+
 def main() -> int:
     """Refresh the pinned Python toolchain, lockfile, and synced dev env."""
     repo_root = Path(__file__).resolve().parents[1]
     uv_bin = which("uv") or "/opt/homebrew/bin/uv"
-    python_minor = "3.14"
+    python_minor = _read_python_minor(repo_root)
 
     _run(
         [

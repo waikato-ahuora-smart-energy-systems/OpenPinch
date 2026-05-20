@@ -7,16 +7,11 @@ maintenance and hardening backlog based on the current repository state.
 
 ## Verified Baseline
 
-- `uv run pytest -q` passes: `833 passed in 30.90s`.
+- `uv run pytest -q` passes: `840 passed in 30.73s`.
 - `uv run pytest -q tests/test_release_artifacts.py tests/test_docs_build.py`
   passes.
-- `uv run python -m build --wheel --sdist --no-isolation` passes.
+- `uv run python scripts/build_dist.py` passes.
 - `uv run ruff check .` passes.
-- Docs build smoke and release artifact boundary checks are covered by the
-  default test suite and now tolerate either direct tool availability or the
-  `uv` dev environment.
-- Package barrel modules now use direct named imports rather than dynamic
-  helper-based re-export logic.
 
 ## Current Debt Snapshot
 
@@ -51,8 +46,7 @@ Why this matters:
 - `PinchProblem` currently mixes loading, validation, source normalization,
   zone-tree preparation, targeting orchestration, comparison helpers, Excel
   export, dashboard launch, and error formatting.
-- The earlier partial-dataclass/property-collision state has been removed, but
-  the class still owns too many responsibilities and too much mutable state.
+- The class still owns too many responsibilities and too much mutable state.
 
 What to do:
 
@@ -145,81 +139,14 @@ Done when:
 - There is no ambiguity about what is supported versus merely present in the
   repository.
 
-## Next
-
-### 5. Fix documentation contradictions and widen docs drift checks
-
-Why this matters:
-
-- `docs/overview/support-and-stability.rst` still claims stable CLI commands
-  for `run`, `graph`, `validate`, and `sample`, but the actual CLI currently
-  exposes only `notebook`.
-- Existing docs consistency tests do not cover that page, so the contradiction
-  slipped through.
-
-What to do:
-
-- Align support/stability pages with the real CLI and public API.
-- Extend docs consistency coverage to overview/support pages, not just the
-  quickstart and guide set.
-- Review API reference pages for modules that should not be elevated as normal
-  user-facing workflows.
-
-Done when:
-
-- The docs tell one coherent story about what users can actually call today.
-
-### 6. Add clean-install testing for optional dependency boundaries
-
-Why this matters:
-
-- The repository advertises `dashboard`, `notebook`, and `brayton_cycle`
-  extras.
-- The current test environment installs the dev surface, so base-install
-  behavior is not being proven separately.
-- Import guards exist in several places, but that is not the same as having a
-  tested extra matrix.
-
-What to do:
-
-- Add smoke tests for a core install with no extras.
-- Add separate smoke tests for `dashboard`, `notebook`, and `brayton_cycle`
-  installs.
-- Verify both import behavior and small entrypoint calls under the right extra.
-
-Done when:
-
-- The claimed optional dependency model is verified instead of assumed.
-
-### 7. Clean up packaging and toolchain metadata
-
-Why this matters:
-
-- The build is healthy right now, but some metadata still needs attention.
-- `pyproject.toml` has small cleanup debt such as duplicate `ruff` entries in
-  the dev dependency group.
-- `requires-python = ">=3.14"` may be correct, but it should be an intentional
-  policy backed by code and CI, not a floor that simply stayed in place.
-
-What to do:
-
-- Deduplicate dependency declarations.
-- Confirm the minimum supported Python version and test it intentionally.
-- Keep build commands centralized so docs, CI, and local workflows use the same
-  path.
-
-Done when:
-
-- Packaging metadata is minimal, intentional, and verified.
-
 ## Later
 
-### 8. Performance and memory profiling for larger studies
+### 5. Performance and memory profiling for larger studies
 
 Do this after the structural refactors above. Profiling a monolith before it is
 cleanly separated tends to produce noisy results and hard-to-apply findings.
 
-### 9. Bundle evolution and migration policy
+### 6. Bundle evolution and migration policy
 
 `PinchWorkspace` persistence is already functional. Once the workspace layer is
 refactored, add explicit versioning, migration rules, and cache-compatibility
