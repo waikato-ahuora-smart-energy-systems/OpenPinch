@@ -295,6 +295,218 @@ class Stream:
         """Set the shifted upper temperature bound."""
         self._t_max_star = value
 
+    # === Readable Alias Properties ===
+
+    @property
+    def stream_type(self) -> Optional[str]:
+        """Alias for the stream thermal type."""
+        return self.type
+
+    @stream_type.setter
+    def stream_type(self, value: str):
+        """Set the stream thermal type via a descriptive alias."""
+        self.type = value
+
+    @property
+    def process_stream(self) -> bool:
+        """Alias for whether the stream is process-side."""
+        return self.is_process_stream
+
+    @process_stream.setter
+    def process_stream(self, value: bool):
+        """Set whether the stream is process-side via a descriptive alias."""
+        self.is_process_stream = value
+
+    @property
+    def is_active(self) -> bool:
+        """Alias for whether the stream participates in analysis."""
+        return self.active
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        """Activate or deactivate the stream via a descriptive alias."""
+        self.active = value
+
+    @property
+    def supply_temperature(self) -> Optional[float]:
+        """Alias for the supply temperature."""
+        return self.t_supply
+
+    @supply_temperature.setter
+    def supply_temperature(self, value: float):
+        """Set the supply temperature via a descriptive alias."""
+        self.t_supply = value
+
+    @property
+    def target_temperature(self) -> Optional[float]:
+        """Alias for the target temperature."""
+        return self.t_target
+
+    @target_temperature.setter
+    def target_temperature(self, value: float):
+        """Set the target temperature via a descriptive alias."""
+        self.t_target = value
+
+    @property
+    def minimum_temperature(self) -> Optional[float]:
+        """Alias for the minimum stream temperature."""
+        return self.t_min
+
+    @minimum_temperature.setter
+    def minimum_temperature(self, value: float):
+        """Set the minimum stream temperature via a descriptive alias."""
+        self.t_min = value
+
+    @property
+    def maximum_temperature(self) -> Optional[float]:
+        """Alias for the maximum stream temperature."""
+        return self.t_max
+
+    @maximum_temperature.setter
+    def maximum_temperature(self, value: float):
+        """Set the maximum stream temperature via a descriptive alias."""
+        self.t_max = value
+
+    @property
+    def shifted_minimum_temperature(self) -> Optional[float]:
+        """Alias for the shifted minimum stream temperature."""
+        return self.t_min_star
+
+    @shifted_minimum_temperature.setter
+    def shifted_minimum_temperature(self, value: float):
+        """Set the shifted minimum stream temperature via a descriptive alias."""
+        self.t_min_star = value
+
+    @property
+    def shifted_maximum_temperature(self) -> Optional[float]:
+        """Alias for the shifted maximum stream temperature."""
+        return self.t_max_star
+
+    @shifted_maximum_temperature.setter
+    def shifted_maximum_temperature(self, value: float):
+        """Set the shifted maximum stream temperature via a descriptive alias."""
+        self.t_max_star = value
+
+    @property
+    def supply_pressure(self) -> Optional[float]:
+        """Alias for the supply pressure."""
+        return self.P_supply
+
+    @supply_pressure.setter
+    def supply_pressure(self, value: float):
+        """Set the supply pressure via a descriptive alias."""
+        self.P_supply = value
+
+    @property
+    def target_pressure(self) -> Optional[float]:
+        """Alias for the target pressure."""
+        return self.P_target
+
+    @target_pressure.setter
+    def target_pressure(self, value: float):
+        """Set the target pressure via a descriptive alias."""
+        self.P_target = value
+
+    @property
+    def supply_enthalpy(self) -> Optional[float]:
+        """Alias for the supply enthalpy."""
+        return self.h_supply
+
+    @supply_enthalpy.setter
+    def supply_enthalpy(self, value: float):
+        """Set the supply enthalpy via a descriptive alias."""
+        self.h_supply = value
+
+    @property
+    def target_enthalpy(self) -> Optional[float]:
+        """Alias for the target enthalpy."""
+        return self.h_target
+
+    @target_enthalpy.setter
+    def target_enthalpy(self, value: float):
+        """Set the target enthalpy via a descriptive alias."""
+        self.h_target = value
+
+    @property
+    def delta_t_contribution(self) -> float:
+        """Alias for the base shifted-temperature contribution."""
+        return self.dt_cont
+
+    @delta_t_contribution.setter
+    def delta_t_contribution(self, value: float):
+        """Set the base shifted-temperature contribution via an alias."""
+        self.dt_cont = value
+
+    @property
+    def effective_delta_t_contribution(self) -> float:
+        """Alias for the effective shifted-temperature contribution."""
+        return self.dt_cont_act
+
+    @effective_delta_t_contribution.setter
+    def effective_delta_t_contribution(self, value: float):
+        """Set the effective shifted-temperature contribution via an alias."""
+        self.dt_cont_act = value
+
+    @property
+    def heat_duty(self) -> float:
+        """Alias for the stream heat flow."""
+        return self.heat_flow
+
+    @heat_duty.setter
+    def heat_duty(self, value: float):
+        """Set the stream heat flow via a descriptive alias."""
+        self.heat_flow = value
+
+    @property
+    def heat_transfer_coefficient(self) -> float:
+        """Alias for the heat-transfer coefficient."""
+        return self.htc
+
+    @heat_transfer_coefficient.setter
+    def heat_transfer_coefficient(self, value: float):
+        """Set the heat-transfer coefficient via a descriptive alias."""
+        self.htc = value
+
+    @property
+    def heat_transfer_resistance(self) -> float:
+        """Alias for the heat-transfer resistance."""
+        return self.htr
+
+    @heat_transfer_resistance.setter
+    def heat_transfer_resistance(self, value: float):
+        """Set the heat-transfer resistance via a descriptive alias."""
+        self.htr = value
+
+    @property
+    def utility_cost(self) -> float:
+        """Alias for the cached utility cost."""
+        return self.ut_cost
+
+    @utility_cost.setter
+    def utility_cost(self, value: float):
+        """Set the cached utility cost via a descriptive alias."""
+        self.ut_cost = value
+
+    @property
+    def heat_capacity_flow_rate(self) -> float:
+        """Alias for the stream heat-capacity flow rate."""
+        return self.CP
+
+    @heat_capacity_flow_rate.setter
+    def heat_capacity_flow_rate(self, value: float):
+        """Set the heat-capacity flow rate via a descriptive alias."""
+        self.CP = value
+
+    @property
+    def resistance_capacity_product(self) -> Optional[float]:
+        """Alias for the stream resistance-capacity product."""
+        return self.rCP
+
+    @resistance_capacity_product.setter
+    def resistance_capacity_product(self, value: float):
+        """Set the resistance-capacity product via a descriptive alias."""
+        self.rCP = value
+
     # === Methods ===
 
     def _update_attributes(self) -> None:
