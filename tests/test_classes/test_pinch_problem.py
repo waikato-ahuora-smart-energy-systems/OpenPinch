@@ -1164,3 +1164,47 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     net_stream = area.net_hot_streams[0]
     assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
     assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)
+
+
+def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_streams():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+    problem.target()
+
+    problem.set_dt_cont_multiplier(0.5, zone_name="AreaA")
+    problem.target()
+
+    area = problem.master_zone.get_subzone("AreaA")
+    cold_utility = next(
+        utility for utility in area.cold_utilities if utility.name == "CU"
+    )
+
+    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 0.5)
+    assert cold_utility.t_supply == pytest.approx(115.0)
+    assert cold_utility.t_target == pytest.approx(115.01)
+    assert len(area.net_hot_streams) > 0
+
+    net_stream = area.net_hot_streams[0]
+    assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
+    assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)
