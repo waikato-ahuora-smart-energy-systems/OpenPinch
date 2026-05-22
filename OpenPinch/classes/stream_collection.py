@@ -61,13 +61,17 @@ class StreamCollection:
 
     def add(self, stream, key: str = None, prevent_overwrite: bool = True):
         """Insert a stream, optionally renaming the key to avoid collisions."""
+        base_name = new_name = stream.name
         if key is None:
-            key = stream.name
+            key = base_name
+
         original_key = key
         counter = 1
         while prevent_overwrite and key in self._streams:
             key = f"{original_key}_{counter}"
+            new_name = f"{base_name}_{counter}"
             counter += 1
+        stream.name = new_name
         self._streams[key] = stream
         self._needs_sort = True
 

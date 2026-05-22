@@ -19,7 +19,8 @@
             "cwd": "${workspaceFolder}", 
             "args": [
                 // "-s",
-                "tests/test_classes/test_pinch_problem.py",
+                "tests/test_analysis/test_data_preparation.py",
+                // "tests/test_classes/test_pinch_problem.py",
                 // "tests/test_classes/test_cascade_heat_pump_cycle.py",
                 // "tests/test_utils/test_optimiser_handles.py",
                 // "tests/test_utils/test_export.py",

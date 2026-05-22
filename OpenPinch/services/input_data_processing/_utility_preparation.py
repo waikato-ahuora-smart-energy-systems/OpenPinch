@@ -118,7 +118,7 @@ def _complete_utility_data(
         if (
             utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
-            and max(utility.t_supply, utility.t_target) + effective_dt_cont <= cu_t_max
+            and max(utility.t_supply, utility.t_target) - effective_dt_cont <= cu_t_max
         ):
             add_default_cu = False
     return utilities, add_default_hu, add_default_cu

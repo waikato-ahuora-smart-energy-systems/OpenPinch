@@ -337,7 +337,8 @@ def test_duplicate_stream_names():
     ]
     site = prepare_problem(streams=streams)
     names = [s.name for z in site.subzones.values() for s in z.process_streams]
-    assert names.count("DupStream") == 2
+    assert names.count("DupStream") == 1
+    assert names.count("DupStream_1") == 1
 
 
 def test_inactive_utilities_are_ignored(dummy_streams):
