@@ -54,6 +54,7 @@ from ._problem.validation import (
 )
 from .accessors.plot_accessor import _PlotAccessorDescriptor
 from .accessors.target_accessor import _TargetAccessorDescriptor
+from .stream_collection import StreamCollection
 from .zone import Zone
 
 ZoneService = Callable[["Zone"], "Zone"]
@@ -297,8 +298,28 @@ class PinchProblem:
 
     @property
     def master_zone(self) -> Optional["Zone"]:
-        """Return the analysed Zone hierarchy after a successful ``target()`` run."""
+        """Return the prepared root zone after a successful ``load()`` pass."""
         return self._master_zone
+
+    @property
+    def hot_streams(self) -> StreamCollection:
+        """Hot process streams on the root analysis zone."""
+        return self._require_prepared_root_zone().hot_streams
+
+    @property
+    def cold_streams(self) -> StreamCollection:
+        """Cold process streams on the root analysis zone."""
+        return self._require_prepared_root_zone().cold_streams
+
+    @property
+    def hot_utilities(self) -> StreamCollection:
+        """Hot utility streams on the root analysis zone."""
+        return self._require_prepared_root_zone().hot_utilities
+
+    @property
+    def cold_utilities(self) -> StreamCollection:
+        """Cold utility streams on the root analysis zone."""
+        return self._require_prepared_root_zone().cold_utilities
 
     @property
     def project_name(self) -> str:
@@ -425,6 +446,14 @@ class PinchProblem:
             raise RuntimeError("No analysed zone is available. Run target() first.")
         self._results = TargetOutput.model_validate(extract_results(self._master_zone))
         return self._results
+
+    def _require_prepared_root_zone(self) -> Zone:
+        """Return the prepared root zone, rebuilding it lazily when possible."""
+        if self._master_zone is None:
+            if self._problem_data is None:
+                raise RuntimeError("No input loaded. Call load(...) first.")
+            return self._rebuild_problem_state()
+        return self._master_zone
 
     def _problem_source_adapters(self) -> ProblemSourceAdapters:
         """Build source adapters lazily so tests can monkeypatch module symbols."""

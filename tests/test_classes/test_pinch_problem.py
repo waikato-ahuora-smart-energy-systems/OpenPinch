@@ -313,6 +313,74 @@ def test_problem_data_and_master_zone_properties():
     assert obj.master_zone == {"z": 1}
 
 
+def test_root_stream_views_are_exposed_on_problem():
+    payload = {
+        "options": {"DT_CONT": 10},
+        "streams": [
+            {
+                "zone": "Area1",
+                "name": "H1",
+                "t_supply": 180.0,
+                "t_target": 90.0,
+                "heat_flow": 100.0,
+                "dtcont": 5.0,
+            },
+            {
+                "zone": "Area1",
+                "name": "C1",
+                "t_supply": 40.0,
+                "t_target": 120.0,
+                "heat_flow": 80.0,
+                "dtcont": 5.0,
+            },
+        ],
+        "utilities": [
+            {"name": "Steam", "t_supply": 220.0, "type": "Hot", "cost": 20.0},
+            {"name": "CW", "t_supply": 25.0, "type": "Cold", "cost": 5.0},
+        ],
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    assert problem.hot_streams is problem.master_zone.hot_streams
+    assert problem.cold_streams is problem.master_zone.cold_streams
+    assert problem.hot_utilities is problem.master_zone.hot_utilities
+    assert problem.cold_utilities is problem.master_zone.cold_utilities
+
+
+def test_root_stream_views_require_loaded_problem():
+    problem = PinchProblem()
+
+    with pytest.raises(RuntimeError, match="No input loaded"):
+        _ = problem.hot_streams
+
+
+def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
+    payload = {
+        "options": {"DT_CONT": 10},
+        "streams": [
+            {
+                "zone": "Area1",
+                "name": "H1",
+                "t_supply": 180.0,
+                "t_target": 90.0,
+                "heat_flow": 100.0,
+                "dtcont": 5.0,
+            }
+        ],
+        "utilities": [],
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    hot_stream = problem.hot_streams["Area1.H1"]
+    hot_stream.t_supply = 195.0
+
+    assert problem.hot_streams["Area1.H1"].t_supply == pytest.approx(195.0)
+    assert problem.master_zone.hot_streams["Area1.H1"].t_supply == pytest.approx(195.0)
+    assert hot_stream.t_max == pytest.approx(195.0)
+
+
 def test_show_dashboard_builds_graph_payload(monkeypatch):
     mod = sys.modules[PinchProblem.__module__]
     captured = {}
