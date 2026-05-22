@@ -59,6 +59,7 @@ class PinchWorkspace:
         | JsonDict
         | PathLike
         | tuple[PathLike, PathLike]
+        | PinchProblem
         | None = None,
         *,
         project_name: Optional[str] = "Site",
@@ -76,32 +77,6 @@ class PinchWorkspace:
             self.load(source, case_name=baseline_name, activate=True)
 
     @classmethod
-    def from_payload(
-        cls,
-        payload: TargetInput | JsonDict,
-        *,
-        baseline_name: str = "baseline",
-        project_name: Optional[str] = None,
-    ) -> "PinchWorkspace":
-        workspace = cls(project_name=project_name, baseline_name=baseline_name)
-        workspace.load(payload, case_name=baseline_name, activate=True)
-        return workspace
-
-    @classmethod
-    def from_problem(
-        cls,
-        problem: PinchProblem,
-        *,
-        baseline_name: str = "baseline",
-    ) -> "PinchWorkspace":
-        workspace = cls(
-            project_name=problem.project_name,
-            baseline_name=baseline_name,
-        )
-        workspace.load(problem, case_name=baseline_name, activate=True)
-        return workspace
-
-    @classmethod
     def from_json(
         cls,
         data: JsonDict,
@@ -109,7 +84,7 @@ class PinchWorkspace:
         baseline_name: str = "baseline",
         project_name: Optional[str] = None,
     ) -> "PinchWorkspace":
-        return cls.from_payload(
+        return cls(
             data,
             baseline_name=baseline_name,
             project_name=project_name,
@@ -442,22 +417,13 @@ class PinchWorkspace:
         """Return the solved summary for one case."""
         return self.case(case_name).summary_frame(detailed=detailed)
 
-    def export_to_Excel(
-        self,
-        results_dir: Optional[PathLike] = None,
-        *,
-        case_name: Optional[str] = None,
-    ) -> Path:
-        """Export one case using :class:`PinchProblem` naming."""
-        return self.case(case_name).export_to_Excel(results_dir)
-
     def export_excel(
         self,
         results_dir: Optional[PathLike] = None,
         *,
         case_name: Optional[str] = None,
     ) -> Path:
-        """Export one case using the snake_case alias."""
+        """Export one case to an Excel workbook."""
         return self.case(case_name).export_excel(results_dir)
 
     def set_dt_cont_multiplier(
@@ -490,23 +456,6 @@ class PinchWorkspace:
         self._sync_case_payload(resolved_name)
         return problem
 
-    def render_streamlit_dashboard(
-        self,
-        *,
-        case_name: Optional[str] = None,
-        zone=None,
-        graph_payload: Optional[dict[str, Any]] = None,
-        page_title: Optional[str] = "OpenPinch Dashboard",
-        value_rounding: int = 2,
-    ) -> None:
-        """Launch the dashboard for one case."""
-        self.case(case_name).render_streamlit_dashboard(
-            zone=zone,
-            graph_payload=graph_payload,
-            page_title=page_title,
-            value_rounding=value_rounding,
-        )
-
     def show_dashboard(
         self,
         *,
@@ -516,9 +465,8 @@ class PinchWorkspace:
         page_title: Optional[str] = "OpenPinch Dashboard",
         value_rounding: int = 2,
     ) -> None:
-        """Alias for :meth:`render_streamlit_dashboard`."""
-        self.render_streamlit_dashboard(
-            case_name=case_name,
+        """Launch the dashboard for one case."""
+        self.case(case_name).show_dashboard(
             zone=zone,
             graph_payload=graph_payload,
             page_title=page_title,

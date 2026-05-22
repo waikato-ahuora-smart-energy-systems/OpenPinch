@@ -40,4 +40,4 @@ if __name__ == "__main__":
     validate_problem_path(problem_path)
 
     problem = _load_problem(str(problem_path))
-    problem.render_streamlit_dashboard()
+    problem.show_dashboard()

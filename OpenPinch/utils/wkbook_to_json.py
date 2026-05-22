@@ -155,7 +155,3 @@ def _parse_options_sheet(
         (key.strip() if isinstance(key, str) else key): to_python(value)
         for key, value in zip(keys, values)
     }
-
-
-_validate_stream_data = validate_stream_data
-_validate_utilities_data = validate_utility_data

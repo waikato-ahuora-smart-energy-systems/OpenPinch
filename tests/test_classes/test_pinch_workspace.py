@@ -19,7 +19,7 @@ def _chocolate_payload() -> dict:
 
 
 def test_pinch_workspace_returns_real_cases_and_delegates_to_pinchproblem():
-    workspace = PinchWorkspace.from_payload(_basic_payload(), project_name="Demo")
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
 
     baseline = workspace.case("baseline")
     summary = workspace.summary_frame()
@@ -49,7 +49,7 @@ def test_pinch_workspace_returns_real_cases_and_delegates_to_pinchproblem():
 
 
 def test_pinch_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: Path):
-    workspace = PinchWorkspace.from_payload(_basic_payload(), project_name="Demo")
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
     workspace.copy_case("baseline", "wide_dt", activate=False)
     workspace.update_options({"DT_CONT": 15}, case_name="wide_dt")
 
@@ -63,7 +63,7 @@ def test_pinch_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: P
 
 
 def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
-    workspace = PinchWorkspace.from_payload(_basic_payload(), project_name="Demo")
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
 
     payload_view = workspace.payload_view("baseline")
     assert payload_view.variant_name == "baseline"
@@ -92,7 +92,7 @@ def test_pinch_workspace_validation_and_configuration_metadata():
     payload = _basic_payload()
     del payload["streams"][0]["t_target"]
 
-    workspace = PinchWorkspace.from_payload(payload)
+    workspace = PinchWorkspace(payload)
     report = workspace.validate_variant("baseline")
     invalid_view = workspace.solve_variant("baseline")
     fields = PinchWorkspace.configuration_field_metadata()
@@ -108,7 +108,7 @@ def test_pinch_workspace_validation_and_configuration_metadata():
 
 
 def test_pinch_workspace_reports_error_category_for_unsupported_workflow():
-    workspace = PinchWorkspace.from_payload(_basic_payload(), project_name="Demo")
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
 
     view = workspace.solve_variant("baseline", workflow="not_a_real_workflow")
 
@@ -117,7 +117,7 @@ def test_pinch_workspace_reports_error_category_for_unsupported_workflow():
 
 
 def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
-    workspace = PinchWorkspace.from_payload(_chocolate_payload(), project_name="Site")
+    workspace = PinchWorkspace(_chocolate_payload(), project_name="Site")
     case = workspace.copy_case("baseline", "direct_hp_full_load", activate=False)
     case.update_options(
         {
@@ -138,6 +138,15 @@ def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
         == 1.0
     )
     assert not case.plot.catalog().empty
+
+
+def test_pinch_workspace_accepts_existing_problem_as_constructor_source():
+    problem = PinchProblem(source=_basic_payload(), project_name="Demo")
+    workspace = PinchWorkspace(problem)
+
+    assert workspace.active_case_name == "baseline"
+    assert workspace.case("baseline").project_name == "Demo"
+    assert workspace.get_case_payload("baseline")["zone_tree"] is not None
 
 
 def test_pinch_workspace_accepts_packaged_sample_case_name_as_source():

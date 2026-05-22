@@ -213,7 +213,7 @@ class PinchProblem:
             return build_summary_dataframe(results.targets)
         return build_problem_summary_frame(results, detailed=False)
 
-    def export_to_Excel(self, results_dir: Optional[PathLike] = None) -> Path:
+    def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Export the solved target summary and problem tables to an Excel file."""
         if results_dir is not None:
             self.results_dir = Path(results_dir)
@@ -228,10 +228,6 @@ class PinchProblem:
             out_dir=self.results_dir,
         )
         return Path(output_path)
-
-    def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
-        """Alias for :meth:`export_to_Excel` with a conventional snake_case name."""
-        return self.export_to_Excel(results_dir)
 
     def compare_to(
         self,
@@ -398,7 +394,7 @@ class PinchProblem:
         has_results = "yes" if self._results is not None else "no"
         return f"PinchProblem(source={src}, export={export}, results={has_results})"
 
-    def render_streamlit_dashboard(
+    def show_dashboard(
         self,
         *,
         zone: Optional["Zone"] = None,
@@ -420,22 +416,6 @@ class PinchProblem:
         _render_streamlit_dashboard(
             active_zone,
             graph_payload=payload,
-            page_title=page_title,
-            value_rounding=value_rounding,
-        )
-
-    def show_dashboard(
-        self,
-        *,
-        zone: Optional["Zone"] = None,
-        graph_payload: Optional[Dict[str, Any]] = None,
-        page_title: Optional[str] = "OpenPinch Dashboard",
-        value_rounding: int = 2,
-    ) -> None:
-        """Alias for :meth:`render_streamlit_dashboard`."""
-        self.render_streamlit_dashboard(
-            zone=zone,
-            graph_payload=graph_payload,
             page_title=page_title,
             value_rounding=value_rounding,
         )

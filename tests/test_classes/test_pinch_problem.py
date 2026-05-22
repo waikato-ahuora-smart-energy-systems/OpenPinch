@@ -157,7 +157,7 @@ def test_export_without_results_dir_raises(sample_problem, capsys):
     obj._problem_data = sample_problem
     obj._results = {"ok": True}
     with pytest.raises(ValueError):
-        obj.export_to_Excel(None)
+        obj.export_excel(None)
 
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -185,7 +185,7 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
     obj._results = {"foo": "bar"}  # Pretend targeting already ran
     dest = tmp_path / "out"
 
-    path = obj.export_to_Excel(dest)
+    path = obj.export_excel(dest)
 
     assert path == dest / "targets.xlsx"
     assert called["kwargs"]["target_response"] == {"foo": "bar"}
@@ -298,7 +298,7 @@ def test_export_calls_target_when_results_missing(
 
     obj = PinchProblem()
     obj._problem_data = sample_problem
-    out = obj.export_to_Excel(tmp_path)
+    out = obj.export_excel(tmp_path)
 
     assert called["target"] == 1
     assert called["write"] == 1
@@ -313,7 +313,7 @@ def test_problem_data_and_master_zone_properties():
     assert obj.master_zone == {"z": 1}
 
 
-def test_render_streamlit_dashboard_builds_graph_payload(monkeypatch):
+def test_show_dashboard_builds_graph_payload(monkeypatch):
     mod = sys.modules[PinchProblem.__module__]
     captured = {}
 
@@ -335,7 +335,7 @@ def test_render_streamlit_dashboard_builds_graph_payload(monkeypatch):
     obj._master_zone = {"name": "root"}
     obj._results = ResultContainer()
 
-    obj.render_streamlit_dashboard(page_title="Dash", value_rounding=3)
+    obj.show_dashboard(page_title="Dash", value_rounding=3)
 
     assert captured["zone"] == {"name": "root"}
     assert captured["payload"]["g1"] == {"x": 1}
@@ -344,10 +344,10 @@ def test_render_streamlit_dashboard_builds_graph_payload(monkeypatch):
     assert captured["rounding"] == 3
 
 
-def test_render_streamlit_dashboard_requires_available_zone():
+def test_show_dashboard_requires_available_zone():
     obj = PinchProblem()
     with pytest.raises(RuntimeError, match="No analysed zone is available"):
-        obj.render_streamlit_dashboard()
+        obj.show_dashboard()
 
 
 def test_init_accepts_problem_filepath_and_run(monkeypatch, tmp_path: Path):
@@ -857,26 +857,6 @@ def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
 
     assert len(written) == 1
     assert written[0].exists()
-
-
-def test_export_excel_and_show_dashboard_aliases(monkeypatch, tmp_path: Path):
-    captured = {}
-
-    monkeypatch.setattr(
-        PinchProblem,
-        "export_to_Excel",
-        lambda self, results_dir=None: Path(results_dir) / "alias.xlsx",
-    )
-
-    def fake_render(self, **kwargs):
-        captured.update(kwargs)
-
-    monkeypatch.setattr(PinchProblem, "render_streamlit_dashboard", fake_render)
-
-    obj = PinchProblem()
-    assert obj.export_excel(tmp_path) == tmp_path / "alias.xlsx"
-    obj.show_dashboard(page_title="Demo")
-    assert captured["page_title"] == "Demo"
 
 
 def test_compare_to_builds_delta_table(monkeypatch):

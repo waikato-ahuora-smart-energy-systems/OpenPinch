@@ -21,28 +21,6 @@ __all__ = [
     "linear_interpolation",
     "make_monotonic",
 ]
-
-
-class _PlotlyShowProxy:
-    """Compatibility shim preserving the historical ``plt.show()`` test hook."""
-
-    def __init__(self) -> None:
-        self._current_figure: Any | None = None
-
-    def set_current_figure(self, figure: Any) -> None:
-        """Remember the figure to be shown by the compatibility ``show`` hook."""
-        self._current_figure = figure
-
-    def show(self) -> None:
-        """Display the most recently registered Plotly figure."""
-        if self._current_figure is None:
-            raise RuntimeError("No current figure is available to show.")
-        self._current_figure.show()
-
-
-plt = _PlotlyShowProxy()
-
-
 def _require_plotly():
     try:
         import plotly.graph_objects as go
@@ -255,8 +233,7 @@ def graph_simple_cc_plot(Tc, Hc, Th, Hh):
     )
     fig.update_yaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)")
     fig.update_xaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)")
-    plt.set_current_figure(fig)
-    plt.show()
+    fig.show()
     return fig
 
 

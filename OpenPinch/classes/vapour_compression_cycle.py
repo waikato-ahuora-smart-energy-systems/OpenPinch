@@ -142,11 +142,6 @@ class VapourCompressionCycle:
         self._cycle_states = value
 
     @property
-    def states(self) -> list[dict[str, float]]:
-        """Expose state container for compatibility with plotting API."""
-        return self._cycle_states
-
-    @property
     def state_points(self) -> list[dict[str, float]]:
         """State points around the cycle."""
         return self._cycle_states

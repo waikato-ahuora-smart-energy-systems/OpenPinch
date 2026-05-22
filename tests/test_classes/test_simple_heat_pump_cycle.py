@@ -562,7 +562,6 @@ def test_simple_heat_pump_state_and_cycle_state_setters():
 
     assert hp.solved is True
     assert len(hp.state_points) == hp.STATECOUNT
-    assert len(hp.states) == hp.STATECOUNT
     assert len(hp.Hs) == hp.STATECOUNT
     assert len(hp.Ss) == hp.STATECOUNT
     assert len(hp.Ts) == hp.STATECOUNT

@@ -31,11 +31,11 @@ class _DummyPinchProblem:
     def target(self):
         self.calls.append(("target", None))
 
-    def export_to_Excel(self, path):
-        self.calls.append(("export_to_Excel", str(path)))
+    def export_excel(self, path):
+        self.calls.append(("export_excel", str(path)))
 
-    def render_streamlit_dashboard(self):
-        self.calls.append(("render_streamlit_dashboard", None))
+    def show_dashboard(self):
+        self.calls.append(("show_dashboard", None))
 
 
 class _FakeStreamlit:
@@ -159,4 +159,4 @@ def test_streamlit_app_main_block_executes(monkeypatch):
 
     assert len(_DummyPinchProblem.created) == 1
     calls = _DummyPinchProblem.created[0].calls
-    assert calls == [("target", None), ("render_streamlit_dashboard", None)]
+    assert calls == [("target", None), ("show_dashboard", None)]

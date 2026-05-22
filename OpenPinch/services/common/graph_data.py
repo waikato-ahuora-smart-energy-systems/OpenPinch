@@ -382,33 +382,6 @@ def _format_segment_title(meta: GraphSeriesMeta, index: int) -> str:
     return f"{base} {index}"
 
 
-def _graph_gcc(
-    y_vals: Iterable[float],
-    x_vals: Iterable[float],
-    *,
-    series_label: str = "GCC",
-    series_id: str = "GCC",
-    series_description: Optional[str] = None,
-    preferred_stream_loc: Optional[StreamLoc] = None,
-    is_utility_profile: bool = False,
-    decolour: bool = False,
-) -> List[dict]:
-    """Backward-compatible wrapper retained for tests and legacy callers."""
-    meta = GraphSeriesMeta(
-        label=series_label,
-        description=series_description or series_label,
-        preferred_stream_loc=preferred_stream_loc,
-    )
-    return _build_gcc_segments(
-        list(y_vals),
-        list(x_vals),
-        series_id=series_id,
-        meta=meta,
-        is_utility_profile=is_utility_profile,
-        decolour=decolour,
-    )
-
-
 def _make_gcc_graph(
     graph_title: str,
     key: str,

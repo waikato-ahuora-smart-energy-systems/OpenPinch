@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 from OpenPinch.utils import wkbook_to_json
+from OpenPinch.utils.input_validation import validate_stream_data, validate_utility_data
 from OpenPinch.utils.wkbook_to_json import (
-    _validate_stream_data,
     get_problem_from_excel,
     get_results_from_excel,
 )
@@ -234,7 +234,7 @@ def test_validate_stream_data_inherits_missing_zone_from_previous_stream():
         {"zone": None, "name": "4"},
     ]
 
-    out = _validate_stream_data(streams)
+    out = validate_stream_data(streams)
 
     assert [s["zone"] for s in out] == ["Zone A", "Zone A", "Zone A", "Z2", "Z2"]
     assert [s["name"] for s in out] == ["H1", "C1", "H2", "S3", "S4"]
@@ -248,7 +248,7 @@ def test_validate_stream_data_defaults_first_missing_zone_then_inherits():
         {"zone": None, "name": "C2"},
     ]
 
-    out = _validate_stream_data(streams)
+    out = validate_stream_data(streams)
 
     assert [s["zone"] for s in out] == [
         "Process Zone",
@@ -266,7 +266,7 @@ def test_validate_stream_data_defaults_name_when_zone_and_name_missing():
         {"zone": None, "name": None, "t_supply": {"value": 120.0, "units": "degC"}},
     ]
 
-    out = _validate_stream_data(streams)
+    out = validate_stream_data(streams)
 
     assert [s["zone"] for s in out] == [
         "Process Zone",
@@ -498,7 +498,7 @@ def test_write_targets_to_dict_and_list_empty_paths():
 
 
 def test_validate_utilities_data_alias_executes():
-    out = wkbook_to_json._validate_utilities_data(
+    out = validate_utility_data(
         [
             {"name": "HP Steam", "type": "Hot"},
             {"name": "Cooling Water", "type": "Cold"},
