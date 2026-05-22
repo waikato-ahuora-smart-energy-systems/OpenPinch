@@ -18,6 +18,15 @@ class ConfigurationFieldSpec:
     group: str
     enum_cls: type[Enum] | None = None
     numeric_min: float | None = None
+    runtime_status: str = "supported"
+
+
+@dataclass(frozen=True)
+class ConfigurationOptionStatus:
+    """Classify one incoming configuration option name."""
+
+    name: str
+    runtime_status: str
 
 
 CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
@@ -45,12 +54,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "T_ENV": ConfigurationFieldSpec(float, 15, "general"),
     "DT_ENV_CONT": ConfigurationFieldSpec(float, 10, "general", numeric_min=0.0),
     "P_ENV": ConfigurationFieldSpec(float, 101, "general"),
-    "DECIMAL_PLACES": ConfigurationFieldSpec(
-        int,
-        2,
-        "general",
-        numeric_min=0.0,
-    ),
+    "DECIMAL_PLACES": ConfigurationFieldSpec(int, 2, "general", numeric_min=0.0),
     "DO_DIRECT_OPERATION_TARGETING": ConfigurationFieldSpec(
         bool,
         False,
@@ -69,7 +73,12 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "DO_UTILITY_HP_TARGETING": ConfigurationFieldSpec(bool, False, "targeting"),
     "DO_UTILITY_RFRG_TARGETING": ConfigurationFieldSpec(bool, False, "targeting"),
     "DO_TURBINE_TARGETING": ConfigurationFieldSpec(bool, False, "targeting"),
-    "DO_EXERGY_TARGETING": ConfigurationFieldSpec(bool, False, "targeting"),
+    "DO_EXERGY_TARGETING": ConfigurationFieldSpec(
+        bool,
+        False,
+        "targeting",
+        runtime_status="experimental",
+    ),
     "DO_VERTICAL_GCC": ConfigurationFieldSpec(bool, False, "targeting"),
     "DO_ASSITED_HT": ConfigurationFieldSpec(bool, False, "targeting"),
     "DO_TURBINE_WORK": ConfigurationFieldSpec(bool, False, "targeting"),
@@ -204,3 +213,17 @@ def configuration_group(name: str) -> str:
     if spec is None:
         return "general"
     return spec.group
+
+
+def configuration_option_status(name: str) -> ConfigurationOptionStatus:
+    """Classify one configuration option key by runtime support status."""
+    if name in CONFIG_FIELD_SPECS:
+        spec = CONFIG_FIELD_SPECS[name]
+        return ConfigurationOptionStatus(name=name, runtime_status=spec.runtime_status)
+    return ConfigurationOptionStatus(name=name, runtime_status="dead")
+
+
+def configuration_field_support_level(name: str) -> str:
+    """Return the frontend support level for one editable config field."""
+    group = configuration_group(name)
+    return "stable" if group in {"general", "targeting"} else "advanced"

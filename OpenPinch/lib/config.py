@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from .config_metadata import CONFIG_FIELD_SPECS
+from .config_metadata import (
+    CONFIG_FIELD_SPECS,
+    configuration_option_status,
+)
 
 C_to_K: float = 273.15  # degrees
 tol: float = 1e-6
@@ -36,14 +39,6 @@ class Configuration:
     :class:`~OpenPinch.classes.zone.Zone` so workflows can vary behaviour by
     hierarchy level if needed.
     """
-
-    _LEGACY_OPTION_GATEWAYS = {"main", "turbine"}
-    _RENAMED_OPTIONS = {
-        "HP_CONDESATE": "IS_HIGH_P_COND_FLASH",
-        "IS_HP_CONDESATE": "IS_HIGH_P_COND_FLASH",
-        "IS_HP_CONDENSATE": "IS_HIGH_P_COND_FLASH",
-        "CONDENSATE_FLASH_CORRECTION": "IS_HIGH_P_COND_FLASH",
-    }
 
     def __init__(
         self,
@@ -84,36 +79,17 @@ class Configuration:
 
     @classmethod
     def _validate_option_keys(cls, options: dict) -> dict:
-        """Fail fast on unsupported workbook gateways and unknown option names."""
-        legacy_gateways = sorted(
+        """Fail fast on unsupported or removed configuration keys."""
+        statuses = {key: configuration_option_status(str(key)) for key in options}
+
+        dead_keys = sorted(
             key
-            for key in options
-            if key in cls._LEGACY_OPTION_GATEWAYS or str(key).startswith("PROP_TOP_")
+            for key, status in statuses.items()
+            if status.runtime_status == "dead"
         )
-        if legacy_gateways:
+        if dead_keys:
             raise ValueError(
-                "Legacy workbook option gateways are no longer supported: "
-                f"{', '.join(legacy_gateways)}. Set canonical turbine fields directly "
-                "on zone.config or pass them through Configuration(options=...), e.g. "
-                "TURB_T_IN, TURB_P_IN, MIN_EFF, LOAD_FRACTION, ETA_MECH, TURB_MODEL, "
-                "and IS_HIGH_P_COND_FLASH."
-            )
-
-        renamed_keys = sorted(key for key in options if key in cls._RENAMED_OPTIONS)
-        if renamed_keys:
-            rename_map = ", ".join(
-                f"{key} -> {cls._RENAMED_OPTIONS[key]}" for key in renamed_keys
-            )
-            raise ValueError(
-                "Unsupported configuration option name(s): "
-                f"{rename_map}. Use the canonical zone.config field names instead."
-            )
-
-        known_keys = cls._known_option_keys()
-        unknown_keys = sorted(key for key in options if key not in known_keys)
-        if unknown_keys:
-            raise ValueError(
-                f"Unknown configuration option(s): {', '.join(unknown_keys)}."
+                f"Unknown configuration option(s): {', '.join(dead_keys)}."
             )
 
         return options

@@ -1,19 +1,20 @@
-"""Shared helpers for the PinchWorkspace multi-case surface."""
+"""View shaping helpers for :class:`OpenPinch.classes.PinchWorkspace`."""
 
 from __future__ import annotations
 
 import math
-from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import pandas as pd
-from pydantic import ValidationError
 
-from ..lib.enums import ST
-from ..lib.schemas.io import TargetInput
-from ..lib.schemas.workspace import (
+from ...lib.config_metadata import (
+    CONFIG_FIELD_SPECS,
+    configuration_field_support_level,
+)
+from ...lib.schemas.workspace import (
+    ConfigurationFieldMetadata,
     GraphCatalogEntry,
     GraphPayloadEntry,
     PayloadRecordView,
@@ -22,18 +23,15 @@ from ..lib.schemas.workspace import (
     ScenarioVariantView,
     SummaryCard,
     TableView,
-    ValidationIssue,
     ValidationReport,
     VariantMetricDelta,
     ZoneNodeView,
 )
-from ..streamlit_webviewer.web_graphing import (
+from ...streamlit_webviewer.web_graphing import (
     collect_targets,
     problem_table_to_dataframe,
 )
-from .pinch_problem import PinchProblem, _build_validation_context, _maybe_get_value
-
-JsonDict = Dict[str, Any]
+from ..pinch_problem import PinchProblem
 
 _SUMMARY_METRIC_COLUMNS = [
     "Hot Utility Target",
@@ -43,301 +41,51 @@ _SUMMARY_METRIC_COLUMNS = [
     "Cold Pinch",
 ]
 
-_WORKFLOW_SUPPORT_LEVELS = {
-    "target": "stable",
-    "direct_heat_integration": "stable",
-    "indirect_heat_integration": "stable",
-    "direct_heat_pump": "advanced",
-    "indirect_heat_pump": "advanced",
-    "direct_refrigeration": "advanced",
-    "indirect_refrigeration": "advanced",
-    "cogeneration": "advanced",
-    "area_cost": "advanced",
-}
 
-
-def normalise_payload(payload: TargetInput | JsonDict) -> JsonDict:
-    if isinstance(payload, TargetInput):
-        return payload.model_dump(mode="python")
-    if not isinstance(payload, dict):
-        raise TypeError("Workspace payloads must be a dict or TargetInput instance.")
-    return deepcopy(payload)
-
-
-def project_name_from_payload(payload: JsonDict) -> Optional[str]:
-    zone_tree = payload.get("zone_tree")
-    if isinstance(zone_tree, dict):
-        name = zone_tree.get("name")
-        if name not in (None, ""):
-            return str(name)
-    return None
-
-
-def merge_payloads(base: JsonDict, overlay: JsonDict) -> JsonDict:
-    merged = deepcopy(base)
-    for key, value in overlay.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = merge_payloads(merged[key], value)
-        else:
-            merged[key] = deepcopy(value)
-    return merged
-
-
-def build_validation_report(payload: JsonDict) -> ValidationReport:
-    context = _build_validation_context(payload, source_kind="target_input")
-    issues: list[ValidationIssue] = []
-
-    try:
-        validated = TargetInput.model_validate(payload)
-    except ValidationError as exc:
-        for error in exc.errors():
-            issues.append(schema_issue_to_view(error, context=context))
-        return ValidationReport(valid=False, issues=issues)
-
-    issues.extend(semantic_issues(validated, context=context))
-    return ValidationReport(
-        valid=not any(issue.severity == "error" for issue in issues),
-        issues=issues,
-    )
-
-
-def schema_issue_to_view(
-    error: dict[str, Any],
+def invalid_variant_view(
     *,
-    context: dict[str, list[dict[str, Any]]],
-) -> ValidationIssue:
-    loc = tuple(error.get("loc", ()))
-    section = loc[0] if loc and isinstance(loc[0], str) else None
-    record_index = loc[1] if len(loc) > 1 and isinstance(loc[1], int) else None
-    field = ".".join(str(part) for part in loc[2:]) if len(loc) > 2 else None
-    path = path_from_loc(loc)
-    record_label = validation_record_label(section, record_index, context)
-    return ValidationIssue(
-        severity="error",
-        path=path,
-        message=error.get("msg", "Invalid value."),
-        section=section,
-        record_index=record_index,
-        field=field,
-        record_label=record_label,
-    )
-
-
-def semantic_issues(
-    payload: TargetInput,
-    *,
-    context: dict[str, list[dict[str, Any]]],
-) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if len(payload.streams) == 0:
-        issues.append(
-            ValidationIssue(
-                severity="error",
-                path="streams",
-                message="At least one stream must be provided.",
-            )
-        )
-
-    for index, stream in enumerate(payload.streams):
-        label = validation_record_label("streams", index, context)
-        t_supply = _maybe_get_value(stream.t_supply)
-        t_target = _maybe_get_value(stream.t_target)
-        if t_supply == t_target:
-            issues.append(
-                ValidationIssue(
-                    severity="error",
-                    path=f"streams[{index}].t_supply",
-                    field="t_supply/t_target",
-                    message="Supply and target temperatures must differ.",
-                    section="streams",
-                    record_index=index,
-                    record_label=label,
-                )
-            )
-
-        value = _maybe_get_value(getattr(stream, "heat_flow"))
-        if value is not None and value < 0:
-            issues.append(
-                ValidationIssue(
-                    severity="error",
-                    path=f"streams[{index}].heat_flow",
-                    field="heat_flow",
-                    message="Value must be non-negative.",
-                    section="streams",
-                    record_index=index,
-                    record_label=label,
-                )
-            )
-
-        value = _maybe_get_value(getattr(stream, "dt_cont"))
-        if value is not None and value < 0:
-            issues.append(
-                ValidationIssue(
-                    severity="warning",
-                    path=f"streams[{index}].dt_cont",
-                    field="dt_cont",
-                    message="Value should be non-negative.",
-                    section="streams",
-                    record_index=index,
-                    record_label=label,
-                )
-            )
-
-        value = _maybe_get_value(getattr(stream, "htc"))
-        if value is not None and value <= 0:
-            issues.append(
-                ValidationIssue(
-                    severity="error",
-                    path=f"streams[{index}].htc",
-                    field="htc",
-                    message="Value must be positive.",
-                    section="streams",
-                    record_index=index,
-                    record_label=label,
-                )
-            )
-
-    for index, utility in enumerate(payload.utilities):
-        label = validation_record_label("utilities", index, context)
-        utility_type = str(utility.type)
-        t_supply = _maybe_get_value(utility.t_supply)
-        t_target = _maybe_get_value(utility.t_target)
-        if (
-            utility_type == ST.Hot.value
-            and t_supply is not None
-            and t_target is not None
-            and t_supply < t_target
-        ):
-            issues.append(
-                ValidationIssue(
-                    severity="warning",
-                    path=f"utilities[{index}].t_supply",
-                    field="t_supply/t_target",
-                    message="Hot utilities should have t_supply >= t_target.",
-                    section="utilities",
-                    record_index=index,
-                    record_label=label,
-                )
-            )
-        if (
-            utility_type == ST.Cold.value
-            and t_supply is not None
-            and t_target is not None
-            and t_supply > t_target
-        ):
-            issues.append(
-                ValidationIssue(
-                    severity="warning",
-                    path=f"utilities[{index}].t_supply",
-                    field="t_supply/t_target",
-                    message="Cold utilities should have t_supply <= t_target.",
-                    section="utilities",
-                    record_index=index,
-                    record_label=label,
-                )
-            )
-
-        for field_name in ("dt_cont", "price", "heat_flow"):
-            value = _maybe_get_value(getattr(utility, field_name))
-            if value is not None and value < 0:
-                issues.append(
-                    ValidationIssue(
-                        severity="warning",
-                        path=f"utilities[{index}].{field_name}",
-                        field=field_name,
-                        message="Value should be non-negative.",
-                        section="utilities",
-                        record_index=index,
-                        record_label=label,
-                    )
-                )
-
-        value = _maybe_get_value(getattr(utility, "htc"))
-        if value is not None and value <= 0:
-            issues.append(
-                ValidationIssue(
-                    severity="error",
-                    path=f"utilities[{index}].htc",
-                    field="htc",
-                    message="Value must be positive.",
-                    section="utilities",
-                    record_index=index,
-                    record_label=label,
-                )
-            )
-    return issues
-
-
-def path_from_loc(loc: tuple[Any, ...]) -> str:
-    parts = []
-    for part in loc:
-        if isinstance(part, int):
-            if not parts:
-                parts.append(f"[{part}]")
-            else:
-                parts[-1] = f"{parts[-1]}[{part}]"
-        else:
-            parts.append(str(part))
-    return ".".join(parts)
-
-
-def validation_record_label(
-    section: Optional[str],
-    record_index: Optional[int],
-    context: dict[str, list[dict[str, Any]]],
-) -> Optional[str]:
-    if section is None or record_index is None:
-        return None
-    records = context.get(section, [])
-    if 0 <= record_index < len(records):
-        record = records[record_index]
-        label = "Stream" if section == "streams" else "Utility"
-        name = record.get("name")
-        if name in (None, ""):
-            return f"{label} {record_index + 1}"
-        return f"{label} {record_index + 1} '{name}'"
-    return None
-
-
-def workflow_support_level(workflow: str) -> str:
-    normalized = normalise_workflow_name(workflow)
-    return _WORKFLOW_SUPPORT_LEVELS.get(normalized, "unsupported")
-
-
-def workflow_warnings(workflow: str, support_level: str) -> list[str]:
-    if support_level == "advanced":
-        return [
-            f"Workflow '{workflow}' should be treated as an advanced "
-            "PinchWorkspace workflow."
-        ]
-    if support_level == "unsupported":
-        return [f"Workflow '{workflow}' is not a supported PinchWorkspace workflow."]
-    return []
-
-
-def run_problem_workflow(
-    problem: PinchProblem,
+    variant_name: str,
     workflow: str,
     workflow_options: dict[str, Any],
-) -> None:
-    normalized = normalise_workflow_name(workflow)
-    if normalized == "target":
-        problem.target()
-        return
+    validation: ValidationReport,
+    support_level: str,
+    warnings_list: list[str],
+) -> ScenarioVariantView:
+    """Build a deterministic invalid-variant response view."""
+    return ScenarioVariantView(
+        variant_name=variant_name,
+        workflow=workflow,
+        workflow_options=workflow_options,
+        status="invalid",
+        support_level=support_level,
+        validation=validation,
+        warnings=warnings_list,
+    )
 
-    if not hasattr(problem.target, normalized):
-        raise ValueError(
-            f"Unknown workflow {workflow!r}. Supported workflows include: "
-            f"target, {', '.join(sorted(_WORKFLOW_SUPPORT_LEVELS))}."
-        )
 
-    problem.target()
-    method = getattr(problem.target, normalized)
-    method(**workflow_options)
-
-
-def normalise_workflow_name(workflow: str) -> str:
-    return str(workflow).strip().lower().replace("-", "_").replace(" ", "_")
+def error_variant_view(
+    *,
+    variant_name: str,
+    workflow: str,
+    workflow_options: dict[str, Any],
+    validation: ValidationReport,
+    support_level: str,
+    warnings_list: list[str],
+    error_message: str,
+    error_category: str,
+) -> ScenarioVariantView:
+    """Build a deterministic workflow-error response view."""
+    return ScenarioVariantView(
+        variant_name=variant_name,
+        workflow=workflow,
+        workflow_options=workflow_options,
+        status="error",
+        support_level=support_level,
+        validation=validation,
+        warnings=warnings_list,
+        error_message=error_message,
+        error_category=error_category,
+    )
 
 
 def problem_to_variant_view(
@@ -350,6 +98,7 @@ def problem_to_variant_view(
     support_level: str,
     warnings_list: list[str],
 ) -> ScenarioVariantView:
+    """Convert one solved problem into the workspace frontend view model."""
     summary_frame = problem.summary_frame()
     graph_payload = problem.plot.get_graph_data()
     graph_catalog = graph_catalog_entries(graph_payload)
@@ -372,7 +121,30 @@ def problem_to_variant_view(
     )
 
 
+def configuration_field_metadata() -> list[ConfigurationFieldMetadata]:
+    """Return declarative metadata for editable configuration fields."""
+    fields = []
+    for name, spec in CONFIG_FIELD_SPECS.items():
+        enum_cls = spec.enum_cls
+        field_type, multiple = annotation_metadata(spec.annotation, enum_cls=enum_cls)
+        fields.append(
+            ConfigurationFieldMetadata(
+                name=name,
+                label=name.replace("_", " ").title(),
+                field_type=field_type,
+                group=spec.group,
+                support_level=configuration_field_support_level(name),
+                runtime_status=spec.runtime_status,
+                enum_choices=[str(item.value) for item in enum_cls] if enum_cls else [],
+                numeric_min=spec.numeric_min,
+                multiple=multiple,
+            )
+        )
+    return fields
+
+
 def summary_cards(frame: pd.DataFrame) -> list[SummaryCard]:
+    """Build summary-card rows from a compact summary dataframe."""
     cards = []
     for _, row in frame.iterrows():
         target_name = str(row.get("Target"))
@@ -390,7 +162,8 @@ def summary_cards(frame: pd.DataFrame) -> list[SummaryCard]:
     return cards
 
 
-def graph_catalog_entries(graph_payload: JsonDict) -> list[GraphCatalogEntry]:
+def graph_catalog_entries(graph_payload: dict[str, Any]) -> list[GraphCatalogEntry]:
+    """Flatten graph payload metadata into a catalog view."""
     entries = []
     for graph_set_id, graph_set in graph_payload.items():
         target_name = str(graph_set.get("name", graph_set_id))
@@ -418,7 +191,8 @@ def graph_catalog_entries(graph_payload: JsonDict) -> list[GraphCatalogEntry]:
     return entries
 
 
-def graph_payload_entries(graph_payload: JsonDict) -> list[GraphPayloadEntry]:
+def graph_payload_entries(graph_payload: dict[str, Any]) -> list[GraphPayloadEntry]:
+    """Flatten raw graph payloads into stable graph entry records."""
     payloads = []
     for graph_set_id, graph_set in graph_payload.items():
         target_name = str(graph_set.get("name", graph_set_id))
@@ -441,6 +215,7 @@ def graph_payload_entries(graph_payload: JsonDict) -> list[GraphPayloadEntry]:
 
 
 def problem_table_views(problem: PinchProblem) -> list[ProblemTableView]:
+    """Build serializable problem-table views for one solved problem."""
     if problem.master_zone is None:
         return []
 
@@ -468,6 +243,7 @@ def problem_table_views(problem: PinchProblem) -> list[ProblemTableView]:
 
 
 def dataframe_to_table_view(frame: pd.DataFrame) -> TableView:
+    """Convert a dataframe to a JSON-safe table view."""
     safe_frame = frame.copy()
     rows = [
         {column: json_safe(value) for column, value in row.items()}
@@ -482,6 +258,7 @@ def summary_metric_deltas(
     variant_name: str,
     variant_view: ScenarioVariantView,
 ) -> list[VariantMetricDelta]:
+    """Build deterministic summary metric deltas between two solved variants."""
     base_rows = summary_rows_by_target(base_view.summary_table)
     variant_rows = summary_rows_by_target(variant_view.summary_table)
     target_ids = sorted(set(base_rows) | set(variant_rows))
@@ -511,6 +288,7 @@ def summary_metric_deltas(
 
 
 def summary_rows_by_target(table: Optional[TableView]) -> dict[str, dict[str, Any]]:
+    """Index summary rows by their target label."""
     if table is None:
         return {}
     return {
@@ -526,6 +304,7 @@ def problem_table_diffs(
     variant_name: str,
     variant_view: ScenarioVariantView,
 ) -> list[ProblemTableDiffView]:
+    """Build structural and cell-level diffs between problem-table views."""
     base_tables = {table.table_id: table for table in base_view.problem_tables}
     variant_tables = {table.table_id: table for table in variant_view.problem_tables}
     diffs = []
@@ -559,7 +338,9 @@ def problem_table_diffs(
                 variant_rows=variant_rows,
                 shared_columns=shared_columns,
                 changed_cells=count_changed_cells(
-                    base_table, variant_table, shared_columns
+                    base_table,
+                    variant_table,
+                    shared_columns,
                 ),
                 shape_changed=base_rows != variant_rows
                 or (
@@ -578,6 +359,7 @@ def count_changed_cells(
     variant_table: Optional[ProblemTableView],
     shared_columns: list[str],
 ) -> Optional[int]:
+    """Count changed cells across the shared shape of two problem tables."""
     if base_table is None or variant_table is None:
         return None
     changed = 0
@@ -592,6 +374,7 @@ def count_changed_cells(
 
 
 def zone_tree_view(zone_tree: Any) -> list[ZoneNodeView]:
+    """Flatten a nested zone tree into frontend-friendly node records."""
     if not isinstance(zone_tree, dict):
         return []
 
@@ -621,6 +404,7 @@ def zone_tree_view(zone_tree: Any) -> list[ZoneNodeView]:
 
 
 def record_views(records: Any, *, section: str) -> list[PayloadRecordView]:
+    """Convert stream/utility payload rows into editable frontend records."""
     if not isinstance(records, list):
         return []
     views = []
@@ -647,9 +431,9 @@ def annotation_metadata(
     *,
     enum_cls: Optional[type[Enum]],
 ) -> tuple[str, bool]:
+    """Map Python annotations to simple frontend input field kinds."""
     if enum_cls is not None:
         return "enum", False
-
     if annotation in {bool}:
         return "boolean", False
     if annotation in {int, float}:
@@ -672,6 +456,7 @@ def annotation_metadata(
 
 
 def numeric_delta(base_value: Any, variant_value: Any) -> Optional[float]:
+    """Return a numeric delta when both inputs are plain numbers."""
     if isinstance(base_value, bool) or isinstance(variant_value, bool):
         return None
     if is_number(base_value) and is_number(variant_value):
@@ -680,23 +465,26 @@ def numeric_delta(base_value: Any, variant_value: Any) -> Optional[float]:
 
 
 def is_number(value: Any) -> bool:
+    """Return whether a value is a plain numeric scalar."""
     if value is None or isinstance(value, bool):
         return False
     return isinstance(value, (int, float))
 
 
 def maybe_string(value: Any) -> Optional[str]:
+    """Return a non-empty string representation when present."""
     if value in (None, ""):
         return None
     return str(value)
 
 
 def maybe_float(value: Any) -> Optional[float]:
+    """Return a finite float when conversion is possible."""
     if value is None:
         return None
     try:
         value = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if not math.isfinite(value):
         return None
@@ -704,6 +492,7 @@ def maybe_float(value: Any) -> Optional[float]:
 
 
 def json_safe(value: Any) -> Any:
+    """Convert nested values to JSON-safe plain data structures."""
     if isinstance(value, dict):
         return {str(key): json_safe(val) for key, val in value.items()}
     if isinstance(value, list):
@@ -738,24 +527,3 @@ def json_safe(value: Any) -> Any:
         except Exception:
             pass
     return str(value)
-
-
-__all__ = [
-    "JsonDict",
-    "annotation_metadata",
-    "build_validation_report",
-    "graph_catalog_entries",
-    "graph_payload_entries",
-    "json_safe",
-    "merge_payloads",
-    "normalise_payload",
-    "problem_table_diffs",
-    "problem_to_variant_view",
-    "project_name_from_payload",
-    "record_views",
-    "run_problem_workflow",
-    "summary_metric_deltas",
-    "workflow_support_level",
-    "workflow_warnings",
-    "zone_tree_view",
-]

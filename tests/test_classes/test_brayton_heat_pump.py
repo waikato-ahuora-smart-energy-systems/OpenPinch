@@ -174,6 +174,6 @@ def test_brayton_cycle_raises_runtime_error_on_result_extraction_failure(monkeyp
 """Additional branch coverage tests for Brayton heat pump wrappers."""
 
 
-def test_brayton_cycle_states_property_alias():
+def test_brayton_cycle_states_property_returns_internal_state_list():
     cycle = SimpleBraytonHeatPumpCycle()
-    assert cycle.cycle_states is cycle.states
+    assert cycle.cycle_states is cycle._states

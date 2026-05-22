@@ -434,11 +434,37 @@ def test_clean_composite_curve_forced_duplicate_edges(monkeypatch):
 
 def test_graph_simple_cc_plot_executes_show(monkeypatch):
     shown = {"called": False}
-    monkeypatch.setattr(
-        miscellaneous.plt,
-        "show",
-        lambda: shown.__setitem__("called", True),
-    )
+
+    class _FakeScatter:
+        def __init__(self, **kwargs):
+            self.name = kwargs["name"]
+            self.kwargs = kwargs
+
+    class _FakeFigure:
+        def __init__(self):
+            self.data = []
+
+        def add_trace(self, trace):
+            self.data.append(trace)
+
+        def update_layout(self, **kwargs):
+            self.layout = kwargs
+
+        def update_yaxes(self, **kwargs):
+            self.yaxis = kwargs
+
+        def update_xaxes(self, **kwargs):
+            self.xaxis = kwargs
+
+        def show(self):
+            shown["called"] = True
+
+    class _FakePlotly:
+        Figure = _FakeFigure
+        Scatter = _FakeScatter
+
+    monkeypatch.setattr(miscellaneous, "_require_plotly", lambda: _FakePlotly)
+
     figure = miscellaneous.graph_simple_cc_plot(
         Tc=[40, 30],
         Hc=[0, 10],

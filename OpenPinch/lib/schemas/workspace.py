@@ -121,6 +121,7 @@ class ConfigurationFieldMetadata(BaseModel):
     field_type: str
     group: str
     support_level: str
+    runtime_status: str = "supported"
     enum_choices: List[str] = Field(default_factory=list)
     numeric_min: Optional[float] = None
     numeric_max: Optional[float] = None
@@ -145,6 +146,7 @@ class ScenarioVariantView(BaseModel):
     validation: ValidationReport
     warnings: List[str] = Field(default_factory=list)
     error_message: Optional[str] = None
+    error_category: Optional[str] = None
     summary_cards: List[SummaryCard] = Field(default_factory=list)
     summary_table: Optional[TableView] = None
     graph_catalog: List[GraphCatalogEntry] = Field(default_factory=list)

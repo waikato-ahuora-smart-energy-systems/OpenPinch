@@ -9,8 +9,6 @@ from typing import Any, Iterable, Optional
 
 import pandas as pd
 
-from ..lib.config import Configuration
-from ..lib.config_metadata import CONFIG_ENUMS, CONFIG_MINIMUMS, configuration_group
 from ..lib.schemas.io import TargetInput
 from ..lib.schemas.workspace import (
     ConfigurationFieldMetadata,
@@ -21,26 +19,35 @@ from ..lib.schemas.workspace import (
     ScenarioWorkflowConfig,
     VariantPayloadView,
 )
-from ._workspace_support import (
-    JsonDict,
-    annotation_metadata,
-    build_validation_report,
-    json_safe,
-    merge_payloads,
-    normalise_payload,
-    problem_table_diffs,
-    problem_to_variant_view,
-    project_name_from_payload,
-    record_views,
+from ._problem.validation import build_validation_report
+from ._workspace.execution import (
+    WorkspaceExecutionError,
     run_problem_workflow,
-    summary_metric_deltas,
     workflow_support_level,
     workflow_warnings,
+)
+from ._workspace.payloads import (
+    JsonDict,
+    PathLike,
+    canonical_payload_from_source,
+    merge_payloads,
+    normalise_payload,
+    project_name_from_payload,
+)
+from ._workspace.views import (
+    configuration_field_metadata as _configuration_field_metadata,
+)
+from ._workspace.views import (
+    error_variant_view,
+    invalid_variant_view,
+    json_safe,
+    problem_table_diffs,
+    problem_to_variant_view,
+    record_views,
+    summary_metric_deltas,
     zone_tree_view,
 )
 from .pinch_problem import PinchProblem
-
-PathLike = str | Path
 
 
 class PinchWorkspace:
@@ -52,6 +59,7 @@ class PinchWorkspace:
         | JsonDict
         | PathLike
         | tuple[PathLike, PathLike]
+        | PinchProblem
         | None = None,
         *,
         project_name: Optional[str] = "Site",
@@ -69,32 +77,6 @@ class PinchWorkspace:
             self.load(source, case_name=baseline_name, activate=True)
 
     @classmethod
-    def from_payload(
-        cls,
-        payload: TargetInput | JsonDict,
-        *,
-        baseline_name: str = "baseline",
-        project_name: Optional[str] = None,
-    ) -> "PinchWorkspace":
-        workspace = cls(project_name=project_name, baseline_name=baseline_name)
-        workspace.load(payload, case_name=baseline_name, activate=True)
-        return workspace
-
-    @classmethod
-    def from_problem(
-        cls,
-        problem: PinchProblem,
-        *,
-        baseline_name: str = "baseline",
-    ) -> "PinchWorkspace":
-        workspace = cls(
-            project_name=problem.project_name,
-            baseline_name=baseline_name,
-        )
-        workspace.load(problem, case_name=baseline_name, activate=True)
-        return workspace
-
-    @classmethod
     def from_json(
         cls,
         data: JsonDict,
@@ -102,8 +84,7 @@ class PinchWorkspace:
         baseline_name: str = "baseline",
         project_name: Optional[str] = None,
     ) -> "PinchWorkspace":
-        """Build a workspace from one in-memory payload."""
-        return cls.from_payload(
+        return cls(
             data,
             baseline_name=baseline_name,
             project_name=project_name,
@@ -159,16 +140,16 @@ class PinchWorkspace:
             return self.case(case_name)
 
         name = case_name or self._active_case_name or self.baseline_name
-        payload, resolved_project_name = self._canonical_payload_from_source(
+        payload, resolved_project_name = canonical_payload_from_source(
             source,
             project_name=project_name,
+            workspace_project_name=self.project_name,
         )
 
         self.project_name = resolved_project_name
         self._variant_payloads[name] = payload
         self._variant_workflows[name] = ScenarioWorkflowConfig()
-        self._cached_views.pop(name, None)
-        self._case_cache.pop(name, None)
+        self._invalidate_variant_state(name)
 
         if activate or self._active_case_name is None:
             self._active_case_name = name
@@ -214,12 +195,11 @@ class PinchWorkspace:
             base_payload = self._get_variant_payload(base)
             normalized = merge_payloads(base_payload, normalized)
         self._variant_payloads[name] = normalized
-        self._cached_views.pop(name, None)
-        self._case_cache.pop(name, None)
         if name not in self._variant_workflows:
             self._variant_workflows[name] = ScenarioWorkflowConfig()
         if self._active_case_name is None:
             self._active_case_name = name
+        self._invalidate_variant_state(name)
         return deepcopy(normalized)
 
     def solve_variant(
@@ -241,14 +221,13 @@ class PinchWorkspace:
         )
 
         if not validation.valid:
-            view = ScenarioVariantView(
+            view = invalid_variant_view(
                 variant_name=name,
                 workflow=workflow,
                 workflow_options=resolved_options,
-                status="invalid",
-                support_level=support_level,
                 validation=validation,
-                warnings=warnings_list,
+                support_level=support_level,
+                warnings_list=warnings_list,
             )
             self._cached_views[name] = view
             return view
@@ -256,16 +235,29 @@ class PinchWorkspace:
         try:
             problem = self.case(name)
             run_problem_workflow(problem, workflow, resolved_options)
-        except Exception as exc:
-            view = ScenarioVariantView(
+        except WorkspaceExecutionError as exc:
+            view = error_variant_view(
                 variant_name=name,
                 workflow=workflow,
                 workflow_options=resolved_options,
-                status="error",
-                support_level=support_level,
                 validation=validation,
-                warnings=warnings_list,
+                support_level=support_level,
+                warnings_list=warnings_list,
                 error_message=str(exc),
+                error_category=exc.category,
+            )
+            self._cached_views[name] = view
+            return view
+        except Exception as exc:
+            view = error_variant_view(
+                variant_name=name,
+                workflow=workflow,
+                workflow_options=resolved_options,
+                validation=validation,
+                support_level=support_level,
+                warnings_list=warnings_list,
+                error_message=str(exc),
+                error_category="unexpected_error",
             )
             self._cached_views[name] = view
             return view
@@ -425,22 +417,13 @@ class PinchWorkspace:
         """Return the solved summary for one case."""
         return self.case(case_name).summary_frame(detailed=detailed)
 
-    def export_to_Excel(
-        self,
-        results_dir: Optional[PathLike] = None,
-        *,
-        case_name: Optional[str] = None,
-    ) -> Path:
-        """Export one case using :class:`PinchProblem` naming."""
-        return self.case(case_name).export_to_Excel(results_dir)
-
     def export_excel(
         self,
         results_dir: Optional[PathLike] = None,
         *,
         case_name: Optional[str] = None,
     ) -> Path:
-        """Export one case using the snake_case alias."""
+        """Export one case to an Excel workbook."""
         return self.case(case_name).export_excel(results_dir)
 
     def set_dt_cont_multiplier(
@@ -473,23 +456,6 @@ class PinchWorkspace:
         self._sync_case_payload(resolved_name)
         return problem
 
-    def render_streamlit_dashboard(
-        self,
-        *,
-        case_name: Optional[str] = None,
-        zone=None,
-        graph_payload: Optional[dict[str, Any]] = None,
-        page_title: Optional[str] = "OpenPinch Dashboard",
-        value_rounding: int = 2,
-    ) -> None:
-        """Launch the dashboard for one case."""
-        self.case(case_name).render_streamlit_dashboard(
-            zone=zone,
-            graph_payload=graph_payload,
-            page_title=page_title,
-            value_rounding=value_rounding,
-        )
-
     def show_dashboard(
         self,
         *,
@@ -499,9 +465,8 @@ class PinchWorkspace:
         page_title: Optional[str] = "OpenPinch Dashboard",
         value_rounding: int = 2,
     ) -> None:
-        """Alias for :meth:`render_streamlit_dashboard`."""
-        self.render_streamlit_dashboard(
-            case_name=case_name,
+        """Launch the dashboard for one case."""
+        self.case(case_name).show_dashboard(
             zone=zone,
             graph_payload=graph_payload,
             page_title=page_title,
@@ -577,30 +542,7 @@ class PinchWorkspace:
     @classmethod
     def configuration_field_metadata(cls) -> list[ConfigurationFieldMetadata]:
         """Return declarative metadata for editable configuration fields."""
-        fields = []
-        for name, annotation in Configuration.__annotations__.items():
-            if name.startswith("_"):
-                continue
-            enum_cls = CONFIG_ENUMS.get(name)
-            field_type, multiple = annotation_metadata(annotation, enum_cls=enum_cls)
-            group = configuration_group(name)
-            fields.append(
-                ConfigurationFieldMetadata(
-                    name=name,
-                    label=name.replace("_", " ").title(),
-                    field_type=field_type,
-                    group=group,
-                    support_level="stable"
-                    if group in {"general", "targeting"}
-                    else "advanced",
-                    enum_choices=[str(item.value) for item in enum_cls]
-                    if enum_cls
-                    else [],
-                    numeric_min=CONFIG_MINIMUMS.get(name),
-                    multiple=multiple,
-                )
-            )
-        return fields
+        return _configuration_field_metadata()
 
     def _resolve_case_name(self, name: Optional[str]) -> str:
         if name is None:
@@ -640,7 +582,8 @@ class PinchWorkspace:
             view = self._cached_views[name]
         else:
             workflow_config = self._variant_workflows.get(
-                name, ScenarioWorkflowConfig()
+                name,
+                ScenarioWorkflowConfig(),
             )
             view = self.solve_variant(
                 name,
@@ -655,67 +598,10 @@ class PinchWorkspace:
             )
         return view
 
-    def _canonical_payload_from_source(
-        self,
-        source: TargetInput
-        | JsonDict
-        | PathLike
-        | tuple[PathLike, PathLike]
-        | PinchProblem,
-        *,
-        project_name: Optional[str] = None,
-    ) -> tuple[JsonDict, str]:
-        if isinstance(source, PinchProblem):
-            payload = source.canonical_problem_json()
-            resolved_project_name = (
-                project_name
-                or source.project_name
-                or project_name_from_payload(payload)
-                or self.project_name
-                or "Site"
-            )
-            return payload, resolved_project_name
-
-        if isinstance(source, TargetInput):
-            payload = normalise_payload(source)
-            resolved_project_name = (
-                project_name
-                or project_name_from_payload(payload)
-                or self.project_name
-                or "Site"
-            )
-            return payload, resolved_project_name
-
-        normalized = normalise_payload(source) if isinstance(source, dict) else source
-        seed_project_name = (
-            project_name
-            or self.project_name
-            or (
-                project_name_from_payload(normalized)
-                if isinstance(normalized, dict)
-                else None
-            )
-            or "Site"
-        )
-        try:
-            problem = PinchProblem(
-                source=deepcopy(normalized),
-                project_name=seed_project_name,
-            )
-        except ValueError:
-            if isinstance(normalized, dict):
-                return normalized, seed_project_name
-            raise
-
-        payload = problem.canonical_problem_json()
-        resolved_project_name = (
-            project_name
-            or project_name_from_payload(payload)
-            or problem.project_name
-            or self.project_name
-            or "Site"
-        )
-        return payload, resolved_project_name
+    def _invalidate_variant_state(self, name: str) -> None:
+        """Drop cached case and view state for one variant payload."""
+        self._cached_views.pop(name, None)
+        self._case_cache.pop(name, None)
 
     def _sync_case_payload(self, name: str) -> None:
         problem = self._case_cache.get(name)

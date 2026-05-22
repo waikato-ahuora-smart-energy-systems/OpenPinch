@@ -178,10 +178,6 @@ def test_reference_docs_mark_partial_analysis_modules_as_partial():
     assert "Experimental or Partial Analysis Modules" in api_analysis
     assert "they should not be read as stable production workflows" in api_analysis
     assert "OpenPinch.services.exergy_analysis.exergy_targeting_entry" in api_analysis
-    assert (
-        "OpenPinch.services.energy_transfer_analysis.energy_transfer_analysis"
-        in api_analysis
-    )
 
 
 def test_reference_docs_show_uv_docs_build_command():

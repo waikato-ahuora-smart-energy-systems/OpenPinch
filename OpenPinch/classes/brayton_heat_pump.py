@@ -97,17 +97,6 @@ class SimpleBraytonHeatPumpCycle:
         return self._states
 
     @property
-    def states(self):
-        """Alias for :attr:`cycle_states`.
-
-        Returns
-        -------
-        list[dict]
-            Cycle state dictionaries.
-        """
-        return self.cycle_states
-
-    @property
     def Hs(self) -> Sequence[float]:
         """Return state specific enthalpies.
 

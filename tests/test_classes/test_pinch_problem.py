@@ -157,7 +157,7 @@ def test_export_without_results_dir_raises(sample_problem, capsys):
     obj._problem_data = sample_problem
     obj._results = {"ok": True}
     with pytest.raises(ValueError):
-        obj.export_to_Excel(None)
+        obj.export_excel(None)
 
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -185,7 +185,7 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
     obj._results = {"foo": "bar"}  # Pretend targeting already ran
     dest = tmp_path / "out"
 
-    path = obj.export_to_Excel(dest)
+    path = obj.export_excel(dest)
 
     assert path == dest / "targets.xlsx"
     assert called["kwargs"]["target_response"] == {"foo": "bar"}
@@ -298,7 +298,7 @@ def test_export_calls_target_when_results_missing(
 
     obj = PinchProblem()
     obj._problem_data = sample_problem
-    out = obj.export_to_Excel(tmp_path)
+    out = obj.export_excel(tmp_path)
 
     assert called["target"] == 1
     assert called["write"] == 1
@@ -313,7 +313,75 @@ def test_problem_data_and_master_zone_properties():
     assert obj.master_zone == {"z": 1}
 
 
-def test_render_streamlit_dashboard_builds_graph_payload(monkeypatch):
+def test_root_stream_views_are_exposed_on_problem():
+    payload = {
+        "options": {"DT_CONT": 10},
+        "streams": [
+            {
+                "zone": "Area1",
+                "name": "H1",
+                "t_supply": 180.0,
+                "t_target": 90.0,
+                "heat_flow": 100.0,
+                "dtcont": 5.0,
+            },
+            {
+                "zone": "Area1",
+                "name": "C1",
+                "t_supply": 40.0,
+                "t_target": 120.0,
+                "heat_flow": 80.0,
+                "dtcont": 5.0,
+            },
+        ],
+        "utilities": [
+            {"name": "Steam", "t_supply": 220.0, "type": "Hot", "cost": 20.0},
+            {"name": "CW", "t_supply": 25.0, "type": "Cold", "cost": 5.0},
+        ],
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    assert problem.hot_streams is problem.master_zone.hot_streams
+    assert problem.cold_streams is problem.master_zone.cold_streams
+    assert problem.hot_utilities is problem.master_zone.hot_utilities
+    assert problem.cold_utilities is problem.master_zone.cold_utilities
+
+
+def test_root_stream_views_require_loaded_problem():
+    problem = PinchProblem()
+
+    with pytest.raises(RuntimeError, match="No input loaded"):
+        _ = problem.hot_streams
+
+
+def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
+    payload = {
+        "options": {"DT_CONT": 10},
+        "streams": [
+            {
+                "zone": "Area1",
+                "name": "H1",
+                "t_supply": 180.0,
+                "t_target": 90.0,
+                "heat_flow": 100.0,
+                "dtcont": 5.0,
+            }
+        ],
+        "utilities": [],
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    hot_stream = problem.hot_streams["Area1.H1"]
+    hot_stream.t_supply = 195.0
+
+    assert problem.hot_streams["Area1.H1"].t_supply == pytest.approx(195.0)
+    assert problem.master_zone.hot_streams["Area1.H1"].t_supply == pytest.approx(195.0)
+    assert hot_stream.t_max == pytest.approx(195.0)
+
+
+def test_show_dashboard_builds_graph_payload(monkeypatch):
     mod = sys.modules[PinchProblem.__module__]
     captured = {}
 
@@ -335,7 +403,7 @@ def test_render_streamlit_dashboard_builds_graph_payload(monkeypatch):
     obj._master_zone = {"name": "root"}
     obj._results = ResultContainer()
 
-    obj.render_streamlit_dashboard(page_title="Dash", value_rounding=3)
+    obj.show_dashboard(page_title="Dash", value_rounding=3)
 
     assert captured["zone"] == {"name": "root"}
     assert captured["payload"]["g1"] == {"x": 1}
@@ -344,10 +412,10 @@ def test_render_streamlit_dashboard_builds_graph_payload(monkeypatch):
     assert captured["rounding"] == 3
 
 
-def test_render_streamlit_dashboard_requires_available_zone():
+def test_show_dashboard_requires_available_zone():
     obj = PinchProblem()
     with pytest.raises(RuntimeError, match="No analysed zone is available"):
-        obj.render_streamlit_dashboard()
+        obj.show_dashboard()
 
 
 def test_init_accepts_problem_filepath_and_run(monkeypatch, tmp_path: Path):
@@ -859,26 +927,6 @@ def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
     assert written[0].exists()
 
 
-def test_export_excel_and_show_dashboard_aliases(monkeypatch, tmp_path: Path):
-    captured = {}
-
-    monkeypatch.setattr(
-        PinchProblem,
-        "export_to_Excel",
-        lambda self, results_dir=None: Path(results_dir) / "alias.xlsx",
-    )
-
-    def fake_render(self, **kwargs):
-        captured.update(kwargs)
-
-    monkeypatch.setattr(PinchProblem, "render_streamlit_dashboard", fake_render)
-
-    obj = PinchProblem()
-    assert obj.export_excel(tmp_path) == tmp_path / "alias.xlsx"
-    obj.show_dashboard(page_title="Demo")
-    assert captured["page_title"] == "Demo"
-
-
 def test_compare_to_builds_delta_table(monkeypatch):
     base_frame = __import__("pandas").DataFrame(
         [
@@ -1111,6 +1159,50 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     )
     assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
     assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
+    assert len(area.net_hot_streams) > 0
+
+    net_stream = area.net_hot_streams[0]
+    assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
+    assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)
+
+
+def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_streams():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+    problem.target()
+
+    problem.set_dt_cont_multiplier(0.5, zone_name="AreaA")
+    problem.target()
+
+    area = problem.master_zone.get_subzone("AreaA")
+    cold_utility = next(
+        utility for utility in area.cold_utilities if utility.name == "CU"
+    )
+
+    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
+    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 0.5)
+    assert cold_utility.t_supply == pytest.approx(115.0)
+    assert cold_utility.t_target == pytest.approx(115.01)
     assert len(area.net_hot_streams) > 0
 
     net_stream = area.net_hot_streams[0]

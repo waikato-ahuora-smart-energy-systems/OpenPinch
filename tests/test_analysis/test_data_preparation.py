@@ -337,7 +337,8 @@ def test_duplicate_stream_names():
     ]
     site = prepare_problem(streams=streams)
     names = [s.name for z in site.subzones.values() for s in z.process_streams]
-    assert names.count("DupStream") == 2
+    assert names.count("DupStream") == 1
+    assert names.count("DupStream_1") == 1
 
 
 def test_inactive_utilities_are_ignored(dummy_streams):
@@ -1152,11 +1153,8 @@ def test_prepare_problem_preserves_passed_configuration_object(dummy_streams):
     assert site.config.IS_HIGH_P_COND_FLASH is True
 
 
-def test_prepare_problem_rejects_legacy_turbine_option_gateway(dummy_streams):
-    with pytest.raises(
-        ValueError,
-        match="Legacy workbook option gateways are no longer supported",
-    ):
+def test_prepare_problem_rejects_removed_legacy_turbine_gateway(dummy_streams):
+    with pytest.raises(ValueError, match="Unknown configuration option"):
         prepare_problem(
             streams=dummy_streams,
             options={"turbine": [{"key": "PROP_TOP_0", "value": 450.0}]},

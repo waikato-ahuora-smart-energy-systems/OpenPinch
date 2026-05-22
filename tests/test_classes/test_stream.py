@@ -233,3 +233,65 @@ def test_stream_invert_raises_for_process_stream():
 
     with pytest.raises(ValueError, match="Process streams cannot be inverted"):
         s.invert()
+
+
+def test_descriptive_aliases_update_canonical_stream_fields():
+    s = Stream(name="Alias", t_supply=150.0, t_target=90.0, heat_flow=240.0, htc=2.0)
+
+    s.supply_temperature = 160.0
+    s.target_temperature = 100.0
+    s.supply_pressure = 3.5
+    s.target_pressure = 2.5
+    s.supply_enthalpy = 1100.0
+    s.target_enthalpy = 850.0
+    s.delta_t_contribution = 8.0
+    s.effective_delta_t_contribution = 12.0
+    s.heat_duty = 300.0
+    s.heat_transfer_coefficient = 4.0
+    s.process_stream = False
+    s.is_active = False
+
+    assert s.t_supply == 160.0
+    assert s.t_target == 100.0
+    assert s.P_supply == 3.5
+    assert s.P_target == 2.5
+    assert s.h_supply == 1100.0
+    assert s.h_target == 850.0
+    assert s.dt_cont == 8.0
+    assert s.dt_cont_act == 12.0
+    assert s.heat_flow == 300.0
+    assert s.htc == 4.0
+    assert s.is_process_stream is False
+    assert s.active is False
+    assert s.supply_temperature == 160.0
+    assert s.target_temperature == 100.0
+    assert s.minimum_temperature == 100.0
+    assert s.maximum_temperature == 160.0
+    assert s.shifted_minimum_temperature == 88.0
+    assert s.shifted_maximum_temperature == 148.0
+    assert s.heat_transfer_resistance == pytest.approx(0.25)
+    assert s.heat_capacity_flow_rate == pytest.approx(5.0)
+
+
+def test_descriptive_aliases_cover_abbreviation_backed_fields():
+    s = Stream(name="Readable", t_supply=120.0, t_target=80.0, heat_flow=200.0, htc=2.0)
+
+    s.stream_type = ST.Both.value
+    s.minimum_temperature = 70.0
+    s.maximum_temperature = 130.0
+    s.shifted_minimum_temperature = 65.0
+    s.shifted_maximum_temperature = 125.0
+    s.heat_transfer_resistance = 0.75
+    s.utility_cost = 42.0
+    s.heat_capacity_flow_rate = 9.0
+    s.resistance_capacity_product = 6.75
+
+    assert s.type == ST.Both.value
+    assert s.t_min == 70.0
+    assert s.t_max == 130.0
+    assert s.t_min_star == 65.0
+    assert s.t_max_star == 125.0
+    assert s.htr == 0.75
+    assert s.ut_cost == 42.0
+    assert s.CP == 9.0
+    assert s.rCP == 6.75

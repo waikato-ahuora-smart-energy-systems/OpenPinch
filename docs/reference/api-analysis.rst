@@ -137,9 +137,3 @@ workflow documentation.
 
 .. automodule:: OpenPinch.services.exergy_analysis.exergy_targeting_entry
    :no-members:
-
-.. automodule:: OpenPinch.services.energy_transfer_analysis
-   :no-members:
-
-.. automodule:: OpenPinch.services.energy_transfer_analysis.energy_transfer_analysis
-   :no-members:
