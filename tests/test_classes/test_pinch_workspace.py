@@ -104,6 +104,16 @@ def test_pinch_workspace_validation_and_configuration_metadata():
     assert by_name["HPR_TYPE"].field_type == "enum"
     assert by_name["DT_ASSISTED_HT"].group == "general"
     assert by_name["ELE_PRICE"].group == "costing"
+    assert by_name["DO_EXERGY_TARGETING"].runtime_status == "experimental"
+
+
+def test_pinch_workspace_reports_error_category_for_unsupported_workflow():
+    workspace = PinchWorkspace.from_payload(_basic_payload(), project_name="Demo")
+
+    view = workspace.solve_variant("baseline", workflow="not_a_real_workflow")
+
+    assert view.status == "error"
+    assert view.error_category == "unsupported_workflow"
 
 
 def test_pinch_workspace_supports_advanced_workflows_on_real_cases():

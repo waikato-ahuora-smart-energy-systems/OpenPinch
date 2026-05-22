@@ -1,24 +1,25 @@
 """CSV ingestion helpers that mirror the workbook-to-JSON conversion flow."""
 
+from __future__ import annotations
+
 import json
 from typing import IO, Union
 
 import pandas as pd
 from pandas.errors import EmptyDataError, ParserError
 
-from .input_validation import validate_stream_data, validate_utility_data
-from .wkbook_to_json import (
-    _get_column_names_and_units,
-    _write_problem_to_dict_and_list,
-    _write_targets_to_dict_and_list,
+from ._tabular_input import (
+    get_column_names_and_units as _get_column_names_and_units,
 )
+from ._tabular_input import (
+    problem_records_from_frame as _write_problem_to_dict_and_list,
+)
+from ._tabular_input import (
+    target_records_from_frame as _write_targets_to_dict_and_list,
+)
+from .input_validation import validate_stream_data, validate_utility_data
 
 __all__ = ["get_problem_from_csv", "get_results_from_csv"]
-
-
-################################################################################
-# Public API
-################################################################################
 
 
 def get_problem_from_csv(
@@ -30,32 +31,7 @@ def get_problem_from_csv(
     row_data: int = 2,
     encoding: str = "utf-8-sig",
 ):
-    """
-    Read two CSV files with the same structure as the Excel template:
-      - Row 1 = column names
-      - Row 2 = column units
-      - Row 3 onward = stream data
-
-    Parameters
-    ----------
-    streams_csv : path or file-like
-        CSV for the "Stream Data" sheet.
-    utilities_csv : path or file-like
-        CSV for the "Utility Data" sheet.
-    output_json : str | None
-        If provided, write the combined JSON to this path.
-    row_units : int
-        Zero-based row index containing units (defaults to 1 -> the 2nd row).
-    row_data : int
-        Zero-based first row of data (defaults to 2 -> the 3rd row).
-    encoding : str
-        CSV text encoding (default 'utf-8-sig' to gracefully handle BOMs).
-
-    Returns
-    -------
-    dict
-        Dictionary containing ``streams``, ``utilities``, and ``options`` keys.
-    """
+    """Read stream and utility CSV files into one OpenPinch payload."""
     try:
         streams_data = _parse_csv_with_units(
             streams_csv,
@@ -77,17 +53,16 @@ def get_problem_from_csv(
         raise FileNotFoundError(f"CSV input file not found: {exc.filename}") from exc
     except (EmptyDataError, ParserError, UnicodeDecodeError, ValueError) as exc:
         raise ValueError(f"Failed to read CSV problem inputs: {exc}") from exc
-    options_data = dict()
 
     output_dict = {
         "streams": streams_data,
         "utilities": utilities_data,
-        "options": options_data,
+        "options": {},
     }
 
     if isinstance(output_json, str):
-        with open(output_json, "w", encoding="utf-8") as f:
-            json.dump(output_dict, f, indent=4)
+        with open(output_json, "w", encoding="utf-8") as handle:
+            json.dump(output_dict, handle, indent=4)
 
     return output_dict
 
@@ -101,34 +76,7 @@ def get_results_from_csv(
     row_data: int = 4,
     encoding: str = "utf-8-sig",
 ):
-    """
-    Reads a CSV equivalent of the Excel 'Summary' sheet with:
-      - Row 1 = column names
-      - Row 2 = column units
-      - Row 3 onward = data
-
-    Defaults mirror the Excel workbook call: units on row 2 and data at row 4.
-
-    Parameters
-    ----------
-    summary_csv : path or file-like
-        CSV for the 'Summary' sheet.
-    output_json : str | None
-        If provided, write the JSON to this path.
-    project_name : str
-        Used to prefix/rename totals exactly like your Excel version.
-    row_units : int
-        Zero-based units row index (default 2).
-    row_data : int
-        Zero-based first data row (default 4).
-    encoding : str
-        CSV text encoding.
-
-    Returns
-    -------
-    dict
-        Dictionary containing a ``targets`` key.
-    """
+    """Read one summary CSV file into structured target JSON."""
     try:
         results_data = _parse_csv_with_units(
             summary_csv,
@@ -143,20 +91,13 @@ def get_results_from_csv(
     except (EmptyDataError, ParserError, UnicodeDecodeError, ValueError) as exc:
         raise ValueError(f"Failed to read CSV summary input: {exc}") from exc
 
-    output_dict = {
-        "targets": results_data,
-    }
+    output_dict = {"targets": results_data}
 
     if isinstance(output_json, str):
-        with open(output_json, "w", encoding="utf-8") as f:
-            json.dump(output_dict, f, indent=4)
+        with open(output_json, "w", encoding="utf-8") as handle:
+            json.dump(output_dict, handle, indent=4)
 
     return output_dict
-
-
-################################################################################
-# Helpers
-################################################################################
 
 
 def _parse_csv_with_units(
@@ -168,12 +109,7 @@ def _parse_csv_with_units(
     project_name: str | None = None,
     encoding: str = "utf-8-sig",
 ):
-    """
-    CSV analogue of _parse_sheet_with_units(...) for Excel.
-    Reads the entire CSV without headers, then delegates to your existing
-    _get_column_names_and_units(...) and writer helpers.
-    """
-    # Read as-is (no header row); keep object dtype so mixed cells don't get mangled.
+    """Read one CSV source and convert it using the shared tabular helpers."""
     df_full = pd.read_csv(csv_file, header=None, encoding=encoding, dtype=object)
     if df_full.empty:
         raise ValueError(f"{kind} CSV is empty.")
@@ -184,43 +120,34 @@ def _parse_csv_with_units(
             "(names, units, and data rows)."
         )
 
-    # Build column names & units using your existing logic keyed by 'kind'
     col_names, col_units = _get_column_names_and_units(
-        df_full, sheet_name=kind, row_units=row_units
+        df_full,
+        sheet_name=kind,
+        row_units=row_units,
     )
-
-    # Slice data rows
     df_data: pd.DataFrame = df_full.iloc[row_data:].copy()
 
-    # Trim or pad columns to match expected 'col_names'
-    for i in range(len(df_data.columns), len(col_names), -1):
-        df_data = df_data.drop(columns=i - 1)
+    for index in range(len(df_data.columns), len(col_names), -1):
+        df_data = df_data.drop(columns=index - 1)
     df_data.columns = col_names[: len(df_data.columns)]
-    for i in range(len(df_data.columns), len(col_names)):
-        df_data[col_names[i]] = 0
+    for index in range(len(df_data.columns), len(col_names)):
+        df_data[col_names[index]] = 0
 
-    # Convert numeric-looking cells to numbers where appropriate
-    # (Excel reader often infers numerics; CSV keeps strings—this helps parity.)
-    def _to_number_maybe(x):
-        """Convert numeric-looking strings to int/float, leave others untouched."""
-        if isinstance(x, str):
-            xs = x.strip()
-            if xs == "":
+    def to_number_maybe(value):
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped == "":
                 return None
             try:
-                # int vs float
-                if "." in xs or "e" in xs.lower():
-                    return float(xs)
-                return int(xs)
+                if "." in stripped or "e" in stripped.lower():
+                    return float(stripped)
+                return int(stripped)
             except ValueError:
-                return x
-        return x
+                return value
+        return value
 
-    df_data = df_data.map(_to_number_maybe)
-
+    df_data = df_data.map(to_number_maybe)
     units_map = dict(zip(col_names, col_units))
-
     if kind == "Summary":
         return _write_targets_to_dict_and_list(df_data, units_map, project_name)
-    else:
-        return _write_problem_to_dict_and_list(df_data, units_map)
+    return _write_problem_to_dict_and_list(df_data, units_map)
