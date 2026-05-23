@@ -164,18 +164,17 @@ def _apply_zone_dt_cont_multiplier(
     zone_tree: ZoneTreeSchema,
     inherited_multiplier: float | None = None,
 ) -> Zone:
-    """Recursively apply dt_cont_multiplier values from the zone tree to the Zone hierarchy."""
+    """Recursively apply dt_cont_multiplier values for zone_tree."""
     parent_zone.dt_cont_multiplier = _resolve_zone_dt_cont_multiplier(
-        zone_tree=zone_tree, 
+        zone_tree=zone_tree,
         inherited_multiplier=inherited_multiplier,
     )
     if zone_tree.children is None:
         return parent_zone
-    
+
     for child_schema in zone_tree.children:
-        try:
-            child_zone = parent_zone.get_subzone(loc=child_schema.name)
-        except:
+        child_zone = parent_zone.get_subzone(loc=child_schema.name)
+        if child_zone is None:
             child_zone = parent_zone
         _apply_zone_dt_cont_multiplier(
             parent_zone=child_zone,

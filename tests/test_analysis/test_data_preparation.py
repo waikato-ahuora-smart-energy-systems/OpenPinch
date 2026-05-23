@@ -47,7 +47,6 @@ flow directions) to verify internal fallbacks or fail-safes.
 
 """
 
-from tkinter.font import names
 
 import pytest
 from pydantic import ValidationError

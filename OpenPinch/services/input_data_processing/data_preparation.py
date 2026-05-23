@@ -21,8 +21,8 @@ from ._canonicalization import (
     _validate_zone_tree_structure,
 )
 from ._utility_preparation import (
-    _set_utilities_for_zone_and_subzones,
     _get_hot_and_cold_utilities,
+    _set_utilities_for_zone_and_subzones,
 )
 
 __all__ = [
@@ -190,17 +190,17 @@ def _find_extreme_process_temperatures(
     hot_streams: StreamCollection, cold_streams: StreamCollection
 ) -> Tuple[float, float]:
     """Find highest TT of a cold stream and lowest TT of a hot stream."""
-    hu_t_min: float = -1e9
-    cu_t_max: float = 1e9
+    hu_t_min: float = None
+    cu_t_max: float = None
     stream: Stream
     for stream in hot_streams:
-        if cu_t_max > stream.t_min_star:
+        if cu_t_max is None or cu_t_max > stream.t_min_star:
             cu_t_max = stream.t_min_star
     for stream in cold_streams:
-        if hu_t_min < stream.t_max_star:
+        if hu_t_min is None or hu_t_min < stream.t_max_star:
             hu_t_min = stream.t_max_star
-    if hu_t_min == -1e9:
+    if hu_t_min is None:
         hu_t_min = cu_t_max
-    if cu_t_max == 1e9:
+    if cu_t_max is None:
         cu_t_max = hu_t_min
     return hu_t_min, cu_t_max

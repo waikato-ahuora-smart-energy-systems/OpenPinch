@@ -94,13 +94,21 @@ def _complete_utility_data(
         if (
             utility.type in [ST.Hot.value, ST.Both.value]
             and utility.active
-            and min(utility.t_supply, utility.t_target) - effective_dt_cont >= hu_t_min
+            and (
+                min(utility.t_supply, utility.t_target) - effective_dt_cont
+                >=
+                hu_t_min - zone_config.DT_PHASE_CHANGE
+            )
         ):
             add_default_hu = False
         if (
             utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
-            and max(utility.t_supply, utility.t_target) + effective_dt_cont <= cu_t_max
+            and (
+                max(utility.t_supply, utility.t_target) + effective_dt_cont
+                <=
+                cu_t_max + zone_config.DT_PHASE_CHANGE
+            )
         ):
             add_default_cu = False
     return utilities, add_default_hu, add_default_cu

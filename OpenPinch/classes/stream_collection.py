@@ -223,10 +223,11 @@ class StreamCollection:
             warnings.warn(f"Stream '{stream_name}' not found.")
 
     def sum_stream_attribute(self, attr_name: str) -> float:
-        """Return the total of a specified attribute across all streams in the collection."""
+        """Return the total of a specified attribute for streams in the collection."""
         if self._streams is None or len(self._streams) == 0:
             warnings.warn(
-                f"Attempted to sum attribute '{attr_name}' on an empty stream collection."
+                f"Attempted to sum attribute '{attr_name}'"
+                f" on an empty stream collection."
             )
             return 0.0
         stream = next(iter(self._streams.values()))
@@ -242,7 +243,8 @@ class StreamCollection:
         """Set a common attribute across all streams in the collection."""
         if self._streams is None or len(self._streams) == 0:
             warnings.warn(
-                f"Attempted to set attribute '{attr_name}' on an empty stream collection."
+                f"Attempted to set attribute '{attr_name}'"
+                f"on an empty stream collection."
             )
             return 0.0
         for stream in self._streams.values():  # Check if attribute exists

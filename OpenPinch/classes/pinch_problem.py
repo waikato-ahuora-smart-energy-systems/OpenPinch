@@ -36,9 +36,6 @@ from ._problem.loading import (
     load_problem_source,
     prepare_in_memory_problem_source,
 )
-from ._problem.loading import (
-    find_zone_tree_node as _find_zone_tree_node,
-)
 from ._problem.output import (
     build_graph_payload,
     build_problem_summary_frame,
@@ -358,7 +355,8 @@ class PinchProblem:
         resolved_value = float(value)
         if not math.isfinite(resolved_value) or resolved_value < 0.0:
             warnings.warn(
-                "dt_cont_multiplier must be a finite non-negative value. Used default value of 1.0 instead.",
+                "dt_cont_multiplier must be a finite non-negative value. "
+                "Used default value of 1.0 instead.",
                 UserWarning,
             )
             resolved_value = 1.0

@@ -1,7 +1,6 @@
 """Data model representing process and utility streams."""
 
 import warnings
-
 from typing import Optional
 
 from ..lib.enums import ST

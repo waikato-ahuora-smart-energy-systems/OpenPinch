@@ -252,7 +252,7 @@ def test_target_model_and_zone_property_branches():
     assert "DI" in z.targets
 
     assert z.get_subzone(next(iter(z.subzones.keys()))) is not None
-    with pytest.raises(ValueError, match="Subzone"):
+    with pytest.warns(Warning):
         z.get_subzone("missing/path")
 
     assert z.calc_utility_cost() == pytest.approx(14.0)

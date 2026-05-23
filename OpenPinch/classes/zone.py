@@ -1,7 +1,7 @@
 """Zone data structure capturing nested scopes and their thermal targets."""
 
-import warnings
 
+import warnings
 from typing import TYPE_CHECKING, Optional
 
 from ..lib.config import Configuration
@@ -128,7 +128,7 @@ class Zone:
                 zone.dt_cont_multiplier = value
         self._dt_cont_multiplier = float(value)
         self.all_streams.set_common_stream_attribute("dt_cont_multiplier", value)
-        self._targets.clear()  # Clear targets to force recalculation with new dt_cont values
+        self._targets.clear()
 
     @property
     def hot_streams(self):
@@ -306,7 +306,8 @@ class Zone:
                 sub_loc = loc_address[-1]
                 return zone.subzones[sub].get_subzone(sub_loc)
         else:
-            raise ValueError(f"Subzone '{loc}' not found.")
+            warnings.warn(f"Subzone '{loc}' not found.")
+            return None
 
     def calc_utility_cost(self):
         """Calculate and cache the annual utility cost across assigned utilities."""
