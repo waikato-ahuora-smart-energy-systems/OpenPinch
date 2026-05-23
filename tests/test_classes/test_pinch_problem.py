@@ -12,7 +12,6 @@ from OpenPinch.classes.accessors.plot_accessor import _PlotAccessor
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.classes.zone import Zone
 from OpenPinch.resources import copy_sample_case
-from tests.test_classes.test_stream import hot_stream
 
 
 @pytest.fixture
