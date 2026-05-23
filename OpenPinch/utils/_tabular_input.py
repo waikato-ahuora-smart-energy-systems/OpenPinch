@@ -242,7 +242,9 @@ def _parse_temp_pinch(value: Any) -> tuple[Optional[float], Optional[float]]:
     if value in (None, ""):
         return None, None
     parts = [part.strip() for part in str(value).split(";")]
-    if len(parts) != 2:
+    if len(parts) == 1:
+        parts = [parts[0], parts[0]]
+    elif len(parts) != 2:
         raise ValueError(f"Invalid temp_pinch value: {value!r}")
     cold_temp = None if parts[0] == "" else float(parts[0])
     hot_temp = None if parts[1] == "" else float(parts[1])

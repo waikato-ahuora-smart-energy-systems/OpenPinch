@@ -101,7 +101,7 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
         _ = sc[999]
     with pytest.raises(TypeError):
         _ = sc[1.2]
-    with pytest.raises(KeyError):
+    with pytest.warns(Warning):
         sc.remove("unknown")
 
     state = sc.__getstate__()

@@ -65,7 +65,7 @@ def get_results_filepath(problem_filepath: Path) -> Path:
 )
 def test_pinch_analysis_pipeline(p_filepath: Path):
     """Validate each example problem produces target outputs matching reference results."""
-    # if p_filepath.name != "p_pulp_mill.json":
+    # if p_filepath.name != "p_Ahmad (example 1).json":
     #     return True
 
     # Set the file path to the directory of this script

@@ -3,30 +3,34 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from ...classes.stream import Stream
+from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.enums import ST, StreamLoc
 from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ...utils.miscellaneous import get_value
 from ._canonicalization import (
+    _apply_zone_dt_cont_multiplier,
     _build_zone_config,
     _create_nested_zones,
     _get_validated_zone_info,
-    _resolve_zone_dt_cont_multiplier,
     _validate_config_data_completed,
     _validate_input_data,
     _validate_zone_tree_structure,
 )
-from ._utility_preparation import _set_utilities_for_zone_and_subzones
+from ._utility_preparation import (
+    _set_utilities_for_zone_and_subzones,
+    _get_hot_and_cold_utilities,
+)
 
 __all__ = [
     "prepare_problem",
+    "_apply_zone_dt_cont_multiplier",
     "_build_zone_config",
     "_create_nested_zones",
     "_get_validated_zone_info",
-    "_resolve_zone_dt_cont_multiplier",
     "_validate_config_data_completed",
     "_validate_input_data",
     "_validate_zone_tree_structure",
@@ -54,25 +58,47 @@ def prepare_problem(
         top_zone_identifier=top_zone_identifier,
     )
     zone_tree, streams, utilities, zone_config = _validate_input_data(
-        zone_tree,
-        streams,
-        utilities,
-        zone_config,
+        zone_tree=zone_tree,
+        streams=streams,
+        utilities=utilities,
+        zone_config=zone_config,
     )
     master_zone = Zone(
         name=zone_config.TOP_ZONE_NAME,
         type=zone_config.TOP_ZONE_IDENTIFIER,
         zone_config=zone_config,
-        dt_cont_multiplier=_resolve_zone_dt_cont_multiplier(zone_tree, None),
-        lock_dt_cont_multiplier=True,
     )
-    master_zone = _create_nested_zones(master_zone, zone_tree, master_zone.config)
+    master_zone = _create_nested_zones(
+        parent_zone=master_zone,
+        zone_tree=zone_tree,
+        zone_config=master_zone.config,
+    )
     master_zone = _get_process_streams_in_each_subzone(
-        master_zone,
-        sorted(streams, key=lambda stream: stream.name),
+        master_zone=master_zone,
+        streams=sorted(streams, key=lambda stream: stream.name),
     )
     master_zone.import_hot_and_cold_streams_from_sub_zones()
-    return _set_utilities_for_zone_and_subzones(master_zone, utilities)
+    hu_t_min, cu_t_max = _find_extreme_process_temperatures(
+        hot_streams=master_zone.hot_streams,
+        cold_streams=master_zone.cold_streams,
+    )
+    hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
+        utilities=utilities,
+        hu_t_min=hu_t_min,
+        cu_t_max=cu_t_max,
+        zone_config=master_zone.config,
+        dt_cont_multiplier=master_zone.dt_cont_multiplier,
+    )
+    master_zone = _set_utilities_for_zone_and_subzones(
+        zone=master_zone,
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+    )
+    master_zone = _apply_zone_dt_cont_multiplier(
+        parent_zone=master_zone,
+        zone_tree=zone_tree,
+    )
+    return master_zone
 
 
 def _get_process_streams_in_each_subzone(
@@ -158,3 +184,23 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
         htc=get_value(stream.htc),
         is_process_stream=True,
     )
+
+
+def _find_extreme_process_temperatures(
+    hot_streams: StreamCollection, cold_streams: StreamCollection
+) -> Tuple[float, float]:
+    """Find highest TT of a cold stream and lowest TT of a hot stream."""
+    hu_t_min: float = -1e9
+    cu_t_max: float = 1e9
+    stream: Stream
+    for stream in hot_streams:
+        if cu_t_max > stream.t_min_star:
+            cu_t_max = stream.t_min_star
+    for stream in cold_streams:
+        if hu_t_min < stream.t_max_star:
+            hu_t_min = stream.t_max_star
+    if hu_t_min == -1e9:
+        hu_t_min = cu_t_max
+    if cu_t_max == 1e9:
+        cu_t_max = hu_t_min
+    return hu_t_min, cu_t_max

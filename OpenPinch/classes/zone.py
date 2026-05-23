@@ -1,5 +1,7 @@
 """Zone data structure capturing nested scopes and their thermal targets."""
 
+import warnings
+
 from typing import TYPE_CHECKING, Optional
 
 from ..lib.config import Configuration
@@ -28,8 +30,6 @@ class Zone:
         type: str = ZT.P.value,
         zone_config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
-        dt_cont_multiplier: float = 1.0,
-        lock_dt_cont_multiplier: bool = False,
     ):
         """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
@@ -37,8 +37,12 @@ class Zone:
         self._type = type
         self._config = zone_config or Configuration()
         self._parent_zone = parent_zone
-        self._dt_cont_multiplier = float(dt_cont_multiplier)
-        self._lock_dt_cont_multiplier = bool(lock_dt_cont_multiplier)
+        self._dt_cont_multiplier = (
+            parent_zone.dt_cont_multiplier
+            if hasattr(parent_zone, "dt_cont_multiplier")
+            else 1.0
+        )
+        self._lock_dt_cont_multiplier = False
         self._active = True
         self._subzones = {}
         self._targets = {}
@@ -119,14 +123,12 @@ class Zone:
     @dt_cont_multiplier.setter
     def dt_cont_multiplier(self, value: float):
         """Set the active ``dt_cont`` multiplier when the zone is still mutable."""
-        if self._lock_dt_cont_multiplier:
-            raise RuntimeError(
-                "Direct mutation of dt_cont_multiplier on prepared analysis "
-                "zones is not supported. "
-                "Use PinchProblem.set_dt_cont_multiplier(...) to rebuild "
-                "the active stream state."
-            )
+        for zone in self.subzones.values():
+            if not (zone._lock_dt_cont_multiplier):
+                zone.dt_cont_multiplier = value
         self._dt_cont_multiplier = float(value)
+        self.all_streams.set_common_stream_attribute("dt_cont_multiplier", value)
+        self._targets.clear()  # Clear targets to force recalculation with new dt_cont values
 
     @property
     def hot_streams(self):
@@ -280,14 +282,16 @@ class Zone:
         if isinstance(target_to_add, BaseTargetModel):
             self._targets[target_to_add.type] = target_to_add
 
-    def add_targets(self, targets: list):
+    def add_targets(self, targets: list = []):
         """Add multiple targets to a specific zone."""
         for t in targets:
             self.add_target(t)
 
-    def get_subzone(self, loc: str) -> "Zone":
+    def get_subzone(self, loc: str = None) -> "Zone":
         """Resolve a slash-delimited zone path relative to this zone."""
         zone = self
+        if loc is None:
+            return zone
         loc_address = loc.split("/", 1)
         if loc_address[0] == zone.name:
             loc_address.pop(0)
@@ -370,3 +374,8 @@ class Zone:
         if resolved[0] == self.name:
             resolved.pop(0)
         return self.get_subzone(resolved)
+
+    def lock_dt_cont_multiplier(self):
+        """Lock the dt_cont_multiplier to prevent further changes."""
+        self._lock_dt_cont_multiplier = True
+        self.all_streams.set_common_stream_attribute("dt_cont_multiplier_locked", True)

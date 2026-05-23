@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import copy
+from copy import deepcopy
 from typing import List, Tuple
 
 from ...classes.stream import Stream
@@ -16,57 +16,39 @@ from ...utils.miscellaneous import get_value
 
 def _get_hot_and_cold_utilities(
     utilities: List[UtilitySchema],
-    hot_streams: StreamCollection,
-    cold_streams: StreamCollection,
+    hu_t_min: float,
+    cu_t_max: float,
     zone_config: Configuration,
     dt_cont_multiplier: float = 1.0,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Extract all utility data into class instances."""
-    utilities = copy.deepcopy(list(utilities))
-    hu_t_min, cu_t_max = _find_extreme_process_temperatures(hot_streams, cold_streams)
-    utilities, add_default_hu, add_default_cu = _complete_utility_data(
-        utilities,
-        zone_config,
-        hu_t_min,
-        cu_t_max,
+    utilities_filled, add_default_hu, add_default_cu = _complete_utility_data(
+        deepcopy(list(utilities)),
+        zone_config=zone_config,
+        hu_t_min=hu_t_min,
+        cu_t_max=cu_t_max,
         dt_cont_multiplier=dt_cont_multiplier,
     )
-    utilities = _add_default_utilities(
-        utilities,
-        zone_config,
-        add_default_hu,
-        add_default_cu,
-        hu_t_min,
-        cu_t_max,
+    utilities_with_defaults = _add_default_utilities(
+        utilities=utilities_filled,
+        zone_config=zone_config,
+        add_default_hu=add_default_hu,
+        add_default_cu=add_default_cu,
+        hu_t_min=hu_t_min,
+        cu_t_max=cu_t_max,
         dt_cont_multiplier=dt_cont_multiplier,
     )
-    hot_utilities, utilities = _create_utilities_list(
-        utilities,
+    hot_utilities, utilities_left = _create_utilities_list(
+        utilities=utilities_with_defaults,
         utility_type=ST.Hot.value,
         dt_cont_multiplier=dt_cont_multiplier,
     )
-    cold_utilities, utilities = _create_utilities_list(
-        utilities,
+    cold_utilities, _ = _create_utilities_list(
+        utilities=utilities_left,
         utility_type=ST.Cold.value,
         dt_cont_multiplier=dt_cont_multiplier,
     )
     return hot_utilities, cold_utilities
-
-
-def _find_extreme_process_temperatures(
-    hot_streams: StreamCollection, cold_streams: StreamCollection
-) -> Tuple[float, float]:
-    """Find highest TT of a cold stream and lowest TT of a hot stream."""
-    hu_t_min: float = -1e9
-    cu_t_max: float = 1e9
-    stream: Stream
-    for stream in hot_streams:
-        if cu_t_max > stream.t_min_star:
-            cu_t_max = stream.t_min_star
-    for stream in cold_streams:
-        if hu_t_min < stream.t_max_star:
-            hu_t_min = stream.t_max_star
-    return hu_t_min, cu_t_max
 
 
 def _complete_utility_data(
@@ -118,7 +100,7 @@ def _complete_utility_data(
         if (
             utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
-            and max(utility.t_supply, utility.t_target) - effective_dt_cont <= cu_t_max
+            and max(utility.t_supply, utility.t_target) + effective_dt_cont <= cu_t_max
         ):
             add_default_cu = False
     return utilities, add_default_hu, add_default_cu
@@ -190,13 +172,18 @@ def _create_utilities_list(
 ) -> Tuple[StreamCollection, List[UtilitySchema]]:
     """Create a sorted list of hot or cold Stream objects based on type."""
     created_utilities = StreamCollection()
+    unassigned_utilities = utilities
 
     def _sort_key(selected: UtilitySchema):
         order = selected.t_supply
         return -order if utility_type == ST.Hot.value else order
 
     candidates = sorted(
-        (u for u in utilities if u.active and u.type in ["Both", utility_type]),
+        (
+            u
+            for u in unassigned_utilities
+            if u.active and u.type in ["Both", utility_type]
+        ),
         key=_sort_key,
     )
 
@@ -231,23 +218,21 @@ def _create_utilities_list(
             key,
         )
 
-    return created_utilities, utilities
+    return created_utilities, unassigned_utilities
 
 
 def _set_utilities_for_zone_and_subzones(
     zone: Zone,
-    utilities: List[UtilitySchema],
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
 ) -> Zone:
     """Add utilities to a zone and its subzones using effective multipliers."""
-    hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
-        utilities,
-        zone.hot_streams,
-        zone.cold_streams,
-        zone.config,
-        dt_cont_multiplier=zone.dt_cont_multiplier,
-    )
-    zone.hot_utilities = hot_utilities
-    zone.cold_utilities = cold_utilities
+    zone.hot_utilities = deepcopy(hot_utilities)
+    zone.cold_utilities = deepcopy(cold_utilities)
     for subzone in zone.subzones.values():
-        _set_utilities_for_zone_and_subzones(subzone, utilities)
+        _set_utilities_for_zone_and_subzones(
+            zone=subzone,
+            hot_utilities=hot_utilities,
+            cold_utilities=cold_utilities,
+        )
     return zone

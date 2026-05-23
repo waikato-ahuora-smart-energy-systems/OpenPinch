@@ -133,7 +133,7 @@ def test_reset_heat_flows_zeros_all_streams_in_place():
     sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=15.0))
     sc.add(Stream(name="C1", t_supply=60, t_target=140, heat_flow=25.0))
 
-    returned = sc.reset_heat_flows()
+    returned = sc.set_common_stream_attribute("heat_flow", 0.0)
 
     assert returned is sc
     assert all(stream.heat_flow == 0.0 for stream in sc)
@@ -144,7 +144,7 @@ def test_sum_heat_flow_returns_total_for_all_streams():
     sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=15.0))
     sc.add(Stream(name="C1", t_supply=60, t_target=140, heat_flow=25.0))
 
-    assert sc.sum_heat_flow() == pytest.approx(40.0)
+    assert sc.sum_stream_attribute("heat_flow") == pytest.approx(40.0)
 
 
 def test_get_hot_streams_filters_and_preserves_sort_settings():

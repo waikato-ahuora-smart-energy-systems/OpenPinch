@@ -484,7 +484,7 @@ def maybe_float(value: Any) -> Optional[float]:
         return None
     try:
         value = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not math.isfinite(value):
         return None

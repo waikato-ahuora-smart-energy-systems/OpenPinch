@@ -38,8 +38,12 @@ def compute_total_subzone_utility_targets(zone: Zone) -> TotalProcessTarget:
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = num_units = area = 0.0
 
-    hot_utilities = deepcopy(zone.hot_utilities).reset_heat_flows()
-    cold_utilities = deepcopy(zone.cold_utilities).reset_heat_flows()
+    hot_utilities = deepcopy(zone.hot_utilities).set_common_stream_attribute(
+        "heat_flow", 0.0
+    )
+    cold_utilities = deepcopy(zone.cold_utilities).set_common_stream_attribute(
+        "heat_flow", 0.0
+    )
     for subzone in zone.subzones.values():
         t = subzone.targets[TT.DI.value]
         hot_utility_target += t.hot_utility_target

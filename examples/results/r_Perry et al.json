@@ -76,6 +76,13 @@
                         "value": 0.0,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -155,6 +162,13 @@
                         "value": 3.977000000000002,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -187,7 +201,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1375.574090909091,
+                "value": 313885.6649999997,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -232,6 +246,13 @@
                     "name": "CW",
                     "heat_flow": {
                         "value": 2.0865909090909085,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.11340909090909079,
                         "units": "kW"
                     }
                 }
@@ -309,6 +330,13 @@
                 },
                 {
                     "name": "CW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -392,6 +420,13 @@
                         "value": 0.0,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -424,7 +459,7 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 3926.291910909091,
+                "value": 316436.38281999965,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -469,6 +504,13 @@
                     "name": "CW",
                     "heat_flow": {
                         "value": 6.063590909090911,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.11340909090909079,
                         "units": "kW"
                     }
                 }
@@ -491,19 +533,19 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 6.063590909090912,
+                "value": 6.177000000000003,
                 "units": "kW"
             },
             "Qr": {
-                "value": 23.420249999999992,
+                "value": 23.42024999999999,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 79.1298178040189,
+                "value": 79.12981780401887,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 3926.2919109090917,
+                "value": 316436.3828199997,
                 "units": "$/y"
             },
             "hot_utilities": [
@@ -548,6 +590,13 @@
                     "name": "CW",
                     "heat_flow": {
                         "value": 6.063590909090911,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 0.11340909090909079,
                         "units": "kW"
                     }
                 }

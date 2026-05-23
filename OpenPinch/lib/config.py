@@ -83,9 +83,7 @@ class Configuration:
         statuses = {key: configuration_option_status(str(key)) for key in options}
 
         dead_keys = sorted(
-            key
-            for key, status in statuses.items()
-            if status.runtime_status == "dead"
+            key for key, status in statuses.items() if status.runtime_status == "dead"
         )
         if dead_keys:
             raise ValueError(

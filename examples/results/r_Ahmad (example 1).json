@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Ahmad (example 1)/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 157.0,
@@ -29,17 +29,10 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 436892232.4055596,
+                "value": 17877.76697526703,
                 "units": "$/y"
             },
             "hot_utilities": [
-                {
-                    "name": "HU",
-                    "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
                 {
                     "name": "HU",
                     "heat_flow": {
@@ -87,17 +80,10 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 436892232.4055596,
+                "value": 17877.76697526703,
                 "units": "$/y"
             },
             "hot_utilities": [
-                {
-                    "name": "HU",
-                    "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
                 {
                     "name": "HU",
                     "heat_flow": {
@@ -117,14 +103,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Ahmad (example 1)/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 157.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 157.0,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -145,17 +131,10 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 436892232.4055596,
+                "value": 17877.76697526703,
                 "units": "$/y"
             },
             "hot_utilities": [
-                {
-                    "name": "HU",
-                    "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
                 {
                     "name": "HU",
                     "heat_flow": {
@@ -175,14 +154,14 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Ahmad (example 1)/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 60.0,
+                    "value": 50.0,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 294.0,
+                    "value": 310.0,
                     "units": "degC"
                 }
             },
@@ -203,17 +182,10 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 436892232.4055596,
+                "value": 17877.76697526703,
                 "units": "$/y"
             },
             "hot_utilities": [
-                {
-                    "name": "HU",
-                    "heat_flow": {
-                        "value": 0.0,
-                        "units": "kW"
-                    }
-                },
                 {
                     "name": "HU",
                     "heat_flow": {
