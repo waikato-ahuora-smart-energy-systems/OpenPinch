@@ -1,0 +1,200 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Ziyatdinov et al",
+            "data": {
+                "T": [
+                    352.5,
+                    352.49,
+                    154.35,
+                    149.35000000000002,
+                    149.25,
+                    139.45000000000005,
+                    139.43993255058712,
+                    139.36750437609405,
+                    139.35008986515174,
+                    139.35000000000002,
+                    124.35000000000005,
+                    119.35000000000002,
+                    104.35000000000002,
+                    44.5
+                ],
+                "H_net": [
+                    700.0000000000005,
+                    700.0000000000005,
+                    700.0000000000005,
+                    700.0000000000005,
+                    700.0000000000005,
+                    700.0000000000005,
+                    700.0000000000005,
+                    700,
+                    3.593707417137921,
+                    0,
+                    150,
+                    200.00000000000045,
+                    800.0000000000008,
+                    800.0000000000008
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Ziyatdinov et al",
+            "name": "H1",
+            "t_supply": {
+                "value": 156.85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 106.85000000000002,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.88,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Ziyatdinov et al",
+            "name": "H2",
+            "t_supply": {
+                "value": 151.85000000000002,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 151.75,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.9,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Ziyatdinov et al",
+            "name": "C1",
+            "t_supply": {
+                "value": 136.85000000000002,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 136.95000000000005,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.7,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Ziyatdinov et al",
+            "name": "C2",
+            "t_supply": {
+                "value": 116.85000000000002,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 146.85000000000002,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 900,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1.85,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HOIL",
+            "type": "Hot",
+            "t_supply": {
+                "value": 355,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 2.5,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 29.850000000000023,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 42,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

@@ -1,0 +1,2346 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Aromatic hydrocarbon extraction unit",
+            "data": {
+                "T": [
+                    425,
+                    424.99,
+                    187,
+                    183,
+                    180,
+                    175,
+                    171,
+                    170.9845186118391,
+                    170,
+                    141,
+                    138,
+                    137.4725725318442,
+                    137.2401082572384,
+                    137,
+                    130,
+                    129.7955156970308,
+                    129.049381036554,
+                    129,
+                    115,
+                    114,
+                    113,
+                    105,
+                    99.51097039098177,
+                    85,
+                    84.15371213937502,
+                    80,
+                    78.46792422977188,
+                    61,
+                    50,
+                    45,
+                    39,
+                    35,
+                    25,
+                    24.99,
+                    15
+                ],
+                "H_net": [
+                    24106.279781420766,
+                    24106.279781420766,
+                    24106.279781420766,
+                    20449.136924277907,
+                    17802.015075538413,
+                    17802.015075538413,
+                    17802.015075538413,
+                    17802.015075538773,
+                    6876.87042751527,
+                    6876.87042751527,
+                    6876.87042751527,
+                    6876.870427515241,
+                    5211.613044716534,
+                    3491.5980070716832,
+                    3491.5980070716832,
+                    3491.5980070717633,
+                    1026.7435952119995,
+                    863.6134361941513,
+                    863.6134361941513,
+                    863.6134361941513,
+                    863.6134361941513,
+                    863.6134361941513,
+                    863.6134361941513,
+                    0,
+                    120.1807378992562,
+                    710.0464480874325,
+                    1141.9386077147392,
+                    6066.146448087435,
+                    14176.277217318204,
+                    16696.033627574616,
+                    19314.741319882305,
+                    21176.27978142077,
+                    21276.27978142077,
+                    21276.27978142077,
+                    21276.27978142077
+                ]
+            }
+        },
+        {
+            "name": "Hydrocracking unit",
+            "data": {
+                "T": [
+                    425,
+                    424.99,
+                    389.5,
+                    377.4,
+                    368.6,
+                    361.1,
+                    345,
+                    299.6,
+                    298.99080931820276,
+                    298.4,
+                    291.4,
+                    274.3,
+                    273.5,
+                    273.2,
+                    268.8876477468139,
+                    261.89797167078785,
+                    261.3,
+                    257.5,
+                    255.2,
+                    254.3,
+                    250.1,
+                    240,
+                    228.3,
+                    222.7,
+                    216.9,
+                    214.7,
+                    212.7,
+                    205,
+                    194.4,
+                    190.1,
+                    189.8,
+                    185,
+                    175.3,
+                    174.5,
+                    170,
+                    163.75729917370626,
+                    160.6,
+                    158.2,
+                    155.5051369252226,
+                    151.5,
+                    148,
+                    144.5,
+                    138.7,
+                    138,
+                    129.9,
+                    128.7,
+                    119.16768872426351,
+                    112.8,
+                    97.7,
+                    91,
+                    82.3,
+                    77,
+                    58.3,
+                    57.9,
+                    57.8,
+                    54,
+                    52.5,
+                    51,
+                    50,
+                    46.3,
+                    39.9,
+                    39.2,
+                    38.7,
+                    38.4,
+                    25.6,
+                    25,
+                    24.99,
+                    15
+                ],
+                "H_net": [
+                    20985.69056810944,
+                    20985.69056810944,
+                    20985.69056810944,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171238,
+                    19822.991387171263,
+                    11613.029472524067,
+                    10910.661495838516,
+                    8147.89790819516,
+                    7098.160997311037,
+                    6687.39008149154,
+                    3802.8642042916326,
+                    1376.6301820925983,
+                    0,
+                    489.2722643881025,
+                    2332.2210698641975,
+                    3127.1277596260734,
+                    3849.7799100132543,
+                    6296.490689003893,
+                    9664.665827560742,
+                    11263.544467424657,
+                    11375.1944191669,
+                    12854.759416372895,
+                    15371.835539011403,
+                    15902.90114414635,
+                    18767.174573454522,
+                    20946.637000709496,
+                    22048.918707324825,
+                    22321.330511650227,
+                    22981.551812177466,
+                    22981.55181217747,
+                    22981.55181217747,
+                    22981.55181217747,
+                    22981.55181217747,
+                    22981.55181217747,
+                    22981.55181217747,
+                    23107.686770162254,
+                    26417.43885443655,
+                    28628.389632007857,
+                    36994.24809142971,
+                    39825.28457167343,
+                    43601.98705621269,
+                    44884.045158317414,
+                    53717.476657211955,
+                    53870.622871475876,
+                    53921.85531123965,
+                    55868.73305447011,
+                    56291.520035493566,
+                    56714.03485608562,
+                    56936.71545172999,
+                    57761.36730511731,
+                    60695.73963915974,
+                    60997.47465667389,
+                    61207.12003955437,
+                    61284.515964934835,
+                    61487.690568109436,
+                    61487.690568109436,
+                    61487.690568109436,
+                    61487.690568109436
+                ]
+            }
+        },
+        {
+            "name": "Isomerization unit",
+            "data": {
+                "T": [
+                    425,
+                    424.99,
+                    411,
+                    407,
+                    348,
+                    324.0750322276372,
+                    250,
+                    249.77097716731015,
+                    242,
+                    238,
+                    205,
+                    193.85038038498877,
+                    175,
+                    172,
+                    170,
+                    147.86044373662872,
+                    139,
+                    132,
+                    129,
+                    100.50626776159545,
+                    95,
+                    55,
+                    45,
+                    35,
+                    25,
+                    24.99
+                ],
+                "H_net": [
+                    44030.57075098815,
+                    44030.57075098815,
+                    44030.57075098815,
+                    41998.82471924211,
+                    39325.04347826088,
+                    38362.59781818183,
+                    35382.73201581028,
+                    34374.4068537266,
+                    160.91067193675553,
+                    0,
+                    5539.629813664593,
+                    10387.899936045957,
+                    10387.899936045957,
+                    10387.899936045957,
+                    10387.899936045957,
+                    10387.899936045957,
+                    10387.899936045957,
+                    10387.899936045957,
+                    10387.899936045957,
+                    11431.746396039318,
+                    11633.464376071784,
+                    33212.66829760879,
+                    59137.46927799305,
+                    64580.57075098813,
+                    64580.57075098813,
+                    64580.57075098813
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from top of column 204 - EC207",
+            "t_supply": {
+                "value": 110,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 800,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from top of column 208 - EC215",
+            "t_supply": {
+                "value": 66,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 11840,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from bottom of column 204 - EA214",
+            "t_supply": {
+                "value": 175,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 146,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3400,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from bottom of column 205 - EA205",
+            "t_supply": {
+                "value": 146,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 85,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 860,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from bottom of column 206 - EA209",
+            "t_supply": {
+                "value": 146,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 85,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4840,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Mixed material - EC212",
+            "t_supply": {
+                "value": 110,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4050,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from bottom of column 212 - EA218",
+            "t_supply": {
+                "value": 188,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2170,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from top of column 213 - EC221",
+            "t_supply": {
+                "value": 85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from bottom of column 202 - EA205",
+            "t_supply": {
+                "value": 80,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 110,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 860,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Material in reboiler of column 204 - EA206",
+            "t_supply": {
+                "value": 165,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 166,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1830,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from bottom of column 205 - EA209",
+            "t_supply": {
+                "value": 80,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 108,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4840,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Material in reboiler of column 207 - EA211",
+            "t_supply": {
+                "value": 165,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 166,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9270,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Feed of column 208 - EA213",
+            "t_supply": {
+                "value": 175,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 182,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6400,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Material in reboiler of column 209 - EA214",
+            "t_supply": {
+                "value": 124,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 125,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3400,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from tank 203 - EA218",
+            "t_supply": {
+                "value": 34,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 109,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2170,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Product from tank 204 - EA219",
+            "t_supply": {
+                "value": 109,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 170,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1760,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aromatic hydrocarbon extraction unit",
+            "name": "Material in reboiler of column 213 - EA220",
+            "t_supply": {
+                "value": 132,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 133,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7260,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil I  - EA101",
+            "t_supply": {
+                "value": 382.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 296.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 19271,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil I  - EA102",
+            "t_supply": {
+                "value": 296.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 278.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4824,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil I  - EA103",
+            "t_supply": {
+                "value": 278.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 233.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7280,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil I  - EA106",
+            "t_supply": {
+                "value": 233.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 194.8,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14136,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil I  - EA107",
+            "t_supply": {
+                "value": 194.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 149.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13737,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Cooled hydrogenated oil I - EC101",
+            "t_supply": {
+                "value": 133.7,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 62.8,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 17165,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Cooled hydrogenated oil I - EA108",
+            "t_supply": {
+                "value": 62.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 43.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4697,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil II - EA109",
+            "t_supply": {
+                "value": 366.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 304.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14752,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil II - EA110",
+            "t_supply": {
+                "value": 304.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 245,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5231,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil II - EA114",
+            "t_supply": {
+                "value": 245,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 199.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9591,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Hydrogenated oil II - EA115",
+            "t_supply": {
+                "value": 199.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 149.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13194,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Cooled hydrogenated oil II - EC102",
+            "t_supply": {
+                "value": 134.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 57.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 12499,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Cooled hydrogenated oil II - EA116",
+            "t_supply": {
+                "value": 57.5,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 43.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2226,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Reflux from top of column 101 - EC103",
+            "t_supply": {
+                "value": 96,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 474,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Reflux from top of column 102 - EA119",
+            "t_supply": {
+                "value": 55,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 44.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 127,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Reflux from top of column 102 - EC104",
+            "t_supply": {
+                "value": 82,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 59,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5301,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Liquid from bottom of column 103 - EC106",
+            "t_supply": {
+                "value": 143,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 87.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 11590,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Liquid from bottom of column 104 - EC108",
+            "t_supply": {
+                "value": 87.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 900,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Aviation kerosene reflux from top of column 104 - EA124",
+            "t_supply": {
+                "value": 180.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 175,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2143,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Aviation kerosene reflux from top of column 105 - EC110",
+            "t_supply": {
+                "value": 175,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 63.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13064,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Aviation kerosene from column 104 - EA126",
+            "t_supply": {
+                "value": 63.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 44.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 505,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Tail oil from bottom of column 104 - EA125",
+            "t_supply": {
+                "value": 255.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 179.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6526,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Tail oil from bottom of column 105 - EC109",
+            "t_supply": {
+                "value": 179.5,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 56,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7286,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Liquid from bottom of column 101 - EA112",
+            "t_supply": {
+                "value": 221.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 217.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 183,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Mid reflux from column 102 - EC105",
+            "t_supply": {
+                "value": 163.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 102.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7955,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Raw material I - EA114",
+            "t_supply": {
+                "value": 107.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 185.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9591,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Raw material I - EA101",
+            "t_supply": {
+                "value": 185.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 340,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 19271,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Recycle hydrogen I - EA106",
+            "t_supply": {
+                "value": 52.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 200,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14136,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Recycle hydrogen I - EA102",
+            "t_supply": {
+                "value": 200,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 250.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4824,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Recycle hydrogen I - BA101",
+            "t_supply": {
+                "value": 250.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 384.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 12905,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Raw material II - EA124",
+            "t_supply": {
+                "value": 107.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 133.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2143,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Raw material II - EA125",
+            "t_supply": {
+                "value": 133.7,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 180,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6526,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Raw material II - EA109",
+            "t_supply": {
+                "value": 180,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 340,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14752,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Recycle hydrogen II - EA110",
+            "t_supply": {
+                "value": 52.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 209.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5231,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Recycle hydrogen II - BA102",
+            "t_supply": {
+                "value": 209.7,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 363.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5135,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Feed to column 101 - EA107",
+            "t_supply": {
+                "value": 41.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 155.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13737,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Feed to column 102 - EA115",
+            "t_supply": {
+                "value": 41.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 155.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13194,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Material in reboiler of column 101 - EA103",
+            "t_supply": {
+                "value": 217.7,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 249.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7280,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Material from reboiler of column 101 - BA103",
+            "t_supply": {
+                "value": 252.5,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 293.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 11069,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Material in reboiler of column 102 - BA104",
+            "t_supply": {
+                "value": 245.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 269.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8718,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Material in reboiler of column 103 - EA112",
+            "t_supply": {
+                "value": 143,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 146.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 183,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Hydrocracking unit",
+            "name": "Material in reboiler of column 104 - BA105",
+            "t_supply": {
+                "value": 256.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 268.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5460,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Liquid from reactor 301-1 - EA301-1",
+            "t_supply": {
+                "value": 412,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 137,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 63610,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Liquid from reactor 301-2 - EA302-1",
+            "t_supply": {
+                "value": 137,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 24240,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Liquid from reactor 301-3 - EA303-1",
+            "t_supply": {
+                "value": 50,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2030,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Liquid from reactor 301-2 - EA301-2",
+            "t_supply": {
+                "value": 412,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 137,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 63610,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Liquid from reactor 301-3 - EA302-2",
+            "t_supply": {
+                "value": 137,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 24240,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Liquid from reactor 301-4 - EA303-2",
+            "t_supply": {
+                "value": 50,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2030,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Product from bottom of column 302 - EA305",
+            "t_supply": {
+                "value": 243,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 180,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13110,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Gas from top of column 302 - EC306",
+            "t_supply": {
+                "value": 144,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14340,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Material from other unit - EA310",
+            "t_supply": {
+                "value": 210,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 177,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8810,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Gas from top of column 310 - EA309",
+            "t_supply": {
+                "value": 134,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 40,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Vapor - EC308",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 20530,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Feed to reactor 301-1 - EA301-1",
+            "t_supply": {
+                "value": 90,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 343,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 63610,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Feed to reactor 301-2 - BA301-1",
+            "t_supply": {
+                "value": 343,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 406,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 16000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Feed to reactor 301-2 - EA301-2",
+            "t_supply": {
+                "value": 90,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 343,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 63610,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Feed to reactor 301-3 - BA301-2",
+            "t_supply": {
+                "value": 343,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 406,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 16000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Feed to column 302 - EA305",
+            "t_supply": {
+                "value": 40,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 124,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 13110,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Feed to column 303 - EA310",
+            "t_supply": {
+                "value": 124,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 165,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8810,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Isomerization unit",
+            "name": "Material in reboiler of column 302 - BA302",
+            "t_supply": {
+                "value": 237,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 245,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 34900,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 430,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

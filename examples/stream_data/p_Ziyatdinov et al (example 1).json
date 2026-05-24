@@ -107,24 +107,21 @@
     ],
     "utilities": [
         {
-            "name": "HU",
+            "name": "HOIL",
             "type": "Hot",
             "t_supply": {
-                "value": 353.85,
+                "value": 355.0,
                 "units": "degC"
             },
             "t_target": {
-                "value": 353.9,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
                 "value": 2.5,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 2.5,
                 "units": "kW/m^2/degC"
@@ -132,7 +129,7 @@
             "heat_flow": null
         },
         {
-            "name": "CU",
+            "name": "CW",
             "type": "Cold",
             "t_supply": {
                 "value": 29.850000000000023,
@@ -146,10 +143,7 @@
                 "value": 2.5,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 1.0,
                 "units": "kW/m^2/degC"

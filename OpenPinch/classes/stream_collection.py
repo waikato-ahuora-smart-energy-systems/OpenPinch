@@ -207,6 +207,13 @@ class StreamCollection:
             invert_utility=True,
         )
 
+    def get_stream_by_name(self, name: str, approximate: bool = False) -> Stream:
+        for stream in self:
+            if (stream.name == name) or (approximate and name in stream.name):
+                return stream
+        warnings.warn(f"Stream '{name}' not found.")
+        return None
+
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
         """Replace the collection contents with the provided stream mapping."""
         self._streams = {}

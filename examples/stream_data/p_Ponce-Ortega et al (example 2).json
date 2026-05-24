@@ -185,10 +185,10 @@
     ],
     "utilities": [
         {
-            "name": "HU",
+            "name": "HOIL",
             "type": "Hot",
             "t_supply": {
-                "value": 353.85,
+                "value": 375.0,
                 "units": "degC"
             },
             "t_target": {
@@ -207,10 +207,76 @@
             "heat_flow": null
         },
         {
-            "name": "CU",
+            "name": "HPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 200.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "MPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 150.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Both",
+            "t_supply": {
+                "value": 30.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 45.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2.5,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CHW",
             "type": "Cold",
             "t_supply": {
-                "value": 29.850000000000023,
+                "value": 15.0,
                 "units": "degC"
             },
             "t_target": {

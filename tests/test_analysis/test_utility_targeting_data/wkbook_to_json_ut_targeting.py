@@ -42,13 +42,10 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
                 or df_full[i][0] == "Heat Receiver Utility"
             ):
                 prefix = "CU::"
-            if df_full[i][1] == "Default HU":
-                col_names.append(prefix + "HU")
-            elif df_full[i][1] == "Default CU":
-                col_names.append(prefix + "CU")
+            if df_full[i][1] == "Default HU" or df_full[i][1] == "Default CU":
+                raise ValueError("Default HU or CU column should not be present in Summary sheet.")
             else:
                 col_names.append(prefix + df_full[i][1])
-        # col_names.append("utility_cost")
 
     col_units = df_full.iloc[row_units].tolist()
 
@@ -119,9 +116,10 @@ def parse_sheet_for_gcc_with_units(excel_file, sheet_name, row_units=1, row_data
     # Read the entire sheet as-is (no header)
     df_full: pd.DataFrame = pd.read_excel(excel_file, sheet_name=sheet_name, header=1)
     cols = df_full.columns.tolist()
-    cols[37] = "T"
-    cols[38] = "H_cold_net"
-    cols[40] = "H_hot_net"
+    col_T = 0
+    col_H_net = 12
+    cols[col_T] = "T"
+    cols[col_H_net] = "H_net"
     df_full.columns = cols
 
     # The actual data starts from the third row
@@ -132,29 +130,30 @@ def parse_sheet_for_gcc_with_units(excel_file, sheet_name, row_units=1, row_data
     i = i_0 = 1
     while i < len(df_full):
         for i in range(i, len(df_full)):
-            if isinstance(df_full.iloc[i, 0], str):
-                if len(df_full.iloc[i, 0]) > 0:
-                    plant_name = df_full.iloc[i, 0]
+            val = df_full.iloc[i, 0]
+            if isinstance(val, str):
+                if len(val) > 0:
+                    plant_name = val
                     break
         i_0 = i + 1
         for i in range(i_0, len(df_full)):
-            if isinstance(df_full.iloc[i, 0], str):
-                if len(df_full.iloc[i, 0]) > 0:
+            val = df_full.iloc[i, 0]
+            if isinstance(val, str):
+                if len(val) > 0:
                     break
 
-        for j in range(i, 1, -1):
-            if not pd.isna(df_full.iloc[j - 1, 37]):
+        for i in range(i, i_0, -1):
+            if not pd.isna(df_full.iloc[i - 1, 0]):
                 break
 
         if plant_name != prev_plant_name:
-            plant_profile_data.append(
-                {
-                    "name": plant_name,
-                    "data": write_dataframe_to_dict_and_list(
-                        df_full.iloc[i_0:j, [37, 40, 38]].copy()
-                    ),
-                }
-            )
+            gcc_data = {
+                "name": plant_name,
+                "data": write_dataframe_to_dict_and_list(
+                    df_full.iloc[i_0:i, [col_T, col_H_net]].copy()
+                ),
+            }
+            plant_profile_data.append(gcc_data)
             prev_plant_name = plant_name
         else:
             break
@@ -195,35 +194,43 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
 
         if row["name"] in [
             "Total Integrated Targets",
+            "Total Integrated Target",
             "Individual Process Targets",
+            "Individual Process Target",
             "Total Site Targets",
+            "Total Site Target",
             "Total Process Targets",
+            "Total Process Target",
         ]:
             continue
 
         entry = {}
-        entry["hot_utilities"] = []
-        entry["cold_utilities"] = []
         for col in df_data.columns.to_list():
             value = row[col]
             unit = units_map[col]
 
             # If the column is numeric, we store a dict with { value, units }
             # You can refine this check, e.g. exclude columns known to be text.
-            if col[0:4] == "HU::":
+            if col == "name":
+                entry[col] = value
+            elif col[:4] == "HU::":
+                if "hot_utilities" not in entry:
+                    entry["hot_utilities"] = []
                 entry["hot_utilities"].append(
                     {
-                        "name": col[4 : len(col)],
+                        "name": col[4:],
                         "heat_flow": {
                             "value": float(value),
                             "units": unit,
                         },
                     }
                 )
-            elif col[0:4] == "CU::":
+            elif col[:4] == "CU::":
+                if "cold_utilities" not in entry:
+                    entry["cold_utilities"] = []
                 entry["cold_utilities"].append(
                     {
-                        "name": col[4 : len(col)],
+                        "name": col[4:],
                         "heat_flow": {
                             "value": float(value),
                             "units": unit,
@@ -255,15 +262,10 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
                 # If it's not numeric or there's no unit string, just store the raw data
                 entry[col] = value if not (pd.isna(value)) else None
 
-        zone_name = entry["name"]
-        entry["name"] = f"{zone_name}/Direct Integration"
+        entry["name"] = f"{row["name"]}/Direct Integration"
         records.append(entry)
 
-    reordered = []
-    for r in records:
-        items = list(r.items())
-        reordered.append(dict(items[2:] + items[:2]))
-    return reordered
+    return records
 
 
 def write_dataframe_to_dict_and_list(df_data: pd.DataFrame) -> list:
@@ -279,18 +281,7 @@ def set_options():
     """
     Create and set default options.
     """
-    return {
-        "TURB_T_IN": 450,
-        "TURB_P_IN": 90,
-        "MIN_EFF": 0.1,
-        "ELE_PRICE": 100,
-        "LOAD_FRACTION": 1,
-        "ETA_MECH": 1,
-        "TURB_MODEL": "Medina-Flores et al. (2010)",
-        "DO_TURBINE_TARGETING": True,
-        "DO_TURBINE_WORK": False,
-        "IS_HIGH_P_COND_FLASH": False,
-    }
+    return {}
 
 
 def get_problem_from_excel(excel_file, output_json):
@@ -352,21 +343,22 @@ def get_results_from_excel(excel_file, output_json):
     print(f"JSON data successfully written to {output_json}")
 
 
-# Set the file path to the workbook fixture directory
-filepath_load = (
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + "/fixtures/workbooks"
-)
-filepath_save = os.path.dirname(__file__) + "/new"
+if __name__ == "__main__":
+    # Set the file path to the workbook fixture directory
+    filepath_load = (
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) + "/examples/OpenPinchWkbs"
+    )
+    filepath_save = os.path.dirname(__file__) #+ "/new"
 
-for filename in os.listdir(filepath_load):
-    # filename = 'locally_integrated.xlsb'
-    if (
-        filename.endswith(".xlsb") or filename.endswith(".xlsx")
-    ) and not filename.startswith("~$"):
-        excel_file = os.path.join(filepath_load, filename)
+    for filename in os.listdir(filepath_load):
+        # filename = 'locally_integrated.xlsb'
+        if (
+            filename.endswith(".xlsb") or filename.endswith(".xlsx")
+        ) and not filename.startswith("~$"):
+            excel_file = os.path.join(filepath_load, filename)
 
-        p_json_file = filepath_save + "/p_" + os.path.splitext(filename)[0] + ".json"
-        get_problem_from_excel(excel_file, p_json_file)
+            p_json_file = filepath_save + "/p_ut_" + os.path.splitext(filename)[0] + ".json"
+            get_problem_from_excel(excel_file, p_json_file)
 
-        r_json_file = filepath_save + "/r_" + os.path.splitext(filename)[0] + ".json"
-        get_results_from_excel(excel_file, r_json_file)
+            r_json_file = filepath_save + "/r_ut_" + os.path.splitext(filename)[0] + ".json"
+            get_results_from_excel(excel_file, r_json_file)

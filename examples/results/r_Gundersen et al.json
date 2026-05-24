@@ -4,48 +4,48 @@
             "name": "Total Integrated Target/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 160.0,
+                    "value": 155.0,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 160.0,
+                    "value": 155.0,
                     "units": "degC"
                 }
             },
             "Qh": {
-                "value": 10049.621230104778,
+                "value": 10253.282221370011,
                 "units": "kW"
             },
             "Qc": {
-                "value": 7799.62123010478,
+                "value": 8003.282221370011,
                 "units": "kW"
             },
             "Qr": {
-                "value": 28200.378769895222,
+                "value": 27996.717778629994,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 95.38261229981602,
+                "value": 94.69376632618729,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1124390.1951905172,
+                "value": 1147609.7862276253,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
-                        "value": 10049.621230104778,
+                        "value": 10253.282221370016,
                         "units": "kW"
                     }
                 }
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 7799.621230104785,
+                        "value": 8003.282221370013,
                         "units": "kW"
                     }
                 }
@@ -55,48 +55,48 @@
             "name": "gundersen/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 160.0,
+                    "value": 155.0,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 160.0,
+                    "value": 155.0,
                     "units": "degC"
                 }
             },
             "Qh": {
-                "value": 10049.621230104778,
+                "value": 10253.282221370011,
                 "units": "kW"
             },
             "Qc": {
-                "value": 7799.62123010478,
+                "value": 8003.282221370011,
                 "units": "kW"
             },
             "Qr": {
-                "value": 28200.378769895222,
+                "value": 27996.717778629994,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 95.38261229981602,
+                "value": 94.69376632618729,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1124390.1951905172,
+                "value": 1147609.7862276253,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
-                        "value": 10049.621230104778,
+                        "value": 10253.282221370016,
                         "units": "kW"
                     }
                 }
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 7799.621230104785,
+                        "value": 8003.282221370013,
                         "units": "kW"
                     }
                 }
@@ -106,24 +106,24 @@
             "name": "Total Process Target/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 160.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 160.0,
+                    "value": null,
                     "units": "degC"
                 }
             },
             "Qh": {
-                "value": 10049.621230104778,
+                "value": 10253.282221370011,
                 "units": "kW"
             },
             "Qc": {
-                "value": 7799.62123010478,
+                "value": 8003.282221370011,
                 "units": "kW"
             },
             "Qr": {
-                "value": 28200.378769895222,
+                "value": 27996.717778629994,
                 "units": "kW"
             },
             "degree_of_integration": {
@@ -131,23 +131,23 @@
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1124390.1951905172,
+                "value": 1147609.7862276253,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
-                        "value": 10049.621230104778,
+                        "value": 10253.282221370016,
                         "units": "kW"
                     }
                 }
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 7799.621230104785,
+                        "value": 8003.282221370013,
                         "units": "kW"
                     }
                 }
@@ -166,39 +166,39 @@
                 }
             },
             "Qh": {
-                "value": 10049.621230104778,
+                "value": 10253.282221370011,
                 "units": "kW"
             },
             "Qc": {
-                "value": 7799.621230104785,
+                "value": 8003.282221370013,
                 "units": "kW"
             },
             "Qr": {
-                "value": 28200.378769895222,
+                "value": 27996.71777863,
                 "units": "kW"
             },
             "degree_of_integration": {
-                "value": 95.38261229981602,
+                "value": 94.69376632618732,
                 "units": "%"
             },
             "utility_cost": {
-                "value": 1124390.1951905172,
+                "value": 1147609.7862276253,
                 "units": "$/y"
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
-                        "value": 10049.621230104778,
+                        "value": 10253.282221370016,
                         "units": "kW"
                     }
                 }
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 7799.621230104785,
+                        "value": 8003.282221370013,
                         "units": "kW"
                     }
                 }

@@ -1,0 +1,236 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Ahmad",
+            "data": {
+                "T": [
+                    405,
+                    332,
+                    295,
+                    276,
+                    254.82782853127196,
+                    246,
+                    190.88730239673643,
+                    190,
+                    160.48319916322686,
+                    150,
+                    129.9226957383548,
+                    129,
+                    117.59365708622398,
+                    89,
+                    79,
+                    68,
+                    59,
+                    55,
+                    25
+                ],
+                "H_net": [
+                    1669.0599999999997,
+                    1669.0599999999997,
+                    1669.0599999999997,
+                    1669.0599999999997,
+                    1669.06,
+                    1543.4399999999998,
+                    871.616216216217,
+                    860.8,
+                    225.5984459926417,
+                    0,
+                    26.70281466798818,
+                    27.930000000000064,
+                    266.7788206144696,
+                    865.5300000000002,
+                    1168.2300000000002,
+                    1442.0200000000002,
+                    1460.3800000000003,
+                    1460.3800000000003,
+                    1460.3800000000003
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Ahmad",
+            "name": "H1",
+            "t_supply": {
+                "value": 159,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 77,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1873.7,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "H2",
+            "t_supply": {
+                "value": 267,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 381.48,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 21,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.04,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "H3",
+            "t_supply": {
+                "value": 343,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1361.14,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 11,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "C1",
+            "t_supply": {
+                "value": 26,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 127,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 942.33,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 63,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.01,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Ahmad",
+            "name": "C2",
+            "t_supply": {
+                "value": 118,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 265,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2882.67,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 11,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 410,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 300,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 12.59157509157509,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.05,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": 1.1446886446886446,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.2,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

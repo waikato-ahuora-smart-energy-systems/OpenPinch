@@ -7,7 +7,7 @@ import numpy as np
 from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
 from ...lib.config import tol
-from ...lib.enums import PT, ST
+from ...lib.enums import PT
 from .gcc_manipulation import get_seperated_gcc_heat_load_profiles
 from .problem_table_analysis import get_utility_heat_cascade
 
@@ -48,23 +48,14 @@ def get_utility_targets(
 
     # Target multiple utility use
     if is_direct_integration:
-        hot_pinch_row, cold_pinch_row, _ = pt.pinch_idx(PT.H_NET_A)
-        is_real_temperatures = False
-        _target_utility(
-            hot_utilities,
-            pt[PT.T],
-            pt[PT.H_NET_COLD],
-            hot_pinch_row,
-            cold_pinch_row,
-            is_real_temperatures,
-        )
-        _target_utility(
-            cold_utilities,
-            pt[PT.T],
-            pt[PT.H_NET_HOT],
-            hot_pinch_row,
-            cold_pinch_row,
-            is_real_temperatures,
+        hot_utilities, cold_utilities = _target_utility(
+            hot_utilities=hot_utilities,
+            cold_utilities=cold_utilities,
+            T_vals=pt[PT.T],
+            H_net_cold=pt[PT.H_NET_COLD],
+            H_net_hot=pt[PT.H_NET_HOT],
+            pinch_idx=pt.pinch_idx(PT.H_NET_A),
+            is_real_temperatures=False,
         )
 
     pt.update(
@@ -109,41 +100,44 @@ def get_utility_targets(
 
 
 def _target_utility(
-    utilities: StreamCollection,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
     T_vals: np.ndarray,
-    H_vals: np.ndarray,
-    hot_pinch_row: int,
-    cold_pinch_row: int,
+    H_net_cold: np.ndarray,
+    H_net_hot: np.ndarray,
+    pinch_idx: Tuple[int, int],
     is_real_temperatures: bool = False,
-) -> StreamCollection:
+) -> Tuple[StreamCollection, StreamCollection]:
     """Targets multiple utility use considering a fixed target temperature."""
-    if len(utilities) == 0:
-        return utilities
-
-    if H_vals.min() < -tol:
-        H_vals = H_vals * -1
-
-    if utilities[0].type == ST.Hot.value and abs(H_vals[0]) > tol:
-        utilities = _assign_utility(
-            T_vals,
-            H_vals,
-            utilities,
-            hot_pinch_row,
+    if abs(H_net_cold[0]) > tol:
+        if len(hot_utilities) == 0:
+            raise ValueError(
+                "Hot utility targeting failed. No hot utilities provided but "
+                "heat load profile indicates utility use is required."
+            )
+        hot_utilities = _assign_utility(
+            T_vals=T_vals,
+            H_vals=np.abs(H_net_cold),
+            u_ls=hot_utilities,
+            pinch_row=pinch_idx[0],
             is_hot_ut=True,
             is_real_temperatures=is_real_temperatures,
         )
-
-    elif utilities[0].type == ST.Cold.value and abs(H_vals[-1]) > tol:
-        utilities = _assign_utility(
-            T_vals,
-            H_vals,
-            utilities,
-            cold_pinch_row,
+    if abs(H_net_hot[-1]) > tol:
+        if len(cold_utilities) == 0:
+            raise ValueError(
+                "Cold utility targeting failed. No cold utilities provided but "
+                "heat load profile indicates utility use is required."
+            )
+        cold_utilities = _assign_utility(
+            T_vals=T_vals,
+            H_vals=np.abs(H_net_hot),
+            u_ls=cold_utilities,
+            pinch_row=pinch_idx[1],
             is_hot_ut=False,
             is_real_temperatures=is_real_temperatures,
         )
-
-    return utilities
+    return hot_utilities, cold_utilities
 
 
 def _assign_utility(

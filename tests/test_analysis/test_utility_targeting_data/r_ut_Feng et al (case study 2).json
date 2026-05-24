@@ -1,0 +1,145 @@
+{
+    "targets": [
+        {
+            "name": "Aromatic hydrocarbon extraction unit/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 85.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 85.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 24106.279781420766,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 21276.27978142077,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 13683.720218579238,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 87.20900665578888,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 24106.279781421206,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 21276.279781420766,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Hydrocracking unit/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 228.3,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 228.3,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 20985.69056810944,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 61487.690568109436,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 133169.30943189067,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 95.8508986043107,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 20985.69056810946,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 61487.690568109436,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Isomerization unit/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 238.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 238.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 44030.57075098815,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 64580.57075098813,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 172009.4292490119,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 96.6100363614037,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 44030.57075098815,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 64580.57075098813,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -9,7 +9,7 @@ def create_problem_and_results_json():
     """Convert each example workbook into paired problem/result JSON files."""
     # Read workbooks from the repo example fixture directory.
     filepath_root = os.path.dirname(__file__)
-    filepath_load = os.path.join(filepath_root, "review")
+    filepath_load = os.path.join(filepath_root, "OpenPinchWkbs")
     filepath_save = filepath_root
 
     for filename in os.listdir(filepath_load):

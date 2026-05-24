@@ -1,0 +1,79 @@
+{
+    "targets": [
+        {
+            "name": "Castillo/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 835.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 835.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 885.4189999999994,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3752.4899999999993,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.00000000000003,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 657.1128888888882,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 183.03466562511744,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 45.27144548599517,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CHW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

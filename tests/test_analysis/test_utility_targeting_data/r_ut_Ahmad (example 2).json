@@ -1,0 +1,51 @@
+{
+    "targets": [
+        {
+            "name": "Ahmad/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 150.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 150.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1669.0599999999997,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1460.3800000000003,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 2155.9399999999996,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 72.92006304581645,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 1669.06,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 1460.3800000000003,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

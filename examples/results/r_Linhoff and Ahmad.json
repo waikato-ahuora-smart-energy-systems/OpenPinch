@@ -34,30 +34,95 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHOIL",
                     "heat_flow": {
-                        "value": 246.00000000000364,
+                        "value": 0.0,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "HU",
+                    "name": "HOIL",
                     "heat_flow": {
-                        "value": 23753.800000000003,
+                        "value": 23999.800000000007,
                         "units": "kW"
                     }
                 }
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 31096.800000000003,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CHW",
+                    "heat_flow": {
+                        "value": 623.0000000000036,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 166.23,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 166.23,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 23999.800000000003,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 31719.800000000003,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 62180.2,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 85.31860592755214,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 153540929760.00003,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHOIL",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HOIL",
+                    "heat_flow": {
+                        "value": 23999.800000000007,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 31096.800000000003,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CHW",
                     "heat_flow": {
                         "value": 623.0000000000036,
                         "units": "kW"
@@ -69,11 +134,11 @@
             "name": "Total Process Target/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 166.23,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 166.23,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -99,30 +164,30 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHOIL",
                     "heat_flow": {
-                        "value": 246.00000000000364,
+                        "value": 0.0,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "HU",
+                    "name": "HOIL",
                     "heat_flow": {
-                        "value": 23753.800000000003,
+                        "value": 23999.800000000007,
                         "units": "kW"
                     }
                 }
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 31096.800000000003,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CHW",
                     "heat_flow": {
                         "value": 623.0000000000036,
                         "units": "kW"
@@ -164,30 +229,30 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHOIL",
                     "heat_flow": {
-                        "value": 246.00000000000364,
+                        "value": 0.0,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "HU",
+                    "name": "HOIL",
                     "heat_flow": {
-                        "value": 23753.800000000003,
+                        "value": 23999.800000000007,
                         "units": "kW"
                     }
                 }
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 31096.800000000003,
                         "units": "kW"
                     }
                 },
                 {
-                    "name": "CU",
+                    "name": "CHW",
                     "heat_flow": {
                         "value": 623.0000000000036,
                         "units": "kW"

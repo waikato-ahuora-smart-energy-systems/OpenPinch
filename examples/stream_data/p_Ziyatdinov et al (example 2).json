@@ -1,7 +1,7 @@
 {
     "streams": [
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "H1",
             "t_supply": {
                 "value": 229.85000000000002,
@@ -27,7 +27,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "H2",
             "t_supply": {
                 "value": 151.85000000000002,
@@ -53,7 +53,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "H3",
             "t_supply": {
                 "value": 107.85000000000002,
@@ -79,7 +79,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C1",
             "t_supply": {
                 "value": 49.85000000000002,
@@ -105,7 +105,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C2",
             "t_supply": {
                 "value": 134.85000000000002,
@@ -131,7 +131,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C3",
             "t_supply": {
                 "value": 117.85000000000002,
@@ -157,7 +157,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C4",
             "t_supply": {
                 "value": 79.85000000000002,
@@ -185,7 +185,7 @@
     ],
     "utilities": [
         {
-            "name": "HU",
+            "name": "HOIL",
             "type": "Hot",
             "t_supply": {
                 "value": 353.85,
@@ -199,10 +199,7 @@
                 "value": 2.5,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 2.5,
                 "units": "kW/m^2/degC"
@@ -210,7 +207,7 @@
             "heat_flow": null
         },
         {
-            "name": "CU",
+            "name": "CW",
             "type": "Cold",
             "t_supply": {
                 "value": 29.850000000000023,
@@ -224,12 +221,31 @@
                 "value": 2.5,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CHW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
                 "units": "kW/m^2/degC"
             },
             "heat_flow": null

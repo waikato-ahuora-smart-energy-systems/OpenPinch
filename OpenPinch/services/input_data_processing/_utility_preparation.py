@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import List, Tuple
 
+import numpy as np
+
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
@@ -66,7 +68,13 @@ def _complete_utility_data(
         utility.t_supply = get_value(utility.t_supply)
 
         t_target = get_value(utility.t_target)
-        if t_target is None or t_target == utility.t_supply:
+        if (
+            not(isinstance(t_target, (int, float)))
+            or
+            (np.isnan(t_target))
+            or
+            (t_target == utility.t_supply)
+        ):
             delta = (
                 -zone_config.DT_PHASE_CHANGE
                 if utility.type in [ST.Hot.value, ST.Both.value]
@@ -77,14 +85,18 @@ def _complete_utility_data(
             utility.t_target = t_target
 
         dt_cont = get_value(utility.dt_cont)
-        base_dt_cont = zone_config.DT_CONT if dt_cont is None else dt_cont
+        base_dt_cont = (
+            zone_config.DT_CONT
+            if dt_cont is None or np.isnan(dt_cont)
+            else dt_cont
+        )
         utility.dt_cont = base_dt_cont
         effective_dt_cont = base_dt_cont * dt_cont_multiplier
 
         price = get_value(utility.price)
         utility.price = (
             zone_config.UTILITY_PRICE * zone_config.ANNUAL_OP_TIME
-            if price is None
+            if price is None or np.isnan(price)
             else price
         )
 

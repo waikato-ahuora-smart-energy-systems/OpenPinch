@@ -23,7 +23,7 @@
                 "value": 1.0,
                 "units": "kW/m^2/degC"
             },
-            "loc": null,
+            "loc": 0,
             "index": 0
         },
         {
@@ -49,7 +49,7 @@
                 "value": 1.0,
                 "units": "kW/m^2/degC"
             },
-            "loc": null,
+            "loc": 0,
             "index": 0
         },
         {
@@ -75,7 +75,7 @@
                 "value": 1.0,
                 "units": "kW/m^2/degC"
             },
-            "loc": null,
+            "loc": 0,
             "index": 0
         },
         {
@@ -101,30 +101,27 @@
                 "value": 1.0,
                 "units": "kW/m^2/degC"
             },
-            "loc": null,
+            "loc": 0,
             "index": 0
         }
     ],
     "utilities": [
         {
-            "name": "HU",
+            "name": "VHPS",
             "type": "Hot",
             "t_supply": {
                 "value": 406.85,
                 "units": "degC"
             },
             "t_target": {
-                "value": 406.75,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
                 "value": 5.33,
                 "units": "degC"
             },
-            "price": {
-                "value": 9.157509157509159,
-                "units": "$/MWh"
-            },
+            "price": 9.157509157509159,
             "htc": {
                 "value": 5.0,
                 "units": "kW/m^2/degC"
@@ -132,7 +129,7 @@
             "heat_flow": null
         },
         {
-            "name": "CU",
+            "name": "CW",
             "type": "Cold",
             "t_supply": {
                 "value": 26.850000000000023,
@@ -146,10 +143,7 @@
                 "value": 5.33,
                 "units": "degC"
             },
-            "price": {
-                "value": 1.717032967032967,
-                "units": "$/MWh"
-            },
+            "price": 1.717032967032967,
             "htc": {
                 "value": 1.0,
                 "units": "kW/m^2/degC"

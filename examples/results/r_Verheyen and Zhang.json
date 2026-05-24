@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Verheyen and Zhang/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 244.0,
@@ -103,14 +103,14 @@
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Verheyen and Zhang/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 244.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 244.0,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -154,7 +154,7 @@
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Verheyen and Zhang/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 15.0,

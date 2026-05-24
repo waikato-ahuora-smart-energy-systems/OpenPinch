@@ -1,0 +1,512 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Dairy",
+            "data": {
+                "T": [
+                    150,
+                    149.99,
+                    100,
+                    90,
+                    80,
+                    74.52485009993336,
+                    73,
+                    70,
+                    68.3,
+                    63.56543348183156,
+                    60,
+                    57.4,
+                    43.49628330995792,
+                    43,
+                    40,
+                    39,
+                    36.847201946472026,
+                    35,
+                    33,
+                    31.587660485021402,
+                    31,
+                    30,
+                    25,
+                    23,
+                    20,
+                    17.2,
+                    9,
+                    0
+                ],
+                "H_net": [
+                    294.782,
+                    294.782,
+                    294.782,
+                    188.48199999999997,
+                    188.48199999999997,
+                    164.50084343770808,
+                    157.82199999999997,
+                    112.79199999999997,
+                    94.72099999999995,
+                    53.57761695711628,
+                    22.593999999999994,
+                    0,
+                    187.8392124824685,
+                    194.54399999999998,
+                    227.154,
+                    234.13400000000001,
+                    260.6779999999999,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678,
+                    260.678
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Dairy",
+            "name": "Mains water",
+            "t_supply": {
+                "value": 12.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 38,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 68.11200000000001,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Milk - rennets vats",
+            "t_supply": {
+                "value": 34,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 35,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3.89,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Effluent pasteurised milk",
+            "t_supply": {
+                "value": 75,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 44,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 135.78,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Boiler water",
+            "t_supply": {
+                "value": 95,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 78,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 180.71,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Raw milk input",
+            "t_supply": {
+                "value": 4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 35,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 135.78,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Milk input",
+            "t_supply": {
+                "value": 35,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 175.2,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Mains water for cooler",
+            "t_supply": {
+                "value": 12.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 18,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 36.830000000000005,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Input milk",
+            "t_supply": {
+                "value": 44,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 36,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 46.72,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Water - storage tank",
+            "t_supply": {
+                "value": 73.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 64.60199999999999,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Water - rennets vats",
+            "t_supply": {
+                "value": 40,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 38,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7.78,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Water - storage tank",
+            "t_supply": {
+                "value": 62.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 25,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 347.82,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Water - storage tank surplus",
+            "t_supply": {
+                "value": 62.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 25,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 482.46,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "Mains water for boiler",
+            "t_supply": {
+                "value": 12.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 95,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 880.164,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "LPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 150,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HW",
+            "type": "Both",
+            "t_supply": {
+                "value": 70,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Both",
+            "t_supply": {
+                "value": 25,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CHW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

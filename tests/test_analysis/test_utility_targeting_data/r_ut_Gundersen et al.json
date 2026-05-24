@@ -1,0 +1,51 @@
+{
+    "targets": [
+        {
+            "name": "gundersen/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 155.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 155.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 10253.282221370011,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 8003.282221370011,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 27996.717778629994,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 94.69376632618729,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 10253.282221370016,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 8003.282221370013,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

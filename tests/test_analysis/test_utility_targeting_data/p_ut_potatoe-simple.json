@@ -1,0 +1,270 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Process",
+            "data": {
+                "T": [
+                    118,
+                    117.99,
+                    101,
+                    87,
+                    80.616,
+                    62,
+                    60,
+                    58,
+                    54.17836010143702,
+                    52,
+                    48,
+                    45.154409216506885,
+                    43,
+                    40,
+                    38.80761159862648,
+                    37,
+                    28.160275976090546,
+                    27,
+                    22.34566222463965,
+                    20,
+                    17,
+                    15,
+                    10,
+                    2
+                ],
+                "H_net": [
+                    2916.813186813187,
+                    2916.813186813187,
+                    2916.813186813187,
+                    2916.813186813187,
+                    2916.8131868131863,
+                    1893.956043956044,
+                    1784.065934065934,
+                    1574.1758241758241,
+                    1173.1136150409184,
+                    944.5054945054944,
+                    524.7252747252746,
+                    226.0945936004482,
+                    0,
+                    60.81700907787854,
+                    144.60892789011814,
+                    271.6340181557571,
+                    892.8220780872446,
+                    974.3573817486861,
+                    1301.428571428572,
+                    1301.4285714285716,
+                    1301.4285714285716,
+                    1351.5384615384617,
+                    1476.813186813187,
+                    1476.813186813187
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Process",
+            "name": "Spent mixed water",
+            "t_supply": {
+                "value": 48,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 25,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2880,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process",
+            "name": "Spent oil",
+            "t_supply": {
+                "value": 106,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 15,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2280,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process",
+            "name": "Feed hot water",
+            "t_supply": {
+                "value": 12,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 82,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5600,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Process",
+            "name": "Circulating water loop",
+            "t_supply": {
+                "value": 35,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "LPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 120,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HW",
+            "type": "Both",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 50,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 25,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 35,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CHW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 2,
+                "units": "degC"
+            },
+            "price": {
+                "value": 30,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

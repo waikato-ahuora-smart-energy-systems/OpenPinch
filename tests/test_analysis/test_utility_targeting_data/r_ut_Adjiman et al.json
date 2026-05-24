@@ -1,0 +1,51 @@
+{
+    "targets": [
+        {
+            "name": "Adjiman/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 311.52000000000004,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 311.52000000000004,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 459.8999999999995,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 2109.9000000000005,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 5090.1,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 96.95428571428573,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 459.8999999999995,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 2109.9000000000005,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

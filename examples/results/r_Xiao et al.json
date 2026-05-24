@@ -17,7 +17,7 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 4870.500000000001,
+                "value": 4870.5,
                 "units": "kW"
             },
             "Qr": {
@@ -34,7 +34,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
                         "value": 9020.499999999996,
                         "units": "kW"
@@ -43,16 +43,16 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 3283.3,
+                        "value": 3637.5,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "FRZ",
                     "heat_flow": {
-                        "value": 1587.2000000000007,
+                        "value": 1233.0,
                         "units": "kW"
                     }
                 }
@@ -75,7 +75,7 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 4870.500000000001,
+                "value": 4870.5,
                 "units": "kW"
             },
             "Qr": {
@@ -92,7 +92,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
                         "value": 9020.499999999996,
                         "units": "kW"
@@ -101,16 +101,16 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 3283.3,
+                        "value": 3637.5,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "FRZ",
                     "heat_flow": {
-                        "value": 1587.2000000000007,
+                        "value": 1233.0,
                         "units": "kW"
                     }
                 }
@@ -133,7 +133,7 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 4870.500000000001,
+                "value": 4870.5,
                 "units": "kW"
             },
             "Qr": {
@@ -150,7 +150,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
                         "value": 9020.499999999996,
                         "units": "kW"
@@ -159,16 +159,16 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 3283.3,
+                        "value": 3637.5,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "FRZ",
                     "heat_flow": {
-                        "value": 1587.2000000000007,
+                        "value": 1233.0,
                         "units": "kW"
                     }
                 }
@@ -182,7 +182,7 @@
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 325.0,
+                    "value": 340.0,
                     "units": "degC"
                 }
             },
@@ -191,7 +191,7 @@
                 "units": "kW"
             },
             "Qc": {
-                "value": 4870.500000000002,
+                "value": 4870.5,
                 "units": "kW"
             },
             "Qr": {
@@ -208,7 +208,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
                         "value": 9020.499999999996,
                         "units": "kW"
@@ -217,16 +217,16 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
-                        "value": 3283.3,
+                        "value": 3637.5,
                         "units": "kW"
                     }
                 },
                 {
                     "name": "FRZ",
                     "heat_flow": {
-                        "value": 1587.2000000000007,
+                        "value": 1233.0,
                         "units": "kW"
                     }
                 }

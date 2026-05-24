@@ -1,0 +1,933 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Distillery",
+            "data": {
+                "T": [
+                    995,
+                    994.99,
+                    358,
+                    350.7,
+                    346.02788908887385,
+                    338.2,
+                    338.1,
+                    334,
+                    324.8,
+                    302.4,
+                    285,
+                    284.99,
+                    275.6,
+                    275,
+                    274.99,
+                    262.90000000000003,
+                    260,
+                    255,
+                    254.99,
+                    254.94878747919535,
+                    245,
+                    244.99,
+                    228.4,
+                    219.13988855883818,
+                    214.20000000000002,
+                    213.9,
+                    201.79999999999998,
+                    180,
+                    179.99,
+                    176.3,
+                    170,
+                    169.99,
+                    159.8,
+                    152.9,
+                    148.5,
+                    146.41100494804706,
+                    145.5,
+                    144,
+                    137.10000000000002,
+                    132.70000000000002,
+                    130,
+                    129.99,
+                    129.7,
+                    120.7,
+                    120,
+                    119.99,
+                    117.59258899237788,
+                    114.5,
+                    111.3,
+                    95.5,
+                    92.4064468904169,
+                    88.10000000000001,
+                    82,
+                    76.1,
+                    75.89999999999999,
+                    66.32483831088572,
+                    56.3,
+                    50.9,
+                    48.699999999999996,
+                    46,
+                    44.099999999999994,
+                    42.22082740875814,
+                    36.199999999999996,
+                    35,
+                    34.989999999999995,
+                    31.9,
+                    29.7,
+                    29.3,
+                    27.099999999999998,
+                    25,
+                    24.99
+                ],
+                "H_net": [
+                    48387.389529613225,
+                    48387.389529613225,
+                    48387.389529613225,
+                    48387.389529613225,
+                    48387.38952961322,
+                    47336.611354804576,
+                    47328.93212245663,
+                    47204.3951226703,
+                    34724.94624510099,
+                    34044.54897797569,
+                    27976.04598154944,
+                    27972.5583361492,
+                    24697.65930531917,
+                    24506.725834720062,
+                    24503.54361021008,
+                    20656.234177638282,
+                    20441.778661866407,
+                    19296.16570363905,
+                    19293.8744777226,
+                    19284.43175814759,
+                    17004.93978718434,
+                    17002.648561267888,
+                    13201.504765869518,
+                    11272.090500628881,
+                    10242.827352481974,
+                    10194.419596435459,
+                    7202.431451159879,
+                    5743.02941497662,
+                    5742.359964501309,
+                    5495.332739110658,
+                    4711.68888407333,
+                    4710.445004938352,
+                    3442.9321663938535,
+                    2710.881543273106,
+                    2710.881543273106,
+                    2710.881543273106,
+                    2539.035392420825,
+                    2186.458811214681,
+                    732.482826326217,
+                    0,
+                    950.4338738580846,
+                    953.9539993168146,
+                    1056.0376376200948,
+                    6727.8739547356745,
+                    7148.440719887913,
+                    7154.448816532946,
+                    8594.836519698656,
+                    10452.89387465547,
+                    12233.891880711708,
+                    20346.535052855746,
+                    21859.680143111465,
+                    23966.086187506004,
+                    27212.701265416687,
+                    30230.35628612811,
+                    30368.284597295624,
+                    32007.12752759904,
+                    32007.12752759904,
+                    32007.12752759904,
+                    32007.12752759904,
+                    32007.12752759904,
+                    32007.12752759904,
+                    32390.66206918144,
+                    32390.66206918143,
+                    32390.66206918143,
+                    32390.66206918143,
+                    32390.66206918143,
+                    32550.018750041272,
+                    32571.675243898957,
+                    32587.38952961324,
+                    32587.38952961324,
+                    32587.38952961324
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Distillery",
+            "name": "39-1_To_39-2",
+            "t_supply": {
+                "value": 234.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 87.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3040,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "52acutal_To_52-1",
+            "t_supply": {
+                "value": 268.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 265.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 450,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "51-1_To_hjkj---TPL4",
+            "t_supply": {
+                "value": 126.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 51.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4460,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "51_To_51-1",
+            "t_supply": {
+                "value": 268.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 126.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 12670,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "61_To_61-1",
+            "t_supply": {
+                "value": 363.7,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 219.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 12380,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "41-1_To_42/MED-D",
+            "t_supply": {
+                "value": 281.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 54.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6930,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "24t_To_24b",
+            "t_supply": {
+                "value": 219.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 35,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8690,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "37-1_To_37-2",
+            "t_supply": {
+                "value": 149.7,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 101.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1180,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "7_To_9",
+            "t_supply": {
+                "value": 196.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 345,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 32780,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "6_To_8",
+            "t_supply": {
+                "value": 196.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 296.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 32030,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "30_To_5-1",
+            "t_supply": {
+                "value": 26.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 196.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 60860,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "13_To_15",
+            "t_supply": {
+                "value": 82.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 105.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "33_To_33cooled",
+            "t_supply": {
+                "value": 56.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 32.8,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 170,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "29_To_32",
+            "t_supply": {
+                "value": 319.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 328.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 12200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "19-1_To_19-2",
+            "t_supply": {
+                "value": 142.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "55-3_To_55-6",
+            "t_supply": {
+                "value": 343.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 182,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9300,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "57_To_57-6",
+            "t_supply": {
+                "value": 343.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 151.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8940,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "PA_1_Draw_To_PA_1_Return---COL1",
+            "t_supply": {
+                "value": 158.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 62,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 18900,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "22t_To_22b",
+            "t_supply": {
+                "value": 165.5,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 35.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2380,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "To Condenser---COL1_TO_water sour---COL1",
+            "t_supply": {
+                "value": 81.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 56.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4490,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "To Condenser---COL5_TO_sour water---COL5",
+            "t_supply": {
+                "value": 138.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 81.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 29450,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "To Reboiler---COL3_TO_19\u20131---COL3",
+            "t_supply": {
+                "value": 124,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 142.8,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5230,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Distillery",
+            "name": "To Condenser---COL3_TO_21\u20131---COL3",
+            "t_supply": {
+                "value": 49.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 41.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3870,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5.7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "MPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 175,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 1000,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 125,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 250,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HOIL",
+            "type": "Both",
+            "t_supply": {
+                "value": 280,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 30,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

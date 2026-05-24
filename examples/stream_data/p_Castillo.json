@@ -290,13 +290,35 @@
     "utilities": [
         {
             "name": "HPS",
-            "type": "Hot",
+            "type": "Both",
             "t_supply": {
                 "value": 280.0,
                 "units": "degC"
             },
             "t_target": {
-                "value": 279.0,
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "price": 30,
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 150.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
@@ -319,6 +341,28 @@
             },
             "t_target": {
                 "value": 40.0,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "price": 30,
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CHW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {

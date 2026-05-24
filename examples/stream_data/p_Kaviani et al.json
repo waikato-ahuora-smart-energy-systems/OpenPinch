@@ -114,7 +114,7 @@
                 "units": "degC"
             },
             "t_target": {
-                "value": 124.0,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
@@ -129,7 +129,7 @@
             "heat_flow": null
         },
         {
-            "name": "CU",
+            "name": "CW",
             "type": "Cold",
             "t_supply": {
                 "value": 30.0,
@@ -141,6 +141,28 @@
             },
             "dt_cont": {
                 "value": 5.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": 1.0,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CHW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
                 "units": "degC"
             },
             "price": null,

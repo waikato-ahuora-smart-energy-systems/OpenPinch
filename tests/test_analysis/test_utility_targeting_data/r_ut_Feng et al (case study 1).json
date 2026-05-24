@@ -1,0 +1,166 @@
+{
+    "targets": [
+        {
+            "name": "Aniline unit/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 101.6,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 101.6,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 7073.746920650564,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 8271.486920650563,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 2199.043079349438,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 46.10469804487264,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HOT",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 7073.746920650565,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 8271.486920650563,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Natural gas unit/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 840.4,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 840.4,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 0.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1543.9299999999976,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 17606.960000000003,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.00000000000004,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HOT",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 1543.9299999999976,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Nitrobenzene unit/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 101.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 101.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2739.4351401869158,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 7217.3151401869145,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 2398.414859813087,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 89.42498771423179,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HOT",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 2739.4351401869158,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 7217.315140186914,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

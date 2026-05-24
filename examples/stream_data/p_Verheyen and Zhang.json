@@ -196,7 +196,7 @@
                 "units": "degC"
             },
             "dt_cont": {
-                "value": null,
+                "value": 0.0,
                 "units": "degC"
             },
             "price": null,
@@ -218,7 +218,7 @@
                 "units": "degC"
             },
             "dt_cont": {
-                "value": null,
+                "value": 0.0,
                 "units": "degC"
             },
             "price": null,

@@ -20,7 +20,6 @@ __all__ = [
     "get_seperated_gcc_heat_load_profiles",
 ]
 
-# TODO: Implement exergy targeting through the exergetic GCC approach.
 
 ################################################################################
 # Public API
@@ -108,7 +107,9 @@ def get_additional_GCCs(
 
 
 def get_GCC_without_pockets(
-    pt: ProblemTable, col_H_NP: str | PT = PT.H_NET_NP, col_H: str | PT = PT.H_NET
+    pt: ProblemTable,
+    col_H_NP: str | PT = PT.H_NET_NP,
+    col_H: str | PT = PT.H_NET,
 ) -> Tuple[ProblemTable, ProblemTable]:
     """Flatten GCC pockets by inserting breakpoints so the profile becomes monotonic."""
     pt[col_H_NP] = pt[col_H]
@@ -277,7 +278,7 @@ def get_GGC_pockets(
 
 def get_seperated_gcc_heat_load_profiles(
     T_col: np.ndarray,
-    H_net,
+    H_net: np.ndarray,
     rcp_net: np.ndarray = None,
     is_process_stream: bool = True,
 ) -> ProblemTableUpdateKwargs:
