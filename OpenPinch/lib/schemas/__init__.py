@@ -1,6 +1,6 @@
 """Concern-based schema package for OpenPinch."""
 
-from .common import HPRMetric, MaybeVU, ScalarOrVU, ValueWithUnit
+from .common import HPRMetric, MaybeVU, ScalarOrVU, StatefulValueWithUnit, ValueWithUnit
 from .graphs import DataPoint, Graph, GraphSet, Segment
 from .hpr import (
     HeatPumpTargetInputs,
@@ -64,6 +64,7 @@ __all__ = [
     "HPRMetric",
     "MaybeVU",
     "ScalarOrVU",
+    "StatefulValueWithUnit",
     "ValueWithUnit",
     "DataPoint",
     "Graph",

@@ -170,20 +170,26 @@ def _get_process_streams_in_each_subzone(
 
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
-    base_dt_cont = get_value(stream.dt_cont)
-    if base_dt_cont is None:
-        base_dt_cont = 0.0
+    htc = stream.htc
+    htc_value = get_value(htc)
+    if (
+        not hasattr(htc, "state_ids")
+        and isinstance(htc_value, (int, float))
+        and htc_value <= 0.0
+    ):
+        htc = zone.config.HTC
 
-    return Stream(
+    stream_obj = Stream(
         name=stream.name,
-        t_supply=get_value(stream.t_supply),
-        t_target=get_value(stream.t_target),
-        heat_flow=get_value(stream.heat_flow),
-        dt_cont=base_dt_cont,
-        dt_cont_act=base_dt_cont * zone.dt_cont_multiplier,
-        htc=get_value(stream.htc),
+        t_supply=stream.t_supply,
+        t_target=stream.t_target,
+        heat_flow=stream.heat_flow,
+        dt_cont=stream.dt_cont,
+        htc=htc,
         is_process_stream=True,
     )
+    stream_obj.dt_cont_multiplier = zone.dt_cont_multiplier
+    return stream_obj
 
 
 def _find_extreme_process_temperatures(

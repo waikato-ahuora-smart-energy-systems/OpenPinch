@@ -65,7 +65,7 @@ def _complete_utility_data(
     add_default_cu = True
 
     for utility in utilities:
-        utility.t_supply = get_value(utility.t_supply)
+        t_supply = get_value(utility.t_supply)
 
         t_target = get_value(utility.t_target)
         if (
@@ -73,16 +73,14 @@ def _complete_utility_data(
             or
             (np.isnan(t_target))
             or
-            (t_target == utility.t_supply)
+            (t_target == t_supply)
         ):
             delta = (
                 -zone_config.DT_PHASE_CHANGE
                 if utility.type in [ST.Hot.value, ST.Both.value]
                 else zone_config.DT_PHASE_CHANGE
             )
-            utility.t_target = utility.t_supply + delta
-        else:
-            utility.t_target = t_target
+            utility.t_target = t_supply + delta
 
         dt_cont = get_value(utility.dt_cont)
         base_dt_cont = (
@@ -90,24 +88,23 @@ def _complete_utility_data(
             if dt_cont is None or np.isnan(dt_cont)
             else dt_cont
         )
-        utility.dt_cont = base_dt_cont
+        if dt_cont is None or np.isnan(dt_cont):
+            utility.dt_cont = base_dt_cont
         effective_dt_cont = base_dt_cont * dt_cont_multiplier
 
         price = get_value(utility.price)
-        utility.price = (
-            zone_config.UTILITY_PRICE * zone_config.ANNUAL_OP_TIME
-            if price is None or np.isnan(price)
-            else price
-        )
+        if price is None or np.isnan(price):
+            utility.price = zone_config.UTILITY_PRICE * zone_config.ANNUAL_OP_TIME
 
         htc = get_value(utility.htc)
-        utility.htc = zone_config.HTC if not htc else htc
+        if htc is None or np.isnan(htc):
+            utility.htc = zone_config.HTC
 
         if (
             utility.type in [ST.Hot.value, ST.Both.value]
             and utility.active
             and (
-                min(utility.t_supply, utility.t_target) - effective_dt_cont
+                min(t_supply, get_value(utility.t_target)) - effective_dt_cont
                 >=
                 hu_t_min - zone_config.DT_PHASE_CHANGE
             )
@@ -117,7 +114,7 @@ def _complete_utility_data(
             utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
             and (
-                max(utility.t_supply, utility.t_target) + effective_dt_cont
+                max(t_supply, get_value(utility.t_target)) + effective_dt_cont
                 <=
                 cu_t_max + zone_config.DT_PHASE_CHANGE
             )
@@ -195,7 +192,7 @@ def _create_utilities_list(
     unassigned_utilities = utilities
 
     def _sort_key(selected: UtilitySchema):
-        order = selected.t_supply
+        order = get_value(selected.t_supply)
         return -order if utility_type == ST.Hot.value else order
 
     candidates = sorted(
@@ -211,12 +208,20 @@ def _create_utilities_list(
         if selected.type == utility_type:
             selected.active = False
 
+        t_supply_value = get_value(selected.t_supply)
+        t_target_value = get_value(selected.t_target)
         if utility_type == ST.Hot.value:
-            t_supply = max(selected.t_supply, selected.t_target)
-            t_target = min(selected.t_supply, selected.t_target)
+            supply_raw, target_raw = (
+                (selected.t_supply, selected.t_target)
+                if t_supply_value >= t_target_value
+                else (selected.t_target, selected.t_supply)
+            )
         else:
-            t_supply = min(selected.t_supply, selected.t_target)
-            t_target = max(selected.t_supply, selected.t_target)
+            supply_raw, target_raw = (
+                (selected.t_supply, selected.t_target)
+                if t_supply_value <= t_target_value
+                else (selected.t_target, selected.t_supply)
+            )
 
         key = (
             ".".join([StreamLoc.HotU.value, selected.name])
@@ -227,16 +232,16 @@ def _create_utilities_list(
         created_utilities.add(
             Stream(
                 name=selected.name,
-                t_supply=t_supply,
-                t_target=t_target,
+                t_supply=supply_raw,
+                t_target=target_raw,
                 dt_cont=selected.dt_cont,
-                dt_cont_act=selected.dt_cont * dt_cont_multiplier,
                 htc=selected.htc,
                 price=selected.price,
                 is_process_stream=False,
             ),
             key,
         )
+        created_utilities[key].dt_cont_multiplier = dt_cont_multiplier
 
     return created_utilities, unassigned_utilities
 

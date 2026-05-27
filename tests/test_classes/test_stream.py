@@ -3,9 +3,12 @@
 import pytest
 
 from OpenPinch.classes import *
+from OpenPinch.classes._stream_value_view import StreamValueView as ExtractedStreamValueView
 from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream import StreamValueView
 from OpenPinch.lib import *
 from OpenPinch.lib.enums import ST
+from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 
 
 class DummyStream(Stream):
@@ -160,6 +163,125 @@ def test_zero_heat_flow_isothermal_stream_initialises_without_error():
     assert s.t_min_star == 100.0
     assert s.t_max_star == 100.0
     assert s.CP == 0.0
+
+
+def test_stream_stateful_value_view_defaults_to_state_zero_and_exposes_unit():
+    s = Stream(
+        name="Stateful",
+        t_supply=StatefulValueWithUnit(
+            values=[300.0, 280.0],
+            unit="degC",
+            state_ids=["0", "1"],
+            weights=[0.6, 0.4],
+        ),
+        t_target=StatefulValueWithUnit(
+            values=[200.0, 180.0],
+            unit="degC",
+            state_ids=["0", "1"],
+            weights=[0.6, 0.4],
+        ),
+        heat_flow=StatefulValueWithUnit(
+            values=[5000.0, 4000.0],
+            unit="kW",
+            state_ids=["0", "1"],
+            weights=[0.6, 0.4],
+        ),
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    assert s.supply_temperature == 300.0
+    assert s.supply_temperature.unit == "°C"
+    assert s.supply_temperature.units == "°C"
+    assert s.supply_temperature[0].value == pytest.approx(300.0)
+    assert s.supply_temperature[1].value == pytest.approx(280.0)
+    assert s.supply_temperature[1].unit == "°C"
+
+
+def test_stream_value_view_import_from_stream_module_remains_supported():
+    assert StreamValueView is ExtractedStreamValueView
+
+
+def test_stream_scalar_value_view_allows_any_state_lookup_key():
+    s = DummyStream(
+        name="Scalar",
+        t_supply=300.0,
+        t_target=200.0,
+        heat_flow=5000.0,
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    assert float(s.supply_temperature) == pytest.approx(300.0)
+    assert s.supply_temperature.value == pytest.approx(300.0)
+    assert s.supply_temperature.unit == "°C"
+    assert s.supply_temperature[0].value == pytest.approx(300.0)
+    assert s.supply_temperature[1].value == pytest.approx(300.0)
+    assert s.supply_temperature["summer"].value == pytest.approx(300.0)
+    assert s.supply_temperature["summer"].unit == "°C"
+    assert s.supply_temperature["summer"].state_ids is None
+    assert isinstance(s.supply_temperature, StreamValueView)
+
+
+def test_stream_stateful_derivatives_broadcast_scalar_inputs():
+    s = Stream(
+        name="Derived",
+        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    assert s.t_min.state_ids == ["0", "1"]
+    assert s.t_min[0].value == pytest.approx(200.0)
+    assert s.t_min[1].value == pytest.approx(180.0)
+    assert s.t_max[0].value == pytest.approx(300.0)
+    assert s.t_max[1].value == pytest.approx(280.0)
+    assert s.t_min_star[0].value == pytest.approx(190.0)
+    assert s.t_min_star[1].value == pytest.approx(170.0)
+    assert s.CP[0].value == pytest.approx(50.0)
+    assert s.CP[1].value == pytest.approx(40.0)
+    assert s.rCP[0].value == pytest.approx(25.0)
+    assert s.rCP[1].value == pytest.approx(20.0)
+
+
+def test_stream_stateful_value_view_remains_strict_for_unknown_state_id():
+    s = Stream(
+        name="Stateful",
+        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    with pytest.raises(KeyError, match="Unknown state_id 'summer'"):
+        _ = s.supply_temperature["summer"]
+
+
+def test_stream_rejects_mismatched_state_alignment():
+    with pytest.raises(ValueError, match="state_ids for heat_flow must align with t_supply"):
+        Stream(
+            name="Misaligned",
+            t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
+            t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+            heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "2"], "unit": "kW"},
+            dt_cont=10.0,
+            htc=2.0,
+        )
+
+
+def test_stream_rejects_mixed_hot_and_cold_state_directions():
+    with pytest.raises(ValueError, match="Stream states must classify consistently"):
+        Stream(
+            name="Mixed",
+            t_supply={"values": [300.0, 120.0], "state_ids": ["0", "1"], "unit": "degC"},
+            t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+            heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+            dt_cont=10.0,
+            htc=2.0,
+        )
 
 
 # ===== Merged from test_stream_extra.py =====

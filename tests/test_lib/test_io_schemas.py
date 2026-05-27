@@ -8,6 +8,7 @@ from OpenPinch.lib.schemas.io import (
     THSchema,
     UtilitySchema,
 )
+from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 
 
 def test_target_input_utilities_default_is_not_shared():
@@ -45,3 +46,36 @@ def test_get_input_output_data_options_default_is_not_shared():
 
     assert first.options == {"mode": "baseline"}
     assert second.options == {}
+
+
+def test_target_input_accepts_stateful_value_payloads():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": {"values": [150.0, 140.0], "units": "degC"},
+                "t_target": {
+                    "values": [60.0, 55.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 90.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "kW",
+                },
+            }
+        ]
+    }
+
+    validated = TargetInput.model_validate(payload)
+    t_supply = validated.streams[0].t_supply
+    t_target = validated.streams[0].t_target
+
+    assert isinstance(t_supply, StatefulValueWithUnit)
+    assert t_supply.values == [150.0, 140.0]
+    assert t_supply.unit == "degC"
+    assert t_supply.state_ids is None
+    assert isinstance(t_target, StatefulValueWithUnit)
+    assert t_target.units == "degC"

@@ -1037,6 +1037,84 @@ def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
     assert "0 issue(s)" not in message
 
 
+def test_load_preserves_stateful_stream_values_on_runtime_streams():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": {
+                    "values": [150.0, 140.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [60.0, 50.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 90.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "options": {},
+    }
+
+    problem = PinchProblem()
+    problem.load(payload)
+    stream = problem.hot_streams[0]
+
+    assert stream.supply_temperature == 150.0
+    assert stream.supply_temperature.unit == "°C"
+    assert stream.supply_temperature[1].value == pytest.approx(140.0)
+    assert stream.supply_temperature[1].unit == "°C"
+
+
+def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Path):
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": {
+                    "values": [150.0, 140.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [60.0, 140.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 90.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "options": {},
+    }
+    path = tmp_path / "stateful_equal_t.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        PinchProblem().load(source=path)
+
+    message = str(exc_info.value)
+    assert "Supply and target temperatures must differ for state_id 'peak'" in message
+    assert "Stream 1 'H1'" in message
+
+
 def test_chocolate_factory_sample_can_be_copied_and_validated(tmp_path: Path):
     case_path = copy_sample_case(
         "chocolate_factory.json",

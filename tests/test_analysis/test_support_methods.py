@@ -30,6 +30,16 @@ def test_get_value_with_valuewithunit():
     assert get_value(vwu) == 99.9
 
 
+def test_get_value_with_stateful_payload_defaults_to_state_zero():
+    payload = {
+        "values": [99.9, 88.8],
+        "state_ids": ["0", "1"],
+        "unit": "kW",
+        "weights": [0.25, 0.75],
+    }
+    assert get_value(payload) == 99.9
+
+
 def test_get_value_with_int_raises():
     assert get_value(5) == 5.0  # Int should be converted to float
 

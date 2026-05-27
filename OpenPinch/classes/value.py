@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -10,6 +11,14 @@ from pint import UnitRegistry
 from pint.errors import DimensionalityError
 
 ureg = UnitRegistry()
+try:
+    ureg.define("USD = [currency]")
+except Exception:
+    pass
+try:
+    ureg.define("NZD = [currency]")
+except Exception:
+    pass
 Q_ = ureg.Quantity
 
 _SERIALIZED_SCALAR_KEYS = {"value", "unit", "units"}
@@ -50,6 +59,15 @@ class Value:
         if state_id is not None:
             state_ids = state_id
 
+        if hasattr(data, "model_dump") and not isinstance(data, Mapping):
+            data = data.model_dump(mode="python")
+
+        if isinstance(data, Value):
+            if weights is not None or state_ids is not None:
+                raise TypeError("Value inputs do not accept state_ids or weights.")
+            self._init_from_value(data, unit)
+            return
+
         if isinstance(data, Mapping):
             if self._is_serialized_stateful_payload(data):
                 self._init_stateful(
@@ -82,10 +100,6 @@ class Value:
             return
 
         if self._is_array_like_input(data):
-            if state_ids is None:
-                raise TypeError(
-                    "state_ids are required for array-backed stateful values."
-                )
             self._init_stateful(data, unit=unit, weights=weights, state_ids=state_ids)
             return
 
@@ -164,7 +178,7 @@ class Value:
     def unit(self, unit_str):
         """Convert the stored quantity to ``unit_str`` in-place."""
         self._set_storage(
-            Q_(self._magnitude_array(), unit_str),
+            Q_(self._magnitude_array(), self._normalise_unit_input(unit_str)),
             self._copy_state_ids(),
             self._weights.copy(),
         )
@@ -172,7 +186,7 @@ class Value:
     def to(self, new_unit: str) -> "Value":
         """Return a copy converted to ``new_unit``."""
         return self._from_quantity(
-            self._quantity.to(new_unit),
+            self._quantity.to(self._normalise_unit_input(new_unit)),
             state_ids=self._copy_state_ids(),
             weights=self._weights.copy(),
         )
@@ -233,6 +247,30 @@ class Value:
             combined_weights,
         )
 
+    def __getitem__(self, state_id):
+        """Return a scalar ``Value`` for one stored state."""
+        if not self._is_stateful():
+            return self._from_quantity(
+                self._quantity,
+                state_ids=None,
+                weights=np.asarray([1.0], dtype=float),
+            )
+
+        lookup = self._normalise_lookup_state_id(state_id)
+        try:
+            idx = self._state_ids.index(lookup)
+        except ValueError as exc:
+            raise KeyError(f"Unknown state_id {state_id!r}.") from exc
+
+        return self._from_quantity(
+            Q_(
+                np.asarray([self._magnitude_array()[idx]], dtype=float),
+                self._quantity.units,
+            ),
+            state_ids=None,
+            weights=np.asarray([1.0], dtype=float),
+        )
+
     def __str__(self):
         if not self._is_stateful():
             return f"{self.value} {self.unit}"
@@ -244,13 +282,13 @@ class Value:
 
     def __repr__(self):
         if not self._is_stateful():
-            return f"Value({self.value}, {repr(self.unit)})"
+            return f"Value({self.value}, {repr(self._serialise_units(self._quantity.units))})"
         return (
             "Value("
             f"values={self.state_values.tolist()}, "
             f"state_ids={self.state_ids!r}, "
             f"weights={self.weights.tolist()}, "
-            f"unit={self.unit!r})"
+            f"unit={self._serialise_units(self._quantity.units)!r})"
         )
 
     def __float__(self):
@@ -450,19 +488,37 @@ class Value:
             quantity = Q_(np.asarray([0.0], dtype=float))
         else:
             quantity = (
-                Q_(np.asarray([data], dtype=float), unit)
+                Q_(np.asarray([data], dtype=float), self._normalise_unit_input(unit))
                 if unit
                 else Q_(np.asarray([data], dtype=float))
             )
         self._set_storage(quantity, None, np.asarray([1.0], dtype=float))
 
-    def _init_from_value_with_unit(self, data, unit: str | None) -> None:
-        quantity = Q_(data.value, data.units)
+    def _init_from_value(self, data: "Value", unit: str | None) -> None:
+        quantity = data._quantity
         if unit is not None:
             try:
-                quantity.to(unit)
-            except DimensionalityError, TypeError, ValueError:
-                pass
+                quantity = quantity.to(self._normalise_unit_input(unit))
+            except (DimensionalityError, TypeError, ValueError):
+                if self._quantity_is_dimensionless(quantity):
+                    quantity = Q_(data._magnitude_array(), self._normalise_unit_input(unit))
+        self._set_storage(
+            Q_(np.asarray(quantity.magnitude, dtype=float).reshape(-1), quantity.units),
+            data._copy_state_ids(),
+            data._weights.copy(),
+        )
+
+    def _init_from_value_with_unit(self, data, unit: str | None) -> None:
+        quantity = Q_(data.value, self._normalise_unit_input(data.units))
+        if unit is not None:
+            try:
+                quantity = quantity.to(self._normalise_unit_input(unit))
+            except (DimensionalityError, TypeError, ValueError):
+                if self._quantity_is_dimensionless(quantity):
+                    quantity = Q_(
+                        np.asarray([quantity.magnitude], dtype=float),
+                        self._normalise_unit_input(unit),
+                    )
         self._set_storage(
             Q_(np.asarray([quantity.magnitude], dtype=float), quantity.units),
             None,
@@ -486,22 +542,21 @@ class Value:
                 label="values",
             )
         else:
-            if state_ids is None:
-                raise TypeError(
-                    "state_ids are required for array-backed stateful values."
-                )
+            values_list = list(data)
             ordered_state_ids = self._normalise_state_ids(state_ids)
             if ordered_state_ids is None:
-                raise TypeError(
-                    "state_ids are required for array-backed stateful values."
-                )
+                ordered_state_ids = self._auto_state_ids(len(values_list))
             magnitudes = self._coerce_magnitude_array(
-                data,
+                values_list,
                 expected_len=len(ordered_state_ids),
                 label="values",
             )
 
-        quantity = Q_(magnitudes, unit) if unit else Q_(magnitudes)
+        quantity = (
+            Q_(magnitudes, self._normalise_unit_input(unit))
+            if unit
+            else Q_(magnitudes)
+        )
         self._set_storage(
             quantity,
             ordered_state_ids,
@@ -672,6 +727,22 @@ class Value:
         return normalised_state_ids
 
     @staticmethod
+    def _auto_state_ids(length: int) -> list[str]:
+        if length <= 0:
+            raise ValueError("Stateful values cannot be empty.")
+        return [str(idx) for idx in range(length)]
+
+    @staticmethod
+    def _normalise_lookup_state_id(state_id) -> str | None:
+        if state_id is None:
+            return None
+        if _is_bool_like(state_id):
+            raise TypeError("state_id must not be boolean.")
+        if isinstance(state_id, (np.integer, int)):
+            return str(int(state_id))
+        return str(state_id)
+
+    @staticmethod
     def _is_numeric_scalar(other: Any) -> bool:
         return isinstance(
             other, (int, float, np.integer, np.floating)
@@ -700,7 +771,40 @@ class Value:
         )
 
     def _format_units(self, units) -> str:
-        return format(units, "~").replace("°", "deg").replace(" ", "")
+        return (
+            format(units, "~")
+            .replace("USD", "$")
+            .replace("NZD", "$")
+            .replace(" ", "")
+        )
+
+    @staticmethod
+    def _serialise_units(units) -> str:
+        return (
+            format(units, "~")
+            .replace("°", "deg")
+            .replace("USD", "$")
+            .replace("NZD", "$")
+            .replace(" ", "")
+        )
+
+    @staticmethod
+    def _normalise_unit_input(unit: str | None) -> str | None:
+        if unit is None:
+            return None
+        text = str(unit).strip().replace("$", "USD")
+        if text in {"C", "°C"}:
+            return "degC"
+        if text == "degK":
+            return "K"
+        text = re.sub(r"(?<=[A-Za-z])2(?=($|[./*]))", "^2", text)
+        text = re.sub(r"(?<=[A-Za-z])3(?=($|[./*]))", "^3", text)
+        text = text.replace(".K", "/K").replace(".degC", "/degC")
+        return text
+
+    @staticmethod
+    def _quantity_is_dimensionless(quantity) -> bool:
+        return str(quantity.units) == "dimensionless"
 
     def to_dict(self):
         """Serialise the value into a JSON-friendly dictionary."""
@@ -709,9 +813,12 @@ class Value:
                 "values": self.state_values.tolist(),
                 "state_ids": self.state_ids,
                 "weights": self.weights.tolist(),
-                "unit": self.unit,
+                "unit": self._serialise_units(self._quantity.units),
             }
-        return {"value": self.weighted_value, "unit": self.unit}
+        return {
+            "value": self.weighted_value,
+            "unit": self._serialise_units(self._quantity.units),
+        }
 
     @classmethod
     def from_dict(cls, data):

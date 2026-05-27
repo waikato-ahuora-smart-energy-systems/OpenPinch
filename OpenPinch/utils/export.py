@@ -81,8 +81,8 @@ def _split_vu(x: Any) -> Tuple[Optional[float], Optional[str]]:
     if x is None:
         return None, None
     # If it's a pydantic model with attributes
-    if hasattr(x, "value") and hasattr(x, "units"):
-        return x.value, x.units
+    if hasattr(x, "value") and (hasattr(x, "unit") or hasattr(x, "units")):
+        return x.value, getattr(x, "unit", getattr(x, "units", None))
     # plain number
     try:
         return float(x), None

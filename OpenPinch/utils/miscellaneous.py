@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import numpy as np
 
+from ..classes.value import Value
 from ..lib.config import tol
 
 if TYPE_CHECKING:
@@ -47,11 +48,26 @@ def get_value(
             f"{type(val)}. Expected float, int, numeric string, dict, "
             "or ValueWithUnit."
         )
+    elif isinstance(val, Value):
+        return val.weighted_value
+    elif getattr(val, "_stream_value_view", False):
+        return val.value
     elif isinstance(val, float | int):
         return float(val)
+    elif hasattr(val, "model_dump"):
+        return get_value(val.model_dump(mode="python"), val2=val2, zone_name=zone_name)
     elif isinstance(val, dict):
         if zone_name in val:
             return get_value(val[zone_name], val2=val2)
+
+        if _is_stateful_value_payload(val):
+            value = Value(val)
+            default_state_id = "0"
+            if value.state_ids is None:
+                return float(value.value)
+            if default_state_id not in value.state_ids:
+                default_state_id = value.state_ids[0]
+            return float(value[default_state_id].value)
 
         payload = val.copy()
         if "value" not in payload:
@@ -115,6 +131,16 @@ def get_value(
 def _is_value_with_unit(val: Any) -> bool:
     """Return ``True`` for objects that look like ``ValueWithUnit`` containers."""
     return hasattr(val, "value") and hasattr(val, "units")
+
+
+def _is_stateful_value_payload(val: Any) -> bool:
+    """Return ``True`` for dict-like stateful value payloads."""
+    if not isinstance(val, dict):
+        return False
+    keys = set(val)
+    return keys.issubset({"values", "state_ids", "weights", "unit", "units"}) and (
+        "values" in keys or "state_ids" in keys or "weights" in keys
+    )
 
 
 def linear_interpolation(

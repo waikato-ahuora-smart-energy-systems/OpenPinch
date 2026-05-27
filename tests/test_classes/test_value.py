@@ -7,6 +7,7 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.classes.value import Value
 from OpenPinch.lib import *
+from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 
 
 def test_heatflow_value_behavior():
@@ -24,7 +25,7 @@ def test_heatflow_value_behavior():
 def test_temperature_value_behavior():
     v = Value(15, "degC")
     assert v == 15.0
-    assert v.unit == "degC"
+    assert v.unit == "°C"
     assert float(v) == 15
     assert int(v) == 15
 
@@ -99,7 +100,7 @@ def test_valuewithunit_with_mismatched_unit():
     v = Value(vw, unit="K")  # mismatched unit
 
     # It should keep the original "degC" and silently ignore the mismatch
-    assert v.unit == "degC"
+    assert v.unit == "°C"
 
 
 def test_value_from_valuewithunit():
@@ -157,6 +158,14 @@ def test_stateful_value_defaults_to_uniform_weights():
     np.testing.assert_allclose(v.value, np.array([10.0, 4.0]))
     np.testing.assert_allclose(v.weights, np.array([0.5, 0.5]))
     assert v.weighted_value == pytest.approx(7.0)
+
+
+def test_stateful_value_auto_generates_state_ids_for_array_payload():
+    v = Value([10.0, 4.0], "kW")
+
+    np.testing.assert_allclose(v.value, np.array([10.0, 4.0]))
+    assert v.state_ids == ["0", "1"]
+    np.testing.assert_allclose(v.weights, np.array([0.5, 0.5]))
 
 
 def test_stateful_value_accepts_explicit_values_and_state_id_keywords():
@@ -252,6 +261,35 @@ def test_stateful_value_arithmetic_and_conversion():
     assert product.weighted_value == pytest.approx(14.0)
 
 
+def test_stateful_value_getitem_and_units_alias():
+    payload = StatefulValueWithUnit(
+        values=[15.0, 8.0],
+        unit="kW",
+        state_ids=["0", "peak"],
+        weights=[0.75, 0.25],
+    )
+    v = Value(payload)
+
+    default_state = v[0]
+    peak_state = v["peak"]
+
+    assert isinstance(default_state, Value)
+    assert default_state.value == pytest.approx(15.0)
+    assert default_state.unit == "kW"
+    assert not hasattr(default_state, "units")
+    assert peak_state.value == pytest.approx(8.0)
+    assert peak_state.unit == "kW"
+
+
+def test_temperature_value_displays_degree_symbol_but_serialises_deg():
+    v = Value(25.0, "degC")
+
+    assert v.unit == "°C"
+    assert str(v) == "25.0 °C"
+    assert repr(v) == "Value(25.0, 'degC')"
+    assert v.to_dict() == {"value": 25.0, "unit": "degC"}
+
+
 def test_stateful_value_comparisons_use_weighted_scalar():
     v = Value({"on": 10.0, "off": 0.0}, "kW", weights={"on": 0.7, "off": 0.3})
     other_weights = Value(
@@ -332,11 +370,6 @@ def test_scalar_value_add_states_rejected():
             {"data": {}, "unit": "kW"},
             ValueError,
             "empty",
-        ),
-        (
-            {"data": [1.0, 2.0], "unit": "kW"},
-            TypeError,
-            "state_ids",
         ),
         (
             {
@@ -443,6 +476,28 @@ def test_value_stateful_roundtrip_and_weighted_scalar_paths():
         "unit": "kW",
     }
     assert Value.from_dict(v.to_dict()).weighted_value == pytest.approx(7.5)
+
+
+def test_scalar_value_state_lookup_returns_same_value_for_any_key():
+    v = Value(15.0, "degC")
+
+    assert v[0].value == pytest.approx(15.0)
+    assert v[1].value == pytest.approx(15.0)
+    assert v["summer"].value == pytest.approx(15.0)
+    assert v[None].value == pytest.approx(15.0)
+    assert v[1].unit == "°C"
+    assert v["summer"].state_ids is None
+
+
+def test_stateful_value_state_lookup_remains_strict_for_unknown_state_id():
+    v = Value(
+        {"summer": 12.0, "winter": 6.0},
+        "kW",
+        weights={"summer": 0.25, "winter": 0.75},
+    )
+
+    with pytest.raises(KeyError, match="Unknown state_id 'spring'"):
+        _ = v["spring"]
 
 
 # def test_series_unit_conversion():
