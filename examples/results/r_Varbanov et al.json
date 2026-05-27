@@ -34,7 +34,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "HPS",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -76,6 +76,13 @@
                         "value": 0.0,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "ChW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -113,7 +120,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "HPS",
                     "heat_flow": {
                         "value": 1.2282352941176526,
                         "units": "kW"
@@ -155,6 +162,13 @@
                         "value": 69.95137812735338,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "ChW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -192,7 +206,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "HPS",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -234,6 +248,13 @@
                         "value": 36.84854851031322,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "ChW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -271,7 +292,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "HPS",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -313,6 +334,13 @@
                         "value": 0.0,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "ChW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -350,7 +378,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "HPS",
                     "heat_flow": {
                         "value": 0.0,
                         "units": "kW"
@@ -392,6 +420,13 @@
                         "value": 0.0,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "ChW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -429,7 +464,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "HPS",
                     "heat_flow": {
                         "value": 1.2282352941176526,
                         "units": "kW"
@@ -471,6 +506,13 @@
                         "value": 106.7999266376666,
                         "units": "kW"
                     }
+                },
+                {
+                    "name": "ChW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
                 }
             ]
         },
@@ -508,7 +550,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "HPS",
                     "heat_flow": {
                         "value": 1.2282352941176526,
                         "units": "kW"
@@ -548,6 +590,13 @@
                     "name": "CW",
                     "heat_flow": {
                         "value": 106.7999266376666,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "ChW",
+                    "heat_flow": {
+                        "value": 0.0,
                         "units": "kW"
                     }
                 }

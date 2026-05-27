@@ -1,0 +1,65 @@
+{
+    "targets": [
+        {
+            "name": "Plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 64.4,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 79.4,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 1068.7000000000003,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1900.0000000000002,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 6086.6,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 100.0,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HOIL",
+                    "heat_flow": {
+                        "value": 76.20000000000027,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 992.5,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 1900.0,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

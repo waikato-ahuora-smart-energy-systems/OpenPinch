@@ -1,7 +1,7 @@
 {
     "targets": [
         {
-            "name": "Total Integrated Target/Direct Integration",
+            "name": "Kaviani et al/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 85.0,
@@ -43,9 +43,16 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 63.812999999999995,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CHW",
+                    "heat_flow": {
+                        "value": 0.0,
                         "units": "kW"
                     }
                 }
@@ -94,23 +101,30 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 63.812999999999995,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CHW",
+                    "heat_flow": {
+                        "value": 0.0,
                         "units": "kW"
                     }
                 }
             ]
         },
         {
-            "name": "Total Process Target/Direct Integration",
+            "name": "Kaviani et al/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 85.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 85.0,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -145,23 +159,30 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 63.812999999999995,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CHW",
+                    "heat_flow": {
+                        "value": 0.0,
                         "units": "kW"
                     }
                 }
             ]
         },
         {
-            "name": "Total Site Target/Direct Integration",
+            "name": "Kaviani et al/Total Site Target",
             "temp_pinch": {
                 "cold_temp": {
                     "value": 40.0,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 124.0,
+                    "value": 125.0,
                     "units": "degC"
                 }
             },
@@ -196,9 +217,16 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 63.812999999999995,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CHW",
+                    "heat_flow": {
+                        "value": 0.0,
                         "units": "kW"
                     }
                 }

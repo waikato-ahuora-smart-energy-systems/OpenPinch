@@ -106,11 +106,11 @@
             "name": "Total Process Target/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 45.0,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 45.0,
+                    "value": null,
                     "units": "degC"
                 }
             },

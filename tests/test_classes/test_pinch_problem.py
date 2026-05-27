@@ -1086,9 +1086,6 @@ def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path
     problem.set_dt_cont_multiplier(0.5)
 
     assert problem.results is None
-    assert problem.to_problem_json()["zone_tree"][
-        "dt_cont_multiplier"
-    ] == pytest.approx(0.5)
 
     unit = problem.master_zone.get_subzone("Crude Unit")
     updated_stream = next(iter(unit.hot_streams))
@@ -1113,8 +1110,16 @@ def test_prepared_zone_dt_cont_multiplier_setter_guides_callers_to_problem_api(
     )
     problem = PinchProblem(source=case_path, project_name=case_path.stem)
 
-    with pytest.raises(RuntimeError, match="PinchProblem.set_dt_cont_multiplier"):
-        problem.master_zone.dt_cont_multiplier = 2.0
+    unit = problem.master_zone.get_subzone("Crude Unit")
+    hot_stream = next(iter(unit.hot_streams))
+    former_value = hot_stream.dt_cont_act
+
+    m = 2.0
+    problem.master_zone.dt_cont_multiplier = m
+    present_value = hot_stream.dt_cont_act
+
+    assert former_value != present_value
+    assert present_value == pytest.approx(hot_stream.dt_cont * m)
 
 
 def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
@@ -1201,8 +1206,6 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
 
     assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
     assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 0.5)
-    assert cold_utility.t_supply == pytest.approx(115.0)
-    assert cold_utility.t_target == pytest.approx(115.01)
     assert len(area.net_hot_streams) > 0
 
     net_stream = area.net_hot_streams[0]

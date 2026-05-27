@@ -2,6 +2,7 @@
 
 import csv
 import pickle
+import warnings
 from copy import copy
 from functools import partial
 from pathlib import Path
@@ -206,6 +207,13 @@ class StreamCollection:
             invert_utility=True,
         )
 
+    def get_stream_by_name(self, name: str, approximate: bool = False) -> Stream:
+        for stream in self:
+            if (stream.name == name) or (approximate and name in stream.name):
+                return stream
+        warnings.warn(f"Stream '{name}' not found.")
+        return None
+
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
         """Replace the collection contents with the provided stream mapping."""
         self._streams = {}
@@ -219,17 +227,43 @@ class StreamCollection:
             del self._streams[stream_name]
             self._needs_sort = True
         else:
-            raise KeyError(f"Stream '{stream_name}' not found.")
+            warnings.warn(f"Stream '{stream_name}' not found.")
 
-    def reset_heat_flows(self) -> "StreamCollection":
-        """Set every stream heat flow in the collection to zero in place."""
-        for stream in self._streams.values():
-            stream.set_heat_flow(0.0)
+    def sum_stream_attribute(self, attr_name: str) -> float:
+        """Return the total of a specified attribute for streams in the collection."""
+        if self._streams is None or len(self._streams) == 0:
+            warnings.warn(
+                f"Attempted to sum attribute '{attr_name}'"
+                f" on an empty stream collection."
+            )
+            return 0.0
+        stream = next(iter(self._streams.values()))
+        if hasattr(stream, attr_name):
+            return sum(getattr(stream, attr_name) for stream in self._streams.values())
+        else:
+            warnings.warn(
+                f"Stream '{stream.name}' does not have attribute '{attr_name}'."
+            )
+        return 0.0
+
+    def set_common_stream_attribute(self, attr_name: str, value: Any):
+        """Set a common attribute across all streams in the collection."""
+        if self._streams is None or len(self._streams) == 0:
+            warnings.warn(
+                f"Attempted to set attribute '{attr_name}'"
+                f"on an empty stream collection."
+            )
+            return 0.0
+        for stream in self._streams.values():  # Check if attribute exists
+            if hasattr(stream, attr_name):
+                current_value = getattr(stream, attr_name)
+                if current_value != value:
+                    setattr(stream, attr_name, value)
+            else:
+                warnings.warn(
+                    f"Stream '{stream.name}' does not have attribute '{attr_name}'."
+                )
         return self
-
-    def sum_heat_flow(self) -> float:
-        """Return the total heat flow across all streams in the collection."""
-        return sum(stream.heat_flow for stream in self._streams.values())
 
     def set_sort_key(self, key: Union[str, List[str], Callable], reverse: bool = False):
         """Set the sorting key. Supports attribute names or custom lambdas."""

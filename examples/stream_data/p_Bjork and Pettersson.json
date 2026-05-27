@@ -407,10 +407,7 @@
                 "value": 10.0,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 1.0,
                 "units": "kW/m^2/degC"
@@ -425,17 +422,14 @@
                 "units": "degC"
             },
             "t_target": {
-                "value": 40.0,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
                 "value": 10.0,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 2.0,
                 "units": "kW/m^2/degC"

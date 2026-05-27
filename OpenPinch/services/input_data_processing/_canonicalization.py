@@ -139,10 +139,6 @@ def _create_nested_zones(
             type=child_schema.type,
             zone_config=zone_config,
             parent_zone=parent_zone,
-            dt_cont_multiplier=_resolve_zone_dt_cont_multiplier(
-                child_schema, parent_zone.dt_cont_multiplier
-            ),
-            lock_dt_cont_multiplier=True,
         )
         parent_zone.add_zone(child_zone, sub=True)
         _create_nested_zones(child_zone, child_schema, zone_config)
@@ -161,6 +157,31 @@ def _resolve_zone_dt_cont_multiplier(
     if not math.isfinite(value) or value < 0.0:
         raise ValueError("dt_cont_multiplier must be a finite non-negative value.")
     return value
+
+
+def _apply_zone_dt_cont_multiplier(
+    parent_zone: Zone,
+    zone_tree: ZoneTreeSchema,
+    inherited_multiplier: float | None = None,
+) -> Zone:
+    """Recursively apply dt_cont_multiplier values for zone_tree."""
+    parent_zone.dt_cont_multiplier = _resolve_zone_dt_cont_multiplier(
+        zone_tree=zone_tree,
+        inherited_multiplier=inherited_multiplier,
+    )
+    if zone_tree.children is None:
+        return parent_zone
+
+    for child_schema in zone_tree.children:
+        child_zone = parent_zone.get_subzone(loc=child_schema.name)
+        if child_zone is None:
+            child_zone = parent_zone
+        _apply_zone_dt_cont_multiplier(
+            parent_zone=child_zone,
+            zone_tree=child_schema,
+            inherited_multiplier=parent_zone.dt_cont_multiplier,
+        )
+    return parent_zone
 
 
 def _rewrite_stream_zones_from_tree(

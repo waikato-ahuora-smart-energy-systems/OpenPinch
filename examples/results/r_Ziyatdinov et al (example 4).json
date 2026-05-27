@@ -34,7 +34,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
                         "value": 2150.0,
                         "units": "kW"
@@ -43,7 +43,58 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 7200.000000000001,
+                        "units": "kW"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 141.85000000000002,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 141.85000000000002,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2150.0,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 7200.0,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 35550.0,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 94.29708222811671,
+                "units": "%"
+            },
+            "utility_cost": {
+                "value": 25764860000.000004,
+                "units": "$/y"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 2150.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "CW",
                     "heat_flow": {
                         "value": 7200.000000000001,
                         "units": "kW"
@@ -55,11 +106,11 @@
             "name": "Total Process Target/Direct Integration",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": 141.85000000000002,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": 141.85000000000002,
+                    "value": null,
                     "units": "degC"
                 }
             },
@@ -85,7 +136,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
                         "value": 2150.0,
                         "units": "kW"
@@ -94,7 +145,7 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 7200.000000000001,
                         "units": "kW"
@@ -136,7 +187,7 @@
             },
             "hot_utilities": [
                 {
-                    "name": "HU",
+                    "name": "VHPS",
                     "heat_flow": {
                         "value": 2150.0,
                         "units": "kW"
@@ -145,7 +196,7 @@
             ],
             "cold_utilities": [
                 {
-                    "name": "CU",
+                    "name": "CW",
                     "heat_flow": {
                         "value": 7200.000000000001,
                         "units": "kW"

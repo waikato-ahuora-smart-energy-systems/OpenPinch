@@ -1,0 +1,1541 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Aniline unit",
+            "data": {
+                "T": [
+                    700,
+                    699.99,
+                    250,
+                    249.99,
+                    212.5,
+                    209.5,
+                    201,
+                    194.1,
+                    193.8,
+                    182.6,
+                    175,
+                    169.7,
+                    164,
+                    150.4,
+                    149.02770889734325,
+                    145,
+                    139.1,
+                    128.1,
+                    124,
+                    114.6,
+                    112.93037932347657,
+                    111,
+                    110.7893896196764,
+                    101.6,
+                    101.5,
+                    99.74924422459691,
+                    94.8,
+                    90.6708390335142,
+                    78.6,
+                    76.9,
+                    73.5,
+                    53.7,
+                    49.7,
+                    49.2,
+                    46.8,
+                    35.9,
+                    34.9,
+                    33.9,
+                    32.1,
+                    25,
+                    16.2,
+                    15,
+                    14.100000000000001,
+                    12.100000000000001,
+                    5.300000000000001,
+                    3,
+                    0,
+                    -0.01
+                ],
+                "H_net": [
+                    7073.746920650564,
+                    7073.746920650564,
+                    7073.746920650564,
+                    7073.746920650564,
+                    7073.746920650564,
+                    7055.260637464723,
+                    6879.769208731215,
+                    6795.256204419077,
+                    5771.921725970724,
+                    5634.741197232182,
+                    5578.663984341971,
+                    3875.367506931692,
+                    3788.6395972640335,
+                    3788.6395972640335,
+                    3788.639597264034,
+                    3505.0190026009427,
+                    3060.8255095335676,
+                    2284.372969910486,
+                    1954.0178586138727,
+                    1925.33197151698,
+                    1045.6987719072713,
+                    28.685887096892657,
+                    28.043169480786673,
+                    0,
+                    5.113173955574894,
+                    79.92988479363066,
+                    291.4306430494935,
+                    828.4313798127496,
+                    2398.253798206987,
+                    2637.0248045368153,
+                    3135.517938140429,
+                    6128.855624113388,
+                    6664.941094665184,
+                    6704.860063647935,
+                    6871.504584152895,
+                    7737.215717485613,
+                    7833.796060611695,
+                    7843.05954230205,
+                    7867.00366948455,
+                    7929.052340230982,
+                    7964.59387869252,
+                    7983.590452119093,
+                    7997.837882189024,
+                    8136.71883789998,
+                    8244.366087317228,
+                    8271.486920650563,
+                    8271.486920650563,
+                    8271.486920650563
+                ]
+            }
+        },
+        {
+            "name": "Natural gas unit",
+            "data": {
+                "T": [
+                    840.4,
+                    838.8226246672534,
+                    778,
+                    700,
+                    699.99,
+                    615.3,
+                    355,
+                    350,
+                    293.3,
+                    283.4,
+                    250,
+                    249.99,
+                    249.94924227926532,
+                    235.2,
+                    231.4,
+                    227.1,
+                    223,
+                    222,
+                    114.4,
+                    101,
+                    100,
+                    99,
+                    85,
+                    45,
+                    42.355746982414566,
+                    40,
+                    36.60311996476555,
+                    33,
+                    26,
+                    20,
+                    15,
+                    8,
+                    6,
+                    0,
+                    -0.01
+                ],
+                "H_net": [
+                    0,
+                    18.86603906070377,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    18.866039060704225,
+                    59.82648151825299,
+                    96.31786039766408,
+                    178.13532037243556,
+                    264.9202878848836,
+                    647.4427153721031,
+                    1076.1207256253363,
+                    1346.1584008363639,
+                    1510.2911461318026,
+                    1543.9299999999976,
+                    1543.9299999999976,
+                    1543.9299999999976
+                ]
+            }
+        },
+        {
+            "name": "Nitrobenzene unit",
+            "data": {
+                "T": [
+                    700,
+                    699.99,
+                    250,
+                    249.99,
+                    172.35,
+                    166.9,
+                    157.8,
+                    156.8,
+                    136.7,
+                    101,
+                    97.11187296965522,
+                    85.1,
+                    84.80745022530095,
+                    84.1,
+                    80,
+                    77.81410227198253,
+                    77.8,
+                    72,
+                    59,
+                    55,
+                    51.1,
+                    47,
+                    36.6,
+                    28.9,
+                    25,
+                    24,
+                    22,
+                    15,
+                    13.3,
+                    7.899999999999999,
+                    5,
+                    2,
+                    1,
+                    0
+                ],
+                "H_net": [
+                    2739.4351401869158,
+                    2739.4351401869158,
+                    2739.4351401869158,
+                    2739.4351401869158,
+                    2739.4351401869158,
+                    2020.6051401869158,
+                    2020.6051401869158,
+                    337.5151401869157,
+                    337.5151401869157,
+                    0,
+                    161.77916538414456,
+                    661.5752802139837,
+                    1029.043690286897,
+                    1029.0436902869021,
+                    1029.0436902869021,
+                    1029.0436902869021,
+                    1029.0436902869021,
+                    1029.0436902869021,
+                    1650.8388461073885,
+                    2031.2637658470253,
+                    2614.182062593171,
+                    3265.7558483169532,
+                    4191.214620382008,
+                    5386.020057391713,
+                    5733.067096916108,
+                    5844.7116991251605,
+                    5959.280903543266,
+                    6565.529589594869,
+                    6712.7614133502575,
+                    6904.700316657503,
+                    6989.735140186915,
+                    6989.735140186915,
+                    7217.3151401869145,
+                    7217.3151401869145
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Aniline unit",
+            "name": "Hydrogen",
+            "t_supply": {
+                "value": 197.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 160,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 183.1,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Reacted gas I",
+            "t_supply": {
+                "value": 216,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 116.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 835.58,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Nitrobenzene from condenser",
+            "t_supply": {
+                "value": 116.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 64.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2812.12,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Reacted gas II",
+            "t_supply": {
+                "value": 29.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 27.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 107.22,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Heat medium",
+            "t_supply": {
+                "value": 31.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 18,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 155.65,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Waste water",
+            "t_supply": {
+                "value": 93.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 64.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 305.84,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline from top of distillation column",
+            "t_supply": {
+                "value": 88.5,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 47.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 188.91,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline water",
+            "t_supply": {
+                "value": 154.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 536.32,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline from cooler",
+            "t_supply": {
+                "value": 48.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 115.51,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline from condenser",
+            "t_supply": {
+                "value": 109.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 49.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5230.28,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Nitrobenzene from heater",
+            "t_supply": {
+                "value": 149,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 154.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 44.67,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Mixed gas",
+            "t_supply": {
+                "value": 149,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 194.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 659.02,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Circulating hydrogen",
+            "t_supply": {
+                "value": 61.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 197.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 835.58,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline water from preheater",
+            "t_supply": {
+                "value": 20.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 38.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 305.4,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline water from reboiler",
+            "t_supply": {
+                "value": 96,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 99.6,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1885.66,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Impure anilines from preheater",
+            "t_supply": {
+                "value": 31.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 113.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 812.01,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline from reboiler",
+            "t_supply": {
+                "value": 178.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 179.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1019.66,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Aniline from distillation column",
+            "t_supply": {
+                "value": 109,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 135.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2046.6,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Aniline unit",
+            "name": "Pure nitrobenzene",
+            "t_supply": {
+                "value": 154.7,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 160,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1664.19,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Transformed gas",
+            "t_supply": {
+                "value": 793,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 365,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3366.37,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Middle transformed gas",
+            "t_supply": {
+                "value": 370,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 21,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5869.98,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Flue gas",
+            "t_supply": {
+                "value": 855.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 129.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8683.25,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Gas after decarbonization",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 23,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 245.24,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Waste liquid from cooler",
+            "t_supply": {
+                "value": 60,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 35,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 435.97,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Carbon dioxide",
+            "t_supply": {
+                "value": 48,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 30,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 550.08,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Desalting water",
+            "t_supply": {
+                "value": 11,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 84,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1226.42,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Natural gas to transformer",
+            "t_supply": {
+                "value": 70,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 268.4,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1061.16,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Raw material gas to transformer",
+            "t_supply": {
+                "value": 212.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 600.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3634.35,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Steam to transformer",
+            "t_supply": {
+                "value": 216.4,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 220.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1810.45,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Air to transformer",
+            "t_supply": {
+                "value": 25,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 278.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2177.29,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Saturation water",
+            "t_supply": {
+                "value": 207,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 208,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3366.37,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Water from preheater",
+            "t_supply": {
+                "value": 86,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 207,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3803.8,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Natural gas unit",
+            "name": "Liquid from reboiler",
+            "t_supply": {
+                "value": 85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 86,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 527.12,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Waste acid",
+            "t_supply": {
+                "value": 70,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 39,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1685.16,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Mixed acid",
+            "t_supply": {
+                "value": 37,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 498.48,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Azeotrope from cooler",
+            "t_supply": {
+                "value": 100.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 99.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1214.48,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Benzene from distillation column",
+            "t_supply": {
+                "value": 92.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 22.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 434.91,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Nitrobenzene from 1st distillation column",
+            "t_supply": {
+                "value": 116,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 28.3,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4478.2,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Nitrobenzene",
+            "t_supply": {
+                "value": 17,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 16,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 227.58,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Nitrobenzene",
+            "t_supply": {
+                "value": 51.6,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 43.9,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 509.61,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Waste acid from cooler",
+            "t_supply": {
+                "value": 74,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 62,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 567.31,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Waste water from cooler",
+            "t_supply": {
+                "value": 10,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 32,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 498.48,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Waste water from reboiler",
+            "t_supply": {
+                "value": 57,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 65,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1428.17,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Nitrobenzene from preheater",
+            "t_supply": {
+                "value": 36.1,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 121.7,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 809.28,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Liquid from reboiler",
+            "t_supply": {
+                "value": 151.9,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 157.35,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 718.83,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Nitrobenzene unit",
+            "name": "Liquid from distillating still",
+            "t_supply": {
+                "value": 141.8,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 142.8,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1683.09,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 15,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HOT",
+            "type": "Hot",
+            "t_supply": {
+                "value": 700,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "MPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 250,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

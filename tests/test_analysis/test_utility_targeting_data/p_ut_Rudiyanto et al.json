@@ -1,0 +1,896 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Plant",
+            "data": {
+                "T": [
+                    452.9625,
+                    364.0625,
+                    353.2925,
+                    302.1625,
+                    300,
+                    299.99,
+                    274.0375,
+                    273.8325,
+                    273.8275,
+                    260.1373933880629,
+                    248.6975,
+                    248.51749999999998,
+                    233.20250000000001,
+                    210.9375,
+                    210.8475,
+                    200.77205773834953,
+                    200,
+                    199.99,
+                    194.6625,
+                    193.4725,
+                    184.3275,
+                    184.2275,
+                    179.73250000000002,
+                    177.2475,
+                    168.8625,
+                    157.4925,
+                    150,
+                    149.99,
+                    148.2175,
+                    147.79749999999999,
+                    117.3225,
+                    117.1025,
+                    115.2075,
+                    115.1775,
+                    99.1925,
+                    94.20649999999999,
+                    94.1245,
+                    79.86748969292475,
+                    79.6365,
+                    69.7915,
+                    69.5955,
+                    53.5925,
+                    52.975500000000004,
+                    51.8495,
+                    51.087500000000006,
+                    48.192982497441704,
+                    48.1605,
+                    47.671499999999995,
+                    32.094500000000004,
+                    31.085500000000003,
+                    15
+                ],
+                "H_net": [
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.482690739984,
+                    34313.48269073997,
+                    34089.89020173316,
+                    22588.405214077742,
+                    22359.78195407134,
+                    3722.1451064399953,
+                    2779.733407920001,
+                    651.5232130799923,
+                    0,
+                    523.5141872537533,
+                    529.3891036200002,
+                    1079.9518710900084,
+                    33338.77240388999,
+                    34383.976736489996,
+                    34383.976736489996
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Plant",
+            "name": "LP FWH No. 1A",
+            "t_supply": {
+                "value": 37.794,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 59.718,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 20718.863371080006,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP FWH No. 1B",
+            "t_supply": {
+                "value": 38.283,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 59.914,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 20441.96923827,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP FWH No. 2A",
+            "t_supply": {
+                "value": 59.718,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 84.329,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 23302.739290839992,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP FWH No. 2B",
+            "t_supply": {
+                "value": 59.914,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 84.247,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 23039.51709252,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP FWH No. 3",
+            "t_supply": {
+                "value": 84.329,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 105.33,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 19980.68,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP FWH No. 4",
+            "t_supply": {
+                "value": 105.3,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 137.92,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 31346.78,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "deaerator",
+            "t_supply": {
+                "value": 138.34,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 167.37,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 27615.19392,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP FWH No. 6A",
+            "t_supply": {
+                "value": 174.35,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 200.97,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 30704.73,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP FWH No. 6B",
+            "t_supply": {
+                "value": 174.45,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 201.06,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 30696.077262000017,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP FWH No. 7A",
+            "t_supply": {
+                "value": 200.97,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 238.64,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 44797.59,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP FWH No. 7B",
+            "t_supply": {
+                "value": 201.06,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 238.82,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 44919.397951999985,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP FWH No. 8A",
+            "t_supply": {
+                "value": 238.64,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 263.95,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 31468.98,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP FWH No. 8B",
+            "t_supply": {
+                "value": 238.82,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 264.16,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 31523.45,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP Extraction No. 1A",
+            "t_supply": {
+                "value": 60.965,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40.963,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 20719.699762800003,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP Extraction No. 1B",
+            "t_supply": {
+                "value": 61.727,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 41.972,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 20447.313974999997,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP Extraction No. 2A",
+            "t_supply": {
+                "value": 127.2,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 62.853,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 23335.618434660002,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP Extraction No. 2B",
+            "t_supply": {
+                "value": 126.98,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 63.47,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 23039.88,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP Extraction No. 3",
+            "t_supply": {
+                "value": 189.61,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 89.514,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 20047.27,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP Extraction No. 4",
+            "t_supply": {
+                "value": 283.71,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 109.07,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 31361.69,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "LP Extraction No. 5",
+            "t_supply": {
+                "value": 373.94,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 167.37,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 27613.68,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP Extraction No. 6A",
+            "t_supply": {
+                "value": 462.84,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 178.74,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 30694.98,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP Extraction No. 6B",
+            "t_supply": {
+                "value": 462.84,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 178.74,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 30694.98,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP Extraction No. 7A",
+            "t_supply": {
+                "value": 312.04,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 203.35,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 44783.82,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP Extraction No. 7B",
+            "t_supply": {
+                "value": 312.04,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 204.54,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 44908.7,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP Extraction No. 8A",
+            "t_supply": {
+                "value": 363.17,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 243.08,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 31458.59,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Plant",
+            "name": "HP Extraction No. 8B",
+            "t_supply": {
+                "value": 363.17,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 243.08,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 31520.24,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9.8775,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HOT",
+            "type": "Hot",
+            "t_supply": {
+                "value": 300,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 200,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 150,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 15,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

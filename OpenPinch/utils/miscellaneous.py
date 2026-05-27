@@ -21,6 +21,8 @@ __all__ = [
     "linear_interpolation",
     "make_monotonic",
 ]
+
+
 def _require_plotly():
     try:
         import plotly.graph_objects as go

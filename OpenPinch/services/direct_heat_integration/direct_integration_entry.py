@@ -172,7 +172,11 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
 
-    if hot_utilities.sum_heat_flow() + cold_utilities.sum_heat_flow() < tol:
+    if (
+        hot_utilities.sum_stream_attribute("heat_flow")
+        + cold_utilities.sum_stream_attribute("heat_flow")
+        < tol
+    ):
         # If no utility is needed, there is no net streams for indirect integration.
         return net_hot_streams, net_cold_streams
 

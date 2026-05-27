@@ -1,0 +1,72 @@
+{
+    "targets": [
+        {
+            "name": "Process/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 43.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 43.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 2916.813186813187,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 1476.813186813187,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3683.186813186813,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 73.91227644607139,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 1342.6373626373627,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 1574.1758241758241,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 974.3573817486861,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CHW",
+                    "heat_flow": {
+                        "value": 502.4558050645014,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

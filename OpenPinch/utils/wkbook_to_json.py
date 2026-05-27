@@ -147,7 +147,7 @@ def _parse_options_sheet(
         if hasattr(value, "item"):
             try:
                 return value.item()
-            except (AttributeError, RuntimeError, TypeError, ValueError):
+            except AttributeError, RuntimeError, TypeError, ValueError:
                 pass
         return value
 

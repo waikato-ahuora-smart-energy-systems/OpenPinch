@@ -1,7 +1,7 @@
 {
     "streams": [
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP FWH No- 1A",
             "t_supply": {
                 "value": 37.794,
@@ -27,7 +27,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP FWH No- 1B",
             "t_supply": {
                 "value": 38.283,
@@ -53,7 +53,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP FWH No- 2A",
             "t_supply": {
                 "value": 59.718,
@@ -79,7 +79,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP FWH No- 2B",
             "t_supply": {
                 "value": 59.914,
@@ -105,7 +105,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP FWH No- 3",
             "t_supply": {
                 "value": 84.329,
@@ -131,7 +131,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP FWH No- 4",
             "t_supply": {
                 "value": 105.3,
@@ -157,7 +157,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "deaerator",
             "t_supply": {
                 "value": 138.34,
@@ -183,7 +183,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP FWH No- 6A",
             "t_supply": {
                 "value": 174.35,
@@ -209,7 +209,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP FWH No- 6B",
             "t_supply": {
                 "value": 174.45,
@@ -235,7 +235,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP FWH No- 7A",
             "t_supply": {
                 "value": 200.97,
@@ -261,7 +261,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP FWH No- 7B",
             "t_supply": {
                 "value": 201.06,
@@ -287,7 +287,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP FWH No- 8A",
             "t_supply": {
                 "value": 238.64,
@@ -313,7 +313,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP FWH No- 8B",
             "t_supply": {
                 "value": 238.82,
@@ -339,7 +339,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP Extraction No- 1A",
             "t_supply": {
                 "value": 60.965,
@@ -365,7 +365,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP Extraction No- 1B",
             "t_supply": {
                 "value": 61.727,
@@ -391,7 +391,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP Extraction No- 2A",
             "t_supply": {
                 "value": 127.2,
@@ -417,7 +417,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP Extraction No- 2B",
             "t_supply": {
                 "value": 126.98,
@@ -443,7 +443,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP Extraction No- 3",
             "t_supply": {
                 "value": 189.61,
@@ -469,7 +469,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP Extraction No- 4",
             "t_supply": {
                 "value": 283.71,
@@ -495,7 +495,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "LP Extraction No- 5",
             "t_supply": {
                 "value": 373.94,
@@ -521,7 +521,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP Extraction No- 6A",
             "t_supply": {
                 "value": 462.84,
@@ -547,7 +547,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP Extraction No- 6B",
             "t_supply": {
                 "value": 462.84,
@@ -573,7 +573,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP Extraction No- 7A",
             "t_supply": {
                 "value": 312.04,
@@ -599,7 +599,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP Extraction No- 7B",
             "t_supply": {
                 "value": 312.04,
@@ -625,7 +625,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP Extraction No- 8A",
             "t_supply": {
                 "value": 363.17,
@@ -651,7 +651,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "HP Extraction No- 8B",
             "t_supply": {
                 "value": 363.17,
@@ -677,6 +677,95 @@
             "index": 0
         }
     ],
-    "utilities": [],
+    "utilities": [
+        {
+            "name": "HOT",
+            "type": "Hot",
+            "t_supply": {
+                "value": 300.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 200.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 150.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 15.0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": null,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0.0,
+                "units": "degC"
+            },
+            "price": null,
+            "htc": {
+                "value": null,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
     "options": {}
 }

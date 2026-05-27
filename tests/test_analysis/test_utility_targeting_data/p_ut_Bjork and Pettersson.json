@@ -1,0 +1,526 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Bjork and Pettersson",
+            "data": {
+                "T": [
+                    315,
+                    314,
+                    277,
+                    260,
+                    248,
+                    233,
+                    231.5,
+                    223,
+                    217,
+                    200,
+                    195.16981132075472,
+                    193,
+                    191,
+                    175.77358490566036,
+                    170,
+                    158,
+                    137,
+                    117,
+                    115,
+                    113,
+                    103,
+                    95.35294117647058,
+                    93,
+                    73.88235294117646,
+                    65,
+                    60,
+                    51,
+                    50,
+                    45,
+                    43,
+                    37,
+                    33,
+                    20,
+                    19.990000000000002
+                ],
+                "H_net": [
+                    9800,
+                    9800,
+                    9800,
+                    9800,
+                    9800,
+                    9800,
+                    9800,
+                    9120,
+                    8280,
+                    6750,
+                    6001.32075471698,
+                    5665,
+                    5255,
+                    2590.377358490561,
+                    1580,
+                    620,
+                    200,
+                    200,
+                    200,
+                    0,
+                    0,
+                    458.82352941176487,
+                    600,
+                    2702.941176470589,
+                    3680,
+                    3930,
+                    5190,
+                    5300,
+                    6025,
+                    6245,
+                    7025,
+                    7425,
+                    7425,
+                    7425
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H1",
+            "t_supply": {
+                "value": 180,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3150,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H2",
+            "t_supply": {
+                "value": 280,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9600,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 3,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H3",
+            "t_supply": {
+                "value": 180,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3150,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H4",
+            "t_supply": {
+                "value": 140,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 3,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H5",
+            "t_supply": {
+                "value": 220,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 3,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H6",
+            "t_supply": {
+                "value": 180,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 55,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4375,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H7",
+            "t_supply": {
+                "value": 200,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 9,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.4,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "H8",
+            "t_supply": {
+                "value": 120,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.5,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "C1",
+            "t_supply": {
+                "value": 40,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 230,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3800,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 3,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "C2",
+            "t_supply": {
+                "value": 100,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 220,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 7200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 3,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "C3",
+            "t_supply": {
+                "value": 40,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 190,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5250,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "C4",
+            "t_supply": {
+                "value": 50,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 190,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "C5",
+            "t_supply": {
+                "value": 50,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 250,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 12000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 2,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "C6",
+            "t_supply": {
+                "value": 90,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 190,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 3,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bjork and Pettersson",
+            "name": "C7",
+            "t_supply": {
+                "value": 160,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 250,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 5400,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": -2,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 3,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 325,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 324,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 10,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 2,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

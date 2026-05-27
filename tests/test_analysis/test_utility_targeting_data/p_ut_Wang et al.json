@@ -1,0 +1,440 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Refinery",
+            "data": {
+                "T": [
+                    155.15,
+                    145,
+                    144.99,
+                    127.65,
+                    107.65,
+                    87.65,
+                    67.65,
+                    57.65,
+                    25,
+                    24.99,
+                    15
+                ],
+                "H_net": [
+                    0,
+                    1353.3333333333342,
+                    1354.6666666666663,
+                    3666.666666666667,
+                    8333.333333333334,
+                    16200.000000000002,
+                    21400,
+                    23000,
+                    23000,
+                    23000,
+                    23000
+                ]
+            }
+        },
+        {
+            "name": "Rubber plant",
+            "data": {
+                "T": [
+                    145,
+                    144.99,
+                    142.35,
+                    127.35,
+                    122.35,
+                    112.35,
+                    107.35,
+                    102.35,
+                    92.35,
+                    25,
+                    24.99,
+                    15
+                ],
+                "H_net": [
+                    12000.000000000002,
+                    12000.000000000002,
+                    12000.000000000002,
+                    7500.000000000002,
+                    5375.000000000002,
+                    4125.000000000002,
+                    2750.000000000002,
+                    1333.333333333334,
+                    0,
+                    0,
+                    0,
+                    0
+                ]
+            }
+        },
+        {
+            "name": "Tank field",
+            "data": {
+                "T": [
+                    145,
+                    144.99,
+                    112.35,
+                    97.35,
+                    92.35,
+                    87.35,
+                    77.35,
+                    72.35,
+                    62.35,
+                    25,
+                    24.99
+                ],
+                "H_net": [
+                    6499.999999999999,
+                    6499.999999999999,
+                    6499.999999999999,
+                    4999.999999999999,
+                    4099.999999999999,
+                    3699.999999999999,
+                    2233.333333333332,
+                    999.9999999999991,
+                    0,
+                    0,
+                    0
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Refinery",
+            "name": "H1 (Refinery)",
+            "t_supply": {
+                "value": 162.5,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 95,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 9000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "H2 (Refinery)",
+            "t_supply": {
+                "value": 135,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 75,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Refinery",
+            "name": "H3 (Refinery)",
+            "t_supply": {
+                "value": 115,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 65,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 8000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Rubber plant",
+            "name": "C1 (Rubber plant)",
+            "t_supply": {
+                "value": 85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Rubber plant",
+            "name": "C2 (Rubber plant)",
+            "t_supply": {
+                "value": 115,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 135,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Rubber plant",
+            "name": "C3 (Rubber plant)",
+            "t_supply": {
+                "value": 100,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 120,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Rubber plant",
+            "name": "C4 (Rubber plant)",
+            "t_supply": {
+                "value": 95,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 105,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Tank field",
+            "name": "C5 (Tank field)",
+            "t_supply": {
+                "value": 55,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 70,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Tank field",
+            "name": "C6 (Tank field)",
+            "t_supply": {
+                "value": 65,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 80,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Tank field",
+            "name": "C7 (Tank field)",
+            "t_supply": {
+                "value": 65,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 90,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Tank field",
+            "name": "C8 (Tank field)",
+            "t_supply": {
+                "value": 85,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 105,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 2000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 7.35,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": {
+                "value": 150,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

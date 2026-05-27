@@ -106,11 +106,11 @@
             "name": "only_cold/Total Process Target",
             "temp_pinch": {
                 "cold_temp": {
-                    "value": NaN,
+                    "value": null,
                     "units": "degC"
                 },
                 "hot_temp": {
-                    "value": NaN,
+                    "value": null,
                     "units": "degC"
                 }
             },

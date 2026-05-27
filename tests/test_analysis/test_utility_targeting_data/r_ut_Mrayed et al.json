@@ -1,0 +1,114 @@
+{
+    "targets": [
+        {
+            "name": "Distillery/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 132.70000000000002,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 132.70000000000002,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 48387.389529613225,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 32587.38952961324,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 95712.61047038675,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 93.37169420354408,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HU",
+                    "heat_flow": {
+                        "value": 23880.663694893163,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HOIL",
+                    "heat_flow": {
+                        "value": 7501.786047535723,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 12293.25090311101,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 4711.68888407333,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HOIL",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "MPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 953.9539993168146,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CU",
+                    "heat_flow": {
+                        "value": 31436.70806986462,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 196.72746043181178,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,892 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "A",
+            "data": {
+                "T": [
+                    292.5,
+                    292.49,
+                    270,
+                    267.5,
+                    267.49,
+                    252.5,
+                    252.49,
+                    250,
+                    236.36363636363635,
+                    225,
+                    215.27777777777777,
+                    207.5,
+                    207.49,
+                    200,
+                    192.5,
+                    192.49,
+                    175,
+                    157.5,
+                    157.49,
+                    142.5,
+                    142.49,
+                    115,
+                    47.5,
+                    22.5,
+                    15
+                ],
+                "H_net": [
+                    20000,
+                    20000,
+                    20000,
+                    17500,
+                    17490.000000000007,
+                    2500,
+                    2490.0000000000073,
+                    0,
+                    3409.0909090909117,
+                    6250,
+                    12083.333333333343,
+                    16750,
+                    16755.999999999993,
+                    21250,
+                    22000,
+                    22001,
+                    23750,
+                    24625,
+                    24625.5,
+                    25375,
+                    25375.5,
+                    26750,
+                    26750,
+                    26750,
+                    26750
+                ]
+            }
+        },
+        {
+            "name": "B",
+            "data": {
+                "T": [
+                    292.5,
+                    292.49,
+                    267.5,
+                    267.49,
+                    252.5,
+                    252.49,
+                    250,
+                    233,
+                    215,
+                    207.5,
+                    207.49,
+                    194.76470588235293,
+                    192.5,
+                    192.49,
+                    184.76608996539795,
+                    175,
+                    159.6060606060606,
+                    157.5,
+                    157.49,
+                    155,
+                    146.75767918088738,
+                    142.5,
+                    142.49,
+                    130,
+                    115,
+                    47.5,
+                    22.5,
+                    15
+                ],
+                "H_net": [
+                    57150,
+                    57150,
+                    57150,
+                    57150,
+                    57150,
+                    57150,
+                    57150,
+                    32500,
+                    17200,
+                    13975,
+                    13970.700000000004,
+                    8498.823529411762,
+                    7525,
+                    7520.700000000004,
+                    4199.4186851211125,
+                    0,
+                    5849.696969696975,
+                    6650,
+                    6653.799999999996,
+                    7600,
+                    21282.25255972694,
+                    28350,
+                    28366.599999999984,
+                    49100,
+                    68300,
+                    68300,
+                    68300,
+                    68300
+                ]
+            }
+        },
+        {
+            "name": "C",
+            "data": {
+                "T": [
+                    292.5,
+                    292.49,
+                    267.5,
+                    267.49,
+                    252.5,
+                    252.49,
+                    207.5,
+                    207.49,
+                    195,
+                    192.5,
+                    192.49,
+                    175,
+                    157.5,
+                    157.49,
+                    142.5,
+                    142.49,
+                    137.6086956521739,
+                    123.51921865154378,
+                    115,
+                    90,
+                    47.5,
+                    22.5,
+                    15
+                ],
+                "H_net": [
+                    59800,
+                    59800,
+                    59800,
+                    59800,
+                    59800,
+                    59800,
+                    59800,
+                    59800,
+                    59800,
+                    55550,
+                    55533.000000000015,
+                    25800,
+                    18275,
+                    18270.700000000004,
+                    11825,
+                    11820.700000000004,
+                    9721.739130434777,
+                    3663.264020163828,
+                    0,
+                    32750,
+                    32750,
+                    32750,
+                    32750
+                ]
+            }
+        },
+        {
+            "name": "D",
+            "data": {
+                "T": [
+                    292.5,
+                    292.49,
+                    267.5,
+                    267.49,
+                    252.5,
+                    252.49,
+                    207.5,
+                    207.49,
+                    192.5,
+                    192.49,
+                    157.5,
+                    157.49,
+                    155,
+                    142.5,
+                    142.49,
+                    115,
+                    104.44444444444444,
+                    93.20987654320987,
+                    90,
+                    86.73913043478261,
+                    76.82926829268293,
+                    75,
+                    60,
+                    47.5,
+                    22.5
+                ],
+                "H_net": [
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    25500,
+                    23000,
+                    22998,
+                    17500,
+                    10111.11111111111,
+                    2246.91358024691,
+                    0,
+                    13369.565217391297,
+                    54000,
+                    54000,
+                    54000,
+                    54000,
+                    54000
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "A",
+            "name": "H1",
+            "t_supply": {
+                "value": 260,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 210,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 25000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "H2",
+            "t_supply": {
+                "value": 235,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 185,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 17500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "H3",
+            "t_supply": {
+                "value": 260,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 125,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 6750,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "C1",
+            "t_supply": {
+                "value": 240,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 260,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 14000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "A",
+            "name": "C2",
+            "t_supply": {
+                "value": 165,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 260,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 28500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "H1",
+            "t_supply": {
+                "value": 185,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 140,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 55350,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "H2",
+            "t_supply": {
+                "value": 225,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 140,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 35699.99999999999,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "H3",
+            "t_supply": {
+                "value": 165,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 125,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 51200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "C1",
+            "t_supply": {
+                "value": 223,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 240,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 10200,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "C2",
+            "t_supply": {
+                "value": 165,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 240,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 63750,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "B",
+            "name": "C3",
+            "t_supply": {
+                "value": 120,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 165,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 57150,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "H1",
+            "t_supply": {
+                "value": 185,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 22100,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "H2",
+            "t_supply": {
+                "value": 125,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 26250,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C1",
+            "t_supply": {
+                "value": 165,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 185,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 27200.000000000004,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C2",
+            "t_supply": {
+                "value": 105,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 185,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 27200.000000000004,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "C",
+            "name": "C3",
+            "t_supply": {
+                "value": 105,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 165,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 21000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "D",
+            "name": "H1",
+            "t_supply": {
+                "value": 165,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 85,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 16000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "D",
+            "name": "H2",
+            "t_supply": {
+                "value": 100,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 85,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 66000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "D",
+            "name": "C1",
+            "t_supply": {
+                "value": 80,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 145,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 26000,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "D",
+            "name": "C2",
+            "t_supply": {
+                "value": 50,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 105,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 27500,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 10,
+                "units": "degC"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HOIL",
+            "type": "Hot",
+            "t_supply": {
+                "value": 300,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.2,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 260,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "MPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 200,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 150,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 15,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 7.5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 0.3,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

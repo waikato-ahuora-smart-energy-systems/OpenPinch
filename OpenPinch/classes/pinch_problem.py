@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
-from pydantic import ValidationError
+from pydantic import ValidationError, warnings
 
 from ..lib.schemas.io import TargetInput, TargetOutput
 from ..lib.schemas.targets import BaseTargetModel
@@ -35,9 +35,6 @@ from ._problem.loading import (
     ProblemSourceAdapters,
     load_problem_source,
     prepare_in_memory_problem_source,
-)
-from ._problem.loading import (
-    find_zone_tree_node as _find_zone_tree_node,
 )
 from ._problem.output import (
     build_graph_payload,
@@ -78,11 +75,7 @@ class PinchProblem:
     def __init__(
         self,
         source: (
-            TargetInput
-            | JsonDict
-            | PathLike
-            | tuple[PathLike, PathLike]
-            | None
+            TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | None
         ) = None,
         *,
         project_name: Optional[str] = "Site",
@@ -103,11 +96,7 @@ class PinchProblem:
     def load(
         self,
         source: (
-            TargetInput
-            | JsonDict
-            | PathLike
-            | tuple[PathLike, PathLike]
-            | None
+            TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | None
         ) = None,
     ) -> Optional[Zone]:
         """Load input data from JSON, Excel, CSV, or an in-memory payload."""
@@ -365,18 +354,14 @@ class PinchProblem:
         """Update one zone-tree multiplier and rebuild the prepared analysis state."""
         resolved_value = float(value)
         if not math.isfinite(resolved_value) or resolved_value < 0.0:
-            raise ValueError("dt_cont_multiplier must be a finite non-negative value.")
-
-        payload = self._canonical_problem_payload()
-        zone_tree = payload.get("zone_tree")
-        if not isinstance(zone_tree, dict):
-            raise RuntimeError("No zone_tree is available to update.")
-
-        target_zone = zone_name or str(zone_tree.get("name") or self.project_name)
-        zone_node = _find_zone_tree_node(zone_tree, target_zone)
-        zone_node["dt_cont_multiplier"] = resolved_value
-
-        self._replace_problem_payload(payload)
+            warnings.warn(
+                "dt_cont_multiplier must be a finite non-negative value. "
+                "Used default value of 1.0 instead.",
+                UserWarning,
+            )
+            resolved_value = 1.0
+        self._master_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
+        self._results = None  # Clear cached results since multipliers have changed
         return self._master_zone
 
     def update_options(

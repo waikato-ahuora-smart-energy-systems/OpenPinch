@@ -1,0 +1,79 @@
+{
+    "targets": [
+        {
+            "name": "Bioethanol production/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 25.0,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 869.3766000000005,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 463.70000000000005,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 4692.3775000000105,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 91.00672943725148,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "HPS",
+                    "heat_flow": {
+                        "value": 35.70960000000002,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 106.23070000001064,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 727.4362999999898,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "LPS",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 0.0,
+                        "units": "kW"
+                    }
+                },
+                {
+                    "name": "CW",
+                    "heat_flow": {
+                        "value": 463.7,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

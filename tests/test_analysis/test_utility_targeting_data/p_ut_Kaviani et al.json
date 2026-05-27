@@ -1,0 +1,229 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Dairy",
+            "data": {
+                "T": [
+                    120,
+                    119.99,
+                    105,
+                    85,
+                    83.28635491095233,
+                    82.00721006198002,
+                    81.1,
+                    81,
+                    71.24802708755465,
+                    68.40387514657435,
+                    60.5,
+                    45,
+                    35,
+                    30,
+                    15,
+                    0
+                ],
+                "H_net": [
+                    25.296,
+                    25.296,
+                    25.296,
+                    0,
+                    7.014781691372548,
+                    12.250942857142832,
+                    12.250942857142853,
+                    12.250942857142853,
+                    52.170504660339134,
+                    63.81299999999999,
+                    63.812999999999995,
+                    63.812999999999995,
+                    63.812999999999995,
+                    63.812999999999995,
+                    63.812999999999995,
+                    63.812999999999995
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Dairy",
+            "name": "1 to 2",
+            "t_supply": {
+                "value": 76,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 76.1,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 4.123,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "4 to 5",
+            "t_supply": {
+                "value": 90,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 12.2,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "6 to 12",
+            "t_supply": {
+                "value": 25,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 94.86,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Dairy",
+            "name": "10 to 11",
+            "t_supply": {
+                "value": 90,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 65.5,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 125.3,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "LPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 125,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 30,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 40,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CHW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 0,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": 0,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": 1,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

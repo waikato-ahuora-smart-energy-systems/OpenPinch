@@ -1,5 +1,6 @@
 """Data model representing process and utility streams."""
 
+import warnings
 from typing import Optional
 
 from ..lib.enums import ST
@@ -42,6 +43,8 @@ class Stream:
         self._h_target: Optional[float] = h_target
         self._dt_cont: float = dt_cont
         self._dt_cont_act: float = dt_cont if dt_cont_act is None else dt_cont_act
+        self._dt_cont_multiplier: float = 1.0
+        self._dt_cont_multiplier_locked: bool = False
         self._heat_flow: float = heat_flow
         self._htc: float = htc if htc != 0.0 and isinstance(htc, float | int) else 1.0
         self._htr: float = 1 / self._htc
@@ -157,7 +160,7 @@ class Stream:
     def dt_cont(self, value: float):
         """Set the base contribution to shifted-temperature calculations."""
         self._dt_cont = value
-        self._dt_cont_act = value
+        self._dt_cont_act = value * self._dt_cont_multiplier
         self._update_attributes()
 
     @property
@@ -170,6 +173,35 @@ class Stream:
         """Set the effective shifted-temperature contribution in active use."""
         self._dt_cont_act = value
         self._update_attributes()
+
+    @property
+    def dt_cont_multiplier(self) -> float:
+        """Effective delta-T contribution used in shifted-temperature calculations."""
+        return self._dt_cont_multiplier
+
+    @dt_cont_multiplier.setter
+    def dt_cont_multiplier(self, value: float):
+        """Set the effective shifted-temperature contribution in active use."""
+        if not self._dt_cont_multiplier_locked:
+            self._dt_cont_multiplier = value
+            self.dt_cont = (
+                self._dt_cont
+            )  # Trigger update of dt_cont_act and derived attributes
+        else:
+            warnings.warn(
+                "Attempted to change dt_cont_multiplier, but it is locked. "
+                "No changes were made."
+            )
+
+    @property
+    def dt_cont_multiplier_locked(self) -> bool:
+        """Whether the delta-T contribution multiplier is locked against changes."""
+        return self._dt_cont_multiplier_locked
+
+    @dt_cont_multiplier_locked.setter
+    def dt_cont_multiplier_locked(self, value: bool):
+        """Lock or unlock the delta-T contribution multiplier."""
+        self._dt_cont_multiplier_locked = value
 
     @property
     def heat_flow(self) -> float:

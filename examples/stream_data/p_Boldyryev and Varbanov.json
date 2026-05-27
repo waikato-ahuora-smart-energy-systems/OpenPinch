@@ -641,10 +641,7 @@
                 "value": 5.0,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": null,
                 "units": "kW/m^2/degC"
@@ -666,10 +663,7 @@
                 "value": 5.0,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": null,
                 "units": "kW/m^2/degC"

@@ -45,11 +45,7 @@ def merge_payloads(base: JsonDict, overlay: JsonDict) -> JsonDict:
 
 def canonical_payload_from_source(
     source: (
-        TargetInput
-        | JsonDict
-        | PathLike
-        | tuple[PathLike, PathLike]
-        | PinchProblem
+        TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | PinchProblem
     ),
     *,
     project_name: Optional[str],

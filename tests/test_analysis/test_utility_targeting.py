@@ -7,6 +7,9 @@ import pytest
 
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.services.common.gcc_manipulation import (
+    get_seperated_gcc_heat_load_profiles,
+)
 from OpenPinch.services.common.utility_targeting import _target_utility
 from OpenPinch.services.input_data_processing.data_preparation import prepare_problem
 from OpenPinch.utils.miscellaneous import *
@@ -28,104 +31,64 @@ def get_test_filenames():
 def test_target_utility(filename):
     # Set the file path to the directory of this script
     filepath = os.path.dirname(__file__) + "/test_utility_targeting_data"
-    p_file_path = filepath + "/p_" + filename[2:]
-    r_file_path = filepath + "/r_" + filename[2:]
+    p_file_path = filepath + "/" + filename
+    r_file_path = filepath + "/r" + filename[1:]
     with open(p_file_path) as json_data:
         input_data = json.load(json_data)
-
     data = GetInputOutputData.model_validate(input_data)
-    site = prepare_problem(
-        streams=data.streams, utilities=data.utilities, options=data.options
-    )
-    for plant in data.plant_profile_data:
-        z: Zone = site.get_subzone(plant.name)
-        GHLP_P = ProblemTable({PT.T: plant.data.T})
-        GHLP_P[PT.H_NET_COLD] = plant.data.H_cold_net
-        GHLP_P[PT.H_NET_HOT] = plant.data.H_hot_net
-
-        _, cold_pinch_row, _ = GHLP_P.pinch_idx(PT.H_NET_HOT)
-        hot_pinch_row, _, _ = GHLP_P.pinch_idx(PT.H_NET_COLD)
-
-        is_real_temperatures = False
-        z.hot_utilities = _target_utility(
-            z.hot_utilities,
-            GHLP_P[PT.T],
-            GHLP_P[PT.H_NET_COLD],
-            hot_pinch_row,
-            cold_pinch_row,
-            is_real_temperatures,
-        )
-        z.cold_utilities = _target_utility(
-            z.cold_utilities,
-            GHLP_P[PT.T],
-            GHLP_P[PT.H_NET_HOT],
-            hot_pinch_row,
-            cold_pinch_row,
-            is_real_temperatures,
-        )
 
     with open(r_file_path) as json_data:
         wkb_res = json.load(json_data)
     wkb_res = TargetOutput.model_validate(wkb_res)
 
-    for z0 in wkb_res.targets:
-        if "Direct Integration" in z0.name:
-            z = site.get_subzone(z0.name.replace("/Direct Integration", ""))
-            if 0:
-                print("\n\nName:", z.name)
+    site = prepare_problem(
+        streams=data.streams, utilities=data.utilities, options=data.options
+    )
 
-                for i in range(len(z.hot_utilities)):
-                    print(
-                        z.hot_utilities[i].name + ":",
-                        round(get_value(z0.hot_utilities[i].heat_flow), 2),
-                        z0.hot_utilities[i].name + ":",
-                        round(get_value(z0.hot_utilities[i].heat_flow), 2),
-                        sep="\t",
-                    )
-                for i in range(len(z.cold_utilities)):
-                    print(
-                        z.cold_utilities[i].name + ":",
-                        round(get_value(z0.cold_utilities[i].heat_flow), 2),
-                        z0.cold_utilities[i].name + ":",
-                        round(get_value(z0.cold_utilities[i].heat_flow), 2),
-                        sep="\t",
-                    )
+    for plant in data.plant_profile_data:
+        z = site.get_subzone(plant.name)
+        pt = ProblemTable({PT.T: plant.data.T})
+        pt[PT.H_NET] = plant.data.H_net
+        pt.update(
+            **get_seperated_gcc_heat_load_profiles(
+                T_col=pt[PT.T],
+                H_net=pt[PT.H_NET],
+            )
+        )
+        z.hot_utilities, z.cold_utilities = _target_utility(
+            hot_utilities=z.hot_utilities,
+            cold_utilities=z.cold_utilities,
+            T_vals=pt[PT.T],
+            H_net_cold=pt[PT.H_NET_COLD],
+            H_net_hot=pt[PT.H_NET_HOT],
+            pinch_idx=pt.pinch_idx(PT.H_NET),
+            is_real_temperatures=False,
+        )
 
-                print(
-                    "dQh:",
-                    round(get_value(z0.Qh), 2)
-                    - round(sum([get_value(u.heat_flow) for u in z.hot_utilities]), 2),
-                    "dQh:",
-                    round(get_value(z0.Qh), 2)
-                    - round(sum([get_value(u.heat_flow) for u in z0.hot_utilities]), 2),
-                    sep="\t",
-                )
-                print(
-                    "dQc:",
-                    round(get_value(z0.Qc), 2)
-                    - round(sum([get_value(u.heat_flow) for u in z.cold_utilities]), 2),
-                    "dQc:",
-                    round(get_value(z0.Qc), 2)
-                    - round(
-                        sum([get_value(u.heat_flow) for u in z0.cold_utilities]), 2
-                    ),
-                    sep="\t",
-                )
-            else:
-                for i in range(len(z.hot_utilities)):
-                    assert (
-                        abs(
-                            get_value(z.hot_utilities[i].heat_flow)
-                            - get_value(z0.hot_utilities[i].heat_flow)
-                        )
-                        < 0.001
-                    )
-                for i in range(len(z.cold_utilities)):
-                    assert (
-                        abs(
-                            get_value(z.cold_utilities[i].heat_flow)
-                            - get_value(z0.cold_utilities[i].heat_flow)
-                        )
-                        < 0.001
-                    )
+        t = None
+        i = 0
+        for t in wkb_res.targets:
+            if plant.name == t.name.replace("/" + TT.DI.value, ""):
+                break
+            i += 1
+        assert i < len(wkb_res.targets)
+
+        for u in t.hot_utilities:
+            s = z.hot_utilities[".".join([StreamLoc.HotU.value, u.name])]
+            assert s is not None
+            h_u = get_value(u.heat_flow)
+            h_s = get_value(s.heat_flow)
+            scalar = 1e-6 + max(h_s, h_u)
+            assert abs(h_u - h_s) < 0.001 * scalar
+
+        for u in t.cold_utilities:
+            s = z.cold_utilities[".".join([StreamLoc.ColdU.value, u.name])]
+            assert s is not None
+            h_u = get_value(u.heat_flow)
+            h_s = get_value(s.heat_flow)
+            scalar = 1e-6 + max(h_s, h_u)
+            assert abs(h_u - h_s) < 0.001 * scalar
+
+        assert len(z.hot_utilities) == len(t.hot_utilities)
+        assert len(z.cold_utilities) == len(t.cold_utilities)
     pass

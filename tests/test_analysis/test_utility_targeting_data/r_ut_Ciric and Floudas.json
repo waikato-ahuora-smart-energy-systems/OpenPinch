@@ -1,0 +1,51 @@
+{
+    "targets": [
+        {
+            "name": "Plant/Direct Integration",
+            "temp_pinch": {
+                "cold_temp": {
+                    "value": 147.45,
+                    "units": "degC"
+                },
+                "hot_temp": {
+                    "value": 147.45,
+                    "units": "degC"
+                }
+            },
+            "Qh": {
+                "value": 229.96855672500334,
+                "units": "kW"
+            },
+            "Qc": {
+                "value": 513.7385567250037,
+                "units": "kW"
+            },
+            "Qr": {
+                "value": 3079.4414432749963,
+                "units": "kW"
+            },
+            "degree_of_integration": {
+                "value": 93.0510708336228,
+                "units": "%"
+            },
+            "hot_utilities": [
+                {
+                    "name": "VHPS",
+                    "heat_flow": {
+                        "value": 229.96855672500334,
+                        "units": "kW"
+                    }
+                }
+            ],
+            "cold_utilities": [
+                {
+                    "name": "HW",
+                    "heat_flow": {
+                        "value": 513.7385567250037,
+                        "units": "kW"
+                    }
+                }
+            ]
+        }
+    ]
+}

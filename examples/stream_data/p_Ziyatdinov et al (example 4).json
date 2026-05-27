@@ -1,7 +1,7 @@
 {
     "streams": [
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "H1",
             "t_supply": {
                 "value": 146.85000000000002,
@@ -27,7 +27,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "H2",
             "t_supply": {
                 "value": 196.85000000000002,
@@ -53,7 +53,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "H3",
             "t_supply": {
                 "value": 211.85000000000002,
@@ -79,7 +79,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "H4",
             "t_supply": {
                 "value": 226.85000000000002,
@@ -105,7 +105,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C1",
             "t_supply": {
                 "value": 66.85000000000002,
@@ -131,7 +131,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C2",
             "t_supply": {
                 "value": 91.85000000000002,
@@ -157,7 +157,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C3",
             "t_supply": {
                 "value": 121.85000000000002,
@@ -183,7 +183,7 @@
             "index": 0
         },
         {
-            "zone": "Process Zone",
+            "zone": "Plant",
             "name": "C4",
             "t_supply": {
                 "value": 136.85000000000002,
@@ -211,24 +211,21 @@
     ],
     "utilities": [
         {
-            "name": "HU",
+            "name": "VHPS",
             "type": "Hot",
             "t_supply": {
                 "value": 346.85,
                 "units": "degC"
             },
             "t_target": {
-                "value": 346.75,
+                "value": null,
                 "units": "degC"
             },
             "dt_cont": {
                 "value": 5.0,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 5.0,
                 "units": "kW/m^2/degC"
@@ -236,7 +233,7 @@
             "heat_flow": null
         },
         {
-            "name": "CU",
+            "name": "CW",
             "type": "Cold",
             "t_supply": {
                 "value": 26.850000000000023,
@@ -250,10 +247,7 @@
                 "value": 5.0,
                 "units": "degC"
             },
-            "price": {
-                "value": null,
-                "units": "$/MWh"
-            },
+            "price": null,
             "htc": {
                 "value": 1.0,
                 "units": "kW/m^2/degC"

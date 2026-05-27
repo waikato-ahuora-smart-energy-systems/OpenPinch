@@ -47,6 +47,7 @@ flow directions) to verify internal fallbacks or fail-safes.
 
 """
 
+
 import pytest
 from pydantic import ValidationError
 
@@ -675,7 +676,8 @@ def test_duplicate_utility_names(dummy_streams):
     ]
     site = prepare_problem(streams=dummy_streams, utilities=utilities)
     names = [u.name for u in site.hot_utilities] + [u.name for u in site.cold_utilities]
-    assert names.count("Duplicate") >= 2
+    assert names.count("Duplicate") == 1
+    assert names.count("Duplicate_1") == 1
 
 
 def test_utility_sorting_by_temp(dummy_streams):
@@ -930,11 +932,11 @@ def test_default_utilities_use_zone_effective_dt_cont_multiplier():
         {
             "name": "Site",
             "type": "Site",
+            "dt_cont_multiplier": 3.0,
             "children": [
                 {
                     "name": "AreaA",
                     "type": "Process Zone",
-                    "dt_cont_multiplier": 3.0,
                 }
             ],
         }

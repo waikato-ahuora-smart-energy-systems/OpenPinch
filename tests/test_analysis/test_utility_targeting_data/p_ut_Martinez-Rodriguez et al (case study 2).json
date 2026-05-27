@@ -1,0 +1,518 @@
+{
+    "plant_profile_data": [
+        {
+            "name": "Bioethanol production",
+            "data": {
+                "T": [
+                    215,
+                    214.99,
+                    199.88,
+                    199,
+                    189,
+                    180.22,
+                    135,
+                    134.99,
+                    125,
+                    124.99000000000001,
+                    112.68,
+                    105,
+                    104.9843054094327,
+                    104.98141626035307,
+                    104.97,
+                    101,
+                    95,
+                    84,
+                    75.2424817923031,
+                    75,
+                    73.57,
+                    73.28,
+                    73.23,
+                    73.2,
+                    67.87,
+                    65,
+                    55,
+                    46.02502271932855,
+                    40.68,
+                    25,
+                    15
+                ],
+                "H_net": [
+                    869.3766000000005,
+                    869.3766000000005,
+                    869.3766000000005,
+                    868.5670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6670000000005,
+                    833.6669999998994,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    727.4362999999898,
+                    574.5152,
+                    0,
+                    463.70000000000005
+                ]
+            }
+        }
+    ],
+    "streams": [
+        {
+            "zone": "Bioethanol production",
+            "name": "Ethanol-water",
+            "t_supply": {
+                "value": 78.23,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 78.2,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 356.64990000001353,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Water SA-R1",
+            "t_supply": {
+                "value": 185.22,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 278.6694,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Anhydrous ethanol",
+            "t_supply": {
+                "value": 78.57,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 78.28,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 125.98759999999655,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Water SA-R2",
+            "t_supply": {
+                "value": 204,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 185.22,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 80.1906,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Side stream water",
+            "t_supply": {
+                "value": 106,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 102.33999999999999,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Glycerol outlet stream",
+            "t_supply": {
+                "value": 194,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1106.64,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Water outlet stream",
+            "t_supply": {
+                "value": 100,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 20,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3105.6,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Ethanol-water",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 79,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 3529.97,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Water SA-C1",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 62.87,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 356.2497,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Ethanol-water R1",
+            "t_supply": {
+                "value": 99.97,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 100,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 279.2400000000106,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Water SA-C2",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 35.68,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 125.91039999999998,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Ethanol-glycerol R2",
+            "t_supply": {
+                "value": 107.68,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 194.88,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 80.22399999999999,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        },
+        {
+            "zone": "Bioethanol production",
+            "name": "Glycerol",
+            "t_supply": {
+                "value": 20,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 194,
+                "units": "degC"
+            },
+            "heat_flow": {
+                "value": 1190.16,
+                "units": "kW"
+            },
+            "dt_cont": {
+                "value": 5,
+                "units": "degC"
+            },
+            "htc": {
+                "value": 0.8,
+                "units": "kW/m^2/degC"
+            },
+            "loc": 0,
+            "index": 0
+        }
+    ],
+    "utilities": [
+        {
+            "name": "HPS",
+            "type": "Hot",
+            "t_supply": {
+                "value": 220,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "LPS",
+            "type": "Both",
+            "t_supply": {
+                "value": 130,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "HW",
+            "type": "Both",
+            "t_supply": {
+                "value": 70,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": 60,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        },
+        {
+            "name": "CW",
+            "type": "Cold",
+            "t_supply": {
+                "value": 10,
+                "units": "degC"
+            },
+            "t_target": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "dt_cont": {
+                "value": NaN,
+                "units": "degC"
+            },
+            "price": {
+                "value": NaN,
+                "units": "$/MWh"
+            },
+            "htc": {
+                "value": NaN,
+                "units": "kW/m^2/degC"
+            },
+            "heat_flow": null
+        }
+    ],
+    "options": {}
+}

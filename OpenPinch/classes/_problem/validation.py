@@ -262,9 +262,7 @@ def _validate_problem_semantics(
     """Raise or warn using the shared semantic validation issue list."""
     issues = semantic_issues(payload, context=context)
     fatal_issues = [
-        _format_validation_issue(issue)
-        for issue in issues
-        if issue.severity == "error"
+        _format_validation_issue(issue) for issue in issues if issue.severity == "error"
     ]
     warning_issues = [
         _format_validation_issue(issue, include_warning_prefix=True)
