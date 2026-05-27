@@ -21,13 +21,13 @@ except Exception:
     pass
 Q_ = ureg.Quantity
 
-_SERIALIZED_SCALAR_KEYS = {"value", "unit", "units"}
-_SERIALIZED_STATEFUL_KEYS = {"values", "state_ids", "weights", "unit", "units"}
+_SERIALIZED_SCALAR_KEYS = {"value", "unit"}
+_SERIALIZED_STATEFUL_KEYS = {"values", "state_ids", "weights", "unit"}
 
 
 def _is_value_with_unit(data: Any) -> bool:
     """Return ``True`` for objects that look like ``ValueWithUnit`` instances."""
-    return hasattr(data, "value") and hasattr(data, "units")
+    return hasattr(data, "value") and hasattr(data, "unit")
 
 
 def _is_bool_like(data: Any) -> bool:
@@ -72,7 +72,7 @@ class Value:
             if self._is_serialized_stateful_payload(data):
                 self._init_stateful(
                     data["values"],
-                    unit=data.get("unit") or data.get("units") or unit,
+                    unit=data.get("unit") or unit,
                     weights=data.get("weights", weights),
                     state_ids=data.get("state_ids"),
                 )
@@ -84,7 +84,7 @@ class Value:
                     )
                 self._init_scalar(
                     data.get("value"),
-                    data.get("unit") or data.get("units") or unit,
+                    data.get("unit") or unit,
                     preserve_none_unit=(data.get("value") is None),
                 )
                 return
@@ -276,13 +276,17 @@ class Value:
             return f"{self.value} {self.unit}"
         return (
             f"{self.value} {self.unit} "
-            f"(states={self.state_ids}, values={self.state_values.tolist()}, "
+            f"(states={self.state_ids}, "
+            f"values={self.state_values.tolist()}, "
             f"weights={self.weights.tolist()})"
         )
 
     def __repr__(self):
         if not self._is_stateful():
-            return f"Value({self.value}, {repr(self._serialise_units(self._quantity.units))})"
+            return (
+                f"Value({self.value}, "
+                f"{repr(self._serialise_units(self._quantity.units))})"
+            )
         return (
             "Value("
             f"values={self.state_values.tolist()}, "
@@ -499,9 +503,11 @@ class Value:
         if unit is not None:
             try:
                 quantity = quantity.to(self._normalise_unit_input(unit))
-            except (DimensionalityError, TypeError, ValueError):
+            except DimensionalityError, TypeError, ValueError:
                 if self._quantity_is_dimensionless(quantity):
-                    quantity = Q_(data._magnitude_array(), self._normalise_unit_input(unit))
+                    quantity = Q_(
+                        data._magnitude_array(), self._normalise_unit_input(unit)
+                    )
         self._set_storage(
             Q_(np.asarray(quantity.magnitude, dtype=float).reshape(-1), quantity.units),
             data._copy_state_ids(),
@@ -509,11 +515,11 @@ class Value:
         )
 
     def _init_from_value_with_unit(self, data, unit: str | None) -> None:
-        quantity = Q_(data.value, self._normalise_unit_input(data.units))
+        quantity = Q_(data.value, self._normalise_unit_input(data.unit))
         if unit is not None:
             try:
                 quantity = quantity.to(self._normalise_unit_input(unit))
-            except (DimensionalityError, TypeError, ValueError):
+            except DimensionalityError, TypeError, ValueError:
                 if self._quantity_is_dimensionless(quantity):
                     quantity = Q_(
                         np.asarray([quantity.magnitude], dtype=float),
@@ -553,9 +559,7 @@ class Value:
             )
 
         quantity = (
-            Q_(magnitudes, self._normalise_unit_input(unit))
-            if unit
-            else Q_(magnitudes)
+            Q_(magnitudes, self._normalise_unit_input(unit)) if unit else Q_(magnitudes)
         )
         self._set_storage(
             quantity,
@@ -772,10 +776,7 @@ class Value:
 
     def _format_units(self, units) -> str:
         return (
-            format(units, "~")
-            .replace("USD", "$")
-            .replace("NZD", "$")
-            .replace(" ", "")
+            format(units, "~").replace("USD", "$").replace("NZD", "$").replace(" ", "")
         )
 
     @staticmethod
@@ -829,9 +830,9 @@ class Value:
         if cls._is_serialized_stateful_payload(data):
             return cls(
                 data["values"],
-                data.get("unit") or data.get("units"),
+                data.get("unit"),
                 weights=data.get("weights"),
                 state_ids=data.get("state_ids"),
             )
 
-        return cls(data["value"], data.get("unit") or data.get("units"))
+        return cls(data["value"], data.get("unit"))

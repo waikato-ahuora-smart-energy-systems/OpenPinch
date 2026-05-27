@@ -47,7 +47,6 @@ flow directions) to verify internal fallbacks or fail-safes.
 
 """
 
-
 import pytest
 from pydantic import ValidationError
 
@@ -85,22 +84,22 @@ def dummy_streams():
             {
                 "name": "H1",
                 "zone": "Z1",
-                "t_supply": ValueWithUnit(value=250, units="C"),
-                "t_target": ValueWithUnit(value=100, units="C"),
-                "heat_flow": ValueWithUnit(value=10000, units="kW"),
-                "dt_cont": ValueWithUnit(value=10, units="K"),
-                "htc": ValueWithUnit(value=1, units="kW/m2.K"),
+                "t_supply": ValueWithUnit(value=250, unit="C"),
+                "t_target": ValueWithUnit(value=100, unit="C"),
+                "heat_flow": ValueWithUnit(value=10000, unit="kW"),
+                "dt_cont": ValueWithUnit(value=10, unit="K"),
+                "htc": ValueWithUnit(value=1, unit="kW/m2.K"),
             }
         ),
         StreamSchema.model_validate(
             {
                 "name": "C1",
                 "zone": "Z1",
-                "t_supply": ValueWithUnit(value=50, units="C"),
-                "t_target": ValueWithUnit(value=150, units="C"),
-                "heat_flow": ValueWithUnit(value=-8000, units="kW"),
-                "dt_cont": ValueWithUnit(value=10, units="K"),
-                "htc": ValueWithUnit(value=1, units="kW/m2.K"),
+                "t_supply": ValueWithUnit(value=50, unit="C"),
+                "t_target": ValueWithUnit(value=150, unit="C"),
+                "heat_flow": ValueWithUnit(value=-8000, unit="kW"),
+                "dt_cont": ValueWithUnit(value=10, unit="K"),
+                "htc": ValueWithUnit(value=1, unit="kW/m2.K"),
             }
         ),
     ]
@@ -114,24 +113,24 @@ def dummy_utilities():
             {
                 "name": "HU1",
                 "type": "Hot",
-                "t_supply": ValueWithUnit(value=300, units="C"),
-                "t_target": ValueWithUnit(value=250, units="C"),
+                "t_supply": ValueWithUnit(value=300, unit="C"),
+                "t_target": ValueWithUnit(value=250, unit="C"),
                 "heat_flow": 0,
-                "dt_cont": ValueWithUnit(value=10, units="K"),
-                "price": ValueWithUnit(value=100, units="$/MWh"),
-                "htc": ValueWithUnit(value=1, units="kW/m2.K"),
+                "dt_cont": ValueWithUnit(value=10, unit="K"),
+                "price": ValueWithUnit(value=100, unit="$/MWh"),
+                "htc": ValueWithUnit(value=1, unit="kW/m2.K"),
             }
         ),
         UtilitySchema.model_validate(
             {
                 "name": "CU1",
                 "type": "Cold",
-                "t_supply": ValueWithUnit(value=20, units="C"),
-                "t_target": ValueWithUnit(value=80, units="C"),
+                "t_supply": ValueWithUnit(value=20, unit="C"),
+                "t_target": ValueWithUnit(value=80, unit="C"),
                 "heat_flow": 0,
-                "dt_cont": ValueWithUnit(value=10, units="K"),
-                "price": ValueWithUnit(value=100, units="$/MWh"),
-                "htc": ValueWithUnit(value=1, units="kW/m2.K"),
+                "dt_cont": ValueWithUnit(value=10, unit="K"),
+                "price": ValueWithUnit(value=100, unit="$/MWh"),
+                "htc": ValueWithUnit(value=1, unit="kW/m2.K"),
             }
         ),
     ]
@@ -220,20 +219,20 @@ def test_mixed_unit_and_unitless_inputs():
                 "name": "H1",
                 "zone": "Z1",
                 "t_supply": 250,
-                "t_target": ValueWithUnit(value=100, units="C"),
-                "heat_flow": ValueWithUnit(value=10000, units="kW"),
+                "t_target": ValueWithUnit(value=100, unit="C"),
+                "heat_flow": ValueWithUnit(value=10000, unit="kW"),
                 "dt_cont": 10,
-                "htc": ValueWithUnit(value=1, units="kW/m2.K"),
+                "htc": ValueWithUnit(value=1, unit="kW/m2.K"),
             }
         ),
         StreamSchema.model_validate(
             {
                 "name": "C1",
                 "zone": "Z1",
-                "t_supply": ValueWithUnit(value=50, units="C"),
+                "t_supply": ValueWithUnit(value=50, unit="C"),
                 "t_target": 150,
                 "heat_flow": -8000,
-                "dt_cont": ValueWithUnit(value=10, units="K"),
+                "dt_cont": ValueWithUnit(value=10, unit="K"),
                 "htc": 1,
             }
         ),
@@ -247,7 +246,7 @@ def test_mixed_unit_and_unitless_inputs():
                 "t_target": 250,
                 "dt_cont": 10,
                 "heat_flow": 0,
-                "price": ValueWithUnit(value=100, units="$/MWh"),
+                "price": ValueWithUnit(value=100, unit="$/MWh"),
                 "htc": 1,
             }
         ),
@@ -255,8 +254,8 @@ def test_mixed_unit_and_unitless_inputs():
             {
                 "name": "CU",
                 "type": "Cold",
-                "t_supply": ValueWithUnit(value=20, units="C"),
-                "t_target": ValueWithUnit(value=80, units="C"),
+                "t_supply": ValueWithUnit(value=20, unit="C"),
+                "t_target": ValueWithUnit(value=80, unit="C"),
                 "dt_cont": 10,
                 "heat_flow": 0,
                 "price": 100,

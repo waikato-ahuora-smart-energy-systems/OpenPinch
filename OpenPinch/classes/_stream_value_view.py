@@ -43,11 +43,6 @@ class StreamValueView(float):
         return self._value.unit
 
     @property
-    def units(self) -> str:
-        """Compatibility alias for helpers expecting ``units``."""
-        return self._value.unit
-
-    @property
     def state_ids(self) -> list[str] | None:
         """Ordered state identifiers for the wrapped value."""
         return self._value.state_ids

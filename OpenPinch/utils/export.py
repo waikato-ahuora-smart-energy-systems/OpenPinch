@@ -77,12 +77,12 @@ def build_summary_dataframe(targets) -> pd.DataFrame:
 
 
 def _split_vu(x: Any) -> Tuple[Optional[float], Optional[str]]:
-    """Return (value, units) for either a float or ValueWithUnit/None."""
+    """Return ``(value, unit)`` for either a float or ValueWithUnit/None."""
     if x is None:
         return None, None
     # If it's a pydantic model with attributes
-    if hasattr(x, "value") and (hasattr(x, "unit") or hasattr(x, "units")):
-        return x.value, getattr(x, "unit", getattr(x, "units", None))
+    if hasattr(x, "value") and hasattr(x, "unit"):
+        return x.value, x.unit
     # plain number
     try:
         return float(x), None

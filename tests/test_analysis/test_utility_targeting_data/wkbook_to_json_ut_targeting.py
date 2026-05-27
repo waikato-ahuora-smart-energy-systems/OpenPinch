@@ -43,7 +43,9 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
             ):
                 prefix = "CU::"
             if df_full[i][1] == "Default HU" or df_full[i][1] == "Default CU":
-                raise ValueError("Default HU or CU column should not be present in Summary sheet.")
+                raise ValueError(
+                    "Default HU or CU column should not be present in Summary sheet."
+                )
             else:
                 col_names.append(prefix + df_full[i][1])
 
@@ -71,7 +73,7 @@ def parse_sheet_with_units(excel_file, sheet_name, row_units=1, row_data=2):
     Returns:
       A list of dictionaries, where each dictionary represents a row of data.
       Numeric columns are stored as:
-         column_name: {"value": <number>, "units": <unit string>}
+         column_name: {"value": <number>, "unit": <unit string>}
       String columns (like 'name' or 'zone') remain as simple keys and values.
     """
     # Read the entire sheet as-is (no header)
@@ -110,7 +112,7 @@ def parse_sheet_for_gcc_with_units(excel_file, sheet_name, row_units=1, row_data
     Returns:
       A list of dictionaries, where each dictionary represents a row of data.
       Numeric columns are stored as:
-         column_name: {"value": <number>, "units": <unit string>}
+         column_name: {"value": <number>, "unit": <unit string>}
       String columns (like 'name' or 'zone') remain as simple keys and values.
     """
     # Read the entire sheet as-is (no header)
@@ -175,7 +177,7 @@ def write_problem_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
             if isinstance(unit, str) and unit.strip():
                 entry[col] = {
                     "value": value if pd.api.types.is_number(value) else None,
-                    "units": unit,
+                    "unit": unit,
                 }
             else:
                 # If it's not numeric or there's no unit string, just store the raw data
@@ -221,7 +223,7 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
                         "name": col[4:],
                         "heat_flow": {
                             "value": float(value),
-                            "units": unit,
+                            "unit": unit,
                         },
                     }
                 )
@@ -233,7 +235,7 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
                         "name": col[4:],
                         "heat_flow": {
                             "value": float(value),
-                            "units": unit,
+                            "unit": unit,
                         },
                     }
                 )
@@ -244,25 +246,25 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
                 entry[col] = {
                     "cold_temp": {
                         "value": val[0],
-                        "units": unit,
+                        "unit": unit,
                     },
                     "hot_temp": {
                         "value": val[-1],
-                        "units": unit,
+                        "unit": unit,
                     },
                 }
             elif col == "degree_of_integration":
-                entry[col] = {"value": float(value) * 100, "units": unit}
+                entry[col] = {"value": float(value) * 100, "unit": unit}
 
             elif (
                 pd.api.types.is_number(value) and isinstance(unit, str) and unit.strip()
             ):
-                entry[col] = {"value": float(value), "units": unit}
+                entry[col] = {"value": float(value), "unit": unit}
             else:
                 # If it's not numeric or there's no unit string, just store the raw data
                 entry[col] = value if not (pd.isna(value)) else None
 
-        entry["name"] = f"{row["name"]}/Direct Integration"
+        entry["name"] = f"{row['name']}/Direct Integration"
         records.append(entry)
 
     return records
@@ -346,9 +348,10 @@ def get_results_from_excel(excel_file, output_json):
 if __name__ == "__main__":
     # Set the file path to the workbook fixture directory
     filepath_load = (
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) + "/examples/OpenPinchWkbs"
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        + "/examples/OpenPinchWkbs"
     )
-    filepath_save = os.path.dirname(__file__) #+ "/new"
+    filepath_save = os.path.dirname(__file__)  # + "/new"
 
     for filename in os.listdir(filepath_load):
         # filename = 'locally_integrated.xlsb'
@@ -357,8 +360,12 @@ if __name__ == "__main__":
         ) and not filename.startswith("~$"):
             excel_file = os.path.join(filepath_load, filename)
 
-            p_json_file = filepath_save + "/p_ut_" + os.path.splitext(filename)[0] + ".json"
+            p_json_file = (
+                filepath_save + "/p_ut_" + os.path.splitext(filename)[0] + ".json"
+            )
             get_problem_from_excel(excel_file, p_json_file)
 
-            r_json_file = filepath_save + "/r_ut_" + os.path.splitext(filename)[0] + ".json"
+            r_json_file = (
+                filepath_save + "/r_ut_" + os.path.splitext(filename)[0] + ".json"
+            )
             get_results_from_excel(excel_file, r_json_file)

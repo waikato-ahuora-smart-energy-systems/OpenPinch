@@ -76,7 +76,7 @@ def problem_records_from_frame(df_data: pd.DataFrame, units_map: dict) -> list:
         if isinstance(unit, str) and unit.strip():
             numeric_values = pd.to_numeric(column_values, errors="coerce")
             payloads = [
-                {"value": (None if pd.isna(val) else float(val)), "units": unit}
+                {"value": (None if pd.isna(val) else float(val)), "unit": unit}
                 for val in numeric_values
             ]
             for record, payload in zip(records, payloads):
@@ -190,7 +190,7 @@ def _utility_records_from_row(
                 "name": str(column_name)[4:],
                 "heat_flow": {
                     "value": numeric_value,
-                    "units": units_map.get(column_name),
+                    "unit": units_map.get(column_name),
                 },
             }
         )
@@ -215,10 +215,10 @@ def _summary_field_payload(
         )
     if column_name == "degree_of_integration":
         if value is None or pd.isna(value):
-            return {"value": None, "units": unit}
-        return {"value": float(value) * 100, "units": unit}
+            return {"value": None, "unit": unit}
+        return {"value": float(value) * 100, "unit": unit}
     if pd.api.types.is_number(value) and isinstance(unit, str) and unit:
-        return {"value": float(value), "units": unit}
+        return {"value": float(value), "unit": unit}
     return value if value is not None else None
 
 
@@ -233,8 +233,8 @@ def _temp_pinch_payload(
         cold_temp = None
         hot_temp = None
     return {
-        "cold_temp": {"value": cold_temp, "units": unit},
-        "hot_temp": {"value": hot_temp, "units": unit},
+        "cold_temp": {"value": cold_temp, "unit": unit},
+        "hot_temp": {"value": hot_temp, "unit": unit},
     }
 
 

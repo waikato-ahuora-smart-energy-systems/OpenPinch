@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional, Union
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ValueWithUnit(BaseModel):
@@ -16,15 +16,7 @@ class ValueWithUnit(BaseModel):
     value: Optional[float] = Field(
         default=None, description="Numeric value (magnitude)."
     )
-    units: str = Field(..., description="Unit string, e.g. 'kW', '°C', 'kJ/s'.")
-
-    @model_validator(mode="before")
-    @classmethod
-    def _accept_unit_alias(cls, data):
-        if isinstance(data, dict) and "unit" in data and "units" not in data:
-            data = dict(data)
-            data["units"] = data.pop("unit")
-        return data
+    unit: str = Field(..., description="Unit string, e.g. 'kW', '°C', 'kJ/s'.")
 
 
 class StatefulValueWithUnit(BaseModel):
@@ -42,19 +34,6 @@ class StatefulValueWithUnit(BaseModel):
     weights: Optional[list[float]] = Field(
         default=None, description="Optional state weights."
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _accept_units_alias(cls, data):
-        if isinstance(data, dict) and "units" in data and "unit" not in data:
-            data = dict(data)
-            data["unit"] = data.pop("units")
-        return data
-
-    @property
-    def units(self) -> Optional[str]:
-        """Compatibility alias used by generic unit-extraction helpers."""
-        return self.unit
 
 
 ScalarOrVU = Union[float, ValueWithUnit, StatefulValueWithUnit]

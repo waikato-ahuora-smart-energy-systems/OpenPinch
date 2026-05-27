@@ -184,7 +184,9 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
                 assert abs(get_value(z.Qr) - get_value(z0.Qr)) < 1e-3
 
                 for i in range(len(z.hot_utilities)):
-                    if get_value(z.hot_utilities[i].heat_flow) > 0 and i < len(z0.hot_utilities):
+                    if get_value(z.hot_utilities[i].heat_flow) > 0 and i < len(
+                        z0.hot_utilities
+                    ):
                         assert (
                             abs(
                                 get_value(z.hot_utilities[i].heat_flow)
@@ -194,7 +196,9 @@ def test_pinch_analysis_pipeline(p_filepath: Path):
                         )
 
                 for i in range(len(z.cold_utilities)):
-                    if get_value(z.cold_utilities[i].heat_flow) > 0 and i < len(z0.cold_utilities):
+                    if get_value(z.cold_utilities[i].heat_flow) > 0 and i < len(
+                        z0.cold_utilities
+                    ):
                         assert (
                             abs(
                                 get_value(z.cold_utilities[i].heat_flow)

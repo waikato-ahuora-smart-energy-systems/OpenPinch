@@ -5,23 +5,23 @@
             "name": "F1",
             "t_supply": {
                 "value": 20.0,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 140.0,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 2400.0,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5.0,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1.0,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -33,20 +33,20 @@
             "type": "Hot",
             "t_supply": {
                 "value": 260.0,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 259.9,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1.0,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": 10,
             "htc": {
                 "value": 1.0,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -55,20 +55,20 @@
             "type": "Cold",
             "t_supply": {
                 "value": 10.0,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 10.1,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1.0,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": 10,
             "htc": {
                 "value": 1.0,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         }

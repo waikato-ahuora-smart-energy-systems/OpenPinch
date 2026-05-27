@@ -156,7 +156,14 @@ def semantic_issues(
             section="utilities",
             record_index=index,
             record_label=label,
-            field_names=("t_supply", "t_target", "heat_flow", "dt_cont", "htc", "price"),
+            field_names=(
+                "t_supply",
+                "t_target",
+                "heat_flow",
+                "dt_cont",
+                "htc",
+                "price",
+            ),
         )
         issues.extend(utility_value_issues)
         issues.extend(
@@ -497,8 +504,12 @@ def _validate_stream_record_states(
     }
 
     for state_id in state_labels:
-        t_supply_value = _get_state_magnitude(t_supply, state_id=state_id, state_ids=state_ids)
-        t_target_value = _get_state_magnitude(t_target, state_id=state_id, state_ids=state_ids)
+        t_supply_value = _get_state_magnitude(
+            t_supply, state_id=state_id, state_ids=state_ids
+        )
+        t_target_value = _get_state_magnitude(
+            t_target, state_id=state_id, state_ids=state_ids
+        )
         if t_supply_value is None or t_target_value is None:
             continue
         if not (math.isfinite(t_supply_value) and math.isfinite(t_target_value)):
@@ -632,9 +643,13 @@ def _validate_utility_record_states(
     if t_supply is None or t_target is None or alignment_issues:
         return issues
 
-    for state_id in (list(state_ids) if state_ids is not None else [None]):
-        t_supply_value = _get_state_magnitude(t_supply, state_id=state_id, state_ids=state_ids)
-        t_target_value = _get_state_magnitude(t_target, state_id=state_id, state_ids=state_ids)
+    for state_id in list(state_ids) if state_ids is not None else [None]:
+        t_supply_value = _get_state_magnitude(
+            t_supply, state_id=state_id, state_ids=state_ids
+        )
+        t_target_value = _get_state_magnitude(
+            t_target, state_id=state_id, state_ids=state_ids
+        )
         if t_supply_value is None or t_target_value is None:
             continue
         if not (math.isfinite(t_supply_value) and math.isfinite(t_target_value)):
@@ -830,10 +845,7 @@ def _validate_positive_states(
 def _iter_state_magnitudes(value: Value) -> list[tuple[str | None, float]]:
     if value.state_ids is None:
         return [(None, float(value.value))]
-    return [
-        (state_id, float(value[state_id].value))
-        for state_id in value.state_ids
-    ]
+    return [(state_id, float(value[state_id].value)) for state_id in value.state_ids]
 
 
 def _get_state_magnitude(

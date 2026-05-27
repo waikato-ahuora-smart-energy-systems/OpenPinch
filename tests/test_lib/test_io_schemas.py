@@ -1,5 +1,8 @@
 """Regression tests for public I/O schema defaults."""
 
+import pytest
+
+from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 from OpenPinch.lib.schemas.io import (
     GetInputOutputData,
     ProblemTableDataSchema,
@@ -8,7 +11,6 @@ from OpenPinch.lib.schemas.io import (
     THSchema,
     UtilitySchema,
 )
-from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 
 
 def test_target_input_utilities_default_is_not_shared():
@@ -54,7 +56,7 @@ def test_target_input_accepts_stateful_value_payloads():
             {
                 "zone": "Zone A",
                 "name": "H1",
-                "t_supply": {"values": [150.0, 140.0], "units": "degC"},
+                "t_supply": {"values": [150.0, 140.0], "unit": "degC"},
                 "t_target": {
                     "values": [60.0, 55.0],
                     "state_ids": ["0", "1"],
@@ -78,4 +80,21 @@ def test_target_input_accepts_stateful_value_payloads():
     assert t_supply.unit == "degC"
     assert t_supply.state_ids is None
     assert isinstance(t_target, StatefulValueWithUnit)
-    assert t_target.units == "degC"
+    assert t_target.unit == "degC"
+
+
+def test_target_input_rejects_legacy_units_alias():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": {"value": 150.0, "units": "degC"},
+                "t_target": {"value": 60.0, "unit": "degC"},
+                "heat_flow": {"value": 100.0, "unit": "kW"},
+            }
+        ]
+    }
+
+    with pytest.raises(Exception):
+        TargetInput.model_validate(payload)

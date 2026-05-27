@@ -15,6 +15,7 @@ _STATE_WEIGHT_RTOL = 1e-12
 _STATE_WEIGHT_ATOL = 1e-12
 _TEMPERATURE_EQUAL_TOL = 1e-12
 
+
 class Stream:
     """Generic thermal stream used for both process and utility duties.
 
@@ -668,7 +669,9 @@ class Stream:
 
         return ref_state_ids, ref_weights
 
-    def _broadcast_magnitudes(self, value, state_ids, attr_name: str) -> np.ndarray | None:
+    def _broadcast_magnitudes(
+        self, value, state_ids, attr_name: str
+    ) -> np.ndarray | None:
         value_obj = self._normalise_existing_value(value, attr_name)
         if value_obj is None:
             return None
@@ -797,7 +800,9 @@ class Stream:
 
         if len(active_classes) > 1:
             state_labels = state_ids or [str(idx) for idx in range(len(t_supply_arr))]
-            hot_state_ids = [sid for sid, active in zip(state_labels, hot_states) if active]
+            hot_state_ids = [
+                sid for sid, active in zip(state_labels, hot_states) if active
+            ]
             cold_state_ids = [
                 sid for sid, active in zip(state_labels, cold_states) if active
             ]
@@ -806,7 +811,9 @@ class Stream:
             ]
             raise ValueError(
                 "Stream states must classify consistently. "
-                f"Hot={hot_state_ids}, Cold={cold_state_ids}, Neutral={neutral_state_ids}."
+                f"Hot={hot_state_ids}, "
+                f"Cold={cold_state_ids}, "
+                f"Neutral={neutral_state_ids}."
             )
 
         if np.any(hot_states):
@@ -890,9 +897,9 @@ class Stream:
         self._is_process_stream = True
         self._update_attributes()
 
-    def set_heat_flow(self, value: float, units: str = "kW") -> None:
+    def set_heat_flow(self, value: float, unit: str = "kW") -> None:
         """Sets the heat flow and updates CP and utility cost."""
-        self._heat_flow = Value(value, unit=units)
+        self._heat_flow = Value(value, unit=unit)
         self._update_attributes()
 
     def _calc_utility_cost(self):

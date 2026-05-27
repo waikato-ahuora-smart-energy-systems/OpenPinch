@@ -130,7 +130,7 @@ def get_value(
 
 def _is_value_with_unit(val: Any) -> bool:
     """Return ``True`` for objects that look like ``ValueWithUnit`` containers."""
-    return hasattr(val, "value") and hasattr(val, "units")
+    return hasattr(val, "value") and hasattr(val, "unit")
 
 
 def _is_stateful_value_payload(val: Any) -> bool:
@@ -138,7 +138,7 @@ def _is_stateful_value_payload(val: Any) -> bool:
     if not isinstance(val, dict):
         return False
     keys = set(val)
-    return keys.issubset({"values", "state_ids", "weights", "unit", "units"}) and (
+    return keys.issubset({"values", "state_ids", "weights", "unit"}) and (
         "values" in keys or "state_ids" in keys or "weights" in keys
     )
 

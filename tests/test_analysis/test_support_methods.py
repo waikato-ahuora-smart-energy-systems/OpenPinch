@@ -26,7 +26,7 @@ def test_get_value_with_missing_dict_key():
 
 
 def test_get_value_with_valuewithunit():
-    vwu = ValueWithUnit(value=99.9, units="kW")
+    vwu = ValueWithUnit(value=99.9, unit="kW")
     assert get_value(vwu) == 99.9
 
 

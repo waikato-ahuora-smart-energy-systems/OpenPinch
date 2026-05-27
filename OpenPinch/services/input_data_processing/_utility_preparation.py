@@ -69,11 +69,9 @@ def _complete_utility_data(
 
         t_target = get_value(utility.t_target)
         if (
-            not(isinstance(t_target, (int, float)))
-            or
-            (np.isnan(t_target))
-            or
-            (t_target == t_supply)
+            not (isinstance(t_target, (int, float)))
+            or (np.isnan(t_target))
+            or (t_target == t_supply)
         ):
             delta = (
                 -zone_config.DT_PHASE_CHANGE
@@ -84,9 +82,7 @@ def _complete_utility_data(
 
         dt_cont = get_value(utility.dt_cont)
         base_dt_cont = (
-            zone_config.DT_CONT
-            if dt_cont is None or np.isnan(dt_cont)
-            else dt_cont
+            zone_config.DT_CONT if dt_cont is None or np.isnan(dt_cont) else dt_cont
         )
         if dt_cont is None or np.isnan(dt_cont):
             utility.dt_cont = base_dt_cont
@@ -105,8 +101,7 @@ def _complete_utility_data(
             and utility.active
             and (
                 min(t_supply, get_value(utility.t_target)) - effective_dt_cont
-                >=
-                hu_t_min - zone_config.DT_PHASE_CHANGE
+                >= hu_t_min - zone_config.DT_PHASE_CHANGE
             )
         ):
             add_default_hu = False
@@ -115,8 +110,7 @@ def _complete_utility_data(
             and utility.active
             and (
                 max(t_supply, get_value(utility.t_target)) + effective_dt_cont
-                <=
-                cu_t_max + zone_config.DT_PHASE_CHANGE
+                <= cu_t_max + zone_config.DT_PHASE_CHANGE
             )
         ):
             add_default_cu = False

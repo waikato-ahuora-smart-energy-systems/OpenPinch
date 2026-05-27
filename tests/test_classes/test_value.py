@@ -96,7 +96,7 @@ def test_pandas():
 
 
 def test_valuewithunit_with_mismatched_unit():
-    vw = ValueWithUnit(value=100, units="degC")
+    vw = ValueWithUnit(value=100, unit="degC")
     v = Value(vw, unit="K")  # mismatched unit
 
     # It should keep the original "degC" and silently ignore the mismatch
@@ -105,7 +105,7 @@ def test_valuewithunit_with_mismatched_unit():
 
 def test_value_from_valuewithunit():
     # Simulate input from schema or external source
-    vw = ValueWithUnit(value=123.45, units="kW")
+    vw = ValueWithUnit(value=123.45, unit="kW")
 
     # Create a Value instance from it
     v = Value(vw)
@@ -216,7 +216,7 @@ def test_stateful_value_serialization_round_trip():
             "values": [10.0, 0.0],
             "state_ids": ["on", "off"],
             "weights": [7.0, 3.0],
-            "units": "kW",
+            "unit": "kW",
         }
     )
 
@@ -261,7 +261,7 @@ def test_stateful_value_arithmetic_and_conversion():
     assert product.weighted_value == pytest.approx(14.0)
 
 
-def test_stateful_value_getitem_and_units_alias():
+def test_stateful_value_getitem_exposes_unit_only():
     payload = StatefulValueWithUnit(
         values=[15.0, 8.0],
         unit="kW",
@@ -448,7 +448,7 @@ def test_value_arithmetic_comparison_and_conversion_paths():
     assert Value.from_dict(as_dict).value == v.value
 
     # Exercise ValueWithUnit branch with unit conversion failure fallback.
-    vw = ValueWithUnit(value=3.0, units="m")
+    vw = ValueWithUnit(value=3.0, unit="m")
     fallback = Value(vw, unit="s")
     assert fallback.value == 3.0
 

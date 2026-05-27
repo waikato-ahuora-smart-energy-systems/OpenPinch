@@ -28,9 +28,9 @@ from OpenPinch.utils.export import (
 class VU:
     """Simple value-with-units stub."""
 
-    def __init__(self, value, units):
+    def __init__(self, value, unit):
         self.value = value
-        self.units = units
+        self.unit = unit
 
 
 def _make_target(

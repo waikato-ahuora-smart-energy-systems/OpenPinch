@@ -3,9 +3,10 @@
 import pytest
 
 from OpenPinch.classes import *
-from OpenPinch.classes._stream_value_view import StreamValueView as ExtractedStreamValueView
-from OpenPinch.classes.stream import Stream
-from OpenPinch.classes.stream import StreamValueView
+from OpenPinch.classes._stream_value_view import (
+    StreamValueView as ExtractedStreamValueView,
+)
+from OpenPinch.classes.stream import Stream, StreamValueView
 from OpenPinch.lib import *
 from OpenPinch.lib.enums import ST
 from OpenPinch.lib.schemas.common import StatefulValueWithUnit
@@ -192,7 +193,7 @@ def test_stream_stateful_value_view_defaults_to_state_zero_and_exposes_unit():
 
     assert s.supply_temperature == 300.0
     assert s.supply_temperature.unit == "°C"
-    assert s.supply_temperature.units == "°C"
+    assert not hasattr(s.supply_temperature, "units")
     assert s.supply_temperature[0].value == pytest.approx(300.0)
     assert s.supply_temperature[1].value == pytest.approx(280.0)
     assert s.supply_temperature[1].unit == "°C"
@@ -261,12 +262,26 @@ def test_stream_stateful_value_view_remains_strict_for_unknown_state_id():
 
 
 def test_stream_rejects_mismatched_state_alignment():
-    with pytest.raises(ValueError, match="state_ids for heat_flow must align with t_supply"):
+    with pytest.raises(
+        ValueError, match="state_ids for heat_flow must align with t_supply"
+    ):
         Stream(
             name="Misaligned",
-            t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
-            t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-            heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "2"], "unit": "kW"},
+            t_supply={
+                "values": [300.0, 280.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
+            t_target={
+                "values": [200.0, 180.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
+            heat_flow={
+                "values": [5000.0, 4000.0],
+                "state_ids": ["0", "2"],
+                "unit": "kW",
+            },
             dt_cont=10.0,
             htc=2.0,
         )
@@ -276,9 +291,21 @@ def test_stream_rejects_mixed_hot_and_cold_state_directions():
     with pytest.raises(ValueError, match="Stream states must classify consistently"):
         Stream(
             name="Mixed",
-            t_supply={"values": [300.0, 120.0], "state_ids": ["0", "1"], "unit": "degC"},
-            t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-            heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+            t_supply={
+                "values": [300.0, 120.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
+            t_target={
+                "values": [200.0, 180.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
+            heat_flow={
+                "values": [5000.0, 4000.0],
+                "state_ids": ["0", "1"],
+                "unit": "kW",
+            },
             dt_cont=10.0,
             htc=2.0,
         )

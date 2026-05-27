@@ -557,9 +557,9 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
 
 def test_summary_frame_compact_and_detailed(monkeypatch):
     class _Value:
-        def __init__(self, value, units="kW"):
+        def __init__(self, value, unit="kW"):
             self.value = value
-            self.units = units
+            self.unit = unit
 
     class _Utility:
         def __init__(self, name, heat_flow):
@@ -609,9 +609,9 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
 
 def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
     class _Value:
-        def __init__(self, value, units="kW"):
+        def __init__(self, value, unit="kW"):
             self.value = value
-            self.units = units
+            self.unit = unit
 
     target = type(
         "Target",

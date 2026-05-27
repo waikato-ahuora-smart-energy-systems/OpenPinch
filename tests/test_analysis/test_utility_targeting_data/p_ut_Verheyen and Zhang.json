@@ -58,23 +58,23 @@
             "name": "Reactor outlet stream to be cooled down",
             "t_supply": {
                 "value": 393,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 60,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 67132.8,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 24,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 0.1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -84,23 +84,23 @@
             "name": "Diesel stream from distillation side stripper to be cooled down",
             "t_supply": {
                 "value": 160,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 22212,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 24,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 0.1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -110,23 +110,23 @@
             "name": "Gas oil stream from reboiler to be cooled down",
             "t_supply": {
                 "value": 354,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 60,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 40395.6,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 24,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 0.1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -136,23 +136,23 @@
             "name": "Reactor inlet stream to be heated to reaction temperature",
             "t_supply": {
                 "value": 72,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 356,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 59469.6,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 24,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 0.1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -162,23 +162,23 @@
             "name": "Stream from low pressure separator heated to H2S stripper",
             "t_supply": {
                 "value": 62,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 210,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 20956.8,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 24,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 0.1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -188,23 +188,23 @@
             "name": "Stream from H2S stripper heated to distillation inlet temperature",
             "t_supply": {
                 "value": 220,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 370,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 26460,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 24,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 0.1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -214,23 +214,23 @@
             "name": "Side stripper reboiler",
             "t_supply": {
                 "value": 253,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 284,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 9126.4,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 24,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 0.1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -242,23 +242,23 @@
             "type": "Hot",
             "t_supply": {
                 "value": 410,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 400,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 0,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -267,23 +267,23 @@
             "type": "Cold",
             "t_supply": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 15,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 0,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         }
