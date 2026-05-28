@@ -199,6 +199,41 @@ def test_stream_stateful_value_view_defaults_to_state_zero_and_exposes_unit():
     assert s.supply_temperature[1].unit == "°C"
 
 
+def test_stream_value_view_exposes_min_and_max_properties():
+    s = Stream(
+        name="Stateful",
+        t_supply=StatefulValueWithUnit(
+            values=[300.0, 280.0],
+            unit="degC",
+            state_ids=["0", "1"],
+            weights=[0.6, 0.4],
+        ),
+        t_target=StatefulValueWithUnit(
+            values=[200.0, 180.0],
+            unit="degC",
+            state_ids=["0", "1"],
+            weights=[0.6, 0.4],
+        ),
+        heat_flow=StatefulValueWithUnit(
+            values=[5000.0, 4000.0],
+            unit="kW",
+            state_ids=["0", "1"],
+            weights=[0.6, 0.4],
+        ),
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    assert isinstance(s.t_supply.min, StreamValueView)
+    assert isinstance(s.t_supply.max, StreamValueView)
+    assert s.t_supply.min == pytest.approx(280.0)
+    assert s.t_supply.max == pytest.approx(300.0)
+    assert s.t_supply.min.unit == "°C"
+    assert s.t_supply.max.unit == "°C"
+    assert s.t_supply.min.raw_value.state_ids is None
+    assert s.t_supply.max.raw_value.state_ids is None
+
+
 def test_stream_value_view_import_from_stream_module_remains_supported():
     assert StreamValueView is ExtractedStreamValueView
 
@@ -216,6 +251,8 @@ def test_stream_scalar_value_view_allows_any_state_lookup_key():
     assert float(s.supply_temperature) == pytest.approx(300.0)
     assert s.supply_temperature.value == pytest.approx(300.0)
     assert s.supply_temperature.unit == "°C"
+    assert s.supply_temperature.min == pytest.approx(300.0)
+    assert s.supply_temperature.max == pytest.approx(300.0)
     assert s.supply_temperature[0].value == pytest.approx(300.0)
     assert s.supply_temperature[1].value == pytest.approx(300.0)
     assert s.supply_temperature["summer"].value == pytest.approx(300.0)
@@ -308,6 +345,45 @@ def test_stream_rejects_mixed_hot_and_cold_state_directions():
             },
             dt_cont=10.0,
             htc=2.0,
+        )
+
+
+def test_set_heat_flow_preserves_existing_state_model_for_scalar_update():
+    s = Stream(
+        name="StatefulDuty",
+        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    s.set_heat_flow(6000.0)
+
+    assert s.heat_flow.state_ids == ["0", "1"]
+    assert s.heat_flow.raw_value.weights.tolist() == pytest.approx([0.5, 0.5])
+    assert s.heat_flow.state_values.tolist() == pytest.approx([6000.0, 6000.0])
+    assert s.CP.state_values.tolist() == pytest.approx([60.0, 60.0])
+
+
+def test_set_heat_flow_rejects_mismatched_stateful_payload():
+    s = Stream(
+        name="StatefulDuty",
+        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    with pytest.raises(ValueError, match="state_ids for heat_flow must align"):
+        s.set_heat_flow(
+            {
+                "values": [6000.0, 5000.0],
+                "state_ids": ["0", "peak"],
+                "weights": [0.5, 0.5],
+                "unit": "kW",
+            }
         )
 
 

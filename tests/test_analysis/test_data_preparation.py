@@ -53,6 +53,8 @@ from pydantic import ValidationError
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.services.input_data_processing.data_preparation import (
+    _assign_process_streams_to_subzones,
+    _build_prepared_stream_collection,
     _create_nested_zones,
     _get_validated_zone_info,
     _validate_config_data_completed,
@@ -952,6 +954,410 @@ def test_default_utilities_use_zone_effective_dt_cont_multiplier():
     assert cu.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
 
 
+def test_phase_change_utility_with_null_target_is_completed_near_supply_temperature():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "AreaA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            }
+        )
+    ]
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "HPS",
+                "type": "Both",
+                "t_supply": {"value": 280.0, "unit": "degC"},
+                "t_target": {"value": None, "unit": "degC"},
+                "dt_cont": {"value": 0.0, "unit": "degC"},
+                "price": 30.0,
+                "htc": {"value": 1.0, "unit": "kW/m^2/degC"},
+                "heat_flow": None,
+            }
+        )
+    ]
+
+    site = prepare_problem(streams=streams, utilities=utilities)
+    hot_hps = site.hot_utilities[".".join([StreamLoc.HotU.value, "HPS"])]
+    cold_hps = site.cold_utilities[".".join([StreamLoc.ColdU.value, "HPS"])]
+
+    assert hot_hps.t_supply == pytest.approx(280.0)
+    assert hot_hps.t_target == pytest.approx(279.99)
+    assert cold_hps.t_supply == pytest.approx(279.99)
+    assert cold_hps.t_target == pytest.approx(280.0)
+
+
+def test_process_stream_with_null_dt_cont_defaults_to_zero():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "AreaA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": {"value": None, "unit": "degC"},
+                "htc": 1.0,
+            }
+        )
+    ]
+
+    site = prepare_problem(streams=streams)
+    hot_a = next(stream for stream in site.hot_streams if stream.name == "HotA")
+
+    assert hot_a.dt_cont == pytest.approx(0.0)
+    assert hot_a.dt_cont_act == pytest.approx(0.0)
+
+
+def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "ColdA",
+                "zone": "AreaA",
+                "t_supply": {
+                    "values": [40.0, 60.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [150.0, 200.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [120.0, 160.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "AreaA",
+                "t_supply": 260.0,
+                "t_target": 140.0,
+                "heat_flow": 200.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+    ]
+
+    site = prepare_problem(streams=streams)
+    hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
+
+    assert hu.t_max_star == pytest.approx(210.0)
+
+
+def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "HU_swing",
+                "type": "Hot",
+                "t_supply": {
+                    "values": [250.0, 400.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [200.0, 350.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "dt_cont": 10.0,
+                "heat_flow": 0.0,
+                "price": 100.0,
+                "htc": 1.0,
+            }
+        ),
+        UtilitySchema.model_validate(
+            {
+                "name": "HU_flat",
+                "type": "Hot",
+                "t_supply": {
+                    "values": [300.0, 310.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [260.0, 270.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "dt_cont": 10.0,
+                "heat_flow": 0.0,
+                "price": 100.0,
+                "htc": 1.0,
+            }
+        ),
+    ]
+
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)
+    hot_names = [utility.name for utility in site.hot_utilities]
+
+    assert hot_names[:2] == ["HU_swing", "HU_flat"]
+
+
+def test_prepare_problem_rejects_cross_stream_state_mismatch():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "AreaA",
+                "t_supply": {
+                    "values": [220.0, 210.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [140.0, 130.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [200.0, 180.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        )
+    ]
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "HU_mismatch",
+                "type": "Hot",
+                "t_supply": {
+                    "values": [300.0, 290.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [260.0, 250.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "dt_cont": {
+                    "values": [10.0, 10.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "delta_degC",
+                },
+                "heat_flow": 0.0,
+                "price": 100.0,
+                "htc": 1.0,
+            }
+        )
+    ]
+
+    with pytest.raises(ValueError, match="state_ids for stream 'Hot Utility.HU_mismatch'"):
+        prepare_problem(streams=streams, utilities=utilities)
+
+
+def test_build_prepared_stream_collection_rejects_neutral_process_stream():
+    master_zone = Zone(name="Site", type=ZT.S.value, zone_config=Configuration())
+    area = Zone(
+        name="AreaA",
+        type=ZT.P.value,
+        zone_config=master_zone.config,
+        parent_zone=master_zone,
+    )
+    master_zone.add_zone(area)
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "NeutralA",
+                "zone": "Site/AreaA",
+                "t_supply": 100.0,
+                "t_target": 100.0,
+                "heat_flow": 0.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        )
+    ]
+
+    with pytest.raises(ValueError, match="must classify as Hot or Cold"):
+        _build_prepared_stream_collection(master_zone, streams, [])
+
+
+def test_prepare_problem_process_streams_are_referenced_in_parent_imports():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "Site/AreaA",
+                "t_supply": 220.0,
+                "t_target": 120.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        )
+    ]
+    zone_tree = ZoneTreeSchema.model_validate(
+        {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        }
+    )
+
+    site = prepare_problem(streams=streams, zone_tree=zone_tree)
+    area = site.get_subzone("AreaA")
+
+    assert site.hot_streams["AreaA.HotA"] is area.hot_streams[0]
+
+
+def test_prepare_problem_utilities_are_copied_per_zone():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "Site/AreaA",
+                "t_supply": 220.0,
+                "t_target": 120.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "ColdB",
+                "zone": "Site/AreaB",
+                "t_supply": 60.0,
+                "t_target": 140.0,
+                "heat_flow": -400.0,
+                "dt_cont": 8.0,
+                "htc": 1.0,
+            }
+        ),
+    ]
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "Steam",
+                "type": "Hot",
+                "t_supply": 260.0,
+                "t_target": 230.0,
+                "heat_flow": 0.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+                "price": 10.0,
+            }
+        )
+    ]
+    zone_tree = ZoneTreeSchema.model_validate(
+        {
+            "name": "Site",
+            "type": "Site",
+            "children": [
+                {"name": "AreaA", "type": "Process Zone"},
+                {"name": "AreaB", "type": "Process Zone"},
+            ],
+        }
+    )
+
+    site = prepare_problem(streams=streams, utilities=utilities, zone_tree=zone_tree)
+    root_utility = site.hot_utilities[".".join([StreamLoc.HotU.value, "Steam"])]
+    area_a_utility = site.get_subzone("AreaA").hot_utilities[
+        ".".join([StreamLoc.HotU.value, "Steam"])
+    ]
+    area_b_utility = site.get_subzone("AreaB").hot_utilities[
+        ".".join([StreamLoc.HotU.value, "Steam"])
+    ]
+
+    assert root_utility is not area_a_utility
+    assert area_a_utility is not area_b_utility
+    assert root_utility.t_supply == area_a_utility.t_supply == area_b_utility.t_supply
+    assert root_utility.t_target == area_a_utility.t_target == area_b_utility.t_target
+
+
+def test_zone_dt_cont_multiplier_changes_only_zone_utility_copies():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "Site/AreaA",
+                "t_supply": 220.0,
+                "t_target": 120.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "HotB",
+                "zone": "Site/AreaB",
+                "t_supply": 210.0,
+                "t_target": 130.0,
+                "heat_flow": 450.0,
+                "dt_cont": 6.0,
+                "htc": 1.0,
+            }
+        ),
+    ]
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "Steam",
+                "type": "Hot",
+                "t_supply": 260.0,
+                "t_target": 230.0,
+                "heat_flow": 0.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+                "price": 10.0,
+            }
+        )
+    ]
+    zone_tree = ZoneTreeSchema.model_validate(
+        {
+            "name": "Site",
+            "type": "Site",
+            "children": [
+                {"name": "AreaA", "type": "Process Zone"},
+                {"name": "AreaB", "type": "Process Zone"},
+            ],
+        }
+    )
+
+    site = prepare_problem(streams=streams, utilities=utilities, zone_tree=zone_tree)
+    area_a = site.get_subzone("AreaA")
+    area_b = site.get_subzone("AreaB")
+    root_hot_ref = site.hot_streams["AreaA.HotA"]
+
+    area_a_hot = area_a.hot_streams[0]
+    area_b_hot = area_b.hot_streams[0]
+    root_utility = site.hot_utilities[".".join([StreamLoc.HotU.value, "Steam"])]
+    area_a_utility = area_a.hot_utilities[".".join([StreamLoc.HotU.value, "Steam"])]
+    area_b_utility = area_b.hot_utilities[".".join([StreamLoc.HotU.value, "Steam"])]
+
+    area_a.dt_cont_multiplier = 2.0
+
+    assert area_a_hot.dt_cont_act == pytest.approx(area_a_hot.dt_cont * 2.0)
+    assert root_hot_ref is area_a_hot
+    assert root_hot_ref.dt_cont_act == pytest.approx(area_a_hot.dt_cont * 2.0)
+    assert area_b_hot.dt_cont_act == pytest.approx(area_b_hot.dt_cont)
+    assert area_a_utility.dt_cont_act == pytest.approx(area_a_utility.dt_cont * 2.0)
+    assert root_utility.dt_cont_act == pytest.approx(root_utility.dt_cont)
+    assert area_b_utility.dt_cont_act == pytest.approx(area_b_utility.dt_cont)
+
+
 def make_stream(zone: str) -> StreamSchema:
     """Build stream data used by this test module."""
     return StreamSchema(
@@ -1271,3 +1677,27 @@ def test_empty_zone_tree_returns_parent():
 
     assert result == parent_zone
     assert result.subzones == {}
+
+
+def test_assign_process_streams_to_subzones_requires_zone_mapping():
+    master_zone = Zone(name="Site", type=ZT.S.value, zone_config=Configuration())
+    process_streams = StreamCollection()
+    process_streams.add(
+        Stream(
+            name="H1",
+            t_supply=200.0,
+            t_target=100.0,
+            heat_flow=10.0,
+            dt_cont=5.0,
+            htc=1.0,
+            is_process_stream=True,
+        ),
+        key="Site.Hot Stream.H1",
+    )
+
+    with pytest.raises(RuntimeError, match="missing a zone mapping"):
+        _assign_process_streams_to_subzones(
+            master_zone=master_zone,
+            process_streams=process_streams,
+            process_zone_paths={},
+        )

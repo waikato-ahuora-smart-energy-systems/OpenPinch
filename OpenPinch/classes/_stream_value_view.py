@@ -63,6 +63,16 @@ class StreamValueView(float):
         return self._value.weighted_value
 
     @property
+    def min(self) -> "StreamValueView":
+        """Return the minimum stored magnitude as a scalar stream-facing view."""
+        return type(self)(self._value.min_value())
+
+    @property
+    def max(self) -> "StreamValueView":
+        """Return the maximum stored magnitude as a scalar stream-facing view."""
+        return type(self)(self._value.max_value())
+
+    @property
     def default_state_id(self) -> str | None:
         """Return the state identifier used by the numeric float face."""
         return self._default_state_id

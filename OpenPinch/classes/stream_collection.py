@@ -3,10 +3,12 @@
 import csv
 import pickle
 import warnings
-from copy import copy
+from copy import copy, deepcopy
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
+
+import numpy as np
 
 from ..lib.enums import ST
 
@@ -60,7 +62,7 @@ class StreamCollection:
         else:
             self._sort_key = payload
 
-    def add(self, stream, key: str = None, prevent_overwrite: bool = True):
+    def add(self, stream, key: str = None, prevent_overwrite: bool = True) -> str:
         """Insert a stream, optionally renaming the key to avoid collisions."""
         base_name = new_name = stream.name
         if key is None:
@@ -75,6 +77,7 @@ class StreamCollection:
         stream.name = new_name
         self._streams[key] = stream
         self._needs_sort = True
+        return key
 
     def add_many(self, streams, keys=None, prevent_overwrite: bool = True):
         """Insert several streams, optionally using explicit keys for each stream."""
@@ -89,7 +92,7 @@ class StreamCollection:
 
     def _build_stream_subset(
         self,
-        target_type: str,
+        target_type: str | None,
         include_process_streams: bool = True,
         include_utility_streams: bool = True,
         invert_utility: bool = False,
@@ -98,7 +101,6 @@ class StreamCollection:
             include_process_streams = False
             include_utility_streams = True
 
-        opposite_type = ST.Cold.value if target_type == ST.Hot.value else ST.Hot.value
         subset = StreamCollection()
         subset._sort_spec = self._sort_spec
         subset._rebuild_sort_key()
@@ -106,7 +108,9 @@ class StreamCollection:
 
         for key, stream in self._streams.items():
             if stream.is_process_stream:
-                if include_process_streams and stream.type == target_type:
+                if not include_process_streams:
+                    continue
+                if target_type is None or stream.type == target_type:
                     subset._streams[key] = stream
                 continue
 
@@ -114,12 +118,15 @@ class StreamCollection:
                 continue
 
             if invert_utility:
+                opposite_type = (
+                    ST.Cold.value if target_type == ST.Hot.value else ST.Hot.value
+                )
                 if stream.type != opposite_type:
                     continue
                 inverted_stream = copy(stream)
                 inverted_stream.invert()
                 subset._streams[key] = inverted_stream
-            elif stream.type == target_type:
+            elif target_type is None or stream.type == target_type:
                 subset._streams[key] = stream
 
         subset._needs_sort = True
@@ -153,8 +160,17 @@ class StreamCollection:
             invert_utility=invert_utility,
         )
 
+    def get_process_streams(self):
+        """Return a new collection containing only process streams."""
+        return self._build_stream_subset(
+            target_type=None,
+            include_process_streams=True,
+            include_utility_streams=False,
+            invert_utility=False,
+        )
+
     def get_hot_process_streams(self):
-        """Return a new collection containing only hot streams."""
+        """Return a new collection containing only hot process streams."""
         return self._build_stream_subset(
             target_type=ST.Hot.value,
             include_process_streams=True,
@@ -163,7 +179,7 @@ class StreamCollection:
         )
 
     def get_cold_process_streams(self):
-        """Return a new collection containing only cold streams."""
+        """Return a new collection containing only cold process streams."""
         return self._build_stream_subset(
             target_type=ST.Cold.value,
             include_process_streams=True,
@@ -171,26 +187,39 @@ class StreamCollection:
             invert_utility=False,
         )
 
-    def get_hot_utility_streams(self):
-        """Return a new collection containing only hot streams."""
+    def get_utility_streams(self):
+        """Return a new collection containing all utility streams."""
         return self._build_stream_subset(
+            target_type=None,
+            include_process_streams=False,
+            include_utility_streams=True,
+            invert_utility=False,
+        )
+
+    def get_hot_utility_streams(self):
+        """Return a new collection containing only hot utility streams."""
+        subset = self._build_stream_subset(
             target_type=ST.Hot.value,
             include_process_streams=False,
             include_utility_streams=True,
             invert_utility=False,
         )
+        subset.set_sort_key(lambda stream: stream.t_supply.max, reverse=True)
+        return subset
 
     def get_cold_utility_streams(self):
-        """Return a new collection containing only cold streams."""
-        return self._build_stream_subset(
+        """Return a new collection containing only cold utility streams."""
+        subset = self._build_stream_subset(
             target_type=ST.Cold.value,
             include_process_streams=False,
             include_utility_streams=True,
             invert_utility=False,
         )
+        subset.set_sort_key(lambda stream: stream.t_supply.max, reverse=True)
+        return subset
 
     def get_inverted_hot_utility_streams(self):
-        """Return a new collection containing only hot streams."""
+        """Return a new collection containing only hot utility streams."""
         return self._build_stream_subset(
             target_type=ST.Hot.value,
             include_process_streams=False,
@@ -277,6 +306,82 @@ class StreamCollection:
         self._rebuild_sort_key()
         self._needs_sort = True
 
+    def copy(
+        self,
+        *,
+        deep: bool = False,
+        sort_key: Union[str, List[str], Callable, None] = None,
+        reverse: bool | None = None,
+    ) -> "StreamCollection":
+        """Return a copy of the collection, optionally deep-copying streams.
+
+        By default the new collection preserves the current sort configuration.
+        Callers may override that with ``sort_key`` and optionally ``reverse``.
+        """
+        copied = StreamCollection()
+        if sort_key is None:
+            copied._sort_spec = self._sort_spec
+            copied._rebuild_sort_key()
+            copied._sort_reverse = self._sort_reverse if reverse is None else reverse
+        else:
+            copied.set_sort_key(
+                sort_key,
+                reverse=self._sort_reverse if reverse is None else reverse,
+            )
+
+        for key, stream in self._streams.items():
+            copied.add(
+                deepcopy(stream) if deep else stream,
+                key=key,
+                prevent_overwrite=False,
+            )
+
+        return copied
+
+    def validate_state_alignment(
+        self,
+        *,
+        allow_scalar_broadcast: bool = True,
+    ) -> tuple[list[str] | None, np.ndarray | None]:
+        """Validate that all explicitly stateful streams share one state model."""
+        canonical_key: str | None = None
+        canonical_state_ids: list[str] | None = None
+        canonical_weights: np.ndarray | None = None
+
+        for key, stream in self._streams.items():
+            state_ids, weights = stream._get_state_context()
+            if state_ids is None:
+                if allow_scalar_broadcast:
+                    continue
+                raise ValueError(
+                    f"Stream '{key}' is scalar but scalar broadcast is disabled."
+                )
+
+            if canonical_state_ids is None:
+                canonical_key = key
+                canonical_state_ids = state_ids
+                canonical_weights = weights
+                continue
+
+            if state_ids != canonical_state_ids:
+                raise ValueError(
+                    f"state_ids for stream '{key}' must align with '{canonical_key}'."
+                )
+            if not np.allclose(
+                weights,
+                canonical_weights,
+                rtol=1e-12,
+                atol=1e-12,
+            ):
+                raise ValueError(
+                    f"weights for stream '{key}' must align with '{canonical_key}'."
+                )
+
+        return (
+            canonical_state_ids,
+            None if canonical_weights is None else canonical_weights.copy(),
+        )
+
     def get_index(self, stream) -> int:
         """Return the position (index) of a stream object in the sorted stream list."""
         self._ensure_sorted()
@@ -296,6 +401,10 @@ class StreamCollection:
     def __iter__(self):
         self._ensure_sorted()
         return iter(self._sorted_cache)
+
+    def items(self):
+        """Return the underlying keyed stream items in insertion order."""
+        return self._streams.items()
 
     def __add__(self, other):
         if not isinstance(other, StreamCollection):

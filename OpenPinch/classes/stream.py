@@ -638,6 +638,15 @@ class Stream:
             return Value(value, unit=self._VALUE_UNITS[attr_name])
         return None
 
+    def _get_state_context(
+        self,
+        field_names: tuple[str, ...] | None = None,
+    ) -> tuple[list[str] | None, np.ndarray | None]:
+        fields = field_names or self._CORE_STATE_FIELDS
+        return self._resolve_state_context(
+            {field_name: getattr(self, field_name) for field_name in fields}
+        )
+
     def _resolve_state_context(self, values_by_name: dict[str, Any]):
         stateful_values: list[tuple[str, Value]] = []
         for name, value in values_by_name.items():
@@ -728,6 +737,38 @@ class Stream:
             state_ids=state_ids,
             weights=weights,
         )
+
+    def _coerce_to_stream_state_context(self, value, attr_name: str) -> Value | None:
+        parsed = self._coerce_to_value(value, attr_name)
+        if parsed is None:
+            return None
+
+        state_ids, weights = self._get_state_context()
+        if state_ids is None:
+            return parsed
+
+        if parsed.state_ids is None:
+            return Value(
+                values=np.full(len(state_ids), float(parsed.value), dtype=float),
+                unit=parsed.unit,
+                state_ids=state_ids,
+                weights=weights,
+            )
+
+        if parsed.state_ids != state_ids:
+            raise ValueError(
+                f"state_ids for {attr_name[1:]} must align with the stream state_ids."
+            )
+        if not np.allclose(
+            parsed.weights,
+            weights,
+            rtol=_STATE_WEIGHT_RTOL,
+            atol=_STATE_WEIGHT_ATOL,
+        ):
+            raise ValueError(
+                f"weights for {attr_name[1:]} must align with the stream weights."
+            )
+        return parsed
 
     def _update_attributes(self) -> None:
         """Calculates key stream attributes based on temperatures."""
@@ -899,7 +940,10 @@ class Stream:
 
     def set_heat_flow(self, value: float, unit: str = "kW") -> None:
         """Sets the heat flow and updates CP and utility cost."""
-        self._heat_flow = Value(value, unit=unit)
+        self._heat_flow = self._coerce_to_stream_state_context(
+            Value(value, unit=unit),
+            "_heat_flow",
+        )
         self._update_attributes()
 
     def _calc_utility_cost(self):

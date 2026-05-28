@@ -82,6 +82,9 @@ class Value:
                     raise TypeError(
                         "Scalar value payloads do not accept state_ids or weights."
                     )
+                if data.get("value") is None:
+                    self._init_missing_scalar(data.get("unit") or unit)
+                    return
                 self._init_scalar(
                     data.get("value"),
                     data.get("unit") or unit,
@@ -127,6 +130,24 @@ class Value:
     def weighted_value(self) -> float:
         """Return the weighted scalar view of the stored quantity."""
         return self._weighted_magnitude()
+
+    def min_value(self) -> "Value":
+        """Return the minimum stored magnitude as a scalar ``Value``."""
+        min_magnitude = float(np.min(self._magnitude_array()))
+        return self._from_quantity(
+            Q_(np.asarray([min_magnitude], dtype=float), self._quantity.units),
+            state_ids=None,
+            weights=np.asarray([1.0], dtype=float),
+        )
+
+    def max_value(self) -> "Value":
+        """Return the maximum stored magnitude as a scalar ``Value``."""
+        max_magnitude = float(np.max(self._magnitude_array()))
+        return self._from_quantity(
+            Q_(np.asarray([max_magnitude], dtype=float), self._quantity.units),
+            state_ids=None,
+            weights=np.asarray([1.0], dtype=float),
+        )
 
     @value.setter
     def value(self, data):
@@ -498,6 +519,14 @@ class Value:
             )
         self._set_storage(quantity, None, np.asarray([1.0], dtype=float))
 
+    def _init_missing_scalar(self, unit: str | None) -> None:
+        quantity = (
+            Q_(np.asarray([np.nan], dtype=float), self._normalise_unit_input(unit))
+            if unit
+            else Q_(np.asarray([np.nan], dtype=float))
+        )
+        self._set_storage(quantity, None, np.asarray([1.0], dtype=float))
+
     def _init_from_value(self, data: "Value", unit: str | None) -> None:
         quantity = data._quantity
         if unit is not None:
@@ -515,6 +544,9 @@ class Value:
         )
 
     def _init_from_value_with_unit(self, data, unit: str | None) -> None:
+        if data.value is None:
+            self._init_missing_scalar(data.unit if data.unit is not None else unit)
+            return
         quantity = Q_(data.value, self._normalise_unit_input(data.unit))
         if unit is not None:
             try:
@@ -816,6 +848,11 @@ class Value:
                 "weights": self.weights.tolist(),
                 "unit": self._serialise_units(self._quantity.units),
             }
+        if np.isnan(self.weighted_value):
+            return {
+                "value": None,
+                "unit": self._serialise_units(self._quantity.units),
+            }
         return {
             "value": self.weighted_value,
             "unit": self._serialise_units(self._quantity.units),
@@ -835,4 +872,4 @@ class Value:
                 state_ids=data.get("state_ids"),
             )
 
-        return cls(data["value"], data.get("unit"))
+        return cls(data)

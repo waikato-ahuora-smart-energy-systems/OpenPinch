@@ -5,8 +5,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from OpenPinch.classes.problem_table import ProblemTable
+from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.config import Configuration
@@ -27,6 +29,9 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
         heat_recovery_target=25.0,
         hot_utility_target=10.0,
         heat_recovery_limit=50.0,
+    )
+    zone.net_hot_streams.add(
+        Stream(name="NetHot", t_supply=300.0, t_target=100.0, heat_flow=20.0)
     )
 
     site_pt = ProblemTable(

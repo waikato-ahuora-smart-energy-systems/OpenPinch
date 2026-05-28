@@ -7,6 +7,7 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.classes.value import Value
 from OpenPinch.lib import *
+from OpenPinch.lib.schemas.common import ValueWithUnit
 from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 
 
@@ -120,6 +121,35 @@ def test_value_from_valuewithunit():
     assert str(v) == "123.45 kW"
 
 
+def test_value_from_valuewithunit_none_preserves_missing_scalar_and_unit():
+    vw = ValueWithUnit(value=None, unit="degC")
+
+    v = Value(vw)
+
+    assert np.isnan(v.value)
+    assert np.isnan(v.state_values[0])
+    assert v.unit == "°C"
+    assert v.to_dict() == {"value": None, "unit": "degC"}
+
+
+def test_value_from_serialized_scalar_none_preserves_missing_scalar_and_unit():
+    v = Value({"value": None, "unit": "kW"})
+
+    assert np.isnan(v.value)
+    assert np.isnan(v.state_values[0])
+    assert v.unit == "kW"
+    assert v.to_dict() == {"value": None, "unit": "kW"}
+
+
+def test_value_from_dict_preserves_missing_scalar_and_unit():
+    v = Value.from_dict({"value": None, "unit": "degC"})
+
+    assert np.isnan(v.value)
+    assert np.isnan(v.state_values[0])
+    assert v.unit == "°C"
+    assert v.to_dict() == {"value": None, "unit": "degC"}
+
+
 def test_value_eq_handles_conversion_errors():
     v = Value(1.0, "m")
     assert (v == object()) is False
@@ -150,6 +180,51 @@ def test_stateful_value_behavior():
     np.testing.assert_allclose(v.weights, np.array([0.7, 0.3]))
     assert "states=['on', 'off']" in str(v)
     assert "state_ids=['on', 'off']" in repr(v)
+
+
+def test_scalar_value_min_and_max_return_scalar_copies():
+    v = Value(12.5, "kW")
+
+    v_min = v.min_value()
+    v_max = v.max_value()
+
+    assert isinstance(v_min, Value)
+    assert isinstance(v_max, Value)
+    assert v_min.value == pytest.approx(12.5)
+    assert v_max.value == pytest.approx(12.5)
+    assert v_min.unit == "kW"
+    assert v_max.unit == "kW"
+    assert v_min.state_ids is None
+    assert v_max.state_ids is None
+
+
+def test_stateful_value_min_and_max_ignore_weights_and_preserve_unit():
+    v = Value(
+        {"summer": 12.0, "winter": 6.0},
+        "kW",
+        weights={"summer": 0.1, "winter": 0.9},
+    )
+
+    assert v.min_value().value == pytest.approx(6.0)
+    assert v.max_value().value == pytest.approx(12.0)
+    assert v.min_value().unit == "kW"
+    assert v.max_value().unit == "kW"
+    assert v.min_value().state_ids is None
+    assert v.max_value().state_ids is None
+
+
+def test_stateful_value_min_and_max_work_after_unit_conversion():
+    v = Value(
+        values=[10.0, 4.0],
+        unit="kW",
+        state_ids=["0", "1"],
+        weights=[0.5, 0.5],
+    ).to("W")
+
+    assert v.min_value().value == pytest.approx(4000.0)
+    assert v.max_value().value == pytest.approx(10000.0)
+    assert v.min_value().unit == "W"
+    assert v.max_value().unit == "W"
 
 
 def test_stateful_value_defaults_to_uniform_weights():

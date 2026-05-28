@@ -1037,6 +1037,41 @@ def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
     assert "0 issue(s)" not in message
 
 
+def test_load_allows_missing_optional_utility_and_stream_fields():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": 150.0,
+                "t_target": 60.0,
+                "heat_flow": 100.0,
+                "dt_cont": None,
+                "htc": None,
+            }
+        ],
+        "utilities": [
+            {
+                "name": "Steam",
+                "type": "Both",
+                "t_supply": 180.0,
+                "t_target": None,
+                "heat_flow": None,
+                "dt_cont": None,
+                "htc": None,
+                "price": None,
+            }
+        ],
+        "options": {},
+    }
+
+    problem = PinchProblem(payload)
+    validated = problem.validate()
+
+    assert validated.streams[0].htc is None
+    assert validated.utilities[0].t_target is None
+
+
 def test_load_preserves_stateful_stream_values_on_runtime_streams():
     payload = {
         "streams": [

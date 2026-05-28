@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import List, Optional, Tuple
+import math
+from typing import Dict, List, Optional, Tuple
 
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
@@ -73,26 +73,22 @@ def prepare_problem(
         zone_tree=zone_tree,
         zone_config=master_zone.config,
     )
-    master_zone = _get_process_streams_in_each_subzone(
+    prepared_streams, process_zone_paths = _build_prepared_stream_collection(
         master_zone=master_zone,
         streams=sorted(streams, key=lambda stream: stream.name),
+        utilities=utilities,
+    )
+    prepared_streams.validate_state_alignment()
+    master_zone = _assign_process_streams_to_subzones(
+        master_zone=master_zone,
+        process_streams=prepared_streams.get_process_streams(),
+        process_zone_paths=process_zone_paths,
     )
     master_zone.import_hot_and_cold_streams_from_sub_zones()
-    hu_t_min, cu_t_max = _find_extreme_process_temperatures(
-        hot_streams=master_zone.hot_streams,
-        cold_streams=master_zone.cold_streams,
-    )
-    hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
-        utilities=utilities,
-        hu_t_min=hu_t_min,
-        cu_t_max=cu_t_max,
-        zone_config=master_zone.config,
-        dt_cont_multiplier=master_zone.dt_cont_multiplier,
-    )
     master_zone = _set_utilities_for_zone_and_subzones(
         zone=master_zone,
-        hot_utilities=hot_utilities,
-        cold_utilities=cold_utilities,
+        hot_utilities=prepared_streams.get_hot_utility_streams(),
+        cold_utilities=prepared_streams.get_cold_utility_streams(),
     )
     master_zone = _apply_zone_dt_cont_multiplier(
         parent_zone=master_zone,
@@ -101,81 +97,103 @@ def prepare_problem(
     return master_zone
 
 
-def _get_process_streams_in_each_subzone(
+def _build_prepared_stream_collection(
     master_zone: Zone,
     streams: List[StreamSchema],
-) -> Zone:
-    """Create stream objects, subzones, and zone attachments for the hierarchy."""
-    streams_by_full_path = defaultdict(list)
-    streams_by_relative_path = defaultdict(list)
-    for stream in streams:
-        zone_path = getattr(stream, "zone", None)
-        if not zone_path:
-            continue
-        streams_by_full_path[zone_path].append(stream)
-        path_components = zone_path.split("/")
-        for index in range(1, len(path_components)):
-            relative_key = "/".join(path_components[index:])
-            streams_by_relative_path[relative_key].append(stream)
-        streams_by_relative_path[zone_path].append(stream)
+    utilities: List[UtilitySchema],
+) -> tuple[StreamCollection, Dict[str, str]]:
+    """Build one canonical collection of prepared process and utility streams."""
+    prepared_streams = StreamCollection()
+    process_zone_paths: Dict[str, str] = {}
 
-    def iter_zones(parent_zone: Zone):
-        yield parent_zone
-        for subzone in parent_zone.subzones.values():
-            yield from iter_zones(subzone)
+    for stream_schema in streams:
+        zone = master_zone.get_subzone(stream_schema.zone)
+        if zone is None:
+            raise ValueError(
+                f"Validated stream '{stream_schema.name}' could not resolve zone "
+                f"'{stream_schema.zone}'."
+            )
 
-    def zone_path_from_child(child_zone: Zone, delimiter="/") -> str:
-        path_parts = []
-        current = child_zone
-        while current is not None:
-            path_parts.append(current.name)
-            current = current.parent_zone
-        return delimiter.join(reversed(path_parts))
-
-    for zone in iter_zones(master_zone):
-        zone_path = zone_path_from_child(zone)
-        relative_zone_path = (
-            zone_path.split("/", 1)[1] if "/" in zone_path else zone_path
+        stream_obj = _create_process_stream(stream_schema, zone)
+        stream_key = _build_process_stream_key(zone.address, stream_obj)
+        resolved_key = _add_stream_to_collection(
+            prepared_streams,
+            stream_obj,
+            key=stream_key,
         )
+        process_zone_paths[resolved_key] = zone.address
 
-        matched_streams: List[StreamSchema] = []
-        seen = set()
+    hu_t_min, cu_t_max = _find_extreme_process_temperatures(
+        hot_streams=prepared_streams.get_hot_process_streams(),
+        cold_streams=prepared_streams.get_cold_process_streams(),
+    )
+    hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
+        utilities=utilities,
+        hu_t_min=hu_t_min,
+        cu_t_max=cu_t_max,
+        zone_config=master_zone.config,
+        dt_cont_multiplier=master_zone.dt_cont_multiplier,
+    )
+    _extend_stream_collection(prepared_streams, hot_utilities)
+    _extend_stream_collection(prepared_streams, cold_utilities)
+    return prepared_streams, process_zone_paths
 
-        for candidate in streams_by_full_path.get(zone_path, ()):
-            candidate_id = id(candidate)
-            if candidate_id not in seen:
-                matched_streams.append(candidate)
-                seen.add(candidate_id)
 
-        for candidate in streams_by_relative_path.get(relative_zone_path, ()):
-            candidate_id = id(candidate)
-            if candidate_id not in seen:
-                matched_streams.append(candidate)
-                seen.add(candidate_id)
+def _assign_process_streams_to_subzones(
+    master_zone: Zone,
+    process_streams: StreamCollection,
+    process_zone_paths: Dict[str, str],
+) -> Zone:
+    """Attach prepared process streams to their owning zones by reference."""
+    for stream_key, stream_obj in process_streams.items():
+        zone_path = process_zone_paths.get(stream_key)
+        if zone_path is None:
+            raise RuntimeError(
+                f"Prepared process stream '{stream_key}' is missing a zone mapping."
+            )
 
-        if not matched_streams:
-            continue
+        zone = master_zone.get_subzone(zone_path)
+        if zone is None:
+            raise ValueError(
+                f"Prepared process stream '{stream_obj.name}' could not resolve zone "
+                f"'{zone_path}'."
+            )
 
-        for stream_schema in matched_streams:
-            stream_obj = _create_process_stream(stream_schema, zone)
-            if stream_obj.type == ST.Hot.value:
-                key = ".".join(
-                    [stream_schema.zone, StreamLoc.HotS.value, stream_schema.name]
-                )
-                zone.hot_streams.add(stream_obj, key)
-            else:
-                zone.cold_streams.add(stream_obj)
+        if stream_obj.type == ST.Hot.value:
+            zone.hot_streams.add(stream_obj, key=stream_key, prevent_overwrite=False)
+        elif stream_obj.type == ST.Cold.value:
+            zone.cold_streams.add(
+                stream_obj,
+                key=stream_key,
+                prevent_overwrite=False,
+            )
+        else:
+            raise ValueError(
+                f"Process stream '{stream_obj.name}' must classify as Hot or Cold, "
+                f"got '{stream_obj.type}'."
+            )
     return master_zone
 
 
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
+    dt_cont = stream.dt_cont
+    dt_cont_value = get_value(dt_cont)
+    if dt_cont_value is None or not isinstance(dt_cont_value, (int, float)):
+        dt_cont = 0.0
+    elif not math.isfinite(dt_cont_value):
+        dt_cont = 0.0
+
     htc = stream.htc
     htc_value = get_value(htc)
     if (
         not hasattr(htc, "state_ids")
-        and isinstance(htc_value, (int, float))
-        and htc_value <= 0.0
+        and (
+            htc_value is None
+            or not isinstance(htc_value, (int, float))
+            or not math.isfinite(htc_value)
+            or htc_value <= 0.0
+        )
     ):
         htc = zone.config.HTC
 
@@ -184,12 +202,47 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
         t_supply=stream.t_supply,
         t_target=stream.t_target,
         heat_flow=stream.heat_flow,
-        dt_cont=stream.dt_cont,
+        dt_cont=dt_cont,
         htc=htc,
         is_process_stream=True,
     )
     stream_obj.dt_cont_multiplier = zone.dt_cont_multiplier
     return stream_obj
+
+
+def _build_process_stream_key(zone_path: str, stream_obj: Stream) -> str:
+    """Build a stable canonical key for one prepared process stream."""
+    if stream_obj.type == ST.Hot.value:
+        stream_loc = StreamLoc.HotS.value
+    elif stream_obj.type == ST.Cold.value:
+        stream_loc = StreamLoc.ColdS.value
+    else:
+        raise ValueError(
+            f"Process stream '{stream_obj.name}' must classify as Hot or Cold, "
+            f"got '{stream_obj.type}'."
+        )
+    return ".".join([zone_path, stream_loc, stream_obj.name])
+
+
+def _add_stream_to_collection(
+    collection: StreamCollection,
+    stream_obj: Stream,
+    *,
+    key: str | None = None,
+    prevent_overwrite: bool = True,
+) -> str:
+    """Add a stream and return the resolved collection key."""
+    return collection.add(stream_obj, key=key, prevent_overwrite=prevent_overwrite)
+
+
+def _extend_stream_collection(
+    destination: StreamCollection,
+    source: StreamCollection,
+) -> StreamCollection:
+    """Copy stream references from ``source`` into ``destination`` using stable keys."""
+    for key, stream_obj in source.items():
+        destination.add(stream_obj, key=key, prevent_overwrite=False)
+    return destination
 
 
 def _find_extreme_process_temperatures(
@@ -200,11 +253,13 @@ def _find_extreme_process_temperatures(
     cu_t_max: float = None
     stream: Stream
     for stream in hot_streams:
-        if cu_t_max is None or cu_t_max > stream.t_min_star:
-            cu_t_max = stream.t_min_star
+        stream_min = stream.t_min_star.min
+        if cu_t_max is None or cu_t_max > stream_min:
+            cu_t_max = stream_min
     for stream in cold_streams:
-        if hu_t_min is None or hu_t_min < stream.t_max_star:
-            hu_t_min = stream.t_max_star
+        stream_max = stream.t_max_star.max
+        if hu_t_min is None or hu_t_min < stream_max:
+            hu_t_min = stream_max
     if hu_t_min is None:
         hu_t_min = cu_t_max
     if cu_t_max is None:

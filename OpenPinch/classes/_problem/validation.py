@@ -137,6 +137,7 @@ def semantic_issues(
             record_index=index,
             record_label=label,
             field_names=("t_supply", "t_target", "heat_flow", "dt_cont", "htc"),
+            optional_field_names=("dt_cont", "htc"),
         )
         issues.extend(stream_value_issues)
         issues.extend(
@@ -158,6 +159,13 @@ def semantic_issues(
             record_label=label,
             field_names=(
                 "t_supply",
+                "t_target",
+                "heat_flow",
+                "dt_cont",
+                "htc",
+                "price",
+            ),
+            optional_field_names=(
                 "t_target",
                 "heat_flow",
                 "dt_cont",
@@ -367,6 +375,7 @@ def _coerce_validation_values(
     record_index: int,
     record_label: Optional[str],
     field_names: tuple[str, ...],
+    optional_field_names: tuple[str, ...] = (),
 ) -> tuple[dict[str, Value | None], list[ValidationIssue]]:
     values: dict[str, Value | None] = {}
     issues: list[ValidationIssue] = []
@@ -374,6 +383,9 @@ def _coerce_validation_values(
     for field_name in field_names:
         raw_value = getattr(record, field_name, None)
         if raw_value is None:
+            values[field_name] = None
+            continue
+        if field_name in optional_field_names and _raw_value_is_missing(raw_value):
             values[field_name] = None
             continue
         try:
@@ -393,6 +405,23 @@ def _coerce_validation_values(
             )
 
     return values, issues
+
+
+def _raw_value_is_missing(raw_value: Any) -> bool:
+    if raw_value is None:
+        return True
+    if hasattr(raw_value, "model_dump"):
+        raw_value = raw_value.model_dump(mode="python")
+    if not isinstance(raw_value, dict):
+        return False
+    if "value" in raw_value and "values" not in raw_value:
+        return raw_value.get("value") is None
+    if "values" in raw_value:
+        magnitudes = raw_value.get("values")
+        if magnitudes is None:
+            return True
+        return all(value is None for value in magnitudes)
+    return False
 
 
 def _validate_stream_record_states(
