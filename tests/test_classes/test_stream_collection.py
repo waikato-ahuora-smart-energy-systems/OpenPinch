@@ -475,8 +475,16 @@ def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
     sc.add(
         Stream(
             name="H1",
-            t_supply={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-            t_target={"values": [120.0, 100.0], "state_ids": ["0", "1"], "unit": "degC"},
+            t_supply={
+                "values": [200.0, 180.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
+            t_target={
+                "values": [120.0, 100.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
             heat_flow={"values": [100.0, 80.0], "state_ids": ["0", "1"], "unit": "kW"},
             htc=1.0,
         ),
@@ -503,8 +511,16 @@ def test_validate_state_alignment_rejects_mismatched_state_ids():
     sc.add(
         Stream(
             name="H1",
-            t_supply={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-            t_target={"values": [120.0, 100.0], "state_ids": ["0", "1"], "unit": "degC"},
+            t_supply={
+                "values": [200.0, 180.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
+            t_target={
+                "values": [120.0, 100.0],
+                "state_ids": ["0", "1"],
+                "unit": "degC",
+            },
             heat_flow={"values": [100.0, 80.0], "state_ids": ["0", "1"], "unit": "kW"},
             htc=1.0,
         ),
@@ -513,9 +529,21 @@ def test_validate_state_alignment_rejects_mismatched_state_ids():
     sc.add(
         Stream(
             name="C1",
-            t_supply={"values": [60.0, 80.0], "state_ids": ["0", "peak"], "unit": "degC"},
-            t_target={"values": [140.0, 160.0], "state_ids": ["0", "peak"], "unit": "degC"},
-            heat_flow={"values": [90.0, 110.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            t_supply={
+                "values": [60.0, 80.0],
+                "state_ids": ["0", "peak"],
+                "unit": "degC",
+            },
+            t_target={
+                "values": [140.0, 160.0],
+                "state_ids": ["0", "peak"],
+                "unit": "degC",
+            },
+            heat_flow={
+                "values": [90.0, 110.0],
+                "state_ids": ["0", "peak"],
+                "unit": "kW",
+            },
             htc=1.0,
         ),
         key="AreaB.C1",

@@ -7,8 +7,7 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.classes.value import Value
 from OpenPinch.lib import *
-from OpenPinch.lib.schemas.common import ValueWithUnit
-from OpenPinch.lib.schemas.common import StatefulValueWithUnit
+from OpenPinch.lib.schemas.common import StatefulValueWithUnit, ValueWithUnit
 
 
 def test_heatflow_value_behavior():

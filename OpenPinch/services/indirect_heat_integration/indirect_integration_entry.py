@@ -98,7 +98,7 @@ def compute_indirect_integration_targets(zone: Zone) -> TotalSiteTarget:
     """
     s_tzt = zone.targets[TT.TZ.value]
     if len(zone.net_hot_streams) == 0 and len(zone.net_cold_streams) == 0:
-        return None 
+        return None
 
     # Total site profiles - process side
     pt = get_process_heat_cascade(

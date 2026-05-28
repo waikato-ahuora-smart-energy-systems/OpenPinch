@@ -5,7 +5,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream

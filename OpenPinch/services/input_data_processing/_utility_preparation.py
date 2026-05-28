@@ -353,7 +353,9 @@ def _create_utilities_list(
         if not (selected.active and selected.type in ["Both", utility_type]):
             continue
 
-        supply_value, target_value = _orient_utility_temperatures(selected, utility_type)
+        supply_value, target_value = _orient_utility_temperatures(
+            selected, utility_type
+        )
         order = float(supply_value.max_value().value)
         candidates.append((order, selected, supply_value, target_value))
 

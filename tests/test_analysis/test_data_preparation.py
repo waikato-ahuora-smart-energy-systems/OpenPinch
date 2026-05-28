@@ -1162,7 +1162,9 @@ def test_prepare_problem_rejects_cross_stream_state_mismatch():
         )
     ]
 
-    with pytest.raises(ValueError, match="state_ids for stream 'Hot Utility.HU_mismatch'"):
+    with pytest.raises(
+        ValueError, match="state_ids for stream 'Hot Utility.HU_mismatch'"
+    ):
         prepare_problem(streams=streams, utilities=utilities)
 
 

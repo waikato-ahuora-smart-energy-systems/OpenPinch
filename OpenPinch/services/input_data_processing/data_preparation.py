@@ -186,14 +186,11 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
 
     htc = stream.htc
     htc_value = get_value(htc)
-    if (
-        not hasattr(htc, "state_ids")
-        and (
-            htc_value is None
-            or not isinstance(htc_value, (int, float))
-            or not math.isfinite(htc_value)
-            or htc_value <= 0.0
-        )
+    if not hasattr(htc, "state_ids") and (
+        htc_value is None
+        or not isinstance(htc_value, (int, float))
+        or not math.isfinite(htc_value)
+        or htc_value <= 0.0
     ):
         htc = zone.config.HTC
 
