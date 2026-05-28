@@ -52,14 +52,10 @@ def compute_total_subzone_utility_targets(zone: Zone) -> TotalProcessTarget:
         utility_cost += t.utility_cost
 
         for j in range(len(hot_utilities)):
-            hot_utilities[j].set_heat_flow(
-                hot_utilities[j].heat_flow + t.hot_utilities[j].heat_flow
-            )
+            hot_utilities[j].heat_flow += t.hot_utilities[j].heat_flow
 
         for j in range(len(cold_utilities)):
-            cold_utilities[j].set_heat_flow(
-                cold_utilities[j].heat_flow + t.cold_utilities[j].heat_flow
-            )
+            cold_utilities[j].heat_flow += t.cold_utilities[j].heat_flow
 
         if area > tol:
             num_units += t.num_units
@@ -176,8 +172,8 @@ def _match_utility_gen_and_use_at_same_level(
                 and abs(u_h.t_target - u_c.t_supply) < 1
             ):
                 Q = min(u_h.heat_flow, u_c.heat_flow)
-                u_h.set_heat_flow(u_h.heat_flow - Q)
-                u_c.set_heat_flow(u_c.heat_flow - Q)
+                u_h.heat_flow = u_h.heat_flow - Q
+                u_c.heat_flow = u_c.heat_flow - Q
     return hot_utilities, cold_utilities
 
 

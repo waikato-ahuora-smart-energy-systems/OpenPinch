@@ -97,8 +97,8 @@ def test_heat_capacity_flowrate_and_RCP(hot_stream):
     assert pytest.approx(hot_stream.rCP, rel=1e-6) == expected_rcp
 
 
-def test_set_heat_flow(hot_stream):
-    hot_stream.set_heat_flow(6000)
+def test_heat_flow_assignment_updates_derived_quantities(hot_stream):
+    hot_stream.heat_flow = 6000
     assert hot_stream.heat_flow == 6000
     assert pytest.approx(hot_stream.CP) == 6000 / (300 - 200)
     assert pytest.approx(hot_stream.ut_cost) == (6000 / 1000) * 50
@@ -348,7 +348,7 @@ def test_stream_rejects_mixed_hot_and_cold_state_directions():
         )
 
 
-def test_set_heat_flow_preserves_existing_state_model_for_scalar_update():
+def test_heat_flow_assignment_preserves_existing_state_model_for_scalar_update():
     s = Stream(
         name="StatefulDuty",
         t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
@@ -358,7 +358,7 @@ def test_set_heat_flow_preserves_existing_state_model_for_scalar_update():
         htc=2.0,
     )
 
-    s.set_heat_flow(6000.0)
+    s.heat_flow = 6000.0
 
     assert s.heat_flow.state_ids == ["0", "1"]
     assert s.heat_flow.raw_value.weights.tolist() == pytest.approx([0.5, 0.5])
@@ -366,7 +366,7 @@ def test_set_heat_flow_preserves_existing_state_model_for_scalar_update():
     assert s.CP.state_values.tolist() == pytest.approx([60.0, 60.0])
 
 
-def test_set_heat_flow_rejects_mismatched_stateful_payload():
+def test_heat_flow_assignment_rejects_mismatched_stateful_payload():
     s = Stream(
         name="StatefulDuty",
         t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
@@ -377,14 +377,53 @@ def test_set_heat_flow_rejects_mismatched_stateful_payload():
     )
 
     with pytest.raises(ValueError, match="state_ids for heat_flow must align"):
-        s.set_heat_flow(
-            {
-                "values": [6000.0, 5000.0],
-                "state_ids": ["0", "peak"],
-                "weights": [0.5, 0.5],
-                "unit": "kW",
-            }
-        )
+        s.heat_flow = {
+            "values": [6000.0, 5000.0],
+            "state_ids": ["0", "peak"],
+            "weights": [0.5, 0.5],
+            "unit": "kW",
+        }
+
+
+def test_heat_flow_assignment_preserves_matching_stateful_payload():
+    s = Stream(
+        name="StatefulDuty",
+        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    s.heat_flow = {
+        "values": [6000.0, 5000.0],
+        "state_ids": ["0", "1"],
+        "weights": [0.5, 0.5],
+        "unit": "kW",
+    }
+
+    assert s.heat_flow.state_ids == ["0", "1"]
+    assert s.heat_flow.state_values.tolist() == pytest.approx([6000.0, 5000.0])
+    assert s.heat_flow.raw_value.weights.tolist() == pytest.approx([0.5, 0.5])
+
+
+def test_heat_flow_assignment_rejects_mismatched_stateful_weights():
+    s = Stream(
+        name="StatefulDuty",
+        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        dt_cont=10.0,
+        htc=2.0,
+    )
+
+    with pytest.raises(ValueError, match="weights for heat_flow must align"):
+        s.heat_flow = {
+            "values": [6000.0, 5000.0],
+            "state_ids": ["0", "1"],
+            "weights": [0.75, 0.25],
+            "unit": "kW",
+        }
 
 
 # ===== Merged from test_stream_extra.py =====
@@ -471,7 +510,7 @@ def test_descriptive_aliases_update_canonical_stream_fields():
     s.target_enthalpy = 850.0
     s.delta_t_contribution = 8.0
     s.effective_delta_t_contribution = 12.0
-    s.heat_duty = 300.0
+    s.heat_flow = 300.0
     s.heat_transfer_coefficient = 4.0
     s.process_stream = False
     s.is_active = False

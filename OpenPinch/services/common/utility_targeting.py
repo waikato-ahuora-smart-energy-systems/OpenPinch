@@ -189,7 +189,7 @@ def _assign_utility(
             Q_assigned,
         )
         if Q_ut_max > tol:
-            u.set_heat_flow(Q_ut_max)
+            u.heat_flow = Q_ut_max
             Q_assigned += Q_ut_max
 
         if abs(segment_limit - Q_assigned) < tol:

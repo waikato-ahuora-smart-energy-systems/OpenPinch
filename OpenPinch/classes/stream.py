@@ -8,6 +8,7 @@ from typing import Any, Optional
 import numpy as np
 
 from ..lib.enums import ST
+from ..lib.schemas.common import MaybeVU
 from ._stream_value_view import StreamValueView
 from .value import Value
 
@@ -72,7 +73,7 @@ class Stream:
         h_target: Optional[float] = None,
         dt_cont: float = 0.0,
         dt_cont_act: Optional[float] = None,
-        heat_flow: float | list[float, float] = 0.0,
+        heat_flow: MaybeVU = 0.0,
         htc: float = 1.0,
         price: float = 0.0,
         is_process_stream: bool = True,
@@ -267,14 +268,15 @@ class Stream:
         self._dt_cont_multiplier_locked = value
 
     @property
-    def heat_flow(self) -> float:
-        """Stream heat flow (e.g., kW)."""
+    def heat_flow(self) -> StreamValueView:
+        """Stream heat flow view over a scalar or stateful duty value."""
         return self._to_view(self._heat_flow)
 
     @heat_flow.setter
-    def heat_flow(self, value: float):
-        """Set the stream duty and refresh derived heat-capacity quantities."""
-        self._set_value_attribute("_heat_flow", value)
+    def heat_flow(self, value: MaybeVU):
+        """Set the stream duty, preserving the stream's existing state model."""
+        self._heat_flow = self._coerce_to_stream_state_context(value, "_heat_flow")
+        self._update_attributes()
 
     @property
     def htc(self) -> float:
@@ -540,16 +542,6 @@ class Stream:
     def effective_delta_t_contribution(self, value: float):
         """Set the effective shifted-temperature contribution via an alias."""
         self.dt_cont_act = value
-
-    @property
-    def heat_duty(self) -> float:
-        """Alias for the stream heat flow."""
-        return self.heat_flow
-
-    @heat_duty.setter
-    def heat_duty(self, value: float):
-        """Set the stream heat flow via a descriptive alias."""
-        self.heat_flow = value
 
     @property
     def heat_transfer_coefficient(self) -> float:
@@ -936,14 +928,6 @@ class Stream:
 
         self._type = ST.Cold.value if self._type == ST.Hot.value else ST.Hot.value
         self._is_process_stream = True
-        self._update_attributes()
-
-    def set_heat_flow(self, value: float, unit: str = "kW") -> None:
-        """Sets the heat flow and updates CP and utility cost."""
-        self._heat_flow = self._coerce_to_stream_state_context(
-            Value(value, unit=unit),
-            "_heat_flow",
-        )
         self._update_attributes()
 
     def _calc_utility_cost(self):
