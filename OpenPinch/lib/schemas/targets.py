@@ -66,6 +66,7 @@ class BaseTargetModel(BaseModel):
     )
 
     zone_name: Optional[str] = Field(default=None, exclude=True, repr=False)
+    state_id: Optional[str] = None
     name: str
     type: str
     parent_zone: Any = None
@@ -134,6 +135,7 @@ class UtilitySummaryTarget(BaseTargetModel):
 
         return TargetResults(
             name=self.name,
+            state_id=self.state_id,
             degree_of_integration=degree_of_integration,
             Qh=self.hot_utility_target,
             Qc=self.cold_utility_target,
@@ -235,6 +237,7 @@ class HeatPumpTargetBase(GraphBackedTarget):
         """Return the reporting payload for explicit HPR target results."""
         return TargetResults(
             name=self.name,
+            state_id=self.state_id,
             degree_of_integration=None,
             Qh=0.0,
             Qc=0.0,

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from OpenPinch.classes.accessors.plot_accessor import _PlotAccessor
+from OpenPinch.classes.accessors._plot_accessor import _PlotAccessor
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.classes.zone import Zone
 from OpenPinch.resources import copy_sample_case
@@ -477,6 +477,44 @@ def test_target_accessor_supports_named_workflow(monkeypatch):
     assert called["include_subzones"] is False
 
 
+def test_target_accessor_supports_named_workflow_with_state_id(monkeypatch):
+    called = {}
+
+    def fake_execute_targeting(
+        self,
+        *,
+        target_id,
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        single_zone_service=None,
+        direct_service_func=None,
+        indirect_service_func=None,
+    ):
+        called["target_id"] = target_id
+        called["application_zone"] = application_zone
+        called["options"] = options
+        return {"target": "di"}
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "_execute_targeting",
+        fake_execute_targeting,
+    )
+
+    obj = PinchProblem()
+    out = obj.target.direct_heat_integration(
+        zone_name="Plant/DI",
+        options={"dt_min": 15},
+        state_id="peak",
+    )
+
+    assert out == {"target": "di"}
+    assert called["target_id"] == "Direct Integration"
+    assert called["application_zone"] == "Plant/DI"
+    assert called["options"] == {"dt_min": 15, "state_id": "peak"}
+
+
 def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
     called = {}
 
@@ -597,8 +635,9 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     compact = obj.summary_frame()
     detailed = obj.summary_frame(detailed=True)
 
-    assert list(compact.columns[:4]) == [
+    assert list(compact.columns[:5]) == [
         "Target",
+        "State ID",
         "Hot Utility Target",
         "Cold Utility Target",
         "Heat Recovery",
@@ -641,6 +680,61 @@ def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
 
     assert summary.iloc[0]["Hot Pinch"] == 120.0
     assert summary.iloc[0]["Cold Pinch"] == 120.0
+
+
+def test_summary_frame_uses_selected_state_for_stateful_results():
+    class _Utility:
+        def __init__(self, name, heat_flow):
+            self.name = name
+            self.heat_flow = heat_flow
+
+    target = type(
+        "Target",
+        (),
+        {
+            "name": "Plant/DI",
+            "state_id": "peak",
+            "Qh": {"values": [10.0, 25.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            "Qc": {"values": [20.0, 15.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            "Qr": {"values": [30.0, 35.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            "temp_pinch": type(
+                "TempPinch",
+                (),
+                {
+                    "hot_temp": {
+                        "values": [120.0, 140.0],
+                        "state_ids": ["0", "peak"],
+                        "unit": "degC",
+                    },
+                    "cold_temp": {
+                        "values": [100.0, 115.0],
+                        "state_ids": ["0", "peak"],
+                        "unit": "degC",
+                    },
+                },
+            )(),
+            "hot_utilities": [
+                _Utility(
+                    "Steam",
+                    {
+                        "values": [10.0, 25.0],
+                        "state_ids": ["0", "peak"],
+                        "unit": "kW",
+                    },
+                )
+            ],
+            "cold_utilities": [],
+        },
+    )()
+    obj = PinchProblem()
+    obj._results = type("Results", (), {"targets": [target]})()
+
+    summary = obj.summary_frame()
+
+    assert summary.iloc[0]["State ID"] == "peak"
+    assert summary.iloc[0]["Hot Utility Target"] == 25.0
+    assert summary.iloc[0]["Hot Pinch"] == 140.0
+    assert summary.iloc[0]["Hot Utilities"] == "Steam: 25.00"
 
 
 def test_graph_data_uses_results_then_master_zone(monkeypatch):
@@ -1324,3 +1418,287 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
     net_stream = area.net_hot_streams[0]
     assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
     assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)
+
+
+def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_results():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": {
+                    "values": [200.0, 220.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [100.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 200.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/AreaA",
+                "name": "ColdA",
+                "t_supply": {
+                    "values": [50.0, 60.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [150.0, 170.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [80.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+        ],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    offpeak = problem.target.direct_heat_integration(state_id="0")
+    peak = problem.target.direct_heat_integration(state_id="peak")
+
+    assert offpeak.state_id == "0"
+    assert peak.state_id == "peak"
+    assert peak.cold_utility_target != offpeak.cold_utility_target
+    assert peak.heat_recovery_target != offpeak.heat_recovery_target
+
+    summary = problem.summary_frame()
+    assert summary.iloc[0]["State ID"] == "peak"
+
+
+def test_direct_heat_integration_rejects_unknown_state_id():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": {
+                    "values": [200.0, 220.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [100.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 200.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    with pytest.raises(
+        ValueError,
+        match="state_id 'summer' was not found on this collection",
+    ):
+        problem.target.direct_heat_integration(state_id="summer")
+
+
+def test_problem_exposes_canonical_state_ids():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": {
+                    "values": [200.0, 220.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [100.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 200.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    assert problem.state_ids == ["0", "peak"]
+
+
+def test_target_all_states_runs_each_state_and_preserves_call_order():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": {
+                    "values": [200.0, 220.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [100.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 200.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/AreaA",
+                "name": "ColdA",
+                "t_supply": {
+                    "values": [50.0, 60.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [150.0, 170.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [80.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    results = problem.target_all_states()
+
+    assert list(results) == ["0", "peak"]
+    assert results["0"].targets[0].state_id == "0"
+    assert results["peak"].targets[0].state_id == "peak"
+    assert results["0"].targets[0].Qc != results["peak"].targets[0].Qc
+
+
+def test_target_all_states_supports_thread_parallel_execution():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": {
+                    "values": [200.0, 220.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [100.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [100.0, 200.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/AreaA",
+                "name": "ColdA",
+                "t_supply": {
+                    "values": [50.0, 60.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [150.0, 170.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [80.0, 120.0],
+                    "state_ids": ["0", "peak"],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    results = problem.target_all_states(parallel="thread", max_workers=2)
+
+    assert list(results) == ["0", "peak"]
+    assert {result.targets[0].state_id for result in results.values()} == {"0", "peak"}
+
+
+def test_target_all_states_rejects_scalar_only_problems(sample_problem):
+    problem = PinchProblem(source=sample_problem, project_name="Site")
+
+    with pytest.raises(ValueError, match="has no canonical state_ids"):
+        problem.target_all_states()

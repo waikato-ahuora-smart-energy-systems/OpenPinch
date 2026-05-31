@@ -25,7 +25,8 @@ __all__ = [
 def get_power_cogeneration_above_pinch(z: Zone):
     """Calculate the power cogeneration potential above pinch for a given zone."""
     turbine_params = _prepare_turbine_parameters(z.config)
-    utility_data = _preprocess_utilities(z, turbine_params)
+    state_id = getattr(z, "_selected_state_id", None)
+    utility_data = _preprocess_utilities(z, turbine_params, state_id=state_id)
     if utility_data is None:
         return z
 
@@ -87,7 +88,12 @@ def _prepare_turbine_parameters(zone_config: Configuration) -> dict:
     }
 
 
-def _preprocess_utilities(z: Zone, turbine_params: dict) -> dict | None:
+def _preprocess_utilities(
+    z: Zone,
+    turbine_params: dict,
+    *,
+    state_id: str | None = None,
+) -> dict | None:
     """Translate hot-utility demands into turbine stage temperatures and duties."""
     stage_temperatures: list[float] = []
     stage_heat_flows: list[float] = []
@@ -95,19 +101,23 @@ def _preprocess_utilities(z: Zone, turbine_params: dict) -> dict | None:
 
     u: Stream
     for idx, u in enumerate(z.hot_utilities):
-        if u.t_supply >= T_CRIT or u.heat_flow <= tol:
+        t_supply = u.t_supply[state_id].value
+        t_target = u.t_target[state_id].value
+        heat_flow = u.heat_flow[state_id].value
+        dt_cont_act = u.dt_cont_act[state_id].value
+        if t_supply >= T_CRIT or heat_flow <= tol:
             continue
 
         T_stage = (
-            u.t_target
-            if abs(u.t_supply - u.t_target) < 1.0 + tol
-            else u.t_target + u.dt_cont_act * 2
+            t_target
+            if abs(t_supply - t_target) < 1.0 + tol
+            else t_target + dt_cont_act * 2
         )
         if turbine_params["P_in"] + tol < psat_T(T_stage):
             continue
 
         stage_temperatures.append(float(T_stage))
-        stage_heat_flows.append(float(u.heat_flow))
+        stage_heat_flows.append(float(heat_flow))
         source_indices.append(idx)
 
     if not stage_temperatures:

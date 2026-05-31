@@ -11,7 +11,7 @@ The package is designed to support three working styles:
 - command-line workflows for quick validation, run, and export tasks
 - notebook and script workflows built around
   :class:`OpenPinch.PinchProblem` and :class:`OpenPinch.PinchWorkspace`
-- programmatic service workflows built around validated schema payloads
+- programmatic service workflows built around validated schema inputs
 
 Technical Scope
 ---------------

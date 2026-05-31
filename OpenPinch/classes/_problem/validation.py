@@ -1,4 +1,4 @@
-"""Shared validation helpers for problem and workspace payloads."""
+"""Shared validation helpers for problem and workspace input data."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ...classes.value import Value
 from ...lib.enums import ST
 from ...lib.schemas.io import TargetInput
 from ...lib.schemas.workspace import ValidationIssue, ValidationReport
-from ...utils.miscellaneous import get_value
+from ...utils.miscellaneous import extract_state_context, get_value
 
 ValidationContext = dict[str, list[dict[str, Any]]]
 _STATE_WEIGHT_RTOL = 1e-12
@@ -21,12 +21,12 @@ _STATE_WEIGHT_ATOL = 1e-12
 _TEMPERATURE_EQUAL_TOL = 1e-12
 
 
-def validate_problem_payload(
+def validate_problem_inputs(
     problem_data: Any,
     *,
     context: Optional[ValidationContext] = None,
 ) -> TargetInput:
-    """Validate one problem payload and raise user-facing errors on failure."""
+    """Validate one problem definition and raise user-facing errors on failure."""
     effective_context = context or {}
     try:
         validated = TargetInput.model_validate(problem_data)
@@ -44,20 +44,20 @@ def validate_problem_payload(
 
 
 def build_validation_report(
-    payload: Any,
+    problem_inputs: Any,
     *,
     context: Optional[ValidationContext] = None,
     source_kind: str = "target_input",
 ) -> ValidationReport:
-    """Build a structured validation report without raising on invalid payloads."""
+    """Build a structured validation report without raising on invalid inputs."""
     effective_context = context or build_validation_context(
-        payload,
+        problem_inputs,
         source_kind=source_kind,
     )
     issues: list[ValidationIssue] = []
 
     try:
-        validated = TargetInput.model_validate(payload)
+        validated = TargetInput.model_validate(problem_inputs)
     except ValidationError as exc:
         for error in exc.errors():
             issues.append(schema_issue_to_view(error, context=effective_context))
@@ -113,14 +113,14 @@ def schema_issue_to_view(
 
 
 def semantic_issues(
-    payload: TargetInput,
+    problem_inputs: TargetInput,
     *,
     context: ValidationContext,
 ) -> list[ValidationIssue]:
-    """Return semantic validation issues for one validated problem payload."""
+    """Return semantic validation issues for one validated problem definition."""
     issues: list[ValidationIssue] = []
 
-    if len(payload.streams) == 0:
+    if len(problem_inputs.streams) == 0:
         issues.append(
             ValidationIssue(
                 severity="error",
@@ -129,9 +129,9 @@ def semantic_issues(
             )
         )
 
-    for index, stream in enumerate(payload.streams):
+    for index, stream in enumerate(problem_inputs.streams):
         label = validation_record_label("streams", index, context)
-        stream_values, stream_value_issues = _coerce_validation_values(
+        stream_values, stream_contexts, stream_value_issues = _coerce_validation_values(
             stream,
             section="streams",
             record_index=index,
@@ -143,40 +143,44 @@ def semantic_issues(
         issues.extend(
             _validate_stream_record_states(
                 stream_values,
+                stream_contexts,
                 section="streams",
                 record_index=index,
                 record_label=label,
             )
         )
 
-    for index, utility in enumerate(payload.utilities):
+    for index, utility in enumerate(problem_inputs.utilities):
         label = validation_record_label("utilities", index, context)
         utility_type = str(utility.type)
-        utility_values, utility_value_issues = _coerce_validation_values(
-            utility,
-            section="utilities",
-            record_index=index,
-            record_label=label,
-            field_names=(
-                "t_supply",
-                "t_target",
-                "heat_flow",
-                "dt_cont",
-                "htc",
-                "price",
-            ),
-            optional_field_names=(
-                "t_target",
-                "heat_flow",
-                "dt_cont",
-                "htc",
-                "price",
-            ),
+        utility_values, utility_contexts, utility_value_issues = (
+            _coerce_validation_values(
+                utility,
+                section="utilities",
+                record_index=index,
+                record_label=label,
+                field_names=(
+                    "t_supply",
+                    "t_target",
+                    "heat_flow",
+                    "dt_cont",
+                    "htc",
+                    "price",
+                ),
+                optional_field_names=(
+                    "t_target",
+                    "heat_flow",
+                    "dt_cont",
+                    "htc",
+                    "price",
+                ),
+            )
         )
         issues.extend(utility_value_issues)
         issues.extend(
             _validate_utility_record_states(
                 utility_values,
+                utility_contexts,
                 utility_type=utility_type,
                 section="utilities",
                 record_index=index,
@@ -188,12 +192,12 @@ def semantic_issues(
 
 
 def _validate_problem_semantics(
-    payload: TargetInput,
+    problem_inputs: TargetInput,
     *,
     context: ValidationContext,
 ) -> None:
     """Raise or warn using the shared semantic validation issue list."""
-    issues = semantic_issues(payload, context=context)
+    issues = semantic_issues(problem_inputs, context=context)
     fatal_issues = [
         _format_validation_issue(issue) for issue in issues if issue.severity == "error"
     ]
@@ -376,22 +380,31 @@ def _coerce_validation_values(
     record_label: Optional[str],
     field_names: tuple[str, ...],
     optional_field_names: tuple[str, ...] = (),
-) -> tuple[dict[str, Value | None], list[ValidationIssue]]:
+) -> tuple[
+    dict[str, Value | None],
+    dict[str, tuple[list[str] | None, np.ndarray | None]],
+    list[ValidationIssue],
+]:
     values: dict[str, Value | None] = {}
+    contexts: dict[str, tuple[list[str] | None, np.ndarray | None]] = {}
     issues: list[ValidationIssue] = []
 
     for field_name in field_names:
         raw_value = getattr(record, field_name, None)
         if raw_value is None:
             values[field_name] = None
+            contexts[field_name] = (None, None)
             continue
         if field_name in optional_field_names and _raw_value_is_missing(raw_value):
             values[field_name] = None
+            contexts[field_name] = (None, None)
             continue
         try:
             values[field_name] = Value(raw_value)
+            contexts[field_name] = extract_state_context(raw_value)
         except (TypeError, ValueError) as exc:
             values[field_name] = None
+            contexts[field_name] = (None, None)
             issues.append(
                 _build_issue(
                     severity="error",
@@ -404,7 +417,7 @@ def _coerce_validation_values(
                 )
             )
 
-    return values, issues
+    return values, contexts, issues
 
 
 def _raw_value_is_missing(raw_value: Any) -> bool:
@@ -426,6 +439,7 @@ def _raw_value_is_missing(raw_value: Any) -> bool:
 
 def _validate_stream_record_states(
     values: dict[str, Value | None],
+    value_contexts: dict[str, tuple[list[str] | None, np.ndarray | None]],
     *,
     section: str,
     record_index: int,
@@ -435,6 +449,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_value_finiteness(
             values.get("t_supply"),
+            value_contexts.get("t_supply", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -444,6 +459,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_value_finiteness(
             values.get("t_target"),
+            value_contexts.get("t_target", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -453,6 +469,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_value_finiteness(
             values.get("heat_flow"),
+            value_contexts.get("heat_flow", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -462,6 +479,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_value_finiteness(
             values.get("dt_cont"),
+            value_contexts.get("dt_cont", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -471,6 +489,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_value_finiteness(
             values.get("htc"),
+            value_contexts.get("htc", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -480,6 +499,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_non_negative_states(
             values.get("heat_flow"),
+            value_contexts.get("heat_flow", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -491,6 +511,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_non_negative_states(
             values.get("dt_cont"),
+            value_contexts.get("dt_cont", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -502,6 +523,7 @@ def _validate_stream_record_states(
     issues.extend(
         _validate_non_negative_states(
             values.get("htc"),
+            value_contexts.get("htc", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -513,6 +535,7 @@ def _validate_stream_record_states(
 
     state_ids, alignment_issues = _validate_state_alignment(
         values,
+        value_contexts,
         section=section,
         record_index=record_index,
         record_label=record_label,
@@ -616,6 +639,7 @@ def _validate_stream_record_states(
 
 def _validate_utility_record_states(
     values: dict[str, Value | None],
+    value_contexts: dict[str, tuple[list[str] | None, np.ndarray | None]],
     *,
     utility_type: str,
     section: str,
@@ -627,6 +651,7 @@ def _validate_utility_record_states(
         issues.extend(
             _validate_value_finiteness(
                 values.get(field_name),
+                value_contexts.get(field_name, (None, None))[0],
                 section=section,
                 record_index=record_index,
                 record_label=record_label,
@@ -638,6 +663,7 @@ def _validate_utility_record_states(
         issues.extend(
             _validate_non_negative_states(
                 values.get(field_name),
+                value_contexts.get(field_name, (None, None))[0],
                 section=section,
                 record_index=record_index,
                 record_label=record_label,
@@ -650,6 +676,7 @@ def _validate_utility_record_states(
     issues.extend(
         _validate_non_negative_states(
             values.get("htc"),
+            value_contexts.get("htc", (None, None))[0],
             section=section,
             record_index=record_index,
             record_label=record_label,
@@ -661,6 +688,7 @@ def _validate_utility_record_states(
 
     state_ids, alignment_issues = _validate_state_alignment(
         values,
+        value_contexts,
         section=section,
         record_index=record_index,
         record_label=record_label,
@@ -719,27 +747,26 @@ def _validate_utility_record_states(
 
 
 def _validate_state_alignment(
-    values: dict[str, Value | None],
+    values: dict[str, object],
+    value_contexts: dict[str, tuple[list[str] | None, np.ndarray | None]],
     *,
     section: str,
     record_index: int,
     record_label: Optional[str],
 ) -> tuple[list[str] | None, list[ValidationIssue]]:
-    stateful_values = [
-        (field_name, value)
-        for field_name, value in values.items()
-        if value is not None and value.state_ids is not None
-    ]
+    stateful_values = []
+    for field_name in values:
+        state_ids, weights = value_contexts.get(field_name, (None, None))
+        if state_ids is not None:
+            stateful_values.append((field_name, state_ids, weights))
     if not stateful_values:
         return None, []
 
-    ref_name, ref_value = stateful_values[0]
-    ref_state_ids = ref_value.state_ids
-    ref_weights = ref_value.weights
+    ref_name, ref_state_ids, ref_weights = stateful_values[0]
     issues: list[ValidationIssue] = []
 
-    for field_name, value in stateful_values[1:]:
-        if value.state_ids != ref_state_ids:
+    for field_name, state_ids, weights in stateful_values[1:]:
+        if state_ids != ref_state_ids:
             issues.append(
                 _build_issue(
                     severity="error",
@@ -753,10 +780,7 @@ def _validate_state_alignment(
             )
             continue
         if not np.allclose(
-            value.weights,
-            ref_weights,
-            rtol=_STATE_WEIGHT_RTOL,
-            atol=_STATE_WEIGHT_ATOL,
+            weights, ref_weights, rtol=_STATE_WEIGHT_RTOL, atol=_STATE_WEIGHT_ATOL
         ):
             issues.append(
                 _build_issue(
@@ -777,6 +801,7 @@ def _validate_state_alignment(
 
 def _validate_value_finiteness(
     value: Value | None,
+    state_ids: list[str] | None,
     *,
     section: str,
     record_index: int,
@@ -787,7 +812,7 @@ def _validate_value_finiteness(
     if value is None:
         return issues
 
-    for state_id, magnitude in _iter_state_magnitudes(value):
+    for state_id, magnitude in _iter_state_magnitudes(value, state_ids):
         if magnitude is None:
             continue
         if math.isfinite(magnitude):
@@ -809,6 +834,7 @@ def _validate_value_finiteness(
 
 def _validate_non_negative_states(
     value: Value | None,
+    state_ids: list[str] | None,
     *,
     section: str,
     record_index: int,
@@ -821,7 +847,7 @@ def _validate_non_negative_states(
     if value is None:
         return issues
 
-    for state_id, magnitude in _iter_state_magnitudes(value):
+    for state_id, magnitude in _iter_state_magnitudes(value, state_ids):
         if magnitude is None or not math.isfinite(magnitude) or magnitude >= 0.0:
             continue
         issues.append(
@@ -841,6 +867,7 @@ def _validate_non_negative_states(
 
 def _validate_positive_states(
     value: Value | None,
+    state_ids: list[str] | None,
     *,
     section: str,
     record_index: int,
@@ -853,7 +880,7 @@ def _validate_positive_states(
     if value is None:
         return issues
 
-    for state_id, magnitude in _iter_state_magnitudes(value):
+    for state_id, magnitude in _iter_state_magnitudes(value, state_ids):
         if magnitude is None or not math.isfinite(magnitude) or magnitude > 0.0:
             continue
         issues.append(
@@ -871,10 +898,19 @@ def _validate_positive_states(
     return issues
 
 
-def _iter_state_magnitudes(value: Value) -> list[tuple[str | None, float]]:
-    if value.state_ids is None:
+def _iter_state_magnitudes(
+    value: Value,
+    state_ids: list[str] | None,
+) -> list[tuple[str | None, float]]:
+    if len(value.state_values) <= 1:
         return [(None, float(value.value))]
-    return [(state_id, float(value[state_id].value)) for state_id in value.state_ids]
+    return [
+        (state_id, float(magnitude))
+        for state_id, magnitude in zip(
+            state_ids or [str(idx) for idx in range(len(value.state_values))],
+            value.state_values.tolist(),
+        )
+    ]
 
 
 def _get_state_magnitude(
@@ -885,11 +921,12 @@ def _get_state_magnitude(
 ) -> float | None:
     if value is None:
         return None
-    if value.state_ids is None:
+    if len(value.state_values) <= 1:
         return float(value.value)
     if state_id is None and state_ids is None:
-        state_id = value.state_ids[0]
-    return float(value[state_id].value)
+        state_id = "0"
+    active_state_ids = state_ids or [str(idx) for idx in range(len(value.state_values))]
+    return float(value[active_state_ids.index(str(state_id))].value)
 
 
 def _build_issue(

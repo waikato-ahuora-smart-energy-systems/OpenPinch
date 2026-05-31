@@ -36,9 +36,6 @@ def test_stream_property_roundtrip_and_mutation_paths():
     s.is_process_stream = False
     assert s.is_process_stream is False
 
-    s.type = "Manual"
-    assert s.type == "Manual"
-
     s.t_supply = 160.0
     s.t_target = 95.0
     s.P_supply = 200.0
@@ -49,29 +46,22 @@ def test_stream_property_roundtrip_and_mutation_paths():
     s.dt_cont_act = 6.0
     s.heat_flow = 100.0
     s.htc = 3.0
-    s.htr = 0.25
     s.price = 12.0
-    s.ut_cost = 1_000.0
-    s.CP = 2.5
-    s.rCP = 0.4
     s.active = False
-    s.t_min = 50.0
-    s.t_max = 160.0
-    s.t_min_star = 48.0
-    s.t_max_star = 162.0
 
-    assert s.htr == 0.25
+    assert s.type == "Hot"
+    assert s.htr == pytest.approx(1.0 / 3.0)
     assert s.price == 12.0
-    assert s.ut_cost == 1_000.0
-    assert s.CP == 2.5
-    assert s.rCP == 0.4
+    assert s.ut_cost == pytest.approx(1.2)
+    assert s.CP == pytest.approx(100.0 / (160.0 - 95.0))
+    assert s.rCP == pytest.approx((100.0 / (160.0 - 95.0)) / 3.0)
     assert s.active is False
     assert s.dt_cont == 4.0
     assert s.dt_cont_act == 6.0
-    assert s.t_min == 50.0
+    assert s.t_min == 95.0
     assert s.t_max == 160.0
-    assert s.t_min_star == 48.0
-    assert s.t_max_star == 162.0
+    assert s.t_min_star == 89.0
+    assert s.t_max_star == 154.0
 
 
 def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
@@ -145,13 +135,17 @@ def test_target_model_and_zone_property_branches():
         t_supply=180.0,
         t_target=170.0,
         heat_flow=20.0,
+        price=400.0,
         is_process_stream=False,
     )
     cu = Stream(
-        name="CU", t_supply=20.0, t_target=30.0, heat_flow=15.0, is_process_stream=False
+        name="CU",
+        t_supply=20.0,
+        t_target=30.0,
+        heat_flow=15.0,
+        price=400.0,
+        is_process_stream=False,
     )
-    hu.ut_cost = 8.0
-    cu.ut_cost = 6.0
     hot.add(hu)
     cold.add(cu)
 

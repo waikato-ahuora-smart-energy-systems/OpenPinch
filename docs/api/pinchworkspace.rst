@@ -12,8 +12,8 @@ When To Use It
 Use ``PinchWorkspace`` when you want:
 
 - named baseline-versus-variant study cases
-- script or notebook comparisons without rebuilding payload-management helpers
-- case copying, payload editing, and bundle save/load in one object
+- script or notebook comparisons without rebuilding case-input helpers
+- case copying, input editing, and bundle save/load in one object
 - the normal ``PinchProblem`` workflow on each case once it is selected
 
 Lifecycle
@@ -21,7 +21,7 @@ Lifecycle
 
 The typical lifecycle is:
 
-1. construct the workspace from a payload, an existing ``PinchProblem``, or a
+1. construct the workspace from input data, an existing ``PinchProblem``, or a
    packaged sample-case name
 2. use ``case(...)`` or ``use_case(...)`` to work with the active
    ``PinchProblem``
@@ -51,7 +51,7 @@ Relationship To PinchProblem
 ----------------------------
 
 ``PinchWorkspace`` is not a second solver. It orchestrates multiple named
-payloads and live ``PinchProblem`` cases on top of the same validation,
+case inputs and live ``PinchProblem`` cases on top of the same validation,
 preparation, targeting, graph, and export surfaces documented for
 ``PinchProblem``.
 

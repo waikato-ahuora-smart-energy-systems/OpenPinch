@@ -38,7 +38,7 @@ When To Leave the CLI
 Move to the Python workflow immediately when you need to:
 
 - solve a case
-- validate a payload
+- validate the input data
 - export Excel or graph artifacts
 - work with `problem.target.*` or `problem.plot.*`
 - use packaged sample cases directly by name

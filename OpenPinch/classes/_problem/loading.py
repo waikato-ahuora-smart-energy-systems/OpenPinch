@@ -30,18 +30,18 @@ class ProblemSourceAdapters:
 
 @dataclass(frozen=True)
 class LoadedProblemSource:
-    """Normalized payload and metadata produced by source loading."""
+    """Normalized problem inputs and metadata produced by source loading."""
 
-    payload: TargetInput | JsonDict
+    input_data: TargetInput | JsonDict
     source_kind: str
     validation_context: dict[str, list[dict[str, Any]]]
     problem_filepath: Optional[Path]
     project_name: Optional[str] = None
 
 
-def normalize_problem_mapping(payload: JsonDict) -> JsonDict:
-    """Return a defensive copy of one in-memory payload with cleaned records."""
-    normalized = deepcopy(payload)
+def normalize_problem_mapping(input_data: JsonDict) -> JsonDict:
+    """Return a defensive copy of one in-memory problem definition."""
+    normalized = deepcopy(input_data)
     if isinstance(normalized.get("streams"), list):
         normalized["streams"] = validate_stream_data(normalized["streams"])
     if isinstance(normalized.get("utilities"), list):
@@ -54,19 +54,19 @@ def prepare_in_memory_problem_source(
     *,
     source_kind: str,
 ) -> LoadedProblemSource:
-    """Normalize one in-memory payload without reading from the filesystem."""
+    """Normalize one in-memory problem definition without filesystem access."""
     if isinstance(source, TargetInput):
-        payload: TargetInput | JsonDict = source
-        context_payload = source.model_dump(mode="python")
+        input_data: TargetInput | JsonDict = source
+        context_data = source.model_dump(mode="python")
     else:
-        payload = normalize_problem_mapping(source)
-        context_payload = payload
+        input_data = normalize_problem_mapping(source)
+        context_data = input_data
 
     return LoadedProblemSource(
-        payload=payload,
+        input_data=input_data,
         source_kind=source_kind,
         validation_context=build_validation_context(
-            context_payload,
+            context_data,
             source_kind=source_kind,
         ),
         problem_filepath=None,
@@ -79,7 +79,7 @@ def load_problem_source(
     current_project_name: Optional[str],
     adapters: ProblemSourceAdapters,
 ) -> LoadedProblemSource:
-    """Load one supported problem source into a normalized payload bundle."""
+    """Load one supported problem source into a normalized input-data bundle."""
     source = _coerce_target_input(source)
 
     if isinstance(source, TargetInput):
@@ -90,15 +90,15 @@ def load_problem_source(
 
     if isinstance(source, tuple) and len(source) == 2:
         streams_csv, utilities_csv = map(Path, source)
-        payload = adapters.get_problem_from_csv(
+        input_data = adapters.get_problem_from_csv(
             streams_csv,
             utilities_csv,
             output_json=None,
         )
         return LoadedProblemSource(
-            payload=payload,
+            input_data=input_data,
             source_kind="csv",
-            validation_context=build_validation_context(payload, source_kind="csv"),
+            validation_context=build_validation_context(input_data, source_kind="csv"),
             problem_filepath=None,
         )
 
@@ -108,21 +108,23 @@ def load_problem_source(
     )
 
     if src_path.suffix.lower() == ".json":
-        payload = _load_json_payload(src_path, source=source, adapters=adapters)
+        input_data = _load_json_inputs(src_path, source=source, adapters=adapters)
         return LoadedProblemSource(
-            payload=payload,
+            input_data=input_data,
             source_kind="json",
-            validation_context=build_validation_context(payload, source_kind="json"),
+            validation_context=build_validation_context(input_data, source_kind="json"),
             problem_filepath=src_path,
             project_name=resolved_project_name,
         )
 
     if src_path.suffix.lower() in {".xlsx", ".xls", ".xlsb", ".xlsm"}:
-        payload = adapters.get_problem_from_excel(src_path, output_json=None)
+        input_data = adapters.get_problem_from_excel(src_path, output_json=None)
         return LoadedProblemSource(
-            payload=payload,
+            input_data=input_data,
             source_kind="excel",
-            validation_context=build_validation_context(payload, source_kind="excel"),
+            validation_context=build_validation_context(
+                input_data, source_kind="excel"
+            ),
             problem_filepath=src_path,
             project_name=resolved_project_name,
         )
@@ -135,15 +137,15 @@ def load_problem_source(
                 f"CSV directory '{src_path}' must contain "
                 "'streams.csv' and 'utilities.csv'."
             )
-        payload = adapters.get_problem_from_csv(
+        input_data = adapters.get_problem_from_csv(
             streams_csv,
             utilities_csv,
             output_json=None,
         )
         return LoadedProblemSource(
-            payload=payload,
+            input_data=input_data,
             source_kind="csv",
-            validation_context=build_validation_context(payload, source_kind="csv"),
+            validation_context=build_validation_context(input_data, source_kind="csv"),
             problem_filepath=src_path,
             project_name=resolved_project_name,
         )
@@ -195,7 +197,7 @@ def _coerce_target_input(
         return source
 
 
-def _load_json_payload(
+def _load_json_inputs(
     src_path: Path,
     *,
     source: PathLike,
@@ -208,16 +210,16 @@ def _load_json_payload(
             sample_case_names=adapters.list_sample_cases(),
         )
         if sample_case_name is not None:
-            payload = json.loads(adapters.read_sample_case(sample_case_name))
+            input_data = json.loads(adapters.read_sample_case(sample_case_name))
         else:
             with src_path.open("r", encoding="utf-8") as handle:
-                payload = json.load(handle)
+                input_data = json.load(handle)
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Failed to parse JSON from {src_path}: {exc}") from exc
 
-    if not isinstance(payload, dict):
-        raise ValueError(f"JSON payload in {src_path} must be an object.")
-    return normalize_problem_mapping(payload)
+    if not isinstance(input_data, dict):
+        raise ValueError(f"JSON inputs in {src_path} must be an object.")
+    return normalize_problem_mapping(input_data)
 
 
 def _packaged_sample_case_name(

@@ -24,6 +24,13 @@ def _sort_by_attrs(attrs: Tuple[str, ...], stream: object):
     return tuple(getattr(stream, attr) for attr in attrs)
 
 
+def _stream_attr_value(stream: object, attr_name: str, state_id: str | None = None):
+    value = getattr(stream, attr_name)
+    if hasattr(value, "_stream_value_accessor"):
+        return value[state_id].value
+    return value
+
+
 def _is_picklable(obj: object) -> bool:
     try:
         pickle.dumps(obj)
@@ -47,6 +54,8 @@ class StreamCollection:
     def __init__(self):
         """Initialise an empty collection sorted by descending supply temperature."""
         self._streams: Dict[str, object] = {}
+        self._state_ids: List[str] | None = None
+        self._weights: np.ndarray | None = None
         self._sort_spec: Tuple[str, Any] = ("attr", "t_supply")
         self._sort_key: Callable = partial(_sort_by_attr, "t_supply")
         self._sort_reverse: bool = True
@@ -64,6 +73,7 @@ class StreamCollection:
 
     def add(self, stream, key: str = None, prevent_overwrite: bool = True) -> str:
         """Insert a stream, optionally renaming the key to avoid collisions."""
+        self._validate_stream_state_context(stream)
         base_name = new_name = stream.name
         if key is None:
             key = base_name
@@ -76,6 +86,7 @@ class StreamCollection:
             counter += 1
         stream.name = new_name
         self._streams[key] = stream
+        stream.bind_state_collection(self)
         self._needs_sort = True
         return key
 
@@ -102,6 +113,8 @@ class StreamCollection:
             include_utility_streams = True
 
         subset = StreamCollection()
+        subset._state_ids = None if self._state_ids is None else list(self._state_ids)
+        subset._weights = None if self._weights is None else self._weights.copy()
         subset._sort_spec = self._sort_spec
         subset._rebuild_sort_key()
         subset._sort_reverse = self._sort_reverse
@@ -112,6 +125,7 @@ class StreamCollection:
                     continue
                 if target_type is None or stream.type == target_type:
                     subset._streams[key] = stream
+                    stream.bind_state_collection(subset)
                 continue
 
             if not include_utility_streams:
@@ -126,8 +140,10 @@ class StreamCollection:
                 inverted_stream = copy(stream)
                 inverted_stream.invert()
                 subset._streams[key] = inverted_stream
+                inverted_stream.bind_state_collection(subset)
             elif target_type is None or stream.type == target_type:
                 subset._streams[key] = stream
+                stream.bind_state_collection(subset)
 
         subset._needs_sort = True
         return subset
@@ -196,7 +212,7 @@ class StreamCollection:
             invert_utility=False,
         )
 
-    def get_hot_utility_streams(self):
+    def get_hot_utility_streams(self, state_id: str | None = None):
         """Return a new collection containing only hot utility streams."""
         subset = self._build_stream_subset(
             target_type=ST.Hot.value,
@@ -204,10 +220,15 @@ class StreamCollection:
             include_utility_streams=True,
             invert_utility=False,
         )
-        subset.set_sort_key(lambda stream: stream.t_supply.max, reverse=True)
+        subset.set_sort_key(
+            (lambda stream: stream.t_supply.max)
+            if state_id is None
+            else (lambda stream: _stream_attr_value(stream, "t_supply", state_id)),
+            reverse=True,
+        )
         return subset
 
-    def get_cold_utility_streams(self):
+    def get_cold_utility_streams(self, state_id: str | None = None):
         """Return a new collection containing only cold utility streams."""
         subset = self._build_stream_subset(
             target_type=ST.Cold.value,
@@ -215,7 +236,12 @@ class StreamCollection:
             include_utility_streams=True,
             invert_utility=False,
         )
-        subset.set_sort_key(lambda stream: stream.t_supply.max, reverse=True)
+        subset.set_sort_key(
+            (lambda stream: stream.t_supply.min)
+            if state_id is None
+            else (lambda stream: _stream_attr_value(stream, "t_supply", state_id)),
+            reverse=True,
+        )
         return subset
 
     def get_inverted_hot_utility_streams(self):
@@ -245,9 +271,13 @@ class StreamCollection:
 
     def replace(self, stream_dict: Dict[str, Union["Stream", "Stream"]]):
         """Replace the collection contents with the provided stream mapping."""
+        self.clear_state_context()
         self._streams = {}
         for stream in stream_dict.values():
+            self._validate_stream_state_context(stream)
             self._streams[stream.name] = stream
+            stream.bind_state_collection(self)
+        self.validate_state_alignment()
         self._needs_sort = True
 
     def remove(self, stream_name: str):
@@ -258,7 +288,9 @@ class StreamCollection:
         else:
             warnings.warn(f"Stream '{stream_name}' not found.")
 
-    def sum_stream_attribute(self, attr_name: str) -> float:
+    def sum_stream_attribute(
+        self, attr_name: str, state_id: str | None = None
+    ) -> float:
         """Return the total of a specified attribute for streams in the collection."""
         if self._streams is None or len(self._streams) == 0:
             warnings.warn(
@@ -268,14 +300,23 @@ class StreamCollection:
             return 0.0
         stream = next(iter(self._streams.values()))
         if hasattr(stream, attr_name):
-            return sum(getattr(stream, attr_name) for stream in self._streams.values())
+            return sum(
+                _stream_attr_value(stream, attr_name, state_id)
+                for stream in self._streams.values()
+            )
         else:
             warnings.warn(
                 f"Stream '{stream.name}' does not have attribute '{attr_name}'."
             )
         return 0.0
 
-    def set_common_stream_attribute(self, attr_name: str, value: Any):
+    def set_common_stream_attribute(
+        self,
+        attr_name: str,
+        value: Any,
+        *,
+        state_id: str | None = None,
+    ):
         """Set a common attribute across all streams in the collection."""
         if self._streams is None or len(self._streams) == 0:
             warnings.warn(
@@ -285,9 +326,12 @@ class StreamCollection:
             return 0.0
         for stream in self._streams.values():  # Check if attribute exists
             if hasattr(stream, attr_name):
-                current_value = getattr(stream, attr_name)
+                current_value = _stream_attr_value(stream, attr_name, state_id)
                 if current_value != value:
-                    setattr(stream, attr_name, value)
+                    if state_id is None:
+                        setattr(stream, attr_name, value)
+                    else:
+                        stream.set_attr_for_state(attr_name, value, state_id=state_id)
             else:
                 warnings.warn(
                     f"Stream '{stream.name}' does not have attribute '{attr_name}'."
@@ -319,6 +363,8 @@ class StreamCollection:
         Callers may override that with ``sort_key`` and optionally ``reverse``.
         """
         copied = StreamCollection()
+        copied._state_ids = None if self._state_ids is None else list(self._state_ids)
+        copied._weights = None if self._weights is None else self._weights.copy()
         if sort_key is None:
             copied._sort_spec = self._sort_spec
             copied._rebuild_sort_key()
@@ -337,6 +383,63 @@ class StreamCollection:
             )
 
         return copied
+
+    @property
+    def state_ids(self) -> list[str] | None:
+        """Return the canonical state identifiers for this collection."""
+        return None if self._state_ids is None else list(self._state_ids)
+
+    @property
+    def weights(self) -> np.ndarray | None:
+        """Return the canonical normalised state weights for this collection."""
+        return None if self._weights is None else self._weights.copy()
+
+    def set_state_context(
+        self,
+        state_ids: list[str] | tuple[str, ...] | None,
+        weights: np.ndarray | list[float] | tuple[float, ...] | None,
+    ) -> None:
+        """Persist the canonical shared state model for this collection."""
+        if state_ids is None:
+            self._state_ids = None
+            self._weights = None
+            for stream in self._streams.values():
+                stream.bind_state_collection(None)
+            return
+
+        state_ids_list = [str(state_id) for state_id in state_ids]
+        weights_array = np.asarray(weights, dtype=float).reshape(-1)
+        if len(state_ids_list) != len(weights_array):
+            raise ValueError("state_ids and weights must have the same length.")
+
+        self._state_ids = state_ids_list
+        self._weights = weights_array.copy()
+        for stream in self._streams.values():
+            stream.bind_state_collection(self)
+
+    def clear_state_context(self) -> None:
+        """Remove any stored canonical state model from this collection."""
+        self._state_ids = None
+        self._weights = None
+        for stream in self._streams.values():
+            stream.bind_state_collection(None)
+
+    def _validate_stream_state_context(self, stream) -> None:
+        if self._state_ids is None:
+            return
+
+        state_ids, weights = stream._get_state_context()
+        if state_ids is None:
+            return
+        if state_ids != self._state_ids:
+            raise ValueError(
+                f"state_ids for stream '{stream.name}' must align with the collection."
+            )
+        if not np.allclose(weights, self._weights, rtol=1e-12, atol=1e-12):
+            raise ValueError(
+                f"weights for stream '{stream.name}' must align with the collection."
+            )
+        stream.bind_state_collection(self)
 
     def validate_state_alignment(
         self,
@@ -377,10 +480,32 @@ class StreamCollection:
                     f"weights for stream '{key}' must align with '{canonical_key}'."
                 )
 
+        self.set_state_context(canonical_state_ids, canonical_weights)
         return (
             canonical_state_ids,
             None if canonical_weights is None else canonical_weights.copy(),
         )
+
+    def validate_state_id(self, state_id: str) -> None:
+        """Validate that ``state_id`` exists on every explicitly stateful stream."""
+        if not state_id:
+            raise ValueError("state_id must be a non-empty string.")
+        if self._state_ids is not None:
+            if state_id not in self._state_ids:
+                raise ValueError(
+                    f"state_id {state_id!r} was not found on this collection. "
+                    f"Available states: {', '.join(self._state_ids)}."
+                )
+            return
+        for key, stream in self._streams.items():
+            state_ids, _weights = stream._get_state_context()
+            if state_ids is None:
+                continue
+            if state_id not in state_ids:
+                raise ValueError(
+                    f"state_id {state_id!r} was not found on stream {key!r}. "
+                    f"Available states: {', '.join(state_ids)}."
+                )
 
     def get_index(self, stream) -> int:
         """Return the position (index) of a stream object in the sorted stream list."""
@@ -410,12 +535,17 @@ class StreamCollection:
         if not isinstance(other, StreamCollection):
             return NotImplemented
         combined = StreamCollection()
+        if self._state_ids is not None:
+            combined.set_state_context(self._state_ids, self._weights)
+        elif other._state_ids is not None:
+            combined.set_state_context(other._state_ids, other._weights)
         # Add all streams from self
         for stream in self._streams.values():
             combined.add(stream)
         # Add all streams from other
         for stream in other._streams.values():
             combined.add(stream)
+        combined.validate_state_alignment()
         return combined
 
     def __len__(self):

@@ -14,9 +14,8 @@ from ...classes.zone import Zone
 from ...lib.config import Configuration
 from ...lib.enums import ST, StreamLoc
 from ...lib.schemas.io import UtilitySchema
+from ...utils.miscellaneous import extract_state_context
 
-_STATE_WEIGHT_RTOL = 1e-12
-_STATE_WEIGHT_ATOL = 1e-12
 _TEMPERATURE_EQUAL_TOL = 1e-12
 
 
@@ -35,48 +34,6 @@ def _value_is_missing(value: Value | None) -> bool:
     return bool(np.all(np.isnan(value.state_values.astype(float))))
 
 
-def _resolve_state_context(
-    values_by_name: dict[str, Value | None],
-) -> tuple[list[str] | None, np.ndarray | None]:
-    stateful_values = [
-        (name, value)
-        for name, value in values_by_name.items()
-        if value is not None and value.state_ids is not None
-    ]
-    if not stateful_values:
-        return None, None
-
-    ref_name, ref_value = stateful_values[0]
-    ref_state_ids = ref_value.state_ids
-    ref_weights = ref_value.weights
-
-    for name, value in stateful_values[1:]:
-        if value.state_ids != ref_state_ids:
-            raise ValueError(f"state_ids for {name} must align with {ref_name}.")
-        if not np.allclose(
-            value.weights,
-            ref_weights,
-            rtol=_STATE_WEIGHT_RTOL,
-            atol=_STATE_WEIGHT_ATOL,
-        ):
-            raise ValueError(f"weights for {name} must align with {ref_name}.")
-
-    return ref_state_ids, ref_weights
-
-
-def _broadcast_magnitudes(
-    value: Value | None,
-    state_ids: list[str] | None,
-) -> np.ndarray | None:
-    if value is None:
-        return None
-    if state_ids is None:
-        return np.asarray([float(value.value)], dtype=float)
-    if value.state_ids is None:
-        return np.full(len(state_ids), float(value.value), dtype=float)
-    return value.state_values.astype(float)
-
-
 def _value_from_array(
     magnitudes,
     *,
@@ -87,67 +44,50 @@ def _value_from_array(
     arr = np.asarray(magnitudes, dtype=float).reshape(-1)
     if state_ids is None:
         return Value(float(arr[0]), unit=unit)
-    return Value(values=arr, unit=unit, state_ids=state_ids, weights=weights)
+    return Value(values=arr, unit=unit)
 
 
 def _shift_temperature_value(value: Value, delta: float) -> Value:
     unit = value.to_dict().get("unit")
+    state_ids, weights = extract_state_context(value)
     return _value_from_array(
         value.state_values.astype(float) + float(delta),
         unit=unit,
-        state_ids=value.state_ids,
-        weights=None if value.state_ids is None else value.weights,
+        state_ids=state_ids,
+        weights=weights,
     )
 
 
 def _utility_temperature_arrays(
     utility: UtilitySchema,
-) -> tuple[Value, Value, np.ndarray, np.ndarray, list[str] | None, np.ndarray | None]:
-    t_supply_value = _coerce_value(utility.t_supply, unit="degC")
-    t_target_value = _coerce_value(utility.t_target, unit="degC")
-    if t_supply_value is None or t_target_value is None:
+) -> tuple[Value, Value]:
+    t_supply = _coerce_value(utility.t_supply, unit="degC")
+    t_target = _coerce_value(utility.t_target, unit="degC")
+    if t_supply is None or t_target is None:
         raise ValueError(
             f"Utility '{utility.name}' is missing supply or target temperature."
         )
-
-    state_ids, weights = _resolve_state_context(
-        {"t_supply": t_supply_value, "t_target": t_target_value}
-    )
-    t_supply_arr = _broadcast_magnitudes(t_supply_value, state_ids)
-    t_target_arr = _broadcast_magnitudes(t_target_value, state_ids)
-    return (
-        t_supply_value,
-        t_target_value,
-        t_supply_arr,
-        t_target_arr,
-        state_ids,
-        weights,
-    )
+    return t_supply, t_target
 
 
 def _orient_utility_temperatures(
     utility: UtilitySchema,
     utility_type: str,
 ) -> tuple[Value, Value]:
-    (
-        t_supply_value,
-        t_target_value,
-        t_supply_arr,
-        t_target_arr,
-        _state_ids,
-        _weights,
-    ) = _utility_temperature_arrays(utility)
+    t_supply, t_target = _utility_temperature_arrays(utility)
+    t_supply_arr = t_supply.state_values
+    t_target_arr = t_target.state_values
 
     if utility_type == ST.Hot.value:
         if np.all(t_supply_arr >= t_target_arr - _TEMPERATURE_EQUAL_TOL):
-            return t_supply_value, t_target_value
+            return t_supply, t_target
         if np.all(t_supply_arr <= t_target_arr + _TEMPERATURE_EQUAL_TOL):
-            return t_target_value, t_supply_value
+            return t_target, t_supply
     elif utility_type == ST.Cold.value:
         if np.all(t_supply_arr <= t_target_arr + _TEMPERATURE_EQUAL_TOL):
-            return t_supply_value, t_target_value
+            return t_supply, t_target
         if np.all(t_supply_arr >= t_target_arr - _TEMPERATURE_EQUAL_TOL):
-            return t_target_value, t_supply_value
+            return t_target, t_supply
 
     raise ValueError(
         f"Utility '{utility.name}' temperatures cannot be oriented consistently as "
@@ -189,7 +129,9 @@ def _get_hot_and_cold_utilities(
         utility_type=ST.Cold.value,
         dt_cont_multiplier=dt_cont_multiplier,
     )
-    return hot_utilities, cold_utilities
+    ordered_hot_utilities = hot_utilities.get_hot_utility_streams()
+    ordered_cold_utilities = cold_utilities.get_cold_utility_streams()
+    return ordered_hot_utilities, ordered_cold_utilities
 
 
 def _complete_utility_data(
@@ -204,25 +146,20 @@ def _complete_utility_data(
     add_default_cu = True
 
     for utility in utilities:
-        t_supply_value = _coerce_value(utility.t_supply, unit="degC")
-        t_target_value = _coerce_value(utility.t_target, unit="degC")
-        if _value_is_missing(t_target_value):
+        t_supply = _coerce_value(utility.t_supply, unit="degC")
+        t_target = _coerce_value(utility.t_target, unit="degC")
+        if _value_is_missing(t_target):
             delta = (
                 -zone_config.DT_PHASE_CHANGE
                 if utility.type in [ST.Hot.value, ST.Both.value]
                 else zone_config.DT_PHASE_CHANGE
             )
-            utility.t_target = _shift_temperature_value(t_supply_value, delta).to_dict()
-            t_target_value = _coerce_value(utility.t_target, unit="degC")
+            utility.t_target = _shift_temperature_value(t_supply, delta).to_dict()
+            t_target = _coerce_value(utility.t_target, unit="degC")
         else:
-            state_ids, _weights = _resolve_state_context(
-                {"t_supply": t_supply_value, "t_target": t_target_value}
-            )
-            t_supply_arr = _broadcast_magnitudes(t_supply_value, state_ids)
-            t_target_arr = _broadcast_magnitudes(t_target_value, state_ids)
             if np.allclose(
-                t_supply_arr,
-                t_target_arr,
+                t_supply.state_values,
+                t_target.state_values,
                 atol=_TEMPERATURE_EQUAL_TOL,
                 rtol=0.0,
             ):
@@ -232,15 +169,15 @@ def _complete_utility_data(
                     else zone_config.DT_PHASE_CHANGE
                 )
                 utility.t_target = _shift_temperature_value(
-                    t_supply_value,
+                    t_supply,
                     delta,
                 ).to_dict()
-                t_target_value = _coerce_value(utility.t_target, unit="degC")
+                t_target = _coerce_value(utility.t_target, unit="degC")
 
-        dt_cont_value = _coerce_value(utility.dt_cont, unit="delta_degC")
-        if _value_is_missing(dt_cont_value):
+        dt_cont = _coerce_value(utility.dt_cont, unit="delta_degC")
+        if _value_is_missing(dt_cont):
             utility.dt_cont = zone_config.DT_CONT
-            dt_cont_value = _coerce_value(utility.dt_cont, unit="delta_degC")
+            dt_cont = _coerce_value(utility.dt_cont, unit="delta_degC")
 
         price_value = _coerce_value(utility.price, unit="USD/MWh")
         if _value_is_missing(price_value):
@@ -250,30 +187,28 @@ def _complete_utility_data(
         if _value_is_missing(htc_value):
             utility.htc = zone_config.HTC
 
-        state_ids, _weights = _resolve_state_context(
-            {
-                "t_supply": t_supply_value,
-                "t_target": t_target_value,
-                "dt_cont": dt_cont_value,
-            }
-        )
-        t_supply_arr = _broadcast_magnitudes(t_supply_value, state_ids)
-        t_target_arr = _broadcast_magnitudes(t_target_value, state_ids)
-        dt_cont_arr = _broadcast_magnitudes(dt_cont_value, state_ids)
+        t_supply_arr = t_supply.state_values
+        t_target_arr = t_target.state_values
+        dt_cont_arr = dt_cont.state_values
+
         effective_dt_cont_arr = dt_cont_arr * float(dt_cont_multiplier)
 
         if (
             utility.type in [ST.Hot.value, ST.Both.value]
             and utility.active
-            and np.min(np.minimum(t_supply_arr, t_target_arr) - effective_dt_cont_arr)
-            >= hu_t_min - zone_config.DT_PHASE_CHANGE
+            and (
+                np.min(np.minimum(t_supply_arr, t_target_arr) - effective_dt_cont_arr)
+                >= hu_t_min - zone_config.DT_PHASE_CHANGE
+            )
         ):
             add_default_hu = False
         if (
             utility.type in [ST.Cold.value, ST.Both.value]
             and utility.active
-            and np.max(np.maximum(t_supply_arr, t_target_arr) + effective_dt_cont_arr)
-            <= cu_t_max + zone_config.DT_PHASE_CHANGE
+            and (
+                np.max(np.maximum(t_supply_arr, t_target_arr) + effective_dt_cont_arr)
+                <= cu_t_max + zone_config.DT_PHASE_CHANGE
+            )
         ):
             add_default_cu = False
     return utilities, add_default_hu, add_default_cu
@@ -345,7 +280,6 @@ def _create_utilities_list(
 ) -> Tuple[StreamCollection, List[UtilitySchema]]:
     """Create a sorted list of hot or cold Stream objects based on type."""
     created_utilities = StreamCollection()
-    created_utilities.set_sort_key(lambda stream: stream.t_supply.max, reverse=True)
     unassigned_utilities = utilities
 
     candidates: list[tuple[float, UtilitySchema, Value, Value]] = []
@@ -356,15 +290,9 @@ def _create_utilities_list(
         supply_value, target_value = _orient_utility_temperatures(
             selected, utility_type
         )
-        order = float(supply_value.max_value().value)
-        candidates.append((order, selected, supply_value, target_value))
+        candidates.append((selected, supply_value, target_value))
 
-    candidates.sort(
-        key=lambda item: item[0],
-        reverse=True,
-    )
-
-    for _order, selected, supply_value, target_value in candidates:
+    for selected, supply_value, target_value in candidates:
         if selected.type == utility_type:
             selected.active = False
 

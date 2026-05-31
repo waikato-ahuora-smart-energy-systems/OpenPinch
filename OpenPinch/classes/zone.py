@@ -41,6 +41,7 @@ class Zone:
             if hasattr(parent_zone, "dt_cont_multiplier")
             else 1.0
         )
+        self._active_state_name = None
         self._lock_dt_cont_multiplier = False
         self._active = True
         self._subzones = {}
@@ -106,6 +107,22 @@ class Zone:
     def active(self, value: bool):
         """Activate or deactivate the zone for subsequent analysis passes."""
         self._active = bool(value)
+
+    @property
+    def active_state_name(self) -> str:
+        """Which named state is active for the analysis."""
+        return str(self._active_state_name)
+
+    @active_state_name.setter
+    def active_state_name(self, value: str):
+        """Set active state for the analysis."""
+        self.active_state_name = str(value)
+
+    @property
+    def active_state_idx(self) -> int:
+        """The state index of the named active state."""
+        # TODO: Fetch the state index for the active state name.
+        return int(0)
 
     @property
     def address(self) -> str:

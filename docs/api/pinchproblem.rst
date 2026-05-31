@@ -2,7 +2,7 @@ PinchProblem
 ============
 
 :class:`OpenPinch.classes.pinch_problem.PinchProblem` is the primary
-single-case interface in the package. It owns the source payload, validated
+single-case interface in the package. It owns the source inputs, validated
 problem data, prepared zone tree, solved targets, graph exports, and several
 advanced post-processing helpers.
 
@@ -55,7 +55,9 @@ Two descriptor families make ``PinchProblem`` broader than a simple wrapper:
 ``problem.target``
    Re-runs targeted advanced routines such as direct and indirect heat pump,
    refrigeration, cogeneration, or area/cost targeting against the prepared
-   zone hierarchy.
+   zone hierarchy. Named target workflows also accept ``state_id=...`` when a
+   input data carries stateful values, and the refreshed summary/export surfaces
+   then expose that selected state on the result rows.
 
 Those accessors are the high-level path into the package's deeper analytical
 power without dropping all the way to the raw service modules.
@@ -78,7 +80,7 @@ Relationship To Lower Layers
 ----------------------------
 
 ``PinchProblem`` is a wrapper, not a separate solver. Under the hood it still
-validates the payload, prepares a :class:`~OpenPinch.classes.zone.Zone` tree,
+validates the input data, prepares a :class:`~OpenPinch.classes.zone.Zone` tree,
 runs the same targeting services documented in :doc:`service-layer`, and then
 packages the outputs for summaries, graphs, and export.
 

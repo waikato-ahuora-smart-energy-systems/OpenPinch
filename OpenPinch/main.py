@@ -23,12 +23,12 @@ def pinch_analysis_service(
     data: Any,
     project_name: str = "Project",
 ) -> TargetOutput:
-    """Validate an input payload, run targeting, and return ``TargetOutput``.
+    """Validate input data, run targeting, and return ``TargetOutput``.
 
     Parameters
     ----------
     data:
-        Raw request payload matching :class:`OpenPinch.lib.schemas.io.TargetInput`.
+        Raw request data matching :class:`OpenPinch.lib.schemas.io.TargetInput`.
         Dictionaries, Pydantic models, and dataclass-like objects are accepted.
     project_name:
         Optional label used in generated graphs and result files.
@@ -36,7 +36,7 @@ def pinch_analysis_service(
     Returns
     -------
     TargetOutput
-        Validated response payload containing solved targets and graph data.
+        Validated response data containing solved targets and graph data.
     """
     input_data = TargetInput.model_validate(data)
     problem = PinchProblem(

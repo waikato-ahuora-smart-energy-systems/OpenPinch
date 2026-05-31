@@ -3,18 +3,38 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
 from ..lib.enums import ST
 from ..lib.schemas.common import MaybeVU
-from ._stream_value_view import StreamValueView
+from ..utils.miscellaneous import extract_state_context, resolve_value_for_state
+from .accessors._stream_value_accessor import StreamValueAccessor
 from .value import Value
+
+if TYPE_CHECKING:
+    from .stream_collection import StreamCollection
 
 _STATE_WEIGHT_RTOL = 1e-12
 _STATE_WEIGHT_ATOL = 1e-12
 _TEMPERATURE_EQUAL_TOL = 1e-12
+
+
+@dataclass(frozen=True)
+class _DerivedStreamState:
+    state_ids: list[str] | None
+    weights: np.ndarray | None
+    stream_type: str
+    t_min: np.ndarray
+    t_max: np.ndarray
+    t_min_star: np.ndarray
+    t_max_star: np.ndarray
+    cp: np.ndarray
+    htr: np.ndarray
+    ut_cost: np.ndarray
+    rcp: np.ndarray
 
 
 class Stream:
@@ -80,11 +100,13 @@ class Stream:
     ):
         """Initialise a stream and infer hot/cold classification."""
         self._name: str = name
-        self._type: str = None
         self._dt_cont_multiplier: float = 1.0
         self._dt_cont_multiplier_locked: bool = False
         self._is_process_stream: bool = is_process_stream
         self._active = True
+        self._state_collection: StreamCollection | None = None
+        self._state_ids: list[str] | None = None
+        self._weights: np.ndarray | None = None
 
         self._t_supply: Value | None = None
         self._t_target: Value | None = None
@@ -96,15 +118,7 @@ class Stream:
         self._dt_cont_act: Value | None = None
         self._heat_flow: Value | None = None
         self._htc: Value | None = None
-        self._htr: Value | None = None
         self._price: Value | None = None
-        self._ut_cost: Value | None = None
-        self._CP: Value | None = None
-        self._RCP_prod: Value | None = None
-        self._t_min: Value | None = None
-        self._t_max: Value | None = None
-        self._t_min_star: Value | None = None
-        self._t_max_star: Value | None = None
 
         self._set_value_attribute("_t_supply", t_supply, update=False)
         self._set_value_attribute("_t_target", t_target, update=False)
@@ -120,9 +134,7 @@ class Stream:
         )
         self._set_value_attribute("_heat_flow", heat_flow, update=False)
         self._set_value_attribute("_htc", htc, update=False)
-        self._htr = self._inverse_value(self._htc, "_htr")
         self._set_value_attribute("_price", price, update=False)
-        self._update_attributes()
 
     # === Core Properties ===
 
@@ -149,17 +161,13 @@ class Stream:
     @property
     def type(self) -> Optional[str]:
         """Stream type (Hot, Cold, Both)."""
-        return self._type
-
-    @type.setter
-    def type(self, value: str):
-        """Override the inferred stream thermal type."""
-        self._type = value
+        derived = self._derive_stream_state()
+        return None if derived is None else derived.stream_type
 
     @property
-    def t_supply(self) -> Optional[StreamValueView]:
+    def t_supply(self) -> Optional[StreamValueAccessor]:
         """Supply temperature (e.g., degC)."""
-        return self._to_view(self._t_supply)
+        return self._to_accessor(self._t_supply, "t_supply", writable=True)
 
     @t_supply.setter
     def t_supply(self, value: float):
@@ -167,9 +175,9 @@ class Stream:
         self._set_value_attribute("_t_supply", value)
 
     @property
-    def t_target(self) -> Optional[StreamValueView]:
+    def t_target(self) -> Optional[StreamValueAccessor]:
         """Target temperature (e.g., degC)."""
-        return self._to_view(self._t_target)
+        return self._to_accessor(self._t_target, "t_target", writable=True)
 
     @t_target.setter
     def t_target(self, value: float):
@@ -177,9 +185,9 @@ class Stream:
         self._set_value_attribute("_t_target", value)
 
     @property
-    def P_supply(self) -> Optional[StreamValueView]:
+    def P_supply(self) -> Optional[StreamValueAccessor]:
         """Supply pressure (e.g., kPa)."""
-        return self._to_view(self._P_supply)
+        return self._to_accessor(self._P_supply, "P_supply", writable=True)
 
     @P_supply.setter
     def P_supply(self, value: float):
@@ -187,9 +195,9 @@ class Stream:
         self._set_value_attribute("_P_supply", value)
 
     @property
-    def P_target(self) -> Optional[StreamValueView]:
+    def P_target(self) -> Optional[StreamValueAccessor]:
         """Target pressure (e.g., kPa)."""
-        return self._to_view(self._P_target)
+        return self._to_accessor(self._P_target, "P_target", writable=True)
 
     @P_target.setter
     def P_target(self, value: float):
@@ -197,9 +205,9 @@ class Stream:
         self._set_value_attribute("_P_target", value)
 
     @property
-    def h_supply(self) -> Optional[StreamValueView]:
+    def h_supply(self) -> Optional[StreamValueAccessor]:
         """Supply enthalpy (e.g., kJ/kg)."""
-        return self._to_view(self._h_supply)
+        return self._to_accessor(self._h_supply, "h_supply", writable=True)
 
     @h_supply.setter
     def h_supply(self, value: float):
@@ -207,9 +215,9 @@ class Stream:
         self._set_value_attribute("_h_supply", value)
 
     @property
-    def h_target(self) -> Optional[StreamValueView]:
+    def h_target(self) -> Optional[StreamValueAccessor]:
         """Target enthalpy (e.g., kJ/kg)."""
-        return self._to_view(self._h_target)
+        return self._to_accessor(self._h_target, "h_target", writable=True)
 
     @h_target.setter
     def h_target(self, value: float):
@@ -217,27 +225,25 @@ class Stream:
         self._set_value_attribute("_h_target", value)
 
     @property
-    def dt_cont(self) -> StreamValueView:
+    def dt_cont(self) -> StreamValueAccessor:
         """Preserved base delta-T contribution before any zone multiplier."""
-        return self._to_view(self._dt_cont)
+        return self._to_accessor(self._dt_cont, "dt_cont", writable=True)
 
     @dt_cont.setter
     def dt_cont(self, value: float):
         """Set the base contribution to shifted-temperature calculations."""
         self._dt_cont = self._coerce_to_value(value, "_dt_cont")
         self._dt_cont_act = self._scale_value(self._dt_cont, self._dt_cont_multiplier)
-        self._update_attributes()
 
     @property
-    def dt_cont_act(self) -> StreamValueView:
+    def dt_cont_act(self) -> StreamValueAccessor:
         """Effective delta-T contribution used in shifted-temperature calculations."""
-        return self._to_view(self._dt_cont_act)
+        return self._to_accessor(self._dt_cont_act, "dt_cont_act", writable=True)
 
     @dt_cont_act.setter
     def dt_cont_act(self, value: float):
         """Set the effective shifted-temperature contribution in active use."""
         self._dt_cont_act = self._coerce_to_value(value, "_dt_cont_act")
-        self._update_attributes()
 
     @property
     def dt_cont_multiplier(self) -> float:
@@ -250,7 +256,6 @@ class Stream:
         if not self._dt_cont_multiplier_locked:
             self._dt_cont_multiplier = value
             self._dt_cont_act = self._scale_value(self._dt_cont, value)
-            self._update_attributes()
         else:
             warnings.warn(
                 "Attempted to change dt_cont_multiplier, but it is locked. "
@@ -268,20 +273,19 @@ class Stream:
         self._dt_cont_multiplier_locked = value
 
     @property
-    def heat_flow(self) -> StreamValueView:
+    def heat_flow(self) -> StreamValueAccessor:
         """Stream heat flow view over a scalar or stateful duty value."""
-        return self._to_view(self._heat_flow)
+        return self._to_accessor(self._heat_flow, "heat_flow", writable=True)
 
     @heat_flow.setter
     def heat_flow(self, value: MaybeVU):
         """Set the stream duty, preserving the stream's existing state model."""
         self._heat_flow = self._coerce_to_stream_state_context(value, "_heat_flow")
-        self._update_attributes()
 
     @property
     def htc(self) -> float:
         """Heat transfer coefficient (e.g., kW/m^2/K)."""
-        return self._to_view(self._htc)
+        return self._to_accessor(self._htc, "htc", writable=True)
 
     @htc.setter
     def htc(self, value: float):
@@ -291,53 +295,36 @@ class Stream:
     @property
     def htr(self) -> float:
         """Heat transfer resistance (e.g., m^2.K/kW)."""
-        return self._to_view(self._htr)
-
-    @htr.setter
-    def htr(self, value: float):
-        """Set the stored heat-transfer resistance explicitly."""
-        self._htr = self._coerce_to_value(value, "_htr")
+        return self._to_accessor(self._derived_value("_htr"), "htr", writable=False)
 
     @property
     def price(self) -> float:
         """Unit energy price (e.g., $/MWh)."""
-        return self._to_view(self._price)
+        return self._to_accessor(self._price, "price", writable=True)
 
     @price.setter
     def price(self, value: float):
         """Set the unit energy price used in utility-cost calculations."""
         self._price = self._coerce_to_value(value, "_price")
-        self._calc_utility_cost()
 
     @property
     def ut_cost(self) -> float:
         """Utility cost (e.g., $/y)."""
-        return self._to_view(self._ut_cost)
-
-    @ut_cost.setter
-    def ut_cost(self, value: float):
-        """Set the cached utility-cost figure for the stream."""
-        self._ut_cost = self._coerce_to_value(value, "_ut_cost")
+        return self._to_accessor(
+            self._derived_value("_ut_cost"), "ut_cost", writable=False
+        )
 
     @property
     def CP(self) -> float:
         """Heat capacity flowrate (e.g., kW/K)."""
-        return self._to_view(self._CP)
-
-    @CP.setter
-    def CP(self, value: float):
-        """Set the cached heat-capacity flow rate."""
-        self._CP = self._coerce_to_value(value, "_CP")
+        return self._to_accessor(self._derived_value("_CP"), "CP", writable=False)
 
     @property
     def rCP(self) -> Optional[float]:
         """Resistance-capacity product (1/heat transfer rate)."""
-        return self._to_view(self._RCP_prod)
-
-    @rCP.setter
-    def rCP(self, value: float):
-        """Set the cached resistance-capacity product."""
-        self._RCP_prod = self._coerce_to_value(value, "_RCP_prod")
+        return self._to_accessor(
+            self._derived_value("_RCP_prod"), "rCP", writable=False
+        )
 
     @property
     def active(self) -> bool:
@@ -352,44 +339,28 @@ class Stream:
     # === Computed Temperature Bounds ===
 
     @property
-    def t_min(self) -> Optional[StreamValueView]:
+    def t_min(self) -> Optional[StreamValueAccessor]:
         """Minimum temperature (supply or target depending on hot/cold)."""
-        return self._to_view(self._t_min)
-
-    @t_min.setter
-    def t_min(self, value: float):
-        """Set the unshifted lower temperature bound."""
-        self._t_min = self._coerce_to_value(value, "_t_min")
+        return self._to_accessor(self._derived_value("_t_min"), "t_min", writable=False)
 
     @property
-    def t_max(self) -> Optional[StreamValueView]:
+    def t_max(self) -> Optional[StreamValueAccessor]:
         """Maximum temperature (supply or target depending on hot/cold)."""
-        return self._to_view(self._t_max)
-
-    @t_max.setter
-    def t_max(self, value: float):
-        """Set the unshifted upper temperature bound."""
-        self._t_max = self._coerce_to_value(value, "_t_max")
+        return self._to_accessor(self._derived_value("_t_max"), "t_max", writable=False)
 
     @property
-    def t_min_star(self) -> Optional[StreamValueView]:
+    def t_min_star(self) -> Optional[StreamValueAccessor]:
         """Shifted minimum temperature."""
-        return self._to_view(self._t_min_star)
-
-    @t_min_star.setter
-    def t_min_star(self, value: float):
-        """Set the shifted lower temperature bound."""
-        self._t_min_star = self._coerce_to_value(value, "_t_min_star")
+        return self._to_accessor(
+            self._derived_value("_t_min_star"), "t_min_star", writable=False
+        )
 
     @property
-    def t_max_star(self) -> Optional[StreamValueView]:
+    def t_max_star(self) -> Optional[StreamValueAccessor]:
         """Shifted maximum temperature."""
-        return self._to_view(self._t_max_star)
-
-    @t_max_star.setter
-    def t_max_star(self, value: float):
-        """Set the shifted upper temperature bound."""
-        self._t_max_star = self._coerce_to_value(value, "_t_max_star")
+        return self._to_accessor(
+            self._derived_value("_t_max_star"), "t_max_star", writable=False
+        )
 
     # === Readable Alias Properties ===
 
@@ -397,11 +368,6 @@ class Stream:
     def stream_type(self) -> Optional[str]:
         """Alias for the stream thermal type."""
         return self.type
-
-    @stream_type.setter
-    def stream_type(self, value: str):
-        """Set the stream thermal type via a descriptive alias."""
-        self.type = value
 
     @property
     def process_stream(self) -> bool:
@@ -424,7 +390,7 @@ class Stream:
         self.active = value
 
     @property
-    def supply_temperature(self) -> Optional[StreamValueView]:
+    def supply_temperature(self) -> Optional[StreamValueAccessor]:
         """Alias for the supply temperature."""
         return self.t_supply
 
@@ -434,7 +400,7 @@ class Stream:
         self.t_supply = value
 
     @property
-    def target_temperature(self) -> Optional[StreamValueView]:
+    def target_temperature(self) -> Optional[StreamValueAccessor]:
         """Alias for the target temperature."""
         return self.t_target
 
@@ -444,47 +410,27 @@ class Stream:
         self.t_target = value
 
     @property
-    def minimum_temperature(self) -> Optional[StreamValueView]:
+    def minimum_temperature(self) -> Optional[StreamValueAccessor]:
         """Alias for the minimum stream temperature."""
         return self.t_min
 
-    @minimum_temperature.setter
-    def minimum_temperature(self, value: float):
-        """Set the minimum stream temperature via a descriptive alias."""
-        self.t_min = value
-
     @property
-    def maximum_temperature(self) -> Optional[StreamValueView]:
+    def maximum_temperature(self) -> Optional[StreamValueAccessor]:
         """Alias for the maximum stream temperature."""
         return self.t_max
 
-    @maximum_temperature.setter
-    def maximum_temperature(self, value: float):
-        """Set the maximum stream temperature via a descriptive alias."""
-        self.t_max = value
-
     @property
-    def shifted_minimum_temperature(self) -> Optional[StreamValueView]:
+    def shifted_minimum_temperature(self) -> Optional[StreamValueAccessor]:
         """Alias for the shifted minimum stream temperature."""
         return self.t_min_star
 
-    @shifted_minimum_temperature.setter
-    def shifted_minimum_temperature(self, value: float):
-        """Set the shifted minimum stream temperature via a descriptive alias."""
-        self.t_min_star = value
-
     @property
-    def shifted_maximum_temperature(self) -> Optional[StreamValueView]:
+    def shifted_maximum_temperature(self) -> Optional[StreamValueAccessor]:
         """Alias for the shifted maximum stream temperature."""
         return self.t_max_star
 
-    @shifted_maximum_temperature.setter
-    def shifted_maximum_temperature(self, value: float):
-        """Set the shifted maximum stream temperature via a descriptive alias."""
-        self.t_max_star = value
-
     @property
-    def supply_pressure(self) -> Optional[StreamValueView]:
+    def supply_pressure(self) -> Optional[StreamValueAccessor]:
         """Alias for the supply pressure."""
         return self.P_supply
 
@@ -494,7 +440,7 @@ class Stream:
         self.P_supply = value
 
     @property
-    def target_pressure(self) -> Optional[StreamValueView]:
+    def target_pressure(self) -> Optional[StreamValueAccessor]:
         """Alias for the target pressure."""
         return self.P_target
 
@@ -504,7 +450,7 @@ class Stream:
         self.P_target = value
 
     @property
-    def supply_enthalpy(self) -> Optional[StreamValueView]:
+    def supply_enthalpy(self) -> Optional[StreamValueAccessor]:
         """Alias for the supply enthalpy."""
         return self.h_supply
 
@@ -514,7 +460,7 @@ class Stream:
         self.h_supply = value
 
     @property
-    def target_enthalpy(self) -> Optional[StreamValueView]:
+    def target_enthalpy(self) -> Optional[StreamValueAccessor]:
         """Alias for the target enthalpy."""
         return self.h_target
 
@@ -524,7 +470,7 @@ class Stream:
         self.h_target = value
 
     @property
-    def delta_t_contribution(self) -> StreamValueView:
+    def delta_t_contribution(self) -> StreamValueAccessor:
         """Alias for the base shifted-temperature contribution."""
         return self.dt_cont
 
@@ -534,7 +480,7 @@ class Stream:
         self.dt_cont = value
 
     @property
-    def effective_delta_t_contribution(self) -> StreamValueView:
+    def effective_delta_t_contribution(self) -> StreamValueAccessor:
         """Alias for the effective shifted-temperature contribution."""
         return self.dt_cont_act
 
@@ -558,69 +504,75 @@ class Stream:
         """Alias for the heat-transfer resistance."""
         return self.htr
 
-    @heat_transfer_resistance.setter
-    def heat_transfer_resistance(self, value: float):
-        """Set the heat-transfer resistance via a descriptive alias."""
-        self.htr = value
-
     @property
     def utility_cost(self) -> float:
-        """Alias for the cached utility cost."""
+        """Alias for the derived utility cost."""
         return self.ut_cost
-
-    @utility_cost.setter
-    def utility_cost(self, value: float):
-        """Set the cached utility cost via a descriptive alias."""
-        self.ut_cost = value
 
     @property
     def heat_capacity_flow_rate(self) -> float:
-        """Alias for the stream heat-capacity flow rate."""
+        """Alias for the derived stream heat-capacity flow rate."""
         return self.CP
-
-    @heat_capacity_flow_rate.setter
-    def heat_capacity_flow_rate(self, value: float):
-        """Set the heat-capacity flow rate via a descriptive alias."""
-        self.CP = value
 
     @property
     def resistance_capacity_product(self) -> Optional[float]:
         """Alias for the stream resistance-capacity product."""
         return self.rCP
 
-    @resistance_capacity_product.setter
-    def resistance_capacity_product(self, value: float):
-        """Set the resistance-capacity product via a descriptive alias."""
-        self.rCP = value
-
     # === Methods ===
 
     def _set_value_attribute(self, attr_name: str, value, update: bool = True) -> None:
         setattr(self, attr_name, self._coerce_to_value(value, attr_name))
-        if update:
-            self._update_attributes()
+        del update
 
     def _coerce_to_value(self, value, attr_name: str) -> Value | None:
         if value is None:
             return None
-        if isinstance(value, StreamValueView):
+        if isinstance(value, StreamValueAccessor):
             return value.raw_value
+        incoming_state_ids, incoming_weights = extract_state_context(value)
+        if incoming_state_ids is not None:
+            active_state_ids = self.state_ids
+            active_weights = self.weights
+            if active_state_ids is None:
+                self._set_local_state_context(incoming_state_ids, incoming_weights)
+            elif incoming_state_ids != active_state_ids:
+                raise ValueError(
+                    f"state_ids for {attr_name[1:]} "
+                    f"must align with the stream state_ids."
+                )
+            elif not np.allclose(
+                incoming_weights,
+                active_weights,
+                rtol=_STATE_WEIGHT_RTOL,
+                atol=_STATE_WEIGHT_ATOL,
+            ):
+                raise ValueError(
+                    f"weights for {attr_name[1:]} must align with the stream weights."
+                )
         parsed = Value(value)
         target_unit = self._VALUE_UNITS[attr_name]
         if target_unit is None:
             return parsed
         return Value(parsed, unit=target_unit)
 
-    @staticmethod
-    def _to_view(value):
+    def _to_accessor(self, value, attr_name: str, *, writable: bool):
         if isinstance(value, Value):
-            return StreamValueView(value)
+            state_ids, weights = self._current_state_context()
+            return StreamValueAccessor(
+                self,
+                attr_name,
+                value,
+                writable=writable,
+                state_ids=state_ids,
+                weights=weights,
+            )
         return value
 
     def _normalise_existing_value(self, value, attr_name: str) -> Value | None:
         if value is None:
             return None
-        if isinstance(value, StreamValueView):
+        if isinstance(value, StreamValueAccessor):
             return value.raw_value
         if isinstance(value, Value):
             return value
@@ -643,43 +595,49 @@ class Stream:
         stateful_values: list[tuple[str, Value]] = []
         for name, value in values_by_name.items():
             value_obj = self._normalise_existing_value(value, name)
-            if value_obj is not None and value_obj.state_ids is not None:
+            if value_obj is not None and len(value_obj.state_values) > 1:
                 stateful_values.append((name, value_obj))
 
         if not stateful_values:
             return None, None
 
         ref_name, ref_value = stateful_values[0]
-        ref_state_ids = ref_value.state_ids
-        ref_weights = ref_value.weights
+        ref_len = len(ref_value.state_values)
 
         for name, value_obj in stateful_values[1:]:
-            if value_obj.state_ids != ref_state_ids:
+            if len(value_obj.state_values) != ref_len:
                 raise ValueError(
-                    f"state_ids for {name[1:]} must align with {ref_name[1:]}."
-                )
-            if not np.allclose(
-                value_obj.weights,
-                ref_weights,
-                rtol=_STATE_WEIGHT_RTOL,
-                atol=_STATE_WEIGHT_ATOL,
-            ):
-                raise ValueError(
-                    f"weights for {name[1:]} must align with {ref_name[1:]}."
+                    f"state count for {name[1:]} must align with {ref_name[1:]}."
                 )
 
-        return ref_state_ids, ref_weights
+        active_state_ids, active_weights = self._current_state_context()
+        if active_state_ids is not None:
+            if len(active_state_ids) != ref_len:
+                raise ValueError(
+                    "Stream state_ids must align with the stored state count."
+                )
+            return active_state_ids, active_weights
 
-    def _broadcast_magnitudes(
-        self, value, state_ids, attr_name: str
+        state_ids = [str(idx) for idx in range(ref_len)]
+        weights = np.ones(ref_len, dtype=float) / ref_len
+        return state_ids, weights
+
+    def _broadcast_value_object(
+        self,
+        value_obj: Value | None,
+        state_ids: list[str] | None,
+        attr_name: str,
     ) -> np.ndarray | None:
-        value_obj = self._normalise_existing_value(value, attr_name)
         if value_obj is None:
             return None
         if state_ids is None:
             return np.asarray([float(value_obj.value)], dtype=float)
-        if value_obj.state_ids is None:
+        if len(value_obj.state_values) == 1:
             return np.full(len(state_ids), float(value_obj.value), dtype=float)
+        if len(value_obj.state_values) != len(state_ids):
+            raise ValueError(
+                f"state count for {attr_name[1:]} must align with the stream state_ids."
+            )
         return value_obj.state_values.astype(float)
 
     def _value_from_array(
@@ -693,42 +651,16 @@ class Stream:
         arr = np.asarray(magnitudes, dtype=float).reshape(-1)
         if state_ids is None:
             return Value(float(arr[0]), unit=self._VALUE_UNITS[attr_name])
-        return Value(
-            values=arr,
-            unit=self._VALUE_UNITS[attr_name],
-            state_ids=state_ids,
-            weights=weights,
-        )
+        del weights
+        return Value(values=arr, unit=self._VALUE_UNITS[attr_name])
 
     def _scale_value(self, value: Value | None, factor: float) -> Value | None:
         if value is None:
             return None
         scaled = np.asarray(value.state_values, dtype=float) * float(factor)
-        if value.state_ids is None:
+        if len(value.state_values) == 1:
             return Value(float(scaled[0]), unit=value.unit)
-        return Value(
-            values=scaled,
-            unit=value.unit,
-            state_ids=value.state_ids,
-            weights=value.weights,
-        )
-
-    def _inverse_value(self, value: Value | None, attr_name: str) -> Value | None:
-        if value is None:
-            return None
-        state_ids, weights = self._resolve_state_context({attr_name: value})
-        magnitudes = self._broadcast_magnitudes(value, state_ids, attr_name)
-        if magnitudes is None:
-            return None
-        inv = np.zeros_like(magnitudes, dtype=float)
-        mask = np.abs(magnitudes) > _TEMPERATURE_EQUAL_TOL
-        inv[mask] = 1.0 / magnitudes[mask]
-        return self._value_from_array(
-            inv,
-            attr_name=attr_name,
-            state_ids=state_ids,
-            weights=weights,
-        )
+        return Value(values=scaled, unit=value.unit)
 
     def _coerce_to_stream_state_context(self, value, attr_name: str) -> Value | None:
         parsed = self._coerce_to_value(value, attr_name)
@@ -739,84 +671,199 @@ class Stream:
         if state_ids is None:
             return parsed
 
-        if parsed.state_ids is None:
+        if len(parsed.state_values) == 1:
             return Value(
                 values=np.full(len(state_ids), float(parsed.value), dtype=float),
                 unit=parsed.unit,
-                state_ids=state_ids,
-                weights=weights,
             )
 
-        if parsed.state_ids != state_ids:
+        if len(parsed.state_values) != len(state_ids):
             raise ValueError(
-                f"state_ids for {attr_name[1:]} must align with the stream state_ids."
-            )
-        if not np.allclose(
-            parsed.weights,
-            weights,
-            rtol=_STATE_WEIGHT_RTOL,
-            atol=_STATE_WEIGHT_ATOL,
-        ):
-            raise ValueError(
-                f"weights for {attr_name[1:]} must align with the stream weights."
+                f"state count for {attr_name[1:]} must align with the stream state_ids."
             )
         return parsed
 
-    def _update_attributes(self) -> None:
-        """Calculates key stream attributes based on temperatures."""
+    @property
+    def state_ids(self) -> list[str] | None:
+        state_ids, _ = self._current_state_context()
+        if state_ids is None:
+            state_ids, _ = self._get_state_context()
+        return state_ids
+
+    @property
+    def weights(self) -> np.ndarray | None:
+        _state_ids, weights = self._current_state_context()
+        if weights is None:
+            _state_ids, weights = self._get_state_context()
+        return None if weights is None else weights.copy()
+
+    def _current_state_context(
+        self,
+    ) -> tuple[list[str] | None, np.ndarray | None]:
+        if (
+            self._state_collection is not None
+            and self._state_collection._state_ids is not None
+        ):
+            return (
+                list(self._state_collection._state_ids),
+                self._state_collection._weights.copy(),
+            )
+        if self._state_ids is None:
+            return None, None
+        return list(self._state_ids), self._weights.copy()
+
+    def _set_local_state_context(
+        self,
+        state_ids: list[str] | None,
+        weights: np.ndarray | list[float] | None,
+    ) -> None:
+        if state_ids is None:
+            self._state_ids = None
+            self._weights = None
+            return
+
+        state_ids_list = [str(state_id) for state_id in state_ids]
+        weights_arr = np.asarray(weights, dtype=float).reshape(-1)
+        if len(state_ids_list) != len(weights_arr):
+            raise ValueError("state_ids and weights must have the same length.")
+        if not np.allclose(
+            weights_arr.sum(), 1.0, rtol=_STATE_WEIGHT_RTOL, atol=_STATE_WEIGHT_ATOL
+        ):
+            weights_arr = weights_arr / float(weights_arr.sum())
+        self._state_ids = state_ids_list
+        self._weights = weights_arr.copy()
+
+    def bind_state_collection(self, collection: StreamCollection | None) -> None:
+        """Bind this stream to a collection-owned shared state model."""
+        self._state_collection = collection
+
+    def clear_state_context(self) -> None:
+        """Detach any bound collection state model and local fallback context."""
+        self._state_collection = None
+        self._state_ids = None
+        self._weights = None
+
+    def resolve_attr(
+        self,
+        attr_name: str,
+        state_id: str | None = None,
+        *,
+        default_allowed: bool = True,
+    ) -> float | None:
+        """Resolve one stream attribute to a scalar for the selected state."""
+        internal_name = (
+            attr_name
+            if attr_name.startswith("_")
+            else f"_{attr_name}"
+            if hasattr(self, f"_{attr_name}")
+            else attr_name
+        )
+        value = getattr(self, internal_name)
+        return resolve_value_for_state(
+            value,
+            state_id=state_id,
+            state_ids=self.state_ids,
+            default_allowed=default_allowed,
+        )
+
+    def set_attr_for_state(
+        self,
+        attr_name: str,
+        value,
+        *,
+        state_id: str | None,
+    ) -> None:
+        """Update one state of a value-backed attribute while preserving others."""
+        if not attr_name.startswith("_"):
+            public_name = attr_name
+            internal_name = (
+                f"_{attr_name}" if hasattr(self, f"_{attr_name}") else attr_name
+            )
+        else:
+            internal_name = attr_name
+            public_name = attr_name[1:]
+
+        existing = self._normalise_existing_value(
+            getattr(self, internal_name), internal_name
+        )
+        state_ids = self.state_ids
+        if existing is None or state_ids is None or len(existing.state_values) <= 1:
+            setattr(self, public_name, value)
+            return
+
+        if state_id is None:
+            state_id = "0" if "0" in state_ids else state_ids[0]
+        if state_id not in state_ids:
+            raise ValueError(
+                f"Unknown state_id {state_id!r} for stream {self.name!r}. "
+                f"Available states: {', '.join(state_ids)}."
+            )
+
+        parsed = self._coerce_to_value(value, internal_name)
+        scalar_value = resolve_value_for_state(
+            parsed, state_id=state_id, state_ids=state_ids
+        )
+        state_values = existing.state_values
+        state_values[state_ids.index(state_id)] = float(scalar_value)
+        updated = Value(values=state_values, unit=existing.unit)
+        setattr(self, internal_name, updated)
+
+    def _derive_stream_state(self) -> _DerivedStreamState | None:
+        """Derive temperature bounds and transport properties from core values."""
         t_supply_value = self._normalise_existing_value(self._t_supply, "_t_supply")
         t_target_value = self._normalise_existing_value(self._t_target, "_t_target")
         htc_value = self._normalise_existing_value(self._htc, "_htc")
+        heat_flow_value = self._normalise_existing_value(self._heat_flow, "_heat_flow")
+        dt_cont_act_value = self._normalise_existing_value(
+            self._dt_cont_act, "_dt_cont_act"
+        )
+        price_value = self._normalise_existing_value(self._price, "_price")
 
         if t_supply_value is None or t_target_value is None or htc_value is None:
-            return
+            return None
 
         state_ids, weights = self._resolve_state_context(
             {
                 "_t_supply": t_supply_value,
                 "_t_target": t_target_value,
-                "_heat_flow": self._heat_flow,
+                "_heat_flow": heat_flow_value,
                 "_dt_cont": self._dt_cont,
-                "_dt_cont_act": self._dt_cont_act,
+                "_dt_cont_act": dt_cont_act_value,
                 "_htc": htc_value,
-                "_price": self._price,
+                "_price": price_value,
             }
         )
 
-        t_supply_arr = self._broadcast_magnitudes(
+        t_supply_arr = self._broadcast_value_object(
             t_supply_value, state_ids, "_t_supply"
         )
-        t_target_arr = self._broadcast_magnitudes(
+        t_target_arr = self._broadcast_value_object(
             t_target_value, state_ids, "_t_target"
         )
-        heat_flow_arr = self._broadcast_magnitudes(
-            self._heat_flow, state_ids, "_heat_flow"
+        heat_flow_arr = self._broadcast_value_object(
+            heat_flow_value, state_ids, "_heat_flow"
         )
         if heat_flow_arr is None:
             heat_flow_arr = np.zeros_like(t_supply_arr, dtype=float)
-        dt_cont_act_arr = self._broadcast_magnitudes(
-            self._dt_cont_act, state_ids, "_dt_cont_act"
+        dt_cont_act_arr = self._broadcast_value_object(
+            dt_cont_act_value, state_ids, "_dt_cont_act"
         )
         if dt_cont_act_arr is None:
             dt_cont_act_arr = np.zeros_like(t_supply_arr, dtype=float)
+        htc_arr = self._broadcast_value_object(htc_value, state_ids, "_htc")
+        if htc_arr is None:
+            return
 
         equal_mask = np.isclose(
             t_supply_arr, t_target_arr, atol=_TEMPERATURE_EQUAL_TOL, rtol=0.0
         )
         if np.any(equal_mask):
-            adjusted_target = t_target_arr.copy()
+            adjusted_target_arr = t_target_arr.copy()
             cold_mask = equal_mask & (heat_flow_arr > 0.0)
             hot_mask = equal_mask & (heat_flow_arr < 0.0)
-            adjusted_target[cold_mask] = t_supply_arr[cold_mask] + 0.01
-            adjusted_target[hot_mask] = t_supply_arr[hot_mask] - 0.01
-            if np.any(cold_mask | hot_mask):
-                self._t_target = self._value_from_array(
-                    adjusted_target,
-                    attr_name="_t_target",
-                    state_ids=state_ids,
-                    weights=weights,
-                )
-                t_target_arr = adjusted_target
+            adjusted_target_arr[cold_mask] = t_supply_arr[cold_mask] + 0.01
+            adjusted_target_arr[hot_mask] = t_supply_arr[hot_mask] - 0.01
+            t_target_arr = adjusted_target_arr
 
         hot_states = t_supply_arr > t_target_arr + _TEMPERATURE_EQUAL_TOL
         cold_states = t_supply_arr < t_target_arr - _TEMPERATURE_EQUAL_TOL
@@ -850,69 +897,75 @@ class Stream:
             )
 
         if np.any(hot_states):
+            stream_type = ST.Hot.value
             t_min_arr = t_target_arr
             t_max_arr = t_supply_arr
             t_min_star_arr = t_min_arr - dt_cont_act_arr
             t_max_star_arr = t_max_arr - dt_cont_act_arr
-            if self._type is None:
-                self._type = ST.Hot.value
         elif np.any(cold_states):
+            stream_type = ST.Cold.value
             t_min_arr = t_supply_arr
             t_max_arr = t_target_arr
             t_min_star_arr = t_min_arr + dt_cont_act_arr
             t_max_star_arr = t_max_arr + dt_cont_act_arr
-            if self._type is None:
-                self._type = ST.Cold.value
         else:
+            stream_type = ST.Both.value
             t_min_arr = t_supply_arr
             t_max_arr = t_target_arr
             t_min_star_arr = t_min_arr.copy()
             t_max_star_arr = t_max_arr.copy()
-            self._type = ST.Both.value
-
-        self._t_min = self._value_from_array(
-            t_min_arr, attr_name="_t_min", state_ids=state_ids, weights=weights
-        )
-        self._t_max = self._value_from_array(
-            t_max_arr, attr_name="_t_max", state_ids=state_ids, weights=weights
-        )
-        self._t_min_star = self._value_from_array(
-            t_min_star_arr,
-            attr_name="_t_min_star",
-            state_ids=state_ids,
-            weights=weights,
-        )
-        self._t_max_star = self._value_from_array(
-            t_max_star_arr,
-            attr_name="_t_max_star",
-            state_ids=state_ids,
-            weights=weights,
-        )
 
         dt_arr = t_max_arr - t_min_arr
-        heat_flow_value = self._normalise_existing_value(self._heat_flow, "_heat_flow")
-        cp_value = self._normalise_existing_value(self._CP, "_CP")
+        cp_arr = np.zeros_like(dt_arr, dtype=float)
+        non_zero_dt = np.abs(dt_arr) > _TEMPERATURE_EQUAL_TOL
+        cp_arr[non_zero_dt] = heat_flow_arr[non_zero_dt] / dt_arr[non_zero_dt]
 
-        if heat_flow_value is not None:
-            q_arr = self._broadcast_magnitudes(heat_flow_value, state_ids, "_heat_flow")
-            cp_arr = np.zeros_like(dt_arr, dtype=float)
-            non_zero_dt = np.abs(dt_arr) > _TEMPERATURE_EQUAL_TOL
-            cp_arr[non_zero_dt] = q_arr[non_zero_dt] / dt_arr[non_zero_dt]
-            self._CP = self._value_from_array(
-                cp_arr, attr_name="_CP", state_ids=state_ids, weights=weights
-            )
-        elif cp_value is not None:
-            cp_arr = self._broadcast_magnitudes(cp_value, state_ids, "_CP")
-            heat_flow_arr = cp_arr * dt_arr
-            self._heat_flow = self._value_from_array(
-                heat_flow_arr,
-                attr_name="_heat_flow",
-                state_ids=state_ids,
-                weights=weights,
-            )
+        htr_arr = np.zeros_like(htc_arr, dtype=float)
+        positive_mask = htc_arr > 0.0
+        htr_arr[positive_mask] = 1.0 / htc_arr[positive_mask]
+        price_arr = self._broadcast_value_object(price_value, state_ids, "_price")
+        if price_arr is None:
+            price_arr = np.zeros_like(heat_flow_arr, dtype=float)
+        ut_cost_arr = (heat_flow_arr / 1000.0) * price_arr
 
-        self._calc_utility_cost()
-        self._calc_htr_and_cp_product()
+        rcp_arr = np.zeros_like(cp_arr, dtype=float)
+        rcp_arr[positive_mask] = cp_arr[positive_mask] * htr_arr[positive_mask]
+
+        return _DerivedStreamState(
+            state_ids=state_ids,
+            weights=weights,
+            stream_type=stream_type,
+            t_min=t_min_arr,
+            t_max=t_max_arr,
+            t_min_star=t_min_star_arr,
+            t_max_star=t_max_star_arr,
+            cp=cp_arr,
+            htr=htr_arr,
+            ut_cost=ut_cost_arr,
+            rcp=rcp_arr,
+        )
+
+    def _derived_value(self, attr_name: str) -> Value | None:
+        derived = self._derive_stream_state()
+        if derived is None:
+            return None
+
+        magnitudes = {
+            "_t_min": derived.t_min,
+            "_t_max": derived.t_max,
+            "_t_min_star": derived.t_min_star,
+            "_t_max_star": derived.t_max_star,
+            "_CP": derived.cp,
+            "_htr": derived.htr,
+            "_ut_cost": derived.ut_cost,
+            "_RCP_prod": derived.rcp,
+        }[attr_name]
+        return self._value_from_array(
+            magnitudes,
+            attr_name=attr_name,
+            state_ids=derived.state_ids,
+            weights=derived.weights,
+        )
 
     def invert(self) -> None:
         """Flip a utility stream into its generating process-stream analogue."""
@@ -926,60 +979,4 @@ class Stream:
         self._P_supply, self._P_target = self._P_target, self._P_supply
         self._h_supply, self._h_target = self._h_target, self._h_supply
 
-        self._type = ST.Cold.value if self._type == ST.Hot.value else ST.Hot.value
         self._is_process_stream = True
-        self._update_attributes()
-
-    def _calc_utility_cost(self):
-        heat_flow_value = self._normalise_existing_value(self._heat_flow, "_heat_flow")
-        price_value = self._normalise_existing_value(self._price, "_price")
-        if heat_flow_value is None or price_value is None:
-            return
-
-        state_ids, weights = self._resolve_state_context(
-            {"_heat_flow": heat_flow_value, "_price": price_value}
-        )
-        heat_flow_arr = self._broadcast_magnitudes(
-            heat_flow_value, state_ids, "_heat_flow"
-        )
-        price_arr = self._broadcast_magnitudes(price_value, state_ids, "_price")
-        utility_cost_arr = (heat_flow_arr / 1000.0) * price_arr
-        self._ut_cost = self._value_from_array(
-            utility_cost_arr,
-            attr_name="_ut_cost",
-            state_ids=state_ids,
-            weights=weights,
-        )
-
-    def _calc_htr_and_cp_product(self):
-        htc_value = self._normalise_existing_value(self._htc, "_htc")
-        cp_value = self._normalise_existing_value(self._CP, "_CP")
-        if htc_value is None:
-            return
-
-        state_ids, weights = self._resolve_state_context(
-            {"_htc": htc_value, "_CP": cp_value}
-        )
-        htc_arr = self._broadcast_magnitudes(htc_value, state_ids, "_htc")
-        if htc_arr is None:
-            return
-
-        htr_arr = np.zeros_like(htc_arr, dtype=float)
-        positive_mask = htc_arr > 0.0
-        htr_arr[positive_mask] = 1.0 / htc_arr[positive_mask]
-        self._htr = self._value_from_array(
-            htr_arr, attr_name="_htr", state_ids=state_ids, weights=weights
-        )
-
-        if cp_value is None:
-            return
-
-        cp_arr = self._broadcast_magnitudes(cp_value, state_ids, "_CP")
-        rcp_arr = np.zeros_like(cp_arr, dtype=float)
-        rcp_arr[positive_mask] = cp_arr[positive_mask] * htr_arr[positive_mask]
-        self._RCP_prod = self._value_from_array(
-            rcp_arr,
-            attr_name="_RCP_prod",
-            state_ids=state_ids,
-            weights=weights,
-        )

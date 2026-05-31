@@ -49,6 +49,7 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "show_dashboard()" in combined
     assert "plot.grand_composite_curve" in combined
     assert "problem.target.direct_heat_pump" in combined
+    assert 'state_id="peak"' in combined or 'state_id="0"' in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():
@@ -111,6 +112,7 @@ def test_docs_reference_the_current_three_notebook_series():
     assert "03_carnot_hpr_comparison.ipynb" in combined
     assert "01_basic_pinch_analysis.ipynb" not in combined
     assert "06_target_services_workflow.ipynb" not in combined
+    assert "selected-state" in combined or 'state_id="' in combined
 
 
 def test_docs_explain_base_and_notebook_installs():

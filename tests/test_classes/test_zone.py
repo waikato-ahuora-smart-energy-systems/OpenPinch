@@ -45,10 +45,22 @@ def sample_streams():
 @pytest.fixture
 def sample_utilities():
     """Return sample utilities data used by this test module."""
-    u1 = Stream(name="Steam", t_supply=450, t_target=250, is_process_stream=False)
-    u1.ut_cost = 100
-    u2 = Stream(name="CoolingWater", t_supply=25, t_target=40, is_process_stream=False)
-    u2.ut_cost = 50
+    u1 = Stream(
+        name="Steam",
+        t_supply=450,
+        t_target=250,
+        heat_flow=250,
+        price=400,
+        is_process_stream=False,
+    )
+    u2 = Stream(
+        name="CoolingWater",
+        t_supply=25,
+        t_target=40,
+        heat_flow=125,
+        price=400,
+        is_process_stream=False,
+    )
     return [u1, u2]
 
 

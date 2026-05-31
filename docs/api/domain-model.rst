@@ -61,8 +61,8 @@ How These Objects Relate
 
 The usual flow is:
 
-1. input schemas describe the external payload
-2. preparation turns that payload into ``Zone`` and ``Stream`` objects
+1. input schemas describe the external inputs
+2. preparation turns those inputs into ``Zone`` and ``Stream`` objects
 3. targeting populates ``ProblemTable`` objects, zone targets, and graph data
 4. result schemas serialize the solved state back out
 

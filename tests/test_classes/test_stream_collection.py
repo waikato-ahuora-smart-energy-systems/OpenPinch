@@ -468,6 +468,8 @@ def test_validate_state_alignment_returns_none_for_all_scalar_streams():
 
     assert state_ids is None
     assert weights is None
+    assert sc.state_ids is None
+    assert sc.weights is None
 
 
 def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
@@ -504,6 +506,54 @@ def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
 
     assert state_ids == ["0", "1"]
     np.testing.assert_allclose(weights, np.array([0.5, 0.5]))
+    assert sc.state_ids == ["0", "1"]
+    np.testing.assert_allclose(sc.weights, np.array([0.5, 0.5]))
+
+
+def test_state_context_is_preserved_on_copy_and_subset():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="H1",
+            t_supply={
+                "values": [200.0, 180.0],
+                "state_ids": ["0", "1"],
+                "weights": [0.25, 0.75],
+                "unit": "degC",
+            },
+            t_target={
+                "values": [120.0, 100.0],
+                "state_ids": ["0", "1"],
+                "weights": [0.25, 0.75],
+                "unit": "degC",
+            },
+            heat_flow={
+                "values": [100.0, 80.0],
+                "state_ids": ["0", "1"],
+                "weights": [0.25, 0.75],
+                "unit": "kW",
+            },
+            htc=1.0,
+        ),
+    )
+    sc.add(
+        Stream(
+            name="HU",
+            t_supply=260.0,
+            t_target=220.0,
+            heat_flow=0.0,
+            is_process_stream=False,
+        )
+    )
+    sc.validate_state_alignment()
+
+    copied = sc.copy()
+    hot_streams = sc.get_hot_streams()
+
+    assert copied.state_ids == ["0", "1"]
+    np.testing.assert_allclose(copied.weights, np.array([0.25, 0.75]))
+    assert hot_streams.state_ids == ["0", "1"]
+    np.testing.assert_allclose(hot_streams.weights, np.array([0.25, 0.75]))
 
 
 def test_validate_state_alignment_rejects_mismatched_state_ids():

@@ -51,7 +51,7 @@ For supported advanced Heat Pump and refrigeration work today, prefer the
 methods. Use ``chocolate_factory.json`` plus notebook 03 when the question is
 direct-versus-indirect comparison over a study range, and use
 ``heat_pump_targeting.json`` when you want a smaller direct HPR screening
-payload.
+input data.
 
 What To Compare
 ---------------

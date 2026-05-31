@@ -60,6 +60,9 @@ Python Pattern
    baseline = workspace.case("baseline")
    summary = baseline.summary_frame()
    total_site = baseline.target.indirect_heat_integration()
+   selected_state_total_site = baseline.target.indirect_heat_integration(
+       state_id="peak",
+   )
 
 What To Compare
 ---------------

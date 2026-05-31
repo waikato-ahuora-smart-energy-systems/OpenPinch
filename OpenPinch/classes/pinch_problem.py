@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -14,7 +15,7 @@ from ..lib.schemas.io import TargetInput, TargetOutput
 from ..lib.schemas.targets import BaseTargetModel
 from ..resources import list_sample_cases, read_sample_case
 from ..services import data_preprocessing_service
-from ..services.input_data_processing._canonicalization import canonical_problem_payload
+from ..services.input_data_processing._canonicalization import canonical_problem_inputs
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
 )
@@ -49,8 +50,8 @@ from ._problem.validation import (
 from ._problem.validation import (
     format_schema_validation_error as _format_schema_validation_error,
 )
-from .accessors.plot_accessor import _PlotAccessorDescriptor
-from .accessors.target_accessor import _TargetAccessorDescriptor
+from .accessors._plot_accessor import _PlotAccessorDescriptor
+from .accessors._target_accessor import _TargetAccessorDescriptor
 from .stream_collection import StreamCollection
 from .zone import Zone
 
@@ -99,7 +100,7 @@ class PinchProblem:
             TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | None
         ) = None,
     ) -> Optional[Zone]:
-        """Load input data from JSON, Excel, CSV, or an in-memory payload."""
+        """Load problem inputs from JSON, Excel, CSV, or an in-memory object."""
         if source is None:
             if self.problem_filepath is None:
                 return None
@@ -118,20 +119,22 @@ class PinchProblem:
         zone: Optional[Zone] = None,
         direct_service_func: Optional[ZoneService] = None,
         indirect_service_func: Optional[ZoneService] = None,
+        options: Optional[dict[str, Any]] = None,
     ) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
-        if self._master_zone is None:
-            if self._problem_data is None:
-                raise RuntimeError("No input loaded. Call load(...) first.")
-            self.load(self._problem_data)
+        state_id = None if not isinstance(options, dict) else options.get("state_id")
+        execution_master_zone = self._build_execution_master_zone(state_id=state_id)
         if not isinstance(zone, Zone):
-            zone = self._master_zone
+            zone = execution_master_zone
         get_targets_for_zone_and_sub_zones(
             zone=zone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
+            args=options,
         )
-        self._results = TargetOutput.model_validate(extract_results(zone))
+        self._results = TargetOutput.model_validate(
+            extract_results(zone, state_id=state_id)
+        )
         return self._results
 
     def _execute_targeting(
@@ -144,19 +147,26 @@ class PinchProblem:
         direct_service_func: Optional[ZoneService] = None,
         indirect_service_func: Optional[ZoneService] = None,
     ) -> BaseTargetModel:
-        zone = self._resolve_target_zone(application_zone)
+        state_id = None if not isinstance(options, dict) else options.get("state_id")
+        execution_master_zone = self._build_execution_master_zone(state_id=state_id)
+        zone = self._resolve_target_zone(
+            application_zone, master_zone=execution_master_zone
+        )
         if include_subzones:
             self._run_targeting_for_zone_and_subzones(
                 zone=zone,
                 direct_service_func=direct_service_func,
                 indirect_service_func=indirect_service_func,
+                options=options,
             )
         else:
             if direct_service_func is not None:
                 direct_service_func(zone, options)
             if indirect_service_func is not None:
                 indirect_service_func(zone, options)
-            self._refresh_results_from_master_zone()
+            self._results = TargetOutput.model_validate(
+                extract_results(execution_master_zone, state_id=state_id)
+            )
 
         try:
             return zone.targets[target_id]
@@ -166,14 +176,126 @@ class PinchProblem:
                 f"for zone {zone.name!r}."
             ) from exc
 
-    def _resolve_target_zone(self, application_zone: Optional[str] = None) -> "Zone":
-        if self._master_zone is None:
-            raise RuntimeError("Load source first before targeting.")
+    def _resolve_target_zone(
+        self,
+        application_zone: Optional[str] = None,
+        *,
+        master_zone: Optional["Zone"] = None,
+    ) -> "Zone":
+        selected_master_zone = master_zone or self._master_zone
+        if selected_master_zone is None:
+            raise RuntimeError("Load problem source data first before targeting.")
         if isinstance(application_zone, Zone):
             return application_zone
         if application_zone is None:
+            return selected_master_zone
+        return selected_master_zone.get_subzone(application_zone)
+
+    def _build_execution_master_zone(
+        self,
+        *,
+        state_id: str | None = None,
+    ) -> "Zone":
+        if self._problem_data is None and self._master_zone is None:
+            raise RuntimeError("No input loaded. Call load(...) first.")
+        if self._master_zone is None:
+            self.load(self._problem_data)
+        if state_id is None:
             return self._master_zone
-        return self._master_zone.get_subzone(application_zone)
+
+        self._validate_known_state_id(state_id)
+        validated = self.validate()
+        execution_master_zone = data_preprocessing_service(
+            validated,
+            project_name=self._project_name,
+            state_id=state_id,
+        )
+        execution_master_zone._selected_state_id = state_id
+        return execution_master_zone
+
+    @property
+    def state_ids(self) -> list[str]:
+        """Return the canonical ordered state identifiers for the loaded problem."""
+        master_zone = self._require_prepared_root_zone()
+        state_ids = master_zone.all_streams.state_ids
+        return [] if state_ids is None else list(state_ids)
+
+    def target_all_states(
+        self,
+        *,
+        parallel: bool | str = False,
+        max_workers: int | None = None,
+        preserve_cached_results: bool = True,
+    ) -> dict[str, TargetOutput]:
+        """Run default targeting once per canonical state id.
+
+        Parameters
+        ----------
+        parallel:
+            ``False`` runs serially. ``True`` and ``"process"`` use a process pool,
+            while ``"thread"`` uses a thread pool which is suitable for no-GIL
+            Python builds.
+        max_workers:
+            Optional executor worker limit for parallel runs.
+        preserve_cached_results:
+            Restore the original ``results`` cache after the batch run when ``True``.
+        """
+        state_ids = self.state_ids
+        if not state_ids:
+            raise ValueError("This problem has no canonical state_ids to target.")
+
+        previous_results = self._results
+        try:
+            if parallel in (False, None):
+                return {
+                    state_id: self._solve_target_for_state(state_id)
+                    for state_id in state_ids
+                }
+            return self._target_all_states_parallel(
+                state_ids=state_ids,
+                backend="thread" if parallel == "thread" else "process",
+                max_workers=max_workers,
+            )
+        finally:
+            if preserve_cached_results:
+                self._results = previous_results
+
+    def _solve_target_for_state(self, state_id: str) -> TargetOutput:
+        result = self.target(state_id=state_id)
+        return TargetOutput.model_validate(result.model_dump(mode="python"))
+
+    def _target_all_states_parallel(
+        self,
+        *,
+        state_ids: list[str],
+        backend: str,
+        max_workers: int | None,
+    ) -> dict[str, TargetOutput]:
+        problem_inputs = self.canonical_problem_json()
+        executor_cls = (
+            ThreadPoolExecutor if backend == "thread" else ProcessPoolExecutor
+        )
+        results_by_state: dict[str, TargetOutput] = {}
+        with executor_cls(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(
+                    _solve_default_target_for_state,
+                    problem_inputs,
+                    self.project_name,
+                    state_id,
+                ): state_id
+                for state_id in state_ids
+            }
+            for future in as_completed(futures):
+                state_id = futures[future]
+                results_by_state[state_id] = TargetOutput.model_validate(
+                    future.result()
+                )
+        return {state_id: results_by_state[state_id] for state_id in state_ids}
+
+    def _validate_known_state_id(self, state_id: str) -> None:
+        master_zone = self._require_prepared_root_zone()
+        master_zone.all_streams.validate_state_id(state_id)
 
     def validate(self) -> TargetInput:
         """Validate the currently loaded problem data without running targeting."""
@@ -332,17 +454,17 @@ class PinchProblem:
         return obj
 
     def to_problem_json(self, *, canonical: bool = False) -> JsonDict:
-        """Return the currently loaded problem payload."""
+        """Return the currently loaded problem inputs."""
         if self._problem_data is None:
             raise RuntimeError(
                 "No problem_data available. Did you call load(...) or from_json(...)?"
             )
         if canonical:
-            return self._canonical_problem_payload()
+            return self._canonical_problem_inputs()
         return self._problem_data
 
     def canonical_problem_json(self) -> JsonDict:
-        """Return a canonical mutable payload including an explicit zone tree."""
+        """Return canonical mutable problem inputs with an explicit zone tree."""
         return self.to_problem_json(canonical=True)
 
     def set_dt_cont_multiplier(
@@ -374,20 +496,20 @@ class PinchProblem:
         if not isinstance(options, dict):
             raise TypeError("options must be provided as a dict.")
 
-        payload = self.canonical_problem_json()
-        current_options = payload.get("options") or {}
-        payload["options"] = (
+        problem_inputs = self.canonical_problem_json()
+        current_options = problem_inputs.get("options") or {}
+        problem_inputs["options"] = (
             deepcopy(options)
             if replace
             else {**deepcopy(current_options), **deepcopy(options)}
         )
-        self._replace_problem_payload(payload)
+        self._replace_problem_inputs(problem_inputs)
         return self._master_zone
 
-    def _canonical_problem_payload(self) -> JsonDict:
-        """Return a canonical mutable payload including an explicit zone tree."""
+    def _canonical_problem_inputs(self) -> JsonDict:
+        """Return canonical mutable problem inputs with an explicit zone tree."""
         validated = self.validate()
-        return canonical_problem_payload(validated, project_name=self.project_name)
+        return canonical_problem_inputs(validated, project_name=self.project_name)
 
     def __repr__(self) -> str:
         """Return a compact summary of the source and cached result state."""
@@ -451,7 +573,7 @@ class PinchProblem:
 
     def _apply_loaded_source(self, loaded_source: LoadedProblemSource) -> None:
         """Apply one normalized source bundle to this problem instance."""
-        self._problem_data = loaded_source.payload
+        self._problem_data = loaded_source.input_data
         self._input_source_kind = loaded_source.source_kind
         self._validation_context = loaded_source.validation_context
         self._problem_filepath = loaded_source.problem_filepath
@@ -465,13 +587,23 @@ class PinchProblem:
         self._results = None
         return self._master_zone
 
-    def _replace_problem_payload(self, payload: JsonDict) -> Zone:
-        """Replace the current payload and rebuild prepared analysis state."""
+    def _replace_problem_inputs(self, problem_inputs: JsonDict) -> Zone:
+        """Replace the current problem inputs and rebuild analysis state."""
         current_filepath = self._problem_filepath
         loaded_source = prepare_in_memory_problem_source(
-            payload,
+            problem_inputs,
             source_kind=self._input_source_kind or "target_input",
         )
         self._apply_loaded_source(loaded_source)
         self._problem_filepath = current_filepath
         return self._rebuild_problem_state()
+
+
+def _solve_default_target_for_state(
+    problem_inputs: JsonDict,
+    project_name: str,
+    state_id: str,
+) -> dict[str, Any]:
+    problem = PinchProblem(source=problem_inputs, project_name=project_name)
+    result = problem.target(state_id=state_id)
+    return result.model_dump(mode="python")

@@ -72,9 +72,17 @@ problem.target()
 summary = problem.summary_frame()
 print(summary)
 
+selected_state = problem.target.direct_heat_integration(state_id="peak")
+state_summary = problem.summary_frame()
+print(state_summary[["Target", "State ID", "Hot Utility Target", "Cold Utility Target"]])
+
 problem.export_excel("results")
 problem.plot.export("graphs", graph_type="gcc")
 ```
+
+When the PinchProblem data contains stateful values, the named ``problem.target.*``
+entry points also accept ``state_id=...`` so one cached solve can be refreshed
+for a selected operating state without flattening the in-memory model first.
 
 For named study cases and bundle save/load, use `PinchWorkspace`:
 

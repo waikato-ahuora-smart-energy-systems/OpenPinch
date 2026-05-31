@@ -1,4 +1,4 @@
-"""Canonical payload and zone-tree preparation helpers."""
+"""Canonical problem-input and zone-tree preparation helpers."""
 
 from __future__ import annotations
 
@@ -13,13 +13,13 @@ from ...lib.enums import ZT
 from ...lib.schemas.io import StreamSchema, TargetInput, UtilitySchema, ZoneTreeSchema
 
 
-def canonical_problem_payload(
+def canonical_problem_inputs(
     input_data: TargetInput,
     *,
     project_name: str,
 ) -> dict[str, Any]:
-    """Build a canonical mutable payload with an explicit normalized zone tree."""
-    payload = copy.deepcopy(input_data.model_dump(mode="python"))
+    """Build canonical mutable problem inputs with a normalized zone tree."""
+    problem_inputs = copy.deepcopy(input_data.model_dump(mode="python"))
     stream_models = [stream.model_copy(deep=True) for stream in input_data.streams]
     zone_tree = (
         input_data.zone_tree.model_copy(deep=True)
@@ -31,9 +31,11 @@ def canonical_problem_payload(
         stream_models,
         project_name,
     )
-    payload["streams"] = [stream.model_dump(mode="python") for stream in stream_models]
-    payload["zone_tree"] = canonical_zone_tree.model_dump(mode="python")
-    return payload
+    problem_inputs["streams"] = [
+        stream.model_dump(mode="python") for stream in stream_models
+    ]
+    problem_inputs["zone_tree"] = canonical_zone_tree.model_dump(mode="python")
+    return problem_inputs
 
 
 def _build_zone_config(

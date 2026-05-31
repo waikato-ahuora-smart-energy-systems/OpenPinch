@@ -380,7 +380,7 @@
                 "unit": "kW"
             },
             "dt_cont": {
-                "value": -2.0,
+                "value": 2.0,
                 "unit": "degC"
             },
             "htc": {
@@ -404,7 +404,7 @@
                 "unit": "degC"
             },
             "dt_cont": {
-                "value": 10.0,
+                "value": null,
                 "unit": "degC"
             },
             "price": null,
@@ -426,7 +426,7 @@
                 "unit": "degC"
             },
             "dt_cont": {
-                "value": 10.0,
+                "value": null,
                 "unit": "degC"
             },
             "price": null,

@@ -43,7 +43,7 @@ Service Package Map
 Preparation and Zone Construction
 ---------------------------------
 
-These functions are the bridge between external schema payloads and the
+These functions are the bridge between external schema inputs and the
 internal object model.
 
 .. automodule:: OpenPinch.services.input_data_processing

@@ -1,4 +1,4 @@
-"""Excel workbook ingestion helpers for OpenPinch problem/result payloads."""
+"""Excel workbook ingestion helpers for OpenPinch problem/result data."""
 
 from __future__ import annotations
 

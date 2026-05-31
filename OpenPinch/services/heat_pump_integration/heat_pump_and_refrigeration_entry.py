@@ -55,8 +55,10 @@ __all__ = [
 def compute_direct_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
+    args: dict | None = None,
 ) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
     """Solve an explicit direct Heat Pump or refrigeration target for one zone."""
+    state_id = None if not isinstance(args, dict) else args.get("state_id")
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.DI.value].pt)
     target_load = _validate_hpr_required(
@@ -65,6 +67,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
         zone_config=zone.config,
+        state_id=state_id,
     )
     if target_load < tol:
         return None
@@ -94,6 +97,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
             is_direct=True,
             is_heat_pumping=is_heat_pumping,
         ),
+        "state_id": state_id,
     } | _get_hpr_target_summary(res, zone)
     model_cls = DirectHeatPumpTarget if is_heat_pumping else DirectRefrigerationTarget
     return model_cls.model_validate(payload)
@@ -102,8 +106,10 @@ def compute_direct_heat_pump_or_refrigeration_target(
 def compute_indirect_heat_pump_or_refrigeration_target(
     zone: Zone,
     is_heat_pumping: bool,
+    args: dict | None = None,
 ) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
     """Solve an indirect / utility system Heat Pump or refrigeration target."""
+    state_id = None if not isinstance(args, dict) else args.get("state_id")
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.TS.value].pt)
     # Create problem table based on inverted utility streams
@@ -112,6 +118,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
         is_shifted=True,
         is_full_analysis=True,
+        state_id=state_id,
     )
     # Perform heat pump and/or refrigeration targeting on the correct cascades
     target_load = _validate_hpr_required(
@@ -120,6 +127,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
         zone_config=zone.config,
+        state_id=state_id,
     )
     if target_load < tol:
         return None
@@ -149,6 +157,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
             is_direct=False,
             is_heat_pumping=is_heat_pumping,
         ),
+        "state_id": state_id,
     } | _get_hpr_target_summary(res, zone)
     model_cls = (
         IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
@@ -168,6 +177,7 @@ def _validate_hpr_required(
     zone_name: str = None,
     zone_config: Configuration | None = None,
     r: dict | float | int = None,
+    state_id: str | None = None,
 ) -> float:
     if zone_config is None:
         raise ValueError("zone_config must be provided for HPR targeting.")
@@ -184,7 +194,15 @@ def _validate_hpr_required(
     if isinstance(hpr_load, float | int):
         Q = Q_max * hpr_load
     elif isinstance(hpr_load, dict):
-        Q = min(get_value(hpr_load, val2=Q_max, zone_name=zone_name), Q_max)
+        Q = min(
+            get_value(
+                hpr_load,
+                val2=Q_max,
+                zone_name=zone_name,
+                state_id=state_id,
+            ),
+            Q_max,
+        )
     elif isinstance(hpr_load, str):
         hpr_load = literal_eval(hpr_load.strip())
         if isinstance(hpr_load, float | int | dict):
@@ -195,6 +213,7 @@ def _validate_hpr_required(
                 zone_name=zone_name,
                 zone_config=zone_config,
                 r=hpr_load,
+                state_id=state_id,
             )
     return Q
 

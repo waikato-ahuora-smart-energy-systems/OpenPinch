@@ -65,6 +65,12 @@ def test_packaged_notebooks_use_pinch_workspace_without_local_helpers(tmp_path: 
         assert "read_sample_case" not in combined_source
         assert "json.loads(" not in combined_source
         assert "def " not in combined_source
+        assert all(cell.get("execution_count") is None for cell in notebook["cells"])
+        assert all(
+            not cell.get("outputs")
+            for cell in notebook["cells"]
+            if cell["cell_type"] == "code"
+        )
 
 
 def test_notebook_3_uses_standard_hpr_plot_accessors(tmp_path: Path):
@@ -84,3 +90,24 @@ def test_notebook_3_uses_standard_hpr_plot_accessors(tmp_path: Path):
     assert (
         "profile_problem.plot.grand_composite_curve_with_heat_pump(" in combined_source
     )
+
+
+def test_notebooks_demonstrate_selected_state_targeting_surface(tmp_path: Path):
+    notebook_1 = _load_notebook(
+        copy_notebook(
+            "01_basic_pinch_and_dtcont_sensitivity.ipynb",
+            tmp_path / "01_basic_pinch_and_dtcont_sensitivity.ipynb",
+        )
+    )
+    notebook_2 = _load_notebook(
+        copy_notebook(
+            "02_total_site_targets_and_sugcc.ipynb",
+            tmp_path / "02_total_site_targets_and_sugcc.ipynb",
+        )
+    )
+
+    combined_1 = _combined_source(notebook_1)
+    combined_2 = _combined_source(notebook_2)
+
+    assert 'target.direct_heat_integration(state_id="0")' in combined_1
+    assert 'target.indirect_heat_integration(state_id="0")' in combined_2

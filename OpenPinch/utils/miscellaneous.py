@@ -1,6 +1,6 @@
 """Shared numerical helpers."""
 
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Iterable, Tuple, Union
 
 import numpy as np
 
@@ -15,13 +15,62 @@ __all__ = [
     "clean_composite_curve_ends",
     "delta_vals",
     "delta_with_zero_at_start",
+    "extract_state_context",
     "g_ineq_penalty",
     "get_value",
     "graph_simple_cc_plot",
     "interp_with_plateaus",
     "linear_interpolation",
     "make_monotonic",
+    "resolve_stream_attr",
+    "resolve_stream_attr_array",
+    "resolve_value_for_state",
 ]
+
+
+def extract_state_context(
+    val: Any,
+) -> tuple[list[str] | None, np.ndarray | None]:
+    """Extract state identifiers and weights from raw payloads or value-like objects."""
+    if val is None:
+        return None, None
+    if hasattr(val, "model_dump") and not isinstance(val, dict):
+        val = val.model_dump(mode="python")
+    if getattr(val, "_stream_value_accessor", False):
+        val = val.raw_value
+    if isinstance(val, Value):
+        if len(val.state_values) <= 1:
+            return None, None
+        state_ids = [str(idx) for idx in range(len(val.state_values))]
+        weights = np.ones(len(state_ids), dtype=float) / len(state_ids)
+        return state_ids, weights
+    if not isinstance(val, dict):
+        return None, None
+    if "values" not in val or val.get("values") is None:
+        return None, None
+
+    values = list(val["values"])
+    if len(values) <= 1:
+        return None, None
+
+    state_ids = val.get("state_ids")
+    if state_ids is None:
+        state_ids = [str(idx) for idx in range(len(values))]
+    else:
+        state_ids = [str(state_id) for state_id in state_ids]
+
+    weights = val.get("weights")
+    if weights is None:
+        weights_arr = np.ones(len(values), dtype=float) / len(values)
+    else:
+        weights_arr = np.asarray(weights, dtype=float).reshape(-1)
+        if len(weights_arr) != len(values):
+            raise ValueError("weights length must match the number of states.")
+        total = float(weights_arr.sum())
+        if total <= 0.0:
+            raise ValueError("weights must sum to a positive value.")
+        weights_arr = weights_arr / total
+    return state_ids, weights_arr
 
 
 def _require_plotly():
@@ -36,10 +85,92 @@ def _require_plotly():
     return go
 
 
+def resolve_value_for_state(
+    val: Any,
+    state_id: str | None = None,
+    *,
+    state_ids: list[str] | None = None,
+    default_allowed: bool = True,
+) -> float | None:
+    """Return one scalar magnitude from a scalar or stateful value-like object."""
+    if val is None:
+        return None
+    if getattr(val, "_stream_value_accessor", False):
+        raw_value = val.raw_value
+    elif isinstance(val, Value):
+        raw_value = val
+    else:
+        raw_value = Value(val)
+
+    if len(raw_value.state_values) <= 1:
+        return float(raw_value.value)
+
+    available_state_ids = (
+        list(state_ids) if state_ids is not None else extract_state_context(val)[0]
+    )
+    if available_state_ids is None:
+        raise ValueError("state_ids are required for stateful values.")
+    resolved_state_id = state_id
+    if resolved_state_id is None:
+        if not default_allowed:
+            raise ValueError("state_id is required for stateful values.")
+        resolved_state_id = (
+            "0" if "0" in available_state_ids else available_state_ids[0]
+        )
+
+    if resolved_state_id not in available_state_ids:
+        raise ValueError(
+            f"Unknown state_id {resolved_state_id!r}. "
+            f"Available states: {', '.join(available_state_ids)}."
+        )
+    return float(raw_value[available_state_ids.index(str(resolved_state_id))].value)
+
+
+def resolve_stream_attr(
+    stream: Any,
+    attr_name: str,
+    state_id: str | None = None,
+    *,
+    default_allowed: bool = True,
+) -> float | None:
+    """Resolve one stream attribute to a scalar for the selected state."""
+    if not hasattr(stream, attr_name):
+        raise AttributeError(f"Stream {stream!r} has no attribute {attr_name!r}.")
+    return resolve_value_for_state(
+        getattr(stream, attr_name),
+        state_id=state_id,
+        state_ids=getattr(stream, "state_ids", None),
+        default_allowed=default_allowed,
+    )
+
+
+def resolve_stream_attr_array(
+    streams: Iterable[Any],
+    attr_name: str,
+    state_id: str | None = None,
+    *,
+    default_allowed: bool = True,
+) -> np.ndarray:
+    """Resolve one attribute across a stream iterable into a float array."""
+    return np.asarray(
+        [
+            resolve_stream_attr(
+                stream,
+                attr_name,
+                state_id=state_id,
+                default_allowed=default_allowed,
+            )
+            for stream in streams
+        ],
+        dtype=float,
+    )
+
+
 def get_value(
     val: Union[float, int, str, dict, "ValueWithUnit", None],
     val2: Union[float, int, str, None] = None,
     zone_name: str = None,
+    state_id: str | None = None,
 ) -> float:
     """Extract a numeric value from supported scalars and payload wrappers."""
     if isinstance(val, bool):
@@ -49,25 +180,24 @@ def get_value(
             "or ValueWithUnit."
         )
     elif isinstance(val, Value):
-        return val.weighted_value
-    elif getattr(val, "_stream_value_view", False):
-        return val.value
+        return resolve_value_for_state(val, state_id=state_id)
+    elif getattr(val, "_stream_value_accessor", False):
+        return resolve_value_for_state(val, state_id=state_id)
     elif isinstance(val, float | int):
         return float(val)
     elif hasattr(val, "model_dump"):
-        return get_value(val.model_dump(mode="python"), val2=val2, zone_name=zone_name)
+        return get_value(
+            val.model_dump(mode="python"),
+            val2=val2,
+            zone_name=zone_name,
+            state_id=state_id,
+        )
     elif isinstance(val, dict):
         if zone_name in val:
-            return get_value(val[zone_name], val2=val2)
+            return get_value(val[zone_name], val2=val2, state_id=state_id)
 
         if _is_stateful_value_payload(val):
-            value = Value(val)
-            default_state_id = "0"
-            if value.state_ids is None:
-                return float(value.value)
-            if default_state_id not in value.state_ids:
-                default_state_id = value.state_ids[0]
-            return float(value[default_state_id].value)
+            return resolve_value_for_state(val, state_id=state_id)
 
         payload = val.copy()
         if "value" not in payload:
@@ -83,20 +213,24 @@ def get_value(
                 "'power', 'log', 'exp', 'abs', 'min', or 'max'."
             )
 
-        value = get_value(payload["value"])
+        value = get_value(payload["value"], state_id=state_id)
 
         if "multiplier" in payload:
-            return value * get_value(payload["multiplier"])
+            return value * get_value(payload["multiplier"], state_id=state_id)
         elif "multiply" in payload:
-            return value * get_value(payload["multiply"])
+            return value * get_value(payload["multiply"], state_id=state_id)
         elif "add" in payload:
-            return value + get_value(payload["add"])
+            return value + get_value(payload["add"], state_id=state_id)
         elif "subtract" in payload:
-            return value - get_value(payload["subtract"])
+            return value - get_value(payload["subtract"], state_id=state_id)
         elif "divide" in payload:
-            return value / get_value(payload["divide"]) if value != 0 else 0.0
+            return (
+                value / get_value(payload["divide"], state_id=state_id)
+                if value != 0
+                else 0.0
+            )
         elif "power" in payload:
-            return value ** get_value(payload["power"])
+            return value ** get_value(payload["power"], state_id=state_id)
         elif "log" in payload:
             base = payload["log"] if isinstance(payload["log"], float) else np.e
             return np.log(value) / np.log(base) if value > 0 else 0.0
@@ -106,9 +240,9 @@ def get_value(
         elif "abs" in payload:
             return abs(value)
         elif "min" in payload:
-            return min(value, get_value(payload["min"]))
+            return min(value, get_value(payload["min"], state_id=state_id))
         elif "max" in payload:
-            return max(value, get_value(payload["max"]))
+            return max(value, get_value(payload["max"], state_id=state_id))
         else:
             return value
     elif _is_value_with_unit(val):
@@ -121,7 +255,7 @@ def get_value(
                 f"Unsupported string value: {val}. String must be convertible to float."
             )
     elif val is None and val2 is not None:
-        return get_value(val2, zone_name=zone_name)
+        return get_value(val2, zone_name=zone_name, state_id=state_id)
     elif val is None:
         return None
     else:

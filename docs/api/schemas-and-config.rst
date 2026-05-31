@@ -3,7 +3,7 @@ Schemas and Config
 
 OpenPinch has two distinct but closely related typed surfaces:
 
-- schema models for external payloads and returned results
+- schema models for external inputs and returned results
 - a runtime :class:`~OpenPinch.lib.config.Configuration` object attached to
   each prepared zone
 
@@ -79,7 +79,7 @@ model choices.
 Design Notes
 ------------
 
-The schema layer should be the source of truth for external payload contracts.
+The schema layer should be the source of truth for external input contracts.
 The configuration layer should be the source of truth for runtime toggles and
 per-zone behavior. Keeping those roles distinct is what makes the package
 predictable when used from notebooks, services, and the CLI.

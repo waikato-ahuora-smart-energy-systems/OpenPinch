@@ -87,7 +87,7 @@ The practical power of OpenPinch comes from the combination of:
 - multiple workflow styles over one analysis engine
 - hierarchical zone modeling
 - graph-first interpretation support
-- typed payloads for integration into other software
+- typed input/result models for integration into other software
 - packaged examples and notebooks that exercise the supported public API
 
 For the workflow-level view, continue to :doc:`workflow-map`.

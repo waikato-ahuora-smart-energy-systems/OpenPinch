@@ -1,4 +1,4 @@
-"""Schemas for external inputs, outputs, and user-facing I/O payloads."""
+"""Schemas for external inputs, outputs, and user-facing I/O data."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class ZoneTreeSchema(BaseModel):
 
 
 class TargetInput(BaseModel):
-    """Validated top-level input payload for ``pinch_analysis_service``."""
+    """Validated top-level input data for ``pinch_analysis_service``."""
 
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)
@@ -70,15 +70,16 @@ class TargetInput(BaseModel):
 
 
 class TargetOutput(BaseModel):
-    """Top-level payload returned by :func:`OpenPinch.pinch_analysis_service`."""
+    """Top-level response data returned by :func:`OpenPinch.pinch_analysis_service`."""
 
     name: str = "Site"
+    state_id: Optional[str] = None
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
 
 
 class THSchema(BaseModel):
-    """Temperature-enthalpy series payload used for Problem Table exchange."""
+    """Temperature-enthalpy series data used for Problem Table exchange."""
 
     T: List[float]
     H_hot: Optional[List[float]] = None
@@ -128,13 +129,13 @@ class LineariseInput(BaseModel):
 
 
 class LineariseOutput(BaseModel):
-    """Output payload containing generated linearised stream segments."""
+    """Output data containing generated linearised stream segments."""
 
     streams: List[Optional[list]]
 
 
 class VisualiseInput(BaseModel):
-    """Input payload for graph visualisation conversion routines."""
+    """Input data for graph visualisation conversion routines."""
 
     zones: list
 

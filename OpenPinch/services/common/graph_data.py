@@ -201,6 +201,7 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
     return {
         "name": graph_title,
         "target_type": getattr(t, "type", None),
+        "state_id": getattr(t, "state_id", None),
         "zone_name": zone_name,
         "zone_address": zone_address,
         "graphs": graphs,

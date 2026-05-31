@@ -309,7 +309,11 @@ def test_equal_supply_target_temperature_adjustment():
     site = prepare_problem(streams=streams)
 
     s = next(iter(site.subzones["Z1"].process_streams))
-    assert s.t_supply != s.t_target
+    assert s.t_supply == pytest.approx(200.0)
+    assert s.t_target == pytest.approx(200.0)
+    assert s.type == "Cold"
+    assert s.t_max > s.t_min
+    assert s.CP > 0.0
 
 
 def test_duplicate_stream_names():
@@ -1023,6 +1027,47 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
                 "zone": "AreaA",
                 "t_supply": {
                     "values": [40.0, 60.0],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [150.0, 200.0],
+                    "unit": "degC",
+                },
+                "heat_flow": {
+                    "values": [120.0, 160.0],
+                    "unit": "kW",
+                },
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "HotA",
+                "zone": "AreaA",
+                "t_supply": 260.0,
+                "t_target": 140.0,
+                "heat_flow": 200.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            }
+        ),
+    ]
+
+    site = prepare_problem(streams=streams)
+    hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
+
+    assert hu.t_max_star == pytest.approx(210.0)
+
+
+def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "ColdA",
+                "zone": "AreaA",
+                "t_supply": {
+                    "values": [40.0, 60.0],
                     "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
@@ -1053,10 +1098,13 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
         ),
     ]
 
-    site = prepare_problem(streams=streams)
-    hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
+    site0 = prepare_problem(streams=streams, state_id="0")
+    site1 = prepare_problem(streams=streams, state_id="1")
+    hu0 = next(utility for utility in site0.hot_utilities if utility.name == "HU")
+    hu1 = next(utility for utility in site1.hot_utilities if utility.name == "HU")
 
-    assert hu.t_max_star == pytest.approx(210.0)
+    assert hu0.t_max_star == pytest.approx(210.0)
+    assert hu1.t_max_star == pytest.approx(210.0)
 
 
 def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
@@ -1107,6 +1155,63 @@ def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
     hot_names = [utility.name for utility in site.hot_utilities]
 
     assert hot_names[:2] == ["HU_swing", "HU_flat"]
+
+
+def test_stateful_hot_utility_sorting_uses_selected_state(dummy_streams):
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "HU_swing",
+                "type": "Hot",
+                "t_supply": {
+                    "values": [250.0, 400.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [200.0, 350.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "dt_cont": 10.0,
+                "heat_flow": 0.0,
+                "price": 100.0,
+                "htc": 1.0,
+            }
+        ),
+        UtilitySchema.model_validate(
+            {
+                "name": "HU_flat",
+                "type": "Hot",
+                "t_supply": {
+                    "values": [300.0, 310.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "t_target": {
+                    "values": [260.0, 270.0],
+                    "state_ids": ["0", "1"],
+                    "unit": "degC",
+                },
+                "dt_cont": 10.0,
+                "heat_flow": 0.0,
+                "price": 100.0,
+                "htc": 1.0,
+            }
+        ),
+    ]
+
+    site0 = prepare_problem(streams=dummy_streams, utilities=utilities, state_id="0")
+    site1 = prepare_problem(streams=dummy_streams, utilities=utilities, state_id="1")
+
+    assert [utility.name for utility in list(site0.hot_utilities)[:2]] == [
+        "HU_flat",
+        "HU_swing",
+    ]
+    assert [utility.name for utility in list(site1.hot_utilities)[:2]] == [
+        "HU_swing",
+        "HU_flat",
+    ]
 
 
 def test_prepare_problem_rejects_cross_stream_state_mismatch():

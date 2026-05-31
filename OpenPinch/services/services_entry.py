@@ -48,21 +48,26 @@ def _apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
 def data_preprocessing_service(
     input_data: TargetInput,
     project_name: str = "Site",
+    state_id: str | None = None,
 ) -> Zone:
-    """Validate raw input payloads and construct the in-memory zone tree."""
+    """Validate raw input data and construct the in-memory zone tree."""
     return prepare_problem(
         project_name=project_name,
         streams=input_data.streams,
         utilities=input_data.utilities,
         options=input_data.options,
         zone_tree=input_data.zone_tree,
+        state_id=state_id,
     )
 
 
 def direct_heat_integration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct heat integration targeting for a prepared zone."""
     _apply_zone_config_overrides(zone, args)
-    zone.add_target(compute_direct_integration_targets(zone))
+    zone._selected_state_id = (
+        None if not isinstance(args, dict) else args.get("state_id")
+    )
+    zone.add_target(compute_direct_integration_targets(zone, args))
     return zone
 
 
@@ -74,8 +79,11 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
         is_n_zone_depth=False,
         is_new_stream_collection=True,
     )
-    zone.add_target(compute_total_subzone_utility_targets(zone))
-    zone.add_target(compute_indirect_integration_targets(zone))
+    zone._selected_state_id = (
+        None if not isinstance(args, dict) else args.get("state_id")
+    )
+    zone.add_target(compute_total_subzone_utility_targets(zone, args))
+    zone.add_target(compute_indirect_integration_targets(zone, args))
     return zone
 
 
@@ -83,11 +91,12 @@ def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct Heat Pump targeting after ensuring a base DI target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
-        direct_heat_integration_service(zone)
+        direct_heat_integration_service(zone, args)
     zone.add_target(
         compute_direct_heat_pump_or_refrigeration_target(
             zone,
             is_heat_pumping=True,
+            args=args,
         )
     )
     return zone
@@ -97,11 +106,12 @@ def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run indirect Heat Pump targeting after ensuring a base TS target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
-        indirect_heat_integration_service(zone)
+        indirect_heat_integration_service(zone, args)
     zone.add_target(
         compute_indirect_heat_pump_or_refrigeration_target(
             zone,
             is_heat_pumping=True,
+            args=args,
         )
     )
     return zone
@@ -111,11 +121,12 @@ def direct_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct refrigeration targeting after ensuring a base DI target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.DI.value not in zone.targets:
-        direct_heat_integration_service(zone)
+        direct_heat_integration_service(zone, args)
     zone.add_target(
         compute_direct_heat_pump_or_refrigeration_target(
             zone,
             is_heat_pumping=False,
+            args=args,
         )
     )
     return zone
@@ -125,11 +136,12 @@ def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone
     """Run indirect refrigeration targeting after ensuring a base TS target exists."""
     _apply_zone_config_overrides(zone, args)
     if TT.TS.value not in zone.targets:
-        indirect_heat_integration_service(zone)
+        indirect_heat_integration_service(zone, args)
     zone.add_target(
         compute_indirect_heat_pump_or_refrigeration_target(
             zone,
             is_heat_pumping=False,
+            args=args,
         )
     )
     return zone
@@ -150,7 +162,7 @@ def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
     if "base_target_type" in runtime_args:
         target_type = [str(runtime_args["base_target_type"])]
     if len(zone.targets) == 0:
-        direct_heat_integration_service(zone)
+        direct_heat_integration_service(zone, args)
     for tt in target_type:
         if tt in zone.targets:
             get_power_cogeneration_above_pinch(zone.targets[tt])
@@ -161,5 +173,5 @@ def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
 def area_cost_targeting_service(zone: Zone, args: dict | None = None) -> Zone:
     """Refresh direct integration targets before area and cost reporting."""
     _apply_zone_config_overrides(zone, args)
-    direct_heat_integration_service(zone)
+    direct_heat_integration_service(zone, args)
     return zone

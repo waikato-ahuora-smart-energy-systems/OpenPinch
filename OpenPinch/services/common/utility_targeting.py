@@ -24,6 +24,7 @@ def get_utility_targets(
     hot_utilities: StreamCollection = None,
     cold_utilities: StreamCollection = None,
     is_direct_integration: bool = True,
+    state_id: str | None = None,
 ) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection]:
     """Target utility usage and compute GCC variants for a zone.
 
@@ -56,6 +57,7 @@ def get_utility_targets(
             H_net_hot=pt[PT.H_NET_HOT],
             pinch_idx=pt.pinch_idx(PT.H_NET_A),
             is_real_temperatures=False,
+            state_id=state_id,
         )
 
     pt.update(
@@ -64,6 +66,7 @@ def get_utility_targets(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             is_shifted=True,
+            state_id=state_id,
         )
     )
     pt.update(
@@ -81,6 +84,7 @@ def get_utility_targets(
                 hot_utilities=hot_utilities,
                 cold_utilities=cold_utilities,
                 is_shifted=False,
+                state_id=state_id,
             )
         )
         pt_real.update(
@@ -107,6 +111,7 @@ def _target_utility(
     H_net_hot: np.ndarray,
     pinch_idx: Tuple[int, int],
     is_real_temperatures: bool = False,
+    state_id: str | None = None,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Targets multiple utility use considering a fixed target temperature."""
     if abs(H_net_cold[0]) > tol:
@@ -122,6 +127,7 @@ def _target_utility(
             pinch_row=pinch_idx[0],
             is_hot_ut=True,
             is_real_temperatures=is_real_temperatures,
+            state_id=state_id,
         )
     if abs(H_net_hot[-1]) > tol:
         if len(cold_utilities) == 0:
@@ -136,6 +142,7 @@ def _target_utility(
             pinch_row=pinch_idx[1],
             is_hot_ut=False,
             is_real_temperatures=is_real_temperatures,
+            state_id=state_id,
         )
     return hot_utilities, cold_utilities
 
@@ -147,6 +154,7 @@ def _assign_utility(
     pinch_row: int,
     is_hot_ut: bool,
     is_real_temperatures: bool,
+    state_id: str | None,
 ) -> StreamCollection:
     """Assigns utility heat duties based on vertical heat transfer across a pinch."""
     if is_hot_ut:
@@ -166,19 +174,14 @@ def _assign_utility(
 
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
-        Ts, Tt = (
-            (
-                (u.t_max, u.t_min)
-                if is_real_temperatures
-                else (u.t_max_star, u.t_min_star)
-            )
-            if is_hot_ut
-            else (
-                (u.t_min, u.t_max)
-                if is_real_temperatures
-                else (u.t_min_star, u.t_max_star)
-            )
-        )
+        if is_real_temperatures:
+            t_lo, t_hi = u.t_min, u.t_max
+        else:
+            t_lo, t_hi = u.t_min_star, u.t_max_star
+        if is_hot_ut:
+            Ts, Tt = float(t_hi[state_id]), float(t_lo[state_id])
+        else:
+            Ts, Tt = float(t_lo[state_id]), float(t_hi[state_id])
 
         Q_ut_max = _maximise_utility_duty(
             T_segment,
@@ -189,7 +192,7 @@ def _assign_utility(
             Q_assigned,
         )
         if Q_ut_max > tol:
-            u.heat_flow = Q_ut_max
+            u.heat_flow[state_id] = Q_ut_max
             Q_assigned += Q_ut_max
 
         if abs(segment_limit - Q_assigned) < tol:

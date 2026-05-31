@@ -23,7 +23,8 @@ The main Python wrappers are ``PinchProblem`` for single cases and
 include ``target()``, ``summary_frame()``, ``export_excel()``,
 ``plot.grand_composite_curve()``, ``plot.export(...)``,
 ``show_dashboard()``, ``problem.target.direct_heat_pump(...)``, and
-``workspace.compare_cases(...)``.
+``workspace.compare_cases(...)``. When a case definition carries stateful values,
+named ``problem.target.*`` workflows also accept ``state_id=...``.
 
 Use these pages instead:
 

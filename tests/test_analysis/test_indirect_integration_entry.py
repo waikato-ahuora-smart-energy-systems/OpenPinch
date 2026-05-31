@@ -63,13 +63,16 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     monkeypatch.setattr(
         indirect,
         "_match_utility_gen_and_use_at_same_level",
-        lambda hot_utilities, cold_utilities: (hot_utilities, cold_utilities),
+        lambda hot_utilities, cold_utilities, state_id=None: (
+            hot_utilities,
+            cold_utilities,
+        ),
     )
     monkeypatch.setattr(indirect, "_save_graph_data", lambda pt: {})
     monkeypatch.setattr(
         indirect,
         "_compute_utility_cost",
-        lambda hot_utilities, cold_utilities: 0.0,
+        lambda utilities, state_id=None: 0.0,
     )
 
     target = indirect.compute_indirect_integration_targets(zone)

@@ -15,6 +15,8 @@ surface is still:
 - export with ``export_excel()`` and ``problem.plot.export(...)``
 - review advanced heat pump and refrigeration routes with
   ``problem.target.direct_heat_pump(...)``
+- use ``problem.target.direct_heat_integration(state_id="...")`` when you want
+  one selected-state solve from stateful input data
 - use ``show_dashboard()`` for the Streamlit dashboard
 - use ``PinchWorkspace`` for named baseline-versus-variant studies
 

@@ -5,12 +5,14 @@ from __future__ import annotations
 import math
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
+
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
 from ...lib.enums import ST, StreamLoc
 from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
-from ...utils.miscellaneous import get_value
+from ...utils.miscellaneous import extract_state_context, get_value
 from ._canonicalization import (
     _apply_zone_dt_cont_multiplier,
     _build_zone_config,
@@ -43,6 +45,7 @@ def prepare_problem(
     options=None,
     project_name: str = "Site",
     zone_tree: ZoneTreeSchema = None,
+    state_id: str | None = None,
 ) -> Zone:
     """Build the top-level zone hierarchy for analysis."""
     streams = [] if streams is None else list(streams)
@@ -77,6 +80,7 @@ def prepare_problem(
         master_zone=master_zone,
         streams=sorted(streams, key=lambda stream: stream.name),
         utilities=utilities,
+        state_id=state_id,
     )
     prepared_streams.validate_state_alignment()
     master_zone = _assign_process_streams_to_subzones(
@@ -87,8 +91,8 @@ def prepare_problem(
     master_zone.import_hot_and_cold_streams_from_sub_zones()
     master_zone = _set_utilities_for_zone_and_subzones(
         zone=master_zone,
-        hot_utilities=prepared_streams.get_hot_utility_streams(),
-        cold_utilities=prepared_streams.get_cold_utility_streams(),
+        hot_utilities=prepared_streams.get_hot_utility_streams(state_id),
+        cold_utilities=prepared_streams.get_cold_utility_streams(state_id),
     )
     master_zone = _apply_zone_dt_cont_multiplier(
         parent_zone=master_zone,
@@ -101,9 +105,15 @@ def _build_prepared_stream_collection(
     master_zone: Zone,
     streams: List[StreamSchema],
     utilities: List[UtilitySchema],
+    state_id: str | None = None,
 ) -> tuple[StreamCollection, Dict[str, str]]:
     """Build one canonical collection of prepared process and utility streams."""
     prepared_streams = StreamCollection()
+    collection_state_ids, collection_weights = _resolve_input_state_context(
+        streams, utilities
+    )
+    if collection_state_ids is not None:
+        prepared_streams.set_state_context(collection_state_ids, collection_weights)
     process_zone_paths: Dict[str, str] = {}
 
     for stream_schema in streams:
@@ -137,6 +147,50 @@ def _build_prepared_stream_collection(
     _extend_stream_collection(prepared_streams, hot_utilities)
     _extend_stream_collection(prepared_streams, cold_utilities)
     return prepared_streams, process_zone_paths
+
+
+def _resolve_input_state_context(
+    streams: List[StreamSchema],
+    utilities: List[UtilitySchema],
+) -> tuple[list[str] | None, object]:
+    """Resolve one canonical state model from raw input data."""
+    canonical_state_ids = None
+    canonical_weights = None
+    for item in [*streams, *utilities]:
+        for attr_name in (
+            "t_supply",
+            "t_target",
+            "heat_flow",
+            "dt_cont",
+            "htc",
+            "price",
+        ):
+            if not hasattr(item, attr_name):
+                continue
+            value = getattr(item, attr_name, None)
+            state_ids, weights = extract_state_context(value)
+            if state_ids is None:
+                continue
+            if canonical_state_ids is None:
+                canonical_state_ids = state_ids
+                canonical_weights = weights
+                continue
+            if state_ids != canonical_state_ids:
+                item_name = getattr(item, "name", "<unnamed>")
+                if isinstance(item, UtilitySchema):
+                    item_name = f"{item.type} Utility.{item_name}"
+                raise ValueError(
+                    f"state_ids for stream '{item_name}'"
+                    f" must align with the collection."
+                )
+            if not np.allclose(weights, canonical_weights, rtol=1e-12, atol=1e-12):
+                item_name = getattr(item, "name", "<unnamed>")
+                if isinstance(item, UtilitySchema):
+                    item_name = f"{item.type} Utility.{item_name}"
+                raise ValueError(
+                    f"weights for stream '{item_name}' must align with the collection."
+                )
+    return canonical_state_ids, canonical_weights
 
 
 def _assign_process_streams_to_subzones(
@@ -243,18 +297,19 @@ def _extend_stream_collection(
 
 
 def _find_extreme_process_temperatures(
-    hot_streams: StreamCollection, cold_streams: StreamCollection
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
 ) -> Tuple[float, float]:
     """Find highest TT of a cold stream and lowest TT of a hot stream."""
     hu_t_min: float = None
     cu_t_max: float = None
     stream: Stream
     for stream in hot_streams:
-        stream_min = stream.t_min_star.min
+        stream_min = stream.t_min_star.min.value
         if cu_t_max is None or cu_t_max > stream_min:
             cu_t_max = stream_min
     for stream in cold_streams:
-        stream_max = stream.t_max_star.max
+        stream_max = stream.t_max_star.max.value
         if hu_t_min is None or hu_t_min < stream_max:
             hu_t_min = stream_max
     if hu_t_min is None:
