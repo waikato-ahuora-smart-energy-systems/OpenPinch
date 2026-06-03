@@ -34,7 +34,7 @@ dependencies=[
   "pydantic",
   "scipy",
 ]
-version = "0.1.28"
+version = "0.2.0"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
