@@ -3,6 +3,8 @@
 import warnings
 from typing import TYPE_CHECKING, Optional
 
+import numpy as np
+
 from ..lib.config import Configuration
 from ..lib.enums import ZT
 from ..lib.schemas.targets import BaseTargetModel
@@ -44,17 +46,35 @@ class Zone:
         self._active_state_name = None
         self._lock_dt_cont_multiplier = False
         self._active = True
+        if parent_zone is not None:
+            self._state_ids = parent_zone._state_ids
+            self._num_states = (
+                len(self._state_ids) if self._state_ids is not None else 1
+            )
+            self._weights = parent_zone._weights
+        else:
+            self._state_ids = (
+                zone_config.STATE_IDS
+                if isinstance(zone_config.STATE_IDS, dict)
+                else {"0": 0}
+            )
+            self._num_states = len(self._state_ids)
+            self._weights = (
+                zone_config.WEIGHTS
+                if isinstance(zone_config.WEIGHTS, np.ndarray | list)
+                else np.ones(len(self._state_ids), dtype=float)
+            )
         self._subzones = {}
         self._targets = {}
         self._graphs = {}
 
         # === Streams & Utilities ===
-        self._hot_streams: StreamCollection = StreamCollection()
-        self._cold_streams: StreamCollection = StreamCollection()
-        self._net_hot_streams: StreamCollection = StreamCollection()
-        self._net_cold_streams: StreamCollection = StreamCollection()
-        self._hot_utilities: StreamCollection = StreamCollection()
-        self._cold_utilities: StreamCollection = StreamCollection()
+        self._hot_streams: StreamCollection = self._new_stream_collection()
+        self._cold_streams: StreamCollection = self._new_stream_collection()
+        self._net_hot_streams: StreamCollection = self._new_stream_collection()
+        self._net_cold_streams: StreamCollection = self._new_stream_collection()
+        self._hot_utilities: StreamCollection = self._new_stream_collection()
+        self._cold_utilities: StreamCollection = self._new_stream_collection()
 
     # === Properties ===
 
@@ -109,20 +129,14 @@ class Zone:
         self._active = bool(value)
 
     @property
-    def active_state_name(self) -> str:
-        """Which named state is active for the analysis."""
-        return str(self._active_state_name)
-
-    @active_state_name.setter
-    def active_state_name(self, value: str):
-        """Set active state for the analysis."""
-        self.active_state_name = str(value)
+    def state_ids(self) -> dict[str, int] | None:
+        """Canonical ``state_id -> idx`` lookup for this zone."""
+        return self._state_ids
 
     @property
-    def active_state_idx(self) -> int:
-        """The state index of the named active state."""
-        # TODO: Fetch the state index for the active state name.
-        return int(0)
+    def weights(self):
+        """Canonical state weights for this zone."""
+        return self._weights
 
     @property
     def address(self) -> str:
@@ -154,7 +168,7 @@ class Zone:
     @hot_streams.setter
     def hot_streams(self, data):
         """Replace the zone hot-stream collection."""
-        self._hot_streams = data
+        self._hot_streams = self._attach_stream_collection(data)
 
     @property
     def cold_streams(self):
@@ -164,7 +178,7 @@ class Zone:
     @cold_streams.setter
     def cold_streams(self, data):
         """Replace the zone cold-stream collection."""
-        self._cold_streams = data
+        self._cold_streams = self._attach_stream_collection(data)
 
     @property
     def net_hot_streams(self):
@@ -174,7 +188,7 @@ class Zone:
     @net_hot_streams.setter
     def net_hot_streams(self, data):
         """Replace the aggregated net hot-stream collection."""
-        self._net_hot_streams = data
+        self._net_hot_streams = self._attach_stream_collection(data)
 
     @property
     def net_cold_streams(self):
@@ -184,7 +198,7 @@ class Zone:
     @net_cold_streams.setter
     def net_cold_streams(self, data):
         """Replace the aggregated net cold-stream collection."""
-        self._net_cold_streams = data
+        self._net_cold_streams = self._attach_stream_collection(data)
 
     @property
     def hot_utilities(self):
@@ -194,7 +208,7 @@ class Zone:
     @hot_utilities.setter
     def hot_utilities(self, data):
         """Replace the zone hot-utility collection."""
-        self._hot_utilities = data
+        self._hot_utilities = self._attach_stream_collection(data)
 
     @property
     def cold_utilities(self):
@@ -204,7 +218,7 @@ class Zone:
     @cold_utilities.setter
     def cold_utilities(self, data):
         """Replace the zone cold-utility collection."""
-        self._cold_utilities = data
+        self._cold_utilities = self._attach_stream_collection(data)
 
     @property
     def graphs(self):
@@ -246,10 +260,65 @@ class Zone:
         """All process and utility streams defined on the zone."""
         return self.process_streams + self.utility_streams
 
-    @property
-    def all_net_streams(self):
-        """All net-process and utility streams defined on the zone."""
-        return self.net_process_streams + self.utility_streams
+    def _new_stream_collection(self) -> StreamCollection:
+        collection = StreamCollection()
+        collection.set_state_context(self._state_ids, self._weights, self._num_states)
+        return collection
+
+    def _attach_stream_collection(
+        self, collection: StreamCollection
+    ) -> StreamCollection:
+        if not isinstance(collection, StreamCollection):
+            raise TypeError(
+                "Zone stream containers must be StreamCollection instances."
+            )
+
+        if self._state_ids is not None:
+            collection.set_state_context(
+                self._state_ids, self._weights, self._num_states
+            )
+        return collection
+
+    def _propagate_state_context(self) -> None:
+        for collection in (
+            self._hot_streams,
+            self._cold_streams,
+            self._net_hot_streams,
+            self._net_cold_streams,
+            self._hot_utilities,
+            self._cold_utilities,
+        ):
+            collection.set_state_context(
+                self._state_ids, self._weights, self._num_states
+            )
+        for subzone in self._subzones.values():
+            subzone.set_state_context(self._state_ids, self._weights, self._num_states)
+
+    def set_state_context(
+        self,
+        state_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
+        weights,
+        num_states: int | None,
+    ) -> None:
+        """Set the canonical state lookup owned by this zone and propagate refs."""
+        if state_ids is None:
+            self._state_ids = None
+            self._weights = None
+            self._num_states = None
+        else:
+            self._state_ids = (
+                state_ids
+                if isinstance(state_ids, dict)
+                else {str(state_id): idx for idx, state_id in enumerate(state_ids)}
+            )
+            if weights is None:
+                self._weights = None
+            elif hasattr(weights, "copy"):
+                self._weights = weights
+            else:
+                self._weights = np.asarray(weights, dtype=float).reshape(-1)
+            self._num_states = num_states
+        self._propagate_state_context()
 
     # === Methods ===
     def add_graph(self, name: str, result):
@@ -350,14 +419,14 @@ class Zone:
         s: Stream
         if not get_net_streams:
             if is_new_stream_collection:
-                self._hot_streams = StreamCollection()
-                self._cold_streams = StreamCollection()
+                self._hot_streams = self._new_stream_collection()
+                self._cold_streams = self._new_stream_collection()
             hs_dst = self._hot_streams
             cs_dst = self._cold_streams
         else:
             if is_new_stream_collection:
-                self._net_hot_streams = StreamCollection()
-                self._net_cold_streams = StreamCollection()
+                self._net_hot_streams = self._new_stream_collection()
+                self._net_cold_streams = self._new_stream_collection()
             hs_dst = self._net_hot_streams
             cs_dst = self._net_cold_streams
 

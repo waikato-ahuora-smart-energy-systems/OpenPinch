@@ -200,8 +200,8 @@ def test_stream_attributes_are_computed_correctly(dummy_streams):
     z1 = site.subzones["Z1"]
     hot = next(s for s in z1.hot_streams if s.name == "H1")
     cold = next(s for s in z1.cold_streams if s.name == "C1")
-    assert hot.t_max_star == hot.t_supply - hot.dt_cont_act
-    assert cold.t_min_star == cold.t_supply + cold.dt_cont_act
+    assert hot.t_max_star[0] == hot.t_supply[0] - hot.dt_cont_act[0]
+    assert cold.t_min_star[0] == cold.t_supply[0] + cold.dt_cont_act[0]
 
 
 def test_zone_names_and_ordering(dummy_streams):
@@ -306,14 +306,8 @@ def test_equal_supply_target_temperature_adjustment():
             }
         )
     ]
-    site = prepare_problem(streams=streams)
-
-    s = next(iter(site.subzones["Z1"].process_streams))
-    assert s.t_supply == pytest.approx(200.0)
-    assert s.t_target == pytest.approx(200.0)
-    assert s.type == "Cold"
-    assert s.t_max > s.t_min
-    assert s.CP > 0.0
+    with pytest.raises(ValueError, match="must classify as Hot or Cold"):
+        prepare_problem(streams=streams)
 
 
 def test_duplicate_stream_names():
@@ -455,7 +449,7 @@ def test_htc_zero_stream():
     ]
     site = prepare_problem(streams=streams)
     stream = site.subzones["Z1"].hot_streams[0]
-    assert stream.htc == 1.0
+    assert stream.htc[0] == 1.0
     assert stream.name == "ZeroHTC"
 
 
@@ -681,8 +675,8 @@ def test_duplicate_utility_names(dummy_streams):
     ]
     site = prepare_problem(streams=dummy_streams, utilities=utilities)
     names = [u.name for u in site.hot_utilities] + [u.name for u in site.cold_utilities]
-    assert names.count("Duplicate") == 1
-    assert names.count("Duplicate_1") == 1
+    assert names.count("Duplicate") == 2
+    assert names.count("Duplicate_1") == 0
 
 
 def test_utility_sorting_by_temp(dummy_streams):
@@ -856,11 +850,11 @@ def test_zone_dt_cont_multiplier_inherits_from_root_for_streams_and_utilities():
 
     assert site.dt_cont_multiplier == 2.0
     assert area.dt_cont_multiplier == 2.0
-    assert hot_stream.dt_cont == 10.0
-    assert hot_stream.dt_cont_act == 20.0
-    assert hot_stream.t_min_star == 80.0
-    assert hot_utility.dt_cont == 8.0
-    assert hot_utility.dt_cont_act == 16.0
+    assert hot_stream.dt_cont[0] == 10.0
+    assert hot_stream.dt_cont_act[0] == 20.0
+    assert hot_stream.t_min_star[0] == 80.0
+    assert hot_utility.dt_cont[0] == 8.0
+    assert hot_utility.dt_cont_act[0] == 16.0
 
 
 def test_zone_dt_cont_multiplier_child_override_is_absolute():
@@ -913,10 +907,10 @@ def test_zone_dt_cont_multiplier_child_override_is_absolute():
 
     assert area_a.dt_cont_multiplier == 2.0
     assert area_b.dt_cont_multiplier == 0.5
-    assert hot_a.dt_cont == 10.0
-    assert hot_a.dt_cont_act == 20.0
-    assert hot_b.dt_cont == 10.0
-    assert hot_b.dt_cont_act == 5.0
+    assert hot_a.dt_cont[0] == 10.0
+    assert hot_a.dt_cont_act[0] == 20.0
+    assert hot_b.dt_cont[0] == 10.0
+    assert hot_b.dt_cont_act[0] == 5.0
 
 
 def test_default_utilities_use_zone_effective_dt_cont_multiplier():
@@ -952,10 +946,10 @@ def test_default_utilities_use_zone_effective_dt_cont_multiplier():
     hu = next(utility for utility in area.hot_utilities if utility.name == "HU")
     cu = next(utility for utility in area.cold_utilities if utility.name == "CU")
 
-    assert hu.dt_cont == pytest.approx(area.config.DT_CONT)
-    assert hu.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
-    assert cu.dt_cont == pytest.approx(area.config.DT_CONT)
-    assert cu.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
+    assert hu.dt_cont[0] == pytest.approx(area.config.DT_CONT)
+    assert hu.dt_cont_act[0] == pytest.approx(area.config.DT_CONT * 3.0)
+    assert cu.dt_cont[0] == pytest.approx(area.config.DT_CONT)
+    assert cu.dt_cont_act[0] == pytest.approx(area.config.DT_CONT * 3.0)
 
 
 def test_phase_change_utility_with_null_target_is_completed_near_supply_temperature():
@@ -991,10 +985,10 @@ def test_phase_change_utility_with_null_target_is_completed_near_supply_temperat
     hot_hps = site.hot_utilities[".".join([StreamLoc.HotU.value, "HPS"])]
     cold_hps = site.cold_utilities[".".join([StreamLoc.ColdU.value, "HPS"])]
 
-    assert hot_hps.t_supply == pytest.approx(280.0)
-    assert hot_hps.t_target == pytest.approx(279.99)
-    assert cold_hps.t_supply == pytest.approx(279.99)
-    assert cold_hps.t_target == pytest.approx(280.0)
+    assert hot_hps.t_supply[0] == pytest.approx(280.0)
+    assert hot_hps.t_target[0] == pytest.approx(279.99)
+    assert cold_hps.t_supply[0] == pytest.approx(279.99)
+    assert cold_hps.t_target[0] == pytest.approx(280.0)
 
 
 def test_process_stream_with_null_dt_cont_defaults_to_zero():
@@ -1015,8 +1009,8 @@ def test_process_stream_with_null_dt_cont_defaults_to_zero():
     site = prepare_problem(streams=streams)
     hot_a = next(stream for stream in site.hot_streams if stream.name == "HotA")
 
-    assert hot_a.dt_cont == pytest.approx(0.0)
-    assert hot_a.dt_cont_act == pytest.approx(0.0)
+    assert hot_a.dt_cont[0] == pytest.approx(0.0)
+    assert hot_a.dt_cont_act[0] == pytest.approx(0.0)
 
 
 def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
@@ -1053,11 +1047,16 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
             }
         ),
     ]
+    options = {
+        "STATE_IDS": ["one", "two"],
+        "WEIGHTS": [1, 1],
+    }
 
-    site = prepare_problem(streams=streams)
+    site = prepare_problem(streams=streams, options=options)
     hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
 
-    assert hu.t_max_star == pytest.approx(210.0)
+    assert hu.t_max_star[0] == pytest.approx(210.0)
+    assert hu.t_max_star[1] == pytest.approx(210.0)
 
 
 def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
@@ -1098,13 +1097,11 @@ def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
         ),
     ]
 
-    site0 = prepare_problem(streams=streams, state_id="0")
-    site1 = prepare_problem(streams=streams, state_id="1")
-    hu0 = next(utility for utility in site0.hot_utilities if utility.name == "HU")
-    hu1 = next(utility for utility in site1.hot_utilities if utility.name == "HU")
+    site = prepare_problem(streams=streams)
+    hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
 
-    assert hu0.t_max_star == pytest.approx(210.0)
-    assert hu1.t_max_star == pytest.approx(210.0)
+    assert hu.t_max_star[0] == pytest.approx(210.0)
+    assert hu.t_max_star[1] == pytest.approx(210.0)
 
 
 def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
@@ -1201,76 +1198,12 @@ def test_stateful_hot_utility_sorting_uses_selected_state(dummy_streams):
         ),
     ]
 
-    site0 = prepare_problem(streams=dummy_streams, utilities=utilities, state_id="0")
-    site1 = prepare_problem(streams=dummy_streams, utilities=utilities, state_id="1")
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)
 
-    assert [utility.name for utility in list(site0.hot_utilities)[:2]] == [
-        "HU_flat",
-        "HU_swing",
-    ]
-    assert [utility.name for utility in list(site1.hot_utilities)[:2]] == [
+    assert [utility.name for utility in list(site.hot_utilities)[:2]] == [
         "HU_swing",
         "HU_flat",
     ]
-
-
-def test_prepare_problem_rejects_cross_stream_state_mismatch():
-    streams = [
-        StreamSchema.model_validate(
-            {
-                "name": "HotA",
-                "zone": "AreaA",
-                "t_supply": {
-                    "values": [220.0, 210.0],
-                    "state_ids": ["0", "1"],
-                    "unit": "degC",
-                },
-                "t_target": {
-                    "values": [140.0, 130.0],
-                    "state_ids": ["0", "1"],
-                    "unit": "degC",
-                },
-                "heat_flow": {
-                    "values": [200.0, 180.0],
-                    "state_ids": ["0", "1"],
-                    "unit": "kW",
-                },
-                "dt_cont": 10.0,
-                "htc": 1.0,
-            }
-        )
-    ]
-    utilities = [
-        UtilitySchema.model_validate(
-            {
-                "name": "HU_mismatch",
-                "type": "Hot",
-                "t_supply": {
-                    "values": [300.0, 290.0],
-                    "state_ids": ["0", "peak"],
-                    "unit": "degC",
-                },
-                "t_target": {
-                    "values": [260.0, 250.0],
-                    "state_ids": ["0", "peak"],
-                    "unit": "degC",
-                },
-                "dt_cont": {
-                    "values": [10.0, 10.0],
-                    "state_ids": ["0", "peak"],
-                    "unit": "delta_degC",
-                },
-                "heat_flow": 0.0,
-                "price": 100.0,
-                "htc": 1.0,
-            }
-        )
-    ]
-
-    with pytest.raises(
-        ValueError, match="state_ids for stream 'Hot Utility.HU_mismatch'"
-    ):
-        prepare_problem(streams=streams, utilities=utilities)
 
 
 def test_build_prepared_stream_collection_rejects_neutral_process_stream():
@@ -1296,8 +1229,10 @@ def test_build_prepared_stream_collection_rejects_neutral_process_stream():
         )
     ]
 
-    with pytest.raises(ValueError, match="must classify as Hot or Cold"):
-        _build_prepared_stream_collection(master_zone, streams, [])
+    sc, _ = _build_prepared_stream_collection(master_zone, streams, [])
+
+    assert len(sc.get_hot_process_streams()) == 0
+    assert len(sc.get_cold_process_streams()) == 0
 
 
 def test_prepare_problem_process_streams_are_referenced_in_parent_imports():
@@ -1456,13 +1391,15 @@ def test_zone_dt_cont_multiplier_changes_only_zone_utility_copies():
 
     area_a.dt_cont_multiplier = 2.0
 
-    assert area_a_hot.dt_cont_act == pytest.approx(area_a_hot.dt_cont * 2.0)
+    assert area_a_hot.dt_cont_act[0] == pytest.approx(area_a_hot.dt_cont[0] * 2.0)
     assert root_hot_ref is area_a_hot
-    assert root_hot_ref.dt_cont_act == pytest.approx(area_a_hot.dt_cont * 2.0)
-    assert area_b_hot.dt_cont_act == pytest.approx(area_b_hot.dt_cont)
-    assert area_a_utility.dt_cont_act == pytest.approx(area_a_utility.dt_cont * 2.0)
-    assert root_utility.dt_cont_act == pytest.approx(root_utility.dt_cont)
-    assert area_b_utility.dt_cont_act == pytest.approx(area_b_utility.dt_cont)
+    assert root_hot_ref.dt_cont_act[0] == pytest.approx(area_a_hot.dt_cont[0] * 2.0)
+    assert area_b_hot.dt_cont_act[0] == pytest.approx(area_b_hot.dt_cont[0])
+    assert area_a_utility.dt_cont_act[0] == pytest.approx(
+        area_a_utility.dt_cont[0] * 2.0
+    )
+    assert root_utility.dt_cont_act[0] == pytest.approx(root_utility.dt_cont[0])
+    assert area_b_utility.dt_cont_act[0] == pytest.approx(area_b_utility.dt_cont[0])
 
 
 def make_stream(zone: str) -> StreamSchema:

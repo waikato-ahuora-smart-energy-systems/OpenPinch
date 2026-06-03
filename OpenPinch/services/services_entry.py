@@ -48,7 +48,6 @@ def _apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
 def data_preprocessing_service(
     input_data: TargetInput,
     project_name: str = "Site",
-    state_id: str | None = None,
 ) -> Zone:
     """Validate raw input data and construct the in-memory zone tree."""
     return prepare_problem(
@@ -57,7 +56,6 @@ def data_preprocessing_service(
         utilities=input_data.utilities,
         options=input_data.options,
         zone_tree=input_data.zone_tree,
-        state_id=state_id,
     )
 
 
@@ -165,7 +163,7 @@ def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
         direct_heat_integration_service(zone, args)
     for tt in target_type:
         if tt in zone.targets:
-            get_power_cogeneration_above_pinch(zone.targets[tt])
+            get_power_cogeneration_above_pinch(zone.targets[tt], args=args)
             return zone
     raise ValueError("Load data before running pinch analysis services.")
 

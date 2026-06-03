@@ -295,40 +295,62 @@ def _calc_hpr_cascade(
     res: HeatPumpTargetOutputs,
     is_T_vals_shifted: bool = True,
     is_heat_pumping: bool = True,
+    idx: int | None = None,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
-    pt_hpr_grid = create_problem_table_with_t_int(
-        streams=(
+    pt_grid_kwargs = {
+        "streams": (
             res.hpr_hot_streams
             + res.hpr_cold_streams
             + res.amb_streams.get_hot_streams()
             + res.amb_streams.get_cold_streams()
         ),
-        is_shifted=is_T_vals_shifted,
-    )
+        "is_shifted": is_T_vals_shifted,
+    }
+    if idx is not None:
+        pt_grid_kwargs["idx"] = idx
+    try:
+        pt_hpr_grid = create_problem_table_with_t_int(**pt_grid_kwargs)
+    except TypeError:
+        pt_grid_kwargs.pop("idx", None)
+        pt_hpr_grid = create_problem_table_with_t_int(**pt_grid_kwargs)
     pt.share_temperature_intervals(pt_hpr_grid)
 
     # Ambient air addition to the process stream set
     pt[PT.H_NET_W_AIR] = pt[PT.H_NET_A]
     if len(res.amb_streams) > 0:
-        pt_air = get_process_heat_cascade(
-            hot_streams=res.amb_streams.get_hot_streams(),
-            cold_streams=res.amb_streams.get_cold_streams(),
-            is_shifted=is_T_vals_shifted,
-            is_full_analysis=True,
-        )
+        pt_air_kwargs = {
+            "hot_streams": res.amb_streams.get_hot_streams(),
+            "cold_streams": res.amb_streams.get_cold_streams(),
+            "is_shifted": is_T_vals_shifted,
+            "is_full_analysis": True,
+        }
+        if idx is not None:
+            pt_air_kwargs["idx"] = idx
+        try:
+            pt_air = get_process_heat_cascade(**pt_air_kwargs)
+        except TypeError:
+            pt_air_kwargs.pop("idx", None)
+            pt_air = get_process_heat_cascade(**pt_air_kwargs)
         pt.share_temperature_intervals(pt_air)
         pt[PT.H_NET_W_AIR] += pt_air[PT.H_NET]
         pt[PT.H_NET_HOT] += pt_air[PT.H_NET_HOT]
         pt[PT.H_NET_COLD] += pt_air[PT.H_NET_COLD]
 
     # Heat pump or refrigeration cascade
-    hpr_profile = get_utility_heat_cascade(
-        T_int_vals=pt[PT.T],
-        hot_utilities=res.hpr_hot_streams,
-        cold_utilities=res.hpr_cold_streams,
-        is_shifted=is_T_vals_shifted,
-    )
+    hpr_cascade_kwargs = {
+        "T_int_vals": pt[PT.T],
+        "hot_utilities": res.hpr_hot_streams,
+        "cold_utilities": res.hpr_cold_streams,
+        "is_shifted": is_T_vals_shifted,
+    }
+    if idx is not None:
+        hpr_cascade_kwargs["idx"] = idx
+    try:
+        hpr_profile = get_utility_heat_cascade(**hpr_cascade_kwargs)
+    except TypeError:
+        hpr_cascade_kwargs.pop("idx", None)
+        hpr_profile = get_utility_heat_cascade(**hpr_cascade_kwargs)
     hpr_updates = hpr_profile["updates"]
     if is_heat_pumping:
         pt.update(

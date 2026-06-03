@@ -68,6 +68,7 @@ def plot_multi_hp_profiles_from_results(
     H_cold: np.ndarray = None,
     hpr_hot_streams: StreamCollection = None,
     hpr_cold_streams: StreamCollection = None,
+    idx: int = 0,
     title: str = None,
 ) -> "go.Figure":
     """Plot background source/sink profiles alongside solved HPR cycle streams."""
@@ -100,7 +101,9 @@ def plot_multi_hp_profiles_from_results(
 
     if hpr_hot_streams is not None and hpr_cold_streams is not None:
         T_hpr_arr, H_hpr_hot, H_hpr_cold = _get_hpr_cascade(
-            hpr_hot_streams, hpr_cold_streams
+            hpr_hot_streams,
+            hpr_cold_streams,
+            idx,
         )
         T_hpr_hot, H_hpr_hot = clean_composite_curve_ends(T_hpr_arr, H_hpr_hot)
         T_hpr_cold, H_hpr_cold = clean_composite_curve_ends(T_hpr_arr, H_hpr_cold)
@@ -313,6 +316,7 @@ def evaluate_carnot_hpr_result(
                 f"{(Q_ext_cold / args.Q_hpr_target):.5f} + "
                 f"{(penalty / args.Q_hpr_target):.5f}"
             ),
+            idx=args.idx,
         )
 
     return HPRBackendResult(
@@ -407,6 +411,7 @@ def evaluate_vapour_hpr_result(
                 f"{(Q_ext_cold / args.Q_hpr_target):.5f} + "
                 f"{(penalty / args.Q_hpr_target):.5f}"
             ),
+            idx=args.idx,
         )
 
     return HPRBackendResult(
@@ -699,10 +704,12 @@ def _append_unspecified_final_cascade_cooling_duty(Q_cool: np.ndarray) -> np.nda
 def _get_hpr_cascade(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
+    idx: int,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     pt = create_problem_table_with_t_int(
         streams=hot_streams + cold_streams,
         is_shifted=False,
+        idx=idx,
     )
     pt.update(
         **get_utility_heat_cascade(
@@ -710,6 +717,7 @@ def _get_hpr_cascade(
             hot_streams,
             cold_streams,
             is_shifted=False,
+            idx=idx,
         )
     )
     return pt[PT.T], pt[PT.H_HOT_UT], pt[PT.H_COLD_UT]

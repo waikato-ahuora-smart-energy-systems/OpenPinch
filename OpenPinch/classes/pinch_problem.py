@@ -120,10 +120,10 @@ class PinchProblem:
         direct_service_func: Optional[ZoneService] = None,
         indirect_service_func: Optional[ZoneService] = None,
         options: Optional[dict[str, Any]] = None,
+        sid: str = None,
     ) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
-        state_id = None if not isinstance(options, dict) else options.get("state_id")
-        execution_master_zone = self._build_execution_master_zone(state_id=state_id)
+        execution_master_zone = self._build_execution_master_zone()
         if not isinstance(zone, Zone):
             zone = execution_master_zone
         get_targets_for_zone_and_sub_zones(
@@ -132,9 +132,7 @@ class PinchProblem:
             indirect_service_func=indirect_service_func,
             args=options,
         )
-        self._results = TargetOutput.model_validate(
-            extract_results(zone, state_id=state_id)
-        )
+        self._results = TargetOutput.model_validate(extract_results(zone, state_id=sid))
         return self._results
 
     def _execute_targeting(
@@ -146,9 +144,11 @@ class PinchProblem:
         include_subzones: bool,
         direct_service_func: Optional[ZoneService] = None,
         indirect_service_func: Optional[ZoneService] = None,
+        sid: str = None,
     ) -> BaseTargetModel:
-        state_id = None if not isinstance(options, dict) else options.get("state_id")
-        execution_master_zone = self._build_execution_master_zone(state_id=state_id)
+        runtime_options = dict(options or {})
+        runtime_options["sid"] = sid
+        execution_master_zone = self._build_execution_master_zone()
         zone = self._resolve_target_zone(
             application_zone, master_zone=execution_master_zone
         )
@@ -165,7 +165,7 @@ class PinchProblem:
             if indirect_service_func is not None:
                 indirect_service_func(zone, options)
             self._results = TargetOutput.model_validate(
-                extract_results(execution_master_zone, state_id=state_id)
+                extract_results(execution_master_zone, state_id=sid)
             )
 
         try:
@@ -191,27 +191,12 @@ class PinchProblem:
             return selected_master_zone
         return selected_master_zone.get_subzone(application_zone)
 
-    def _build_execution_master_zone(
-        self,
-        *,
-        state_id: str | None = None,
-    ) -> "Zone":
+    def _build_execution_master_zone(self) -> "Zone":
         if self._problem_data is None and self._master_zone is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
         if self._master_zone is None:
             self.load(self._problem_data)
-        if state_id is None:
-            return self._master_zone
-
-        self._validate_known_state_id(state_id)
-        validated = self.validate()
-        execution_master_zone = data_preprocessing_service(
-            validated,
-            project_name=self._project_name,
-            state_id=state_id,
-        )
-        execution_master_zone._selected_state_id = state_id
-        return execution_master_zone
+        return self._master_zone
 
     @property
     def state_ids(self) -> list[str]:
@@ -292,10 +277,6 @@ class PinchProblem:
                     future.result()
                 )
         return {state_id: results_by_state[state_id] for state_id in state_ids}
-
-    def _validate_known_state_id(self, state_id: str) -> None:
-        master_zone = self._require_prepared_root_zone()
-        master_zone.all_streams.validate_state_id(state_id)
 
     def validate(self) -> TargetInput:
         """Validate the currently loaded problem data without running targeting."""

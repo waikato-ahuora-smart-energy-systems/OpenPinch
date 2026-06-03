@@ -103,6 +103,7 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
         res,
         is_T_vals_shifted=True,
         is_heat_pumping=True,
+        idx=0,
     )
     assert isinstance(out, ProblemTable)
     np.testing.assert_allclose(out[PT.H_NET_HOT], expected_hot)
@@ -197,6 +198,7 @@ def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
         H_cold=np.array([0.0, 15.0]),
         hpr_hot_streams=hot_streams,
         hpr_cold_streams=cold_streams,
+        idx=0,
         title="HP Profile",
     )
 

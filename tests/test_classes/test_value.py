@@ -46,6 +46,13 @@ def test_stateful_value_getitem_is_position_based():
         _ = value["peak"]
 
 
+def test_value_supports_pytest_approx_comparisons():
+    value = Value(5.0, "Δ°C")
+    result = value * 0.5
+    assert result * 2 == value
+    assert pytest.approx(value * 0.5) == result
+
+
 def test_stateful_arithmetic_requires_matching_state_count():
     left = Value(values=[10.0, 4.0], unit="kW")
     right = Value(values=[1.0, 2.0], unit="kW")
@@ -66,7 +73,5 @@ def test_stateful_value_add_states_appends_magnitudes_only():
 
 
 def test_stateful_value_rejects_explicit_state_metadata_kwargs():
-    with pytest.raises(
-        TypeError, match="State metadata belongs on StreamCollection, not Value."
-    ):
+    with pytest.raises(TypeError, match="State metadata belongs on Zone, not Value."):
         Value(values=[10.0, 4.0], unit="kW", state_ids=["base", "peak"])

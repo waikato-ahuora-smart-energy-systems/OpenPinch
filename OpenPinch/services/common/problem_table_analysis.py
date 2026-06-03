@@ -44,7 +44,7 @@ def get_process_heat_cascade(
     known_heat_recovery: float = None,
     extra_T_intervals: list = None,
     is_full_analysis: bool = False,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> ProblemTable:
     """Prepare, calculate, and analyse the problem table for given streams."""
     if hot_streams is None:
@@ -62,7 +62,7 @@ def get_process_heat_cascade(
         streams=all_streams,
         is_shifted=is_shifted,
         extra_T_intervals=extra_T_intervals,
-        state_id=state_id,
+        idx=idx,
     )
     # Perform the heat cascade of the problem table
     problem_table_algorithm(
@@ -70,7 +70,7 @@ def get_process_heat_cascade(
         hot_streams=hot_streams,
         cold_streams=cold_streams,
         is_shifted=is_shifted,
-        state_id=state_id,
+        idx=idx,
     )
 
     if isinstance(known_heat_recovery, float):
@@ -97,7 +97,7 @@ def get_utility_heat_cascade(
     hot_utilities: StreamCollection = None,
     cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> ProblemTableUpdateKwargs:
     """Prepare and calculate the utility heat cascade for a utility set."""
     pt_ut = ProblemTable({PT.T: T_int_vals})
@@ -106,7 +106,7 @@ def get_utility_heat_cascade(
         hot_utilities,
         cold_utilities,
         is_shifted,
-        state_id=state_id,
+        idx=idx,
     )
 
     h_net_values = pt_ut[PT.H_NET]
@@ -132,7 +132,7 @@ def create_problem_table_with_t_int(
     streams: StreamCollection = None,
     is_shifted: bool = True,
     extra_T_intervals: list | float | np.ndarray = None,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> ProblemTable:
     """Return a problem table populated with ordered unique temperature intervals."""
     if streams is None:
@@ -146,14 +146,10 @@ def create_problem_table_with_t_int(
 
     if is_shifted:
         T_vals = [
-            float(t)
-            for s in streams
-            for t in (s.t_min_star[state_id], s.t_max_star[state_id])
+            float(t) for s in streams for t in (s.t_min_star[idx], s.t_max_star[idx])
         ]
     else:
-        T_vals = [
-            float(t) for s in streams for t in (s.t_min[state_id], s.t_max[state_id])
-        ]
+        T_vals = [float(t) for s in streams for t in (s.t_min[idx], s.t_max[idx])]
     T_vals += extra_T_intervals
     dp = int(-math.log10(tol))
     T_vals = np.array(T_vals).round(dp)
@@ -165,28 +161,24 @@ def problem_table_algorithm(
     hot_streams: StreamCollection = None,
     cold_streams: StreamCollection = None,
     is_shifted: bool = True,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> ProblemTable:
     """Fast calculation of the problem table using vectorized cascade formulas."""
 
     # Sum m_dot*Cp contributions from hot streams per interval (sets CP_HOT and rCP_HOT)
     if hot_streams is not None:
-        sum_cp_hot, sum_rcp_hot = _sum_mcp_between_temperature_boundaries(
-            pt[PT.T], hot_streams, is_shifted, state_id=state_id
+        pt[PT.CP_HOT], pt[PT.RCP_HOT] = _sum_mcp_between_temperature_boundaries(
+            pt[PT.T], hot_streams, is_shifted, idx=idx
         )
-        pt[PT.CP_HOT] = sum_cp_hot
-        pt[PT.RCP_HOT] = sum_rcp_hot
     else:
         pt[PT.CP_HOT].fill(0.0)
         pt[PT.RCP_HOT].fill(0.0)
 
     # Sum m_dot*Cp contributions from cold streams per interval.
     if cold_streams is not None:
-        sum_cp_cold, sum_rcp_cold = _sum_mcp_between_temperature_boundaries(
-            pt[PT.T], cold_streams, is_shifted, state_id=state_id
+        pt[PT.CP_COLD], pt[PT.RCP_COLD] = _sum_mcp_between_temperature_boundaries(
+            pt[PT.T], cold_streams, is_shifted, idx=idx
         )
-        pt[PT.CP_COLD] = sum_cp_cold
-        pt[PT.RCP_COLD] = sum_rcp_cold
     else:
         pt[PT.CP_COLD].fill(0.0)
         pt[PT.RCP_COLD].fill(0.0)
@@ -216,12 +208,11 @@ def problem_table_algorithm(
     pt[PT.H_NET] = -np.cumsum(pt[PT.DELTA_H_NET])
 
     # Shift cascades so minimum H_net is zero and the curves align at the pinch.
-    min_H = pt[PT.H_NET].min()
-    shift = pt[PT.H_NET][-1] - min_H
-
     pt[PT.H_HOT] = pt[PT.H_HOT][-1] - pt[PT.H_HOT]
-    pt[PT.H_COLD] = pt[PT.H_COLD][-1] + shift - pt[PT.H_COLD]
-    pt[PT.H_NET] = pt[PT.H_NET] - min_H
+    pt[PT.H_COLD] = (pt[PT.H_COLD][-1] + pt[PT.H_NET][-1] - pt[PT.H_NET].min()) - pt[
+        PT.H_COLD
+    ]
+    pt[PT.H_NET] -= pt[PT.H_NET].min()
 
     return pt
 
@@ -272,25 +263,21 @@ def _sum_mcp_between_temperature_boundaries(
     temperatures: List[float],
     streams: StreamCollection,
     is_shifted: bool = True,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """Vectorized CP and rCP summation across temperature intervals."""
 
     def calc_active_matrix(streams: StreamCollection, use_shifted: bool) -> np.ndarray:
         if use_shifted:
             t_min = np.asarray(
-                [stream.t_min_star[state_id] for stream in streams], dtype=float
+                [stream.t_min_star[idx] for stream in streams], dtype=float
             )
             t_max = np.asarray(
-                [stream.t_max_star[state_id] for stream in streams], dtype=float
+                [stream.t_max_star[idx] for stream in streams], dtype=float
             )
         else:
-            t_min = np.asarray(
-                [stream.t_min[state_id] for stream in streams], dtype=float
-            )
-            t_max = np.asarray(
-                [stream.t_max[state_id] for stream in streams], dtype=float
-            )
+            t_min = np.asarray([stream.t_min[idx] for stream in streams], dtype=float)
+            t_max = np.asarray([stream.t_max[idx] for stream in streams], dtype=float)
 
         lower_bounds = np.array(temperatures[1:])
         upper_bounds = np.array(temperatures[:-1])
@@ -303,8 +290,8 @@ def _sum_mcp_between_temperature_boundaries(
         return active
 
     def sum_cp_rcp(streams: StreamCollection, active: np.ndarray):
-        cp = np.asarray([stream.CP[state_id] for stream in streams], dtype=float)
-        rcp = np.asarray([stream.rCP[state_id] for stream in streams], dtype=float)
+        cp = np.asarray([stream.CP[idx] for stream in streams], dtype=float)
+        rcp = np.asarray([stream.rCP[idx] for stream in streams], dtype=float)
         cp_sum = active @ cp
         rcp_sum = active @ rcp
         return np.insert(cp_sum, 0, 0.0), np.insert(rcp_sum, 0, 0.0)

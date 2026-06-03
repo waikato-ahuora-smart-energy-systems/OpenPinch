@@ -17,6 +17,7 @@ from ...lib.config import tol
 from ...lib.enums import GT, PT, TT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
+from ...utils.miscellaneous import get_state_index
 from ..common.problem_table_analysis import (
     get_process_heat_cascade,
 )
@@ -38,15 +39,15 @@ def compute_total_subzone_utility_targets(
 ) -> TotalProcessTarget:
     """Sums and records zonal targets."""
     # Sum targets from subzones
-    state_id = None if not isinstance(args, dict) else args.get("state_id")
+    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = num_units = area = 0.0
 
     hot_utilities = deepcopy(zone.hot_utilities).set_common_stream_attribute(
-        "heat_flow", 0.0, state_id=state_id
+        attr_name="heat_flow", value=0.0, idx=idx
     )
     cold_utilities = deepcopy(zone.cold_utilities).set_common_stream_attribute(
-        "heat_flow", 0.0, state_id=state_id
+        attr_name="heat_flow", value=0.0, idx=idx
     )
     for subzone in zone.subzones.values():
         t = subzone.targets[TT.DI.value]
@@ -56,14 +57,20 @@ def compute_total_subzone_utility_targets(
         utility_cost += t.utility_cost
 
         for j in range(len(hot_utilities)):
-            hot_utilities[j].heat_flow[state_id] += t.hot_utilities[j].heat_flow[
-                state_id
-            ]
+            hot_utilities[j].set_value_attr_at_state_idx(
+                attr_name="heat_flow",
+                value=hot_utilities[j].heat_flow[idx]
+                + t.hot_utilities[j].heat_flow[idx],
+                idx=idx,
+            )
 
         for j in range(len(cold_utilities)):
-            cold_utilities[j].heat_flow[state_id] += t.cold_utilities[j].heat_flow[
-                state_id
-            ]
+            cold_utilities[j].set_value_attr_at_state_idx(
+                attr_name="heat_flow",
+                value=cold_utilities[j].heat_flow[idx]
+                + t.cold_utilities[j].heat_flow[idx],
+                idx=idx,
+            )
 
         if area > tol:
             num_units += t.num_units
@@ -88,7 +95,7 @@ def compute_total_subzone_utility_targets(
             else 1.0
         ),
         "utility_cost": utility_cost,
-        "state_id": state_id,
+        "state_id": sid,
     }
     return TotalProcessTarget.model_validate(output)
 
@@ -104,7 +111,7 @@ def compute_indirect_integration_targets(
     stream cascades, performs utility-to-utility balancing, and records the
     resulting Total Site target on ``zone`` before returning it.
     """
-    state_id = None if not isinstance(args, dict) else args.get("state_id")
+    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
     s_tzt = zone.targets[TT.TZ.value]
     if len(zone.net_hot_streams) == 0 and len(zone.net_cold_streams) == 0:
         return None
@@ -114,7 +121,7 @@ def compute_indirect_integration_targets(
         hot_streams=zone.net_hot_streams,
         cold_streams=zone.net_cold_streams,
         is_shifted=True,  # Align a second shift with the real utility scale.
-        state_id=state_id,
+        idx=idx,
     )
     pt.update(
         **_shift_site_process_profiles(
@@ -129,7 +136,7 @@ def compute_indirect_integration_targets(
             hot_utilities=s_tzt.hot_utilities,
             cold_utilities=s_tzt.cold_utilities,
             is_shifted=False,
-            state_id=state_id,
+            idx=idx,
         )
     )
 
@@ -145,7 +152,7 @@ def compute_indirect_integration_targets(
     hot_utilities, cold_utilities = _match_utility_gen_and_use_at_same_level(
         hot_utilities=deepcopy(s_tzt.hot_utilities),
         cold_utilities=deepcopy(s_tzt.cold_utilities),
-        state_id=state_id,
+        idx=idx,
     )
 
     output = {
@@ -170,9 +177,9 @@ def compute_indirect_integration_targets(
         ),
         "utility_cost": _compute_utility_cost(
             hot_utilities + cold_utilities,
-            state_id=state_id,
+            idx=idx,
         ),
-        "state_id": state_id,
+        "state_id": sid,
     }
     return TotalSiteTarget.model_validate(output)
 
@@ -185,25 +192,25 @@ def compute_indirect_integration_targets(
 def _match_utility_gen_and_use_at_same_level(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> Tuple[StreamCollection, StreamCollection]:
     for u_h in hot_utilities:
         for u_c in cold_utilities:
             if (
-                abs((u_h.t_supply[state_id] - u_c.t_target[state_id]).value) < 1
-                and abs((u_h.t_target[state_id] - u_c.t_supply[state_id]).value) < 1
+                abs((u_h.t_supply[idx] - u_c.t_target[idx])) < 1
+                and abs((u_h.t_target[idx] - u_c.t_supply[idx])) < 1
             ):
-                Q = min(u_h.heat_flow[state_id], u_c.heat_flow[state_id])
-                u_h.heat_flow[state_id] -= Q
-                u_c.heat_flow[state_id] -= Q
+                Q = min(u_h.heat_flow[idx], u_c.heat_flow[idx])
+                u_h.heat_flow[idx] -= Q
+                u_c.heat_flow[idx] -= Q
     return hot_utilities, cold_utilities
 
 
 def _compute_utility_cost(
     utilities: StreamCollection,
-    state_id: str | None = None,
-) -> float:
-    return np.sum([u.ut_cost[state_id].value for u in utilities])
+    idx: int | None = None,
+) -> np.float64:
+    return np.sum([u.utility_cost[idx] for u in utilities])
 
 
 def _shift_site_process_profiles(
@@ -224,13 +231,13 @@ def _build_site_utility_profile(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
     is_shifted: bool = False,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> ProblemTableUpdateKwargs:
     pt_ut = get_process_heat_cascade(
         hot_streams=hot_utilities,
         cold_streams=cold_utilities,
         is_shifted=is_shifted,
-        state_id=state_id,
+        idx=idx,
     )
     h_net_ut = pt_ut[PT.H_HOT] - pt_ut[PT.H_COLD]
     return {

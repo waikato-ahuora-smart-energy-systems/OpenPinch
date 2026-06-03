@@ -181,7 +181,7 @@ def get_min_number_hx(
     cold_streams: StreamCollection,
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> int:
     """Estimate the minimum number of exchangers using vectorised interval logic."""
     num_hx: int = 0
@@ -195,14 +195,10 @@ def get_min_number_hx(
 
     for i0, i1 in idx_pairs:
         T_high, T_low = T_vals[i0], T_vals[i1]
-        num_hx += _count_crossing(T_low, T_high, hot_streams, state_id=state_id)
-        num_hx += _count_crossing(T_low, T_high, cold_streams, state_id=state_id)
-        num_hx += _count_utility_range_container(
-            T_low, T_high, hot_utilities, state_id=state_id
-        )
-        num_hx += _count_utility_range_container(
-            T_low, T_high, cold_utilities, state_id=state_id
-        )
+        num_hx += _count_crossing(T_low, T_high, hot_streams, idx=idx)
+        num_hx += _count_crossing(T_low, T_high, cold_streams, idx=idx)
+        num_hx += _count_utility_range_container(T_low, T_high, hot_utilities, idx=idx)
+        num_hx += _count_utility_range_container(T_low, T_high, cold_utilities, idx=idx)
 
     return int(num_hx - len(idx_pairs))
 
@@ -251,11 +247,11 @@ def _count_crossing(
     T_low: float,
     T_high: float,
     streams: StreamCollection,
-    state_id: str | None = None,
+    idx: int | None = None,
 ):
     """Count process streams intersecting interval ``[T_low, T_high]``."""
-    t_max = np.array([s.t_max_star[state_id].value for s in streams])
-    t_min = np.array([s.t_min_star[state_id].value for s in streams])
+    t_max = np.array([s.t_max_star[idx] for s in streams])
+    t_min = np.array([s.t_min_star[idx] for s in streams])
     return np.sum(
         ((t_max > T_low + tol) & (t_max <= T_high + tol))
         | ((t_min >= T_low - tol) & (t_min < T_high - tol))
@@ -267,10 +263,10 @@ def _count_utility_range_container(
     T_low: float,
     T_high: float,
     utilities: StreamCollection,
-    state_id: str | None = None,
+    idx: int | None = None,
 ):
     """Count utility streams intersecting interval ``[T_low, T_high]``."""
-    t_max = np.array([u.t_max_star[state_id].value for u in utilities])
-    t_min = np.array([u.t_min_star[state_id].value for u in utilities])
-    active = np.array([1 if u.heat_flow > tol else 0 for u in utilities])
+    t_max = np.array([u.t_max_star[idx] for u in utilities])
+    t_min = np.array([u.t_min_star[idx] for u in utilities])
+    active = np.array([1 if u.heat_flow[idx] > tol else 0 for u in utilities])
     return np.sum((t_min >= T_low - tol) & (t_max <= T_high + tol) & (active))

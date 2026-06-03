@@ -11,33 +11,47 @@ from pydantic import BaseModel, ConfigDict, Field
 class ValueWithUnit(BaseModel):
     """Container storing a magnitude and its associated unit string."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     value: Optional[float] = Field(
         default=None, description="Numeric value (magnitude)."
     )
-    unit: str = Field(..., description="Unit string, e.g. 'kW', '°C', 'kJ/s'.")
+    unit: Optional[str] = Field(
+        default=None, description="Shared unit string, e.g. 'degC' or 'kW'."
+    )
 
 
 class StatefulValueWithUnit(BaseModel):
     """Container storing multi-state magnitudes, weights, and a shared unit."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     values: list[float] = Field(..., description="Per-state magnitudes.")
     unit: Optional[str] = Field(
         default=None, description="Shared unit string, e.g. 'degC' or 'kW'."
     )
-    state_ids: Optional[list[str]] = Field(
-        default=None, description="Optional state identifiers."
+
+
+class StatefulValueWithUnitAndWeights(BaseModel):
+    """Container storing multi-state magnitudes, weights, and a shared unit."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    values: list[float] = Field(..., description="Per-state magnitudes.")
+    unit: Optional[str] = Field(
+        default=None, description="Shared unit string, e.g. 'degC' or 'kW'."
     )
     weights: Optional[list[float]] = Field(
-        default=None, description="Optional state weights."
+        default=None, description="Optional ordered state weights."
     )
 
 
-ScalarOrVU = Union[float, ValueWithUnit, StatefulValueWithUnit]
-MaybeVU = Union[float, ValueWithUnit, StatefulValueWithUnit, None]
+ScalarOrVU = Union[
+    float, ValueWithUnit, StatefulValueWithUnit, StatefulValueWithUnitAndWeights
+]
+MaybeVU = Union[
+    float, ValueWithUnit, StatefulValueWithUnit, StatefulValueWithUnitAndWeights, None
+]
 HPRMetric = Union[float, list[float], np.ndarray, None]
 
 
@@ -46,5 +60,6 @@ __all__ = [
     "MaybeVU",
     "ScalarOrVU",
     "StatefulValueWithUnit",
+    "StatefulValueWithUnitAndWeights",
     "ValueWithUnit",
 ]

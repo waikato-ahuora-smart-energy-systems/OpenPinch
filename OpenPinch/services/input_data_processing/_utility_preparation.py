@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 from typing import List, Tuple
 
@@ -13,10 +14,71 @@ from ...classes.value import Value
 from ...classes.zone import Zone
 from ...lib.config import Configuration
 from ...lib.enums import ST, StreamLoc
+from ...lib.schemas.common import ValueWithUnit
 from ...lib.schemas.io import UtilitySchema
-from ...utils.miscellaneous import extract_state_context
+
+__all__ = [
+    "_get_hot_and_cold_utilities",
+    "_set_utilities_for_zone_and_subzones",
+]
 
 _TEMPERATURE_EQUAL_TOL = 1e-12
+
+
+def _get_hot_and_cold_utilities(
+    utilities: List[UtilitySchema],
+    hu_t_min: float,
+    cu_t_max: float,
+    zone_config: Configuration,
+    dt_cont_multiplier: float = 1.0,
+) -> StreamCollection:
+    """Extract all utility data into class instances."""
+    utilities_filled, add_default_hu, add_default_cu = _complete_utility_data(
+        deepcopy(list(utilities)),
+        zone_config=zone_config,
+        hu_t_min=hu_t_min,
+        cu_t_max=cu_t_max,
+        dt_cont_multiplier=dt_cont_multiplier,
+    )
+    utilities_with_defaults = _add_default_utilities(
+        utilities=utilities_filled,
+        zone_config=zone_config,
+        add_default_hu=add_default_hu,
+        add_default_cu=add_default_cu,
+        hu_t_min=hu_t_min,
+        cu_t_max=cu_t_max,
+        dt_cont_multiplier=dt_cont_multiplier,
+    )
+    hot_utilities, utilities_left = _create_utilities_list(
+        utilities=utilities_with_defaults,
+        utility_type=ST.Hot.value,
+        dt_cont_multiplier=dt_cont_multiplier,
+        zone_config=zone_config,
+    )
+    cold_utilities, _ = _create_utilities_list(
+        utilities=utilities_left,
+        utility_type=ST.Cold.value,
+        dt_cont_multiplier=dt_cont_multiplier,
+        zone_config=zone_config,
+    )
+    return hot_utilities + cold_utilities
+
+
+def _set_utilities_for_zone_and_subzones(
+    zone: Zone,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+) -> Zone:
+    """Add utilities to a zone and its subzones using effective multipliers."""
+    zone.hot_utilities = hot_utilities.copy(deep=True)
+    zone.cold_utilities = cold_utilities.copy(deep=True)
+    for subzone in zone.subzones.values():
+        _set_utilities_for_zone_and_subzones(
+            zone=subzone,
+            hot_utilities=hot_utilities,
+            cold_utilities=cold_utilities,
+        )
+    return zone
 
 
 def _coerce_value(data, *, unit: str | None = None) -> Value | None:
@@ -34,28 +96,8 @@ def _value_is_missing(value: Value | None) -> bool:
     return bool(np.all(np.isnan(value.state_values.astype(float))))
 
 
-def _value_from_array(
-    magnitudes,
-    *,
-    unit: str | None,
-    state_ids: list[str] | None,
-    weights: np.ndarray | None,
-) -> Value:
-    arr = np.asarray(magnitudes, dtype=float).reshape(-1)
-    if state_ids is None:
-        return Value(float(arr[0]), unit=unit)
-    return Value(values=arr, unit=unit)
-
-
 def _shift_temperature_value(value: Value, delta: float) -> Value:
-    unit = value.to_dict().get("unit")
-    state_ids, weights = extract_state_context(value)
-    return _value_from_array(
-        value.state_values.astype(float) + float(delta),
-        unit=unit,
-        state_ids=state_ids,
-        weights=weights,
-    )
+    return value + Value(delta, unit="delta_degC")
 
 
 def _utility_temperature_arrays(
@@ -93,45 +135,6 @@ def _orient_utility_temperatures(
         f"Utility '{utility.name}' temperatures cannot be oriented consistently as "
         f"'{utility_type}' across all states."
     )
-
-
-def _get_hot_and_cold_utilities(
-    utilities: List[UtilitySchema],
-    hu_t_min: float,
-    cu_t_max: float,
-    zone_config: Configuration,
-    dt_cont_multiplier: float = 1.0,
-) -> Tuple[StreamCollection, StreamCollection]:
-    """Extract all utility data into class instances."""
-    utilities_filled, add_default_hu, add_default_cu = _complete_utility_data(
-        deepcopy(list(utilities)),
-        zone_config=zone_config,
-        hu_t_min=hu_t_min,
-        cu_t_max=cu_t_max,
-        dt_cont_multiplier=dt_cont_multiplier,
-    )
-    utilities_with_defaults = _add_default_utilities(
-        utilities=utilities_filled,
-        zone_config=zone_config,
-        add_default_hu=add_default_hu,
-        add_default_cu=add_default_cu,
-        hu_t_min=hu_t_min,
-        cu_t_max=cu_t_max,
-        dt_cont_multiplier=dt_cont_multiplier,
-    )
-    hot_utilities, utilities_left = _create_utilities_list(
-        utilities=utilities_with_defaults,
-        utility_type=ST.Hot.value,
-        dt_cont_multiplier=dt_cont_multiplier,
-    )
-    cold_utilities, _ = _create_utilities_list(
-        utilities=utilities_left,
-        utility_type=ST.Cold.value,
-        dt_cont_multiplier=dt_cont_multiplier,
-    )
-    ordered_hot_utilities = hot_utilities.get_hot_utility_streams()
-    ordered_cold_utilities = cold_utilities.get_cold_utility_streams()
-    return ordered_hot_utilities, ordered_cold_utilities
 
 
 def _complete_utility_data(
@@ -273,10 +276,37 @@ def _create_default_utility(
     )
 
 
+def _validate_dt_cont_value(value, zone_config: Configuration) -> Value:
+    """Validate one DT_CONT value and coerce to a non-negative float."""
+    if isinstance(value, ValueWithUnit):
+        return Value(value.value, unit="delta_degC")
+    if (
+        (value is None)
+        or (not isinstance(value, (int, float)))
+        or not math.isfinite(value)
+    ):
+        value = zone_config.DT_CONT
+    return Value(value, unit="delta_degC")
+
+
+def _validate_htc_value(value, zone_config: Configuration) -> Value:
+    """Validate one HTC value and coerce to a positive float."""
+    if isinstance(value, ValueWithUnit):
+        return Value(value.value, unit="kW/m^2/delta_degC")
+    if (
+        (value is None)
+        or (not isinstance(value, (int, float)))
+        or not math.isfinite(value)
+    ):
+        value = zone_config.DT_CONT
+    return Value(value, unit="kW/m^2/delta_degC")
+
+
 def _create_utilities_list(
     utilities: List[UtilitySchema],
     utility_type: str,
     dt_cont_multiplier: float = 1.0,
+    zone_config: Configuration = Configuration(),
 ) -> Tuple[StreamCollection, List[UtilitySchema]]:
     """Create a sorted list of hot or cold Stream objects based on type."""
     created_utilities = StreamCollection()
@@ -302,13 +332,15 @@ def _create_utilities_list(
             else ".".join([StreamLoc.ColdU.value, selected.name])
         )
 
+        dt_cont = _validate_dt_cont_value(selected.dt_cont, zone_config)
+        htc = _validate_htc_value(selected.htc, zone_config)
         created_utilities.add(
             Stream(
                 name=selected.name,
                 t_supply=supply_value,
                 t_target=target_value,
-                dt_cont=selected.dt_cont,
-                htc=selected.htc,
+                dt_cont=dt_cont,
+                htc=htc,
                 price=selected.price,
                 is_process_stream=False,
             ),
@@ -317,20 +349,3 @@ def _create_utilities_list(
         created_utilities[key].dt_cont_multiplier = dt_cont_multiplier
 
     return created_utilities, unassigned_utilities
-
-
-def _set_utilities_for_zone_and_subzones(
-    zone: Zone,
-    hot_utilities: StreamCollection,
-    cold_utilities: StreamCollection,
-) -> Zone:
-    """Add utilities to a zone and its subzones using effective multipliers."""
-    zone.hot_utilities = hot_utilities.copy(deep=True)
-    zone.cold_utilities = cold_utilities.copy(deep=True)
-    for subzone in zone.subzones.values():
-        _set_utilities_for_zone_and_subzones(
-            zone=subzone,
-            hot_utilities=hot_utilities,
-            cold_utilities=cold_utilities,
-        )
-    return zone

@@ -38,8 +38,8 @@ def test_stream_property_roundtrip_and_mutation_paths():
 
     s.t_supply = 160.0
     s.t_target = 95.0
-    s.P_supply = 200.0
-    s.P_target = 180.0
+    s.p_supply = 200.0
+    s.p_target = 180.0
     s.h_supply = 2_500.0
     s.h_target = 2_000.0
     s.dt_cont = 4.0
@@ -215,7 +215,6 @@ def test_target_model_and_zone_property_branches():
     assert z.net_process_streams is not None
     assert z.utility_streams is not None
     assert z.all_streams is not None
-    assert z.all_net_streams is not None
 
     child1 = Zone(name="Child")
     child2 = Zone(name="Child")
