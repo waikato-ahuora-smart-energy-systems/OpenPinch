@@ -2,8 +2,8 @@
 
 from ._loading import (
     JsonDict,
-    _LoadedProblemSource,
     PathLike,
+    _LoadedProblemSource,
     _ProblemSourceAdapters,
     load_problem_source,
     prepare_in_memory_problem_source,

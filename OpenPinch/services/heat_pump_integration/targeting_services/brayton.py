@@ -4,7 +4,6 @@ from typing import List, Tuple
 
 import numpy as np
 
-from ..unit_models.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ....classes.stream_collection import StreamCollection
 from ....lib.enums import PT
 from ....lib.schemas.hpr import HeatPumpTargetInputs
@@ -13,6 +12,7 @@ from ..common.shared import (
     calc_hpr_obj,
     get_process_heat_cascade,
 )
+from ..unit_models.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 
 __all__ = [
     "optimise_brayton_heat_pump_placement",

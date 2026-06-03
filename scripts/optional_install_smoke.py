@@ -39,7 +39,9 @@ def _exercise_cli_help() -> None:
 def _check_core_surface() -> None:
     import OpenPinch
     from OpenPinch import PinchProblem
-    from OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump import SimpleBraytonHeatPumpCycle
+    from OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump import (
+        SimpleBraytonHeatPumpCycle,
+    )
     from OpenPinch.streamlit_webviewer import web_graphing as wg
     from OpenPinch.utils.miscellaneous import graph_simple_cc_plot
 
@@ -113,7 +115,9 @@ def _check_notebook_surface() -> None:
 
 
 def _check_brayton_cycle_surface() -> None:
-    from OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump import SimpleBraytonHeatPumpCycle
+    from OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump import (
+        SimpleBraytonHeatPumpCycle,
+    )
 
     _exercise_cli_help()
     _assert_module_present("tespy")

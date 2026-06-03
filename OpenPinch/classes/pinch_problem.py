@@ -34,16 +34,20 @@ from ._problem import (
     JsonDict,
     PathLike,
     _LoadedProblemSource,
-    _ProblemSourceAdapters,
     _PlotAccessorDescriptor,
+    _ProblemSourceAdapters,
     _TargetAccessorDescriptor,
     _validate_problem_semantics,
     build_graph_payload,
     build_problem_summary_frame,
-    format_schema_validation_error as _format_schema_validation_error,
     load_problem_source,
-    locate_summary_row as _locate_summary_row,
     prepare_in_memory_problem_source,
+)
+from ._problem import (
+    format_schema_validation_error as _format_schema_validation_error,
+)
+from ._problem import (
+    locate_summary_row as _locate_summary_row,
 )
 from .stream_collection import StreamCollection
 from .zone import Zone

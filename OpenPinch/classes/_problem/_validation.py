@@ -9,10 +9,10 @@ from typing import Any, Optional
 import numpy as np
 from pydantic import ValidationError
 
-from ..value import Value
 from ...lib.enums import ST
 from ...lib.schemas.io import TargetInput
 from ...lib.schemas.workspace import ValidationIssue, ValidationReport
+from ..value import Value
 
 ValidationContext = dict[str, list[dict[str, Any]]]
 _TEMPERATURE_EQUAL_TOL = 1e-12
