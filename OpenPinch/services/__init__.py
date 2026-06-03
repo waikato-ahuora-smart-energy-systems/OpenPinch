@@ -45,7 +45,7 @@ def data_preprocessing_service(
     input_data: Any,
     project_name: str = "Site",
 ) -> "Zone":
-    """Validate raw input payloads and construct the in-memory zone tree."""
+    """Validate raw input data and construct the in-memory zone tree."""
     return _load_services_entry_module().data_preprocessing_service(
         input_data=input_data,
         project_name=project_name,

@@ -11,7 +11,7 @@ from ...lib.enums import PT
 from .gcc_manipulation import get_seperated_gcc_heat_load_profiles
 from .problem_table_analysis import get_utility_heat_cascade
 
-__all__ = ["get_utility_targets"]
+__all__ = ["target_utilities_for_load_profiles", "get_utility_targets"]
 
 ################################################################################
 # Public API
@@ -24,6 +24,7 @@ def get_utility_targets(
     hot_utilities: StreamCollection = None,
     cold_utilities: StreamCollection = None,
     is_direct_integration: bool = True,
+    idx: int | None = None,
 ) -> Tuple[ProblemTable, ProblemTable, StreamCollection, StreamCollection]:
     """Target utility usage and compute GCC variants for a zone.
 
@@ -48,7 +49,7 @@ def get_utility_targets(
 
     # Target multiple utility use
     if is_direct_integration:
-        hot_utilities, cold_utilities = _target_utility(
+        hot_utilities, cold_utilities = target_utilities_for_load_profiles(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             T_vals=pt[PT.T],
@@ -56,6 +57,7 @@ def get_utility_targets(
             H_net_hot=pt[PT.H_NET_HOT],
             pinch_idx=pt.pinch_idx(PT.H_NET_A),
             is_real_temperatures=False,
+            idx=idx,
         )
 
     pt.update(
@@ -64,6 +66,7 @@ def get_utility_targets(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             is_shifted=True,
+            idx=idx,
         )
     )
     pt.update(
@@ -81,6 +84,7 @@ def get_utility_targets(
                 hot_utilities=hot_utilities,
                 cold_utilities=cold_utilities,
                 is_shifted=False,
+                idx=idx,
             )
         )
         pt_real.update(
@@ -99,7 +103,8 @@ def get_utility_targets(
 ################################################################################
 
 
-def _target_utility(
+def target_utilities_for_load_profiles(
+    *,
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
     T_vals: np.ndarray,
@@ -107,8 +112,9 @@ def _target_utility(
     H_net_hot: np.ndarray,
     pinch_idx: Tuple[int, int],
     is_real_temperatures: bool = False,
+    idx: int | None = None,
 ) -> Tuple[StreamCollection, StreamCollection]:
-    """Targets multiple utility use considering a fixed target temperature."""
+    """Targets multiple utilities for precomputed hot- and cold-side load profiles."""
     if abs(H_net_cold[0]) > tol:
         if len(hot_utilities) == 0:
             raise ValueError(
@@ -122,6 +128,7 @@ def _target_utility(
             pinch_row=pinch_idx[0],
             is_hot_ut=True,
             is_real_temperatures=is_real_temperatures,
+            idx=idx,
         )
     if abs(H_net_hot[-1]) > tol:
         if len(cold_utilities) == 0:
@@ -136,6 +143,7 @@ def _target_utility(
             pinch_row=pinch_idx[1],
             is_hot_ut=False,
             is_real_temperatures=is_real_temperatures,
+            idx=idx,
         )
     return hot_utilities, cold_utilities
 
@@ -147,6 +155,7 @@ def _assign_utility(
     pinch_row: int,
     is_hot_ut: bool,
     is_real_temperatures: bool,
+    idx: int | None,
 ) -> StreamCollection:
     """Assigns utility heat duties based on vertical heat transfer across a pinch."""
     if is_hot_ut:
@@ -166,19 +175,14 @@ def _assign_utility(
 
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
-        Ts, Tt = (
-            (
-                (u.t_max, u.t_min)
-                if is_real_temperatures
-                else (u.t_max_star, u.t_min_star)
-            )
-            if is_hot_ut
-            else (
-                (u.t_min, u.t_max)
-                if is_real_temperatures
-                else (u.t_min_star, u.t_max_star)
-            )
-        )
+        if is_real_temperatures:
+            t_lo, t_hi = u.t_min, u.t_max
+        else:
+            t_lo, t_hi = u.t_min_star, u.t_max_star
+        if is_hot_ut:
+            Ts, Tt = float(t_hi[idx]), float(t_lo[idx])
+        else:
+            Ts, Tt = float(t_lo[idx]), float(t_hi[idx])
 
         Q_ut_max = _maximise_utility_duty(
             T_segment,
@@ -189,7 +193,11 @@ def _assign_utility(
             Q_assigned,
         )
         if Q_ut_max > tol:
-            u.set_heat_flow(Q_ut_max)
+            u.set_value_attr_at_state_idx(
+                attr_name="heat_flow",
+                value=Q_ut_max,
+                idx=idx,
+            )
             Q_assigned += Q_ut_max
 
         if abs(segment_limit - Q_assigned) < tol:

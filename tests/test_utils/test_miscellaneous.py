@@ -44,14 +44,14 @@ from OpenPinch.utils.miscellaneous import *
             id="zone-name-takes-precedence-over-value",
         ),
         pytest.param(
-            {"value": {"value": 1.25}, "units": "kW"},
+            {"value": {"value": 1.25}, "unit": "kW"},
             None,
             None,
             1.25,
             id="dict-recurses-through-value-payload",
         ),
         pytest.param(
-            ValueWithUnit(value=99.9, units="kW"),
+            ValueWithUnit(value=99.9, unit="kW"),
             None,
             None,
             99.9,
@@ -137,7 +137,7 @@ from OpenPinch.utils.miscellaneous import *
             id="abs-operator",
         ),
         pytest.param(
-            {"value": ValueWithUnit(value=8.0, units="kW"), "add": 2.0},
+            {"value": ValueWithUnit(value=8.0, unit="kW"), "add": 2.0},
             None,
             None,
             10.0,
@@ -165,14 +165,14 @@ from OpenPinch.utils.miscellaneous import *
             id="zone-name-with-operator-payload",
         ),
         pytest.param(
-            {"units": "kW"},
+            {"unit": "kW"},
             None,
             12.5,
             12.5,
             id="val2-fallback",
         ),
         pytest.param(
-            {"units": "kW"},
+            {"unit": "kW"},
             None,
             "12.5",
             12.5,
@@ -194,12 +194,12 @@ def test_get_value_does_not_mutate_payload():
 
 
 def test_get_value_val2_fallback_does_not_mutate_payload():
-    payload = {"units": "kW"}
+    payload = {"unit": "kW"}
 
     result = get_value(payload, val2=12.5)
 
     assert result == pytest.approx(12.5)
-    assert payload == {"units": "kW"}
+    assert payload == {"unit": "kW"}
 
 
 def test_get_value_none_raises_type_error():
@@ -228,7 +228,7 @@ def test_get_value_none_raises_type_error():
             id="missing-zone-key-and-value",
         ),
         pytest.param(
-            {"value": "abc", "units": "kW"},
+            {"value": "abc", "unit": "kW"},
             None,
             None,
             TypeError,
@@ -244,7 +244,7 @@ def test_get_value_none_raises_type_error():
             id="operator-with-invalid-string",
         ),
         pytest.param(
-            {"units": "kW"},
+            {"unit": "kW"},
             None,
             "twelve point five",
             TypeError,

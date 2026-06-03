@@ -6,9 +6,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ...classes.multi_stage_steam_turbine import MultiStageSteamTurbine
 from ...lib.config import T_CRIT, Configuration, tol
+from ...utils.miscellaneous import get_state_index
 from ...utils.water_properties import psat_T
+from ..power_cogeneration.unit_models.multi_stage_steam_turbine import (
+    MultiStageSteamTurbine,
+)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -22,12 +25,19 @@ __all__ = [
 ]
 
 
-def get_power_cogeneration_above_pinch(z: Zone):
+def get_power_cogeneration_above_pinch(
+    zone: Zone,
+    args: dict | None = None,
+) -> Zone:
     """Calculate the power cogeneration potential above pinch for a given zone."""
-    turbine_params = _prepare_turbine_parameters(z.config)
-    utility_data = _preprocess_utilities(z, turbine_params)
+    turbine_params = _prepare_turbine_parameters(zone.config)
+    idx, sid = get_state_index(
+        state_ids=getattr(zone, "state_ids", None),
+        args=args,
+    )
+    utility_data = _preprocess_utilities(zone, turbine_params, idx=idx)
     if utility_data is None:
-        return z
+        return zone
 
     turbine = MultiStageSteamTurbine()
     total_work, details = turbine.solve(
@@ -43,9 +53,9 @@ def get_power_cogeneration_above_pinch(z: Zone):
         is_high_p_cond_flash=turbine_params["is_high_p_cond_flash"],
     )
 
-    z.work_target = total_work
-    z.turbine_efficiency_target = details["overall_efficiency"]
-    return z
+    zone.work_target = total_work
+    zone.turbine_efficiency_target = details["overall_efficiency"]
+    return zone
 
 
 def get_power_cogeneration_below_pinch(
@@ -87,28 +97,37 @@ def _prepare_turbine_parameters(zone_config: Configuration) -> dict:
     }
 
 
-def _preprocess_utilities(z: Zone, turbine_params: dict) -> dict | None:
+def _preprocess_utilities(
+    zone: Zone,
+    turbine_params: dict,
+    *,
+    idx: int | None = None,
+) -> dict | None:
     """Translate hot-utility demands into turbine stage temperatures and duties."""
     stage_temperatures: list[float] = []
     stage_heat_flows: list[float] = []
     source_indices: list[int] = []
 
     u: Stream
-    for idx, u in enumerate(z.hot_utilities):
-        if u.t_supply >= T_CRIT or u.heat_flow <= tol:
+    for i, u in enumerate(zone.hot_utilities):
+        t_supply = float(u.t_supply[idx])
+        t_target = float(u.t_target[idx])
+        heat_flow = float(u.heat_flow[idx])
+        dt_cont_act = float(u.dt_cont_act[idx])
+        if t_supply >= T_CRIT or heat_flow <= tol:
             continue
 
         T_stage = (
-            u.t_target
-            if abs(u.t_supply - u.t_target) < 1.0 + tol
-            else u.t_target + u.dt_cont_act * 2
+            t_target
+            if abs(t_supply - t_target) < 1.0 + tol
+            else t_target + dt_cont_act * 2
         )
         if turbine_params["P_in"] + tol < psat_T(T_stage):
             continue
 
         stage_temperatures.append(float(T_stage))
-        stage_heat_flows.append(float(u.heat_flow))
-        source_indices.append(idx)
+        stage_heat_flows.append(float(heat_flow))
+        source_indices.append(i)
 
     if not stage_temperatures:
         return None

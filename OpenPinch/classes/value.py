@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -10,15 +11,23 @@ from pint import UnitRegistry
 from pint.errors import DimensionalityError
 
 ureg = UnitRegistry()
-Q_ = ureg.Quantity
+try:
+    ureg.define("USD = [currency]")
+except Exception:
+    pass
+try:
+    ureg.define("NZD = [currency]")
+except Exception:
+    pass
+Q_ = ureg.Quantity  # type: ignore
 
-_SERIALIZED_SCALAR_KEYS = {"value", "unit", "units"}
-_SERIALIZED_STATEFUL_KEYS = {"values", "state_ids", "weights", "unit", "units"}
+_SERIALIZED_SCALAR_KEYS = {"value", "unit"}
+_SERIALIZED_STATEFUL_KEYS = {"values", "state_ids", "weights", "unit"}
 
 
 def _is_value_with_unit(data: Any) -> bool:
     """Return ``True`` for objects that look like ``ValueWithUnit`` instances."""
-    return hasattr(data, "value") and hasattr(data, "units")
+    return hasattr(data, "value") and hasattr(data, "unit")
 
 
 def _is_bool_like(data: Any) -> bool:
@@ -29,90 +38,18 @@ def _is_bool_like(data: Any) -> bool:
 class Value:
     """Thin wrapper around a Pint ``Quantity`` with serialization helpers."""
 
-    def __init__(
-        self,
-        data=None,
-        unit: str = None,
-        *,
-        values=None,
-        weights: Mapping[str, float] | list[float] | np.ndarray | None = None,
-        state_id: list[str] | tuple[str, ...] | None = None,
-        state_ids: list[str] | tuple[str, ...] | None = None,
-    ):
-        """Create a unit-aware scalar or discrete-state value."""
-        if data is not None and values is not None:
-            raise TypeError("Use either data or values, not both.")
-        if state_id is not None and state_ids is not None:
-            raise TypeError("Use either state_id or state_ids, not both.")
-
-        if values is not None:
-            data = values
-        if state_id is not None:
-            state_ids = state_id
-
-        if isinstance(data, Mapping):
-            if self._is_serialized_stateful_payload(data):
-                self._init_stateful(
-                    data["values"],
-                    unit=data.get("unit") or data.get("units") or unit,
-                    weights=data.get("weights", weights),
-                    state_ids=data.get("state_ids"),
-                )
-                return
-            if self._is_serialized_scalar_payload(data):
-                if weights is not None or state_ids is not None:
-                    raise TypeError(
-                        "Scalar value payloads do not accept state_ids or weights."
-                    )
-                self._init_scalar(
-                    data.get("value"),
-                    data.get("unit") or data.get("units") or unit,
-                    preserve_none_unit=(data.get("value") is None),
-                )
-                return
-            self._init_stateful(data, unit=unit, weights=weights, state_ids=state_ids)
-            return
-
-        if _is_value_with_unit(data):
-            if weights is not None or state_ids is not None:
-                raise TypeError(
-                    "ValueWithUnit inputs do not accept state_ids or weights."
-                )
-            self._init_from_value_with_unit(data, unit)
-            return
-
-        if self._is_array_like_input(data):
-            if state_ids is None:
-                raise TypeError(
-                    "state_ids are required for array-backed stateful values."
-                )
-            self._init_stateful(data, unit=unit, weights=weights, state_ids=state_ids)
-            return
-
-        if state_ids is not None:
-            self._init_stateful(data, unit=unit, weights=weights, state_ids=state_ids)
-            return
-
-        if weights is not None:
-            raise TypeError("weights can only be used with stateful values.")
-
-        if data is None:
-            self._init_scalar(0.0, None, preserve_none_unit=True)
-            return
-
-        self._init_scalar(data, unit)
+    def __init__(self, data=None, unit: str = None):
+        """Create a scalar or stateful value from ``data`` and an optional ``unit``."""
+        quantity, weights = self._coerce_input(data, unit)
+        self._set_storage(quantity)
+        self._weights = weights
 
     @property
     def value(self):
         """Return the scalar magnitude or per-state magnitudes for stateful values."""
-        if self._is_stateful():
-            return self.state_values
-        return self._weighted_magnitude()
-
-    @property
-    def weighted_value(self) -> float:
-        """Return the weighted scalar view of the stored quantity."""
-        return self._weighted_magnitude()
+        if not self._is_stateful():
+            return self._quantity.magnitude[0]
+        return self._quantity.magnitude.copy()
 
     @value.setter
     def value(self, data):
@@ -120,40 +57,57 @@ class Value:
         if self._is_stateful():
             magnitudes = self._coerce_magnitude_array(
                 data,
-                expected_len=len(self._weights),
+                expected_len=len(self.state_values),
                 allow_scalar_broadcast=True,
                 label="value",
             )
-            self._set_storage(
-                Q_(magnitudes, self._quantity.units),
-                self._copy_state_ids(),
-                self._weights.copy(),
-            )
-            return
+        else:
+            if _is_bool_like(data):
+                raise TypeError("Boolean values are not supported.")
+            magnitudes = np.asarray([data], dtype=float)
+        self._set_storage(Q_(magnitudes, self._quantity.units))
 
-        if _is_bool_like(data):
-            raise TypeError("Boolean values are not supported.")
+    @property
+    def min(self) -> "Value":
+        """Return the minimum stored magnitude as a scalar ``Value``."""
+        return self._summary_value(np.min(self._quantity.magnitude))
 
-        self._set_storage(
-            Q_(np.asarray([data], dtype=float), self._quantity.units),
-            None,
-            np.asarray([1.0], dtype=float),
+    @property
+    def max(self) -> "Value":
+        """Return the maximum stored magnitude as a scalar ``Value``."""
+        return self._summary_value(np.max(self._quantity.magnitude))
+
+    @property
+    def mean(self) -> "Value":
+        """Return the arithmetic mean stored magnitude as a scalar ``Value``."""
+        return self._summary_value(np.mean(self._quantity.magnitude))
+
+    @property
+    def weighted_mean(self) -> "Value":
+        """Return the weighted mean stored magnitude as a scalar ``Value``."""
+        return self._summary_value(
+            np.average(self._quantity.magnitude, weights=self.weights)
         )
+
+    @property
+    def median(self) -> "Value":
+        """Return the median stored magnitude as a scalar ``Value``."""
+        return self._summary_value(np.median(self._quantity.magnitude))
 
     @property
     def state_values(self) -> np.ndarray:
         """Return the raw numpy magnitudes for each stored state."""
-        return self._magnitude_array().copy()
-
-    @property
-    def state_ids(self) -> list[str] | None:
-        """Return the state identifiers, or ``None`` for scalar values."""
-        return self._copy_state_ids()
+        return self._quantity.magnitude.copy()
 
     @property
     def weights(self) -> np.ndarray:
-        """Return the normalised state weights."""
-        return self._weights.copy()
+        """Return optional passive state weights carried with this value."""
+        return self._weights
+
+    @property
+    def num_states(self) -> int:
+        """Return the number of stored magnitudes."""
+        return len(self._quantity.magnitude)
 
     @property
     def unit(self):
@@ -163,145 +117,170 @@ class Value:
     @unit.setter
     def unit(self, unit_str):
         """Convert the stored quantity to ``unit_str`` in-place."""
-        self._set_storage(
-            Q_(self._magnitude_array(), unit_str),
-            self._copy_state_ids(),
-            self._weights.copy(),
-        )
+        self._set_storage(self._quantity.to(self._normalise_unit_input(unit_str)))
 
     def to(self, new_unit: str) -> "Value":
         """Return a copy converted to ``new_unit``."""
+        new_value = self._from_quantity(
+            self._quantity.to(self._normalise_unit_input(new_unit)),
+        )
+        new_value._weights = self._weights.copy() if self._weights is not None else None
+        return new_value
+
+    def __getitem__(self, idx):
+        """Return one selected state as an independent ``Value``."""
+        if idx is None or not self._is_stateful():
+            return Value(self)
+
+        if isinstance(idx, slice):
+            subset = self._quantity.magnitude[idx]
+            result = Value(subset, unit=self.unit)
+            if self._weights is not None:
+                result._weights = np.asarray(self._weights[idx], dtype=float).reshape(
+                    -1
+                )
+            return result
+
+        resolved_idx = self._resolve_state_index(idx)
         return self._from_quantity(
-            self._quantity.to(new_unit),
-            state_ids=self._copy_state_ids(),
-            weights=self._weights.copy(),
-        )
-
-    def add_states(
-        self,
-        state_id: list[str] | tuple[str, ...] | str,
-        value,
-        weight=None,
-    ) -> None:
-        """Append one or more states and renormalise weights.
-
-        Parameters
-        ----------
-        state_id:
-            One state identifier or a sequence of identifiers to append.
-        value:
-            One scalar or an array-like of magnitudes aligned to ``state_id``.
-            Scalars broadcast across multiple state identifiers.
-        weight:
-            Optional final probability mass for the new state(s). Scalars
-            broadcast across multiple state identifiers. When omitted, the new
-            states receive uniform weight across the full combined state set
-            while preserving the relative ratios between existing states.
-        """
-        if not self._is_stateful():
-            raise TypeError("add_states requires an existing stateful Value.")
-
-        new_state_ids = self._normalise_state_ids(
-            [state_id] if isinstance(state_id, str) else state_id
-        )
-        if new_state_ids is None:
-            raise TypeError("state_id is required.")
-
-        existing_state_ids = self._copy_state_ids()
-        overlapping_state_ids = sorted(set(existing_state_ids) & set(new_state_ids))
-        if overlapping_state_ids:
-            raise ValueError(
-                f"Duplicate state_ids are not allowed: {overlapping_state_ids}."
+            Q_(
+                np.asarray([self._quantity.magnitude[resolved_idx]], dtype=float),
+                self._quantity.units,
             )
-
-        new_values = self._coerce_magnitude_array(
-            value,
-            expected_len=len(new_state_ids),
-            label="value",
-            allow_scalar_broadcast=True,
         )
-        new_weights = self._prepare_added_state_weights(len(new_state_ids), weight)
 
-        combined_state_ids = existing_state_ids + new_state_ids
-        combined_values = np.concatenate([self._magnitude_array(), new_values])
-        remaining_mass = max(0.0, 1.0 - float(new_weights.sum()))
-        combined_weights = np.concatenate([self._weights * remaining_mass, new_weights])
+    def __iter__(self):
+        if not self._is_stateful():
+            raise TypeError("Scalar Value is not iterable.")
+        return iter(self._quantity.magnitude)
 
-        self._set_storage(
-            Q_(combined_values, self._quantity.units),
-            combined_state_ids,
-            combined_weights,
-        )
+    def __setitem__(self, idx, value):
+        resolved_idx = self._resolve_state_index(idx)
+        values = self._quantity.magnitude.copy()
+        values[resolved_idx] = self._coerce_scalar_magnitude(value)
+        self._set_storage(Q_(values, self._quantity.units))
+
+    def __len__(self):
+        """Return the number of states stored."""
+        return len(self._quantity.magnitude)
 
     def __str__(self):
-        if not self._is_stateful():
-            return f"{self.value} {self.unit}"
-        return (
-            f"{self.value} {self.unit} "
-            f"(states={self.state_ids}, values={self.state_values.tolist()}, "
-            f"weights={self.weights.tolist()})"
-        )
+        return f"{self.value} {self.unit}"
 
     def __repr__(self):
         if not self._is_stateful():
-            return f"Value({self.value}, {repr(self.unit)})"
+            return (
+                f"Value({self.value}, "
+                f"{repr(self._serialise_units(self._quantity.units))})"
+            )
         return (
             "Value("
             f"values={self.state_values.tolist()}, "
-            f"state_ids={self.state_ids!r}, "
-            f"weights={self.weights.tolist()}, "
-            f"unit={self.unit!r})"
+            f"unit={self._serialise_units(self._quantity.units)!r})"
         )
 
     def __float__(self):
-        return float(self.weighted_value)
+        if self._is_stateful():
+            raise TypeError("Cannot convert stateful Value to float.")
+        return float(self._quantity.magnitude[0])
 
     def __int__(self):
-        return int(self.weighted_value)
+        if self._is_stateful():
+            raise TypeError("Cannot convert stateful Value to int.")
+        return int(self._quantity.magnitude[0])
 
     def __round__(self, ndigits=None):
-        return round(self.weighted_value, ndigits)
+        if self._is_stateful():
+            raise TypeError("Cannot round stateful Value.")
+        return round(self._quantity.magnitude[0], ndigits)
+
+    def __array__(self, dtype=None):
+        if self._is_stateful():
+            return np.asarray(self.state_values, dtype=dtype)
+        return np.asarray(float(self), dtype=dtype)
+
+    def __format__(self, format_spec):
+        return format(float(self), format_spec)
+
+    def __abs__(self):
+        return abs(float(self))
+
+    def __neg__(self):
+        return -float(self)
+
+    def __pos__(self):
+        return +float(self)
 
     def __eq__(self, other):
         try:
             if self._is_numeric_scalar(other):
-                return self._weighted_magnitude() == other
-            return self._weighted_quantity() == self._to_quantity(other)
+                return np.all(self._quantity.magnitude == other)
+            if isinstance(other, Value):
+                return np.all(self.to(other.unit).value == other.value)
+            return False
         except DimensionalityError, TypeError, ValueError:
             return False
 
     def __lt__(self, other):
-        if self._is_numeric_scalar(other):
-            return self._weighted_magnitude() < other
-        return self._weighted_quantity() < self._to_quantity(other)
+        try:
+            if self._is_numeric_scalar(other):
+                return np.all(self._quantity.magnitude < other)
+            if isinstance(other, Value):
+                return np.all(self.to(other.unit).value < other.value)
+            return False
+        except DimensionalityError, TypeError, ValueError:
+            return False
 
     def __le__(self, other):
-        if self._is_numeric_scalar(other):
-            return self._weighted_magnitude() <= other
-        return self._weighted_quantity() <= self._to_quantity(other)
+        try:
+            if self._is_numeric_scalar(other):
+                return np.all(self._quantity.magnitude <= other)
+            if isinstance(other, Value):
+                return np.all(self.to(other.unit).value <= other.value)
+            return False
+        except DimensionalityError, TypeError, ValueError:
+            return False
 
     def __gt__(self, other):
-        if self._is_numeric_scalar(other):
-            return self._weighted_magnitude() > other
-        return self._weighted_quantity() > self._to_quantity(other)
+        try:
+            if self._is_numeric_scalar(other):
+                return np.all(self._quantity.magnitude > other)
+            if isinstance(other, Value):
+                return np.all(self.to(other.unit).value > other.value)
+            return False
+        except DimensionalityError, TypeError, ValueError:
+            return False
 
     def __ge__(self, other):
-        if self._is_numeric_scalar(other):
-            return self._weighted_magnitude() >= other
-        return self._weighted_quantity() >= self._to_quantity(other)
+        try:
+            if self._is_numeric_scalar(other):
+                return np.all(self._quantity.magnitude >= other)
+            if isinstance(other, Value):
+                return np.all(self.to(other.unit).value >= other.value)
+            return False
+        except DimensionalityError, TypeError, ValueError:
+            return False
 
     def __add__(self, other):
+        if self._is_numeric_scalar(other):
+            return self._from_quantity(self._quantity + Q_(other, self._quantity.units))
         return self._binary_operation(other, lambda left, right: left + right)
 
     def __radd__(self, other):
+        if self._is_numeric_scalar(other):
+            return self._from_quantity(Q_(other, self._quantity.units) + self._quantity)
         return self._binary_operation(
             other, lambda left, right: left + right, reverse=True
         )
 
     def __sub__(self, other):
+        if self._is_numeric_scalar(other):
+            return self._from_quantity(self._quantity - Q_(other, self._quantity.units))
         return self._binary_operation(other, lambda left, right: left - right)
 
     def __rsub__(self, other):
+        if self._is_numeric_scalar(other):
+            return self._from_quantity(Q_(other, self._quantity.units) - self._quantity)
         return self._binary_operation(
             other, lambda left, right: left - right, reverse=True
         )
@@ -322,29 +301,18 @@ class Value:
             other, lambda left, right: left / right, reverse=True
         )
 
-    def _to_quantity(self, other):
-        """Return the weighted scalar quantity for comparisons."""
-        if isinstance(other, Value):
-            return other._weighted_quantity()
-        return Q_(other)
-
-    def _from_quantity(
-        self,
-        qty,
-        *,
-        state_ids: list[str] | None = None,
-        weights: np.ndarray | None = None,
-    ):
-        """Build a new ``Value`` instance from a Pint quantity and state metadata."""
+    def _from_quantity(self, qty):
+        """Build a new ``Value`` instance from a Pint quantity."""
         instance = type(self).__new__(type(self))
-        instance._set_storage(qty, state_ids, weights)
+        instance._set_storage(qty)
+        instance._weights = self.weights
         return instance
 
     def _binary_operation(self, other, operator, reverse: bool = False):
         left, right = (other, self) if reverse else (self, other)
-        left_qty, right_qty, state_ids, weights = self._align_operands(left, right)
+        left_qty, right_qty = self._align_operands(left, right)
         result = operator(left_qty, right_qty)
-        return self._from_quantity(result, state_ids=state_ids, weights=weights)
+        return self._from_quantity(result)
 
     def _align_operands(self, left, right):
         left_value = left if isinstance(left, Value) else None
@@ -355,172 +323,173 @@ class Value:
 
         if left_value is not None and right_value is not None:
             if left_value._is_stateful() and right_value._is_stateful():
-                left_value._validate_compatible_states(right_value)
-                return (
-                    left_qty,
-                    right_qty,
-                    left_value._copy_state_ids(),
-                    left_value._weights.copy(),
-                )
-            if left_value._is_stateful():
-                return (
-                    left_qty,
-                    right_qty,
-                    left_value._copy_state_ids(),
-                    left_value._weights.copy(),
-                )
-            if right_value._is_stateful():
-                return (
-                    left_qty,
-                    right_qty,
-                    right_value._copy_state_ids(),
-                    right_value._weights.copy(),
-                )
-            return left_qty, right_qty, None, np.asarray([1.0], dtype=float)
+                if len(left_value._quantity.magnitude) != len(
+                    right_value._quantity.magnitude
+                ):
+                    raise ValueError(
+                        "Stateful arithmetic requires identical state counts."
+                    )
+        return left_qty, right_qty
 
-        if left_value is not None and left_value._is_stateful():
-            return (
-                left_qty,
-                right_qty,
-                left_value._copy_state_ids(),
-                left_value._weights.copy(),
-            )
-
-        if right_value is not None and right_value._is_stateful():
-            return (
-                left_qty,
-                right_qty,
-                right_value._copy_state_ids(),
-                right_value._weights.copy(),
-            )
-
-        return left_qty, right_qty, None, np.asarray([1.0], dtype=float)
-
-    def _validate_compatible_states(self, other: "Value") -> None:
-        if self._state_ids != other._state_ids:
-            raise ValueError("Stateful arithmetic requires identical state_ids order.")
-        if not np.allclose(self._weights, other._weights, rtol=1e-12, atol=1e-12):
-            raise ValueError(
-                "Stateful arithmetic requires identical normalised weights."
-            )
-
-    def _weighted_quantity(self):
-        return Q_(self._weighted_magnitude(), self._quantity.units)
-
-    def _weighted_magnitude(self) -> float:
-        magnitudes = self._magnitude_array()
-        return float(np.dot(self._weights, magnitudes))
-
-    def _magnitude_array(self) -> np.ndarray:
-        return np.asarray(self._quantity.magnitude, dtype=float).reshape(-1)
+    def _resolve_state_index(self, idx: int | str | None) -> int:
+        if not self._is_stateful():
+            return 0
+        if idx is None:
+            return 0
+        if isinstance(idx, str):
+            try:
+                return int(idx)
+            except (TypeError, ValueError) as exc:
+                raise KeyError(idx) from exc
+        idx = int(idx)
+        if idx < 0 or idx >= self.num_states:
+            raise IndexError(idx)
+        if idx >= self.num_states:
+            idx = 0
+        return idx
 
     def _is_stateful(self) -> bool:
-        return self._state_ids is not None
+        return len(self._quantity.magnitude) > 1
 
-    def _copy_state_ids(self) -> list[str] | None:
-        return None if self._state_ids is None else list(self._state_ids)
-
-    def _set_storage(self, quantity, state_ids, weights) -> None:
-        magnitudes = np.asarray(quantity.magnitude, dtype=float).reshape(-1)
-        state_ids = self._normalise_state_ids(state_ids)
-        weights_array = self._normalise_weights(weights, len(magnitudes))
-
-        if state_ids is None:
-            if len(magnitudes) != 1:
-                raise ValueError("Scalar values must contain exactly one magnitude.")
-        elif len(state_ids) != len(magnitudes):
-            raise ValueError(
-                "state_ids length must match the number of stored magnitudes."
-            )
-
+    def _set_storage(self, quantity) -> None:
+        magnitudes = np.array(quantity.magnitude, dtype=float, copy=True).reshape(-1)
+        if magnitudes.size == 0:
+            raise ValueError("Values cannot be empty.")
         self._quantity = Q_(magnitudes, quantity.units)
-        self._state_ids = state_ids
-        self._weights = weights_array
 
-    def _init_scalar(
-        self, data, unit: str | None, preserve_none_unit: bool = False
-    ) -> None:
-        if _is_bool_like(data):
-            raise TypeError("Boolean values are not supported.")
-
-        if data is None:
-            data = 0.0
-
-        if preserve_none_unit and unit is None:
-            quantity = Q_(np.asarray([0.0], dtype=float))
-        else:
-            quantity = (
-                Q_(np.asarray([data], dtype=float), unit)
-                if unit
-                else Q_(np.asarray([data], dtype=float))
-            )
-        self._set_storage(quantity, None, np.asarray([1.0], dtype=float))
-
-    def _init_from_value_with_unit(self, data, unit: str | None) -> None:
-        quantity = Q_(data.value, data.units)
-        if unit is not None:
-            try:
-                quantity.to(unit)
-            except DimensionalityError, TypeError, ValueError:
-                pass
-        self._set_storage(
-            Q_(np.asarray([quantity.magnitude], dtype=float), quantity.units),
-            None,
-            np.asarray([1.0], dtype=float),
+    def _summary_value(self, magnitude: float) -> "Value":
+        return self._from_quantity(
+            Q_(np.asarray([float(magnitude)], dtype=float), self._quantity.units)
         )
 
-    def _init_stateful(
+    def _coerce_scalar_magnitude(self, value) -> float:
+        if isinstance(value, Value):
+            return float(value.to(self.unit).value)
+        if hasattr(value, "units"):
+            quantity = Q_(value).to(self._quantity.units)
+            return float(np.asarray(quantity.magnitude, dtype=float).reshape(-1)[0])
+        return float(value)
+
+    def _coerce_input(
         self,
         data,
-        *,
         unit: str | None,
-        weights: Mapping[str, float] | list[float] | np.ndarray | None,
-        state_ids: list[str] | tuple[str, ...] | None,
-    ) -> None:
-        if isinstance(data, Mapping):
-            state_map = self._normalise_state_map(data)
-            ordered_state_ids = self._state_ids_from_mapping(state_map, state_ids)
-            magnitudes = self._coerce_magnitude_array(
-                [state_map[state_id] for state_id in ordered_state_ids],
-                expected_len=len(ordered_state_ids),
-                label="values",
-            )
-        else:
-            if state_ids is None:
-                raise TypeError(
-                    "state_ids are required for array-backed stateful values."
-                )
-            ordered_state_ids = self._normalise_state_ids(state_ids)
-            if ordered_state_ids is None:
-                raise TypeError(
-                    "state_ids are required for array-backed stateful values."
-                )
-            magnitudes = self._coerce_magnitude_array(
-                data,
-                expected_len=len(ordered_state_ids),
-                label="values",
-            )
+    ) -> tuple[Any, np.ndarray]:
+        payload = self._normalise_input_object(data)
 
-        quantity = Q_(magnitudes, unit) if unit else Q_(magnitudes)
-        self._set_storage(
-            quantity,
-            ordered_state_ids,
-            self._coerce_weights(weights, ordered_state_ids),
+        if isinstance(payload, Value):
+            quantity = payload._quantity
+            weights = payload.weights
+        elif isinstance(payload, Mapping):
+            quantity, weights = self._coerce_mapping_input(payload, unit)
+            return quantity, weights
+        elif hasattr(payload, "units"):
+            quantity = payload
+            weights = None
+        elif self._is_array_like_input(payload):
+            quantity = self._quantity_from_values(payload, unit)
+            weights = None
+        elif _is_value_with_unit(payload):
+            quantity, weights = self._coerce_object_with_unit(payload, unit)
+            return quantity, weights
+        elif payload is None:
+            quantity = self._quantity_from_scalar(0.0, unit)
+            weights = None
+        else:
+            quantity = self._quantity_from_scalar(payload, unit)
+            weights = None
+
+        quantity = self._coerce_quantity_to_unit(quantity, unit)
+        return quantity, weights
+
+    def _normalise_input_object(self, data):
+        if hasattr(data, "model_dump") and not isinstance(data, Mapping):
+            return data.model_dump(mode="python")
+        return data
+
+    def _coerce_mapping_input(
+        self,
+        data: Mapping[Any, Any],
+        unit: str | None,
+    ) -> tuple[Any, np.ndarray]:
+        if self._is_serialized_stateful_payload(data):
+            quantity = self._quantity_from_values(
+                data.get("values"),
+                data.get("unit") or unit,
+            )
+            weights = data.get("weights")
+        elif self._is_serialized_scalar_payload(data):
+            quantity = self._missing_or_zero_quantity(
+                data.get("value"),
+                data.get("unit") or unit,
+            )
+            weights = data.get("weights")
+        else:
+            quantity = self._quantity_from_values(list(data.values()), unit)
+            weights = None
+
+        return quantity, weights
+
+    def _coerce_object_with_unit(
+        self,
+        data,
+        unit: str | None,
+    ) -> tuple[Any, np.ndarray]:
+        source_unit = getattr(data, "unit", None) or unit
+        if hasattr(data, "values"):
+            quantity = self._quantity_from_values(data.values, source_unit)
+            weights = getattr(data, "weights", None)
+        else:
+            quantity = self._missing_or_zero_quantity(
+                getattr(data, "value", None), source_unit
+            )
+            weights = getattr(data, "weights", None)
+        weights_arr = self._normalise_weights(
+            weights,
+            expected_len=np.asarray(quantity.magnitude, dtype=float).reshape(-1).size,
         )
+        return quantity, weights_arr
 
-    def _coerce_weights(self, weights, state_ids: list[str]) -> np.ndarray:
-        if weights is None:
-            return np.ones(len(state_ids), dtype=float) / len(state_ids)
+    def _quantity_from_scalar(self, data, unit: str | None):
+        if _is_bool_like(data):
+            raise TypeError("Boolean values are not supported.")
+        resolved_unit = self._normalise_unit_input(unit)
+        magnitude = np.asarray([data], dtype=float)
+        return Q_(magnitude, resolved_unit) if resolved_unit else Q_(magnitude)
 
-        if isinstance(weights, Mapping):
-            weight_map = self._normalise_state_map(weights)
-            if set(weight_map) != set(state_ids):
-                raise ValueError("Weight keys must match the provided state_ids.")
-            raw_weights = [weight_map[state_id] for state_id in state_ids]
-        else:
-            raw_weights = weights
+    def _missing_or_zero_quantity(self, data, unit: str | None):
+        resolved_unit = self._normalise_unit_input(unit)
+        magnitude = np.asarray([np.nan if data is None else data], dtype=float)
+        return Q_(magnitude, resolved_unit) if resolved_unit else Q_(magnitude)
 
-        return self._normalise_weights(raw_weights, len(state_ids))
+    def _quantity_from_values(self, data, unit: str | None):
+        values_list = list(data)
+        magnitudes = self._coerce_magnitude_array(
+            values_list,
+            expected_len=len(values_list),
+            label="values",
+        )
+        resolved_unit = self._normalise_unit_input(unit)
+        return Q_(magnitudes, resolved_unit) if resolved_unit else Q_(magnitudes)
+
+    def _coerce_quantity_to_unit(self, quantity, unit: str | None):
+        copied = Q_(
+            np.asarray(quantity.magnitude, dtype=float).reshape(-1),
+            quantity.units,
+        )
+        if unit is None:
+            return copied
+        resolved_unit = self._normalise_unit_input(unit)
+        try:
+            return copied.to(resolved_unit)
+        except DimensionalityError, TypeError, ValueError:
+            if self._quantity_is_dimensionless(copied) or self._same_dimensionality(
+                copied, resolved_unit
+            ):
+                return Q_(
+                    np.asarray(copied.magnitude, dtype=float).reshape(-1), resolved_unit
+                )
+            raise
 
     def _coerce_magnitude_array(
         self,
@@ -565,112 +534,6 @@ class Value:
 
         return magnitudes
 
-    def _normalise_weights(self, weights, expected_len: int) -> np.ndarray:
-        if weights is None:
-            weights_array = np.ones(expected_len, dtype=float)
-        else:
-            if _is_bool_like(weights):
-                raise TypeError("Boolean weights are not supported.")
-            try:
-                weight_values = list(weights)
-            except TypeError as exc:
-                raise TypeError("weights must be 1-D array-like data.") from exc
-            if any(_is_bool_like(weight) for weight in weight_values):
-                raise TypeError("Boolean weights are not supported.")
-            weights_array = np.asarray(weight_values, dtype=float).reshape(-1)
-
-        if len(weights_array) != expected_len:
-            raise ValueError("weights length must match the number of states.")
-        if len(weights_array) == 0:
-            raise ValueError("Stateful values cannot be empty.")
-        if not np.all(np.isfinite(weights_array)):
-            raise ValueError("weights must be finite.")
-        if np.any(weights_array < 0.0):
-            raise ValueError("weights must be non-negative.")
-
-        total_weight = float(weights_array.sum())
-        if total_weight <= 0.0:
-            raise ValueError("weights must sum to a positive value.")
-
-        return weights_array / total_weight
-
-    def _prepare_added_state_weights(self, num_new_states: int, weight) -> np.ndarray:
-        """Return final probability masses for newly appended states."""
-        if num_new_states <= 0:
-            raise ValueError("At least one new state is required.")
-
-        num_existing_states = len(self._weights)
-        if weight is None:
-            total_new_mass = num_new_states / (num_existing_states + num_new_states)
-            return np.full(num_new_states, total_new_mass / num_new_states, dtype=float)
-
-        if _is_bool_like(weight):
-            raise TypeError("Boolean weights are not supported.")
-
-        if np.isscalar(weight) and not isinstance(weight, (str, bytes)):
-            raw_weights = np.full(num_new_states, float(weight), dtype=float)
-        else:
-            try:
-                raw_weight_values = list(weight)
-            except TypeError as exc:
-                raise TypeError(
-                    "weight must be a scalar or 1-D array-like data."
-                ) from exc
-            if any(_is_bool_like(item) for item in raw_weight_values):
-                raise TypeError("Boolean weights are not supported.")
-            raw_weights = np.asarray(raw_weight_values, dtype=float).reshape(-1)
-
-        if len(raw_weights) != num_new_states:
-            raise ValueError("weight length must match the number of added states.")
-        if not np.all(np.isfinite(raw_weights)):
-            raise ValueError("weight must be finite.")
-        if np.any(raw_weights < 0.0):
-            raise ValueError("weight must be non-negative.")
-
-        total_new_mass = float(raw_weights.sum())
-        if total_new_mass > 1.0 + 1e-12:
-            raise ValueError("Added state weights must sum to 1.0 or less.")
-
-        return raw_weights
-
-    def _state_ids_from_mapping(
-        self,
-        data: Mapping[str, Any],
-        state_ids: list[str] | tuple[str, ...] | None,
-    ) -> list[str]:
-        if len(data) == 0:
-            raise ValueError("Stateful values cannot be empty.")
-        if state_ids is None:
-            return list(data.keys())
-
-        normalised_state_ids = self._normalise_state_ids(state_ids)
-        if normalised_state_ids is None:
-            raise TypeError("state_ids are required for array-backed stateful values.")
-        if set(normalised_state_ids) != set(data):
-            raise ValueError("state_ids must match the provided state-value keys.")
-        return normalised_state_ids
-
-    def _normalise_state_map(self, data: Mapping[Any, Any]) -> dict[str, Any]:
-        state_map = {str(key): value for key, value in data.items()}
-        if len(state_map) != len(data):
-            raise ValueError("Duplicate state_ids are not allowed.")
-        return state_map
-
-    def _normalise_state_ids(
-        self, state_ids: list[str] | tuple[str, ...] | None
-    ) -> list[str] | None:
-        if state_ids is None:
-            return None
-        if isinstance(state_ids, (str, bytes)):
-            raise TypeError("state_ids must be a sequence of identifiers.")
-
-        normalised_state_ids = [str(state_id) for state_id in state_ids]
-        if len(normalised_state_ids) == 0:
-            raise ValueError("state_ids cannot be empty.")
-        if len(set(normalised_state_ids)) != len(normalised_state_ids):
-            raise ValueError("Duplicate state_ids are not allowed.")
-        return normalised_state_ids
-
     @staticmethod
     def _is_numeric_scalar(other: Any) -> bool:
         return isinstance(
@@ -695,36 +558,70 @@ class Value:
 
     @staticmethod
     def _is_serialized_stateful_payload(data: Mapping[Any, Any]) -> bool:
-        return set(data).issubset(_SERIALIZED_STATEFUL_KEYS) and (
-            "values" in data or "state_ids" in data or "weights" in data
-        )
+        return set(data).issubset(_SERIALIZED_STATEFUL_KEYS) and ("values" in data)
 
     def _format_units(self, units) -> str:
-        return format(units, "~").replace("°", "deg").replace(" ", "")
+        return (
+            format(units, "~").replace("USD", "$").replace("NZD", "$").replace(" ", "")
+        )
+
+    @staticmethod
+    def _serialise_units(units) -> str:
+        return (
+            format(units, "~")
+            .replace("°", "deg")
+            .replace("USD", "$")
+            .replace("NZD", "$")
+            .replace(" ", "")
+        )
+
+    @staticmethod
+    def _normalise_unit_input(unit: str | None) -> str | None:
+        if unit is None:
+            return None
+        text = str(unit).strip().replace("$", "USD")
+        if text in {"C", "°C"}:
+            return "degC"
+        if text == "degK":
+            return "K"
+        text = re.sub(r"(?<=[A-Za-z])2(?=($|[./*]))", "^2", text)
+        text = re.sub(r"(?<=[A-Za-z])3(?=($|[./*]))", "^3", text)
+        text = text.replace(".K", "/K").replace(".degC", "/degC")
+        return text
+
+    @staticmethod
+    def _quantity_is_dimensionless(quantity) -> bool:
+        return str(quantity.units) == "dimensionless"
+
+    @staticmethod
+    def _same_dimensionality(quantity, unit: str) -> bool:
+        try:
+            return quantity.dimensionality == Q_(1.0, unit).dimensionality
+        except Exception:
+            return False
 
     def to_dict(self):
         """Serialise the value into a JSON-friendly dictionary."""
         if self._is_stateful():
             return {
                 "values": self.state_values.tolist(),
-                "state_ids": self.state_ids,
-                "weights": self.weights.tolist(),
-                "unit": self.unit,
+                "unit": self._serialise_units(self._quantity.units),
             }
-        return {"value": self.weighted_value, "unit": self.unit}
+        if np.isnan(self.value):
+            return {
+                "value": None,
+                "unit": self._serialise_units(self._quantity.units),
+            }
+        return {
+            "value": self.value,
+            "unit": self._serialise_units(self._quantity.units),
+        }
 
     @classmethod
     def from_dict(cls, data):
         """Instantiate from a scalar or stateful serialized mapping."""
         if not isinstance(data, Mapping):
             raise TypeError("data must be a mapping.")
-
         if cls._is_serialized_stateful_payload(data):
-            return cls(
-                data["values"],
-                data.get("unit") or data.get("units"),
-                weights=data.get("weights"),
-                state_ids=data.get("state_ids"),
-            )
-
-        return cls(data["value"], data.get("unit") or data.get("units"))
+            return cls(data)
+        return cls(data)

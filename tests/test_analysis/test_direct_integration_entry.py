@@ -19,7 +19,7 @@ def test_initialise_utility_index_returns_first_available():
 def test_add_net_segment_stateful_consumes_residuals():
     u1 = Stream("U1", 200, 250, heat_flow=120.0)
     u2 = Stream("U2", 200, 250, heat_flow=80.0)
-    residuals = [u1.heat_flow, u2.heat_flow]
+    residuals = [u1.heat_flow[0], u2.heat_flow[0]]
     net_streams = StreamCollection()
     next_idx, next_k = _add_net_segment_stateful(
         400,

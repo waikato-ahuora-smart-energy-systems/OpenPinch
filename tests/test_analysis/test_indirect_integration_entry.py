@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from OpenPinch.classes.problem_table import ProblemTable
+from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.config import Configuration
@@ -27,6 +28,9 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
         heat_recovery_target=25.0,
         hot_utility_target=10.0,
         heat_recovery_limit=50.0,
+    )
+    zone.net_hot_streams.add(
+        Stream(name="NetHot", t_supply=300.0, t_target=100.0, heat_flow=20.0)
     )
 
     site_pt = ProblemTable(
@@ -59,13 +63,16 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     monkeypatch.setattr(
         indirect,
         "_match_utility_gen_and_use_at_same_level",
-        lambda hot_utilities, cold_utilities: (hot_utilities, cold_utilities),
+        lambda hot_utilities, cold_utilities, idx=0: (
+            hot_utilities,
+            cold_utilities,
+        ),
     )
     monkeypatch.setattr(indirect, "_save_graph_data", lambda pt: {})
     monkeypatch.setattr(
         indirect,
         "_compute_utility_cost",
-        lambda hot_utilities, cold_utilities: 0.0,
+        lambda utilities, idx=None: 0.0,
     )
 
     target = indirect.compute_indirect_integration_targets(zone)

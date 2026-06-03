@@ -5,35 +5,35 @@
             "temp_pinch": {
                 "cold_temp": {
                     "value": 244.0,
-                    "units": "degC"
+                    "unit": "degC"
                 },
                 "hot_temp": {
                     "value": 244.0,
-                    "units": "degC"
+                    "unit": "degC"
                 }
             },
             "Qh": {
                 "value": 27048.4,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qc": {
                 "value": 40776.0,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qr": {
                 "value": 88964.4,
-                "units": "kW"
+                "unit": "kW"
             },
             "degree_of_integration": {
                 "value": 84.53766947558069,
-                "units": "%"
+                "unit": "%"
             },
             "hot_utilities": [
                 {
                     "name": "HU",
                     "heat_flow": {
                         "value": 27048.4,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ],
@@ -42,7 +42,7 @@
                     "name": "CU",
                     "heat_flow": {
                         "value": 40776.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ]

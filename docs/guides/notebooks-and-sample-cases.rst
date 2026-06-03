@@ -38,7 +38,8 @@ The current packaged notebooks load bundled sample cases directly with
 ``PinchWorkspace(source="sample_case.json", ...)`` and then work against real
 ``PinchProblem`` cases inside the workspace. They are packaged as clean sources:
 no stored Plotly payloads, no cached execution counts, and no stale traceback
-output.
+output. The examples also stay on the public selected-state workflow surface,
+for example ``problem.target.direct_heat_integration(state_id="0")``.
 
 Copy the full series with:
 
@@ -71,7 +72,7 @@ Recommended Learning Path
    SUGCC workflows
 3. `chocolate_factory.json` and notebook 03 for direct-versus-indirect HPR and
    refrigeration comparison
-4. `heat_pump_targeting.json` for a smaller direct HPR screening payload when
+4. `heat_pump_targeting.json` for smaller direct HPR screening input data when
    you want to test the advanced `problem.target.*` surface without the full
    notebook comparison flow
 

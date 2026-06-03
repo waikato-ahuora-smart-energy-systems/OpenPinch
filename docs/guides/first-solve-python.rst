@@ -83,6 +83,16 @@ Step 6. Use the Richer Workflow Hooks
 These are best treated as explicit advanced workflows after you understand the
 base case.
 
+When the input data contains stateful values, the named targeting entry
+points also accept ``state_id`` so you can rerun one selected operating state
+without flattening the prepared model up front:
+
+.. code-block:: python
+
+   peak_target = problem.target.direct_heat_integration(state_id="peak")
+   peak_summary = problem.summary_frame()
+   print(peak_summary[["Target", "State ID", "Hot Utility Target"]])
+
 Named Multi-Case Alternative
 ----------------------------
 
@@ -112,7 +122,7 @@ When you do not want a stateful wrapper object, use the service boundary:
    from OpenPinch import pinch_analysis_service
    from OpenPinch.lib.schemas.io import StreamSchema, TargetInput
 
-   payload = TargetInput(
+   input_data = TargetInput(
        streams=[
            StreamSchema(
                zone="Process",
@@ -125,7 +135,7 @@ When you do not want a stateful wrapper object, use the service boundary:
        ]
    )
 
-   result = pinch_analysis_service(payload, project_name="Example")
+   result = pinch_analysis_service(input_data, project_name="Example")
 
 When To Drop Lower
 ------------------

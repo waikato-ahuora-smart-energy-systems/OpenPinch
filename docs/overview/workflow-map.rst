@@ -48,7 +48,7 @@ Use `PinchProblem` when:
 Use `PinchWorkspace` when:
 
 - you need named baseline and variant cases in one session
-- you want to compare cases without rebuilding payload management helpers
+- you want to compare cases without rebuilding case-input management helpers
 - you want to keep using real `PinchProblem` cases inside that study
 
 Use `pinch_analysis_service` when:

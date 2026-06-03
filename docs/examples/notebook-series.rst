@@ -13,11 +13,12 @@ Included Notebooks
 ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
    Baseline direct-integration workflow, summary reading, graph inspection, and
    ``dt_cont`` sensitivity using ``PinchWorkspace`` plus real
-   ``PinchProblem`` cases.
+   ``PinchProblem`` cases, including the selected-state targeting call surface.
 
 ``02_total_site_targets_and_sugcc.ipynb``
    Zonal and Total Site workflow on a pulp-mill style case, including indirect
-   targeting and site utility grand composite interpretation.
+   targeting, selected-state total-site calls, and site utility grand composite
+   interpretation.
 
 ``03_carnot_hpr_comparison.ipynb``
    Direct and indirect Carnot HPR and refrigeration comparison using the

@@ -5,53 +5,53 @@
             "temp_pinch": {
                 "cold_temp": {
                     "value": 57.4,
-                    "units": "degC"
+                    "unit": "degC"
                 },
                 "hot_temp": {
                     "value": 57.4,
-                    "units": "degC"
+                    "unit": "degC"
                 }
             },
             "Qh": {
                 "value": 294.782,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qc": {
                 "value": 260.678,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qr": {
                 "value": 1005.1939999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "degree_of_integration": {
                 "value": 87.00763615149042,
-                "units": "%"
+                "unit": "%"
             },
             "utility_cost": {
                 "value": 1530625576.0,
-                "units": "$/y"
+                "unit": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "LPS",
                     "heat_flow": {
                         "value": 181.99,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "HW",
                     "heat_flow": {
                         "value": 112.79199999999997,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ],
@@ -60,21 +60,21 @@
                     "name": "HW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 260.678,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CHW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ]
@@ -84,53 +84,53 @@
             "temp_pinch": {
                 "cold_temp": {
                     "value": 57.4,
-                    "units": "degC"
+                    "unit": "degC"
                 },
                 "hot_temp": {
                     "value": 57.4,
-                    "units": "degC"
+                    "unit": "degC"
                 }
             },
             "Qh": {
                 "value": 294.782,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qc": {
                 "value": 260.678,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qr": {
                 "value": 1005.1939999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "degree_of_integration": {
                 "value": 87.00763615149042,
-                "units": "%"
+                "unit": "%"
             },
             "utility_cost": {
                 "value": 1530625576.0,
-                "units": "$/y"
+                "unit": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "LPS",
                     "heat_flow": {
                         "value": 181.99,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "HW",
                     "heat_flow": {
                         "value": 112.79199999999997,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ],
@@ -139,21 +139,21 @@
                     "name": "HW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 260.678,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CHW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ]
@@ -163,53 +163,53 @@
             "temp_pinch": {
                 "cold_temp": {
                     "value": null,
-                    "units": "degC"
+                    "unit": "degC"
                 },
                 "hot_temp": {
                     "value": null,
-                    "units": "degC"
+                    "unit": "degC"
                 }
             },
             "Qh": {
                 "value": 294.782,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qc": {
                 "value": 260.678,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qr": {
                 "value": 1005.1939999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "degree_of_integration": {
                 "value": null,
-                "units": "%"
+                "unit": "%"
             },
             "utility_cost": {
                 "value": 1530625576.0,
-                "units": "$/y"
+                "unit": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "LPS",
                     "heat_flow": {
                         "value": 181.99,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "HW",
                     "heat_flow": {
                         "value": 112.79199999999997,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ],
@@ -218,21 +218,21 @@
                     "name": "HW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 260.678,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CHW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ]
@@ -242,53 +242,53 @@
             "temp_pinch": {
                 "cold_temp": {
                     "value": 30.0,
-                    "units": "degC"
+                    "unit": "degC"
                 },
                 "hot_temp": {
                     "value": 60.0,
-                    "units": "degC"
+                    "unit": "degC"
                 }
             },
             "Qh": {
                 "value": 294.782,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qc": {
                 "value": 260.678,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qr": {
                 "value": 1005.1939999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "degree_of_integration": {
                 "value": 87.00763615149042,
-                "units": "%"
+                "unit": "%"
             },
             "utility_cost": {
                 "value": 1530625576.0,
-                "units": "$/y"
+                "unit": "$/y"
             },
             "hot_utilities": [
                 {
                     "name": "LPS",
                     "heat_flow": {
                         "value": 181.99,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "HW",
                     "heat_flow": {
                         "value": 112.79199999999997,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ],
@@ -297,21 +297,21 @@
                     "name": "HW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CW",
                     "heat_flow": {
                         "value": 260.678,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CHW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ]

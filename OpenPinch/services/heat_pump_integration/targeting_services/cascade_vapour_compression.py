@@ -2,7 +2,6 @@
 
 import numpy as np
 
-from ....classes.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
@@ -22,6 +21,7 @@ from ..common.shared import (
     solve_hpr_placement,
     validate_vapour_hp_refrigerant_ls,
 )
+from ..unit_models.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
 from .multi_temperature_carnot import (
     optimise_multi_temperature_carnot_heat_pump_placement,
 )

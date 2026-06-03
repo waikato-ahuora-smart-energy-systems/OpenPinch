@@ -11,7 +11,7 @@ Recommended Usage
 
 For new code, prefer one of these two patterns:
 
-1. Build a :class:`~OpenPinch.lib.schemas.io.TargetInput` payload and call
+1. Build a :class:`~OpenPinch.lib.schemas.io.TargetInput` input object and call
    :func:`~OpenPinch.main.pinch_analysis_service`.
 2. Load a problem file into
    :class:`~OpenPinch.classes.pinch_problem.PinchProblem`, call
@@ -33,7 +33,7 @@ Service-Layer Example
    from OpenPinch import pinch_analysis_service
    from OpenPinch.lib.schemas.io import StreamSchema, TargetInput
 
-   payload = TargetInput(
+   input_data = TargetInput(
        streams=[
            StreamSchema(
                zone="Process",
@@ -47,7 +47,7 @@ Service-Layer Example
        utilities=[],
    )
 
-   result = pinch_analysis_service(payload, project_name="Example")
+   result = pinch_analysis_service(input_data, project_name="Example")
 
 Top-Level Package Re-Exports
 ----------------------------
@@ -86,7 +86,7 @@ Core Service Functions
 :mod:`OpenPinch.main` is the thin orchestration layer above the analysis
 modules.
 
-- :func:`~OpenPinch.main.pinch_analysis_service` validates the incoming payload,
+- :func:`~OpenPinch.main.pinch_analysis_service` validates the incoming input data,
   prepares the zone hierarchy, runs the appropriate direct and indirect
   targeting steps, and returns a structured response.
 - :func:`~OpenPinch.utils.multiscale_targeting.get_targets_for_zone_and_sub_zones` accepts an already prepared
@@ -139,4 +139,7 @@ entrypoint family. Each named workflow returns the affected
 :class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat pump and
 refrigeration targets also surface HPR summary fields such as ``hpr_cycle``,
 ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``, and
-``StreamCollection`` payloads on ``hpr_hot_streams`` and ``hpr_cold_streams``.
+``StreamCollection`` objects on ``hpr_hot_streams`` and ``hpr_cold_streams``.
+For stateful input data, the same named entry points also accept
+``state_id=...`` and the refreshed summaries, exports, and graph metadata carry
+that selected state context forward.

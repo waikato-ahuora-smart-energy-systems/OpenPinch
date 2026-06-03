@@ -38,23 +38,23 @@
             "name": "H1",
             "t_supply": {
                 "value": 100,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 30,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 3616.6666666666665,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -64,23 +64,23 @@
             "name": "H2",
             "t_supply": {
                 "value": 75,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 30,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 2100,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -90,23 +90,23 @@
             "name": "H3",
             "t_supply": {
                 "value": 50,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 30,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 133.33333333333334,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -116,23 +116,23 @@
             "name": "C1",
             "t_supply": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 100,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 4666.666666666667,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -142,23 +142,23 @@
             "name": "C2",
             "t_supply": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 75,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 1283.3333333333333,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -168,23 +168,23 @@
             "name": "C3",
             "t_supply": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 466.66666666666663,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -194,23 +194,23 @@
             "name": "C4",
             "t_supply": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 67,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 483.3333333333333,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -222,23 +222,23 @@
             "type": "Hot",
             "t_supply": {
                 "value": 180,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 179,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -247,23 +247,23 @@
             "type": "Cold",
             "t_supply": {
                 "value": 10,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         }

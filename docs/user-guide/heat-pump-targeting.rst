@@ -9,7 +9,7 @@ still worth calling out here for compatibility:
 - advanced targeting via ``problem.target.direct_heat_pump(...)`` and related
   indirect/refrigeration routes
 - the packaged ``03_carnot_hpr_comparison.ipynb`` notebook
-- the compact HPR sample payload ``heat_pump_targeting.json`` for smaller
+- the compact HPR sample input file ``heat_pump_targeting.json`` for smaller
   direct screening studies
 
 Use these pages instead:

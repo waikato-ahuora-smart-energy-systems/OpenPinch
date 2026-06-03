@@ -1,161 +1,56 @@
-# OpenPinch Package Sweep Plan
+# Refactor `power_cogeneration_service`
 
-Last sweep: 2026-05-21
+## Summary
+Simplify cogeneration targeting into a predictable “select candidate -> ensure that exact target exists for the requested state -> apply turbine analysis” flow.
 
-This plan replaces the previous frontend-oriented roadmap with a package-wide
-maintenance and hardening backlog based on the current repository state.
+Keep the public API shape the same, but change the implicit default behavior of `problem.target.cogeneration()` so it prefers:
 
-## Verified Baseline
+`TS -> IHP -> IR -> DHP -> DR -> DI`
 
-- `uv run pytest -q` passes: `840 passed in 30.73s`.
-- `uv run pytest -q tests/test_release_artifacts.py tests/test_docs_build.py`
-  passes.
-- `uv run python scripts/build_dist.py` passes.
-- `uv run ruff check .` passes.
+This matches your preference for Total Site first, then HPR targets, then Direct Integration.
 
-## Current Debt Snapshot
+## Key Changes
+- In [services_entry.py](/Users/timothyw/Github_Local/OpenPinch/OpenPinch/services/services_entry.py), split cogeneration orchestration into small internal helpers:
+  - one helper to validate/normalize `base_target_type`
+  - one helper to produce the candidate order for the current call
+  - one helper to ensure a specific candidate target exists for the requested state by calling the mapped prerequisite service
+- Make `power_cogeneration_service()` operate on one selected candidate at a time instead of looping over a mixed priority list and mutating whichever target happens to exist.
+- Treat fallback only as a “target unavailable” condition:
+  - if `TS` cannot be produced for the zone/state, continue to the next candidate
+  - if a candidate exists and cogeneration finds no viable turbine stage, keep that target and return it with zero/no work result rather than falling through to another base target
+- Keep explicit `base_target_type` as the override path:
+  - explicit type disables fallback
+  - unsupported explicit types raise `ValueError`
+  - explicit supported type that cannot be produced for the requested state raises a clear runtime error
+- Fix the accessor/return mismatch by making cogeneration return the actual target family selected by the service, not a hardcoded `DI` target:
+  - add a dedicated internal cogeneration execution path in `PinchProblem` / the accessor flow
+  - have the service persist the selected cogeneration target type on the zone for that execution
+  - return `zone.targets[selected_type]` after targeting completes
+- In [power_cogeneration_analysis.py](/Users/timothyw/Github_Local/OpenPinch/OpenPinch/services/power_cogeneration_analysis/power_cogeneration_analysis.py), rename the conceptual input from `zone` to `target` in type hints/docstrings and document that cogeneration operates on compatible target objects carrying `config`, `hot_utilities`, `work_target`, and `turbine_efficiency_target`.
+- Update accessor docstrings and any user-facing notes so the implicit default order is clear.
 
-- There is no active Ruff backlog at the repository level; the current lint
-  baseline is clean.
-- A small number of targeted Ruff `per-file-ignores` now exist for intentional
-  wildcard-import test patterns and a handful of data-heavy or placeholder
-  files. Those exceptions should be revisited if those files are refactored.
+## Public API / Behavior
+- No signature change to `problem.target.cogeneration(...)`.
+- `options["base_target_type"]` remains the public override.
+- Behavioral change:
+  calls without `base_target_type` no longer imply `DI`; they now resolve by `TS -> IHP -> IR -> DHP -> DR -> DI`.
+- Compatible target families for cogeneration become:
+  `TS`, `IHP`, `IR`, `DHP`, `DR`, `DI`.
 
-The package is currently green for the restored verification gates, full-repo
-lint, and build flow, but the sweep still shows substantial structural debt in
-the public orchestration layer and several partial subsystems.
+## Test Plan
+- Add a regression where both `TS` and `DI` exist and implicit cogeneration mutates and returns `TS`, not `DI`.
+- Add fallback-order tests:
+  - `TS` unavailable -> falls to `IHP`
+  - no `TS`/HPR target available -> falls to `DI`
+- Add explicit override tests:
+  - explicit `TS`, `IHP`, and `DI` each target exactly that family
+  - unsupported explicit type raises `ValueError`
+  - explicit supported type that cannot be produced raises a clear error
+- Add state-sensitive tests proving the selected candidate is refreshed when its cached target was solved for a different state.
+- Add a regression that “no viable turbine stage” does not trigger fallback to another base target.
+- Keep the existing analysis-layer test that `get_power_cogeneration_above_pinch()` accepts HPR targets.
 
-## High-Risk Hotspots
-
-- `OpenPinch/classes/pinch_problem.py` (`1028` lines)
-- `OpenPinch/classes/pinch_workspace.py` (`734` lines)
-- `OpenPinch/classes/_workspace_support.py` (`759` lines)
-- `OpenPinch/services/input_data_processing/data_preparation.py` (`755` lines)
-- `OpenPinch/services/common/graph_data.py` (`868` lines)
-- `OpenPinch/utils/wkbook_to_json.py` (`395` lines)
-
-These files are carrying too many responsibilities at once. Refactoring them
-should be treated as maintainability work, not cosmetic cleanup.
-
-## Now
-
-### 1. Refactor `PinchProblem` into smaller components
-
-Why this matters:
-
-- `PinchProblem` currently mixes loading, validation, source normalization,
-  zone-tree preparation, targeting orchestration, comparison helpers, Excel
-  export, dashboard launch, and error formatting.
-- The class still owns too many responsibilities and too much mutable state.
-
-What to do:
-
-- Split loader logic away from orchestration.
-- Split schema/semantic validation and message formatting into dedicated
-  helpers.
-- Split export and dashboard integration away from core solve orchestration.
-- Keep state ownership explicit as the class is broken into smaller units.
-
-Done when:
-
-- `PinchProblem` reads like a coordinator rather than a 1000-line utility
-  bucket.
-- Smaller units can be tested independently.
-
-### 2. Refactor `PinchWorkspace` and `_workspace_support`
-
-Why this matters:
-
-- `pinch_workspace.py` and `_workspace_support.py` currently combine storage,
-  payload normalization, validation, workflow dispatch, comparison logic,
-  serialization, and frontend-view shaping.
-- Broad exception-to-view translation hides real failure categories.
-- This layer is close to being a second product surface and deserves clearer
-  boundaries.
-
-What to do:
-
-- Split persistence/storage concerns from workflow execution.
-- Split comparison and view-model generation from case lifecycle management.
-- Narrow broad exception handling into clearer error/status taxonomies.
-- Document which methods are stable user-facing API and which are adapter code.
-
-Done when:
-
-- The workspace layer has clean internal boundaries.
-- Failure handling is predictable instead of broadly catch-all.
-
-### 3. Simplify input preparation and workbook ingestion
-
-Why this matters:
-
-- `data_preparation.py` and `wkbook_to_json.py` are both large and highly
-  procedural.
-- `OpenPinch/lib/config.py` still carries an explicit TODO that many
-  workbook-style options exist without a well-defined runtime role.
-- The path from external payloads to canonical internal state is more complex
-  than it needs to be.
-
-What to do:
-
-- Centralize canonical payload normalization.
-- Separate zone-tree validation, stream/utility normalization, and default
-  utility completion into smaller units.
-- Audit configuration fields as one of: supported, legacy alias, workbook-only,
-  experimental, or dead.
-- Keep workbook parsing but make its contract and failure modes cleaner.
-
-Done when:
-
-- Input preparation is understandable in layers.
-- Config options have a documented runtime status instead of mixed implicit
-  behavior.
-
-### 4. Quarantine, finish, or remove partial subsystems
-
-Why this matters:
-
-- `OpenPinch/services/heat_pump_integration/cycles/brayton.py` raises
-  `NotImplementedError` immediately, but still contains dormant code below it.
-- `OpenPinch/services/exergy_analysis/exergy_targeting_entry.py` is mostly a
-  small helper plus commented-out restoration stubs.
-- `OpenPinch/services/energy_transfer_analysis/energy_transfer_analysis.py` is
-  effectively a large commented-out placeholder.
-- `OpenPinch/services/common/graph_data.py` still contains a large commented
-  ETD block.
-- The API docs still present exergy and energy-transfer modules as if they are
-  normal reference surfaces.
-
-What to do:
-
-- For each partial subsystem, choose one status: restore, explicitly mark
-  experimental, move under a quarantine namespace, or remove.
-- Delete large dead/commented blocks once the decision is made.
-- Stop documenting intentionally partial modules like standard production
-  workflows unless the page clearly says otherwise.
-
-Done when:
-
-- There is no ambiguity about what is supported versus merely present in the
-  repository.
-
-## Later
-
-### 5. Performance and memory profiling for larger studies
-
-Do this after the structural refactors above. Profiling a monolith before it is
-cleanly separated tends to produce noisy results and hard-to-apply findings.
-
-### 6. Bundle evolution and migration policy
-
-`PinchWorkspace` persistence is already functional. Once the workspace layer is
-refactored, add explicit versioning, migration rules, and cache-compatibility
-tests rather than letting bundle behavior drift implicitly.
-
-## Guiding Rule
-
-Do not spend the next cycle adding new feature surface area before items 1
-through 4 are under control. The package is currently functional, but the sweep
-shows that maintenance debt is concentrated in public orchestration code and
-partially restored subsystems. That is the real constraint on the next round of
-progress.
+## Assumptions
+- Within the HPR group, preserve the current implicit priority order: `IHP -> IR -> DHP -> DR`.
+- `TZ`, `RT`, `TL`, and `ET` remain unsupported for cogeneration.
+- Cogeneration continues to mutate the selected base target in place via `work_target` and `turbine_efficiency_target`; it does not create a new dedicated cogeneration target model.

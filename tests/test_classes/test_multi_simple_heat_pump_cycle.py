@@ -5,12 +5,14 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import OpenPinch.classes.parallel_vapour_compression_cycles as multi_mod
-from OpenPinch.classes.parallel_vapour_compression_cycles import (
+import OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles as multi_mod
+from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
-from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+from OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle import (
+    VapourCompressionCycle,
+)
 
 pytest.importorskip("CoolProp")
 

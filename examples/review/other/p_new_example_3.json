@@ -79,23 +79,23 @@
             "type": "Hot",
             "t_supply": {
                 "value": 260,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 259.9,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": 10,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -104,23 +104,23 @@
             "type": "Cold",
             "t_supply": {
                 "value": 10,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 10.1,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": 10,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         }

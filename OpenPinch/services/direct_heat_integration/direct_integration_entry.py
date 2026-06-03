@@ -11,7 +11,7 @@ from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import GT, PT, ST, TT
 from ...lib.schemas.targets import DirectIntegrationTarget
-from ...utils.miscellaneous import delta_vals
+from ...utils.miscellaneous import delta_vals, get_state_index
 from ..common.capital_cost_and_area_targeting import (
     get_area_targets,
     get_balanced_CC,
@@ -33,18 +33,23 @@ __all__ = ["compute_direct_integration_targets"]
 ################################################################################
 
 
-def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
+def compute_direct_integration_targets(
+    zone: Zone,
+    args: dict | None = None,
+) -> DirectIntegrationTarget:
     """Populate a ``Zone`` with detailed direct heat integration pinch targets.
 
     The function aggregates Problem Table calculations, multi-utility targeting,
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
+    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
     pt = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
         all_streams=zone.all_streams,
         is_shifted=True,
+        idx=idx,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
@@ -52,6 +57,7 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
         all_streams=zone.all_streams,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
+        idx=idx,
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     pt = get_additional_GCCs(
@@ -67,6 +73,7 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
         hot_utilities=zone.hot_utilities,
         cold_utilities=zone.cold_utilities,
         is_direct_integration=True,
+        idx=idx,
     )
     zone.net_hot_streams, zone.net_cold_streams = (
         _create_net_hot_and_cold_stream_collections_for_site_analysis(
@@ -74,6 +81,7 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
             H_vals=pt[PT.H_NET_A],
             hot_utilities=zone.hot_utilities,
             cold_utilities=zone.cold_utilities,
+            idx=idx,
         )
     )
     if zone.config.DO_BALANCED_CC or zone.config.DO_AREA_TARGETING:
@@ -110,6 +118,7 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
                 cold_streams=zone.cold_streams,
                 hot_utilities=zone.hot_utilities,
                 cold_utilities=zone.cold_utilities,
+                idx=idx,
             )
             area = get_area_targets(
                 T_vals=pt_real[PT.T],
@@ -151,6 +160,8 @@ def compute_direct_integration_targets(zone: Zone) -> DirectIntegrationTarget:
             "cold_utilities": zone.cold_utilities,
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
+            "state_id": sid,
+            "state_idx": idx,
         }
         | area_payload
     )
@@ -167,14 +178,15 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     H_vals: np.ndarray,
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
+    idx: int | None = None,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Construct net stream segments requiring utility input by interval."""
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
 
     if (
-        hot_utilities.sum_stream_attribute("heat_flow")
-        + cold_utilities.sum_stream_attribute("heat_flow")
+        hot_utilities.sum_stream_attribute("heat_flow", idx=idx)
+        + cold_utilities.sum_stream_attribute("heat_flow", idx=idx)
         < tol
     ):
         # If no utility is needed, there is no net streams for indirect integration.
@@ -188,8 +200,8 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
 
     hot_utilities_seq = list(hot_utilities)
     cold_utilities_seq = list(cold_utilities)
-    hot_remaining = [u.heat_flow for u in hot_utilities_seq]
-    cold_remaining = [u.heat_flow for u in cold_utilities_seq]
+    hot_remaining = [float(u.heat_flow[idx]) for u in hot_utilities_seq]
+    cold_remaining = [float(u.heat_flow[idx]) for u in cold_utilities_seq]
 
     hu_idx = _initialise_utility_index(hot_utilities_seq, hot_remaining)
     cu_idx = _initialise_utility_index(cold_utilities_seq, cold_remaining)
@@ -206,6 +218,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
                 remaining=hot_remaining,
                 net_streams=net_cold_streams,
                 k=k,
+                idx=idx,
             )
         elif -dh > tol and cu_idx >= 0:
             cu_idx, k = _add_net_segment_stateful(
@@ -217,6 +230,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
                 remaining=cold_remaining,
                 net_streams=net_hot_streams,
                 k=k,
+                idx=idx,
             )
 
     return net_hot_streams, net_cold_streams
@@ -232,13 +246,14 @@ def _add_net_segment_stateful(
     net_streams: StreamCollection,
     k: int,
     j: int = 0,
+    idx: int | None = None,
 ) -> Tuple[int, int]:
     """Adds a net utility segment and recursively handles segmentation if needed."""
     if curr_idx < 0 or not utilities or dh_req <= tol:
         return curr_idx, k
 
     curr_u = utilities[curr_idx]
-    available = remaining[curr_idx] if curr_idx < len(remaining) else 0.0
+    available = float(remaining[curr_idx]) if curr_idx < len(remaining) else 0.0
 
     if available <= tol:
         next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
@@ -254,9 +269,10 @@ def _add_net_segment_stateful(
             net_streams=net_streams,
             k=k,
             j=j,
+            idx=idx,
         )
 
-    dh_curr = min(dh_req, available)
+    dh_curr = float(min(dh_req, available))
     remaining[curr_idx] = max(available - dh_curr, 0.0)
     dh_next = dh_req - dh_curr
 
@@ -269,8 +285,8 @@ def _add_net_segment_stateful(
             t_supply=T_i if curr_u.type == ST.Hot.value else T_ub,
             t_target=T_ub if curr_u.type == ST.Hot.value else T_i,
             heat_flow=dh_curr,
-            dt_cont=curr_u.dt_cont_act,
-            dt_cont_act=curr_u.dt_cont_act,
+            dt_cont=float(curr_u.dt_cont[idx]),
+            dt_cont_multiplier=curr_u.dt_cont_multiplier,
             htc=1.0,
             is_process_stream=True,
         )
@@ -290,6 +306,7 @@ def _add_net_segment_stateful(
             net_streams=net_streams,
             k=k,
             j=j + 1,
+            idx=idx,
         )
 
     next_idx = (

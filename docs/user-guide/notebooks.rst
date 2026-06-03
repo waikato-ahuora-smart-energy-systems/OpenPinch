@@ -12,7 +12,8 @@ This page has moved, but the packaged notebook workflow still depends on
 
 These notebooks now load bundled cases directly with
 ``PinchWorkspace(source="sample_case.json", ...)`` and then use real
-``PinchProblem`` cases for targeting, plotting, and comparison.
+``PinchProblem`` cases for targeting, plotting, comparison, and selected-state
+workflow calls such as ``problem.target.direct_heat_integration(state_id="0")``.
 
 Use these pages instead:
 

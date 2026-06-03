@@ -1,4 +1,4 @@
-"""Schemas for serialized summaries and report-facing payloads."""
+"""Schemas for serialized summaries and report-facing data."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ class TargetResults(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
+    state_id: Optional[str] = None
     degree_of_integration: MaybeVU = None
     Qh: ScalarOrVU
     Qc: ScalarOrVU

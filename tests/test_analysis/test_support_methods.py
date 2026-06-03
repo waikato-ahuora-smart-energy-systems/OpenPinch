@@ -26,8 +26,52 @@ def test_get_value_with_missing_dict_key():
 
 
 def test_get_value_with_valuewithunit():
-    vwu = ValueWithUnit(value=99.9, units="kW")
+    vwu = ValueWithUnit(value=99.9, unit="kW")
     assert get_value(vwu) == 99.9
+
+
+def test_get_value_with_stateful_payload_defaults_to_state_zero():
+    payload = {
+        "values": [99.9, 88.8],
+        "state_ids": ["0", "1"],
+        "unit": "kW",
+        "weights": [0.25, 0.75],
+    }
+    assert get_value(payload) == 99.9
+
+
+def test_get_value_with_stateful_payload_uses_requested_state_id():
+    payload = {
+        "values": [99.9, 88.8],
+        "state_ids": ["0", "1"],
+        "unit": "kW",
+        "weights": [0.25, 0.75],
+    }
+    assert get_value(payload, state_id="1") == 88.8
+
+
+def test_get_state_index_resolves_state_id():
+    idx, sid = get_state_index({"0": 0, "peak": 1}, {"state_id": "peak"})
+
+    assert idx == 1
+    assert sid == "peak"
+
+
+def test_get_state_index_rejects_unknown_state_id():
+    with pytest.raises(ValueError, match="state_id 'summer' was not found"):
+        get_state_index({"0": 0, "peak": 1}, {"state_id": "summer"})
+
+
+def test_get_state_index_accepts_explicit_idx():
+    idx, sid = get_state_index({"0": 0, "peak": 1}, {"idx": 1})
+
+    assert idx == 1
+    assert sid is None
+
+
+def test_get_state_index_rejects_conflicting_state_id_and_idx():
+    with pytest.raises(ValueError, match="state_id 'peak' resolves to idx 1"):
+        get_state_index({"0": 0, "peak": 1}, {"state_id": "peak", "idx": 0})
 
 
 def test_get_value_with_int_raises():

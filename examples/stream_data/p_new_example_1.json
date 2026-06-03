@@ -5,23 +5,23 @@
             "name": "Intermediate Product",
             "t_supply": {
                 "value": 58.3905079519419,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 29.9999999999959,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 1060,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -31,23 +31,23 @@
             "name": "Intermediate Reactant",
             "t_supply": {
                 "value": 76.3058910545671,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 80.000000000004,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 240,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -57,23 +57,23 @@
             "name": "Distillate",
             "t_supply": {
                 "value": 52,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 70.7934890887794,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 1500,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -83,23 +83,23 @@
             "name": "Distillation Feed",
             "t_supply": {
                 "value": 181.999999999828,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 107.450832377723,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 1500,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -109,23 +109,23 @@
             "name": "Intermediate Distillate",
             "t_supply": {
                 "value": 70.7934890887794,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 99.999999999998,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 2340,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -135,23 +135,23 @@
             "name": "Intermediate Mixture",
             "t_supply": {
                 "value": 107.450832377723,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 77.9999999999994,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 580,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -161,23 +161,23 @@
             "name": "Reactant Feed",
             "t_supply": {
                 "value": 30,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 76.3058910545671,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 3000,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -187,23 +187,23 @@
             "name": "Hot Product",
             "t_supply": {
                 "value": 138,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 58.3905079519419,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 3000,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -215,23 +215,23 @@
             "type": "Hot",
             "t_supply": {
                 "value": 260,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 259.9,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": 10,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -240,23 +240,23 @@
             "type": "Cold",
             "t_supply": {
                 "value": 10,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 10.1,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": 10,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         }

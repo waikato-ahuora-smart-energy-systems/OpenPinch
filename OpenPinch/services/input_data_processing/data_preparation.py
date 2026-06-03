@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import List, Optional, Tuple
+import math
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
+from ...classes.value import Value
 from ...classes.zone import Zone
-from ...lib.enums import ST, StreamLoc
+from ...lib.config import Configuration, tol
+from ...lib.enums import ST
+from ...lib.schemas.common import ValueWithUnit
 from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
-from ...utils.miscellaneous import get_value
+from ...utils.miscellaneous import get_values
 from ._canonicalization import (
     _apply_zone_dt_cont_multiplier,
     _build_zone_config,
@@ -40,7 +45,7 @@ __all__ = [
 def prepare_problem(
     streams: Optional[List[StreamSchema]] = None,
     utilities: Optional[List[UtilitySchema]] = None,
-    options=None,
+    options: Optional[Dict[str, Any]] = None,
     project_name: str = "Site",
     zone_tree: ZoneTreeSchema = None,
 ) -> Zone:
@@ -73,26 +78,21 @@ def prepare_problem(
         zone_tree=zone_tree,
         zone_config=master_zone.config,
     )
-    master_zone = _get_process_streams_in_each_subzone(
+    prepared_streams, process_zone_paths = _build_prepared_stream_collection(
         master_zone=master_zone,
         streams=sorted(streams, key=lambda stream: stream.name),
+        utilities=utilities,
+    )
+    master_zone = _assign_process_streams_to_subzones(
+        master_zone=master_zone,
+        process_streams=prepared_streams.get_process_streams(),
+        process_zone_paths=process_zone_paths,
     )
     master_zone.import_hot_and_cold_streams_from_sub_zones()
-    hu_t_min, cu_t_max = _find_extreme_process_temperatures(
-        hot_streams=master_zone.hot_streams,
-        cold_streams=master_zone.cold_streams,
-    )
-    hot_utilities, cold_utilities = _get_hot_and_cold_utilities(
-        utilities=utilities,
-        hu_t_min=hu_t_min,
-        cu_t_max=cu_t_max,
-        zone_config=master_zone.config,
-        dt_cont_multiplier=master_zone.dt_cont_multiplier,
-    )
     master_zone = _set_utilities_for_zone_and_subzones(
         zone=master_zone,
-        hot_utilities=hot_utilities,
-        cold_utilities=cold_utilities,
+        hot_utilities=prepared_streams.get_hot_utility_streams(),
+        cold_utilities=prepared_streams.get_cold_utility_streams(),
     )
     master_zone = _apply_zone_dt_cont_multiplier(
         parent_zone=master_zone,
@@ -101,106 +101,174 @@ def prepare_problem(
     return master_zone
 
 
-def _get_process_streams_in_each_subzone(
+def _build_prepared_stream_collection(
     master_zone: Zone,
     streams: List[StreamSchema],
+    utilities: List[UtilitySchema],
+) -> tuple[StreamCollection, Dict[str, str]]:
+    """Build one canonical collection of prepared process and utility streams."""
+    process_streams = StreamCollection()
+    process_streams.set_state_context(
+        state_ids=master_zone.state_ids,
+        weights=master_zone.weights,
+        num_states=master_zone.num_states,
+    )
+    process_zone_paths: Dict[str, str] = {}
+
+    for stream_schema in streams:
+        zone = master_zone.get_subzone(stream_schema.zone)
+        if zone is None:
+            raise ValueError(
+                f"Validated stream '{stream_schema.name}' could not resolve zone "
+                f"'{stream_schema.zone}'."
+            )
+        stream_obj = _create_process_stream(
+            stream=stream_schema,
+            zone=zone,
+        )
+        stream_key = _build_process_stream_key(
+            zone_path=zone.address,
+            stream_obj=stream_obj,
+        )
+        resolved_key = process_streams.add(
+            stream=stream_obj,
+            key=stream_key,
+            prevent_overwrite=True,
+        )
+        process_zone_paths[resolved_key] = zone.address
+
+    hu_t_min, cu_t_max = _find_extreme_process_temperatures(
+        hot_streams=process_streams.get_hot_process_streams(),
+        cold_streams=process_streams.get_cold_process_streams(),
+    )
+    utility_streams = _get_hot_and_cold_utilities(
+        utilities=utilities,
+        hu_t_min=hu_t_min,
+        cu_t_max=cu_t_max,
+        zone_config=master_zone.config,
+        dt_cont_multiplier=master_zone.dt_cont_multiplier,
+    )
+    prepared_streams = process_streams + utility_streams
+    return prepared_streams, process_zone_paths
+
+
+def _assign_process_streams_to_subzones(
+    master_zone: Zone,
+    process_streams: StreamCollection,
+    process_zone_paths: Dict[str, str],
 ) -> Zone:
-    """Create stream objects, subzones, and zone attachments for the hierarchy."""
-    streams_by_full_path = defaultdict(list)
-    streams_by_relative_path = defaultdict(list)
-    for stream in streams:
-        zone_path = getattr(stream, "zone", None)
-        if not zone_path:
-            continue
-        streams_by_full_path[zone_path].append(stream)
-        path_components = zone_path.split("/")
-        for index in range(1, len(path_components)):
-            relative_key = "/".join(path_components[index:])
-            streams_by_relative_path[relative_key].append(stream)
-        streams_by_relative_path[zone_path].append(stream)
+    """Attach prepared process streams to their owning zones by reference."""
+    for stream_key, stream_obj in process_streams.items():
+        zone_path = process_zone_paths.get(stream_key)
+        if zone_path is None:
+            raise RuntimeError(
+                f"Prepared process stream '{stream_key}' is missing a zone mapping."
+            )
 
-    def iter_zones(parent_zone: Zone):
-        yield parent_zone
-        for subzone in parent_zone.subzones.values():
-            yield from iter_zones(subzone)
+        zone = master_zone.get_subzone(zone_path)
+        if zone is None:
+            raise ValueError(
+                f"Prepared process stream '{stream_obj.name}' could not resolve zone "
+                f"'{zone_path}'."
+            )
 
-    def zone_path_from_child(child_zone: Zone, delimiter="/") -> str:
-        path_parts = []
-        current = child_zone
-        while current is not None:
-            path_parts.append(current.name)
-            current = current.parent_zone
-        return delimiter.join(reversed(path_parts))
+        if stream_obj.type == ST.Hot.value:
+            zone.hot_streams.add(stream_obj, key=stream_key, prevent_overwrite=False)
+        elif stream_obj.type == ST.Cold.value:
+            zone.cold_streams.add(
+                stream_obj,
+                key=stream_key,
+                prevent_overwrite=False,
+            )
+        else:
+            raise ValueError(
+                f"Process stream '{stream_obj.name}' must classify as Hot or Cold, "
+                f"got '{stream_obj.type}'."
+            )
+    return master_zone
 
-    for zone in iter_zones(master_zone):
-        zone_path = zone_path_from_child(zone)
-        relative_zone_path = (
-            zone_path.split("/", 1)[1] if "/" in zone_path else zone_path
+
+def _validate_stream_temperatures(stream: StreamSchema):
+    """Validate that supply and target temperatures align with stream type."""
+    t_supply = get_values(stream.t_supply)
+    t_target = get_values(stream.t_target)
+    heat_flow = get_values(stream.heat_flow)
+    if np.all((abs(t_supply - t_target) < tol) * (heat_flow != 0.0)):
+        raise ValueError(
+            f"Process stream '{stream.name}' must classify as Hot or Cold."
         )
 
-        matched_streams: List[StreamSchema] = []
-        seen = set()
 
-        for candidate in streams_by_full_path.get(zone_path, ()):
-            candidate_id = id(candidate)
-            if candidate_id not in seen:
-                matched_streams.append(candidate)
-                seen.add(candidate_id)
+def _validate_dt_cont_value(value, zone_config: Configuration) -> Value:
+    """Validate one DT_CONT value and coerce to a non-negative float."""
+    if isinstance(value, ValueWithUnit):
+        return Value(value.value, unit="delta_degC")
+    if (
+        (value is None)
+        or (not isinstance(value, (int, float)))
+        or not math.isfinite(value)
+    ):
+        value = zone_config.DT_CONT
+    return Value(value, unit="delta_degC")
 
-        for candidate in streams_by_relative_path.get(relative_zone_path, ()):
-            candidate_id = id(candidate)
-            if candidate_id not in seen:
-                matched_streams.append(candidate)
-                seen.add(candidate_id)
 
-        if not matched_streams:
-            continue
-
-        for stream_schema in matched_streams:
-            stream_obj = _create_process_stream(stream_schema, zone)
-            if stream_obj.type == ST.Hot.value:
-                key = ".".join(
-                    [stream_schema.zone, StreamLoc.HotS.value, stream_schema.name]
-                )
-                zone.hot_streams.add(stream_obj, key)
-            else:
-                zone.cold_streams.add(stream_obj)
-    return master_zone
+def _validate_htc_value(value, zone_config: Configuration) -> Value:
+    """Validate one HTC value and coerce to a positive float."""
+    if isinstance(value, ValueWithUnit):
+        return Value(value.value, unit="kW/m^2/delta_degC")
+    if (
+        (value is None)
+        or (not isinstance(value, (int, float)))
+        or not math.isfinite(value)
+        or value <= 0.0
+    ):
+        value = zone_config.HTC
+    return Value(value, unit="kW/m^2/delta_degC")
 
 
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
-    base_dt_cont = get_value(stream.dt_cont)
-    if base_dt_cont is None:
-        base_dt_cont = 0.0
-
-    return Stream(
+    _validate_stream_temperatures(stream)
+    dt_cont = _validate_dt_cont_value(stream.dt_cont, zone.config)
+    htc = _validate_htc_value(stream.htc, zone.config)
+    stream_obj = Stream(
         name=stream.name,
-        t_supply=get_value(stream.t_supply),
-        t_target=get_value(stream.t_target),
-        heat_flow=get_value(stream.heat_flow),
-        dt_cont=base_dt_cont,
-        dt_cont_act=base_dt_cont * zone.dt_cont_multiplier,
-        htc=get_value(stream.htc),
+        t_supply=stream.t_supply,
+        t_target=stream.t_target,
+        heat_flow=stream.heat_flow,
+        dt_cont=dt_cont,
+        dt_cont_multiplier=zone.dt_cont_multiplier,
+        htc=htc,
         is_process_stream=True,
     )
+    return stream_obj
+
+
+def _build_process_stream_key(zone_path: str, stream_obj: Stream) -> str:
+    """Build a stable canonical key for one prepared process stream."""
+    return ".".join([zone_path, stream_obj.name])
 
 
 def _find_extreme_process_temperatures(
-    hot_streams: StreamCollection, cold_streams: StreamCollection
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
 ) -> Tuple[float, float]:
     """Find highest TT of a cold stream and lowest TT of a hot stream."""
+    if len(hot_streams) == 0 and len(cold_streams) == 0:
+        return 20, 20
     hu_t_min: float = None
     cu_t_max: float = None
     stream: Stream
     for stream in hot_streams:
-        if cu_t_max is None or cu_t_max > stream.t_min_star:
-            cu_t_max = stream.t_min_star
+        stream_min = stream.t_min_star.min
+        if cu_t_max is None or cu_t_max > stream_min:
+            cu_t_max = stream_min
     for stream in cold_streams:
-        if hu_t_min is None or hu_t_min < stream.t_max_star:
-            hu_t_min = stream.t_max_star
+        stream_max = stream.t_max_star.max
+        if hu_t_min is None or hu_t_min < stream_max:
+            hu_t_min = stream_max
     if hu_t_min is None:
         hu_t_min = cu_t_max
     if cu_t_max is None:
         cu_t_max = hu_t_min
-    return hu_t_min, cu_t_max
+    return float(hu_t_min), float(cu_t_max)

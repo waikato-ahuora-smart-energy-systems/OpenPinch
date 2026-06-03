@@ -15,7 +15,10 @@ import pandas as pd
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
 from ..lib.problem_table_types import ProblemTableColumnUpdates
-from ._problem_table_constants import HEAT_CAPACITY_PAIRS, INTERPOLATION_KEYS
+from ._problem_table._problem_table_constants import (
+    HEAT_CAPACITY_PAIRS,
+    INTERPOLATION_KEYS,
+)
 
 PT = ProblemTableLabel
 

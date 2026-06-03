@@ -2,9 +2,6 @@
 
 import numpy as np
 
-from ....classes.parallel_vapour_compression_cycles import (
-    ParallelVapourCompressionCycles,
-)
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
@@ -22,6 +19,9 @@ from ..common.shared import (
     evaluate_vapour_hpr_result,
     solve_hpr_placement,
     validate_vapour_hp_refrigerant_ls,
+)
+from ..unit_models.parallel_vapour_compression_cycles import (
+    ParallelVapourCompressionCycles,
 )
 from .multi_simple_carnot import optimise_multi_simple_carnot_heat_pump_placement
 

@@ -9,10 +9,10 @@ from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.services.heat_pump_integration.common.shared import (
     compute_entropic_mean_temperature,
 )
-from OpenPinch.services.heat_pump_integration.cycles import (
+from OpenPinch.services.heat_pump_integration.targeting_services import (
     multi_temperature_carnot as hp_multi_temp_carnot,
 )
-from OpenPinch.services.heat_pump_integration.cycles.multi_temperature_carnot import (
+from OpenPinch.services.heat_pump_integration.targeting_services.multi_temperature_carnot import (
     _get_multi_temperature_carnot_stage_duties_and_work,
     _parse_multi_temperature_carnot_cycle_state_variables,
 )
@@ -324,7 +324,7 @@ def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
 
 
 def test_multi_temp_carnot_objective_debug_branch(monkeypatch):
-    args = _base_args(n_cond=1, n_evap=1)
+    args = _base_args(n_cond=1, n_evap=1, idx=0)
     called = {"plot": 0}
     monkeypatch.setattr(
         hp_shared,

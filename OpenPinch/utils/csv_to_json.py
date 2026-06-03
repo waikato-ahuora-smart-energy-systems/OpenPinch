@@ -31,7 +31,7 @@ def get_problem_from_csv(
     row_data: int = 2,
     encoding: str = "utf-8-sig",
 ):
-    """Read stream and utility CSV files into one OpenPinch payload."""
+    """Read stream and utility CSV files into one OpenPinch input mapping."""
     try:
         streams_data = _parse_csv_with_units(
             streams_csv,

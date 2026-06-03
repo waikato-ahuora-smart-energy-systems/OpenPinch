@@ -1,13 +1,12 @@
 """Shared numerical helpers."""
 
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import Any, Iterable, Tuple, Union
 
 import numpy as np
 
+from ..classes.value import Value
 from ..lib.config import tol
-
-if TYPE_CHECKING:
-    from ..lib.schemas.common import ValueWithUnit
+from ..lib.schemas.common import MaybeVU, StatefulValueWithUnit, ValueWithUnit
 
 __all__ = [
     "clean_composite_curve",
@@ -15,11 +14,14 @@ __all__ = [
     "delta_vals",
     "delta_with_zero_at_start",
     "g_ineq_penalty",
+    "get_state_index",
     "get_value",
     "graph_simple_cc_plot",
     "interp_with_plateaus",
     "linear_interpolation",
     "make_monotonic",
+    "resolve_stream_attr",
+    "resolve_stream_attr_array",
 ]
 
 
@@ -35,10 +37,98 @@ def _require_plotly():
     return go
 
 
+def resolve_value_for_state(
+    val: Any,
+    state_id: str | None = None,
+    *,
+    state_ids: dict[str, int] | list[str] | None = None,
+    default_allowed: bool = True,
+) -> float | None:
+    """Return one scalar magnitude from a scalar or stateful value-like object."""
+    if val is None:
+        return None
+    if isinstance(val, Value):
+        raw_value = val
+    else:
+        raw_value = Value(val)
+
+    if len(raw_value.state_values) <= 1:
+        return float(raw_value.value)
+
+    if state_ids is None and isinstance(val, dict) and val.get("state_ids") is not None:
+        state_ids = {str(sid): idx for idx, sid in enumerate(val["state_ids"])}
+
+    if isinstance(state_ids, dict):
+        state_lookup = {str(sid): int(idx) for sid, idx in state_ids.items()}
+    elif state_ids:
+        state_lookup = {str(sid): idx for idx, sid in enumerate(state_ids)}
+    else:
+        state_lookup = None
+
+    if state_lookup is None:
+        if not default_allowed and state_id is not None:
+            raise ValueError("state_ids are required for stateful values.")
+        return float(raw_value[0].value)
+
+    resolved_state_id = None if state_id is None else str(state_id)
+    if resolved_state_id is None:
+        if not default_allowed:
+            raise ValueError("state_id is required for stateful values.")
+        resolved_state_id = "0" if "0" in state_lookup else next(iter(state_lookup))
+
+    if resolved_state_id not in state_lookup:
+        raise ValueError(
+            f"Unknown state_id {resolved_state_id!r}. "
+            f"Available states: {', '.join(state_lookup)}."
+        )
+    return float(raw_value[state_lookup[resolved_state_id]].value)
+
+
+def resolve_stream_attr(
+    stream: Any,
+    attr_name: str,
+    state_id: str | None = None,
+    *,
+    default_allowed: bool = True,
+) -> float | None:
+    """Resolve one stream attribute to a scalar for the selected state."""
+    if not hasattr(stream, attr_name):
+        raise AttributeError(f"Stream {stream!r} has no attribute {attr_name!r}.")
+    return resolve_value_for_state(
+        getattr(stream, attr_name),
+        state_id=state_id,
+        state_ids=getattr(stream, "state_ids", None),
+        default_allowed=default_allowed,
+    )
+
+
+def resolve_stream_attr_array(
+    streams: Iterable[Any],
+    attr_name: str,
+    state_id: str | None = None,
+    *,
+    default_allowed: bool = True,
+) -> np.ndarray:
+    """Resolve one attribute across a stream iterable into a float array."""
+    return np.asarray(
+        [
+            resolve_stream_attr(
+                stream,
+                attr_name,
+                state_id=state_id,
+                default_allowed=default_allowed,
+            )
+            for stream in streams
+        ],
+        dtype=float,
+    )
+
+
 def get_value(
     val: Union[float, int, str, dict, "ValueWithUnit", None],
     val2: Union[float, int, str, None] = None,
     zone_name: str = None,
+    state_id: str | None = None,
 ) -> float:
     """Extract a numeric value from supported scalars and payload wrappers."""
     if isinstance(val, bool):
@@ -47,11 +137,23 @@ def get_value(
             f"{type(val)}. Expected float, int, numeric string, dict, "
             "or ValueWithUnit."
         )
-    elif isinstance(val, float | int):
+    elif isinstance(val, Value):
+        return resolve_value_for_state(val, state_id=state_id)
+    elif isinstance(val, (float, int)):
         return float(val)
+    elif hasattr(val, "model_dump"):
+        return get_value(
+            val.model_dump(mode="python"),
+            val2=val2,
+            zone_name=zone_name,
+            state_id=state_id,
+        )
     elif isinstance(val, dict):
         if zone_name in val:
-            return get_value(val[zone_name], val2=val2)
+            return get_value(val[zone_name], val2=val2, state_id=state_id)
+
+        if _is_stateful_value_payload(val):
+            return resolve_value_for_state(val, state_id=state_id)
 
         payload = val.copy()
         if "value" not in payload:
@@ -67,20 +169,24 @@ def get_value(
                 "'power', 'log', 'exp', 'abs', 'min', or 'max'."
             )
 
-        value = get_value(payload["value"])
+        value = get_value(payload["value"], state_id=state_id)
 
         if "multiplier" in payload:
-            return value * get_value(payload["multiplier"])
+            return value * get_value(payload["multiplier"], state_id=state_id)
         elif "multiply" in payload:
-            return value * get_value(payload["multiply"])
+            return value * get_value(payload["multiply"], state_id=state_id)
         elif "add" in payload:
-            return value + get_value(payload["add"])
+            return value + get_value(payload["add"], state_id=state_id)
         elif "subtract" in payload:
-            return value - get_value(payload["subtract"])
+            return value - get_value(payload["subtract"], state_id=state_id)
         elif "divide" in payload:
-            return value / get_value(payload["divide"]) if value != 0 else 0.0
+            return (
+                value / get_value(payload["divide"], state_id=state_id)
+                if value != 0
+                else 0.0
+            )
         elif "power" in payload:
-            return value ** get_value(payload["power"])
+            return value ** get_value(payload["power"], state_id=state_id)
         elif "log" in payload:
             base = payload["log"] if isinstance(payload["log"], float) else np.e
             return np.log(value) / np.log(base) if value > 0 else 0.0
@@ -90,9 +196,9 @@ def get_value(
         elif "abs" in payload:
             return abs(value)
         elif "min" in payload:
-            return min(value, get_value(payload["min"]))
+            return min(value, get_value(payload["min"], state_id=state_id))
         elif "max" in payload:
-            return max(value, get_value(payload["max"]))
+            return max(value, get_value(payload["max"], state_id=state_id))
         else:
             return value
     elif _is_value_with_unit(val):
@@ -105,16 +211,77 @@ def get_value(
                 f"Unsupported string value: {val}. String must be convertible to float."
             )
     elif val is None and val2 is not None:
-        return get_value(val2, zone_name=zone_name)
+        return get_value(val2, zone_name=zone_name, state_id=state_id)
     elif val is None:
         return None
     else:
         raise TypeError("Unsupported type")
 
 
+def get_values(obj: MaybeVU) -> np.ndarray:
+    if isinstance(obj, ValueWithUnit):
+        return np.asarray(obj.value)
+    elif isinstance(obj, (float, int)):
+        return np.asarray([float(obj)])
+    elif isinstance(obj, StatefulValueWithUnit):
+        return np.asarray(obj.values)
+    elif obj is None:
+        return np.array([])
+    else:
+        raise TypeError("Unsupported type")
+
+
 def _is_value_with_unit(val: Any) -> bool:
     """Return ``True`` for objects that look like ``ValueWithUnit`` containers."""
-    return hasattr(val, "value") and hasattr(val, "units")
+    return hasattr(val, "value") and hasattr(val, "unit")
+
+
+def _is_stateful_value_payload(val: Any) -> bool:
+    """Return ``True`` for dict-like stateful value payloads."""
+    if not isinstance(val, dict):
+        return False
+    keys = set(val)
+    return keys.issubset({"values", "state_ids", "weights", "unit"}) and (
+        "values" in keys or "state_ids" in keys or "weights" in keys
+    )
+
+
+def get_state_index(
+    state_ids: dict[str, int] | None,
+    args: dict | None,
+) -> Tuple[int, str | None]:
+    sid = None if not isinstance(args, dict) else args.get("state_id")
+    sid = None if sid is None else str(sid)
+    raw_idx = None if not isinstance(args, dict) else args.get("idx")
+    explicit_idx = None if raw_idx is None else int(raw_idx)
+
+    lookup = {} if state_ids is None else state_ids
+
+    if sid is not None:
+        if lookup and sid not in lookup:
+            raise ValueError(
+                f"state_id {sid!r} was not found on this collection. "
+                f"Available states: {', '.join(lookup)}."
+            )
+        resolved_idx = lookup.get(sid, 0)
+        if explicit_idx is not None and explicit_idx != resolved_idx:
+            raise ValueError(
+                f"state_id {sid!r} resolves to idx {resolved_idx}, "
+                f"but idx {explicit_idx} was also provided."
+            )
+        return resolved_idx, sid
+
+    if explicit_idx is not None:
+        if explicit_idx < 0:
+            raise ValueError("idx must be a non-negative integer.")
+        if lookup and explicit_idx not in set(lookup.values()):
+            raise ValueError(
+                f"idx {explicit_idx} was not found on this collection. "
+                f"Available indices: {', '.join(str(idx) for idx in lookup.values())}."
+            )
+        return explicit_idx, None
+
+    return 0, None
 
 
 def linear_interpolation(

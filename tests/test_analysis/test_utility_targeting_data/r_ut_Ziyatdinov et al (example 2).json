@@ -5,35 +5,35 @@
             "temp_pinch": {
                 "cold_temp": {
                     "value": 82.35000000000002,
-                    "units": "degC"
+                    "unit": "degC"
                 },
                 "hot_temp": {
                     "value": 82.35000000000002,
-                    "units": "degC"
+                    "unit": "degC"
                 }
             },
             "Qh": {
                 "value": 5106.400000000005,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qc": {
                 "value": 1847.0,
-                "units": "kW"
+                "unit": "kW"
             },
             "Qr": {
                 "value": 56990.999999999985,
-                "units": "kW"
+                "unit": "kW"
             },
             "degree_of_integration": {
                 "value": 99.42082584651885,
-                "units": "%"
+                "unit": "%"
             },
             "hot_utilities": [
                 {
                     "name": "HOIL",
                     "heat_flow": {
                         "value": 5106.400000000005,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ],
@@ -42,14 +42,14 @@
                     "name": "CW",
                     "heat_flow": {
                         "value": 1847.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 },
                 {
                     "name": "CHW",
                     "heat_flow": {
                         "value": 0.0,
-                        "units": "kW"
+                        "unit": "kW"
                     }
                 }
             ]

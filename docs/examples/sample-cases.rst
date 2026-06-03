@@ -24,7 +24,7 @@ Included Cases
    Larger site-style example used in the packaged Total Site notebook.
 
 ``heat_pump_targeting.json``
-   Compact HPR screening payload for direct Heat Pump experimentation without
+   Compact HPR screening input data for direct Heat Pump experimentation without
    the larger multi-case notebook flow.
 
 ``chocolate_factory.json``
@@ -65,6 +65,6 @@ Choosing The Right Case
 - Use ``zonal_site.json`` or ``pulp_mill.json`` when you need a real zone-tree
   and indirect integration example.
 - Use ``heat_pump_targeting.json`` when you want a smaller direct HPR
-  screening payload.
+  screening input data.
 - Use ``chocolate_factory.json`` when you want to study the advanced
   direct-versus-indirect HPR and refrigeration surface used by notebook 03.

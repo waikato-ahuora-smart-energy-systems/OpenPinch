@@ -23,8 +23,8 @@ else:
     _TESPY_IMPORT_ERROR = None
 
 # Local stream API used by the simple heat pump
-from .stream import Stream
-from .stream_collection import StreamCollection
+from ....classes.stream import Stream
+from ....classes.stream_collection import StreamCollection
 
 
 def _require_tespy() -> None:

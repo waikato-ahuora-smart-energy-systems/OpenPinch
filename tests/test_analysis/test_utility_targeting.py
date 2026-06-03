@@ -10,11 +10,13 @@ from OpenPinch.lib import *
 from OpenPinch.services.common.gcc_manipulation import (
     get_seperated_gcc_heat_load_profiles,
 )
-from OpenPinch.services.common.utility_targeting import _target_utility
+from OpenPinch.services.common.utility_targeting import (
+    target_utilities_for_load_profiles,
+)
 from OpenPinch.services.input_data_processing.data_preparation import prepare_problem
 from OpenPinch.utils.miscellaneous import *
 
-"""Tests for _target_utility"""
+"""Tests for target_utilities_for_load_profiles."""
 
 
 def get_test_filenames():
@@ -55,7 +57,7 @@ def test_target_utility(filename):
                 H_net=pt[PT.H_NET],
             )
         )
-        z.hot_utilities, z.cold_utilities = _target_utility(
+        z.hot_utilities, z.cold_utilities = target_utilities_for_load_profiles(
             hot_utilities=z.hot_utilities,
             cold_utilities=z.cold_utilities,
             T_vals=pt[PT.T],

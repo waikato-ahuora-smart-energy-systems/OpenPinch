@@ -12,7 +12,7 @@ from ...streamlit_webviewer.web_graphing import (
 )
 
 if TYPE_CHECKING:
-    from ...classes.pinch_problem import PinchProblem
+    from ..pinch_problem import PinchProblem
 
 PathLike = Union[str, Path]
 GraphRecord = Dict[str, Any]

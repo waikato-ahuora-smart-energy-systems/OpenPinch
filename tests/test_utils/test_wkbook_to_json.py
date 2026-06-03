@@ -149,9 +149,9 @@ def test_get_problem_from_excel_happy_path(tmp_path: Path):
     assert s["zone"] == "Zone A"
     assert s["name"] == "H1"
     # Unit-backed fields become dicts {value, units}
-    assert s["t_supply"]["value"] == 150.0 and s["t_supply"]["units"] == "degC"
-    assert s["t_target"]["value"] == 60.0 and s["t_target"]["units"] == "degC"
-    assert s["heat_flow"]["value"] == 100.0 and s["heat_flow"]["units"] == "kW"
+    assert s["t_supply"]["value"] == 150.0 and s["t_supply"]["unit"] == "degC"
+    assert s["t_target"]["value"] == 60.0 and s["t_target"]["unit"] == "degC"
+    assert s["heat_flow"]["value"] == 100.0 and s["heat_flow"]["unit"] == "kW"
     # Field with no unit string is stored raw (not a dict)
     assert s["index"] == 1
 
@@ -159,7 +159,7 @@ def test_get_problem_from_excel_happy_path(tmp_path: Path):
     u0 = out["utilities"][0]
     assert u0["name"] == "HP Steam"
     assert u0["type"] == "Hot"
-    assert u0["heat_flow"]["value"] == 75.0 and u0["heat_flow"]["units"] == "kW"
+    assert u0["heat_flow"]["value"] == 75.0 and u0["heat_flow"]["unit"] == "kW"
 
     # # Options present with expected shape (don’t overfit exact values)
     # opts = out["options"]
@@ -184,10 +184,10 @@ def test_get_results_from_excel_parses_summary(tmp_path: Path):
     ts = next(t for t in targets if t["name"].startswith("Proj/Total Site Target"))
     # degree_of_integration gets scaled by 100
     assert ts["degree_of_integration"]["value"] == pytest.approx(70.0)
-    assert ts["degree_of_integration"]["units"] == "%"
+    assert ts["degree_of_integration"]["unit"] == "%"
     # temp pinch split into cold/hot floats with units
     assert ts["temp_pinch"]["cold_temp"]["value"] == pytest.approx(85.0)
-    assert ts["temp_pinch"]["cold_temp"]["units"] == "degC"
+    assert ts["temp_pinch"]["cold_temp"]["unit"] == "degC"
     assert ts["temp_pinch"]["hot_temp"]["value"] == pytest.approx(125.0)
     # utility cost becomes a normal numeric field wrapped with units
     assert ts["utility_cost"]["value"] == pytest.approx(1234.0)
@@ -204,11 +204,11 @@ def test_get_results_from_excel_parses_summary(tmp_path: Path):
     assert z["Qh"]["value"] == pytest.approx(90.0)
     # Utility cost present & wrapped with units
     assert z["utility_cost"]["value"] == pytest.approx(999.0)
-    assert z["utility_cost"]["units"] == "$/h"
+    assert z["utility_cost"]["unit"] == "$/h"
     # Work a sample utility value
     hu0 = z["hot_utilities"][0]
     assert (
-        hu0["heat_flow"]["value"] in (50.0, 40.0) and hu0["heat_flow"]["units"] == "kW"
+        hu0["heat_flow"]["value"] in (50.0, 40.0) and hu0["heat_flow"]["unit"] == "kW"
     )
 
 
@@ -260,10 +260,10 @@ def test_validate_stream_data_defaults_first_missing_zone_then_inherits():
 
 def test_validate_stream_data_defaults_name_when_zone_and_name_missing():
     streams = [
-        {"zone": None, "name": None, "t_supply": {"value": 150.0, "units": "degC"}},
-        {"zone": "", "name": "", "t_supply": {"value": 140.0, "units": "degC"}},
-        {"zone": "Zone C", "name": "H3", "t_supply": {"value": 130.0, "units": "degC"}},
-        {"zone": None, "name": None, "t_supply": {"value": 120.0, "units": "degC"}},
+        {"zone": None, "name": None, "t_supply": {"value": 150.0, "unit": "degC"}},
+        {"zone": "", "name": "", "t_supply": {"value": 140.0, "unit": "degC"}},
+        {"zone": "Zone C", "name": "H3", "t_supply": {"value": 130.0, "unit": "degC"}},
+        {"zone": None, "name": None, "t_supply": {"value": 120.0, "unit": "degC"}},
     ]
 
     out = validate_stream_data(streams)
@@ -318,7 +318,7 @@ def test_parse_sheet_with_units_handles_extra_and_missing_columns(monkeypatch):
 
     def _capture(df_data, units_map):
         captured["df"] = df_data
-        captured["units"] = units_map
+        captured["unit"] = units_map
         return []
 
     monkeypatch.setattr(wkbook_to_json, "_write_problem_to_dict_and_list", _capture)

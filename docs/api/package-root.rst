@@ -16,7 +16,7 @@ Use the package root when you want the supported front door:
 - :func:`OpenPinch.pinch_analysis_service` for typed programmatic execution
 - :func:`OpenPinch.get_piecewise_linearisation_for_streams` for nonlinear
   stream segmentation utilities
-- :mod:`OpenPinch.lib` re-exports when you are constructing payloads with
+- :mod:`OpenPinch.lib` re-exports when you are constructing typed inputs with
   enums, schemas, or configuration objects
 
 Typical Pattern
@@ -63,5 +63,5 @@ The root package also re-exports the contents of :mod:`OpenPinch.lib`. That is
 useful for interactive work, but for larger codebases it is usually clearer to
 import schemas, enums, and configuration types from their explicit modules.
 
-Use :doc:`schemas-and-config` when you need the typed payload and config layer,
+Use :doc:`schemas-and-config` when you need the typed input/config layer,
 and :doc:`generated-index` when you need exhaustive module-level details.

@@ -6,10 +6,10 @@ from typing import Optional
 
 import numpy as np
 
-from ..lib.config import tol
-from ..lib.enums import TurbineModel
-from ..lib.schemas.turbine import TurbineSolveResult, TurbineStageResult
-from ..utils.water_properties import Tsat_p, h_ps, h_pT, hL_p, hV_p, psat_T, s_ph
+from ....lib.config import tol
+from ....lib.enums import TurbineModel
+from ....lib.schemas.turbine import TurbineSolveResult, TurbineStageResult
+from ....utils.water_properties import Tsat_p, h_ps, h_pT, hL_p, hV_p, psat_T, s_ph
 
 __all__ = ["MultiStageSteamTurbine"]
 
@@ -513,10 +513,10 @@ class MultiStageSteamTurbine:
         m_in_est = 0.0
 
         s_inlet = s_ph(P_in, h_inlet)
-        for idx, T_target, Q_target, P_target in zip(
+        for idx, T_target, Q_target, p_target in zip(
             source_idx, T_stage, Q_stage, P_stage
         ):
-            P_out.append(float(P_target))
+            P_out.append(float(p_target))
             Q_users.append(float(Q_target))
             w_k.append(0.0)
             w_isen_k.append(0.0)
@@ -524,13 +524,13 @@ class MultiStageSteamTurbine:
             stage_T.append(float(T_target))
             stage_idx.append(int(idx))
 
-            h_sat_stage = hV_p(P_target)
-            h_tar_stage = hL_p(P_target)
+            h_sat_stage = hV_p(p_target)
+            h_tar_stage = hL_p(p_target)
             h_sat.append(h_sat_stage)
             h_tar.append(h_tar_stage)
             h_out.append(h_sat_stage)
 
-            dh_is = h_inlet - h_ps(P_target, s_inlet)
+            dh_is = h_inlet - h_ps(p_target, s_inlet)
             dh_is_k.append(dh_is)
             dh_cond = h_inlet - dh_is - h_tar_stage
             m_stage = Q_target / dh_cond if dh_cond > tol else 0.0

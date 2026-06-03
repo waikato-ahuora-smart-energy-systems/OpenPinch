@@ -84,9 +84,9 @@ def get_temperature_driving_forces(
 
     discontinuities = _collect_discontinuities(H_hot, H_cold)
     if discontinuities:
-        for idx in range(len(delta_T2_raw) - 2, -1, -1):
-            if _is_discontinuity(h_end[idx], discontinuities):
-                delta_T2_raw[idx] = min(delta_T2_raw[idx], delta_T2_raw[idx + 1])
+        for i in range(len(delta_T2_raw) - 2, -1, -1):
+            if _is_discontinuity(h_end[i], discontinuities):
+                delta_T2_raw[i] = min(delta_T2_raw[i], delta_T2_raw[i + 1])
 
     delta_T1 = delta_T1_raw - min_dT
     delta_T2 = delta_T2_raw - min_dT

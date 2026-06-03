@@ -34,7 +34,7 @@ dependencies=[
   "pydantic",
   "scipy",
 ]
-version = "0.1.28"
+version = "0.2.0"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -114,20 +114,9 @@ select = ["E", "F", "W", "I"]
 ignore = ["E203"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["F403", "F405"]
+"tests/**/*.py" = ["F403", "F405", "E501"]
 "OpenPinch/services/energy_transfer_analysis/energy_transfer_analysis.py" = ["E501"]
 "OpenPinch/services/exergy_analysis/exergy_targeting_entry.py" = ["E501"]
-"tests/e2e/test_main.py" = ["E501"]
-"tests/test_analysis/test_capital_cost_and_area_targeting.py" = ["E501"]
-"tests/test_analysis/test_graphs.py" = ["E501"]
-"tests/test_analysis/test_heat_pump_and_refrigeration_targeting/heat_pump_and_refrigeration/test_multi_simple_carnot.py" = ["E501"]
-"tests/test_analysis/test_heat_pump_and_refrigeration_targeting/heat_pump_and_refrigeration/test_multi_temperature_carnot.py" = ["E501"]
-"tests/test_analysis/test_heat_pump_and_refrigeration_targeting/heat_pump_and_refrigeration/test_preprocessing.py" = ["E501"]
-"tests/test_analysis/test_problem_table.py" = ["E501"]
-"tests/test_analysis/test_utility_targeting_data/wkbook_to_json_ut_targeting.py" = ["E501"]
-"tests/test_classes/test_value.py" = ["E501"]
-"tests/test_utils/test_export.py" = ["E501"]
-"tests/test_utils/test_wkbook_to_json.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

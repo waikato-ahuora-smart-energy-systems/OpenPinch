@@ -224,23 +224,23 @@
             "name": "Whey",
             "t_supply": {
                 "value": 80,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 9,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 7444.776,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 1.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -250,23 +250,23 @@
             "name": "Cow Wash",
             "t_supply": {
                 "value": 83,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 45,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 1763.1239999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -276,23 +276,23 @@
             "name": "Cow Water",
             "t_supply": {
                 "value": 35,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 30,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 231.98999999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -302,23 +302,23 @@
             "name": "Skim Milk",
             "t_supply": {
                 "value": 53,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 34,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 224.58,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -328,23 +328,23 @@
             "name": "Wash Water",
             "t_supply": {
                 "value": 45,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 267.52,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -354,23 +354,23 @@
             "name": "Whey",
             "t_supply": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 80,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 4194.24,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 1.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -380,23 +380,23 @@
             "name": "Cow Water",
             "t_supply": {
                 "value": 35,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 30,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 231.98999999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -406,23 +406,23 @@
             "name": "Raw Milk Evap. Feed",
             "t_supply": {
                 "value": 10.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 80,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 6199.400000000001,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -432,23 +432,23 @@
             "name": "Effect 1 Cow Water",
             "t_supply": {
                 "value": 81.3,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 1024.936,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -458,23 +458,23 @@
             "name": "Effect 3 Cow Water",
             "t_supply": {
                 "value": 68.3,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 565.3032,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -484,23 +484,23 @@
             "name": "Effect 4 Cow Water",
             "t_supply": {
                 "value": 64.8,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 449.4335999999999,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -510,23 +510,23 @@
             "name": "Effect 5 Cow Water",
             "t_supply": {
                 "value": 57.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 313.5,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -536,23 +536,23 @@
             "name": "Effect 6 Cow Water",
             "t_supply": {
                 "value": 58.8,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 259.4944,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -562,23 +562,23 @@
             "name": "Effect 7 Cow Vapour",
             "t_supply": {
                 "value": 55.8,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 54.8,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 3078.465,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -588,23 +588,23 @@
             "name": "Effect 7 Cow Water",
             "t_supply": {
                 "value": 55.8,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 194.53719999999998,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -614,23 +614,23 @@
             "name": "Concentrate Heater",
             "t_supply": {
                 "value": 48.8,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 83.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 494.82200000000006,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -640,23 +640,23 @@
             "name": "Main Air Heater Inlet",
             "t_supply": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 209.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 6846.444,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -666,23 +666,23 @@
             "name": "SFB Air Heater Inlet",
             "t_supply": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 98.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 972.6210000000001,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -692,23 +692,23 @@
             "name": "VFI Air Inlet",
             "t_supply": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 59.3,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 61.026599999999995,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -718,23 +718,23 @@
             "name": "VF2 Air Inlet",
             "t_supply": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 67,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 104.652,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -744,23 +744,23 @@
             "name": "VF3 Air Inlet (Dehmid)",
             "t_supply": {
                 "value": 40,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20.3,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 60.282,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -770,23 +770,23 @@
             "name": "VF3 Air Inlet",
             "t_supply": {
                 "value": 20.3,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 46,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 78.642,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -796,23 +796,23 @@
             "name": "Cyclone Recovery Air Inlet",
             "t_supply": {
                 "value": 60,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 90,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 199.8,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -822,23 +822,23 @@
             "name": "Main Air Exhaust",
             "t_supply": {
                 "value": 68,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 25,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 2792.205,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -848,23 +848,23 @@
             "name": "VF Air Exhaust",
             "t_supply": {
                 "value": 68,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 25,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 451.2420000000001,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -874,23 +874,23 @@
             "name": "Raw Milk Evap Feed",
             "t_supply": {
                 "value": 10,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 75,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 18200,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -900,23 +900,23 @@
             "name": "Cow Water",
             "t_supply": {
                 "value": 64,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 10814.496,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -926,23 +926,23 @@
             "name": "TVR Condenser",
             "t_supply": {
                 "value": 54,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 53,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 2388.2,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -952,23 +952,23 @@
             "name": "Concentrate Heater",
             "t_supply": {
                 "value": 54,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 65,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 412.60999999999996,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -978,23 +978,23 @@
             "name": "Main Air Heater Inlet",
             "t_supply": {
                 "value": 25,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 200,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 20884.5,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -1004,23 +1004,23 @@
             "name": "Well Mixed Air Inlet",
             "t_supply": {
                 "value": 25,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 50,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 254.99999999999997,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -1030,23 +1030,23 @@
             "name": "VFI Air Inlet",
             "t_supply": {
                 "value": 25,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 45,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 297.84,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -1056,23 +1056,23 @@
             "name": "VF2 Air Inlet",
             "t_supply": {
                 "value": 25,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 32,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 78.54,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -1082,23 +1082,23 @@
             "name": "Main Air Exhaust",
             "t_supply": {
                 "value": 75,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 20,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 9619.5,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 12.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -1108,23 +1108,23 @@
             "name": "Site Hot Water",
             "t_supply": {
                 "value": 15,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": 55,
-                "units": "degC"
+                "unit": "degC"
             },
             "heat_flow": {
                 "value": 5016,
-                "units": "kW"
+                "unit": "kW"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "htc": {
                 "value": 1,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "loc": 0,
             "index": 0
@@ -1136,23 +1136,23 @@
             "type": "Hot",
             "t_supply": {
                 "value": 250,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": NaN,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -1161,23 +1161,23 @@
             "type": "Hot",
             "t_supply": {
                 "value": 160,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": NaN,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -1186,23 +1186,23 @@
             "type": "Hot",
             "t_supply": {
                 "value": 100,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": NaN,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -1211,23 +1211,23 @@
             "type": "Cold",
             "t_supply": {
                 "value": 25,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": NaN,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 2.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         },
@@ -1236,23 +1236,23 @@
             "type": "Cold",
             "t_supply": {
                 "value": 3,
-                "units": "degC"
+                "unit": "degC"
             },
             "t_target": {
                 "value": NaN,
-                "units": "degC"
+                "unit": "degC"
             },
             "dt_cont": {
                 "value": 1.5,
-                "units": "degC"
+                "unit": "degC"
             },
             "price": {
                 "value": NaN,
-                "units": "$/MWh"
+                "unit": "$/MWh"
             },
             "htc": {
                 "value": NaN,
-                "units": "kW/m^2/degC"
+                "unit": "kW/m^2/degC"
             },
             "heat_flow": null
         }

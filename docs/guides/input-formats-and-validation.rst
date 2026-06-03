@@ -7,7 +7,7 @@ guide explains which one to use and how validation fits into the workflow.
 Supported Input Shapes
 ----------------------
 
-JSON payload
+JSON input data
    Best for reproducible version-controlled studies and programmatic
    generation.
 
@@ -42,7 +42,7 @@ OpenPinch validation happens in layers:
 2. semantic validation and warnings
 3. input preparation into a runtime `Zone` tree
 
-This means a payload can be structurally valid but still produce warnings about
+This means input data can be structurally valid but still produce warnings about
 assumptions or unusual thermal conditions.
 
 Recommended Validation Workflow
@@ -53,7 +53,7 @@ Validation is a Python-side workflow:
 .. code-block:: python
 
    problem = PinchProblem("basic_pinch.json")
-   payload = problem.validate()
+   input_data = problem.validate()
 
 Configuration Inputs
 --------------------

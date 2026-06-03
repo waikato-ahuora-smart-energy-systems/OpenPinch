@@ -24,17 +24,38 @@ def build_problem_summary_frame(
         rows.append(
             {
                 "Target": target.name,
-                "Hot Utility Target": maybe_get_value(target.Qh),
-                "Cold Utility Target": maybe_get_value(target.Qc),
-                "Heat Recovery": maybe_get_value(target.Qr),
-                "Hot Pinch": maybe_get_value(target.temp_pinch.hot_temp),
-                "Cold Pinch": maybe_get_value(target.temp_pinch.cold_temp),
+                "State ID": getattr(target, "state_id", None),
+                "Hot Utility Target": maybe_get_value(
+                    target.Qh, state_id=getattr(target, "state_id", None)
+                ),
+                "Cold Utility Target": maybe_get_value(
+                    target.Qc, state_id=getattr(target, "state_id", None)
+                ),
+                "Heat Recovery": maybe_get_value(
+                    target.Qr, state_id=getattr(target, "state_id", None)
+                ),
+                "Hot Pinch": maybe_get_value(
+                    target.temp_pinch.hot_temp,
+                    state_id=getattr(target, "state_id", None),
+                ),
+                "Cold Pinch": maybe_get_value(
+                    target.temp_pinch.cold_temp,
+                    state_id=getattr(target, "state_id", None),
+                ),
                 "Hot Utilities": ", ".join(
-                    format_utility(utility.name, utility.heat_flow)
+                    format_utility(
+                        utility.name,
+                        utility.heat_flow,
+                        state_id=getattr(target, "state_id", None),
+                    )
                     for utility in target.hot_utilities
                 ),
                 "Cold Utilities": ", ".join(
-                    format_utility(utility.name, utility.heat_flow)
+                    format_utility(
+                        utility.name,
+                        utility.heat_flow,
+                        state_id=getattr(target, "state_id", None),
+                    )
                     for utility in target.cold_utilities
                 ),
             }
@@ -85,16 +106,20 @@ def build_graph_payload(results: Any) -> Optional[dict[str, Any]]:
     }
 
 
-def maybe_get_value(value: Any) -> Any:
+def maybe_get_value(value: Any, state_id: str | None = None) -> Any:
     """Return the scalar value for OpenPinch value objects."""
     if value is None:
         return None
-    return get_value(value)
+    return get_value(value, state_id=state_id)
 
 
-def format_utility(name: str, heat_flow: Any) -> str:
+def format_utility(
+    name: str,
+    heat_flow: Any,
+    state_id: str | None = None,
+) -> str:
     """Render one utility summary item."""
-    value = maybe_get_value(heat_flow)
+    value = maybe_get_value(heat_flow, state_id=state_id)
     if value is None:
         return f"{name}: n/a"
     return f"{name}: {value:.2f}"

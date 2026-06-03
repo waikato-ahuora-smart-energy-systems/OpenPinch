@@ -25,10 +25,18 @@ def _dummy_problem_table() -> ProblemTable:
     return ProblemTable({PT.T: [0.0]})
 
 
-def _make_target(zone: Zone, target_type: str) -> BaseTargetModel:
+def _make_target(
+    zone: Zone,
+    target_type: str,
+    *,
+    state_id: str | None = None,
+    state_idx: int | None = None,
+) -> BaseTargetModel:
     if target_type == TT.DI.value:
         return DirectIntegrationTarget(
             zone_name=zone.name,
+            state_id=state_id,
+            state_idx=state_idx,
             type=target_type,
             parent_zone=zone.parent_zone,
             config=zone.config,
@@ -41,6 +49,8 @@ def _make_target(zone: Zone, target_type: str) -> BaseTargetModel:
     if target_type == TT.TS.value:
         return TotalSiteTarget(
             zone_name=zone.name,
+            state_id=state_id,
+            state_idx=state_idx,
             type=target_type,
             parent_zone=zone.parent_zone,
             config=zone.config,
@@ -51,6 +61,8 @@ def _make_target(zone: Zone, target_type: str) -> BaseTargetModel:
         )
     return BaseTargetModel(
         zone_name=zone.name,
+        state_id=state_id,
+        state_idx=state_idx,
         type=target_type,
         parent_zone=zone.parent_zone,
         config=zone.config,
@@ -81,13 +93,22 @@ def test_direct_hpr_services_enable_flags_and_bootstrap_direct_integration(
     zone = _make_zone()
     calls = {"direct": 0}
 
-    def fake_direct_heat_integration_service(target_zone: Zone) -> Zone:
+    def fake_direct_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
         calls["direct"] += 1
+        assert args is None
         target_zone.add_target(_make_target(target_zone, TT.DI.value))
         return target_zone
 
-    def fake_compute(target_zone: Zone, is_heat_pumping: bool) -> BaseTargetModel:
+    def fake_compute(
+        target_zone: Zone,
+        is_heat_pumping: bool,
+        args: dict | None = None,
+    ) -> BaseTargetModel:
         assert is_heat_pumping is expected_is_heat_pumping
+        assert args is None
         return _make_target(target_zone, target_id)
 
     monkeypatch.setattr(
@@ -133,13 +154,22 @@ def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
     zone = _make_zone()
     calls = {"indirect": 0}
 
-    def fake_indirect_heat_integration_service(target_zone: Zone) -> Zone:
+    def fake_indirect_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
         calls["indirect"] += 1
+        assert args is None
         target_zone.add_target(_make_target(target_zone, TT.TS.value))
         return target_zone
 
-    def fake_compute(target_zone: Zone, is_heat_pumping: bool) -> BaseTargetModel:
+    def fake_compute(
+        target_zone: Zone,
+        is_heat_pumping: bool,
+        args: dict | None = None,
+    ) -> BaseTargetModel:
         assert is_heat_pumping is expected_is_heat_pumping
+        assert args is None
         return _make_target(target_zone, target_id)
 
     monkeypatch.setattr(
@@ -167,7 +197,7 @@ def test_indirect_service_skips_none_targets(monkeypatch):
     monkeypatch.setattr(
         svc,
         "indirect_heat_integration_service",
-        lambda target_zone: (
+        lambda target_zone, args=None: (
             target_zone.add_target(_make_target(target_zone, TT.TS.value))
             or target_zone
         ),
@@ -175,7 +205,7 @@ def test_indirect_service_skips_none_targets(monkeypatch):
     monkeypatch.setattr(
         svc,
         "compute_indirect_heat_pump_or_refrigeration_target",
-        lambda target_zone, is_heat_pumping: None,
+        lambda target_zone, is_heat_pumping, args=None: None,
     )
 
     out = svc.indirect_refrigeration_service(zone)
@@ -191,7 +221,10 @@ def test_cogeneration_and_area_cost_services_update_direct_integration_target(
     zone = _make_zone()
     calls = {"direct": 0, "cogen": 0}
 
-    def fake_direct_heat_integration_service(target_zone: Zone) -> Zone:
+    def fake_direct_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
         calls["direct"] += 1
         di_target = target_zone.targets.get(TT.DI.value) or _make_target(
             target_zone,
@@ -226,3 +259,111 @@ def test_cogeneration_and_area_cost_services_update_direct_integration_target(
     assert calls["cogen"] == 1
     assert zone.targets[TT.DI.value].work_target == 12.0
     assert zone.targets[TT.DI.value].turbine_efficiency_target == 0.42
+
+
+def test_direct_service_records_selected_state_id_on_zone(monkeypatch):
+    zone = _make_zone()
+    zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    monkeypatch.setattr(
+        svc,
+        "compute_direct_integration_targets",
+        lambda target_zone, args=None: _make_target(target_zone, TT.DI.value),
+    )
+
+    out = svc.direct_heat_integration_service(zone, {"state_id": "peak"})
+
+    assert out is zone
+    assert zone._selected_state_id == "peak"
+    assert zone._selected_state_idx == 1
+
+
+def test_direct_heat_pump_service_refreshes_direct_integration_for_new_state(
+    monkeypatch,
+):
+    zone = _make_zone()
+    zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    zone.targets[TT.DI.value] = _make_target(
+        zone,
+        TT.DI.value,
+        state_id="0",
+        state_idx=0,
+    )
+    calls = {"direct": 0}
+
+    def fake_direct_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
+        calls["direct"] += 1
+        target_zone.add_target(
+            _make_target(target_zone, TT.DI.value, state_id="peak", state_idx=1)
+        )
+        return target_zone
+
+    monkeypatch.setattr(
+        svc,
+        "direct_heat_integration_service",
+        fake_direct_heat_integration_service,
+    )
+    monkeypatch.setattr(
+        svc,
+        "compute_direct_heat_pump_or_refrigeration_target",
+        lambda target_zone, is_heat_pumping, args=None: _make_target(
+            target_zone,
+            TT.DHP.value,
+            state_id="peak",
+            state_idx=1,
+        ),
+    )
+
+    out = svc.direct_heat_pump_service(zone, {"state_id": "peak", "idx": 1})
+
+    assert out is zone
+    assert calls["direct"] == 1
+    assert zone.targets[TT.DI.value].state_idx == 1
+    assert zone.targets[TT.DHP.value].state_idx == 1
+
+
+def test_indirect_heat_pump_service_refreshes_total_site_for_new_state(monkeypatch):
+    zone = _make_zone()
+    zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    zone.targets[TT.TS.value] = _make_target(
+        zone,
+        TT.TS.value,
+        state_id="0",
+        state_idx=0,
+    )
+    calls = {"indirect": 0}
+
+    def fake_indirect_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
+        calls["indirect"] += 1
+        target_zone.add_target(
+            _make_target(target_zone, TT.TS.value, state_id="peak", state_idx=1)
+        )
+        return target_zone
+
+    monkeypatch.setattr(
+        svc,
+        "indirect_heat_integration_service",
+        fake_indirect_heat_integration_service,
+    )
+    monkeypatch.setattr(
+        svc,
+        "compute_indirect_heat_pump_or_refrigeration_target",
+        lambda target_zone, is_heat_pumping, args=None: _make_target(
+            target_zone,
+            TT.IHP.value,
+            state_id="peak",
+            state_idx=1,
+        ),
+    )
+
+    out = svc.indirect_heat_pump_service(zone, {"state_id": "peak", "idx": 1})
+
+    assert out is zone
+    assert calls["indirect"] == 1
+    assert zone.targets[TT.TS.value].state_idx == 1
+    assert zone.targets[TT.IHP.value].state_idx == 1
