@@ -193,7 +193,11 @@ def _assign_utility(
             Q_assigned,
         )
         if Q_ut_max > tol:
-            u.heat_flow[idx] = Q_ut_max
+            u.set_value_attr_at_state_idx(
+                attr_name="heat_flow", 
+                value=Q_ut_max, 
+                idx=idx,
+            )
             Q_assigned += Q_ut_max
 
         if abs(segment_limit - Q_assigned) < tol:

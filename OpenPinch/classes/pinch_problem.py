@@ -30,29 +30,21 @@ from ..utils.multiscale_targeting import (
     get_targets_for_zone_and_sub_zones,
 )
 from ..utils.wkbook_to_json import get_problem_from_excel
-from ._problem.loading import (
+from ._problem import (
     JsonDict,
-    LoadedProblemSource,
     PathLike,
-    ProblemSourceAdapters,
-    load_problem_source,
-    prepare_in_memory_problem_source,
-)
-from ._problem.output import (
+    _LoadedProblemSource,
+    _ProblemSourceAdapters,
+    _PlotAccessorDescriptor,
+    _TargetAccessorDescriptor,
+    _validate_problem_semantics,
     build_graph_payload,
     build_problem_summary_frame,
-)
-from ._problem.output import (
-    locate_summary_row as _locate_summary_row,
-)
-from ._problem.validation import (
-    _validate_problem_semantics,
-)
-from ._problem.validation import (
     format_schema_validation_error as _format_schema_validation_error,
+    load_problem_source,
+    locate_summary_row as _locate_summary_row,
+    prepare_in_memory_problem_source,
 )
-from .accessors._plot_accessor import _PlotAccessorDescriptor
-from .accessors._target_accessor import _TargetAccessorDescriptor
 from .stream_collection import StreamCollection
 from .zone import Zone
 
@@ -596,16 +588,16 @@ class PinchProblem:
             return self._rebuild_problem_state()
         return self._master_zone
 
-    def _problem_source_adapters(self) -> ProblemSourceAdapters:
+    def _problem_source_adapters(self) -> _ProblemSourceAdapters:
         """Build source adapters lazily so tests can monkeypatch module symbols."""
-        return ProblemSourceAdapters(
+        return _ProblemSourceAdapters(
             get_problem_from_excel=get_problem_from_excel,
             get_problem_from_csv=get_problem_from_csv,
             list_sample_cases=list_sample_cases,
             read_sample_case=read_sample_case,
         )
 
-    def _apply_loaded_source(self, loaded_source: LoadedProblemSource) -> None:
+    def _apply_loaded_source(self, loaded_source: _LoadedProblemSource) -> None:
         """Apply one normalized source bundle to this problem instance."""
         self._problem_data = loaded_source.input_data
         self._input_source_kind = loaded_source.source_kind

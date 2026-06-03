@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from .stream_collection import StreamCollection
+from ....classes.stream_collection import StreamCollection
 from .vapour_compression_cycle import VapourCompressionCycle
 
 __all__ = ["ParallelVapourCompressionCycles"]

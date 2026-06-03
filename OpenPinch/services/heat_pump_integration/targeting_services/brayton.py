@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from ..cycle_classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
+from ..unit_models.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 from ....classes.stream_collection import StreamCollection
 from ....lib.enums import PT
 from ....lib.schemas.hpr import HeatPumpTargetInputs

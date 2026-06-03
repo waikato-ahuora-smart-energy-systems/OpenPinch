@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from OpenPinch.classes.accessors._plot_accessor import _PlotAccessor
+from OpenPinch.classes._problem._plot_accessor import _PlotAccessor
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.classes.zone import Zone
 from OpenPinch.resources import copy_sample_case

@@ -9,7 +9,7 @@ from typing import Any, Optional
 import numpy as np
 from pydantic import ValidationError
 
-from ...classes.value import Value
+from ..value import Value
 from ...lib.enums import ST
 from ...lib.schemas.io import TargetInput
 from ...lib.schemas.workspace import ValidationIssue, ValidationReport

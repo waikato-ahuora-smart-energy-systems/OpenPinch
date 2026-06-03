@@ -135,7 +135,7 @@ class Stream:
         self.set_value_attr("_price", price, update_derived=False)
         self._validate_num_states()
         self._calculate_missing_properties()
-        self._update_derived_properties()
+        self.update_derived_properties()
 
     # === Core Properties ===
 
@@ -255,7 +255,7 @@ class Stream:
         """Set the effective shifted-temperature contribution in active use."""
         if not self._dt_cont_multiplier_locked:
             self._dt_cont_multiplier = float(value)
-            self._update_derived_properties()
+            self.update_derived_properties()
         else:
             warnings.warn(
                 "Attempted to change dt_cont_multiplier, but it is locked. "
@@ -470,14 +470,14 @@ class Stream:
         if value is None:
             setattr(self, internal_name, None)
             if update_derived:
-                self._update_derived_properties()
+                self.update_derived_properties()
             return
 
         parsed = self._coerce_to_value(value, internal_name)
         if parsed is None:
             setattr(self, internal_name, None)
             if update_derived:
-                self._update_derived_properties()
+                self.update_derived_properties()
             return
 
         if parsed.num_states == 1 and self._num_states not in (None, 0, 1):
@@ -498,7 +498,7 @@ class Stream:
         setattr(self, internal_name, parsed)
         self._validate_num_states()
         if update_derived:
-            self._update_derived_properties()
+            self.update_derived_properties()
 
     def set_value_attr_at_state_idx(
         self,
@@ -529,7 +529,7 @@ class Stream:
         current[idx if current.num_states > 1 else 0] = value
         self._validate_num_states()
         if update_derived:
-            self._update_derived_properties()
+            self.update_derived_properties()
 
     def _coerce_to_value(
         self, value, attr_name: str
@@ -597,7 +597,7 @@ class Stream:
                 unit=self._VALUE_UNITS["_t_target"],
             )
 
-    def _update_derived_properties(self) -> None:
+    def update_derived_properties(self) -> None:
         if self._t_supply is None:
             return
         if self._t_target is None:
@@ -741,7 +741,7 @@ class Stream:
         self._p_supply, self._p_target = self._p_target, self._p_supply
         self._h_supply, self._h_target = self._h_target, self._h_supply
         self._is_process_stream = True
-        self._update_derived_properties()
+        self.update_derived_properties()
 
     def get_state_index(self, state_id: str | None = None) -> int:
         if self._state_ids is None or state_id is None:

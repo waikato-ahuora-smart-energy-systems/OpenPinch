@@ -45,17 +45,12 @@ EXPECTED_EXPORTS = {
         "ZoneType",
     },
     "OpenPinch.classes": {
-        "CascadeVapourCompressionCycle",
-        "MultiStageSteamTurbine",
-        "ParallelVapourCompressionCycles",
         "PinchProblem",
         "PinchWorkspace",
         "ProblemTable",
-        "SimpleBraytonHeatPumpCycle",
         "Stream",
         "StreamCollection",
         "Value",
-        "VapourCompressionCycle",
         "Zone",
     },
     "OpenPinch.utils": {

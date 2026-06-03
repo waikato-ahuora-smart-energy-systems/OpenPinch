@@ -1,6 +1,6 @@
 """Private constants used by :mod:`OpenPinch.classes.problem_table`."""
 
-from ..lib.enums import ProblemTableLabel
+from ...lib.enums import ProblemTableLabel
 
 PT = ProblemTableLabel
 

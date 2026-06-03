@@ -7,14 +7,14 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import OpenPinch.classes.multi_stage_steam_turbine as turbine_mod
+import OpenPinch.services.power_cogeneration.unit_models.multi_stage_steam_turbine as turbine_mod
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import PT, TT
 from OpenPinch.lib.schemas.targets import DirectHeatPumpTarget
-from OpenPinch.services.power_cogeneration_analysis import (
+from OpenPinch.services.power_cogeneration import (
     power_cogeneration_analysis as pca,
 )
 

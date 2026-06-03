@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from OpenPinch.classes import brayton_heat_pump as br
-from OpenPinch.classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
+from OpenPinch.services.heat_pump_integration.cycle_classes import brayton_heat_pump as br
+from OpenPinch.services.heat_pump_integration.cycle_classes.brayton_heat_pump import SimpleBraytonHeatPumpCycle
 
 
 class _FakeComponent:

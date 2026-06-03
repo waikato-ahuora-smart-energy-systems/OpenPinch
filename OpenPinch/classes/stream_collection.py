@@ -1,7 +1,6 @@
 """Utility container for managing ordered sets of stream objects."""
 
 import csv
-import pickle
 import warnings
 from copy import copy, deepcopy
 from functools import partial
@@ -11,32 +10,13 @@ from typing import Any, Callable, List, Tuple, Union
 import numpy as np
 
 from ..lib.enums import ST
+from ._stream_collection._helpers import (
+    _is_picklable,
+    _sort_by_attr,
+    _sort_by_attrs,
+    _stream_attr_value,
+)
 from .stream import Stream
-from .value import Value
-
-
-def _sort_by_attr(attr: str, stream: object):
-    return getattr(stream, attr)
-
-
-def _sort_by_attrs(attrs: Tuple[str, ...], stream: object):
-    return tuple(getattr(stream, attr) for attr in attrs)
-
-
-def _stream_attr_value(stream: object, attr_name: str, idx: int | None = None):
-    value = getattr(stream, attr_name)
-    if isinstance(value, Value):
-        state_idx = 0 if idx is None else int(idx)
-        return float(value[state_idx])
-    return value
-
-
-def _is_picklable(obj: object) -> bool:
-    try:
-        pickle.dumps(obj)
-        return True
-    except Exception:
-        return False
 
 
 class StreamCollection:

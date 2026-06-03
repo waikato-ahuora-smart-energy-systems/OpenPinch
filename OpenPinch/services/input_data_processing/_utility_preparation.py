@@ -298,7 +298,7 @@ def _validate_htc_value(value, zone_config: Configuration) -> Value:
         or (not isinstance(value, (int, float)))
         or not math.isfinite(value)
     ):
-        value = zone_config.DT_CONT
+        value = zone_config.HTC
     return Value(value, unit="kW/m^2/delta_degC")
 
 

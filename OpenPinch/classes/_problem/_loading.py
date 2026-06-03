@@ -12,14 +12,14 @@ from pydantic import ValidationError
 
 from ...lib.schemas.io import TargetInput
 from ...utils.input_validation import validate_stream_data, validate_utility_data
-from .validation import build_validation_context
+from ._validation import build_validation_context
 
 JsonDict = Dict[str, Any]
 PathLike = str | Path
 
 
 @dataclass(frozen=True)
-class ProblemSourceAdapters:
+class _ProblemSourceAdapters:
     """External readers and resource lookups used during source loading."""
 
     get_problem_from_excel: Callable[[PathLike, Optional[str]], JsonDict]
@@ -29,7 +29,7 @@ class ProblemSourceAdapters:
 
 
 @dataclass(frozen=True)
-class LoadedProblemSource:
+class _LoadedProblemSource:
     """Normalized problem inputs and metadata produced by source loading."""
 
     input_data: TargetInput | JsonDict
@@ -53,7 +53,7 @@ def prepare_in_memory_problem_source(
     source: TargetInput | JsonDict,
     *,
     source_kind: str,
-) -> LoadedProblemSource:
+) -> _LoadedProblemSource:
     """Normalize one in-memory problem definition without filesystem access."""
     if isinstance(source, TargetInput):
         input_data: TargetInput | JsonDict = source
@@ -62,7 +62,7 @@ def prepare_in_memory_problem_source(
         input_data = normalize_problem_mapping(source)
         context_data = input_data
 
-    return LoadedProblemSource(
+    return _LoadedProblemSource(
         input_data=input_data,
         source_kind=source_kind,
         validation_context=build_validation_context(
@@ -77,8 +77,8 @@ def load_problem_source(
     source: TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike],
     *,
     current_project_name: Optional[str],
-    adapters: ProblemSourceAdapters,
-) -> LoadedProblemSource:
+    adapters: _ProblemSourceAdapters,
+) -> _LoadedProblemSource:
     """Load one supported problem source into a normalized input-data bundle."""
     source = _coerce_target_input(source)
 
@@ -95,7 +95,7 @@ def load_problem_source(
             utilities_csv,
             output_json=None,
         )
-        return LoadedProblemSource(
+        return _LoadedProblemSource(
             input_data=input_data,
             source_kind="csv",
             validation_context=build_validation_context(input_data, source_kind="csv"),
@@ -109,7 +109,7 @@ def load_problem_source(
 
     if src_path.suffix.lower() == ".json":
         input_data = _load_json_inputs(src_path, source=source, adapters=adapters)
-        return LoadedProblemSource(
+        return _LoadedProblemSource(
             input_data=input_data,
             source_kind="json",
             validation_context=build_validation_context(input_data, source_kind="json"),
@@ -119,7 +119,7 @@ def load_problem_source(
 
     if src_path.suffix.lower() in {".xlsx", ".xls", ".xlsb", ".xlsm"}:
         input_data = adapters.get_problem_from_excel(src_path, output_json=None)
-        return LoadedProblemSource(
+        return _LoadedProblemSource(
             input_data=input_data,
             source_kind="excel",
             validation_context=build_validation_context(
@@ -142,7 +142,7 @@ def load_problem_source(
             utilities_csv,
             output_json=None,
         )
-        return LoadedProblemSource(
+        return _LoadedProblemSource(
             input_data=input_data,
             source_kind="csv",
             validation_context=build_validation_context(input_data, source_kind="csv"),
@@ -201,7 +201,7 @@ def _load_json_inputs(
     src_path: Path,
     *,
     source: PathLike,
-    adapters: ProblemSourceAdapters,
+    adapters: _ProblemSourceAdapters,
 ) -> JsonDict:
     try:
         sample_case_name = _packaged_sample_case_name(

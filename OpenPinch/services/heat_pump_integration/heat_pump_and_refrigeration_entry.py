@@ -26,19 +26,19 @@ from .common.shared import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
 )
-from .cycles.brayton import (
+from .targeting_services.brayton import (
     optimise_brayton_heat_pump_placement,
 )
-from .cycles.cascade_vapour_compression import (
+from .targeting_services.cascade_vapour_compression import (
     optimise_cascade_heat_pump_placement,
 )
-from .cycles.multi_simple_carnot import (
+from .targeting_services.multi_simple_carnot import (
     optimise_multi_simple_carnot_heat_pump_placement,
 )
-from .cycles.multi_simple_vapour_compression import (
+from .targeting_services.multi_simple_vapour_compression import (
     optimise_multi_simple_heat_pump_placement,
 )
-from .cycles.multi_temperature_carnot import (
+from .targeting_services.multi_temperature_carnot import (
     optimise_multi_temperature_carnot_heat_pump_placement,
 )
 

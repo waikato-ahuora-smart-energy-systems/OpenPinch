@@ -5,12 +5,12 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import OpenPinch.classes.cascade_vapour_compression_cycle as cascade_mod
-from OpenPinch.classes.cascade_vapour_compression_cycle import (
+import OpenPinch.services.heat_pump_integration.cycle_classes.cascade_vapour_compression_cycle as cascade_mod
+from OpenPinch.services.heat_pump_integration.cycle_classes.cascade_vapour_compression_cycle import (
     CascadeVapourCompressionCycle,
 )
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+from OpenPinch.services.heat_pump_integration.cycle_classes.vapour_compression_cycle import VapourCompressionCycle
 
 pytest.importorskip("CoolProp")
 

@@ -9,10 +9,10 @@ from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.services.heat_pump_integration.common.shared import (
     compute_entropic_mean_temperature,
 )
-from OpenPinch.services.heat_pump_integration.cycles import (
+from OpenPinch.services.heat_pump_integration.targeting_services import (
     multi_temperature_carnot as hp_multi_temp_carnot,
 )
-from OpenPinch.services.heat_pump_integration.cycles.multi_temperature_carnot import (
+from OpenPinch.services.heat_pump_integration.targeting_services.multi_temperature_carnot import (
     _get_multi_temperature_carnot_stage_duties_and_work,
     _parse_multi_temperature_carnot_cycle_state_variables,
 )

@@ -19,7 +19,7 @@ from ..lib.schemas.workspace import (
     ScenarioWorkflowConfig,
     VariantPayloadView,
 )
-from ._problem.validation import build_validation_report
+from ._problem._validation import build_validation_report
 from ._workspace.execution import (
     WorkspaceExecutionError,
     run_problem_workflow,

@@ -16,7 +16,7 @@ from .indirect_heat_integration.indirect_integration_entry import (
     compute_total_subzone_utility_targets,
 )
 from .input_data_processing.data_preparation import prepare_problem
-from .power_cogeneration_analysis import get_power_cogeneration_above_pinch
+from .power_cogeneration import get_power_cogeneration_above_pinch
 
 __all__ = [
     "data_preprocessing_service",

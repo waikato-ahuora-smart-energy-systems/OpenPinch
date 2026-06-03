@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..power_cogeneration.unit_models.multi_stage_steam_turbine import MultiStageSteamTurbine
+from .unit_models.multi_stage_steam_turbine import MultiStageSteamTurbine
 from ...lib.config import T_CRIT, Configuration, tol
 from ...utils.miscellaneous import get_state_index
 from ...utils.water_properties import psat_T

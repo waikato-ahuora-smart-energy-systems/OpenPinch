@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import OpenPinch.classes.multi_stage_steam_turbine as turbine_mod
-from OpenPinch.classes.multi_stage_steam_turbine import MultiStageSteamTurbine
+import OpenPinch.services.power_cogeneration.unit_models.multi_stage_steam_turbine as turbine_mod
+from OpenPinch.services.power_cogeneration.unit_models.multi_stage_steam_turbine import MultiStageSteamTurbine
 
 
 def _patch_steam_properties(monkeypatch):

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
-from OpenPinch.services.heat_pump_integration.cycles import (
+from OpenPinch.services.heat_pump_integration.targeting_services import (
     multi_simple_vapour_compression as hp_multi_simple_vapour,
 )
 

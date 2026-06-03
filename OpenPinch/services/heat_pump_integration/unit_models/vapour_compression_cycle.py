@@ -9,9 +9,9 @@ import CoolProp
 import numpy as np
 from scipy.optimize import brentq
 
-from ..utils.stream_linearisation import get_piecewise_data_points
-from .stream import Stream
-from .stream_collection import StreamCollection
+from ....utils.stream_linearisation import get_piecewise_data_points
+from ....classes.stream import Stream
+from ....classes.stream_collection import StreamCollection
 
 __all__ = ["VapourCompressionCycle"]
 

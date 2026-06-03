@@ -1,1 +1,37 @@
 """Private helpers for the :mod:`OpenPinch.classes.pinch_problem` surface."""
+
+from ._loading import (
+    JsonDict,
+    _LoadedProblemSource,
+    PathLike,
+    _ProblemSourceAdapters,
+    load_problem_source,
+    prepare_in_memory_problem_source,
+)
+from ._output import (
+    build_graph_payload,
+    build_problem_summary_frame,
+    locate_summary_row,
+)
+from ._plot_accessor import _PlotAccessorDescriptor
+from ._target_accessor import _TargetAccessorDescriptor
+from ._validation import (
+    _validate_problem_semantics,
+    format_schema_validation_error,
+)
+
+__all__ = [
+    "JsonDict",
+    "_LoadedProblemSource",
+    "PathLike",
+    "_ProblemSourceAdapters",
+    "_PlotAccessorDescriptor",
+    "_TargetAccessorDescriptor",
+    "_validate_problem_semantics",
+    "build_graph_payload",
+    "build_problem_summary_frame",
+    "format_schema_validation_error",
+    "load_problem_source",
+    "locate_summary_row",
+    "prepare_in_memory_problem_source",
+]

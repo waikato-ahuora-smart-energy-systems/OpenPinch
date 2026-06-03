@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-import OpenPinch.classes.vapour_compression_cycle as shp_mod
-from OpenPinch.classes.vapour_compression_cycle import VapourCompressionCycle
+import OpenPinch.services.heat_pump_integration.cycle_classes.vapour_compression_cycle as shp_mod
+from OpenPinch.services.heat_pump_integration.cycle_classes.vapour_compression_cycle import VapourCompressionCycle
 from OpenPinch.lib.enums import *
 
 pytest.importorskip("CoolProp")
