@@ -11,7 +11,7 @@ from ...lib.enums import PT
 from .gcc_manipulation import get_seperated_gcc_heat_load_profiles
 from .problem_table_analysis import get_utility_heat_cascade
 
-__all__ = ["get_utility_targets"]
+__all__ = ["target_utilities_for_load_profiles", "get_utility_targets"]
 
 ################################################################################
 # Public API
@@ -49,7 +49,7 @@ def get_utility_targets(
 
     # Target multiple utility use
     if is_direct_integration:
-        hot_utilities, cold_utilities = _target_utility(
+        hot_utilities, cold_utilities = target_utilities_for_load_profiles(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             T_vals=pt[PT.T],
@@ -103,7 +103,8 @@ def get_utility_targets(
 ################################################################################
 
 
-def _target_utility(
+def target_utilities_for_load_profiles(
+    *,
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
     T_vals: np.ndarray,
@@ -113,7 +114,7 @@ def _target_utility(
     is_real_temperatures: bool = False,
     idx: int | None = None,
 ) -> Tuple[StreamCollection, StreamCollection]:
-    """Targets multiple utility use considering a fixed target temperature."""
+    """Targets multiple utilities for precomputed hot- and cold-side load profiles."""
     if abs(H_net_cold[0]) > tol:
         if len(hot_utilities) == 0:
             raise ValueError(

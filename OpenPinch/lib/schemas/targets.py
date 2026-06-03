@@ -217,10 +217,22 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
         )
 
 
-class HeatPumpTargetBase(GraphBackedTarget):
+class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     """Base contract for advanced HPR targets from explicit ``target_*`` methods."""
 
     pt: ProblemTable
+    hot_utilities: StreamCollection = Field(default_factory=StreamCollection)
+    cold_utilities: StreamCollection = Field(default_factory=StreamCollection)
+    hot_utility_target: float = 0.0
+    cold_utility_target: float = 0.0
+    heat_recovery_target: float = 0.0
+    heat_recovery_limit: Optional[float] = None
+    degree_of_int: Optional[float] = None
+    utility_cost: float = 0.0
+    hot_pinch: Optional[float] = None
+    cold_pinch: Optional[float] = None
+    work_target: Optional[float] = None
+    turbine_efficiency_target: Optional[float] = None
     hpr_cycle: str
     hpr_utility_total: Any
     hpr_work: Any
@@ -236,29 +248,25 @@ class HeatPumpTargetBase(GraphBackedTarget):
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
         """Return the reporting payload for explicit HPR target results."""
-        return TargetResults(
-            name=self.name,
-            state_id=self.state_id,
-            degree_of_integration=None,
-            Qh=0.0,
-            Qc=0.0,
-            Qr=0.0,
-            utility_cost=None,
-            row_type=_row_type(isTotal),
-            hot_utilities=[],
-            cold_utilities=[],
-            temp_pinch=TempPinch(),
-            hpr_cycle=self.hpr_cycle,
-            hpr_utility_total=self.hpr_utility_total,
-            hpr_work=self.hpr_work,
-            hpr_external_utility=self.hpr_external_utility,
-            hpr_ambient_hot=self.hpr_ambient_hot,
-            hpr_ambient_cold=self.hpr_ambient_cold,
-            hpr_cop=self.hpr_cop,
-            hpr_eta_he=self.hpr_eta_he,
-            hpr_success=self.hpr_success,
-            hpr_hot_streams=self.hpr_hot_streams,
-            hpr_cold_streams=self.hpr_cold_streams,
+        base = self._base_target_results(isTotal=isTotal)
+        return base.model_copy(
+            update={
+                "work_target": self.work_target,
+                "turbine_efficiency_target": None
+                if self.turbine_efficiency_target is None
+                else self.turbine_efficiency_target * 100,
+                "hpr_cycle": self.hpr_cycle,
+                "hpr_utility_total": self.hpr_utility_total,
+                "hpr_work": self.hpr_work,
+                "hpr_external_utility": self.hpr_external_utility,
+                "hpr_ambient_hot": self.hpr_ambient_hot,
+                "hpr_ambient_cold": self.hpr_ambient_cold,
+                "hpr_cop": self.hpr_cop,
+                "hpr_eta_he": self.hpr_eta_he,
+                "hpr_success": self.hpr_success,
+                "hpr_hot_streams": self.hpr_hot_streams,
+                "hpr_cold_streams": self.hpr_cold_streams,
+            }
         )
 
 

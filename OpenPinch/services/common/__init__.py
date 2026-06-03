@@ -33,7 +33,10 @@ from .problem_table_analysis import (
     set_zonal_targets,
 )
 from .temperature_driving_force import get_temperature_driving_forces
-from .utility_targeting import get_utility_targets
+from .utility_targeting import (
+    get_utility_targets,
+    target_utilities_for_load_profiles,
+)
 
 __all__ = [
     "capital_cost_and_area_targeting",
@@ -60,6 +63,7 @@ __all__ = [
     "problem_table_algorithm",
     "problem_table_analysis",
     "set_zonal_targets",
+    "target_utilities_for_load_profiles",
     "temperature_driving_force",
     "utility_targeting",
 ]

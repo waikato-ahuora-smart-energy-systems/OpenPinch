@@ -1,0 +1,181 @@
+"""Internal postprocessing helpers for HPR residual utility accounting."""
+
+from __future__ import annotations
+
+import numpy as np
+
+from ....classes.problem_table import ProblemTable
+from ....lib.enums import PT
+from ...common.gcc_manipulation import get_seperated_gcc_heat_load_profiles
+from ...common.utility_targeting import target_utilities_for_load_profiles
+
+
+def _get_hpr_residual_utility_summary(
+    *,
+    pt: ProblemTable,
+    base_target,
+    idx: int,
+    is_direct: bool,
+    is_heat_pumping: bool,
+) -> dict:
+    residual_net = _get_hpr_residual_net_profile(
+        pt=pt,
+        is_direct=is_direct,
+        is_heat_pumping=is_heat_pumping,
+    )
+    hot_profile, cold_profile = _get_hpr_residual_load_profiles(
+        pt=pt,
+        residual_net=residual_net,
+        is_direct=is_direct,
+        is_heat_pumping=is_heat_pumping,
+    )
+    hot_utilities, cold_utilities = _retarget_hpr_residual_utilities(
+        T_vals=pt[PT.T],
+        residual_net=residual_net,
+        hot_profile=hot_profile,
+        cold_profile=cold_profile,
+        hot_utilities=base_target.hot_utilities.copy(deep=True),
+        cold_utilities=base_target.cold_utilities.copy(deep=True),
+        is_real_temperatures=not is_direct,
+        idx=idx,
+    )
+    hot_utility_target = float(hot_utilities.sum_stream_attribute("heat_flow", idx=idx))
+    cold_utility_target = float(
+        cold_utilities.sum_stream_attribute("heat_flow", idx=idx)
+    )
+    base_heat_recovery = float(getattr(base_target, "heat_recovery_target", 0.0) or 0.0)
+    base_hot_utility_target = float(
+        getattr(base_target, "hot_utility_target", 0.0) or 0.0
+    )
+    heat_recovery_target = base_heat_recovery + (
+        base_hot_utility_target - hot_utility_target
+    )
+    heat_recovery_limit = getattr(base_target, "heat_recovery_limit", None)
+    hot_pinch, cold_pinch = ProblemTable(
+        {
+            PT.T: pt[PT.T],
+            PT.H_NET: residual_net,
+        }
+    ).pinch_temperatures(col_H=PT.H_NET)
+
+    return {
+        "hot_utilities": hot_utilities,
+        "cold_utilities": cold_utilities,
+        "hot_utility_target": hot_utility_target,
+        "cold_utility_target": cold_utility_target,
+        "heat_recovery_target": heat_recovery_target,
+        "heat_recovery_limit": heat_recovery_limit,
+        "degree_of_int": (
+            (heat_recovery_target / heat_recovery_limit)
+            if isinstance(heat_recovery_limit, float | int) and heat_recovery_limit > 0
+            else (1.0 if heat_recovery_limit == 0 else None)
+        ),
+        "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities, idx=idx),
+        "hot_pinch": hot_pinch,
+        "cold_pinch": cold_pinch,
+    }
+
+
+def _get_hpr_residual_net_profile(
+    *,
+    pt: ProblemTable,
+    is_direct: bool,
+    is_heat_pumping: bool,
+) -> np.ndarray:
+    base_col = PT.H_NET_W_AIR if is_direct else PT.H_NET_UT
+    hpr_col = PT.H_NET_HP if is_heat_pumping else PT.H_NET_RFRG
+    return np.asarray(pt[base_col] - pt[hpr_col], dtype=float)
+
+
+def _get_hpr_residual_load_profiles(
+    *,
+    pt: ProblemTable,
+    residual_net: np.ndarray,
+    is_direct: bool,
+    is_heat_pumping: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    if is_direct:
+        updates = get_seperated_gcc_heat_load_profiles(
+            T_col=pt[PT.T],
+            H_net=residual_net,
+            is_process_stream=True,
+        )["updates"]
+        process_hot_profile = np.asarray(updates[PT.H_NET_HOT], dtype=float)
+        process_cold_profile = np.asarray(updates[PT.H_NET_COLD], dtype=float)
+        hot_profile = process_cold_profile
+        cold_profile = process_hot_profile
+        hot_after_col = (
+            PT.H_NET_HOT_AFTR_HP if is_heat_pumping else PT.H_NET_HOT_AFTR_RFRG
+        )
+        cold_after_col = (
+            PT.H_NET_COLD_AFTR_HP if is_heat_pumping else PT.H_NET_COLD_AFTR_RFRG
+        )
+        stored_profiles = {
+            hot_after_col: process_hot_profile,
+            cold_after_col: process_cold_profile,
+        }
+    else:
+        rcp_net = (
+            np.asarray(pt[PT.RCP_UT_NET], dtype=float)
+            if PT.RCP_UT_NET.value in pt.columns
+            else np.zeros_like(residual_net)
+        )
+        updates = get_seperated_gcc_heat_load_profiles(
+            T_col=pt[PT.T],
+            H_net=residual_net,
+            rcp_net=rcp_net,
+            is_process_stream=False,
+        )["updates"]
+        hot_profile = np.asarray(updates[PT.H_HOT_UT], dtype=float)
+        cold_profile = np.asarray(updates[PT.H_COLD_UT], dtype=float)
+        hot_after_col = (
+            PT.H_NET_HOT_UT_AFTR_HP if is_heat_pumping else PT.H_NET_HOT_UT_AFTR_RFRG
+        )
+        cold_after_col = (
+            PT.H_NET_COLD_UT_AFTR_HP if is_heat_pumping else PT.H_NET_COLD_UT_AFTR_RFRG
+        )
+        stored_profiles = {
+            hot_after_col: hot_profile,
+            cold_after_col: cold_profile,
+        }
+
+    pt.update(
+        T_col=pt[PT.T],
+        updates=stored_profiles,
+    )
+    return hot_profile, cold_profile
+
+
+def _retarget_hpr_residual_utilities(
+    *,
+    T_vals: np.ndarray,
+    residual_net: np.ndarray,
+    hot_profile: np.ndarray,
+    cold_profile: np.ndarray,
+    hot_utilities,
+    cold_utilities,
+    is_real_temperatures: bool,
+    idx: int,
+):
+    hot_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=idx)
+    cold_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=idx)
+    pinch_idx = ProblemTable({PT.T: T_vals, PT.H_NET: residual_net}).pinch_idx(PT.H_NET)
+    return target_utilities_for_load_profiles(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        T_vals=T_vals,
+        H_net_cold=hot_profile,
+        H_net_hot=cold_profile,
+        pinch_idx=pinch_idx,
+        is_real_temperatures=is_real_temperatures,
+        idx=idx,
+    )
+
+
+def _compute_utility_cost(hot_utilities, cold_utilities, *, idx: int) -> float:
+    utility_cost = 0.0
+    for utility in hot_utilities + cold_utilities:
+        if utility.utility_cost is None:
+            continue
+        utility_cost += float(utility.utility_cost[idx])
+    return utility_cost

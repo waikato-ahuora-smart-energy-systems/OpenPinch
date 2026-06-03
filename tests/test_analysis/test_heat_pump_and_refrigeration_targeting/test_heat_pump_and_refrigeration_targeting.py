@@ -23,6 +23,34 @@ from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from .helpers import _base_args, _patch_output_model_validate, _pt_with_hnet
 
 
+def _make_base_utility_collections(
+    *,
+    hot_flow: float = 40.0,
+    cold_flow: float = 30.0,
+) -> tuple[StreamCollection, StreamCollection]:
+    hot_utilities = StreamCollection()
+    hot_utilities.add(
+        Stream(
+            name="Steam",
+            t_supply=120.0,
+            t_target=80.0,
+            heat_flow=hot_flow,
+            dt_cont=0.0,
+        )
+    )
+    cold_utilities = StreamCollection()
+    cold_utilities.add(
+        Stream(
+            name="Cooling Water",
+            t_supply=20.0,
+            t_target=60.0,
+            heat_flow=cold_flow,
+            dt_cont=0.0,
+        )
+    )
+    return hot_utilities, cold_utilities
+
+
 @pytest.mark.parametrize(
     ("q_amb_hot", "q_amb_cold", "expected_hot", "expected_cold", "expected_w_air"),
     [
@@ -325,6 +353,22 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
         },
     )
     monkeypatch.setattr(
+        hp,
+        "_get_hpr_residual_utility_summary",
+        lambda **kwargs: {
+            "hot_utilities": StreamCollection(),
+            "cold_utilities": StreamCollection(),
+            "hot_utility_target": 0.0,
+            "cold_utility_target": 0.0,
+            "heat_recovery_target": 0.0,
+            "heat_recovery_limit": None,
+            "degree_of_int": None,
+            "utility_cost": 0.0,
+            "hot_pinch": None,
+            "cold_pinch": None,
+        },
+    )
+    monkeypatch.setattr(
         hp.IndirectHeatPumpTarget,
         "model_validate",
         classmethod(lambda cls, value: value),
@@ -340,6 +384,91 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
     assert "state_id" not in calls["profile_kwargs"]
     assert payload["state_id"] == "peak"
     assert payload["state_idx"] == 1
+
+
+def test_hpr_residual_utility_summary_retargets_direct_utilities():
+    hot_utilities, cold_utilities = _make_base_utility_collections()
+    base_target = SimpleNamespace(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        hot_utility_target=40.0,
+        cold_utility_target=30.0,
+        heat_recovery_target=10.0,
+        heat_recovery_limit=50.0,
+    )
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0, 20.0],
+            PT.H_NET_W_AIR: [40.0, 0.0, 0.0, 30.0],
+            PT.H_NET_HP: [15.0, 0.0, 0.0, 10.0],
+        }
+    )
+
+    summary = hp._get_hpr_residual_utility_summary(
+        pt=pt,
+        base_target=base_target,
+        idx=0,
+        is_direct=True,
+        is_heat_pumping=True,
+    )
+
+    assert summary["hot_utility_target"] == pytest.approx(25.0)
+    assert summary["cold_utility_target"] == pytest.approx(20.0)
+    assert summary["heat_recovery_target"] == pytest.approx(25.0)
+    assert summary["degree_of_int"] == pytest.approx(0.5)
+    assert summary["hot_pinch"] == pytest.approx(80.0)
+    assert summary["cold_pinch"] == pytest.approx(60.0)
+    assert float(summary["hot_utilities"][0].heat_flow[0]) == pytest.approx(25.0)
+    assert float(summary["cold_utilities"][0].heat_flow[0]) == pytest.approx(20.0)
+    np.testing.assert_allclose(
+        pt[PT.H_NET_HOT_AFTR_HP], np.array([0.0, 0.0, 0.0, -20.0])
+    )
+    np.testing.assert_allclose(
+        pt[PT.H_NET_COLD_AFTR_HP], np.array([25.0, 0.0, 0.0, 0.0])
+    )
+
+
+def test_hpr_residual_utility_summary_retargets_indirect_utilities():
+    hot_utilities, cold_utilities = _make_base_utility_collections()
+    base_target = SimpleNamespace(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        hot_utility_target=40.0,
+        cold_utility_target=30.0,
+        heat_recovery_target=10.0,
+        heat_recovery_limit=50.0,
+    )
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0, 20.0],
+            PT.H_NET_UT: [40.0, 0.0, 0.0, 30.0],
+            PT.H_NET_HP: [15.0, 0.0, 0.0, 10.0],
+            PT.RCP_UT_NET: [0.0, 0.0, 0.0, 0.0],
+        }
+    )
+
+    summary = hp._get_hpr_residual_utility_summary(
+        pt=pt,
+        base_target=base_target,
+        idx=0,
+        is_direct=False,
+        is_heat_pumping=True,
+    )
+
+    assert summary["hot_utility_target"] == pytest.approx(25.0)
+    assert summary["cold_utility_target"] == pytest.approx(20.0)
+    assert summary["heat_recovery_target"] == pytest.approx(25.0)
+    assert summary["degree_of_int"] == pytest.approx(0.5)
+    assert summary["hot_pinch"] == pytest.approx(80.0)
+    assert summary["cold_pinch"] == pytest.approx(60.0)
+    assert float(summary["hot_utilities"][0].heat_flow[0]) == pytest.approx(25.0)
+    assert float(summary["cold_utilities"][0].heat_flow[0]) == pytest.approx(20.0)
+    np.testing.assert_allclose(
+        pt[PT.H_NET_HOT_UT_AFTR_HP], np.array([25.0, 0.0, 0.0, 0.0])
+    )
+    np.testing.assert_allclose(
+        pt[PT.H_NET_COLD_UT_AFTR_HP], np.array([0.0, 0.0, 0.0, -20.0])
+    )
 
 
 def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):

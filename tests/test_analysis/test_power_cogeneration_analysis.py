@@ -8,9 +8,12 @@ import numpy as np
 import pytest
 
 import OpenPinch.classes.multi_stage_steam_turbine as turbine_mod
+from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.config import Configuration
+from OpenPinch.lib.enums import PT, TT
+from OpenPinch.lib.schemas.targets import DirectHeatPumpTarget
 from OpenPinch.services.power_cogeneration_analysis import (
     power_cogeneration_analysis as pca,
 )
@@ -151,6 +154,44 @@ def test_get_power_cogeneration_above_pinch_updates_zone_targets(monkeypatch):
     out = pca.get_power_cogeneration_above_pinch(zone)
 
     assert out is zone
+    assert out.work_target > 0.0
+    assert out.turbine_efficiency_target >= cfg.MIN_EFF
+
+
+def test_get_power_cogeneration_above_pinch_accepts_heat_pump_targets(monkeypatch):
+    _patch_steam_properties(monkeypatch)
+
+    cfg = _make_zone_config()
+    hot_utilities = StreamCollection()
+    hot_utilities.add(_steam_utility("HU1", t_supply=180.0, t_target=140.0, q=120.0))
+    target = DirectHeatPumpTarget(
+        zone_name="Plant",
+        type=TT.DHP.value,
+        parent_zone=None,
+        config=cfg,
+        pt=ProblemTable({PT.T: [180.0, 140.0]}),
+        hot_utilities=hot_utilities,
+        cold_utilities=StreamCollection(),
+        hot_utility_target=120.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+        hpr_cycle="stub",
+        hpr_utility_total=0.0,
+        hpr_work=0.0,
+        hpr_external_utility=0.0,
+        hpr_ambient_hot=0.0,
+        hpr_ambient_cold=0.0,
+        hpr_cop=0.0,
+        hpr_eta_he=0.0,
+        hpr_success=True,
+        hpr_hot_streams=StreamCollection(),
+        hpr_cold_streams=StreamCollection(),
+        hpr_details={},
+    )
+
+    out = pca.get_power_cogeneration_above_pinch(target, args={"idx": 0})
+
+    assert out is target
     assert out.work_target > 0.0
     assert out.turbine_efficiency_target >= cfg.MIN_EFF
 
