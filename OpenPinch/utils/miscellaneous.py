@@ -246,33 +246,42 @@ def _is_stateful_value_payload(val: Any) -> bool:
     )
 
 
-def get_state_index(state_ids, args: dict) -> Tuple[int, str]:
+def get_state_index(
+    state_ids: dict[str, int] | None,
+    args: dict | None,
+) -> Tuple[int, str | None]:
     sid = None if not isinstance(args, dict) else args.get("state_id")
-    if isinstance(state_ids, dict):
-        if sid is None:
-            idx = 0
-        elif sid in state_ids.keys():
-            idx = state_ids[sid]
-        else:
-            raise ValueError(
-                f"state_id {sid!r} was not found on this collection. "
-                f"Available states: {', '.join(state_ids.keys())}."
-            )
-    elif state_ids:
-        lookup = [str(state_id) for state_id in state_ids]
-        sid = None if sid is None else str(sid)
-        if sid is None:
-            idx = 0
-        elif sid in lookup:
-            idx = lookup.index(sid)
-        else:
+    sid = None if sid is None else str(sid)
+    raw_idx = None if not isinstance(args, dict) else args.get("idx")
+    explicit_idx = None if raw_idx is None else int(raw_idx)
+
+    lookup = {} if state_ids is None else state_ids
+
+    if sid is not None:
+        if lookup and sid not in lookup:
             raise ValueError(
                 f"state_id {sid!r} was not found on this collection. "
                 f"Available states: {', '.join(lookup)}."
             )
-    else:
-        idx = 0
-    return idx, sid
+        resolved_idx = lookup.get(sid, 0)
+        if explicit_idx is not None and explicit_idx != resolved_idx:
+            raise ValueError(
+                f"state_id {sid!r} resolves to idx {resolved_idx}, "
+                f"but idx {explicit_idx} was also provided."
+            )
+        return resolved_idx, sid
+
+    if explicit_idx is not None:
+        if explicit_idx < 0:
+            raise ValueError("idx must be a non-negative integer.")
+        if lookup and explicit_idx not in set(lookup.values()):
+            raise ValueError(
+                f"idx {explicit_idx} was not found on this collection. "
+                f"Available indices: {', '.join(str(idx) for idx in lookup.values())}."
+            )
+        return explicit_idx, None
+
+    return 0, None
 
 
 def linear_interpolation(

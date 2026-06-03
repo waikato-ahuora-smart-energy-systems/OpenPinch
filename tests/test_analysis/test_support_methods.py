@@ -50,6 +50,30 @@ def test_get_value_with_stateful_payload_uses_requested_state_id():
     assert get_value(payload, state_id="1") == 88.8
 
 
+def test_get_state_index_resolves_state_id():
+    idx, sid = get_state_index({"0": 0, "peak": 1}, {"state_id": "peak"})
+
+    assert idx == 1
+    assert sid == "peak"
+
+
+def test_get_state_index_rejects_unknown_state_id():
+    with pytest.raises(ValueError, match="state_id 'summer' was not found"):
+        get_state_index({"0": 0, "peak": 1}, {"state_id": "summer"})
+
+
+def test_get_state_index_accepts_explicit_idx():
+    idx, sid = get_state_index({"0": 0, "peak": 1}, {"idx": 1})
+
+    assert idx == 1
+    assert sid is None
+
+
+def test_get_state_index_rejects_conflicting_state_id_and_idx():
+    with pytest.raises(ValueError, match="state_id 'peak' resolves to idx 1"):
+        get_state_index({"0": 0, "peak": 1}, {"state_id": "peak", "idx": 0})
+
+
 def test_get_value_with_int_raises():
     assert get_value(5) == 5.0  # Int should be converted to float
 

@@ -70,7 +70,7 @@ def plot_multi_hp_profiles_from_results(
     hpr_cold_streams: StreamCollection = None,
     idx: int = 0,
     title: str = None,
-) -> "go.Figure": # type: ignore
+) -> "go.Figure":  # type: ignore
     """Plot background source/sink profiles alongside solved HPR cycle streams."""
     go = _require_plotly()
     fig = go.Figure()
@@ -369,12 +369,14 @@ def evaluate_vapour_hpr_result(
         cold_streams=args.bckgrd_cold_streams
         + get_ambient_air_stream(Q_amb_cold=state.Q_amb_cold, args=args),
         is_shifted=True,
+        idx=args.idx,
     )
     pt_evap = get_process_heat_cascade(
         hot_streams=args.bckgrd_hot_streams
         + get_ambient_air_stream(Q_amb_hot=state.Q_amb_hot, args=args),
         cold_streams=hpr_streams.get_cold_utility_streams(),
         is_shifted=True,
+        idx=args.idx,
     )
 
     Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(

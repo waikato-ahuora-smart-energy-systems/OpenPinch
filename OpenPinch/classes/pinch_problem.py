@@ -24,6 +24,7 @@ from ..utils.export import (
     build_summary_dataframe,
     export_target_summary_to_excel_with_units,
 )
+from ..utils.miscellaneous import get_state_index
 from ..utils.multiscale_targeting import (
     extract_results,
     get_targets_for_zone_and_sub_zones,
@@ -123,10 +124,12 @@ class PinchProblem:
         sid: str = None,
     ) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
-        runtime_options = dict(options or {})
-        sid = runtime_options.get("state_id", sid)
         if not isinstance(zone, Zone):
             zone = self._build_execution_master_zone()
+        runtime_options, sid = self._resolve_runtime_state_options(
+            options,
+            zone=zone,
+        )
         get_targets_for_zone_and_sub_zones(
             zone=zone,
             direct_service_func=direct_service_func,
@@ -147,9 +150,11 @@ class PinchProblem:
         indirect_service_func: Optional[ZoneService] = None,
         sid: str = None,
     ) -> BaseTargetModel:
-        runtime_options = dict(options or {})
-        sid = runtime_options.get("state_id", sid)
         execution_master_zone = self._build_execution_master_zone()
+        runtime_options, sid = self._resolve_runtime_state_options(
+            options,
+            zone=execution_master_zone,
+        )
         zone = self._resolve_target_zone(
             application_zone, master_zone=execution_master_zone
         )
@@ -201,8 +206,8 @@ class PinchProblem:
         return self._master_zone
 
     @property
-    def state_ids(self) -> list[str]:
-        """Return the canonical ordered state identifiers for the loaded problem."""
+    def state_ids(self) -> dict[str, int]:
+        """Return the canonical ``state_id -> idx`` lookup for the loaded problem."""
         master_zone = self._require_prepared_root_zone()
         return master_zone.state_ids
 
@@ -226,17 +231,21 @@ class PinchProblem:
         preserve_cached_results:
             Restore the original ``results`` cache after the batch run when ``True``.
         """
-        state_ids = self.state_ids
+        state_ids = list(self.state_ids.keys())
         if not state_ids:
             raise ValueError("This problem has no canonical state_ids to target.")
 
         previous_results = self._results
         try:
             if parallel in (False, None):
-                return {
+                results_by_requested_state = {
                     state_id: self._solve_target_for_state(state_id)
                     for state_id in state_ids
                 }
+                return self._order_state_results(
+                    state_ids=state_ids,
+                    results_by_requested_state=results_by_requested_state,
+                )
             return self._target_all_states_parallel(
                 state_ids=state_ids,
                 backend="thread" if parallel == "thread" else "process",
@@ -250,6 +259,46 @@ class PinchProblem:
         result = self.target(state_id=state_id)
         return TargetOutput.model_validate(result.model_dump(mode="python"))
 
+    def _resolve_runtime_state_options(
+        self,
+        options: Optional[dict[str, Any]],
+        *,
+        zone: "Zone",
+    ) -> tuple[dict[str, Any], str | None, int]:
+        runtime_options = dict(options or {})
+        idx, sid = get_state_index(state_ids=zone.state_ids, args=runtime_options)
+        runtime_options["idx"] = idx
+        if sid is not None:
+            runtime_options["state_id"] = sid
+        return runtime_options, sid
+
+    def _state_result_key(
+        self,
+        result: TargetOutput,
+        *,
+        requested_state_id: str,
+    ) -> str:
+        return (
+            str(result.state_id) if result.state_id is not None else requested_state_id
+        )
+
+    def _order_state_results(
+        self,
+        *,
+        state_ids: list[str],
+        results_by_requested_state: dict[str, TargetOutput],
+    ) -> dict[str, TargetOutput]:
+        ordered_results: dict[str, TargetOutput] = {}
+        for requested_state_id in state_ids:
+            result = results_by_requested_state[requested_state_id]
+            ordered_results[
+                self._state_result_key(
+                    result,
+                    requested_state_id=requested_state_id,
+                )
+            ] = result
+        return ordered_results
+
     def _target_all_states_parallel(
         self,
         *,
@@ -261,7 +310,7 @@ class PinchProblem:
         executor_cls = (
             ThreadPoolExecutor if backend == "thread" else ProcessPoolExecutor
         )
-        results_by_state: dict[str, TargetOutput] = {}
+        results_by_requested_state: dict[str, TargetOutput] = {}
         with executor_cls(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(
@@ -274,10 +323,13 @@ class PinchProblem:
             }
             for future in as_completed(futures):
                 state_id = futures[future]
-                results_by_state[state_id] = TargetOutput.model_validate(
+                results_by_requested_state[state_id] = TargetOutput.model_validate(
                     future.result()
                 )
-        return {state_id: results_by_state[state_id] for state_id in state_ids}
+        return self._order_state_results(
+            state_ids=state_ids,
+            results_by_requested_state=results_by_requested_state,
+        )
 
     def validate(self) -> TargetInput:
         """Validate the currently loaded problem data without running targeting."""

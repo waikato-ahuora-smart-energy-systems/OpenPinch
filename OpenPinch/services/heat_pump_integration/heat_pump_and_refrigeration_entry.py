@@ -16,7 +16,7 @@ from ...lib.schemas.targets import (
     IndirectHeatPumpTarget,
     IndirectRefrigerationTarget,
 )
-from ...utils.miscellaneous import get_value
+from ...utils.miscellaneous import get_state_index, get_value
 from ..common.problem_table_analysis import create_problem_table_with_t_int
 from .common.preprocessing import (
     construct_HPRTargetInputs,
@@ -58,7 +58,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
     args: dict | None = None,
 ) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
     """Solve an explicit direct Heat Pump or refrigeration target for one zone."""
-    state_id = None if not isinstance(args, dict) else args.get("state_id")
+    idx, state_id = get_state_index(state_ids=zone.state_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.DI.value].pt)
     target_load = _validate_hpr_required(
@@ -79,12 +79,14 @@ def compute_direct_heat_pump_or_refrigeration_target(
         H_cold=pt[PT.H_NET_COLD],
         zone_config=zone.config,
         is_heat_pumping=is_heat_pumping,
+        idx=idx,
     )
     pt = _calc_hpr_cascade(
         pt=pt,
         res=res,
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
+        idx=idx,
     )
     payload = {
         "zone_name": zone.name,
@@ -98,6 +100,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
             is_heat_pumping=is_heat_pumping,
         ),
         "state_id": state_id,
+        "state_idx": idx,
     } | _get_hpr_target_summary(res, zone)
     model_cls = DirectHeatPumpTarget if is_heat_pumping else DirectRefrigerationTarget
     return model_cls.model_validate(payload)
@@ -109,7 +112,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     args: dict | None = None,
 ) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
     """Solve an indirect / utility system Heat Pump or refrigeration target."""
-    state_id = None if not isinstance(args, dict) else args.get("state_id")
+    idx, state_id = get_state_index(state_ids=zone.state_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
     pt = deepcopy(zone.targets[TT.TS.value].pt)
     # Create problem table based on inverted utility streams
@@ -118,7 +121,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
         is_shifted=True,
         is_full_analysis=True,
-        state_id=state_id,
+        idx=idx,
     )
     # Perform heat pump and/or refrigeration targeting on the correct cascades
     target_load = _validate_hpr_required(
@@ -139,12 +142,14 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         H_cold=pt_ut_gen[PT.H_NET_COLD],
         zone_config=zone.config,
         is_heat_pumping=is_heat_pumping,
+        idx=idx,
     )
     pt = _calc_hpr_cascade(
         pt=pt,
         res=res,
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
+        idx=idx,
     )
     payload = {
         "zone_name": zone.name,
@@ -158,6 +163,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
             is_heat_pumping=is_heat_pumping,
         ),
         "state_id": state_id,
+        "state_idx": idx,
     } | _get_hpr_target_summary(res, zone)
     model_cls = (
         IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
@@ -225,6 +231,7 @@ def _get_hpr_targets(
     H_cold: np.ndarray,
     zone_config: Configuration,
     is_heat_pumping: bool,
+    idx: int = 0,
 ) -> HeatPumpTargetOutputs:
     args = construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
@@ -233,6 +240,7 @@ def _get_hpr_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
+        idx=idx,
         debug=False,  # True,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)

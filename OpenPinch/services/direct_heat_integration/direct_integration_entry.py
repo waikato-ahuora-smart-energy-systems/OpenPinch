@@ -161,6 +161,7 @@ def compute_direct_integration_targets(
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
             "state_id": sid,
+            "state_idx": idx,
         }
         | area_payload
     )

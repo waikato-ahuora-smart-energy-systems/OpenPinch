@@ -27,6 +27,7 @@ def construct_HPRTargetInputs(
     *,
     is_heat_pumping: bool = True,
     zone_config: Configuration,
+    idx: int = 0,
     debug: bool = False,
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
@@ -92,6 +93,7 @@ def construct_HPRTargetInputs(
         bb_minimiser=zone_config.BB_MINIMISER,
         allow_integrated_expander=zone_config.ALLOW_INTEGRATED_EXPANDER,
         initialise_simulated_cycle=zone_config.INITIALISE_SIMULATED_CYCLE,
+        idx=idx,
     )
 
 

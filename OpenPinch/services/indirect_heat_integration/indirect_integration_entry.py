@@ -96,6 +96,7 @@ def compute_total_subzone_utility_targets(
         ),
         "utility_cost": utility_cost,
         "state_id": sid,
+        "state_idx": idx,
     }
     return TotalProcessTarget.model_validate(output)
 
@@ -180,6 +181,7 @@ def compute_indirect_integration_targets(
             idx=idx,
         ),
         "state_id": sid,
+        "state_idx": idx,
     }
     return TotalSiteTarget.model_validate(output)
 

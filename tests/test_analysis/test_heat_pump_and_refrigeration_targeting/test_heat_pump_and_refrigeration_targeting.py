@@ -7,7 +7,9 @@ import OpenPinch.services.heat_pump_integration as hp_pkg
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
-from OpenPinch.lib.enums import GT, PT, HPRcycle
+from OpenPinch.classes.zone import Zone
+from OpenPinch.lib.config import Configuration
+from OpenPinch.lib.enums import GT, PT, TT, ZT, HPRcycle
 from OpenPinch.lib.schemas.hpr import (
     HPRBackendResult,
     HPRThermoArtifacts,
@@ -18,7 +20,7 @@ from OpenPinch.services.heat_pump_integration import (
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 
-from .helpers import _base_args, _pt_with_hnet
+from .helpers import _base_args, _patch_output_model_validate, _pt_with_hnet
 
 
 @pytest.mark.parametrize(
@@ -174,6 +176,170 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
     np.testing.assert_allclose(out[PT.H_NET_W_AIR], np.array([7.0, 5.0, 4.0, 1.0]))
     np.testing.assert_allclose(out[PT.H_NET_HOT], np.array([2.0, 4.0, 5.0, 8.0]))
     np.testing.assert_allclose(out[PT.H_NET_COLD], np.array([9.0, 7.0, 6.0, 3.0]))
+
+
+def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 60.0],
+            PT.H_NET_A: [1.0, 1.0],
+            PT.H_NET_HOT: [2.0, 2.0],
+            PT.H_NET_COLD: [3.0, 3.0],
+        }
+    )
+    calls = {}
+
+    monkeypatch.setattr(
+        hp,
+        "create_problem_table_with_t_int",
+        lambda **kwargs: (
+            calls.__setitem__("grid_idx", kwargs.get("idx"))
+            or ProblemTable({PT.T: [120.0, 60.0]})
+        ),
+    )
+    monkeypatch.setattr(
+        hp,
+        "get_process_heat_cascade",
+        lambda **kwargs: (
+            calls.__setitem__("air_idx", kwargs.get("idx"))
+            or ProblemTable(
+                {
+                    PT.T: [120.0, 60.0],
+                    PT.H_NET: [0.0, 0.0],
+                    PT.H_NET_HOT: [0.0, 0.0],
+                    PT.H_NET_COLD: [0.0, 0.0],
+                }
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        hp,
+        "get_utility_heat_cascade",
+        lambda **kwargs: (
+            calls.__setitem__("utility_idx", kwargs.get("idx"))
+            or {
+                "T_col": np.array(kwargs["T_int_vals"], dtype=float),
+                "updates": {
+                    PT.H_NET_UT: np.zeros(len(kwargs["T_int_vals"])),
+                    PT.H_HOT_UT: np.zeros(len(kwargs["T_int_vals"])),
+                    PT.H_COLD_UT: np.zeros(len(kwargs["T_int_vals"])),
+                },
+            }
+        ),
+    )
+
+    amb_streams = StreamCollection()
+    amb_streams.add(Stream(name="Air", t_supply=50.0, t_target=80.0, heat_flow=10.0))
+    res = SimpleNamespace(
+        hpr_hot_streams=StreamCollection(),
+        hpr_cold_streams=StreamCollection(),
+        amb_streams=amb_streams,
+    )
+
+    hp._calc_hpr_cascade(
+        pt,
+        res,
+        is_T_vals_shifted=True,
+        is_heat_pumping=True,
+        idx=3,
+    )
+
+    assert calls == {"grid_idx": 3, "air_idx": 3, "utility_idx": 3}
+
+
+def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
+    captured = {}
+    _patch_output_model_validate(monkeypatch)
+
+    monkeypatch.setattr(
+        hp,
+        "construct_HPRTargetInputs",
+        lambda *args, idx=0, **kwargs: (
+            captured.__setitem__("idx", idx) or _base_args(idx=idx)
+        ),
+    )
+    monkeypatch.setitem(
+        hp._HP_PLACEMENT_HANDLERS,
+        HPRcycle.MultiTempCarnot.value,
+        lambda args: SimpleNamespace(to_output_payload=lambda: {"idx": args.idx}),
+    )
+
+    out = hp._get_hpr_targets(
+        Q_hpr_target=50.0,
+        T_vals=np.array([120.0, 80.0]),
+        H_hot=np.array([0.0, -10.0]),
+        H_cold=np.array([10.0, 0.0]),
+        zone_config=SimpleNamespace(HPR_TYPE=HPRcycle.MultiTempCarnot.value),
+        is_heat_pumping=True,
+        idx=2,
+    )
+
+    assert captured["idx"] == 2
+    assert out["idx"] == 2
+
+
+def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypatch):
+    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    zone.targets[TT.TS.value] = SimpleNamespace(pt=ProblemTable({PT.T: [120.0, 60.0]}))
+    calls = {}
+
+    monkeypatch.setattr(hp, "_validate_hpr_required", lambda *args, **kwargs: 25.0)
+    monkeypatch.setattr(
+        hp,
+        "get_process_heat_cascade",
+        lambda **kwargs: (
+            calls.__setitem__("profile_kwargs", kwargs)
+            or ProblemTable(
+                {
+                    PT.T: [120.0, 60.0],
+                    PT.H_NET_HOT: [0.0, -10.0],
+                    PT.H_NET_COLD: [10.0, 0.0],
+                }
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_targets",
+        lambda **kwargs: SimpleNamespace(),
+    )
+    monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
+    monkeypatch.setattr(hp, "_get_hpr_graphs", lambda **kwargs: {})
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_target_summary",
+        lambda res, target_zone: {
+            "hpr_cycle": "stub",
+            "hpr_utility_total": 11.0,
+            "hpr_work": 2.0,
+            "hpr_external_utility": 3.0,
+            "hpr_ambient_hot": 4.0,
+            "hpr_ambient_cold": 5.0,
+            "hpr_cop": 6.0,
+            "hpr_eta_he": 7.0,
+            "hpr_success": True,
+            "hpr_hot_streams": StreamCollection(),
+            "hpr_cold_streams": StreamCollection(),
+            "hpr_details": {},
+        },
+    )
+    monkeypatch.setattr(
+        hp.IndirectHeatPumpTarget,
+        "model_validate",
+        classmethod(lambda cls, value: value),
+    )
+
+    payload = hp.compute_indirect_heat_pump_or_refrigeration_target(
+        zone,
+        is_heat_pumping=True,
+        args={"state_id": "peak", "idx": 1},
+    )
+
+    assert calls["profile_kwargs"]["idx"] == 1
+    assert "state_id" not in calls["profile_kwargs"]
+    assert payload["state_id"] == "peak"
+    assert payload["state_idx"] == 1
 
 
 def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):

@@ -67,6 +67,7 @@ class BaseTargetModel(BaseModel):
 
     zone_name: Optional[str] = Field(default=None, exclude=True, repr=False)
     state_id: Optional[str] = None
+    state_idx: Optional[int] = Field(default=None, exclude=True, repr=False)
     name: str
     type: str
     parent_zone: Any = None
