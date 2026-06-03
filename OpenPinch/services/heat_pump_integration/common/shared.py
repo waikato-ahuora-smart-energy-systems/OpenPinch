@@ -70,7 +70,7 @@ def plot_multi_hp_profiles_from_results(
     hpr_cold_streams: StreamCollection = None,
     idx: int = 0,
     title: str = None,
-) -> "go.Figure":
+) -> "go.Figure": # type: ignore
     """Plot background source/sink profiles alongside solved HPR cycle streams."""
     go = _require_plotly()
     fig = go.Figure()
