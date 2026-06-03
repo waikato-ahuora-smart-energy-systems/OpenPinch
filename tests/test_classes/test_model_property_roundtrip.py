@@ -43,25 +43,25 @@ def test_stream_property_roundtrip_and_mutation_paths():
     s.h_supply = 2_500.0
     s.h_target = 2_000.0
     s.dt_cont = 4.0
-    s.dt_cont_act = 6.0
+    s.dt_cont_multiplier = 1.5
     s.heat_flow = 100.0
     s.htc = 3.0
     s.price = 12.0
     s.active = False
 
     assert s.type == "Hot"
-    assert s.htr == pytest.approx(1.0 / 3.0)
-    assert s.price == 12.0
-    assert s.ut_cost == pytest.approx(1.2)
-    assert s.CP == pytest.approx(100.0 / (160.0 - 95.0))
-    assert s.rCP == pytest.approx((100.0 / (160.0 - 95.0)) / 3.0)
+    assert float(s.htr) == pytest.approx(1.0 / 3.0)
+    assert float(s.price) == pytest.approx(12.0)
+    assert float(s.ut_cost) == pytest.approx(1.2)
+    assert float(s.CP) == pytest.approx(100.0 / (160.0 - 95.0))
+    assert float(s.rCP) == pytest.approx((100.0 / (160.0 - 95.0)) / 3.0)
     assert s.active is False
-    assert s.dt_cont == 4.0
-    assert s.dt_cont_act == 6.0
-    assert s.t_min == 95.0
-    assert s.t_max == 160.0
-    assert s.t_min_star == 89.0
-    assert s.t_max_star == 154.0
+    assert float(s.dt_cont) == pytest.approx(4.0)
+    assert float(s.dt_cont_act) == pytest.approx(6.0)
+    assert float(s.t_min) == pytest.approx(95.0)
+    assert float(s.t_max) == pytest.approx(160.0)
+    assert float(s.t_min_star) == pytest.approx(89.0)
+    assert float(s.t_max_star) == pytest.approx(154.0)
 
 
 def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
@@ -100,7 +100,7 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
     sc2.__setstate__(state)
 
     sc3 = StreamCollection()
-    sc3.replace({"A": st1, "B": st2})
+    sc3.add_many([st1, st2], keys=["A", "B"])
     assert sc3.get_hot_streams() is not None
     assert sc3.get_cold_streams() is not None
 
@@ -170,7 +170,7 @@ def test_target_model_and_zone_property_branches():
     t.num_units = 2
     t.add_graph("g", {"x": 1})
     assert t.graphs["g"] == {"x": 1}
-    assert t.calc_utility_cost() == pytest.approx(14.0)
+    assert float(t.calc_utility_cost()) == pytest.approx(14.0)
 
     t.hot_pinch = 120.0
     t.cold_pinch = 120.0
@@ -248,7 +248,7 @@ def test_target_model_and_zone_property_branches():
     with pytest.warns(Warning):
         z.get_subzone("missing/path")
 
-    assert z.calc_utility_cost() == pytest.approx(14.0)
+    assert float(z.calc_utility_cost()) == pytest.approx(14.0)
 
     parent = Zone(name="Parent")
     child = Zone(name="Child")

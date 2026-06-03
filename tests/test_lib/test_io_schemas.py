@@ -56,15 +56,16 @@ def test_target_input_accepts_stateful_value_payloads():
             {
                 "zone": "Zone A",
                 "name": "H1",
-                "t_supply": {"values": [150.0, 140.0], "unit": "degC"},
+                "t_supply": {
+                    "values": [150.0, 140.0],
+                    "unit": "degC",
+                },
                 "t_target": {
                     "values": [60.0, 55.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 90.0],
-                    "state_ids": ["0", "1"],
                     "unit": "kW",
                 },
             }
@@ -78,7 +79,6 @@ def test_target_input_accepts_stateful_value_payloads():
     assert isinstance(t_supply, StatefulValueWithUnit)
     assert t_supply.values == [150.0, 140.0]
     assert t_supply.unit == "degC"
-    assert t_supply.state_ids is None
     assert isinstance(t_target, StatefulValueWithUnit)
     assert t_target.unit == "degC"
 

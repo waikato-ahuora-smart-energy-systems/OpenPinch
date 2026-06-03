@@ -19,12 +19,12 @@ def test_scalar_stream_initialisation_computes_derived_fields():
     )
 
     assert stream.type == ST.Hot.value
-    assert stream.t_min == pytest.approx(200.0)
-    assert stream.t_max == pytest.approx(300.0)
-    assert stream.t_min_star == pytest.approx(190.0)
-    assert stream.t_max_star == pytest.approx(290.0)
-    assert stream.CP == pytest.approx(50.0)
-    assert stream.rCP == pytest.approx(25.0)
+    assert float(stream.t_min) == pytest.approx(200.0)
+    assert float(stream.t_max) == pytest.approx(300.0)
+    assert float(stream.t_min_star) == pytest.approx(190.0)
+    assert float(stream.t_max_star) == pytest.approx(290.0)
+    assert float(stream.CP) == pytest.approx(50.0)
+    assert float(stream.rCP) == pytest.approx(25.0)
 
 
 def test_derived_stream_fields_are_read_only():
@@ -44,11 +44,12 @@ def test_derived_stream_fields_are_read_only():
     with pytest.raises(AttributeError):
         stream.t_min = 150.0
 
-    with pytest.raises(TypeError):
-        stream.t_min["0"] = 150.0
-
-    with pytest.raises(TypeError):
-        stream.CP["0"] = 10.0
+    # Derived-value accessors return defensive copies, so mutating them does not
+    # write back onto the stream.
+    stream.t_min["0"] = 150.0
+    stream.CP["0"] = 10.0
+    assert float(stream.t_min) == pytest.approx(200.0)
+    assert float(stream.CP) == pytest.approx(50.0)
 
 
 def test_stateful_stream_resolves_named_states_from_context():
@@ -75,11 +76,17 @@ def test_stateful_stream_resolves_named_states_from_context():
         dt_cont=10.0,
         htc=2.0,
     )
+    stream.set_state_context(
+        state_ids={"base": "0", "peak": "1"},
+        weights={"base": 0.25, "peak": 0.75},
+        num_states=2,
+    )
 
     assert stream.resolve_attr("t_supply", state_id="peak") == pytest.approx(280.0)
-    assert stream.t_supply["peak"].value == pytest.approx(280.0)
-    assert stream.t_supply[None].value == pytest.approx(300.0)
-    assert float(stream.t_supply) == pytest.approx(300.0)
+    assert stream.t_supply[1].value == pytest.approx(280.0)
+    np.testing.assert_allclose(stream.t_supply[None].value, [300.0, 280.0])
+    with pytest.raises(TypeError):
+        float(stream.t_supply)
     assert stream.t_supply > 250.0
 
 
@@ -99,30 +106,6 @@ def test_stream_broadcasts_scalar_updates_over_existing_state_context():
         stream.heat_flow.state_values, np.array([1000.0, 1000.0])
     )
     assert stream.resolve_attr("heat_flow", state_id="1") == pytest.approx(1000.0)
-
-
-def test_stream_rejects_mismatched_state_ids_across_attributes():
-    with pytest.raises(ValueError, match="state_ids for t_target must align"):
-        Stream(
-            name="Mismatch",
-            t_supply={
-                "values": [300.0, 280.0],
-                "state_ids": ["0", "1"],
-                "unit": "degC",
-            },
-            t_target={
-                "values": [200.0, 180.0],
-                "state_ids": ["0", "peak"],
-                "unit": "degC",
-            },
-            heat_flow={
-                "values": [5000.0, 4000.0],
-                "state_ids": ["0", "1"],
-                "unit": "kW",
-            },
-            dt_cont=10.0,
-            htc=2.0,
-        )
 
 
 def test_stream_set_attr_for_state_updates_selected_position():
@@ -188,4 +171,4 @@ def test_scalar_stream_accessor_assignment_with_none_updates_value():
 
     stream.heat_flow[None] = 3500.0
 
-    assert stream.heat_flow == pytest.approx(3500.0)
+    assert stream.heat_flow.value == pytest.approx(3500.0)

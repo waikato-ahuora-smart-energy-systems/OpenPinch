@@ -473,7 +473,7 @@ class Stream:
                 self._update_derived_properties()
             return
 
-        parsed, state_ids, weights = self._coerce_to_value(value, internal_name)
+        parsed = self._coerce_to_value(value, internal_name)
         if parsed is None:
             setattr(self, internal_name, None)
             if update_derived:
@@ -485,18 +485,15 @@ class Stream:
                 np.full(int(self._num_states), float(parsed.value), dtype=float),
                 unit=parsed.unit,
             )
+        if self.state_ids is None or (
+            len(self.state_ids) == 1 and len(self.state_ids) != parsed.num_states
+        ):
+            self._num_states = parsed.num_states
+            self._state_ids = {str(i): i for i in range(self._num_states)}
+            self._weights = np.ones(self._num_states, dtype=float)
 
-        if parsed.num_states > 1:
-            self._adopt_or_validate_state_context(
-                state_ids=state_ids,
-                weights=weights,
-                num_states=parsed.num_states,
-                attr_name=internal_name,
-            )
-        elif self._num_states not in (None, 0, 1) and parsed.num_states == 1:
-            # Scalar values are intentionally kept scalar. Broadcast happens when
-            # resolving arrays for calculations or when mutating one state.
-            pass
+        if len(self.state_ids) > 1 and len(self.state_ids) != parsed.num_states:
+            raise ValueError("State IDs length must match the number of states.")
 
         setattr(self, internal_name, parsed)
         self._validate_num_states()
@@ -544,16 +541,9 @@ class Stream:
         if hasattr(raw_value, "model_dump") and not isinstance(raw_value, Mapping):
             raw_value = raw_value.model_dump(mode="python")
 
-        state_ids = None
-        weights = None
         if isinstance(raw_value, Mapping) and self._is_stateful_value_payload(
             raw_value
         ):
-            state_ids = self._normalise_state_ids(raw_value.get("state_ids"))
-            weights = self._normalise_weights(
-                raw_value.get("weights"),
-                expected_len=len(raw_value.get("values") or ()),
-            )
             raw_value = {
                 "values": raw_value.get("values"),
                 "unit": raw_value.get("unit"),
@@ -562,52 +552,10 @@ class Stream:
         parsed = raw_value if isinstance(raw_value, Value) else Value(raw_value)
         target_unit = self._VALUE_UNITS[attr_name]
         if target_unit is None or parsed.unit == target_unit:
-            return parsed, state_ids, weights
+            return parsed
         if len(parsed.unit) == 0:
-            return Value(parsed.value, unit=target_unit), state_ids, weights
-        return parsed.to(target_unit), state_ids, weights
-
-    def _adopt_or_validate_state_context(
-        self,
-        *,
-        state_ids: dict[str, int] | None,
-        weights: np.ndarray | None,
-        num_states: int,
-        attr_name: str,
-    ) -> None:
-        incoming_state_ids = (
-            {str(i): i for i in range(num_states)}
-            if state_ids is None
-            else dict(state_ids)
-        )
-        incoming_weights = (
-            np.ones(num_states, dtype=float) / float(num_states)
-            if weights is None
-            else np.asarray(weights, dtype=float).reshape(-1)
-        )
-        if incoming_weights.size != num_states:
-            raise ValueError("weights length must match the number of states.")
-
-        if self._state_ids is None:
-            self._state_ids = incoming_state_ids
-            self._weights = incoming_weights
-            return
-
-        if dict(self._state_ids) != incoming_state_ids:
-            raise ValueError(
-                f"state_ids for {attr_name.lstrip('_')} must align with the "
-                f"stream state_ids"
-            )
-        if self._weights is not None and not np.allclose(
-            np.asarray(self._weights, dtype=float),
-            incoming_weights,
-            rtol=1e-12,
-            atol=1e-12,
-        ):
-            raise ValueError(
-                f"weights for {attr_name.lstrip('_')} must align with the "
-                f"stream weights"
-            )
+            return Value(parsed.value, unit=target_unit)
+        return parsed.to(target_unit)
 
     def _calculate_missing_properties(self) -> None:
         """Calculate any missing core properties from available data."""
@@ -837,6 +785,10 @@ class Stream:
         self._state_ids = state_ids
         self._weights = weights
         self._num_states = num_states
+        if len(self._state_ids) != len(self._weights):
+            raise ValueError(
+                "Length of state_ids and weights must match eachother in length."
+            )
 
     def _state_vector_size(self) -> int:
         counts = [

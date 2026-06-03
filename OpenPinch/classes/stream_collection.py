@@ -54,14 +54,14 @@ class StreamCollection:
     def __init__(self, streams: List["Stream"] | None = None):
         """Initialise an empty collection sorted by descending supply temperature."""
         self._streams: dict[str, object] = {}
-        self._state_ids: dict[str, int] | None = None
-        self._weights: np.ndarray | None = None
+        self._state_ids: dict[str, int] | None = {"0": 0}
+        self._weights: np.ndarray | None = np.array([1.0])
         self._sort_spec: Tuple[str, Any] = ("attr", "t_supply")
         self._sort_key: Callable = partial(_sort_by_attr, "t_supply")
         self._sort_reverse: bool = True
         self._sorted_cache: List[object] = []
         self._needs_sort: bool = True
-        self._num_states: int | None = None
+        self._num_states: int | None = 1
         if streams is not None:
             self.add_many(streams)
 
@@ -94,6 +94,7 @@ class StreamCollection:
     ) -> str:
         """Insert a stream, optionally renaming the key to avoid collisions."""
         self._validate_stream_state_context(stream)
+        self._adopt_appropriate_state_context(stream, stream)
         base_name = new_name = stream.name
         if key is None:
             key = base_name
@@ -106,12 +107,12 @@ class StreamCollection:
             counter += 1
         stream.name = new_name
         self._streams[key] = stream
-        if self._state_ids is not None and self._weights is not None:
-            stream.set_state_context(
-                weights=self._weights,
-                state_ids=self._state_ids,
-                num_states=self._num_states,
-            )
+
+        stream.set_state_context(
+            weights=self._weights,
+            state_ids=self._state_ids,
+            num_states=self._num_states,
+        )
         self._needs_sort = True
         return key
 
@@ -211,34 +212,9 @@ class StreamCollection:
         self,
         *,
         deep: bool = False,
-        sort_key: Union[str, List[str], Callable, None] = None,
-        reverse: bool | None = None,
     ) -> "StreamCollection":
-        """Return a copy of the collection, optionally deep-copying streams.
-
-        By default the new collection preserves the current sort configuration.
-        Callers may override that with ``sort_key`` and optionally ``reverse``.
-        """
-        copied = StreamCollection()
-        copied._state_ids = self._state_ids
-        copied._weights = self._weights
-        if sort_key is None:
-            copied._sort_spec = self._sort_spec
-            copied._rebuild_sort_key()
-            copied._sort_reverse = self._sort_reverse if reverse is None else reverse
-        else:
-            copied.set_sort_key(
-                sort_key,
-                reverse=self._sort_reverse if reverse is None else reverse,
-            )
-
-        for key, stream in self._streams.items():
-            copied.add(
-                deepcopy(stream) if deep else stream,
-                key=key,
-                prevent_overwrite=False,
-            )
-        return copied
+        """Return a copy of the collection, optionally deep-copying streams."""
+        return deepcopy(self) if deep else copy(self)
 
     def set_state_context(
         self,
@@ -258,81 +234,38 @@ class StreamCollection:
             )
 
     def _validate_stream_state_context(self, stream: "Stream") -> None:
-        state_ids, weights = stream._get_state_context()
-        if self._state_ids is None or state_ids is None:
-            return
-        if dict(state_ids) != dict(self._state_ids):
-            raise ValueError(
-                f"state_ids for stream '{stream.name}' must align "
-                "with the collection to be added."
-            )
         if (
-            weights is not None
-            and self._weights is not None
-            and not np.allclose(
-                np.asarray(weights, dtype=float),
-                np.asarray(self._weights, dtype=float),
-                rtol=1e-12,
-                atol=1e-12,
-            )
+            stream.num_states == self._num_states
+            or stream.num_states == 1
+            or self._num_states == 1
         ):
-            raise ValueError(
-                f"weights for stream '{stream.name}' must align with "
-                "the collection to be added."
-            )
-
-    def validate_state_alignment(
-        self,
-        *,
-        allow_scalar_broadcast: bool = True,
-    ) -> tuple[list[str] | None, np.ndarray | None]:
-        canonical_key: str | None = None
-        canonical_state_ids: dict[str, int] | None = None
-        canonical_weights: np.ndarray | None = None
-
-        for key, stream in self._streams.items():
-            state_ids, weights = stream._get_state_context()
-            if state_ids is None:
-                if allow_scalar_broadcast:
-                    continue
-                raise ValueError(
-                    f"Stream '{key}' is scalar but scalar broadcast is disabled."
-                )
-            if canonical_state_ids is None:
-                canonical_key = key
-                canonical_state_ids = dict(state_ids)
-                canonical_weights = (
-                    np.ones(len(canonical_state_ids), dtype=float)
-                    / float(len(canonical_state_ids))
-                    if weights is None
-                    else np.asarray(weights, dtype=float)
-                )
-                continue
-            if dict(state_ids) != canonical_state_ids:
-                raise ValueError(
-                    f"state_ids for stream '{key}' must align with '{canonical_key}'."
-                )
-            if (
-                weights is not None
-                and canonical_weights is not None
-                and not np.allclose(
-                    np.asarray(weights, dtype=float),
-                    canonical_weights,
-                    rtol=1e-12,
-                    atol=1e-12,
-                )
-            ):
-                raise ValueError(
-                    f"weights for stream '{key}' must align with '{canonical_key}'."
-                )
-
-        self.set_state_context(canonical_state_ids, canonical_weights)
-        return (
-            None if canonical_state_ids is None else list(canonical_state_ids.keys()),
-            None
-            if canonical_weights is None
-            else np.asarray(canonical_weights, dtype=float).copy(),
+            return
+        raise ValueError(
+            f"weights for stream '{stream.name}' must align with "
+            "the collection to be added."
         )
+
+    def _adopt_appropriate_state_context(
+        self, other: "Stream", obj: "StreamCollection" | "Stream"
+    ) -> None:
+        if self._num_states >= other._num_states:
+            obj.set_state_context(
+                state_ids=self._state_ids,
+                weights=self._weights,
+                num_states=self._num_states,
+            )
+        else:
+            if obj is not other and obj is not None:
+                obj.set_state_context(
+                    state_ids=other._state_ids,
+                    weights=other._weights,
+                    num_states=other._num_states,
+                )
+            self.set_state_context(
+                state_ids=other._state_ids,
+                weights=other._weights,
+                num_states=other._num_states,
+            )
 
     def get_index(self, stream) -> int:
         """Return the position (index) of a stream object in the sorted stream list."""
@@ -367,11 +300,22 @@ class StreamCollection:
         if self._state_ids is not None:
             combined.set_state_context(self._state_ids, self._weights, self._num_states)
         elif other._state_ids is not None:
-            combined.set_state_context(other._state_ids, other._weights, other._num_states)
-        if self._state_ids != other._state_ids:
+            combined.set_state_context(
+                other._state_ids, other._weights, other._num_states
+            )
+        if (
+            self._state_ids is not None
+            and other._state_ids is not None
+            and self._state_ids != other._state_ids
+            and self._num_states > 1
+            and other._num_states > 1
+        ):
             raise ValueError(
                 "Cannot combine StreamCollections with different state_ids."
             )
+        else:
+            self._adopt_appropriate_state_context(other, combined)
+
         # Add all streams from self
         for key, stream in self._streams.items():
             combined.add(stream=stream, key=key)

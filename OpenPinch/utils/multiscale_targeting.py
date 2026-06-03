@@ -33,7 +33,7 @@ def extract_results(zone: Zone, state_id: str | None = None) -> dict:
     return {
         "name": zone.name,
         "state_id": state_id,
-        "targets": _get_report(zone),
+        "targets": _get_report(zone, state_id=state_id),
         "utilities": _get_utilities(zone),
         "graphs": get_output_graph_data(zone),
     }
@@ -257,16 +257,19 @@ def _get_regional_targets(
     return zone
 
 
-def _get_report(zone: Zone) -> dict:
+def _get_report(zone: Zone, state_id: str | None = None) -> dict:
     """Creates the database summary of zone targets."""
     targets: List[dict] = []
 
     for target in zone.targets.values():
-        targets.append(target.serialize_json())
+        target_payload = target.serialize_json()
+        if state_id is not None:
+            target_payload["state_id"] = state_id
+        targets.append(target_payload)
 
     if len(zone.subzones) > 0:
         for subzone in zone.subzones.values():
-            targets.extend(_get_report(subzone))
+            targets.extend(_get_report(subzone, state_id=state_id))
 
     return targets
 

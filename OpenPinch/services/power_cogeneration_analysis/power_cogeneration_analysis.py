@@ -29,7 +29,10 @@ def get_power_cogeneration_above_pinch(
 ) -> Zone:
     """Calculate the power cogeneration potential above pinch for a given zone."""
     turbine_params = _prepare_turbine_parameters(zone.config)
-    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
+    idx, sid = get_state_index(
+        state_ids=getattr(zone, "state_ids", None),
+        args=args,
+    )
     utility_data = _preprocess_utilities(zone, turbine_params, idx=idx)
     if utility_data is None:
         return zone

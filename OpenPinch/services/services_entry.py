@@ -163,7 +163,10 @@ def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
         direct_heat_integration_service(zone, args)
     for tt in target_type:
         if tt in zone.targets:
-            get_power_cogeneration_above_pinch(zone.targets[tt], args=args)
+            if isinstance(args, dict):
+                get_power_cogeneration_above_pinch(zone.targets[tt], args=args)
+            else:
+                get_power_cogeneration_above_pinch(zone.targets[tt])
             return zone
     raise ValueError("Load data before running pinch analysis services.")
 

@@ -22,7 +22,7 @@ except Exception:
 Q_ = ureg.Quantity  # type: ignore
 
 _SERIALIZED_SCALAR_KEYS = {"value", "unit"}
-_SERIALIZED_STATEFUL_KEYS = {"values", "weights", "unit"}
+_SERIALIZED_STATEFUL_KEYS = {"values", "state_ids", "weights", "unit"}
 
 
 def _is_value_with_unit(data: Any) -> bool:

@@ -103,6 +103,7 @@ def _base_args(**overrides):
         "eta_penalty": 0.001,
         "rho_penalty": 10.0,
         "debug": False,
+        "idx": 0,
     }
     args.update(overrides)
     args.setdefault("Q_heat_max", float(args["H_cold"][0]))

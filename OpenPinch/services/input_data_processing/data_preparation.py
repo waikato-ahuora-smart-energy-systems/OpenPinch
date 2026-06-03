@@ -108,6 +108,11 @@ def _build_prepared_stream_collection(
 ) -> tuple[StreamCollection, Dict[str, str]]:
     """Build one canonical collection of prepared process and utility streams."""
     process_streams = StreamCollection()
+    process_streams.set_state_context(
+        state_ids=master_zone.state_ids,
+        weights=master_zone.weights,
+        num_states=master_zone.num_states,
+    )
     process_zone_paths: Dict[str, str] = {}
 
     for stream_schema in streams:

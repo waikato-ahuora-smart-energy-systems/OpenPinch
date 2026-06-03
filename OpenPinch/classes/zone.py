@@ -54,16 +54,17 @@ class Zone:
             self._weights = parent_zone._weights
         else:
             self._state_ids = (
-                zone_config.STATE_IDS
-                if isinstance(zone_config.STATE_IDS, dict)
+                {state_id: idx for idx, state_id in enumerate(self._config.STATE_IDS)}
+                if isinstance(self._config.STATE_IDS, list | tuple)
                 else {"0": 0}
             )
             self._num_states = len(self._state_ids)
-            self._weights = (
-                zone_config.WEIGHTS
-                if isinstance(zone_config.WEIGHTS, np.ndarray | list)
-                else np.ones(len(self._state_ids), dtype=float)
-            )
+            if isinstance(self._config.WEIGHTS, np.ndarray | list):
+                if len(self._config.WEIGHTS) == self._num_states:
+                    self._weights = self._config.WEIGHTS
+                else:
+                    self._weights = np.ones(len(self._state_ids), dtype=float)
+
         self._subzones = {}
         self._targets = {}
         self._graphs = {}
@@ -137,6 +138,11 @@ class Zone:
     def weights(self):
         """Canonical state weights for this zone."""
         return self._weights
+
+    @property
+    def num_states(self):
+        """Number of distinct states for this zone."""
+        return self._num_states
 
     @property
     def address(self) -> str:

@@ -263,15 +263,21 @@ def test_zone_active_property_and_duplicate_suffix_increment():
     assert root.active is True
 
     first = Zone("Child")
-    first.hot_streams = [1]
+    first.hot_streams.add(
+        Stream(name="H1", t_supply=120.0, t_target=80.0, heat_flow=10.0)
+    )
     root.add_zone(first, sub=True)
 
     already_taken = Zone("Child_1")
-    already_taken.hot_streams = [9]
+    already_taken.hot_streams.add(
+        Stream(name="H9", t_supply=110.0, t_target=70.0, heat_flow=9.0)
+    )
     root.add_zone(already_taken, sub=True)
 
     duplicate = Zone("Child")
-    duplicate.hot_streams = [2]
+    duplicate.hot_streams.add(
+        Stream(name="H2", t_supply=130.0, t_target=90.0, heat_flow=8.0)
+    )
     root.add_zone(duplicate, sub=True)
 
     assert "Child_2" in root.subzones

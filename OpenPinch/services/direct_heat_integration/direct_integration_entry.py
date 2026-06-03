@@ -284,7 +284,7 @@ def _add_net_segment_stateful(
             t_supply=T_i if curr_u.type == ST.Hot.value else T_ub,
             t_target=T_ub if curr_u.type == ST.Hot.value else T_i,
             heat_flow=dh_curr,
-            dt_cont=float(curr_u.dt_cont_act[idx]),
+            dt_cont=float(curr_u.dt_cont[idx]),
             dt_cont_multiplier=curr_u.dt_cont_multiplier,
             htc=1.0,
             is_process_stream=True,

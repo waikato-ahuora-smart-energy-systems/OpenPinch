@@ -103,7 +103,7 @@ def plot_multi_hp_profiles_from_results(
         T_hpr_arr, H_hpr_hot, H_hpr_cold = _get_hpr_cascade(
             hpr_hot_streams,
             hpr_cold_streams,
-            idx,
+            idx=idx,
         )
         T_hpr_hot, H_hpr_hot = clean_composite_curve_ends(T_hpr_arr, H_hpr_hot)
         T_hpr_cold, H_hpr_cold = clean_composite_curve_ends(T_hpr_arr, H_hpr_cold)
@@ -704,8 +704,10 @@ def _append_unspecified_final_cascade_cooling_duty(Q_cool: np.ndarray) -> np.nda
 def _get_hpr_cascade(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
-    idx: int,
+    *,
+    idx: int = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    idx = idx or 0
     pt = create_problem_table_with_t_int(
         streams=hot_streams + cold_streams,
         is_shifted=False,

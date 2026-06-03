@@ -123,14 +123,15 @@ class PinchProblem:
         sid: str = None,
     ) -> TargetOutput:
         """Run the targeting analysis against the loaded input and cache the result."""
-        execution_master_zone = self._build_execution_master_zone()
+        runtime_options = dict(options or {})
+        sid = runtime_options.get("state_id", sid)
         if not isinstance(zone, Zone):
-            zone = execution_master_zone
+            zone = self._build_execution_master_zone()
         get_targets_for_zone_and_sub_zones(
             zone=zone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
-            args=options,
+            args=runtime_options,
         )
         self._results = TargetOutput.model_validate(extract_results(zone, state_id=sid))
         return self._results
@@ -147,7 +148,7 @@ class PinchProblem:
         sid: str = None,
     ) -> BaseTargetModel:
         runtime_options = dict(options or {})
-        runtime_options["sid"] = sid
+        sid = runtime_options.get("state_id", sid)
         execution_master_zone = self._build_execution_master_zone()
         zone = self._resolve_target_zone(
             application_zone, master_zone=execution_master_zone
@@ -157,13 +158,14 @@ class PinchProblem:
                 zone=zone,
                 direct_service_func=direct_service_func,
                 indirect_service_func=indirect_service_func,
-                options=options,
+                options=runtime_options,
+                sid=sid,
             )
         else:
             if direct_service_func is not None:
-                direct_service_func(zone, options)
+                direct_service_func(zone, runtime_options)
             if indirect_service_func is not None:
-                indirect_service_func(zone, options)
+                indirect_service_func(zone, runtime_options)
             self._results = TargetOutput.model_validate(
                 extract_results(execution_master_zone, state_id=sid)
             )
@@ -202,8 +204,7 @@ class PinchProblem:
     def state_ids(self) -> list[str]:
         """Return the canonical ordered state identifiers for the loaded problem."""
         master_zone = self._require_prepared_root_zone()
-        state_ids = master_zone.all_streams.state_ids
-        return [] if state_ids is None else list(state_ids)
+        return master_zone.state_ids
 
     def target_all_states(
         self,

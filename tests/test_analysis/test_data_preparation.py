@@ -946,10 +946,10 @@ def test_default_utilities_use_zone_effective_dt_cont_multiplier():
     hu = next(utility for utility in area.hot_utilities if utility.name == "HU")
     cu = next(utility for utility in area.cold_utilities if utility.name == "CU")
 
-    assert hu.dt_cont[0] == pytest.approx(area.config.DT_CONT)
-    assert hu.dt_cont_act[0] == pytest.approx(area.config.DT_CONT * 3.0)
-    assert cu.dt_cont[0] == pytest.approx(area.config.DT_CONT)
-    assert cu.dt_cont_act[0] == pytest.approx(area.config.DT_CONT * 3.0)
+    assert float(hu.dt_cont[0]) == pytest.approx(area.config.DT_CONT)
+    assert float(hu.dt_cont_act[0]) == pytest.approx(area.config.DT_CONT * 3.0)
+    assert float(cu.dt_cont[0]) == pytest.approx(area.config.DT_CONT)
+    assert float(cu.dt_cont_act[0]) == pytest.approx(area.config.DT_CONT * 3.0)
 
 
 def test_phase_change_utility_with_null_target_is_completed_near_supply_temperature():
@@ -985,10 +985,10 @@ def test_phase_change_utility_with_null_target_is_completed_near_supply_temperat
     hot_hps = site.hot_utilities[".".join([StreamLoc.HotU.value, "HPS"])]
     cold_hps = site.cold_utilities[".".join([StreamLoc.ColdU.value, "HPS"])]
 
-    assert hot_hps.t_supply[0] == pytest.approx(280.0)
-    assert hot_hps.t_target[0] == pytest.approx(279.99)
-    assert cold_hps.t_supply[0] == pytest.approx(279.99)
-    assert cold_hps.t_target[0] == pytest.approx(280.0)
+    assert float(hot_hps.t_supply[0]) == pytest.approx(280.0)
+    assert float(hot_hps.t_target[0]) == pytest.approx(279.99)
+    assert float(cold_hps.t_supply[0]) == pytest.approx(279.99)
+    assert float(cold_hps.t_target[0]) == pytest.approx(280.0)
 
 
 def test_process_stream_with_null_dt_cont_defaults_to_zero():
@@ -1009,8 +1009,8 @@ def test_process_stream_with_null_dt_cont_defaults_to_zero():
     site = prepare_problem(streams=streams)
     hot_a = next(stream for stream in site.hot_streams if stream.name == "HotA")
 
-    assert hot_a.dt_cont[0] == pytest.approx(0.0)
-    assert hot_a.dt_cont_act[0] == pytest.approx(0.0)
+    assert float(hot_a.dt_cont[0]) == pytest.approx(0.0)
+    assert float(hot_a.dt_cont_act[0]) == pytest.approx(0.0)
 
 
 def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
@@ -1055,8 +1055,8 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
     site = prepare_problem(streams=streams, options=options)
     hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
 
-    assert hu.t_max_star[0] == pytest.approx(210.0)
-    assert hu.t_max_star[1] == pytest.approx(210.0)
+    assert float(hu.t_max_star[0]) == pytest.approx(210.0)
+    assert float(hu.t_max_star[1]) == pytest.approx(210.0)
 
 
 def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
@@ -1067,17 +1067,14 @@ def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
                 "zone": "AreaA",
                 "t_supply": {
                     "values": [40.0, 60.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [150.0, 200.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [120.0, 160.0],
-                    "state_ids": ["0", "1"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1100,8 +1097,8 @@ def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
     site = prepare_problem(streams=streams)
     hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
 
-    assert hu.t_max_star[0] == pytest.approx(210.0)
-    assert hu.t_max_star[1] == pytest.approx(210.0)
+    assert float(hu.t_max_star[0]) == pytest.approx(210.0)
+    assert float(hu.t_max_star[1]) == pytest.approx(210.0)
 
 
 def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
@@ -1112,12 +1109,10 @@ def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
                 "type": "Hot",
                 "t_supply": {
                     "values": [250.0, 400.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [200.0, 350.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "dt_cont": 10.0,
@@ -1132,12 +1127,10 @@ def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
                 "type": "Hot",
                 "t_supply": {
                     "values": [300.0, 310.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [260.0, 270.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "dt_cont": 10.0,
@@ -1162,12 +1155,10 @@ def test_stateful_hot_utility_sorting_uses_selected_state(dummy_streams):
                 "type": "Hot",
                 "t_supply": {
                     "values": [250.0, 400.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [200.0, 350.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "dt_cont": 10.0,
@@ -1182,12 +1173,10 @@ def test_stateful_hot_utility_sorting_uses_selected_state(dummy_streams):
                 "type": "Hot",
                 "t_supply": {
                     "values": [300.0, 310.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [260.0, 270.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "dt_cont": 10.0,
@@ -1391,15 +1380,25 @@ def test_zone_dt_cont_multiplier_changes_only_zone_utility_copies():
 
     area_a.dt_cont_multiplier = 2.0
 
-    assert area_a_hot.dt_cont_act[0] == pytest.approx(area_a_hot.dt_cont[0] * 2.0)
-    assert root_hot_ref is area_a_hot
-    assert root_hot_ref.dt_cont_act[0] == pytest.approx(area_a_hot.dt_cont[0] * 2.0)
-    assert area_b_hot.dt_cont_act[0] == pytest.approx(area_b_hot.dt_cont[0])
-    assert area_a_utility.dt_cont_act[0] == pytest.approx(
-        area_a_utility.dt_cont[0] * 2.0
+    assert float(area_a_hot.dt_cont_act[0]) == pytest.approx(
+        float(area_a_hot.dt_cont[0]) * 2.0
     )
-    assert root_utility.dt_cont_act[0] == pytest.approx(root_utility.dt_cont[0])
-    assert area_b_utility.dt_cont_act[0] == pytest.approx(area_b_utility.dt_cont[0])
+    assert root_hot_ref is area_a_hot
+    assert float(root_hot_ref.dt_cont_act[0]) == pytest.approx(
+        float(area_a_hot.dt_cont[0]) * 2.0
+    )
+    assert float(area_b_hot.dt_cont_act[0]) == pytest.approx(
+        float(area_b_hot.dt_cont[0])
+    )
+    assert float(area_a_utility.dt_cont_act[0]) == pytest.approx(
+        float(area_a_utility.dt_cont[0]) * 2.0
+    )
+    assert float(root_utility.dt_cont_act[0]) == pytest.approx(
+        float(root_utility.dt_cont[0])
+    )
+    assert float(area_b_utility.dt_cont_act[0]) == pytest.approx(
+        float(area_b_utility.dt_cont[0])
+    )
 
 
 def make_stream(zone: str) -> StreamSchema:

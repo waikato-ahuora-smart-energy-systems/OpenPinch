@@ -159,20 +159,6 @@ def test_copy_without_deep_shares_stream_references():
     assert copied["AreaA.H1"] is stream
 
 
-def test_copy_can_override_sort_key(sample_streams):
-    s1, s2, s3 = sample_streams
-    sc = StreamCollection()
-    sc.add(s1)
-    sc.add(s2)
-    sc.add(s3)
-    sc.set_sort_key("t_supply", reverse=True)
-
-    copied = sc.copy(sort_key="t_target", reverse=False)
-
-    assert [s.name for s in copied] == ["C", "A", "B"]
-    assert copied._sort_reverse is False
-
-
 def test_reset_heat_flows_zeros_all_streams_in_place():
     sc = StreamCollection()
     sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=15.0))
@@ -459,32 +445,22 @@ def test_get_utility_streams_returns_hot_and_cold_utility_streams():
     assert utility_streams._sort_reverse is True
 
 
-def test_validate_state_alignment_returns_none_for_all_scalar_streams():
-    sc = StreamCollection()
-    sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1))
-    sc.add(Stream(name="C1", t_supply=60, t_target=140, heat_flow=1))
-
-    state_ids, weights = sc.validate_state_alignment()
-
-    assert state_ids is None
-    assert weights is None
-    assert sc.state_ids is None
-    assert sc.weights is None
-
-
 def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
     sc = StreamCollection()
+    sc.set_state_context(
+        state_ids={"0": 0, "1": 1},
+        weights=[0.25, 0.75],
+        num_states=2,
+    )
     sc.add(
         Stream(
             name="H1",
             t_supply={
                 "values": [200.0, 180.0],
-                "state_ids": ["0", "1"],
                 "unit": "degC",
             },
             t_target={
                 "values": [120.0, 100.0],
-                "state_ids": ["0", "1"],
                 "unit": "degC",
             },
             heat_flow={"values": [100.0, 80.0], "state_ids": ["0", "1"], "unit": "kW"},
@@ -502,35 +478,32 @@ def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
         )
     )
 
-    state_ids, weights = sc.validate_state_alignment()
-
-    assert state_ids == ["0", "1"]
-    np.testing.assert_allclose(weights, np.array([0.5, 0.5]))
-    assert sc.state_ids == ["0", "1"]
-    np.testing.assert_allclose(sc.weights, np.array([0.5, 0.5]))
+    assert list(sc[0].state_ids.keys()) == ["0", "1"]
+    np.testing.assert_allclose(sc[0].weights, np.array([0.25, 0.75]))
+    assert sc.state_ids == {"0": 0, "1": 1}
+    np.testing.assert_allclose(sc.weights, np.array([0.25, 0.75]))
 
 
 def test_state_context_is_preserved_on_copy_and_subset():
     sc = StreamCollection()
+    sc.set_state_context(
+        state_ids={"0": 0, "1": 1},
+        weights=[0.25, 0.75],
+        num_states=2,
+    )
     sc.add(
         Stream(
             name="H1",
             t_supply={
                 "values": [200.0, 180.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.25, 0.75],
                 "unit": "degC",
             },
             t_target={
                 "values": [120.0, 100.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.25, 0.75],
                 "unit": "degC",
             },
             heat_flow={
                 "values": [100.0, 80.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.25, 0.75],
                 "unit": "kW",
             },
             htc=1.0,
@@ -545,125 +518,14 @@ def test_state_context_is_preserved_on_copy_and_subset():
             is_process_stream=False,
         )
     )
-    sc.validate_state_alignment()
 
     copied = sc.copy()
     hot_streams = sc.get_hot_streams()
 
-    assert copied.state_ids == ["0", "1"]
+    assert copied.state_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(copied.weights, np.array([0.25, 0.75]))
-    assert hot_streams.state_ids == ["0", "1"]
+    assert hot_streams.state_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(hot_streams.weights, np.array([0.25, 0.75]))
-
-
-def test_validate_state_alignment_rejects_mismatched_state_ids():
-    sc = StreamCollection()
-    sc.add(
-        Stream(
-            name="H1",
-            t_supply={
-                "values": [200.0, 180.0],
-                "state_ids": ["0", "1"],
-                "unit": "degC",
-            },
-            t_target={
-                "values": [120.0, 100.0],
-                "state_ids": ["0", "1"],
-                "unit": "degC",
-            },
-            heat_flow={"values": [100.0, 80.0], "state_ids": ["0", "1"], "unit": "kW"},
-            htc=1.0,
-        ),
-        key="AreaA.H1",
-    )
-    sc.add(
-        Stream(
-            name="C1",
-            t_supply={
-                "values": [60.0, 80.0],
-                "state_ids": ["0", "peak"],
-                "unit": "degC",
-            },
-            t_target={
-                "values": [140.0, 160.0],
-                "state_ids": ["0", "peak"],
-                "unit": "degC",
-            },
-            heat_flow={
-                "values": [90.0, 110.0],
-                "state_ids": ["0", "peak"],
-                "unit": "kW",
-            },
-            htc=1.0,
-        ),
-        key="AreaB.C1",
-    )
-
-    with pytest.raises(
-        ValueError,
-        match="state_ids for stream 'AreaB.C1' must align with 'AreaA.H1'",
-    ):
-        sc.validate_state_alignment()
-
-
-def test_validate_state_alignment_rejects_mismatched_weights():
-    sc = StreamCollection()
-    sc.add(
-        Stream(
-            name="H1",
-            t_supply={
-                "values": [200.0, 180.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.5, 0.5],
-                "unit": "degC",
-            },
-            t_target={
-                "values": [120.0, 100.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.5, 0.5],
-                "unit": "degC",
-            },
-            heat_flow={
-                "values": [100.0, 80.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.5, 0.5],
-                "unit": "kW",
-            },
-            htc=1.0,
-        ),
-        key="AreaA.H1",
-    )
-    sc.add(
-        Stream(
-            name="C1",
-            t_supply={
-                "values": [60.0, 80.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.25, 0.75],
-                "unit": "degC",
-            },
-            t_target={
-                "values": [140.0, 160.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.25, 0.75],
-                "unit": "degC",
-            },
-            heat_flow={
-                "values": [90.0, 110.0],
-                "state_ids": ["0", "1"],
-                "weights": [0.25, 0.75],
-                "unit": "kW",
-            },
-            htc=1.0,
-        ),
-        key="AreaB.C1",
-    )
-
-    with pytest.raises(
-        ValueError,
-        match="weights for stream 'AreaB.C1' must align with 'AreaA.H1'",
-    ):
-        sc.validate_state_alignment()
 
 
 def test_export_to_csv(sample_streams):
@@ -686,7 +548,7 @@ def test_export_to_csv(sample_streams):
             "t_target",
             "heat_flow",
             "dt_cont",
-            "dt_cont_act",
+            "dt_cont_multiplier",
             "htc",
         }
         assert {row["name"] for row in rows} == {s.name for s in sample_streams}

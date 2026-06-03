@@ -249,11 +249,27 @@ def _is_stateful_value_payload(val: Any) -> bool:
 def get_state_index(state_ids, args: dict) -> Tuple[int, str]:
     sid = None if not isinstance(args, dict) else args.get("state_id")
     if isinstance(state_ids, dict):
-        idx = state_ids[sid] if sid in state_ids.keys() else 0
+        if sid is None:
+            idx = 0
+        elif sid in state_ids.keys():
+            idx = state_ids[sid]
+        else:
+            raise ValueError(
+                f"state_id {sid!r} was not found on this collection. "
+                f"Available states: {', '.join(state_ids.keys())}."
+            )
     elif state_ids:
         lookup = [str(state_id) for state_id in state_ids]
         sid = None if sid is None else str(sid)
-        idx = lookup.index(sid) if sid in lookup else 0
+        if sid is None:
+            idx = 0
+        elif sid in lookup:
+            idx = lookup.index(sid)
+        else:
+            raise ValueError(
+                f"state_id {sid!r} was not found on this collection. "
+                f"Available states: {', '.join(lookup)}."
+            )
     else:
         idx = 0
     return idx, sid

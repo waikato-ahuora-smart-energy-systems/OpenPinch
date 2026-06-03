@@ -29,16 +29,16 @@ def test_stateful_value_stores_only_ordered_magnitudes():
     assert value.to_dict() == {"values": [10.0, 4.0], "unit": "kW"}
 
 
-def test_stateful_value_uses_mean_for_scalar_face():
-    value = Value(values=[10.0, 4.0], unit="kW")
+def test_stateful_value_requires_explicit_summary_for_scalar_face():
+    value = Value([10.0, 4.0], unit="kW")
 
-    assert value.mean_value == pytest.approx(7.0)
-    assert float(value) == pytest.approx(7.0)
-    assert value == 7.0
+    assert value.mean.value == pytest.approx(7.0)
+    with pytest.raises(TypeError):
+        float(value)
 
 
 def test_stateful_value_getitem_is_position_based():
-    value = Value(values=[10.0, 4.0], unit="kW")
+    value = Value([10.0, 4.0], unit="kW")
 
     assert value["0"].value == pytest.approx(10.0)
     assert value[1].value == pytest.approx(4.0)
@@ -54,24 +54,18 @@ def test_value_supports_pytest_approx_comparisons():
 
 
 def test_stateful_arithmetic_requires_matching_state_count():
-    left = Value(values=[10.0, 4.0], unit="kW")
-    right = Value(values=[1.0, 2.0], unit="kW")
+    left = Value([10.0, 4.0], unit="kW")
+    right = Value([1.0, 2.0], unit="kW")
 
     result = left + right
 
     np.testing.assert_allclose(result.state_values, np.array([11.0, 6.0]))
     with pytest.raises(ValueError, match="identical state counts"):
-        _ = left + Value(values=[1.0, 2.0, 3.0], unit="kW")
+        _ = left + Value([1.0, 2.0, 3.0], unit="kW")
 
 
-def test_stateful_value_add_states_appends_magnitudes_only():
-    value = Value(values=[10.0, 4.0], unit="kW")
+def test_stateful_value_slice_preserves_magnitudes():
+    value = Value([10.0, 4.0, 2.0], unit="kW")
 
-    value.add_states(state_id=["ignored"], value=[2.0])
-
-    np.testing.assert_allclose(value.state_values, np.array([10.0, 4.0, 2.0]))
-
-
-def test_stateful_value_rejects_explicit_state_metadata_kwargs():
-    with pytest.raises(TypeError, match="State metadata belongs on Zone, not Value."):
-        Value(values=[10.0, 4.0], unit="kW", state_ids=["base", "peak"])
+    subset = value[1:]
+    np.testing.assert_allclose(subset.state_values, np.array([4.0, 2.0]))

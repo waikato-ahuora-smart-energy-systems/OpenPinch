@@ -376,9 +376,11 @@ def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
     hot_stream = problem.hot_streams["Area1.H1"]
     hot_stream.t_supply = 195.0
 
-    assert problem.hot_streams["Area1.H1"].t_supply == pytest.approx(195.0)
-    assert problem.master_zone.hot_streams["Area1.H1"].t_supply == pytest.approx(195.0)
-    assert hot_stream.t_max == pytest.approx(195.0)
+    assert float(problem.hot_streams["Area1.H1"].t_supply) == pytest.approx(195.0)
+    assert float(problem.master_zone.hot_streams["Area1.H1"].t_supply) == pytest.approx(
+        195.0
+    )
+    assert float(hot_stream.t_max) == pytest.approx(195.0)
 
 
 def test_show_dashboard_builds_graph_payload(monkeypatch):
@@ -1092,7 +1094,7 @@ def test_validate_formats_schema_errors_with_stream_context(tmp_path: Path):
     assert "t_target" in message
 
 
-def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
+def test_validate_normalizes_invalid_utility_temperature_direction(tmp_path: Path):
     payload = {
         "streams": [
             {
@@ -1122,13 +1124,13 @@ def test_validate_rejects_invalid_utility_temperature_direction(tmp_path: Path):
     path = tmp_path / "invalid_utility.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.warns() as exc_info:
-        PinchProblem().load(source=path)
+    problem = PinchProblem()
+    problem.load(source=path)
 
-    message = str(exc_info[0].message)
-    assert "Input validation reported 1 warning(s)" in message
-    assert "Cooling Water" in message
-    assert "0 issue(s)" not in message
+    utility = problem.cold_utilities[0]
+    assert utility.name == "Cooling Water"
+    assert float(utility.t_supply) == pytest.approx(25.0)
+    assert float(utility.t_target) == pytest.approx(35.0)
 
 
 def test_load_allows_missing_optional_utility_and_stream_fields():
@@ -1174,17 +1176,14 @@ def test_load_preserves_stateful_stream_values_on_runtime_streams():
                 "name": "H1",
                 "t_supply": {
                     "values": [150.0, 140.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [60.0, 50.0],
-                    "state_ids": ["0", "1"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 90.0],
-                    "state_ids": ["0", "1"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1199,7 +1198,7 @@ def test_load_preserves_stateful_stream_values_on_runtime_streams():
     problem.load(payload)
     stream = problem.hot_streams[0]
 
-    assert stream.supply_temperature == 150.0
+    assert list(stream.supply_temperature.value) == pytest.approx([150.0, 140.0])
     assert stream.supply_temperature.unit == "°C"
     assert stream.supply_temperature[1].value == pytest.approx(140.0)
     assert stream.supply_temperature[1].unit == "°C"
@@ -1213,17 +1212,14 @@ def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Pa
                 "name": "H1",
                 "t_supply": {
                     "values": [150.0, 140.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [60.0, 140.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 90.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1231,7 +1227,9 @@ def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Pa
             }
         ],
         "utilities": [],
-        "options": {},
+        "options": {
+            "STATE_IDS": ["0", "peak"],
+        },
     }
     path = tmp_path / "stateful_equal_t.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -1240,7 +1238,7 @@ def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Pa
         PinchProblem().load(source=path)
 
     message = str(exc_info.value)
-    assert "Supply and target temperatures must differ for state_id 'peak'" in message
+    assert "Supply and target temperatures must differ for state_id '1'" in message
     assert "Stream 1 'H1'" in message
 
 
@@ -1296,8 +1294,10 @@ def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path
 
     unit = problem.master_zone.get_subzone("Crude Unit")
     updated_stream = next(iter(unit.hot_streams))
-    assert updated_stream.dt_cont == hot_stream.dt_cont
-    assert updated_stream.dt_cont_act == pytest.approx(hot_stream.dt_cont * 0.5)
+    assert float(updated_stream.dt_cont) == pytest.approx(float(hot_stream.dt_cont))
+    assert float(updated_stream.dt_cont_act) == pytest.approx(
+        float(hot_stream.dt_cont) * 0.5
+    )
 
     updated = problem.summary_frame()
     updated_row = updated.loc[
@@ -1326,7 +1326,7 @@ def test_prepared_zone_dt_cont_multiplier_setter_guides_callers_to_problem_api(
     present_value = hot_stream.dt_cont_act
 
     assert former_value != present_value
-    assert present_value == pytest.approx(hot_stream.dt_cont * m)
+    assert float(present_value) == pytest.approx(float(hot_stream.dt_cont) * m)
 
 
 def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
@@ -1358,8 +1358,8 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     cold_utility = next(
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
-    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
-    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT)
+    assert float(cold_utility.dt_cont) == pytest.approx(area.config.DT_CONT)
+    assert float(cold_utility.dt_cont_act) == pytest.approx(area.config.DT_CONT)
     assert len(area.net_hot_streams) > 0
 
     problem.set_dt_cont_multiplier(3.0, zone_name="AreaA")
@@ -1369,13 +1369,15 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     cold_utility = next(
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
-    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
-    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 3.0)
+    assert float(cold_utility.dt_cont) == pytest.approx(area.config.DT_CONT)
+    assert float(cold_utility.dt_cont_act) == pytest.approx(area.config.DT_CONT * 3.0)
     assert len(area.net_hot_streams) > 0
 
     net_stream = area.net_hot_streams[0]
-    assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
-    assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)
+    assert float(net_stream.dt_cont) == pytest.approx(float(cold_utility.dt_cont))
+    assert float(net_stream.dt_cont_act) == pytest.approx(
+        float(cold_utility.dt_cont_act)
+    )
 
 
 def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_streams():
@@ -1411,13 +1413,15 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
 
-    assert cold_utility.dt_cont == pytest.approx(area.config.DT_CONT)
-    assert cold_utility.dt_cont_act == pytest.approx(area.config.DT_CONT * 0.5)
+    assert float(cold_utility.dt_cont) == pytest.approx(area.config.DT_CONT)
+    assert float(cold_utility.dt_cont_act) == pytest.approx(area.config.DT_CONT * 0.5)
     assert len(area.net_hot_streams) > 0
 
     net_stream = area.net_hot_streams[0]
-    assert net_stream.dt_cont == pytest.approx(cold_utility.dt_cont_act)
-    assert net_stream.dt_cont_act == pytest.approx(cold_utility.dt_cont_act)
+    assert float(net_stream.dt_cont) == pytest.approx(float(cold_utility.dt_cont))
+    assert float(net_stream.dt_cont_act) == pytest.approx(
+        float(cold_utility.dt_cont_act)
+    )
 
 
 def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_results():
@@ -1428,17 +1432,14 @@ def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_res
                 "name": "HotA",
                 "t_supply": {
                     "values": [200.0, 220.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [100.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 200.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1449,17 +1450,14 @@ def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_res
                 "name": "ColdA",
                 "t_supply": {
                     "values": [50.0, 60.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [150.0, 170.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [80.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1471,7 +1469,9 @@ def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_res
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {},
+        "options": {
+            "STATE_IDS": ["0", "peak"],
+        },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
@@ -1496,17 +1496,14 @@ def test_direct_heat_integration_rejects_unknown_state_id():
                 "name": "HotA",
                 "t_supply": {
                     "values": [200.0, 220.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [100.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 200.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1518,7 +1515,9 @@ def test_direct_heat_integration_rejects_unknown_state_id():
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {},
+        "options": {
+            "STATE_IDS": ["0", "peak"],
+        },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
@@ -1538,17 +1537,14 @@ def test_problem_exposes_canonical_state_ids():
                 "name": "HotA",
                 "t_supply": {
                     "values": [200.0, 220.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [100.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 200.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1561,12 +1557,12 @@ def test_problem_exposes_canonical_state_ids():
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {},
+        "options": {"STATE_IDS": ["0", "peak"]},
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    assert problem.state_ids == ["0", "peak"]
+    assert list(problem.state_ids.keys()) == ["0", "peak"]
 
 
 def test_target_all_states_runs_each_state_and_preserves_call_order():
@@ -1577,17 +1573,14 @@ def test_target_all_states_runs_each_state_and_preserves_call_order():
                 "name": "HotA",
                 "t_supply": {
                     "values": [200.0, 220.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [100.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 200.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1598,17 +1591,14 @@ def test_target_all_states_runs_each_state_and_preserves_call_order():
                 "name": "ColdA",
                 "t_supply": {
                     "values": [50.0, 60.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [150.0, 170.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [80.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1621,7 +1611,9 @@ def test_target_all_states_runs_each_state_and_preserves_call_order():
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {},
+        "options": {
+            "STATE_IDS": ["0", "peak"],
+        },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
@@ -1642,17 +1634,14 @@ def test_target_all_states_supports_thread_parallel_execution():
                 "name": "HotA",
                 "t_supply": {
                     "values": [200.0, 220.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [100.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [100.0, 200.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1663,17 +1652,14 @@ def test_target_all_states_supports_thread_parallel_execution():
                 "name": "ColdA",
                 "t_supply": {
                     "values": [50.0, 60.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "t_target": {
                     "values": [150.0, 170.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "degC",
                 },
                 "heat_flow": {
                     "values": [80.0, 120.0],
-                    "state_ids": ["0", "peak"],
                     "unit": "kW",
                 },
                 "dt_cont": 10.0,
@@ -1686,7 +1672,9 @@ def test_target_all_states_supports_thread_parallel_execution():
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {},
+        "options": {
+            "STATE_IDS": ["0", "peak"],
+        },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
@@ -1699,6 +1687,5 @@ def test_target_all_states_supports_thread_parallel_execution():
 
 def test_target_all_states_rejects_scalar_only_problems(sample_problem):
     problem = PinchProblem(source=sample_problem, project_name="Site")
-
-    with pytest.raises(ValueError, match="has no canonical state_ids"):
-        problem.target_all_states()
+    results = problem.target_all_states()
+    assert list(results) == ["0"]
