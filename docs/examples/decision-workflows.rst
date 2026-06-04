@@ -8,12 +8,16 @@ Which Workflow Should I Use?
 ----------------------------
 
 ``Can I run a known-good case and inspect the main targets?``
-   Use ``basic_pinch.json`` with :doc:`../guides/first-solve-cli` or
-   :doc:`../guides/first-solve-python`.
+   Use ``basic_pinch.json`` with :doc:`../guides/first-solve-python`. If you
+   want the packaged learning path first, use
+   :doc:`../guides/first-solve-cli` to copy notebook 01, then solve inside
+   Python from that notebook.
 
 ``How sensitive is the answer to my minimum approach assumptions?``
    Use ``crude_preheat_train.json`` and
-   ``01_basic_pinch_and_dtcont_sensitivity.ipynb``.
+   ``01_basic_pinch_and_dtcont_sensitivity.ipynb``. The notebook uses
+   ``PinchWorkspace.copy_case(...)`` and ``set_dt_cont_multiplier(...)`` to
+   keep the comparison explicit.
 
 ``How do multiple process areas aggregate into a site view?``
    Use ``zonal_site.json`` or ``pulp_mill.json`` together with
@@ -29,7 +33,9 @@ Which Workflow Should I Use?
 
 ``How do I compare direct and indirect HPR or refrigeration targets?``
    Use ``chocolate_factory.json`` and
-   ``03_carnot_hpr_comparison.ipynb``.
+   ``03_carnot_hpr_comparison.ipynb``. That workflow stays on the public
+   ``problem.target.*`` and ``problem.plot.*`` surfaces rather than lower-level
+   cycle internals.
 
 ``I need a typed request/response service contract, not a notebook wrapper.``
    Start from :doc:`../api/service-layer` and

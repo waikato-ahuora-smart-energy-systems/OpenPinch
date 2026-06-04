@@ -9,7 +9,6 @@ inputs programmatically.
 from . import config, enums, problem_table_types, schemas
 from .config import ACTIVATE_TIMING, LOG_TIMING, T_CRIT, C_to_K, Configuration, tol
 from .enums import (
-    CogenerationTarget,
     GT,
     PT,
     SD,
@@ -19,6 +18,7 @@ from .enums import (
     ZT,
     ArrowHead,
     BB_Minimiser,
+    CogenerationTarget,
     GraphType,
     HeatExchangerTypes,
     HeatFlowUnits,

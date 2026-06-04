@@ -292,7 +292,8 @@ def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone
 
 
 def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
-    """Post-process one compatible target in TS -> IHP -> IR -> DHP -> DR -> DI order."""
+    """Post-process one compatible target in
+    TS -> IHP -> IR -> DHP -> DR -> DI order."""
     _apply_zone_config_overrides(zone, args)
     runtime_args = dict(args or {})
     explicit_target_type = _normalize_cogeneration_base_target_type(

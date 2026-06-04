@@ -3,23 +3,39 @@ PinchProblem
 
 :class:`OpenPinch.classes.pinch_problem.PinchProblem` is the primary
 single-case interface in the package. It owns the source inputs, validated
-problem data, prepared zone tree, solved targets, graph exports, and several
-advanced post-processing helpers.
+problem data, prepared zone tree, solved targets, graph exports, stateful
+reruns, and several advanced post-processing helpers.
 
 When To Use It
 --------------
 
 Use ``PinchProblem`` when you want:
 
-- support for JSON, workbook, or CSV-bundle inputs
+- support for JSON, workbook, CSV-bundle, packaged sample-case, or in-memory
+  inputs
 - one object that keeps both the original case and the solved result state
 - compact and detailed summary tables
 - graph building and graph export without manually wiring result payloads
 - notebook-friendly advanced workflows such as HPR screening or
   ``dt_cont`` sensitivity studies
+- selected-state reruns through ``state_id`` and batch reruns through
+  ``target_all_states()``
 
 Use :doc:`pinchworkspace` instead when the study itself needs to keep multiple
 named cases and compare them over time.
+
+Supported Sources
+-----------------
+
+``PinchProblem`` accepts these load shapes:
+
+- ``TargetInput`` or plain mappings
+- JSON files
+- Excel files such as ``.xlsx`` and ``.xlsb``
+- a directory with ``streams.csv`` and ``utilities.csv``
+- a ``(streams_csv, utilities_csv)`` tuple
+- a packaged sample-case name such as ``basic_pinch.json`` when no local file
+  with that name exists
 
 Lifecycle
 ---------
@@ -30,7 +46,8 @@ The typical lifecycle is:
 2. call :meth:`load` or pass the source at construction time
 3. call :meth:`validate` if you want a preflight check
 4. call :meth:`target`
-5. inspect summaries, graphs, exports, or the prepared ``master_zone``
+5. inspect summaries, graphs, exports, state-specific reruns, or the prepared
+   ``master_zone``
 
 When the source is a bare ``*.json`` filename and no local file exists,
 ``PinchProblem`` also resolves packaged sample cases such as
@@ -41,7 +58,22 @@ Core Workflow Members
 
 The main user-facing workflow members are ``load()``, ``validate()``,
 ``target()``, ``summary_frame()``, ``export_excel()``, ``compare_to()``,
-``set_dt_cont_multiplier()``, and ``show_dashboard()``.
+``set_dt_cont_multiplier()``, ``update_options()``, ``target_all_states()``,
+and ``show_dashboard()``.
+
+Stateful Workflows
+------------------
+
+When the prepared data contains multiple states, the main stateful surfaces are:
+
+- ``state_ids`` for the canonical ``state_id -> idx`` mapping
+- named ``problem.target.*(..., state_id="peak")`` reruns
+- ``target_all_states(parallel=False | True | "thread" | "process")`` for
+  batch solves across every canonical state
+
+State selection happens at targeting time, not at load time. The cached result,
+summary frame, export surface, and graph payload then reflect the selected
+state.
 
 Advanced Entry Points
 ---------------------
@@ -59,8 +91,24 @@ Two descriptor families make ``PinchProblem`` broader than a simple wrapper:
    input data carries stateful values, and the refreshed summary/export surfaces
    then expose that selected state on the result rows.
 
+Named target methods also accept ``zone_name=...`` and
+``include_subzones=True`` when you want one zone-level or subtree-level rerun
+instead of the default root-case solve.
+
 Those accessors are the high-level path into the package's deeper analytical
 power without dropping all the way to the raw service modules.
+
+Output and Inspection Surfaces
+------------------------------
+
+After solving, the main read and export surfaces are:
+
+- ``summary_frame()`` for compact or detailed pandas views
+- ``problem.plot.catalog()`` for the available graph inventory
+- ``problem.plot.*`` for Plotly figures and raw graph payloads
+- ``problem.plot.export(...)`` for standalone HTML graph files
+- ``export_excel(...)`` for workbook output
+- ``show_dashboard()`` for the Streamlit-based review surface
 
 PinchProblem API
 ----------------

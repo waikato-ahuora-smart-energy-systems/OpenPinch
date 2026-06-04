@@ -164,7 +164,10 @@ class _TargetAccessor:
         include_subzones: bool = False,
         state_id: Optional[str] = None,
     ) -> BaseTargetModel:
-        """Run cogeneration on `TS -> IHP -> IR -> DHP -> DR -> DI` unless overridden."""
+        """
+        Run cogeneration on `TS -> IHP -> IR -> DHP -> DR -> DI`
+        unless overridden.
+        """
         runtime_options = dict(options or {})
         if state_id is not None:
             runtime_options["state_id"] = state_id

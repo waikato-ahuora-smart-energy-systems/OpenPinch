@@ -43,6 +43,10 @@ prepared zones, direct service orchestration, or lower-level targeting
 algorithms, move down into the pages under :doc:`service-layer` and
 :doc:`domain-model`.
 
+It is also a Python-first surface. The package root does not hide the fact that
+real solves, comparisons, exports, and advanced targeting happen through Python
+objects even though the project also ships packaged learning notebooks.
+
 Root Exports
 ------------
 

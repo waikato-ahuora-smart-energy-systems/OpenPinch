@@ -600,8 +600,8 @@ def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
 def test_execute_cogeneration_targeting_returns_selected_target_family():
     from OpenPinch.classes.problem_table import ProblemTable
     from OpenPinch.lib.config import Configuration
-    from OpenPinch.lib.enums import ProblemTableLabel as PT
     from OpenPinch.lib.enums import TT, ZT
+    from OpenPinch.lib.enums import ProblemTableLabel as PT
     from OpenPinch.lib.schemas.targets import (
         DirectIntegrationTarget,
         TotalSiteTarget,
