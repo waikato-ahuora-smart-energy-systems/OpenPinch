@@ -54,8 +54,13 @@ The packaged notebook series currently includes:
 - `01_basic_pinch_and_dtcont_sensitivity.ipynb`
 - `02_total_site_targets_and_sugcc.ipynb`
 - `03_carnot_hpr_comparison.ipynb`
+- `04_multistate_targeting_and_state_comparison.ipynb`
+- `05_schema_service_and_output_workflows.ipynb`
 
-These notebooks are intended to be the main learning path for new users.
+These notebooks are intended to be the main learning path for new users. The
+series now spans the single-case `PinchProblem` front door, named
+`PinchWorkspace` studies, real multistate targeting, and the typed/service plus
+serialized-workspace boundaries.
 
 
 ## Python Workflow
@@ -72,17 +77,24 @@ problem.target()
 summary = problem.summary_frame()
 print(summary)
 
-selected_state = problem.target.direct_heat_integration(state_id="peak")
-state_summary = problem.summary_frame()
-print(state_summary[["Target", "State ID", "Hot Utility Target", "Cold Utility Target"]])
-
 problem.export_excel("results")
 problem.plot.export("graphs", graph_type="gcc")
 ```
 
-When the PinchProblem data contains stateful values, the named ``problem.target.*``
-entry points also accept ``state_id=...`` so one cached solve can be refreshed
-for a selected operating state without flattening the in-memory model first.
+When the PinchProblem data contains stateful values, the named
+`problem.target.*` entry points also accept `state_id=...` so one cached solve
+can be refreshed for a selected operating state without flattening the
+in-memory model first:
+
+```python
+multi_state_problem = PinchProblem(
+    "crude_preheat_train_multistate.json",
+    project_name="crude_multistate",
+)
+selected_state = multi_state_problem.target.direct_heat_integration(state_id="peak")
+state_summary = multi_state_problem.summary_frame()
+print(state_summary[["Target", "State ID", "Hot Utility Target", "Cold Utility Target"]])
+```
 
 For named study cases and bundle save/load, use `PinchWorkspace`:
 

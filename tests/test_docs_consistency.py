@@ -12,11 +12,16 @@ NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
 HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
 INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
 GUIDE_FIRST_SOLVE_CLI = REPO_ROOT / "docs" / "guides" / "first-solve-cli.rst"
+GUIDE_NOTEBOOKS_AND_CASES = (
+    REPO_ROOT / "docs" / "guides" / "notebooks-and-sample-cases.rst"
+)
 GUIDE_EXPORTING_RESULTS = REPO_ROOT / "docs" / "guides" / "exporting-results.rst"
 GUIDE_GRAPHING = REPO_ROOT / "docs" / "guides" / "graphing-and-interpretation.rst"
 FUNDAMENTALS_GRAPHS = (
     REPO_ROOT / "docs" / "fundamentals" / "graphs-and-interpretation.rst"
 )
+EXAMPLE_NOTEBOOK_SERIES = REPO_ROOT / "docs" / "examples" / "notebook-series.rst"
+EXAMPLE_SAMPLE_CASES = REPO_ROOT / "docs" / "examples" / "sample-cases.rst"
 OVERVIEW_CAPABILITY_MATRIX = REPO_ROOT / "docs" / "overview" / "capability-matrix.rst"
 OVERVIEW_SUPPORT = REPO_ROOT / "docs" / "overview" / "support-and-stability.rst"
 API_PINCHWORKSPACE = REPO_ROOT / "docs" / "api" / "pinchworkspace.rst"
@@ -49,7 +54,7 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "show_dashboard()" in combined
     assert "plot.grand_composite_curve" in combined
     assert "problem.target.direct_heat_pump" in combined
-    assert 'state_id="peak"' in combined or 'state_id="0"' in combined
+    assert 'state_id="peak"' in combined or 'state_id="winter"' in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():
@@ -105,14 +110,43 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
     assert "03_carnot_hpr_comparison.ipynb" in combined
 
 
-def test_docs_reference_the_current_three_notebook_series():
-    combined = "\n".join([_read(README), _read(QUICKSTART), _read(NOTEBOOKS)])
+def test_docs_reference_the_current_five_notebook_series():
+    combined = "\n".join(
+        [
+            _read(README),
+            _read(QUICKSTART),
+            _read(NOTEBOOKS),
+            _read(GUIDE_FIRST_SOLVE_CLI),
+            _read(GUIDE_NOTEBOOKS_AND_CASES),
+            _read(EXAMPLE_NOTEBOOK_SERIES),
+        ]
+    )
     assert "01_basic_pinch_and_dtcont_sensitivity.ipynb" in combined
     assert "02_total_site_targets_and_sugcc.ipynb" in combined
     assert "03_carnot_hpr_comparison.ipynb" in combined
+    assert "04_multistate_targeting_and_state_comparison.ipynb" in combined
+    assert "05_schema_service_and_output_workflows.ipynb" in combined
     assert "01_basic_pinch_analysis.ipynb" not in combined
     assert "06_target_services_workflow.ipynb" not in combined
-    assert "selected-state" in combined or 'state_id="' in combined
+    assert "multistate" in combined or 'state_id="' in combined
+
+
+def test_docs_reference_current_packaged_sample_cases():
+    combined = "\n".join(
+        [
+            _read(GUIDE_NOTEBOOKS_AND_CASES),
+            _read(EXAMPLE_SAMPLE_CASES),
+        ]
+    )
+
+    assert "basic_pinch.json" in combined
+    assert "crude_preheat_train.json" in combined
+    assert "crude_preheat_train_multistate.json" in combined
+    assert "zonal_site.json" in combined
+    assert "zonal_site_multistate.json" in combined
+    assert "pulp_mill.json" in combined
+    assert "heat_pump_targeting.json" in combined
+    assert "chocolate_factory.json" in combined
 
 
 def test_docs_explain_base_and_notebook_installs():

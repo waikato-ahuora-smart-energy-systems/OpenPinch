@@ -9,11 +9,12 @@ This page has moved, but the packaged notebook workflow still depends on
 - ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
 - ``02_total_site_targets_and_sugcc.ipynb``
 - ``03_carnot_hpr_comparison.ipynb``
+- ``04_multistate_targeting_and_state_comparison.ipynb``
+- ``05_schema_service_and_output_workflows.ipynb``
 
-These notebooks now load bundled cases directly with
-``PinchWorkspace(source="sample_case.json", ...)`` and then use real
-``PinchProblem`` cases for targeting, plotting, comparison, and selected-state
-workflow calls such as ``problem.target.direct_heat_integration(state_id="0")``.
+These notebooks now span the main single-case ``PinchProblem`` workflow, named
+``PinchWorkspace`` studies, real multistate targeting, and the typed/service
+and serialized workspace boundaries.
 
 Use these pages instead:
 

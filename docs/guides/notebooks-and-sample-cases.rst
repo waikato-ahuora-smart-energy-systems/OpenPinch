@@ -19,12 +19,14 @@ Packaged Sample Cases
 
 OpenPinch currently ships with sample cases such as:
 
-- `basic_pinch.json`
-- `heat_pump_targeting.json`
-- `zonal_site.json`
-- `pulp_mill.json`
-- `crude_preheat_train.json`
-- `chocolate_factory.json`
+- ``basic_pinch.json``
+- ``crude_preheat_train.json``
+- ``crude_preheat_train_multistate.json``
+- ``zonal_site.json``
+- ``zonal_site_multistate.json``
+- ``pulp_mill.json``
+- ``heat_pump_targeting.json``
+- ``chocolate_factory.json``
 
 Use the resource helpers when you want to inspect or copy them explicitly:
 
@@ -48,12 +50,13 @@ name exists. That rule is intentional so local files always win.
 Packaged Notebook Series
 ------------------------
 
-The current packaged notebooks load bundled sample cases directly with
-``PinchWorkspace(source="sample_case.json", ...)`` and then work against real
-``PinchProblem`` cases inside the workspace. They are packaged as clean sources:
-no stored Plotly payloads, no cached execution counts, and no stale traceback
-output. The examples also stay on the public selected-state workflow surface,
-for example ``problem.target.direct_heat_integration(state_id="0")``.
+The current packaged notebooks stay on the stable public surfaces while using
+real packaged cases or real derivatives of those cases. Notebook 01 starts from
+``PinchProblem``, notebooks 01 to 03 use ``PinchWorkspace`` where named study
+cases matter, notebook 04 covers named-state targeting, and notebook 05 covers
+the typed and serialized boundaries. The distributed assets are packaged as
+clean sources: no stored Plotly payloads, no cached execution counts, and no
+stale traceback output.
 
 Copy the full series with:
 
@@ -78,26 +81,32 @@ From Python you can also access the same notebook asset helpers directly:
 
 Current packaged notebooks:
 
-1. `01_basic_pinch_and_dtcont_sensitivity.ipynb`
-2. `02_total_site_targets_and_sugcc.ipynb`
-3. `03_carnot_hpr_comparison.ipynb`
+1. ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
+2. ``02_total_site_targets_and_sugcc.ipynb``
+3. ``03_carnot_hpr_comparison.ipynb``
+4. ``04_multistate_targeting_and_state_comparison.ipynb``
+5. ``05_schema_service_and_output_workflows.ipynb``
 
-Notebook 03 also shows the post-target HPR graph surfaces directly through
-``problem.plot.net_load_profiles(zone_name="Direct Heat Pump")`` and
-``problem.plot.grand_composite_curve_with_heat_pump(...)``.
+Notebook 04 shows the named-state workflow directly through
+``problem.target.direct_heat_integration(state_id="peak")`` and
+``problem.target.indirect_heat_integration(state_id="winter")``. Notebook 05
+shows the typed ``TargetInput`` boundary and the serialized
+``PinchWorkspace`` view layer.
 
 Recommended Learning Path
 -------------------------
 
-1. `basic_pinch.json` and notebook 01 for baseline workflow and `dt_cont`
-   interpretation
-2. `zonal_site.json` or `pulp_mill.json` and notebook 02 for Total Site and
-   SUGCC workflows
-3. `chocolate_factory.json` and notebook 03 for direct-versus-indirect HPR and
-   refrigeration comparison
-4. `heat_pump_targeting.json` for smaller direct HPR screening input data when
-   you want to test the advanced `problem.target.*` surface without the full
-   notebook comparison flow
+1. ``basic_pinch.json`` and notebook 01 for the single-case workflow and
+   ``dt_cont`` interpretation.
+2. ``zonal_site.json`` or ``pulp_mill.json`` and notebook 02 for Total Site
+   and SUGCC workflows.
+3. ``chocolate_factory.json`` and notebook 03 for
+   direct-versus-indirect HPR and refrigeration comparison.
+4. ``crude_preheat_train_multistate.json`` and
+   ``zonal_site_multistate.json`` with notebook 04 for real named-state
+   comparison.
+5. ``basic_pinch.json`` and notebook 05 when you need typed validation,
+   exports, or serialized workspace views.
 
 Why These Assets Matter
 -----------------------
