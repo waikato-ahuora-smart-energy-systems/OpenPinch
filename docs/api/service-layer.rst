@@ -39,12 +39,37 @@ Preparation Entry Point
 The preparation stage is the key boundary between external inputs and the
 internal model. It validates configuration choices, builds the zone tree,
 applies ``dt_cont`` multipliers, instantiates process and utility streams, and
-produces the ``Zone`` object consumed by the solver stack. For stateful
-inputs, ``prepare_problem(..., state_id="peak")`` builds a selected-state
-execution context while keeping the stream/value objects state-aware in memory.
+produces the ``Zone`` object consumed by the solver stack.
+
+Stateful inputs remain state-aware after preparation, but state selection does
+not happen inside ``prepare_problem(...)``. Instead, the selected state is
+applied later through the targeting-service ``args`` dictionaries or the higher
+level ``problem.target.*(..., state_id=...)`` wrappers.
 
 .. autofunction:: OpenPinch.services.input_data_processing.data_preparation.prepare_problem
    :no-index:
+
+Typical Preparation and Solve Pattern
+-------------------------------------
+
+.. code-block:: python
+
+   from OpenPinch.lib.schemas.io import TargetInput
+   from OpenPinch.services import (
+       data_preprocessing_service,
+       direct_heat_integration_service,
+       indirect_heat_integration_service,
+   )
+
+   input_data = TargetInput.model_validate(payload)
+   zone = data_preprocessing_service(input_data, project_name="Example")
+
+   direct_heat_integration_service(zone, {"state_id": "peak"})
+   indirect_heat_integration_service(zone, {"state_id": "peak"})
+
+Each targeting service mutates the prepared zone in place, records the
+requested state metadata on the zone, and adds or refreshes the corresponding
+target model.
 
 Direct High-Level Orchestration
 -------------------------------

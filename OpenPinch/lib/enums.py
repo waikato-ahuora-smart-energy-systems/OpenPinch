@@ -1,10 +1,27 @@
-"""Enumerations defining canonical labels across OpenPinch.
+"""Enumerations and lightweight typed contracts used across OpenPinch.
 
 These enums standardize zone types, stream classifications, Problem Table
 column names, graph labels, and options keys used by configuration and schemas.
 """
 
+from __future__ import annotations
+
 from enum import Enum
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from ..classes.stream_collection import StreamCollection
+    from .config import Configuration
+
+
+class CogenerationTarget(Protocol):
+    """Compatible target surface required by cogeneration analysis helpers."""
+
+    config: Configuration
+    hot_utilities: StreamCollection
+    work_target: float | None
+    turbine_efficiency_target: float | None
+    state_ids: dict[str, int] | None
 
 
 class ZoneType(Enum):
@@ -286,6 +303,7 @@ class BB_Minimiser(str, Enum):
 __all__ = [
     "ArrowHead",
     "BB_Minimiser",
+    "CogenerationTarget",
     "GraphType",
     "GT",
     "HeatExchangerTypes",

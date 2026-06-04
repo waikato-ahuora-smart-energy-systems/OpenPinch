@@ -29,6 +29,12 @@ The main user-facing route is:
    problem.target()
    cogeneration_target = problem.target.cogeneration()
 
+By default, ``problem.target.cogeneration()`` resolves the first compatible
+target family in this order:
+``Total Site -> Indirect Heat Pump -> Indirect Refrigeration -> Direct Heat Pump -> Direct Refrigeration -> Direct Integration``.
+To pin one exact family and disable fallback, pass
+``options={"base_target_type": "..."}``.
+
 Configuration
 -------------
 

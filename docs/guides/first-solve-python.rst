@@ -2,6 +2,8 @@ First Solve with Python
 =======================
 
 The main Python single-case front door is :class:`OpenPinch.PinchProblem`.
+It is the supported object when you want one place for loading, validation,
+solving, summaries, graphs, exports, and advanced target reruns.
 
 Question This Guide Answers
 ---------------------------
@@ -17,6 +19,15 @@ Step 1. Load a Known-Good Sample
    from OpenPinch import PinchProblem
 
    problem = PinchProblem("basic_pinch.json", project_name="basic_pinch")
+
+If no local file named ``basic_pinch.json`` exists, this resolves the packaged
+sample case that ships with the wheel. The same wrapper also accepts:
+
+- JSON files
+- Excel workbooks such as ``.xlsx`` or ``.xlsb``
+- a directory containing ``streams.csv`` and ``utilities.csv``
+- a ``(streams_csv, utilities_csv)`` tuple
+- an in-memory ``TargetInput`` or plain mapping
 
 Step 2. Validate and Run
 ------------------------
@@ -51,12 +62,33 @@ Step 4. Inspect Graphs
 
    gcc = problem.plot.grand_composite_curve()
    cc = problem.plot.composite_curve()
+   catalog = problem.plot.catalog()
 
 Use the GCC first when utility placement or Heat Pump opportunity is the main
 question. These rendered Plotly figures require the ``openpinch[notebook]`` or
 ``openpinch[dashboard]`` extra.
 
-Step 5. Export Artifacts
+Step 5. Work With Selected States
+---------------------------------
+
+When a case carries stateful values, the wrapper exposes both the canonical
+state lookup and state-specific reruns:
+
+.. code-block:: python
+
+   print(problem.state_ids)
+
+   peak_target = problem.target.direct_heat_integration(state_id="peak")
+   peak_summary = problem.summary_frame()
+   print(peak_summary[["Target", "State ID", "Hot Utility Target"]])
+
+   all_state_results = problem.target_all_states(parallel="thread")
+   print(all_state_results.keys())
+
+The named ``problem.target.*`` entry points accept ``state_id=...``. The
+returned summary, export, and graph surfaces then reflect that selected state.
+
+Step 6. Export Artifacts
 ------------------------
 
 .. code-block:: python
@@ -67,7 +99,7 @@ Step 5. Export Artifacts
 These Excel and Plotly export hooks require the ``openpinch[notebook]`` or
 ``openpinch[dashboard]`` extra.
 
-Step 6. Use the Richer Workflow Hooks
+Step 7. Use the Richer Workflow Hooks
 -------------------------------------
 
 `PinchProblem` also exposes:
@@ -82,16 +114,6 @@ Step 6. Use the Richer Workflow Hooks
 
 These are best treated as explicit advanced workflows after you understand the
 base case.
-
-When the input data contains stateful values, the named targeting entry
-points also accept ``state_id`` so you can rerun one selected operating state
-without flattening the prepared model up front:
-
-.. code-block:: python
-
-   peak_target = problem.target.direct_heat_integration(state_id="peak")
-   peak_summary = problem.summary_frame()
-   print(peak_summary[["Target", "State ID", "Hot Utility Target"]])
 
 Named Multi-Case Alternative
 ----------------------------
@@ -111,6 +133,9 @@ When you want one notebook or script to keep named study cases together, use
    workspace.copy_case("baseline", "wide_dt", activate=False)
    workspace.set_dt_cont_multiplier(0.5, case_name="wide_dt")
    comparison = workspace.compare_cases("baseline", "wide_dt")
+
+Use ``PinchWorkspace`` when the study itself needs to remember multiple cases.
+Stay on ``PinchProblem`` when you only need one case at a time.
 
 Schema-First Alternative
 ------------------------

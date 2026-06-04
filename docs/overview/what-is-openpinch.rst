@@ -4,14 +4,18 @@ What Is OpenPinch?
 OpenPinch is a process-integration toolkit for thermal targeting studies. It
 combines classical pinch analysis workflows with Total Site utility
 integration, graph generation, and optional advanced workflows such as heat
-pump integration screening and turbine cogeneration analysis.
+pump and refrigeration screening plus turbine cogeneration analysis.
 
-The package is designed to support three working styles:
+The package is built around one numerical engine but exposed through several
+distinct user surfaces:
 
-- command-line workflows for quick validation, run, and export tasks
-- notebook and script workflows built around
-  :class:`OpenPinch.PinchProblem` and :class:`OpenPinch.PinchWorkspace`
-- programmatic service workflows built around validated schema inputs
+- :class:`OpenPinch.PinchProblem` for one case at a time
+- :class:`OpenPinch.PinchWorkspace` for named case studies and bundle
+  persistence
+- :func:`OpenPinch.main.pinch_analysis_service` for typed request/response
+  integration
+- :mod:`OpenPinch.resources` plus ``openpinch notebook`` for packaged learning
+  assets
 
 Technical Scope
 ---------------
@@ -27,35 +31,35 @@ OpenPinch answers questions such as:
   picture?
 - How much above Pinch or below Pinch turbine work is theoretically available?
 
-Core Product Shape
-------------------
+Primary Product Shape
+---------------------
 
-At a high level, the package turns validated inputs into a solved target set:
+At a high level, the codebase turns validated inputs into a solved target set:
 
 .. code-block:: text
 
-   TargetInput / file input
-           |
-           v
-     validation + preparation
-           |
-           v
-        Zone hierarchy
-           |
-           v
-     direct / indirect targeting
-           |
-           +--> graphs
-           +--> summaries
-           +--> Excel export
-           +--> dashboard views
+   TargetInput / JSON / Excel / CSV
+               |
+               v
+     validation + normalization
+               |
+               v
+       prepared Zone hierarchy
+               |
+               +--> direct heat integration
+               +--> indirect / Total Site targeting
+               +--> HPR targeting
+               +--> cogeneration post-processing
+               |
+               v
+   TargetOutput + summaries + graphs + export payloads
 
 The same underlying analysis engine can be reached through:
 
 - :class:`OpenPinch.PinchProblem`
 - :class:`OpenPinch.PinchWorkspace`
 - :func:`OpenPinch.main.pinch_analysis_service`
-- the ``openpinch`` CLI
+- lower-level service helpers under :mod:`OpenPinch.services`
 - packaged sample cases and notebooks
 
 Who This Documentation Serves
@@ -73,13 +77,32 @@ Integrators and contributors
    Users embedding OpenPinch into larger software or extending the package
    internals.
 
+What The Codebase Treats As Public
+----------------------------------
+
+For most users, the supported public surfaces are:
+
+- :class:`OpenPinch.PinchProblem`
+- :class:`OpenPinch.PinchWorkspace`
+- :func:`OpenPinch.main.pinch_analysis_service`
+- :mod:`OpenPinch.resources`
+- the ``openpinch notebook`` CLI command
+
+The CLI is intentionally small. It copies notebooks only. The actual solve,
+graph export, Excel export, validation, and advanced workflow selection happen
+through Python.
+
+Advanced users can drop into schemas, service entrypoints, prepared `Zone`
+trees, or lower-level analysis helpers when they need more control, but those
+surfaces should be read with the support levels explained in
+:doc:`support-and-stability`.
+
 What OpenPinch Does Not Assume
 ------------------------------
 
-OpenPinch does not assume that every user wants the same depth of control.
-Most users should stay at the `PinchProblem`, `PinchWorkspace`, or CLI level.
-Advanced users can drop into schemas, service entrypoints, prepared `Zone`
-trees, or lower-level analysis helpers when they need more control.
+OpenPinch does not assume that every study wants the same depth of control.
+You can stay at the wrapper-object level, move down to a typed service
+boundary, or inspect and mutate the in-memory zone tree directly.
 
 Next Steps
 ----------

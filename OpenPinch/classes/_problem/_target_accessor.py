@@ -164,19 +164,18 @@ class _TargetAccessor:
         include_subzones: bool = False,
         state_id: Optional[str] = None,
     ) -> BaseTargetModel:
-        """Run turbine cogeneration post-processing on a compatible target."""
-        target_id = TT.DI.value
+        """
+        Run cogeneration on `TS -> IHP -> IR -> DHP -> DR -> DI`
+        unless overridden.
+        """
         runtime_options = dict(options or {})
         if state_id is not None:
             runtime_options["state_id"] = state_id
-        if runtime_options and "base_target_type" in runtime_options:
-            target_id = str(runtime_options["base_target_type"])
-        return self._problem._execute_targeting(
-            target_id=target_id,
+        return self._problem._execute_cogeneration_targeting(
             application_zone=zone_name,
             options=runtime_options,
             include_subzones=include_subzones,
-            direct_service_func=power_cogeneration_service,
+            service_func=power_cogeneration_service,
         )
 
     def area_cost(

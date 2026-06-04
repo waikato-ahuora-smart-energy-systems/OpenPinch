@@ -3,7 +3,20 @@ OpenPinch Documentation
 
 OpenPinch is a Python toolkit for advanced pinch analysis, direct and indirect
 heat integration targeting, Total Site utility studies, graph generation,
-Heat Pump integration screening, and cogeneration post-processing.
+Heat Pump and refrigeration screening, and cogeneration post-processing.
+
+The codebase exposes one shared analysis engine through three primary public
+surfaces:
+
+- :class:`OpenPinch.PinchProblem` for one case at a time
+- :class:`OpenPinch.PinchWorkspace` for named multi-case studies and bundle
+  persistence
+- :func:`OpenPinch.main.pinch_analysis_service` for typed request/response
+  integration
+
+The published CLI is intentionally narrow: ``openpinch notebook`` copies the
+packaged notebook series, while solving, validation, graph export, Excel
+export, and advanced targeting all happen in Python.
 
 This documentation is organized to answer three different kinds of questions:
 
@@ -19,13 +32,12 @@ What OpenPinch Covers
 ---------------------
 
 - classical direct pinch targeting for process zones
-- indirect, Total Process, and Total Site targeting through utility
-  systems
+- indirect, Total Process, and Total Site targeting through utility systems
 - multi-utility studies and graph generation
 - hierarchical zone modeling from unit operation to site scope
 - integrated Heat Pump and refrigeration screening workflows
 - above Pinch and below Pinch turbine cogeneration analysis
-- Excel, JSON, CSV-bundle, CLI, notebook, and programmatic Python workflows
+- Excel, JSON, CSV-bundle, notebook, and programmatic Python workflows
 
 Recommended Reading Paths
 -------------------------

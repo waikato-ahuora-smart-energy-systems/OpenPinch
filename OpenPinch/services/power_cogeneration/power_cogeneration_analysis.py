@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ...lib.config import T_CRIT, Configuration, tol
+from ...lib.enums import CogenerationTarget
 from ...utils.miscellaneous import get_state_index
 from ...utils.water_properties import psat_T
 from .unit_models.multi_stage_steam_turbine import MultiStageSteamTurbine
@@ -15,7 +16,6 @@ if TYPE_CHECKING:
     import numpy as np
 
     from ...classes.stream import Stream
-    from ...classes.zone import Zone
 
 __all__ = [
     "get_power_cogeneration_above_pinch",
@@ -24,18 +24,18 @@ __all__ = [
 
 
 def get_power_cogeneration_above_pinch(
-    zone: Zone,
+    target: CogenerationTarget,
     args: dict | None = None,
-) -> Zone:
-    """Calculate the power cogeneration potential above pinch for a given zone."""
-    turbine_params = _prepare_turbine_parameters(zone.config)
+) -> CogenerationTarget:
+    """Calculate above-Pinch cogeneration for a compatible thermal target object."""
+    turbine_params = _prepare_turbine_parameters(target.config)
     idx, sid = get_state_index(
-        state_ids=getattr(zone, "state_ids", None),
+        state_ids=getattr(target, "state_ids", None),
         args=args,
     )
-    utility_data = _preprocess_utilities(zone, turbine_params, idx=idx)
+    utility_data = _preprocess_utilities(target, turbine_params, idx=idx)
     if utility_data is None:
-        return zone
+        return target
 
     turbine = MultiStageSteamTurbine()
     total_work, details = turbine.solve(
@@ -51,9 +51,9 @@ def get_power_cogeneration_above_pinch(
         is_high_p_cond_flash=turbine_params["is_high_p_cond_flash"],
     )
 
-    zone.work_target = total_work
-    zone.turbine_efficiency_target = details["overall_efficiency"]
-    return zone
+    target.work_target = total_work
+    target.turbine_efficiency_target = details["overall_efficiency"]
+    return target
 
 
 def get_power_cogeneration_below_pinch(
@@ -96,18 +96,18 @@ def _prepare_turbine_parameters(zone_config: Configuration) -> dict:
 
 
 def _preprocess_utilities(
-    zone: Zone,
+    target: CogenerationTarget,
     turbine_params: dict,
     *,
     idx: int | None = None,
 ) -> dict | None:
-    """Translate hot-utility demands into turbine stage temperatures and duties."""
+    """Translate target hot-utility demands into turbine stage temperatures."""
     stage_temperatures: list[float] = []
     stage_heat_flows: list[float] = []
     source_indices: list[int] = []
 
     u: Stream
-    for i, u in enumerate(zone.hot_utilities):
+    for i, u in enumerate(target.hot_utilities):
         t_supply = float(u.t_supply[idx])
         t_target = float(u.t_target[idx])
         heat_flow = float(u.heat_flow[idx])

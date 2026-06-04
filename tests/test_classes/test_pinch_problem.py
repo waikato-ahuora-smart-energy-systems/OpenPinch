@@ -517,6 +517,47 @@ def test_target_accessor_supports_named_workflow_with_state_id(monkeypatch):
     assert called["options"] == {"dt_min": 15, "state_id": "peak"}
 
 
+def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch):
+    called = {}
+
+    def fake_execute_cogeneration_targeting(
+        self,
+        *,
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=None,
+        sid=None,
+    ):
+        called["application_zone"] = application_zone
+        called["options"] = options
+        called["include_subzones"] = include_subzones
+        called["service_func"] = service_func
+        return {"target": "ts"}
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "_execute_cogeneration_targeting",
+        fake_execute_cogeneration_targeting,
+    )
+
+    obj = PinchProblem()
+    out = obj.target.cogeneration(
+        zone_name="Plant/TS",
+        options={"base_target_type": "Total Site Target"},
+        state_id="peak",
+    )
+
+    assert out == {"target": "ts"}
+    assert called["application_zone"] == "Plant/TS"
+    assert called["options"] == {
+        "base_target_type": "Total Site Target",
+        "state_id": "peak",
+    }
+    assert called["include_subzones"] is False
+    assert called["service_func"] is not None
+
+
 def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
     called = {}
 
@@ -554,6 +595,58 @@ def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
     assert called["include_subzones"] is True
     assert called["direct_service_func"] is not None
     assert called["indirect_service_func"] is None
+
+
+def test_execute_cogeneration_targeting_returns_selected_target_family():
+    from OpenPinch.classes.problem_table import ProblemTable
+    from OpenPinch.lib.config import Configuration
+    from OpenPinch.lib.enums import TT, ZT
+    from OpenPinch.lib.enums import ProblemTableLabel as PT
+    from OpenPinch.lib.schemas.targets import (
+        DirectIntegrationTarget,
+        TotalSiteTarget,
+    )
+
+    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    ts_target = TotalSiteTarget(
+        zone_name=zone.name,
+        type=TT.TS.value,
+        parent_zone=zone.parent_zone,
+        config=zone.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    di_target = DirectIntegrationTarget(
+        zone_name=zone.name,
+        type=TT.DI.value,
+        parent_zone=zone.parent_zone,
+        config=zone.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt_real=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    zone.add_target(ts_target)
+    zone.add_target(di_target)
+
+    problem = PinchProblem()
+    problem._master_zone = zone
+
+    def fake_cogeneration_service(target_zone: Zone, args=None) -> Zone:
+        target_zone._selected_cogeneration_target_type = TT.TS.value
+        return target_zone
+
+    out = problem._execute_cogeneration_targeting(
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=fake_cogeneration_service,
+    )
+
+    assert out is ts_target
 
 
 def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
