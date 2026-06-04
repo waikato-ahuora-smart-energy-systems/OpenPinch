@@ -179,6 +179,53 @@ class PinchProblem:
                 f"for zone {zone.name!r}."
             ) from exc
 
+    def _execute_cogeneration_targeting(
+        self,
+        *,
+        application_zone: Optional[str | Zone],
+        options: Optional[dict[str, Any]],
+        include_subzones: bool,
+        service_func: Optional[ZoneService] = None,
+        sid: str = None,
+    ) -> BaseTargetModel:
+        """Run cogeneration targeting and return the family selected at runtime."""
+        execution_master_zone = self._build_execution_master_zone()
+        runtime_options, sid = self._resolve_runtime_state_options(
+            options,
+            zone=execution_master_zone,
+        )
+        zone = self._resolve_target_zone(
+            application_zone, master_zone=execution_master_zone
+        )
+        if include_subzones:
+            self._run_targeting_for_zone_and_subzones(
+                zone=zone,
+                direct_service_func=service_func,
+                options=runtime_options,
+                sid=sid,
+            )
+        else:
+            if service_func is not None:
+                service_func(zone, runtime_options)
+            self._results = TargetOutput.model_validate(
+                extract_results(execution_master_zone, state_id=sid)
+            )
+
+        selected_target_type = getattr(zone, "_selected_cogeneration_target_type", None)
+        if not isinstance(selected_target_type, str):
+            raise RuntimeError(
+                "Cogeneration did not select a compatible target "
+                f"for zone {zone.name!r}."
+            )
+        try:
+            return zone.targets[selected_target_type]
+        except KeyError as exc:
+            raise RuntimeError(
+                "Cogeneration selected target "
+                f"{selected_target_type!r} for zone {zone.name!r}, "
+                "but that target was not available on the zone."
+            ) from exc
+
     def _resolve_target_zone(
         self,
         application_zone: Optional[str] = None,

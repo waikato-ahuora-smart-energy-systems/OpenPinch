@@ -9,6 +9,7 @@ inputs programmatically.
 from . import config, enums, problem_table_types, schemas
 from .config import ACTIVATE_TIMING, LOG_TIMING, T_CRIT, C_to_K, Configuration, tol
 from .enums import (
+    CogenerationTarget,
     GT,
     PT,
     SD,
@@ -113,6 +114,7 @@ __all__ = [
     "schemas",
     "ACTIVATE_TIMING",
     "C_to_K",
+    "CogenerationTarget",
     "Configuration",
     "LOG_TIMING",
     "T_CRIT",

@@ -30,6 +30,15 @@ __all__ = [
     "area_cost_targeting_service",
 ]
 
+_COGENERATION_TARGET_ORDER = (
+    TT.TS.value,
+    TT.IHP.value,
+    TT.IR.value,
+    TT.DHP.value,
+    TT.DR.value,
+    TT.DI.value,
+)
+
 
 def _record_selected_state(zone: Zone, args: dict | None) -> tuple[int, str | None]:
     """Persist the selected state metadata on a prepared zone."""
@@ -76,6 +85,86 @@ def _apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
         if key == "REFRIGERANTS" and isinstance(value, str):
             value = value.replace(";", ",").split(",")
         setattr(zone.config, key, value)
+
+
+def _normalize_cogeneration_base_target_type(
+    base_target_type: object | None,
+) -> str | None:
+    """Validate an explicit cogeneration base target override."""
+    if base_target_type is None:
+        return None
+
+    normalized = str(base_target_type)
+    if normalized not in _COGENERATION_TARGET_ORDER:
+        supported = ", ".join(_COGENERATION_TARGET_ORDER)
+        raise ValueError(
+            "Unsupported cogeneration base_target_type "
+            f"{normalized!r}. Supported types: {supported}."
+        )
+    return normalized
+
+
+def _get_cogeneration_candidate_order(
+    base_target_type: str | None,
+) -> tuple[str, ...]:
+    """Return the exact cogeneration target search order for this call."""
+    if base_target_type is not None:
+        return (base_target_type,)
+    return _COGENERATION_TARGET_ORDER
+
+
+def _get_cogeneration_refresh_services():
+    """Map compatible cogeneration target families to their prerequisite service."""
+    return {
+        TT.DI.value: direct_heat_integration_service,
+        TT.TS.value: indirect_heat_integration_service,
+        TT.DHP.value: direct_heat_pump_service,
+        TT.DR.value: direct_refrigeration_service,
+        TT.IHP.value: indirect_heat_pump_service,
+        TT.IR.value: indirect_refrigeration_service,
+    }
+
+
+def _ensure_cogeneration_target(
+    zone: Zone,
+    *,
+    target_type: str,
+    refresh_args: dict | None,
+    compare_args: dict | None,
+):
+    """Ensure one compatible target family exists for the requested state."""
+    target = zone.targets.get(target_type)
+    if _target_matches_requested_state(
+        target,
+        args=compare_args,
+        state_ids=getattr(zone, "state_ids", None),
+    ):
+        return target
+
+    refresh_service = _get_cogeneration_refresh_services().get(target_type)
+    if refresh_service is None:
+        return None
+
+    refresh_service(zone, refresh_args)
+    refreshed_target = zone.targets.get(target_type)
+    if _target_matches_requested_state(
+        refreshed_target,
+        args=compare_args,
+        state_ids=getattr(zone, "state_ids", None),
+    ):
+        return refreshed_target
+    return None
+
+
+def _format_cogeneration_state_suffix(args: dict | None) -> str:
+    """Render the selected state into cogeneration error messages."""
+    if not isinstance(args, dict):
+        return ""
+    if args.get("state_id") is not None:
+        return f" for state_id {str(args['state_id'])!r}"
+    if args.get("idx") is not None:
+        return f" for idx {int(args['idx'])}"
+    return ""
 
 
 def data_preprocessing_service(
@@ -203,56 +292,44 @@ def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone
 
 
 def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
-    """Post-process an existing target to recover above Pinch cogeneration work."""
+    """Post-process one compatible target in TS -> IHP -> IR -> DHP -> DR -> DI order."""
     _apply_zone_config_overrides(zone, args)
-    target_type = [
-        TT.IHP.value,
-        TT.IR.value,
-        TT.TS.value,
-        TT.DHP.value,
-        TT.DR.value,
-        TT.DI.value,
-    ]
     runtime_args = dict(args or {})
+    explicit_target_type = _normalize_cogeneration_base_target_type(
+        runtime_args.get("base_target_type")
+    )
     idx, sid = _record_selected_state(zone, runtime_args)
     runtime_args["idx"] = idx
     if sid is not None:
         runtime_args["state_id"] = sid
-    refresh_args = runtime_args if isinstance(args, dict) else None
-    compare_args = runtime_args if isinstance(args, dict) else None
-    should_refresh_missing_target = False
-    if "base_target_type" in runtime_args:
-        target_type = [str(runtime_args["base_target_type"])]
-        should_refresh_missing_target = True
-    elif len(zone.targets) == 0:
-        direct_heat_integration_service(zone, refresh_args)
-    refresh_services = {
-        TT.DI.value: direct_heat_integration_service,
-        TT.TS.value: indirect_heat_integration_service,
-        TT.DHP.value: direct_heat_pump_service,
-        TT.DR.value: direct_refrigeration_service,
-        TT.IHP.value: indirect_heat_pump_service,
-        TT.IR.value: indirect_refrigeration_service,
-    }
-    for tt in target_type:
-        existing_target = zone.targets.get(tt)
-        if existing_target is None and not should_refresh_missing_target:
+    compare_args = dict(args or {}) if isinstance(args, dict) else {}
+    zone._selected_cogeneration_target_type = None
+
+    for target_type in _get_cogeneration_candidate_order(explicit_target_type):
+        target = _ensure_cogeneration_target(
+            zone,
+            target_type=target_type,
+            refresh_args=runtime_args,
+            compare_args=compare_args,
+        )
+        if target is None:
+            if explicit_target_type is not None:
+                raise RuntimeError(
+                    "Cogeneration could not produce target "
+                    f"{target_type!r} for zone {zone.name!r}"
+                    f"{_format_cogeneration_state_suffix(runtime_args)}."
+                )
             continue
-        if existing_target is None or not _target_matches_requested_state(
-            existing_target,
-            args=compare_args,
-            state_ids=getattr(zone, "state_ids", None),
-        ):
-            refresh_service = refresh_services.get(tt)
-            if refresh_service is not None:
-                refresh_service(zone, refresh_args)
-        if tt in zone.targets:
-            if isinstance(args, dict):
-                get_power_cogeneration_above_pinch(zone.targets[tt], args=runtime_args)
-            else:
-                get_power_cogeneration_above_pinch(zone.targets[tt])
-            return zone
-    raise ValueError("Load data before running pinch analysis services.")
+
+        get_power_cogeneration_above_pinch(target, args=runtime_args)
+        zone._selected_cogeneration_target_type = target_type
+        return zone
+
+    raise RuntimeError(
+        "Cogeneration could not find a compatible target for zone "
+        f"{zone.name!r}{_format_cogeneration_state_suffix(runtime_args)} "
+        f"using implicit order {' -> '.join(_COGENERATION_TARGET_ORDER)}."
+    )
 
 
 def area_cost_targeting_service(zone: Zone, args: dict | None = None) -> Zone:
