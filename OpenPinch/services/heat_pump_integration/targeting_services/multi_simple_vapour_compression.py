@@ -1,5 +1,7 @@
 """Multiple simple vapour-compression HP targeting."""
 
+from __future__ import annotations
+
 import numpy as np
 
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState

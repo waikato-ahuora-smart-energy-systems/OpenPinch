@@ -1,5 +1,7 @@
 """Public entrypoint for heat pump and refrigeration targeting."""
 
+from __future__ import annotations
+
 from ast import literal_eval
 from copy import deepcopy
 

@@ -1,5 +1,7 @@
 """Direct heat integration entry point for process and unit-level targeting."""
 
+from __future__ import annotations
+
 from typing import List, Tuple
 
 import numpy as np

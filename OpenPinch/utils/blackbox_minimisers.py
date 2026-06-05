@@ -1,5 +1,7 @@
 """Black-box optimisation entrypoint with lightweight backend dispatch."""
 
+from __future__ import annotations
+
 from typing import Callable, Optional
 
 from ..lib.enums import BB_Minimiser

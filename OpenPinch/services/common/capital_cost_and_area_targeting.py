@@ -1,5 +1,7 @@
 """Area targeting methods."""
 
+from __future__ import annotations
+
 import numpy as np
 
 from ...classes.stream_collection import StreamCollection

@@ -1,5 +1,7 @@
 """Shared typing helpers for ProblemTable update keyword arguments."""
 
+from __future__ import annotations
+
 from typing import TypeAlias, TypedDict
 
 import numpy as np

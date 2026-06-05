@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import math
+import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
-from pydantic import ValidationError, warnings
+from pydantic import ValidationError
 
 from ..lib.schemas.io import TargetInput, TargetOutput
 from ..lib.schemas.targets import BaseTargetModel

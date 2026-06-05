@@ -1,5 +1,7 @@
 """Zone data structure capturing nested scopes and their thermal targets."""
 
+from __future__ import annotations
+
 import warnings
 from typing import TYPE_CHECKING, Optional
 

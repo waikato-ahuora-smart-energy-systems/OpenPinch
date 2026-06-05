@@ -1,5 +1,7 @@
 """Utility container for managing ordered sets of stream objects."""
 
+from __future__ import annotations
+
 import csv
 import warnings
 from copy import copy, deepcopy

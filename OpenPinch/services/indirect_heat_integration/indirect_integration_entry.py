@@ -5,6 +5,8 @@ from subzones, construct site process/utility cascades, and calculate net
 utility balances after feasible inter-zone heat recovery.
 """
 
+from __future__ import annotations
+
 from copy import deepcopy
 from typing import Tuple
 

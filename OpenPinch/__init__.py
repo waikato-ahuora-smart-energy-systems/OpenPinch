@@ -1,5 +1,7 @@
 """OpenPinch public API."""
 
+from __future__ import annotations
+
 import warnings as _warnings
 
 from . import lib

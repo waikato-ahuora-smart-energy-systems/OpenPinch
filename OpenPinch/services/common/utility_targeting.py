@@ -1,5 +1,7 @@
 """Target multiple utilities over a heating or cooling profile from the pinch."""
 
+from __future__ import annotations
+
 from typing import Tuple
 
 import numpy as np

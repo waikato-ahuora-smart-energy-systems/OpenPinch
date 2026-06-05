@@ -1,5 +1,7 @@
 """Shared numerical helpers."""
 
+from __future__ import annotations
+
 from typing import Any, Iterable, Tuple, Union
 
 import numpy as np
