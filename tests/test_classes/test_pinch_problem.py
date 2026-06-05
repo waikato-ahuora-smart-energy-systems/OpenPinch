@@ -558,6 +558,48 @@ def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch)
     assert called["service_func"] is not None
 
 
+def test_target_accessor_exergy_uses_dedicated_execution_path(monkeypatch):
+    called = {}
+
+    def fake_execute_exergy_targeting(
+        self,
+        *,
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=None,
+        sid=None,
+    ):
+        called["application_zone"] = application_zone
+        called["options"] = options
+        called["include_subzones"] = include_subzones
+        called["service_func"] = service_func
+        return {"target": "x"}
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "_execute_exergy_targeting",
+        fake_execute_exergy_targeting,
+    )
+
+    obj = PinchProblem()
+    out = obj.target.exergy(
+        zone_name="Plant",
+        options={"base_target_type": "Direct Integration"},
+        state_id="peak",
+    )
+
+    assert out == {"target": "x"}
+    assert called["application_zone"] == "Plant"
+    assert called["options"] == {
+        "base_target_type": "Direct Integration",
+        "DO_EXERGY_TARGETING": True,
+        "state_id": "peak",
+    }
+    assert called["include_subzones"] is False
+    assert called["service_func"] is not None
+
+
 def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
     called = {}
 
@@ -647,6 +689,138 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
     )
 
     assert out is ts_target
+
+
+def test_execute_exergy_targeting_returns_selected_target_family():
+    from OpenPinch.classes.problem_table import ProblemTable
+    from OpenPinch.lib.config import Configuration
+    from OpenPinch.lib.enums import TT, ZT
+    from OpenPinch.lib.enums import ProblemTableLabel as PT
+    from OpenPinch.lib.schemas.targets import (
+        DirectIntegrationTarget,
+        TotalSiteTarget,
+    )
+
+    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    ts_target = TotalSiteTarget(
+        zone_name=zone.name,
+        type=TT.TS.value,
+        parent_zone=zone.parent_zone,
+        config=zone.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    di_target = DirectIntegrationTarget(
+        zone_name=zone.name,
+        type=TT.DI.value,
+        parent_zone=zone.parent_zone,
+        config=zone.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt_real=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    zone.add_target(ts_target)
+    zone.add_target(di_target)
+
+    problem = PinchProblem()
+    problem._master_zone = zone
+
+    def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
+        target_zone._selected_exergy_target_type = TT.TS.value
+        return target_zone
+
+    out = problem._execute_exergy_targeting(
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=fake_exergy_service,
+    )
+
+    assert out is ts_target
+
+
+def test_execute_exergy_targeting_does_not_walk_children_without_include_subzones():
+    from OpenPinch.classes.problem_table import ProblemTable
+    from OpenPinch.lib.config import Configuration
+    from OpenPinch.lib.enums import TT, ZT
+    from OpenPinch.lib.enums import ProblemTableLabel as PT
+    from OpenPinch.lib.schemas.targets import TotalSiteTarget
+
+    root = Zone(name="Root", type=ZT.S.value, zone_config=Configuration())
+    child = Zone(name="Child", parent_zone=root)
+    root._subzones = {"Child": child}
+    ts_target = TotalSiteTarget(
+        zone_name=root.name,
+        type=TT.TS.value,
+        parent_zone=root.parent_zone,
+        config=root.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    root.add_target(ts_target)
+
+    problem = PinchProblem()
+    problem._master_zone = root
+    calls = []
+
+    def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
+        calls.append(target_zone.name)
+        target_zone._selected_exergy_target_type = TT.TS.value
+        return target_zone
+
+    out = problem._execute_exergy_targeting(
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=fake_exergy_service,
+    )
+
+    assert out is ts_target
+    assert calls == ["Root"]
+
+
+def test_run_exergy_targeting_for_zone_and_subzones_is_post_order():
+    root = Zone(name="Root")
+    child = Zone(name="Child", parent_zone=root)
+    root._subzones = {"Child": child}
+    order = []
+
+    problem = PinchProblem()
+    problem._run_exergy_targeting_for_zone_and_subzones(
+        zone=root,
+        service_func=lambda zone, args=None: order.append(zone.name),
+        options={"state_id": "peak"},
+    )
+
+    assert order == ["Child", "Root"]
+
+
+def test_run_exergy_targeting_for_zone_and_subzones_drops_base_target_type_for_children():
+    root = Zone(name="Root")
+    child = Zone(name="Child", parent_zone=root)
+    root._subzones = {"Child": child}
+    calls = []
+
+    problem = PinchProblem()
+    problem._run_exergy_targeting_for_zone_and_subzones(
+        zone=root,
+        service_func=lambda zone, args=None: calls.append(
+            (zone.name, dict(args or {}))
+        ),
+        options={"base_target_type": "Total Site Target", "DO_EXERGY_TARGETING": True},
+    )
+
+    assert calls[0] == ("Child", {"DO_EXERGY_TARGETING": True})
+    assert calls[1] == (
+        "Root",
+        {"base_target_type": "Total Site Target", "DO_EXERGY_TARGETING": True},
+    )
 
 
 def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
@@ -974,6 +1148,34 @@ def test_plot_helper_can_return_selected_graph_data(monkeypatch):
 
     assert graph == {"type": "Grand Composite Curve", "name": "GCC"}
     assert build_calls["count"] == 0
+
+
+def test_plot_helper_can_return_exergy_graph_data(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [
+                {"type": "Exergetic Grand Composite Curve", "name": "GCC_X"},
+                {"type": "Exergetic Net Load Profiles", "name": "NLP_X"},
+            ],
+        }
+    }
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+
+    obj = PinchProblem()
+    gcc_graph = obj.plot.exergetic_grand_composite_curve(
+        zone_name="Plant/DI",
+        return_graph_data=True,
+    )
+    nlp_graph = obj.plot.exergetic_net_load_profiles(
+        zone_name="Plant/DI",
+        return_graph_data=True,
+    )
+
+    assert gcc_graph == {"type": "Exergetic Grand Composite Curve", "name": "GCC_X"}
+    assert nlp_graph == {"type": "Exergetic Net Load Profiles", "name": "NLP_X"}
 
 
 def test_plot_helper_rejects_show_when_returning_graph_data(monkeypatch):

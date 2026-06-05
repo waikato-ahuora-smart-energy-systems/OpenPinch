@@ -13,6 +13,7 @@ points to the right sample case, notebook, and API surface for that workflow.
    zonal-and-total-site-workflows
    heat-pump-workflows
    cogeneration-workflows
+   exergy-workflows
    graphing-and-interpretation
    exporting-results
    notebooks-and-sample-cases

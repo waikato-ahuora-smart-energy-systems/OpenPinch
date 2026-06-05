@@ -13,7 +13,7 @@ The service stack is designed in three steps:
 
 1. validate or receive typed request data
 2. prepare the inputs into a :class:`~OpenPinch.classes.zone.Zone` hierarchy
-3. dispatch direct, indirect, HPR, cogeneration, or area/cost targeting
+3. dispatch direct, indirect, HPR, exergy, cogeneration, or area/cost targeting
 
 Use Cases
 ---------
@@ -25,6 +25,7 @@ Use the service layer when you need to:
 - prepare a zone hierarchy once and run multiple advanced studies against it
 - inspect the prepared model before solving
 - bypass file handling entirely and work with typed inputs
+- apply exergy or cogeneration as post-processing on already solved targets
 
 Main Service Surface
 --------------------
@@ -70,6 +71,10 @@ Typical Preparation and Solve Pattern
 Each targeting service mutates the prepared zone in place, records the
 requested state metadata on the zone, and adds or refreshes the corresponding
 target model.
+
+The exergy service follows a slightly different contract from the base thermal
+targeting services: it enriches an already existing compatible target for the
+requested state instead of re-solving direct or indirect targeting internally.
 
 Direct High-Level Orchestration
 -------------------------------

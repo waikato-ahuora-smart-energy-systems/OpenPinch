@@ -173,6 +173,34 @@ def test_create_graph_set_includes_real_grand_composite_curve():
     )
 
 
+def test_create_graph_set_includes_exergy_graphs():
+    mock_target = MagicMock()
+    mock_target.name = "ZoneA/Direct Integration"
+    mock_target.type = TT.DI.value
+    mock_target.zone_name = "ZoneA"
+    mock_target.graphs = {
+        GT.GCC_X.value: {
+            PT.T.value: MagicMock(to_list=lambda: [10, 5, 0]),
+            "X(net)": MagicMock(to_list=lambda: [0, 4, 8]),
+        },
+        GT.NLP_X.value: {
+            PT.T.value: MagicMock(to_list=lambda: [10, 5, 0]),
+            "X(surplus)": MagicMock(to_list=lambda: [8, 4, 0]),
+            "X(deficit)": MagicMock(to_list=lambda: [0, 2, 4]),
+        },
+    }
+    mock_zone = MagicMock(spec=Zone)
+    mock_zone.name = "ZoneA"
+    mock_zone.address = "Site/ZoneA"
+
+    graph_set = _create_graph_set(mock_target, zone=mock_zone)
+
+    assert {graph["type"] for graph in graph_set["graphs"]} == {
+        GT.GCC_X.value,
+        GT.NLP_X.value,
+    }
+
+
 # ----------------------------------------------------------------------------------------------------
 # Tests for get_output_graph_data
 # ----------------------------------------------------------------------------------------------------

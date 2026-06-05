@@ -118,6 +118,11 @@ class UtilitySummaryTarget(BaseTargetModel):
     utility_cost: float = 0.0
     hot_pinch: Optional[float] = None
     cold_pinch: Optional[float] = None
+    exergy_sinks: Optional[float] = None
+    exergy_sources: Optional[float] = None
+    exergy_des_min: Optional[float] = None
+    exergy_req_min: Optional[float] = None
+    ETE: Optional[float] = None
 
     @property
     def utility_streams(self) -> StreamCollection:
@@ -146,6 +151,11 @@ class UtilitySummaryTarget(BaseTargetModel):
             hot_utilities=_build_heat_utilities(self.hot_utilities),
             cold_utilities=_build_heat_utilities(self.cold_utilities),
             temp_pinch=_build_temp_pinch(self.cold_pinch, self.hot_pinch),
+            exergy_sources=self.exergy_sources,
+            exergy_sinks=self.exergy_sinks,
+            ETE=None if self.ETE is None else self.ETE * 100,
+            exergy_req_min=self.exergy_req_min,
+            exergy_des_min=self.exergy_des_min,
         )
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
@@ -163,11 +173,6 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     num_units: Optional[float] = None
     capital_cost: Optional[float] = None
     total_cost: Optional[float] = None
-    exergy_sinks: Optional[float] = None
-    exergy_sources: Optional[float] = None
-    exergy_des_min: Optional[float] = None
-    exergy_req_min: Optional[float] = None
-    ETE: Optional[float] = None
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
 
@@ -184,11 +189,6 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
                 "num_units": self.num_units,
                 "capital_cost": self.capital_cost,
                 "total_cost": self.total_cost,
-                "exergy_sources": self.exergy_sources,
-                "exergy_sinks": self.exergy_sinks,
-                "ETE": None if self.ETE is None else self.ETE * 100,
-                "exergy_req_min": self.exergy_req_min,
-                "exergy_des_min": self.exergy_des_min,
             }
         )
 

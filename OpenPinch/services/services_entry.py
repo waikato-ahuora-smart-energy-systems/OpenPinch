@@ -9,6 +9,7 @@ from ..utils.miscellaneous import get_state_index
 from .direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,
 )
+from .exergy_analysis import apply_exergy_targeting
 from .heat_pump_integration.heat_pump_and_refrigeration_entry import (
     compute_direct_heat_pump_or_refrigeration_target,
     compute_indirect_heat_pump_or_refrigeration_target,
@@ -23,6 +24,7 @@ from .power_cogeneration import get_power_cogeneration_above_pinch
 __all__ = [
     "data_preprocessing_service",
     "direct_heat_integration_service",
+    "exergy_targeting_service",
     "indirect_heat_integration_service",
     "direct_heat_pump_service",
     "indirect_heat_pump_service",
@@ -38,6 +40,12 @@ _COGENERATION_TARGET_ORDER = (
     TT.IR.value,
     TT.DHP.value,
     TT.DR.value,
+    TT.DI.value,
+)
+_EXERGY_TARGET_ORDER = (
+    TT.TS.value,
+    TT.IHP.value,
+    TT.DHP.value,
     TT.DI.value,
 )
 
@@ -169,6 +177,39 @@ def _format_cogeneration_state_suffix(args: dict | None) -> str:
     return ""
 
 
+def _normalize_exergy_base_target_type(
+    base_target_type: object | None,
+) -> str | None:
+    """Validate an explicit exergy base target override."""
+    if base_target_type is None:
+        return None
+
+    normalized = str(base_target_type)
+    if normalized not in _EXERGY_TARGET_ORDER:
+        supported = ", ".join(_EXERGY_TARGET_ORDER)
+        raise ValueError(
+            "Unsupported exergy base_target_type "
+            f"{normalized!r}. Supported types: {supported}."
+        )
+    return normalized
+
+
+def _get_exergy_candidate_order(
+    base_target_type: str | None,
+) -> tuple[str, ...]:
+    """Return the exact exergy target search order for this call."""
+    if base_target_type is not None:
+        return (base_target_type,)
+    return _EXERGY_TARGET_ORDER
+
+
+def _apply_exergy_if_enabled(target, zone: Zone):
+    """Attach exergy outputs to one target when the feature is enabled."""
+    if target is None or not bool(getattr(zone.config, "DO_EXERGY_TARGETING", False)):
+        return target
+    return apply_exergy_targeting(target)
+
+
 def data_preprocessing_service(
     input_data: TargetInput,
     project_name: str = "Site",
@@ -187,7 +228,8 @@ def direct_heat_integration_service(zone: Zone, args: dict | None = None) -> Zon
     """Run direct heat integration targeting for a prepared zone."""
     _apply_zone_config_overrides(zone, args)
     _record_selected_state(zone, args)
-    zone.add_target(compute_direct_integration_targets(zone, args))
+    target = compute_direct_integration_targets(zone, args)
+    zone.add_target(_apply_exergy_if_enabled(target, zone))
     return zone
 
 
@@ -201,7 +243,9 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
     )
     _record_selected_state(zone, args)
     zone.add_target(compute_total_subzone_utility_targets(zone, args))
-    zone.add_target(compute_indirect_integration_targets(zone, args))
+    target = compute_indirect_integration_targets(zone, args)
+    if target is not None:
+        zone.add_target(_apply_exergy_if_enabled(target, zone))
     return zone
 
 
@@ -223,7 +267,7 @@ def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     if target is None:
         zone.targets.pop(TT.DHP.value, None)
     else:
-        zone.add_target(target)
+        zone.add_target(_apply_exergy_if_enabled(target, zone))
     return zone
 
 
@@ -245,7 +289,7 @@ def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     if target is None:
         zone.targets.pop(TT.IHP.value, None)
     else:
-        zone.add_target(target)
+        zone.add_target(_apply_exergy_if_enabled(target, zone))
     return zone
 
 
@@ -332,6 +376,50 @@ def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
         "Cogeneration could not find a compatible target for zone "
         f"{zone.name!r}{_format_cogeneration_state_suffix(runtime_args)} "
         f"using implicit order {' -> '.join(_COGENERATION_TARGET_ORDER)}."
+    )
+
+
+def exergy_targeting_service(zone: Zone, args: dict | None = None) -> Zone:
+    """Enrich the first compatible existing target family with exergy outputs."""
+    _apply_zone_config_overrides(zone, args)
+    zone.config.DO_EXERGY_TARGETING = True
+    runtime_args = dict(args or {})
+    runtime_args["DO_EXERGY_TARGETING"] = True
+    explicit_target_type = _normalize_exergy_base_target_type(
+        runtime_args.get("base_target_type")
+    )
+    idx, sid = _record_selected_state(zone, runtime_args)
+    runtime_args["idx"] = idx
+    if sid is not None:
+        runtime_args["state_id"] = sid
+    compare_args = dict(args or {}) if isinstance(args, dict) else {}
+    zone._selected_exergy_target_type = None
+
+    for target_type in _get_exergy_candidate_order(explicit_target_type):
+        target = zone.targets.get(target_type)
+        if not _target_matches_requested_state(
+            target,
+            args=compare_args,
+            state_ids=getattr(zone, "state_ids", None),
+        ):
+            if explicit_target_type is not None:
+                raise RuntimeError(
+                    "Exergy targeting requires an existing target "
+                    f"{target_type!r} on zone {zone.name!r}"
+                    f"{_format_cogeneration_state_suffix(runtime_args)}. "
+                    "Run the corresponding base targeting accessor first."
+                )
+            continue
+
+        zone.add_target(_apply_exergy_if_enabled(target, zone))
+        zone._selected_exergy_target_type = target_type
+        return zone
+
+    raise RuntimeError(
+        "Exergy targeting could not find a compatible existing target for zone "
+        f"{zone.name!r}{_format_cogeneration_state_suffix(runtime_args)} "
+        f"using implicit order {' -> '.join(_EXERGY_TARGET_ORDER)}. "
+        "Run a compatible thermal target accessor first."
     )
 
 

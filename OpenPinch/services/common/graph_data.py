@@ -61,8 +61,14 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.CC.value,
                 data=target_graphs[GT.CC.value],
                 label="Composite Curve",
-                value_field=[PT.H_HOT, PT.H_COLD],
-                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
+                value_field=[
+                    PT.H_HOT,
+                    PT.H_COLD,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                ],
             )
         )
 
@@ -73,8 +79,14 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.SCC.value,
                 data=target_graphs[GT.SCC.value],
                 label="Shifted Composite Curve",
-                value_field=[PT.H_HOT, PT.H_COLD],
-                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
+                value_field=[
+                    PT.H_HOT,
+                    PT.H_COLD,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                ],
             )
         )
 
@@ -124,6 +136,20 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
             )
         )
 
+    if GT.GCC_X.value in target_graphs:
+        graphs.append(
+            _make_gcc_graph(
+                graph_title=graph_title,
+                key=GT.GCC_X.value,
+                data=target_graphs[GT.GCC_X.value],
+                label="Exergetic Grand Composite Curve",
+                value_field=[
+                    PT.X_GCC.value,
+                ],
+                is_utility_profile=[False],
+            )
+        )
+
     if GT.NLP.value in target_graphs:
         graphs.append(
             _make_composite_graph(
@@ -146,6 +172,25 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                     StreamLoc.ColdU,
                     StreamLoc.HotU,
                     StreamLoc.ColdU,
+                ],
+                include_arrows=True,
+            )
+        )
+
+    if GT.NLP_X.value in target_graphs:
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graph_title,
+                key=GT.NLP_X.value,
+                data=target_graphs[GT.NLP_X.value],
+                label="Exergetic Net Load Profiles",
+                value_field=[
+                    PT.X_SUR,
+                    PT.X_DEF,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
                 ],
                 include_arrows=True,
             )
@@ -193,7 +238,10 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.GCC_HP.value,
                 data=target_graphs[GT.GCC_HP.value],
                 label="Grand Composite Curve with Heat Pump",
-                value_field=[PT.H_NET_W_AIR, PT.H_NET_HP],
+                value_field=[
+                    PT.H_NET_W_AIR,
+                    PT.H_NET_HP,
+                ],
                 is_utility_profile=[False, True],
             )
         )

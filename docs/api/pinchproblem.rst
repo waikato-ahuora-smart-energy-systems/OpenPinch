@@ -82,18 +82,24 @@ Two descriptor families make ``PinchProblem`` broader than a simple wrapper:
 
 ``problem.plot``
    Builds Plotly figures for composite curves, grand composite curves, net-load
-   profiles, and related graph families from the cached solved state.
+   profiles, exergetic post-processing graphs, and related graph families from
+   the cached solved state.
 
 ``problem.target``
    Re-runs targeted advanced routines such as direct and indirect heat pump,
-   refrigeration, cogeneration, or area/cost targeting against the prepared
-   zone hierarchy. Named target workflows also accept ``state_id=...`` when a
-   input data carries stateful values, and the refreshed summary/export surfaces
-   then expose that selected state on the result rows.
+   refrigeration, exergy enrichment, cogeneration, or area/cost targeting
+   against the prepared zone hierarchy. Named target workflows also accept
+   ``state_id=...`` when input data carries stateful values, and the
+   refreshed summary/export surfaces then expose that selected state on the
+   result rows.
 
 Named target methods also accept ``zone_name=...`` and
 ``include_subzones=True`` when you want one zone-level or subtree-level rerun
 instead of the default root-case solve.
+
+``problem.target.exergy(...)`` is intentionally a post-processing accessor: it
+enriches one existing compatible target family instead of solving a new target
+family of its own.
 
 Those accessors are the high-level path into the package's deeper analytical
 power without dropping all the way to the raw service modules.

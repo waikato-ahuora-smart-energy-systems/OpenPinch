@@ -200,6 +200,10 @@ class ProblemTableLabel(Enum):
     R_HOT_BAL = "HTC_hot_balanced"
     R_COLD_BAL = "HTC_cold_balanced"
 
+    X_GCC = "X(net)"
+    X_SUR = "X(surplus)"
+    X_DEF = "X(deficit)"
+
 
 PT = ProblemTableLabel
 
@@ -247,18 +251,11 @@ class GraphType(Enum):
     GCC = "Grand Composite Curve"
     GCC_R = "Grand Composite Curve (Real)"
     GCC_X = "Exergetic Grand Composite Curve"
+    NLP_X = "Exergetic Net Load Profiles"
     GCC_HP = "Grand Composite Curve with Heat Pump"
-    # GCC_N = "Grand Composite Curve (No Pockets)"
-    # GCC_V = "Vertical Grand Composite Curve"
-    # GCC_A = "Actual Grand Composite Curve"
-    # GCC_U = "Utility Grand Composite Curve"
-    # GCC_U_real = "Utility Grand Composite Curve (Real)"
-    # GCC_Lim = "Thermodynamic Limiting GCC"
     NLP = "Net Load Profiles"
 
     TSP = "Total Site Profiles"
-    TSU = "Total Site Utility"
-    # TSU_real = "Total Site Utility"
     SUGCC = "Site Utility Grand Composite Curve"
 
 

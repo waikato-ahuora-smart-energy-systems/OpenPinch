@@ -1,5 +1,15 @@
 """Exergy analysis helpers."""
 
-from .exergy_targeting_entry import compute_exergetic_temperature
+from .exergy_targeting_entry import (
+    apply_exergy_targeting,
+    build_exergy_gcc_curve,
+    build_exergy_nlp_curves,
+    compute_exergetic_temperature,
+)
 
-__all__ = ["compute_exergetic_temperature"]
+__all__ = [
+    "apply_exergy_targeting",
+    "build_exergy_gcc_curve",
+    "build_exergy_nlp_curves",
+    "compute_exergetic_temperature",
+]

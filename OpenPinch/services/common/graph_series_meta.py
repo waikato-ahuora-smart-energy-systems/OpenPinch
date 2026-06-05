@@ -57,7 +57,10 @@ GRAPH_SERIES_META: dict[str, GraphSeriesMeta] = {
         description="Cold Utility",
         composite_title="Cold Utility",
     ),
-    PT.H_NET.value: GraphSeriesMeta(LegendSeries.GCC.name, LegendSeries.GCC.value),
+    PT.H_NET.value: GraphSeriesMeta(
+        LegendSeries.GCC.name,
+        LegendSeries.GCC.value,
+    ),
     PT.H_NET_NP.value: GraphSeriesMeta(
         LegendSeries.GCC_N.name,
         LegendSeries.GCC_N.value,
@@ -84,5 +87,19 @@ GRAPH_SERIES_META: dict[str, GraphSeriesMeta] = {
         label="Heat Pump Evaporator",
         description="Heat Pump Evaporator",
         composite_title="Heat Pump Evaporator",
+    ),
+    PT.X_GCC.value: GraphSeriesMeta(
+        label="GCC_X",
+        description="Exergetic Grand Composite Curve",
+    ),
+    PT.X_SUR.value: GraphSeriesMeta(
+        label="Exergy Surplus",
+        description="Exergy Surplus",
+        composite_title="Exergy Surplus",
+    ),
+    PT.X_DEF.value: GraphSeriesMeta(
+        label="Exergy Deficit",
+        description="Exergy Deficit",
+        composite_title="Exergy Deficit",
     ),
 }

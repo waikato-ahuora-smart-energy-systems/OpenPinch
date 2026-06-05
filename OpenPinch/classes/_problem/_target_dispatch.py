@@ -1,23 +1,17 @@
-"""Recursive dispatch helpers for zone-scale targeting and result extraction."""
+"""Recursive dispatch helpers for zone-scale targeting across subzones."""
 
 from __future__ import annotations
 
 import inspect
-from typing import Callable, List
+from typing import Callable
 
-from ..classes.stream import Stream
-from ..classes.stream_collection import StreamCollection
-from ..classes.zone import Zone
-from ..lib.enums import ZT
-from ..services.common.graph_data import get_output_graph_data
+from ...lib.enums import ZT
+from ..zone import Zone
 
-__all__ = [
-    "get_targets_for_zone_and_sub_zones",
-    "extract_results",
-]
+__all__ = ["run_targeting_for_zone_and_subzones"]
 
 
-def get_targets_for_zone_and_sub_zones(
+def run_targeting_for_zone_and_subzones(
     zone: Zone,
     direct_service_func: Callable = None,
     indirect_service_func: Callable = None,
@@ -28,17 +22,6 @@ def get_targets_for_zone_and_sub_zones(
     if handler is None:
         raise ValueError("No valid zone passed into OpenPinch for analysis.")
     return handler(zone, direct_service_func, indirect_service_func, args)
-
-
-def extract_results(zone: Zone, state_id: str | None = None) -> dict:
-    """Serialise solved targets, generated utilities, and graph payloads."""
-    return {
-        "name": zone.name,
-        "state_id": state_id,
-        "targets": _get_report(zone, state_id=state_id),
-        "utilities": _get_utilities(zone),
-        "graphs": get_output_graph_data(zone),
-    }
 
 
 ################################################################################
@@ -174,16 +157,11 @@ def _get_site_targets(
     indirect_service_func: Callable = None,
     args: dict | None = None,
 ):
-    """Targets heat integration using Total Site Anlysis,
-    by systematically analysing individual zones and then performing
-    site-level indirect integration through the utility system.
-    """
+    """Run site targeting over the full nested zone hierarchy."""
 
-    # Totally integrated analysis for a site zone
     if isinstance(direct_service_func, Callable):
         _invoke_service(direct_service_func, zone, args)
 
-    # Targets sub-zone energy requirements
     if len(zone.subzones) > 0:
         for subzone in zone.subzones.values():
             if subzone.type == ZT.O.value:
@@ -216,7 +194,6 @@ def _get_site_targets(
                     "site, process, and operation zones."
                 )
 
-        # Calculates indirect targets based on different approaches
         if isinstance(indirect_service_func, Callable):
             _invoke_service(indirect_service_func, zone, args)
 
@@ -229,7 +206,7 @@ def _get_community_targets(
     indirect_service_func: Callable = None,
     args: dict | None = None,
 ):
-    """Targets a Community Zone."""
+    """Target a community zone by dispatching each site child."""
     for subzone in zone.subzones.values():
         subzone = _invoke_target_handler(
             _get_site_targets,
@@ -247,7 +224,7 @@ def _get_regional_targets(
     indirect_service_func: Callable = None,
     args: dict | None = None,
 ):
-    """Targets a Regional Zone."""
+    """Target a regional zone by dispatching each community child."""
     for subzone in zone.subzones.values():
         subzone = _invoke_target_handler(
             _get_community_targets,
@@ -257,31 +234,6 @@ def _get_regional_targets(
             args=args,
         )
     return zone
-
-
-def _get_report(zone: Zone, state_id: str | None = None) -> dict:
-    """Creates the database summary of zone targets."""
-    targets: List[dict] = []
-
-    for target in zone.targets.values():
-        target_payload = target.serialize_json()
-        if state_id is not None:
-            target_payload["state_id"] = state_id
-        targets.append(target_payload)
-
-    if len(zone.subzones) > 0:
-        for subzone in zone.subzones.values():
-            targets.extend(_get_report(subzone, state_id=state_id))
-
-    return targets
-
-
-def _get_utilities(zone: Zone) -> StreamCollection:
-    """Gets a list of any default utilities generated during the analysis."""
-    utilities: StreamCollection = zone.hot_utilities + zone.cold_utilities
-    default_hu: Stream = next((u for u in utilities if u.name == "HU"), None)
-    default_cu: Stream = next((u for u in utilities if u.name == "CU"), None)
-    return [default_hu, default_cu]
 
 
 _TARGET_HANDLERS = {

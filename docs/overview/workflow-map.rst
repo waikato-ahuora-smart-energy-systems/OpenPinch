@@ -100,7 +100,7 @@ Workflow Layering
               Zone tree
                  |
                  v
-   direct / indirect / HPR / cogeneration services
+   direct / indirect / HPR / exergy / cogeneration services
                  |
                  v
       TargetOutput + summaries + graphs + exports
@@ -127,6 +127,10 @@ Stateful study
 Advanced HPR study
    ``base case -> problem.target.direct_heat_pump(...) -> compare summary rows
    and GCC / HPR graph surfaces``
+
+Advanced exergy study
+   ``base case -> problem.target.exergy(...) -> inspect enriched target row and
+   exergetic GCC / NLP surfaces``
 
 Programmatic integration
    ``TargetInput schema -> pinch_analysis_service(...) -> TargetOutput``

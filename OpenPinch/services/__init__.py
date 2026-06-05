@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 __all__ = [
     "data_preprocessing_service",
     "direct_heat_integration_service",
+    "exergy_targeting_service",
     "indirect_heat_integration_service",
     "direct_heat_pump_service",
     "indirect_heat_pump_service",
@@ -55,6 +56,11 @@ def data_preprocessing_service(
 def direct_heat_integration_service(zone: "Zone", args: dict = None) -> "Zone":
     """Run direct heat integration targeting for a prepared zone."""
     return _load_services_entry_module().direct_heat_integration_service(zone, args)
+
+
+def exergy_targeting_service(zone: "Zone", args: dict = None) -> "Zone":
+    """Run exergy enrichment on one compatible target family."""
+    return _load_services_entry_module().exergy_targeting_service(zone, args)
 
 
 def indirect_heat_integration_service(zone: "Zone", args: dict = None) -> "Zone":

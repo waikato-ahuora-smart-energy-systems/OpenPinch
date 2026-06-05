@@ -26,10 +26,6 @@ from ..utils.export import (
     export_target_summary_to_excel_with_units,
 )
 from ..utils.miscellaneous import get_state_index
-from ..utils.multiscale_targeting import (
-    extract_results,
-    get_targets_for_zone_and_sub_zones,
-)
 from ..utils.wkbook_to_json import get_problem_from_excel
 from ._problem import (
     JsonDict,
@@ -41,8 +37,10 @@ from ._problem import (
     _validate_problem_semantics,
     build_graph_payload,
     build_problem_summary_frame,
+    extract_results,
     load_problem_source,
     prepare_in_memory_problem_source,
+    run_targeting_for_zone_and_subzones,
 )
 from ._problem import (
     format_schema_validation_error as _format_schema_validation_error,
@@ -127,7 +125,7 @@ class PinchProblem:
             options,
             zone=zone,
         )
-        get_targets_for_zone_and_sub_zones(
+        run_targeting_for_zone_and_subzones(
             zone=zone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
@@ -223,6 +221,73 @@ class PinchProblem:
         except KeyError as exc:
             raise RuntimeError(
                 "Cogeneration selected target "
+                f"{selected_target_type!r} for zone {zone.name!r}, "
+                "but that target was not available on the zone."
+            ) from exc
+
+    def _run_exergy_targeting_for_zone_and_subzones(
+        self,
+        *,
+        zone: "Zone",
+        service_func: Optional[ZoneService],
+        options: Optional[dict[str, Any]],
+    ) -> None:
+        """Run exergy targeting in post-order so site targets see solved children."""
+        child_options = dict(options or {})
+        child_options.pop("base_target_type", None)
+        for subzone in zone.subzones.values():
+            self._run_exergy_targeting_for_zone_and_subzones(
+                zone=subzone,
+                service_func=service_func,
+                options=child_options,
+            )
+        if service_func is not None:
+            service_func(zone, options)
+
+    def _execute_exergy_targeting(
+        self,
+        *,
+        application_zone: Optional[str | Zone],
+        options: Optional[dict[str, Any]],
+        include_subzones: bool,
+        service_func: Optional[ZoneService] = None,
+        sid: str = None,
+    ) -> BaseTargetModel:
+        """Apply exergy targeting and return the compatible target family selected."""
+        execution_master_zone = self._build_execution_master_zone()
+        runtime_options, sid = self._resolve_runtime_state_options(
+            options,
+            zone=execution_master_zone,
+        )
+        zone = self._resolve_target_zone(
+            application_zone, master_zone=execution_master_zone
+        )
+
+        if include_subzones:
+            self._run_exergy_targeting_for_zone_and_subzones(
+                zone=zone,
+                service_func=service_func,
+                options=runtime_options,
+            )
+        elif service_func is not None:
+            service_func(zone, runtime_options)
+
+        self._results = TargetOutput.model_validate(
+            extract_results(execution_master_zone, state_id=sid)
+        )
+
+        selected_target_type = getattr(zone, "_selected_exergy_target_type", None)
+        if not isinstance(selected_target_type, str):
+            raise RuntimeError(
+                "Exergy targeting did not select a compatible target "
+                f"for zone {zone.name!r}."
+            )
+
+        try:
+            return zone.targets[selected_target_type]
+        except KeyError as exc:
+            raise RuntimeError(
+                "Exergy targeting selected target "
                 f"{selected_target_type!r} for zone {zone.name!r}, "
                 "but that target was not available on the zone."
             ) from exc

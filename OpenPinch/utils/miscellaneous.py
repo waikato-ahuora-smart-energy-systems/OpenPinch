@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Tuple, Union
+from typing import Any, Tuple, Union
 
 import numpy as np
 
@@ -22,8 +22,6 @@ __all__ = [
     "interp_with_plateaus",
     "linear_interpolation",
     "make_monotonic",
-    "resolve_stream_attr",
-    "resolve_stream_attr_array",
 ]
 
 
@@ -84,46 +82,6 @@ def resolve_value_for_state(
             f"Available states: {', '.join(state_lookup)}."
         )
     return float(raw_value[state_lookup[resolved_state_id]].value)
-
-
-def resolve_stream_attr(
-    stream: Any,
-    attr_name: str,
-    state_id: str | None = None,
-    *,
-    default_allowed: bool = True,
-) -> float | None:
-    """Resolve one stream attribute to a scalar for the selected state."""
-    if not hasattr(stream, attr_name):
-        raise AttributeError(f"Stream {stream!r} has no attribute {attr_name!r}.")
-    return resolve_value_for_state(
-        getattr(stream, attr_name),
-        state_id=state_id,
-        state_ids=getattr(stream, "state_ids", None),
-        default_allowed=default_allowed,
-    )
-
-
-def resolve_stream_attr_array(
-    streams: Iterable[Any],
-    attr_name: str,
-    state_id: str | None = None,
-    *,
-    default_allowed: bool = True,
-) -> np.ndarray:
-    """Resolve one attribute across a stream iterable into a float array."""
-    return np.asarray(
-        [
-            resolve_stream_attr(
-                stream,
-                attr_name,
-                state_id=state_id,
-                default_allowed=default_allowed,
-            )
-            for stream in streams
-        ],
-        dtype=float,
-    )
 
 
 def get_value(

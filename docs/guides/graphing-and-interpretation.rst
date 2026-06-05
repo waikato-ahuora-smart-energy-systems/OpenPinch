@@ -20,6 +20,14 @@ Python:
    gcc = problem.plot.grand_composite_curve()
    cc = problem.plot.composite_curve()
 
+After exergy post-processing:
+
+.. code-block:: python
+
+   problem.target.exergy()
+   gcc_x = problem.plot.exergetic_grand_composite_curve()
+   nlp_x = problem.plot.exergetic_net_load_profiles()
+
 Best Default Graph
 ------------------
 
@@ -40,6 +48,7 @@ Recommended Interpretation Order
 3. inspect the GCC
 4. move to composite or shifted composite curves if you need overlap detail
 5. move to site-level graph families only when the workflow is multiscale
+6. move to exergetic graphs only after the thermal target context is clear
 
 Exporting Graphs
 ----------------
@@ -63,3 +72,4 @@ Next Steps
 
 - For graph meaning, see :doc:`../fundamentals/graphs-and-interpretation`.
 - For multiscale workflows, see :doc:`zonal-and-total-site-workflows`.
+- For exergy post-processing, see :doc:`exergy-workflows`.
