@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 
 from OpenPinch.utils.plots import (
+    _require_plotly,
     graph_simple_cc_plot,
     plot_t_h_curve,
     plot_t_h_curve_with_piecewise_and_bounds,
-    _require_plotly
 )
 
 
@@ -17,7 +17,7 @@ def test_plot_t_h_curve_and_piecewise_bounds(monkeypatch):
 
     def _fake_show(self):
         shown["count"] += 1
-    
+
     go = _require_plotly()
 
     monkeypatch.setattr(go.Figure, "show", _fake_show)
