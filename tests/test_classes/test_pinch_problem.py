@@ -558,6 +558,48 @@ def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch)
     assert called["service_func"] is not None
 
 
+def test_target_accessor_exergy_uses_dedicated_execution_path(monkeypatch):
+    called = {}
+
+    def fake_execute_exergy_targeting(
+        self,
+        *,
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=None,
+        sid=None,
+    ):
+        called["application_zone"] = application_zone
+        called["options"] = options
+        called["include_subzones"] = include_subzones
+        called["service_func"] = service_func
+        return {"target": "x"}
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "_execute_exergy_targeting",
+        fake_execute_exergy_targeting,
+    )
+
+    obj = PinchProblem()
+    out = obj.target.exergy(
+        zone_name="Plant",
+        options={"base_target_type": "Direct Integration"},
+        state_id="peak",
+    )
+
+    assert out == {"target": "x"}
+    assert called["application_zone"] == "Plant"
+    assert called["options"] == {
+        "base_target_type": "Direct Integration",
+        "DO_EXERGY_TARGETING": True,
+        "state_id": "peak",
+    }
+    assert called["include_subzones"] is False
+    assert called["service_func"] is not None
+
+
 def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
     called = {}
 
@@ -649,6 +691,138 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
     assert out is ts_target
 
 
+def test_execute_exergy_targeting_returns_selected_target_family():
+    from OpenPinch.classes.problem_table import ProblemTable
+    from OpenPinch.lib.config import Configuration
+    from OpenPinch.lib.enums import TT, ZT
+    from OpenPinch.lib.enums import ProblemTableLabel as PT
+    from OpenPinch.lib.schemas.targets import (
+        DirectIntegrationTarget,
+        TotalSiteTarget,
+    )
+
+    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    ts_target = TotalSiteTarget(
+        zone_name=zone.name,
+        type=TT.TS.value,
+        parent_zone=zone.parent_zone,
+        config=zone.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    di_target = DirectIntegrationTarget(
+        zone_name=zone.name,
+        type=TT.DI.value,
+        parent_zone=zone.parent_zone,
+        config=zone.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt_real=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    zone.add_target(ts_target)
+    zone.add_target(di_target)
+
+    problem = PinchProblem()
+    problem._master_zone = zone
+
+    def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
+        target_zone._selected_exergy_target_type = TT.TS.value
+        return target_zone
+
+    out = problem._execute_exergy_targeting(
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=fake_exergy_service,
+    )
+
+    assert out is ts_target
+
+
+def test_execute_exergy_targeting_does_not_walk_children_without_include_subzones():
+    from OpenPinch.classes.problem_table import ProblemTable
+    from OpenPinch.lib.config import Configuration
+    from OpenPinch.lib.enums import TT, ZT
+    from OpenPinch.lib.enums import ProblemTableLabel as PT
+    from OpenPinch.lib.schemas.targets import TotalSiteTarget
+
+    root = Zone(name="Root", type=ZT.S.value, zone_config=Configuration())
+    child = Zone(name="Child", parent_zone=root)
+    root._subzones = {"Child": child}
+    ts_target = TotalSiteTarget(
+        zone_name=root.name,
+        type=TT.TS.value,
+        parent_zone=root.parent_zone,
+        config=root.config,
+        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=0.0,
+    )
+    root.add_target(ts_target)
+
+    problem = PinchProblem()
+    problem._master_zone = root
+    calls = []
+
+    def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
+        calls.append(target_zone.name)
+        target_zone._selected_exergy_target_type = TT.TS.value
+        return target_zone
+
+    out = problem._execute_exergy_targeting(
+        application_zone=None,
+        options=None,
+        include_subzones=False,
+        service_func=fake_exergy_service,
+    )
+
+    assert out is ts_target
+    assert calls == ["Root"]
+
+
+def test_run_exergy_targeting_for_zone_and_subzones_is_post_order():
+    root = Zone(name="Root")
+    child = Zone(name="Child", parent_zone=root)
+    root._subzones = {"Child": child}
+    order = []
+
+    problem = PinchProblem()
+    problem._run_exergy_targeting_for_zone_and_subzones(
+        zone=root,
+        service_func=lambda zone, args=None: order.append(zone.name),
+        options={"state_id": "peak"},
+    )
+
+    assert order == ["Child", "Root"]
+
+
+def test_run_exergy_targeting_for_zone_and_subzones_drops_base_target_type_for_children():
+    root = Zone(name="Root")
+    child = Zone(name="Child", parent_zone=root)
+    root._subzones = {"Child": child}
+    calls = []
+
+    problem = PinchProblem()
+    problem._run_exergy_targeting_for_zone_and_subzones(
+        zone=root,
+        service_func=lambda zone, args=None: calls.append(
+            (zone.name, dict(args or {}))
+        ),
+        options={"base_target_type": "Total Site Target", "DO_EXERGY_TARGETING": True},
+    )
+
+    assert calls[0] == ("Child", {"DO_EXERGY_TARGETING": True})
+    assert calls[1] == (
+        "Root",
+        {"base_target_type": "Total Site Target", "DO_EXERGY_TARGETING": True},
+    )
+
+
 def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
     mod = sys.modules[PinchProblem.__module__]
     calls = {}
@@ -707,8 +881,8 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
             "Qh": _Value(10.0),
             "Qc": _Value(20.0),
             "Qr": _Value(30.0),
-            "temp_pinch": type(
-                "TempPinch",
+            "pinch_temp": type(
+                "PinchTemp",
                 (),
                 {"hot_temp": _Value(110.0, "degC"), "cold_temp": _Value(90.0, "degC")},
             )(),
@@ -730,14 +904,16 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     compact = obj.summary_frame()
     detailed = obj.summary_frame(detailed=True)
 
-    assert list(compact.columns[:5]) == [
+    assert list(compact.columns[:7]) == [
         "Target",
         "State ID",
         "Hot Utility Target",
         "Cold Utility Target",
         "Heat Recovery",
+        "Hot Pinch",
+        "Cold Pinch",
     ]
-    assert compact.iloc[0]["Hot Utilities"] == "Steam: 10.00"
+    assert compact.iloc[0]["Hot Utilities"] == "Steam: 10.00 kW"
     assert detailed.iloc[0]["Target"] == "Plant/DI"
 
 
@@ -755,8 +931,8 @@ def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
             "Qh": _Value(10.0),
             "Qc": _Value(20.0),
             "Qr": _Value(30.0),
-            "temp_pinch": type(
-                "TempPinch",
+            "pinch_temp": type(
+                "PinchTemp",
                 (),
                 {
                     "hot_temp": _Value(120.0, "degC"),
@@ -773,8 +949,8 @@ def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
 
     summary = obj.summary_frame()
 
-    assert summary.iloc[0]["Hot Pinch"] == 120.0
-    assert summary.iloc[0]["Cold Pinch"] == 120.0
+    assert summary.iloc[0]["Hot Pinch"] == "120.00 degC"
+    assert summary.iloc[0]["Cold Pinch"] == "120.00 degC"
 
 
 def test_summary_frame_uses_selected_state_for_stateful_results():
@@ -788,12 +964,13 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
         (),
         {
             "name": "Plant/DI",
+            "idx": 1,
             "state_id": "peak",
             "Qh": {"values": [10.0, 25.0], "state_ids": ["0", "peak"], "unit": "kW"},
             "Qc": {"values": [20.0, 15.0], "state_ids": ["0", "peak"], "unit": "kW"},
             "Qr": {"values": [30.0, 35.0], "state_ids": ["0", "peak"], "unit": "kW"},
-            "temp_pinch": type(
-                "TempPinch",
+            "pinch_temp": type(
+                "PinchTemp",
                 (),
                 {
                     "hot_temp": {
@@ -827,9 +1004,9 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
     summary = obj.summary_frame()
 
     assert summary.iloc[0]["State ID"] == "peak"
-    assert summary.iloc[0]["Hot Utility Target"] == 25.0
-    assert summary.iloc[0]["Hot Pinch"] == 140.0
-    assert summary.iloc[0]["Hot Utilities"] == "Steam: 25.00"
+    assert summary.iloc[0]["Hot Utility Target"] == "25.00 kW"
+    assert summary.iloc[0]["Hot Pinch"] == "140.00 degC"
+    assert summary.iloc[0]["Hot Utilities"] == "Steam: 25.00 kW"
 
 
 def test_graph_data_uses_results_then_master_zone(monkeypatch):
@@ -974,6 +1151,34 @@ def test_plot_helper_can_return_selected_graph_data(monkeypatch):
 
     assert graph == {"type": "Grand Composite Curve", "name": "GCC"}
     assert build_calls["count"] == 0
+
+
+def test_plot_helper_can_return_exergy_graph_data(monkeypatch):
+    payload = {
+        "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [
+                {"type": "Exergetic Grand Composite Curve", "name": "GCC_X"},
+                {"type": "Exergetic Net Load Profiles", "name": "NLP_X"},
+            ],
+        }
+    }
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+
+    obj = PinchProblem()
+    gcc_graph = obj.plot.exergetic_grand_composite_curve(
+        zone_name="Plant/DI",
+        return_graph_data=True,
+    )
+    nlp_graph = obj.plot.exergetic_net_load_profiles(
+        zone_name="Plant/DI",
+        return_graph_data=True,
+    )
+
+    assert gcc_graph == {"type": "Exergetic Grand Composite Curve", "name": "GCC_X"}
+    assert nlp_graph == {"type": "Exergetic Net Load Profiles", "name": "NLP_X"}
 
 
 def test_plot_helper_rejects_show_when_returning_graph_data(monkeypatch):
@@ -1122,10 +1327,15 @@ def test_compare_to_builds_delta_table(monkeypatch):
             {
                 "Target": "Plant/Direct Integration",
                 "Hot Utility Target": 750.0,
+                "Hot Utility Target (unit)": "kW",
                 "Cold Utility Target": 1000.0,
+                "Cold Utility Target (unit)": "kW",
                 "Heat Recovery": 5150.0,
+                "Heat Recovery (unit)": "kW",
                 "Hot Pinch": None,
+                "Hot Pinch (unit)": "degC",
                 "Cold Pinch": 145.0,
+                "Cold Pinch (unit)": "degC",
             }
         ]
     )
@@ -1134,10 +1344,15 @@ def test_compare_to_builds_delta_table(monkeypatch):
             {
                 "Target": "Plant/Direct Integration",
                 "Hot Utility Target": 500.0,
+                "Hot Utility Target (unit)": "kW",
                 "Cold Utility Target": 850.0,
+                "Cold Utility Target (unit)": "kW",
                 "Heat Recovery": 5800.0,
+                "Heat Recovery (unit)": "kW",
                 "Hot Pinch": None,
+                "Hot Pinch (unit)": "degC",
                 "Cold Pinch": 170.0,
+                "Cold Pinch (unit)": "degC",
             }
         ]
     )
@@ -1158,6 +1373,61 @@ def test_compare_to_builds_delta_table(monkeypatch):
     assert comparison.loc["Base case", "Hot Utility Target"] == 750.0
     assert comparison.loc["Scenario", "Cold Utility Target"] == 850.0
     assert comparison.loc["Change", "Heat Recovery"] == 650.0
+    assert comparison.loc["Base case", "Heat Recovery (unit)"] == "kW"
+    assert comparison.loc["Change", "Cold Pinch (unit)"] == "degC"
+
+
+def test_compare_to_suppresses_delta_when_units_do_not_match(monkeypatch):
+    base_frame = __import__("pandas").DataFrame(
+        [
+            {
+                "Target": "Plant/Direct Integration",
+                "Hot Utility Target": 750.0,
+                "Hot Utility Target (unit)": "kW",
+                "Cold Utility Target": 1000.0,
+                "Cold Utility Target (unit)": "kW",
+                "Heat Recovery": 5150.0,
+                "Heat Recovery (unit)": "kW",
+                "Hot Pinch": None,
+                "Hot Pinch (unit)": "degC",
+                "Cold Pinch": 145.0,
+                "Cold Pinch (unit)": "degC",
+            }
+        ]
+    )
+    other_frame = __import__("pandas").DataFrame(
+        [
+            {
+                "Target": "Plant/Direct Integration",
+                "Hot Utility Target": 500.0,
+                "Hot Utility Target (unit)": "MW",
+                "Cold Utility Target": 850.0,
+                "Cold Utility Target (unit)": "kW",
+                "Heat Recovery": 5800.0,
+                "Heat Recovery (unit)": "kW",
+                "Hot Pinch": None,
+                "Hot Pinch (unit)": "degC",
+                "Cold Pinch": 170.0,
+                "Cold Pinch (unit)": "degC",
+            }
+        ]
+    )
+    base_problem = PinchProblem()
+    other_problem = PinchProblem()
+
+    monkeypatch.setattr(
+        base_problem, "summary_frame", lambda detailed=False: base_frame
+    )
+    monkeypatch.setattr(
+        other_problem,
+        "summary_frame",
+        lambda detailed=False: other_frame,
+    )
+
+    comparison = base_problem.compare_to(other_problem)
+
+    assert float(comparison.loc["Change", "Hot Utility Target"]) == 499250.0
+    assert comparison.loc["Change", "Hot Utility Target (unit)"] == "kW"
 
 
 def test_validate_formats_schema_errors_with_stream_context(tmp_path: Path):
@@ -1292,9 +1562,9 @@ def test_load_preserves_stateful_stream_values_on_runtime_streams():
     stream = problem.hot_streams[0]
 
     assert list(stream.supply_temperature.value) == pytest.approx([150.0, 140.0])
-    assert stream.supply_temperature.unit == "°C"
+    assert stream.supply_temperature.unit == "degC"
     assert stream.supply_temperature[1].value == pytest.approx(140.0)
-    assert stream.supply_temperature[1].unit == "°C"
+    assert stream.supply_temperature[1].unit == "degC"
 
 
 def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Path):

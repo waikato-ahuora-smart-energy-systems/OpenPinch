@@ -24,6 +24,11 @@ Which Workflow Should I Use?
    :doc:`../guides/zonal-and-total-site-workflows` and
    ``02_total_site_targets_and_sugcc.ipynb``.
 
+``How do named operating states change the answer across one process or site?``
+   Use ``crude_preheat_train_multistate.json`` or
+   ``zonal_site_multistate.json`` together with
+   ``04_multistate_targeting_and_state_comparison.ipynb``.
+
 ``Would an integrated heat pump improve the utility picture of my plant?``
    Use ``heat_pump_targeting.json`` with
    :doc:`../guides/heat-pump-workflows`. The dedicated explicit
@@ -38,8 +43,9 @@ Which Workflow Should I Use?
    cycle internals.
 
 ``I need a typed request/response service contract, not a notebook wrapper.``
-   Start from :doc:`../api/service-layer` and
-   :doc:`../api/schemas-and-config`.
+   Start from :doc:`../api/service-layer`,
+   :doc:`../api/schemas-and-config`, and
+   ``05_schema_service_and_output_workflows.ipynb``.
 
 ``I need to inspect prepared streams, zones, or Problem Tables directly.``
    Start from :doc:`../api/domain-model`.

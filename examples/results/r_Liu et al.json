@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Liu et al/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 615.0,
                     "unit": "degC"
@@ -102,7 +102,7 @@
         },
         {
             "name": "Acid gas removal/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 107.0,
                     "unit": "degC"
@@ -202,7 +202,7 @@
         },
         {
             "name": "Coal gas shift/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 220.0,
                     "unit": "degC"
@@ -302,7 +302,7 @@
         },
         {
             "name": "Methanation/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 615.0,
                     "unit": "degC"
@@ -402,7 +402,7 @@
         },
         {
             "name": "Water gas shift/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 315.0,
                     "unit": "degC"
@@ -502,7 +502,7 @@
         },
         {
             "name": "Liu et al/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -602,7 +602,7 @@
         },
         {
             "name": "Liu et al/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 450.0,
                     "unit": "degC"

@@ -50,6 +50,8 @@ Live-case surface
    ``case()``, ``use_case()``, ``target``, ``plot``, ``summary_frame()``,
    ``export_excel()``, and ``show_dashboard()`` all delegate to a real active
    :class:`~OpenPinch.classes.pinch_problem.PinchProblem`.
+   That live case can use ``problem.target.exergy(...)`` and the matching
+   exergetic plot accessors exactly like any other ``PinchProblem``.
 
 Serializable variant surface
    ``payload_view()``, ``validate_variant()``, ``solve_variant()``, and
@@ -72,6 +74,10 @@ Advanced workflows
 
 The advanced workflows are supported, but the workspace marks them as advanced
 explicitly so consuming applications can surface that distinction.
+
+``solve_variant()`` does not currently normalize a dedicated ``exergy``
+workflow name. Use the live-case ``PinchProblem`` surface when you need the
+exergy post-processing accessor.
 
 Typical Pattern
 ---------------

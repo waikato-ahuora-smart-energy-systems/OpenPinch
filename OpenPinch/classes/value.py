@@ -100,6 +100,11 @@ class Value:
         return self._quantity.magnitude.copy()
 
     @property
+    def values(self) -> list[float]:
+        """Return magnitudes as a JSON-friendly list for stateful compatibility."""
+        return [float(item) for item in self.state_values.tolist()]
+
+    @property
     def weights(self) -> np.ndarray:
         """Return optional passive state weights carried with this value."""
         return self._weights
@@ -561,25 +566,32 @@ class Value:
         return set(data).issubset(_SERIALIZED_STATEFUL_KEYS) and ("values" in data)
 
     def _format_units(self, units) -> str:
-        return (
-            format(units, "~").replace("USD", "$").replace("NZD", "$").replace(" ", "")
-        )
+        return self._clean_unit_text(format(units, "~"))
 
     @staticmethod
     def _serialise_units(units) -> str:
-        return (
-            format(units, "~")
-            .replace("°", "deg")
-            .replace("USD", "$")
-            .replace("NZD", "$")
-            .replace(" ", "")
-        )
+        return Value._clean_unit_text(format(units, "~"))
+
+    @staticmethod
+    def _clean_unit_text(text: str) -> str:
+        text = text.replace("USD", "$").replace("NZD", "$").replace(" ", "")
+        text = text.replace("°", "deg")
+        text = text.replace("ΔdegC", "delta_degC").replace("Δ°C", "delta_degC")
+        text = text.replace("**2", "^2").replace("**3", "^3")
+        text = text.replace("$/a", "$/y").replace("$/year", "$/y")
+        return "-" if text == "" else text
 
     @staticmethod
     def _normalise_unit_input(unit: str | None) -> str | None:
         if unit is None:
             return None
         text = str(unit).strip().replace("$", "USD")
+        if text in {"", "-", "dimensionless", "1"}:
+            return "dimensionless"
+        if text == "fraction":
+            return "dimensionless"
+        if text in {"USD/y", "USD/yr", "USD/year"}:
+            return "USD/year"
         if text in {"C", "°C"}:
             return "degC"
         if text == "degK":

@@ -10,11 +10,12 @@ from OpenPinch.lib import *
 from OpenPinch.services.common.gcc_manipulation import (
     get_seperated_gcc_heat_load_profiles,
 )
+from OpenPinch.services.common.miscellaneous import *
 from OpenPinch.services.common.utility_targeting import (
     target_utilities_for_load_profiles,
 )
 from OpenPinch.services.input_data_processing.data_preparation import prepare_problem
-from OpenPinch.utils.miscellaneous import *
+from OpenPinch.utils import get_scalar_value
 
 """Tests for target_utilities_for_load_profiles."""
 
@@ -78,16 +79,16 @@ def test_target_utility(filename):
         for u in t.hot_utilities:
             s = z.hot_utilities[".".join([StreamLoc.HotU.value, u.name])]
             assert s is not None
-            h_u = get_value(u.heat_flow)
-            h_s = get_value(s.heat_flow)
+            h_u = get_scalar_value(u.heat_flow)
+            h_s = get_scalar_value(s.heat_flow)
             scalar = 1e-6 + max(h_s, h_u)
             assert abs(h_u - h_s) < 0.001 * scalar
 
         for u in t.cold_utilities:
             s = z.cold_utilities[".".join([StreamLoc.ColdU.value, u.name])]
             assert s is not None
-            h_u = get_value(u.heat_flow)
-            h_s = get_value(s.heat_flow)
+            h_u = get_scalar_value(u.heat_flow)
+            h_s = get_scalar_value(s.heat_flow)
             scalar = 1e-6 + max(h_s, h_u)
             assert abs(h_u - h_s) < 0.001 * scalar
 

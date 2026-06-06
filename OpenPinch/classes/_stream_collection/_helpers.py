@@ -1,5 +1,7 @@
 """Helper utilities for stream collection operations."""
 
+from __future__ import annotations
+
 import pickle
 from typing import Tuple
 

@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Refinery/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 155.15,
                     "unit": "degC"
@@ -49,7 +49,7 @@
         },
         {
             "name": "Rubber plant/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 92.35,
                     "unit": "degC"
@@ -96,7 +96,7 @@
         },
         {
             "name": "Tank field/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 62.35,
                     "unit": "degC"

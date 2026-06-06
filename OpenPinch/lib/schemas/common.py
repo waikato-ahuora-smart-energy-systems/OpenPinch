@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Optional, Union
 
-import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -52,7 +51,7 @@ ScalarOrVU = Union[
 MaybeVU = Union[
     float, ValueWithUnit, StatefulValueWithUnit, StatefulValueWithUnitAndWeights, None
 ]
-HPRMetric = Union[float, list[float], np.ndarray, None]
+HPRMetric = Union[ValueWithUnit, None]
 
 
 __all__ = [

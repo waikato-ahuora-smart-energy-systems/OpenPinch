@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Adjiman/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 311.52000000000004,
                     "unit": "degC"

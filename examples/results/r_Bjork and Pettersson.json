@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Bjork and Pettersson/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 103.0,
                     "unit": "degC"
@@ -53,7 +53,7 @@
         },
         {
             "name": "Bjork and Pettersson/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 103.0,
                     "unit": "degC"
@@ -104,7 +104,7 @@
         },
         {
             "name": "Bjork and Pettersson/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -155,7 +155,7 @@
         },
         {
             "name": "Bjork and Pettersson/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 10.0,
                     "unit": "degC"

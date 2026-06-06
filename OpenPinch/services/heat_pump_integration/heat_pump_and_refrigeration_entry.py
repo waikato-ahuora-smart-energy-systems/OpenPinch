@@ -1,5 +1,7 @@
 """Public entrypoint for heat pump and refrigeration targeting."""
 
+from __future__ import annotations
+
 from ast import literal_eval
 from copy import deepcopy
 
@@ -16,7 +18,8 @@ from ...lib.schemas.targets import (
     IndirectHeatPumpTarget,
     IndirectRefrigerationTarget,
 )
-from ...utils.miscellaneous import get_state_index, get_value
+from ...utils.value_resolution import evaluate_value_spec
+from ..common.miscellaneous import get_state_index
 from ..common.problem_table_analysis import create_problem_table_with_t_int
 from .common.postprocessing import _get_hpr_residual_utility_summary
 from .common.preprocessing import (
@@ -69,7 +72,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
         zone_config=zone.config,
-        state_id=state_id,
+        idx=idx,
     )
     if target_load < tol:
         return None
@@ -141,7 +144,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
         zone_config=zone.config,
-        state_id=state_id,
+        idx=idx,
     )
     if target_load < tol:
         return None
@@ -202,7 +205,7 @@ def _validate_hpr_required(
     zone_name: str = None,
     zone_config: Configuration | None = None,
     r: dict | float | int = None,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> float:
     if zone_config is None:
         raise ValueError("zone_config must be provided for HPR targeting.")
@@ -220,11 +223,11 @@ def _validate_hpr_required(
         Q = Q_max * hpr_load
     elif isinstance(hpr_load, dict):
         Q = min(
-            get_value(
+            evaluate_value_spec(
                 hpr_load,
-                val2=Q_max,
+                default_value=Q_max,
                 zone_name=zone_name,
-                state_id=state_id,
+                idx=idx,
             ),
             Q_max,
         )
@@ -238,7 +241,7 @@ def _validate_hpr_required(
                 zone_name=zone_name,
                 zone_config=zone_config,
                 r=hpr_load,
-                state_id=state_id,
+                idx=idx,
             )
     return Q
 

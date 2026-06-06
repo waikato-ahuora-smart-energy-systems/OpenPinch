@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "A/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 221.85000000000002,
                     "unit": "degC"
@@ -84,7 +84,7 @@
         },
         {
             "name": "B/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 221.85000000000002,
                     "unit": "degC"
@@ -166,7 +166,7 @@
         },
         {
             "name": "C/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 121.85000000000002,
                     "unit": "degC"

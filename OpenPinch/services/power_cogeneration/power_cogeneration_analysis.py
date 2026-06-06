@@ -8,8 +8,8 @@ import numpy as np
 
 from ...lib.config import T_CRIT, Configuration, tol
 from ...lib.enums import CogenerationTarget
-from ...utils.miscellaneous import get_state_index
 from ...utils.water_properties import psat_T
+from ..common.miscellaneous import get_state_index
 from .unit_models.multi_stage_steam_turbine import MultiStageSteamTurbine
 
 if TYPE_CHECKING:

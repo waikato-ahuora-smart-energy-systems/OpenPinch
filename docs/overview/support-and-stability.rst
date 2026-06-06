@@ -38,6 +38,8 @@ Advanced Public Surfaces
 
 - ``problem.target.*`` targeting accessors
 - ``problem.plot.*`` graph accessors
+- exergy post-processing through ``problem.target.exergy(...)`` and the
+  matching exergetic plot accessors
 - :func:`OpenPinch.services.input_data_processing.data_preparation.prepare_problem`
 - service-layer targeting helpers under :mod:`OpenPinch.services`
 - domain classes such as `Zone`, `Stream`, `StreamCollection`, and
@@ -48,8 +50,8 @@ Experimental or Partial Surfaces
 --------------------------------
 
 - community and region framing as a user-facing multiscale workflow
-- exergy analysis modules
 - energy transfer analysis modules
+- lower-level exergy helper modules below the accessor surface
 - some lower-level HPR comparison concepts that sit below the explicit
   ``problem.target.*`` targeting workflows
 

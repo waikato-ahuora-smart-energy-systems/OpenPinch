@@ -220,11 +220,11 @@ def test_serialize_json_basic(dummy_tar):
     json_data = dummy_tar.serialize_json()
 
     assert json_data["name"] == "Z1/DI"
-    assert json_data["Qh"] == 100
-    assert json_data["Qc"] == 50
-    assert json_data["Qr"] == 30
-    assert json_data["utility_cost"] == 500
-    assert "temp_pinch" in json_data
+    assert json_data["Qh"] == {"value": 100.0, "unit": "kW"}
+    assert json_data["Qc"] == {"value": 50.0, "unit": "kW"}
+    assert json_data["Qr"] == {"value": 30.0, "unit": "kW"}
+    assert json_data["utility_cost"] == {"value": 500.0, "unit": "$/h"}
+    assert "pinch_temp" in json_data
 
 
 def test_serialize_json_with_area_and_exergy(dummy_tar):
@@ -243,15 +243,15 @@ def test_serialize_json_with_area_and_exergy(dummy_tar):
 
     json_data = dummy_tar.serialize_json()
 
-    assert json_data["area"] == 120
+    assert json_data["area"] == {"value": 120.0, "unit": "m^2"}
     assert json_data["num_units"] == 3
-    assert json_data["capital_cost"] == 2000
-    assert json_data["total_cost"] == 5000
-    assert json_data["exergy_sources"] == 800
-    assert json_data["exergy_sinks"] == 700
-    assert json_data["ETE"] == 85.0
-    assert json_data["exergy_req_min"] == 100
-    assert json_data["exergy_des_min"] == 90
+    assert json_data["capital_cost"] == {"value": 2000.0, "unit": "$"}
+    assert json_data["total_cost"] == {"value": 5000.0, "unit": "$/y"}
+    assert json_data["exergy_sources"] == {"value": 800.0, "unit": "kW"}
+    assert json_data["exergy_sinks"] == {"value": 700.0, "unit": "kW"}
+    assert json_data["ETE"] == {"value": 85.0, "unit": "%"}
+    assert json_data["exergy_req_min"] == {"value": 100.0, "unit": "kW"}
+    assert json_data["exergy_des_min"] == {"value": 90.0, "unit": "kW"}
 
 
 # ===== Merged from test_zone_extra.py =====

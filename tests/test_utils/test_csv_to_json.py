@@ -90,7 +90,7 @@ def _summary_rows() -> list[list]:
     ]
     row1 = [
         "name",
-        "temp_pinch",
+        "pinch_temp",
         "Qh",
         "Qc",
         "Qr",

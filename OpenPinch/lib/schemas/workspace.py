@@ -41,6 +41,7 @@ class SummaryCard(BaseModel):
     target_name: str
     label: str
     value: Any = None
+    unit: Optional[str] = None
 
 
 class GraphCatalogEntry(BaseModel):
@@ -165,6 +166,7 @@ class VariantMetricDelta(BaseModel):
     metric: str
     base_value: Any = None
     variant_value: Any = None
+    unit: Optional[str] = None
     delta: Optional[float] = None
 
 

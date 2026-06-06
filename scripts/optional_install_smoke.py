@@ -43,7 +43,7 @@ def _check_core_surface() -> None:
         SimpleBraytonHeatPumpCycle,
     )
     from OpenPinch.streamlit_webviewer import web_graphing as wg
-    from OpenPinch.utils.miscellaneous import graph_simple_cc_plot
+    from OpenPinch.utils.plots import graph_simple_cc_plot
 
     assert OpenPinch.__version__ if hasattr(OpenPinch, "__version__") else True
     assert PinchProblem is not None
@@ -98,7 +98,7 @@ def _check_notebook_surface() -> None:
     import nbformat
 
     from OpenPinch.resources import copy_notebook, list_notebooks
-    from OpenPinch.utils.miscellaneous import _require_plotly
+    from OpenPinch.utils.plots import _require_plotly
 
     _exercise_cli_help()
     for module_name in ["plotly", "openpyxl", "pyxlsb", "ipykernel", "nbformat"]:

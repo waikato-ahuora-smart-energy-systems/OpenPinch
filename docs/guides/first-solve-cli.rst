@@ -28,9 +28,11 @@ Or copy one notebook:
 
 The current packaged notebooks are:
 
-- `01_basic_pinch_and_dtcont_sensitivity.ipynb`
-- `02_total_site_targets_and_sugcc.ipynb`
-- `03_carnot_hpr_comparison.ipynb`
+- ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
+- ``02_total_site_targets_and_sugcc.ipynb``
+- ``03_carnot_hpr_comparison.ipynb``
+- ``04_multistate_targeting_and_state_comparison.ipynb``
+- ``05_schema_service_and_output_workflows.ipynb``
 
 When To Leave the CLI
 ---------------------
@@ -40,7 +42,7 @@ Move to the Python workflow immediately when you need to:
 - solve a case
 - validate the input data
 - export Excel or graph artifacts
-- work with `problem.target.*` or `problem.plot.*`
+- work with ``problem.target.*`` or ``problem.plot.*``
 - use packaged sample cases directly by name
 
 Next Steps

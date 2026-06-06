@@ -234,6 +234,141 @@ def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
     assert target_id in zone.targets
 
 
+def test_exergy_targeting_service_auto_selects_total_site_first(monkeypatch):
+    zone = _make_zone()
+    zone.add_target(_make_target(zone, TT.TS.value))
+    zone.add_target(_make_target(zone, TT.DI.value))
+    enriched = []
+
+    monkeypatch.setattr(
+        svc,
+        "apply_exergy_targeting",
+        lambda target: enriched.append(target.type) or target,
+    )
+
+    out = svc.exergy_targeting_service(zone)
+
+    assert out is zone
+    assert enriched == [TT.TS.value]
+    assert zone._selected_exergy_target_type == TT.TS.value
+
+
+def test_exergy_targeting_service_honours_explicit_base_target_type(monkeypatch):
+    zone = _make_zone()
+    zone.add_target(_make_target(zone, TT.TS.value))
+    zone.add_target(_make_target(zone, TT.DI.value))
+    enriched = []
+
+    monkeypatch.setattr(
+        svc,
+        "apply_exergy_targeting",
+        lambda target: enriched.append(target.type) or target,
+    )
+
+    out = svc.exergy_targeting_service(
+        zone,
+        args={"base_target_type": TT.DI.value},
+    )
+
+    assert out is zone
+    assert enriched == [TT.DI.value]
+    assert zone._selected_exergy_target_type == TT.DI.value
+
+
+def test_exergy_targeting_service_uses_existing_matching_state_only(monkeypatch):
+    zone = _make_zone()
+    zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    zone.add_target(_make_target(zone, TT.TS.value, state_id="0", state_idx=0))
+    zone.add_target(_make_target(zone, TT.DI.value, state_id="peak", state_idx=1))
+    enriched = []
+
+    monkeypatch.setattr(
+        svc,
+        "apply_exergy_targeting",
+        lambda target: enriched.append((target.type, target.state_id)) or target,
+    )
+
+    out = svc.exergy_targeting_service(zone, {"state_id": "peak"})
+
+    assert out is zone
+    assert enriched == [(TT.DI.value, "peak")]
+    assert zone._selected_exergy_target_type == TT.DI.value
+
+
+def test_exergy_targeting_service_explicit_target_raises_when_unavailable():
+    zone = _make_zone()
+    zone.add_target(_make_target(zone, TT.DI.value))
+
+    with pytest.raises(RuntimeError, match="requires an existing target"):
+        svc.exergy_targeting_service(zone, {"base_target_type": TT.TS.value})
+
+
+def test_exergy_targeting_service_raises_when_no_existing_target():
+    zone = _make_zone()
+
+    with pytest.raises(RuntimeError, match="compatible existing target"):
+        svc.exergy_targeting_service(zone)
+
+
+def test_direct_heat_integration_service_skips_exergy_when_disabled(monkeypatch):
+    zone = _make_zone()
+    called = {"exergy": 0}
+
+    monkeypatch.setattr(
+        svc,
+        "compute_direct_integration_targets",
+        lambda target_zone, args=None: _make_target(target_zone, TT.DI.value),
+    )
+    monkeypatch.setattr(
+        svc,
+        "apply_exergy_targeting",
+        lambda target: called.__setitem__("exergy", called["exergy"] + 1) or target,
+    )
+
+    out = svc.direct_heat_integration_service(zone)
+
+    assert out is zone
+    assert called["exergy"] == 0
+
+
+def test_exergy_targeting_service_skips_site_only_targets_on_leaf_zone(monkeypatch):
+    zone = _make_zone()
+    zone.add_target(_make_target(zone, TT.DI.value))
+    enriched = []
+
+    monkeypatch.setattr(
+        svc,
+        "apply_exergy_targeting",
+        lambda target: enriched.append(target.type) or target,
+    )
+
+    out = svc.exergy_targeting_service(zone)
+
+    assert out is zone
+    assert enriched == [TT.DI.value]
+    assert zone._selected_exergy_target_type == TT.DI.value
+
+
+def test_exergy_targeting_service_does_not_refresh_state_mismatched_target(
+    monkeypatch,
+):
+    zone = _make_zone()
+    zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    zone.add_target(_make_target(zone, TT.TS.value, state_id="0", state_idx=0))
+
+    monkeypatch.setattr(
+        svc,
+        "apply_exergy_targeting",
+        lambda target: pytest.fail("state-mismatched target should not be enriched"),
+    )
+
+    with pytest.raises(RuntimeError, match="requires an existing target"):
+        svc.exergy_targeting_service(
+            zone,
+            {"base_target_type": TT.TS.value, "state_id": "peak"},
+        )
+
+
 def test_indirect_service_skips_none_targets(monkeypatch):
     zone = _make_zone()
 

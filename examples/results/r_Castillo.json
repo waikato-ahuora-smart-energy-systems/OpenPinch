@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Castillo/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 835.0,
                     "unit": "degC"
@@ -81,7 +81,7 @@
         },
         {
             "name": "Castillo/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 835.0,
                     "unit": "degC"
@@ -160,7 +160,7 @@
         },
         {
             "name": "Castillo/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -239,7 +239,7 @@
         },
         {
             "name": "Castillo/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 280.0,
                     "unit": "degC"

@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "refinery/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 261.0,
                     "unit": "degC"
@@ -123,7 +123,7 @@
         },
         {
             "name": "Refinery/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 261.0,
                     "unit": "degC"
@@ -244,7 +244,7 @@
         },
         {
             "name": "refinery/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -365,7 +365,7 @@
         },
         {
             "name": "refinery/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 233.9,
                     "unit": "degC"

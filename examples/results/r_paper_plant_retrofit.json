@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "paper_plant_retrofit/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 70.0,
                     "unit": "degC"
@@ -109,7 +109,7 @@
         },
         {
             "name": "C1[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 29.0,
                     "unit": "degC"
@@ -216,7 +216,7 @@
         },
         {
             "name": "C2[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 45.3,
                     "unit": "degC"
@@ -323,7 +323,7 @@
         },
         {
             "name": "C3[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 62.620000000000005,
                     "unit": "degC"
@@ -430,7 +430,7 @@
         },
         {
             "name": "C4[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 60.0,
                     "unit": "degC"
@@ -537,7 +537,7 @@
         },
         {
             "name": "C5[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 23.0,
                     "unit": "degC"
@@ -644,7 +644,7 @@
         },
         {
             "name": "E1[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 231.4,
                     "unit": "degC"
@@ -751,7 +751,7 @@
         },
         {
             "name": "E2[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 231.4,
                     "unit": "degC"
@@ -858,7 +858,7 @@
         },
         {
             "name": "E3[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 231.4,
                     "unit": "degC"
@@ -965,7 +965,7 @@
         },
         {
             "name": "E4[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 231.4,
                     "unit": "degC"
@@ -1072,7 +1072,7 @@
         },
         {
             "name": "E5[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 231.4,
                     "unit": "degC"
@@ -1179,7 +1179,7 @@
         },
         {
             "name": "H1[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 53.0,
                     "unit": "degC"
@@ -1286,7 +1286,7 @@
         },
         {
             "name": "H2[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 55.0,
                     "unit": "degC"
@@ -1393,7 +1393,7 @@
         },
         {
             "name": "H4[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 70.0,
                     "unit": "degC"
@@ -1500,7 +1500,7 @@
         },
         {
             "name": "H5[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 70.0,
                     "unit": "degC"
@@ -1607,7 +1607,7 @@
         },
         {
             "name": "paper_plant_retrofit/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -1714,7 +1714,7 @@
         },
         {
             "name": "paper_plant_retrofit/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 50.0,
                     "unit": "degC"

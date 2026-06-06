@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Fodor et al/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 54.8,
                     "unit": "degC"
@@ -74,7 +74,7 @@
         },
         {
             "name": "Casein/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 78.5,
                     "unit": "degC"
@@ -146,7 +146,7 @@
         },
         {
             "name": "D4/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 54.8,
                     "unit": "degC"
@@ -218,7 +218,7 @@
         },
         {
             "name": "D5/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 53.0,
                     "unit": "degC"
@@ -290,7 +290,7 @@
         },
         {
             "name": "Fodor et al/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -362,7 +362,7 @@
         },
         {
             "name": "Fodor et al/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 25.0,
                     "unit": "degC"

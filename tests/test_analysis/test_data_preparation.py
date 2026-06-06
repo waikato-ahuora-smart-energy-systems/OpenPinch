@@ -270,6 +270,42 @@ def test_mixed_unit_and_unitless_inputs():
     assert any(u.name == "CU" for u in site.cold_utilities)
 
 
+def test_prepare_problem_applies_configured_input_unit_defaults():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "H1",
+                "zone": "Z1",
+                "t_supply": 523.15,
+                "t_target": 373.15,
+                "heat_flow": 1000.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "C1",
+                "zone": "Z1",
+                "t_supply": 303.15,
+                "t_target": 423.15,
+                "heat_flow": -800.0,
+            }
+        ),
+    ]
+
+    site = prepare_problem(
+        streams=streams,
+        options={"INPUT_UNITS": {"temperature": "K"}},
+    )
+    z1 = site.subzones["Z1"]
+    hot = next(s for s in z1.hot_streams if s.name == "H1")
+    cold = next(s for s in z1.cold_streams if s.name == "C1")
+
+    assert float(hot.t_supply) == pytest.approx(250.0)
+    assert float(hot.t_target) == pytest.approx(100.0)
+    assert float(cold.t_supply) == pytest.approx(30.0)
+    assert float(cold.t_target) == pytest.approx(150.0)
+
+
 # ---------------- Invalid Input Tests ---------------- #
 
 

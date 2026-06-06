@@ -3,7 +3,8 @@ OpenPinch Documentation
 
 OpenPinch is a Python toolkit for advanced pinch analysis, direct and indirect
 heat integration targeting, Total Site utility studies, graph generation,
-Heat Pump and refrigeration screening, and cogeneration post-processing.
+Heat Pump and refrigeration screening, exergy post-processing, and
+cogeneration post-processing.
 
 The codebase exposes one shared analysis engine through three primary public
 surfaces:
@@ -36,6 +37,7 @@ What OpenPinch Covers
 - multi-utility studies and graph generation
 - hierarchical zone modeling from unit operation to site scope
 - integrated Heat Pump and refrigeration screening workflows
+- exergy targeting as post-processing on solved thermal targets
 - above Pinch and below Pinch turbine cogeneration analysis
 - Excel, JSON, CSV-bundle, notebook, and programmatic Python workflows
 

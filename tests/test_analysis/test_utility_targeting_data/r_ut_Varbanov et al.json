@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Process A - chemical plant/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 82.0,
                     "unit": "degC"
@@ -84,7 +84,7 @@
         },
         {
             "name": "Process B - food plant/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 52.5,
                     "unit": "degC"
@@ -166,7 +166,7 @@
         },
         {
             "name": "Process C - hospital/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 23.0,
                     "unit": "degC"
@@ -248,7 +248,7 @@
         },
         {
             "name": "Process D - residential area/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 21.0,
                     "unit": "degC"

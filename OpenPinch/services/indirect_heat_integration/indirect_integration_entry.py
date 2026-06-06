@@ -5,6 +5,8 @@ from subzones, construct site process/utility cascades, and calculate net
 utility balances after feasible inter-zone heat recovery.
 """
 
+from __future__ import annotations
+
 from copy import deepcopy
 from typing import Tuple
 
@@ -17,7 +19,7 @@ from ...lib.config import tol
 from ...lib.enums import GT, PT, TT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
-from ...utils.miscellaneous import get_state_index
+from ..common.miscellaneous import get_state_index
 from ..common.problem_table_analysis import (
     get_process_heat_cascade,
 )

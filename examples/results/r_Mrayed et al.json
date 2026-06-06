@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Mrayed et al/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 132.70000000000002,
                     "unit": "degC"
@@ -116,7 +116,7 @@
         },
         {
             "name": "Distillery/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 132.70000000000002,
                     "unit": "degC"
@@ -230,7 +230,7 @@
         },
         {
             "name": "Mrayed et al/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -344,7 +344,7 @@
         },
         {
             "name": "Mrayed et al/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 125.0,
                     "unit": "degC"

@@ -6,8 +6,8 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from ...lib.schemas.report_units import split_report_value
 from ...utils.export import build_summary_dataframe
-from ...utils.miscellaneous import get_value
 
 
 def build_problem_summary_frame(
@@ -21,40 +21,55 @@ def build_problem_summary_frame(
 
     rows = []
     for target in results.targets:
+        idx = getattr(target, "idx", None)
+        qh_value, qh_unit = split_report_value(target.Qh, idx=idx)
+        qc_value, qc_unit = split_report_value(target.Qc, idx=idx)
+        qr_value, qr_unit = split_report_value(target.Qr, idx=idx)
+        hot_pinch_value, hot_pinch_unit = split_report_value(
+            target.pinch_temp.hot_temp,
+            idx=idx,
+        )
+        cold_pinch_value, cold_pinch_unit = split_report_value(
+            target.pinch_temp.cold_temp,
+            idx=idx,
+        )
         rows.append(
             {
                 "Target": target.name,
                 "State ID": getattr(target, "state_id", None),
-                "Hot Utility Target": maybe_get_value(
-                    target.Qh, state_id=getattr(target, "state_id", None)
+                "Hot Utility Target": format_res(
+                    value=qh_value,
+                    unit=qh_unit,
                 ),
-                "Cold Utility Target": maybe_get_value(
-                    target.Qc, state_id=getattr(target, "state_id", None)
+                "Cold Utility Target": format_res(
+                    value=qc_value,
+                    unit=qc_unit,
                 ),
-                "Heat Recovery": maybe_get_value(
-                    target.Qr, state_id=getattr(target, "state_id", None)
+                "Heat Recovery": format_res(
+                    value=qr_value,
+                    unit=qr_unit,
                 ),
-                "Hot Pinch": maybe_get_value(
-                    target.temp_pinch.hot_temp,
-                    state_id=getattr(target, "state_id", None),
+                "Hot Pinch": format_res(
+                    value=hot_pinch_value,
+                    unit=hot_pinch_unit,
                 ),
-                "Cold Pinch": maybe_get_value(
-                    target.temp_pinch.cold_temp,
-                    state_id=getattr(target, "state_id", None),
+                "Cold Pinch": format_res(
+                    value=cold_pinch_value,
+                    unit=cold_pinch_unit,
                 ),
                 "Hot Utilities": ", ".join(
-                    format_utility(
-                        utility.name,
-                        utility.heat_flow,
-                        state_id=getattr(target, "state_id", None),
+                    format_res(
+                        name=utility.name,
+                        value=utility.heat_flow,
+                        idx=idx,
                     )
                     for utility in target.hot_utilities
                 ),
                 "Cold Utilities": ", ".join(
-                    format_utility(
-                        utility.name,
-                        utility.heat_flow,
-                        state_id=getattr(target, "state_id", None),
+                    format_res(
+                        name=utility.name,
+                        value=utility.heat_flow,
+                        idx=idx,
                     )
                     for utility in target.cold_utilities
                 ),
@@ -106,20 +121,27 @@ def build_graph_payload(results: Any) -> Optional[dict[str, Any]]:
     }
 
 
-def maybe_get_value(value: Any, state_id: str | None = None) -> Any:
-    """Return the scalar value for OpenPinch value objects."""
-    if value is None:
-        return None
-    return get_value(value, state_id=state_id)
-
-
-def format_utility(
-    name: str,
-    heat_flow: Any,
-    state_id: str | None = None,
+def format_res(
+    name: str | None = None,
+    value: Any | None = None,
+    idx: int | None = None,
+    unit: str | None = None,
 ) -> str:
     """Render one utility summary item."""
-    value = maybe_get_value(heat_flow, state_id=state_id)
-    if value is None:
-        return f"{name}: n/a"
-    return f"{name}: {value:.2f}"
+    val, unt = split_report_value(value, idx=idx)
+    if unt is None:
+        unt = unit
+    if val is None:
+        if name:
+            return f"{name}: n/a"
+        else:
+            return "n/a"
+    if unt is None:
+        if name:
+            return f"{name}: {float(val):.2f}"
+        else:
+            return f"{float(val):.2f}"
+    if name:
+        return f"{name}: {float(val):.2f} {unt}"
+    else:
+        return f"{float(val):.2f} {unt}"

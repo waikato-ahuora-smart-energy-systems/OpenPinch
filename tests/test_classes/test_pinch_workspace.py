@@ -6,7 +6,13 @@ import json
 from pathlib import Path
 
 from OpenPinch import PinchProblem, PinchWorkspace
+from OpenPinch.classes._workspace.views import summary_metric_deltas
 from OpenPinch.lib.enums import HPRcycle
+from OpenPinch.lib.schemas.workspace import (
+    ScenarioVariantView,
+    TableView,
+    ValidationReport,
+)
 from OpenPinch.resources import read_sample_case
 
 
@@ -86,6 +92,55 @@ def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
     assert any(table.table_kind == "shifted" for table in baseline_view.problem_tables)
     assert variant_view.status == "solved"
     assert comparison.metric_deltas
+    assert any(card.value for card in baseline_view.summary_cards)
+    assert any(delta.variant_value for delta in comparison.metric_deltas)
+
+
+def test_workspace_metric_deltas_require_matching_units():
+    base_view = ScenarioVariantView(
+        variant_name="baseline",
+        state_id=None,
+        workflow="target",
+        workflow_options={},
+        status="solved",
+        support_level="supported",
+        validation=ValidationReport(valid=True),
+        summary_table=TableView(
+            columns=["Target", "Hot Utility Target", "Hot Utility Target (unit)"],
+            rows=[
+                {
+                    "Target": "Plant/Direct Integration",
+                    "Hot Utility Target": 100.0,
+                    "Hot Utility Target (unit)": "kW",
+                }
+            ],
+        ),
+    )
+    variant_view = ScenarioVariantView(
+        variant_name="scenario",
+        state_id=None,
+        workflow="target",
+        workflow_options={},
+        status="solved",
+        support_level="supported",
+        validation=ValidationReport(valid=True),
+        summary_table=TableView(
+            columns=["Target", "Hot Utility Target", "Hot Utility Target (unit)"],
+            rows=[
+                {
+                    "Target": "Plant/Direct Integration",
+                    "Hot Utility Target": 120.0,
+                    "Hot Utility Target (unit)": "MW",
+                }
+            ],
+        ),
+    )
+
+    deltas = summary_metric_deltas("baseline", base_view, "scenario", variant_view)
+    hot_delta = next(delta for delta in deltas if delta.metric == "Hot Utility Target")
+
+    assert hot_delta.unit == "kW"
+    assert hot_delta.delta is None
 
 
 def test_pinch_workspace_validation_and_configuration_metadata():

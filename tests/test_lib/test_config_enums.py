@@ -12,6 +12,18 @@ def test_configuration_parses_refrigerant_list_option():
     assert cfg.REFRIGERANTS == ["water", "ammonia", "co2"]
 
 
+def test_configuration_accepts_input_and_output_unit_maps():
+    cfg = Configuration(
+        options={
+            "INPUT_UNITS": {"temperature": "K"},
+            "OUTPUT_UNITS": {"heat_flow": "MW"},
+        }
+    )
+
+    assert cfg.INPUT_UNITS == {"temperature": "K"}
+    assert cfg.OUTPUT_UNITS == {"heat_flow": "MW"}
+
+
 def test_configuration_rejects_unknown_option_keys():
     with pytest.raises(ValueError, match="Unknown configuration option"):
         Configuration(options={"NOT_A_REAL_OPTION": 1})

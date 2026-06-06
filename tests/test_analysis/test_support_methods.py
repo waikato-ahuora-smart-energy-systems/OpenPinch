@@ -1,53 +1,48 @@
 """Regression tests for support methods analysis routines."""
 
-import math
-
 import pytest
 
-from OpenPinch.classes import *
-from OpenPinch.lib import *
-from OpenPinch.utils import *
-from OpenPinch.utils.miscellaneous import *
+from OpenPinch.lib import ValueWithUnit
+from OpenPinch.services.common.miscellaneous import get_state_index
+from OpenPinch.utils.value_resolution import (
+    get_scalar_value,
+    get_state_value,
+)
 
-"""Test cases for the get_value function."""
-
-
-def test_get_value_with_float():
-    assert get_value(3.14) == 3.14
+"""Test cases for value resolution and state selection helpers."""
 
 
-def test_get_value_with_dict():
-    assert get_value({"value": 42}) == 42
+def test_resolve_scalar_value_with_float():
+    assert get_scalar_value(3.14) == 3.14
 
 
-def test_get_value_with_missing_dict_key():
-    with pytest.raises(KeyError):
-        get_value({"not_value": 10})
+def test_resolve_scalar_value_with_dict():
+    assert get_scalar_value({"value": 42}) == 42
 
 
-def test_get_value_with_valuewithunit():
+def test_resolve_scalar_value_with_valuewithunit():
     vwu = ValueWithUnit(value=99.9, unit="kW")
-    assert get_value(vwu) == 99.9
+    assert get_scalar_value(vwu) == 99.9
 
 
-def test_get_value_with_stateful_payload_defaults_to_state_zero():
+def test_resolve_state_value_with_stateful_payload_defaults_to_state_zero():
     payload = {
         "values": [99.9, 88.8],
         "state_ids": ["0", "1"],
         "unit": "kW",
         "weights": [0.25, 0.75],
     }
-    assert get_value(payload) == 99.9
+    assert get_state_value(payload) == 99.9
 
 
-def test_get_value_with_stateful_payload_uses_requested_state_id():
+def test_resolve_state_value_with_stateful_payload_uses_requested_idx():
     payload = {
         "values": [99.9, 88.8],
         "state_ids": ["0", "1"],
         "unit": "kW",
         "weights": [0.25, 0.75],
     }
-    assert get_value(payload, state_id="1") == 88.8
+    assert get_state_value(payload, idx=1) == 88.8
 
 
 def test_get_state_index_resolves_state_id():
@@ -74,60 +69,9 @@ def test_get_state_index_rejects_conflicting_state_id_and_idx():
         get_state_index({"0": 0, "peak": 1}, {"state_id": "peak", "idx": 0})
 
 
-def test_get_value_with_int_raises():
-    assert get_value(5) == 5.0  # Int should be converted to float
+def test_resolve_scalar_value_with_int():
+    assert get_scalar_value(5) == 5.0
 
 
-def test_get_value_with_string_raises():
-    assert (
-        get_value("100") == 100.0
-    )  # String that can be converted to float should work
-
-
-"""Test cases for the compute_capital_recovery_factor function."""
-
-
-def test_crf_typical_case():
-    """Test with typical values for interest and years."""
-    i = 0.08
-    n = 10
-    result = compute_capital_recovery_factor(i, n)
-    expected = i * (1 + i) ** n / ((1 + i) ** n - 1)
-    assert math.isclose(result, expected, rel_tol=1e-9)
-
-
-def test_crf_high_interest():
-    """Test with a high interest rate."""
-    result = compute_capital_recovery_factor(0.2, 5)
-    assert result > 0.2
-
-
-def test_crf_long_term():
-    """Test for long project duration (n=30)."""
-    result = compute_capital_recovery_factor(0.05, 30)
-    assert result < 0.1
-
-
-def test_crf_short_term():
-    """Test with a short project duration (n=1)."""
-    result = compute_capital_recovery_factor(0.1, 1)
-    expected = 1.1
-    assert math.isclose(result, expected, rel_tol=1e-9)
-
-
-def test_crf_zero_interest_raises():
-    """Zero interest should raise ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError):
-        compute_capital_recovery_factor(0.0, 10)
-
-
-def test_crf_zero_years_raises():
-    """Zero years should raise ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError):
-        compute_capital_recovery_factor(0.08, 0)
-
-
-def test_crf_negative_interest():
-    """Negative interest should compute (though rarely used)."""
-    result = compute_capital_recovery_factor(-0.01, 10)
-    assert isinstance(result, float)
+def test_resolve_scalar_value_with_string():
+    assert get_scalar_value("100") == 100.0

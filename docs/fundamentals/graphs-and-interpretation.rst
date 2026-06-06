@@ -64,6 +64,17 @@ These views are especially relevant when direct and indirect integration
 answers differ and you need to understand utility system interaction across
 subzones.
 
+Exergetic Graphs
+----------------
+
+After running the exergy post-processing workflow, OpenPinch also exposes:
+
+- an exergetic grand composite curve
+- exergetic net-load profiles
+
+These are not replacement graphs for the thermal views. Read them after the
+underlying thermal target family and utility picture are already clear.
+
 Common Interpretation Errors
 ----------------------------
 
@@ -85,6 +96,8 @@ The main graph surfaces are:
 - `problem.plot.grand_composite_curve()`
 - `problem.plot.grand_composite_curve_with_heat_pump()`
 - `problem.plot.net_load_profiles()`
+- `problem.plot.exergetic_grand_composite_curve()`
+- `problem.plot.exergetic_net_load_profiles()`
 - `problem.plot.export(...)`
 
 After direct HPR targeting, the target-specific net load profile graph includes

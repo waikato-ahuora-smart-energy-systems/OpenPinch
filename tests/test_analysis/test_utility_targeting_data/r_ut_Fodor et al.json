@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Casein/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 78.5,
                     "unit": "degC"
@@ -70,7 +70,7 @@
         },
         {
             "name": "D4/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 54.8,
                     "unit": "degC"
@@ -138,7 +138,7 @@
         },
         {
             "name": "D5/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 53.0,
                     "unit": "degC"

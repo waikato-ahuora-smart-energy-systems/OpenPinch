@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Ziyatdinov et al/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 139.35000000000002,
                     "unit": "degC"

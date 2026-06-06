@@ -34,7 +34,7 @@ dependencies=[
   "pydantic",
   "scipy",
 ]
-version = "0.2.1"
+version = "0.2.2"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -98,6 +98,8 @@ dev = [
     "openpyxl",
     "pyxlsb",
     "tespy",
+    "pylint>=4.0.5",
+    "graphviz>=0.21",
 ]
 
 [tool.black]

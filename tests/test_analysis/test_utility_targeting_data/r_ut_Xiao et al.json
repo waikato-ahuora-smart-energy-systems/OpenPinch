@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Process/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 136.3,
                     "unit": "degC"

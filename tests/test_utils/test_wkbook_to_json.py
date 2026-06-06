@@ -67,7 +67,7 @@ def _write_test_workbook(path: Path):
         #   row 1: utility names ("Default HU"/"Default CU" turn into "HU"/"CU"; else used verbatim)
         #   row 2: units (used to attach to values)
         #   row 4+: data rows
-        # Columns 0..5 are fixed: name, temp_pinch, Qh, Qc, Qr, degree_of_integration
+        # Columns 0..5 are fixed: name, pinch_temp, Qh, Qc, Qr, degree_of_integration
         # Then utility columns (index >= 6) until last column, which is utility_cost.
         row0 = [
             "Meta",
@@ -84,7 +84,7 @@ def _write_test_workbook(path: Path):
         ]
         row1 = [
             "name",
-            "temp_pinch",
+            "pinch_temp",
             "Qh",
             "Qc",
             "Qr",
@@ -99,7 +99,7 @@ def _write_test_workbook(path: Path):
 
         # Data rows start at row index 4 (row_data=4)
         # Two rows: a "Total Site Targets" row and a zone-level row
-        # temp_pinch format: "cold; hot"
+        # pinch_temp format: "cold; hot"
         data1 = [
             "Total Site Targets",
             "85; 125",
@@ -186,9 +186,9 @@ def test_get_results_from_excel_parses_summary(tmp_path: Path):
     assert ts["degree_of_integration"]["value"] == pytest.approx(70.0)
     assert ts["degree_of_integration"]["unit"] == "%"
     # temp pinch split into cold/hot floats with units
-    assert ts["temp_pinch"]["cold_temp"]["value"] == pytest.approx(85.0)
-    assert ts["temp_pinch"]["cold_temp"]["unit"] == "degC"
-    assert ts["temp_pinch"]["hot_temp"]["value"] == pytest.approx(125.0)
+    assert ts["pinch_temp"]["cold_temp"]["value"] == pytest.approx(85.0)
+    assert ts["pinch_temp"]["cold_temp"]["unit"] == "degC"
+    assert ts["pinch_temp"]["hot_temp"]["value"] == pytest.approx(125.0)
     # utility cost becomes a normal numeric field wrapped with units
     assert ts["utility_cost"]["value"] == pytest.approx(1234.0)
     # hot & cold utilities are flattened with names from the header rows
@@ -443,7 +443,7 @@ def test_write_targets_to_dict_and_list_special_name_and_none_fields():
         [
             {
                 "name": "Total Process Targets",
-                "temp_pinch": "70; 100",
+                "pinch_temp": "70; 100",
                 "Qh": 10.0,
                 "Qc": 8.0,
                 "Qr": 2.0,
@@ -455,7 +455,7 @@ def test_write_targets_to_dict_and_list_special_name_and_none_fields():
         ]
     )
     units = {
-        "temp_pinch": "degC",
+        "pinch_temp": "degC",
         "Qh": "kW",
         "Qc": "kW",
         "Qr": "kW",
@@ -468,13 +468,13 @@ def test_write_targets_to_dict_and_list_special_name_and_none_fields():
     out = wkbook_to_json._write_targets_to_dict_and_list(df, units, project_name="Proj")
 
     assert out[0]["name"] == "Proj/Total Process Target"
-    assert out[0]["temp_pinch"]["cold_temp"]["value"] is None
-    assert out[0]["temp_pinch"]["hot_temp"]["value"] is None
+    assert out[0]["pinch_temp"]["cold_temp"]["value"] is None
+    assert out[0]["pinch_temp"]["hot_temp"]["value"] is None
     assert out[0]["degree_of_integration"]["value"] is None
 
 
 def test_write_targets_to_dict_and_list_empty_paths():
-    empty_columns = ["name", "temp_pinch", "Qh", "Qc", "Qr", "degree_of_integration"]
+    empty_columns = ["name", "pinch_temp", "Qh", "Qc", "Qr", "degree_of_integration"]
     empty_df = pd.DataFrame(columns=empty_columns)
     assert (
         wkbook_to_json._write_targets_to_dict_and_list(
@@ -485,8 +485,8 @@ def test_write_targets_to_dict_and_list_empty_paths():
 
     filtered_out_df = pd.DataFrame(
         [
-            {"name": "Individual Process Targets", "temp_pinch": "50; 70"},
-            {"name": 123, "temp_pinch": "50; 70"},
+            {"name": "Individual Process Targets", "pinch_temp": "50; 70"},
+            {"name": 123, "pinch_temp": "50; 70"},
         ]
     )
     assert (

@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import math
+import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
-from pydantic import ValidationError, warnings
+from pydantic import ValidationError
 
 from ..lib.schemas.io import TargetInput, TargetOutput
 from ..lib.schemas.targets import BaseTargetModel
 from ..resources import list_sample_cases, read_sample_case
 from ..services import data_preprocessing_service
+from ..services.common.miscellaneous import get_state_index
 from ..services.input_data_processing._canonicalization import canonical_problem_inputs
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
@@ -23,11 +25,6 @@ from ..utils.csv_to_json import get_problem_from_csv
 from ..utils.export import (
     build_summary_dataframe,
     export_target_summary_to_excel_with_units,
-)
-from ..utils.miscellaneous import get_state_index
-from ..utils.multiscale_targeting import (
-    extract_results,
-    get_targets_for_zone_and_sub_zones,
 )
 from ..utils.wkbook_to_json import get_problem_from_excel
 from ._problem import (
@@ -40,8 +37,10 @@ from ._problem import (
     _validate_problem_semantics,
     build_graph_payload,
     build_problem_summary_frame,
+    extract_results,
     load_problem_source,
     prepare_in_memory_problem_source,
+    run_targeting_for_zone_and_subzones,
 )
 from ._problem import (
     format_schema_validation_error as _format_schema_validation_error,
@@ -50,6 +49,7 @@ from ._problem import (
     locate_summary_row as _locate_summary_row,
 )
 from .stream_collection import StreamCollection
+from .value import Value
 from .zone import Zone
 
 ZoneService = Callable[["Zone"], "Zone"]
@@ -126,7 +126,7 @@ class PinchProblem:
             options,
             zone=zone,
         )
-        get_targets_for_zone_and_sub_zones(
+        run_targeting_for_zone_and_subzones(
             zone=zone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
@@ -222,6 +222,73 @@ class PinchProblem:
         except KeyError as exc:
             raise RuntimeError(
                 "Cogeneration selected target "
+                f"{selected_target_type!r} for zone {zone.name!r}, "
+                "but that target was not available on the zone."
+            ) from exc
+
+    def _run_exergy_targeting_for_zone_and_subzones(
+        self,
+        *,
+        zone: "Zone",
+        service_func: Optional[ZoneService],
+        options: Optional[dict[str, Any]],
+    ) -> None:
+        """Run exergy targeting in post-order so site targets see solved children."""
+        child_options = dict(options or {})
+        child_options.pop("base_target_type", None)
+        for subzone in zone.subzones.values():
+            self._run_exergy_targeting_for_zone_and_subzones(
+                zone=subzone,
+                service_func=service_func,
+                options=child_options,
+            )
+        if service_func is not None:
+            service_func(zone, options)
+
+    def _execute_exergy_targeting(
+        self,
+        *,
+        application_zone: Optional[str | Zone],
+        options: Optional[dict[str, Any]],
+        include_subzones: bool,
+        service_func: Optional[ZoneService] = None,
+        sid: str = None,
+    ) -> BaseTargetModel:
+        """Apply exergy targeting and return the compatible target family selected."""
+        execution_master_zone = self._build_execution_master_zone()
+        runtime_options, sid = self._resolve_runtime_state_options(
+            options,
+            zone=execution_master_zone,
+        )
+        zone = self._resolve_target_zone(
+            application_zone, master_zone=execution_master_zone
+        )
+
+        if include_subzones:
+            self._run_exergy_targeting_for_zone_and_subzones(
+                zone=zone,
+                service_func=service_func,
+                options=runtime_options,
+            )
+        elif service_func is not None:
+            service_func(zone, runtime_options)
+
+        self._results = TargetOutput.model_validate(
+            extract_results(execution_master_zone, state_id=sid)
+        )
+
+        selected_target_type = getattr(zone, "_selected_exergy_target_type", None)
+        if not isinstance(selected_target_type, str):
+            raise RuntimeError(
+                "Exergy targeting did not select a compatible target "
+                f"for zone {zone.name!r}."
+            )
+
+        try:
+            return zone.targets[selected_target_type]
+        except KeyError as exc:
+            raise RuntimeError(
+                "Exergy targeting selected target "
                 f"{selected_target_type!r} for zone {zone.name!r}, "
                 "but that target was not available on the zone."
             ) from exc
@@ -443,18 +510,45 @@ class PinchProblem:
             "Hot Pinch",
             "Cold Pinch",
         ]
+        unit_columns = {col: f"{col} (unit)" for col in columns}
+
         comparison = pd.DataFrame(
             [
-                pd.Series({col: base_row.get(col) for col in columns}, name=base_label),
                 pd.Series(
-                    {col: other_row.get(col) for col in columns},
+                    {
+                        col: base_row.get(col)
+                        for col in [*columns, *unit_columns.values()]
+                    },
+                    name=base_label,
+                ),
+                pd.Series(
+                    {
+                        col: other_row.get(col)
+                        for col in [*columns, *unit_columns.values()]
+                    },
                     name=other_label,
                 ),
             ]
         )
-        comparison.loc["Change"] = (
-            comparison.loc[other_label] - comparison.loc[base_label]
-        )
+
+        change_row: dict[str, object] = {}
+        for col in columns:
+            unit_col = unit_columns[col]
+            base_unit = base_row.get(unit_col)
+            other_unit = other_row.get(unit_col)
+            base_value = base_row.get(col)
+            other_value = other_row.get(col)
+            try:
+                base_value = Value(base_value, base_unit)
+                other_value = Value(other_value, other_unit).to(base_unit)
+                other_unit = base_unit
+                change_row[col] = float(other_value) - float(base_value)
+                change_row[unit_col] = base_unit
+            except TypeError, ValueError:
+                change_row[col] = None
+                change_row[unit_col] = None
+
+        comparison.loc["Change"] = pd.Series(change_row)
         comparison.insert(0, "Target", str(base_row["Target"]))
         comparison.loc["Change", "Target"] = str(base_row["Target"])
         return comparison

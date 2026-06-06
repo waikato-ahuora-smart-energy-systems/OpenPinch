@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Medium/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 82.35000000000002,
                     "unit": "degC"

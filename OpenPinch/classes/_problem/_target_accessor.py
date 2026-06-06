@@ -7,6 +7,7 @@ from ...services import (
     direct_heat_integration_service,
     direct_heat_pump_service,
     direct_refrigeration_service,
+    exergy_targeting_service,
     indirect_heat_integration_service,
     indirect_heat_pump_service,
     indirect_refrigeration_service,
@@ -196,6 +197,26 @@ class _TargetAccessor:
             options=runtime_options,
             include_subzones=include_subzones,
             direct_service_func=area_cost_targeting_service,
+        )
+
+    def exergy(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+        state_id: Optional[str] = None,
+    ) -> BaseTargetModel:
+        """Run exergy targeting on the first compatible base target family."""
+        runtime_options = dict(options or {})
+        runtime_options["DO_EXERGY_TARGETING"] = True
+        if state_id is not None:
+            runtime_options["state_id"] = state_id
+        return self._problem._execute_exergy_targeting(
+            application_zone=zone_name,
+            options=runtime_options,
+            include_subzones=include_subzones,
+            service_func=exergy_targeting_service,
         )
 
 

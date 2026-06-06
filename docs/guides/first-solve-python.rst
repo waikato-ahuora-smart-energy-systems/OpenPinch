@@ -108,12 +108,18 @@ Step 7. Use the Richer Workflow Hooks
 - `problem.target.indirect_heat_integration(...)`
 - `problem.target.direct_heat_pump(...)`
 - `problem.target.indirect_heat_pump(...)`
+- `problem.target.direct_refrigeration(...)`
+- `problem.target.indirect_refrigeration(...)`
+- `problem.target.exergy(...)`
 - `problem.target.cogeneration(...)`
-- `problem.target.direct_heat_pump(...)` and
-  `problem.target.indirect_heat_pump(...)`
 
 These are best treated as explicit advanced workflows after you understand the
 base case.
+
+`problem.target.exergy(...)` is a post-processing step on an existing target
+result. Run the compatible thermal target first, then inspect
+`problem.plot.exergetic_grand_composite_curve()` or
+`problem.plot.exergetic_net_load_profiles()` if you need the exergy view.
 
 Named Multi-Case Alternative
 ----------------------------

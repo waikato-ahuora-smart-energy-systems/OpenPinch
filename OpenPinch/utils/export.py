@@ -1,14 +1,16 @@
 """Excel export utilities for OpenPinch targeting outputs."""
 
+from __future__ import annotations
+
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Optional
 
 import pandas as pd
 
+from ..lib.schemas.report_units import split_report_value
 from ..streamlit_webviewer.web_graphing import problem_table_to_dataframe
-from .miscellaneous import get_value
 
 if TYPE_CHECKING:
     from ..classes.zone import Zone
@@ -77,23 +79,17 @@ def build_summary_dataframe(targets) -> pd.DataFrame:
 ################################################################################
 
 
-def _split_vu(
-    x: Any,
-    state_id: str | None = None,
-) -> Tuple[Optional[float], Optional[str]]:
-    """Return ``(value, unit)`` for either a float or ValueWithUnit/None."""
-    if x is None:
-        return None, None
-    # If it's a pydantic model with attributes
-    if hasattr(x, "value") and hasattr(x, "unit"):
-        return x.value, x.unit
-    if hasattr(x, "unit"):
-        return get_value(x, state_id=state_id), x.unit
-    # plain number
-    try:
-        return get_value(x, state_id=state_id), None
-    except TypeError, ValueError:
-        return None, None
+def _value_unit_columns(
+    label: str,
+    value: Any,
+    *,
+    idx: int | None = None,
+) -> dict[str, Any]:
+    resolved_value, resolved_unit = split_report_value(value, idx=idx)
+    return {
+        f"{label} (value)": resolved_value,
+        f"{label} (unit)": resolved_unit,
+    }
 
 
 def _autosize_columns(df: pd.DataFrame, ws, start_col: int = 1, header_row: int = 1):
@@ -120,79 +116,78 @@ def _safe_name(name: str) -> str:
 
 def _make_summary_row(t) -> dict:
     state_id = getattr(t, "state_id", None)
-    cold_val, cold_unit = _split_vu(
-        getattr(t.temp_pinch, "cold_temp", None),
-        state_id=state_id,
-    )
-    hot_val, hot_unit = _split_vu(
-        getattr(t.temp_pinch, "hot_temp", None),
-        state_id=state_id,
-    )
-
-    Qh_val, Qh_unit = _split_vu(t.Qh, state_id=state_id)
-    Qc_val, Qc_unit = _split_vu(t.Qc, state_id=state_id)
-    Qr_val, Qr_unit = _split_vu(t.Qr, state_id=state_id)
-
-    deg_val, deg_unit = _split_vu(t.degree_of_integration, state_id=state_id)
-
+    idx = getattr(t, "idx", None)
     base_columns = {
         "Target": t.name,
         "State ID": state_id,
-        "Cold Pinch (value)": cold_val,
-        "Cold Pinch (unit)": cold_unit,
-        "Hot Pinch (value)": hot_val,
-        "Hot Pinch (unit)": hot_unit,
-        "Qh (value)": Qh_val,
-        "Qh (unit)": Qh_unit,
-        "Qc (value)": Qc_val,
-        "Qc (unit)": Qc_unit,
-        "Qr (value)": Qr_val,
-        "Qr (unit)": Qr_unit,
-        "Degree of Integration (value)": deg_val,
-        "Degree of Integration (unit)": deg_unit,
+        **_value_unit_columns(
+            "Cold Pinch",
+            getattr(t.pinch_temp, "cold_temp", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "Hot Pinch",
+            getattr(t.pinch_temp, "hot_temp", None),
+            idx=idx,
+        ),
+        **_value_unit_columns("Qh", t.Qh, idx=idx),
+        **_value_unit_columns("Qc", t.Qc, idx=idx),
+        **_value_unit_columns("Qr", t.Qr, idx=idx),
+        **_value_unit_columns(
+            "Degree of Integration",
+            t.degree_of_integration,
+            idx=idx,
+        ),
     }
 
     utility_columns = _utility_columns(
         t.hot_utilities,
         t.cold_utilities,
-        state_id=state_id,
+        idx=idx,
     )
-
-    util_cost_val, util_cost_unit = _split_vu(t.utility_cost, state_id=state_id)
-    area_val, area_unit = _split_vu(t.area, state_id=state_id)
-
-    work_val, work_unit = _split_vu(t.work_target, state_id=state_id)
-    turb_eff_val, turb_eff_unit = _split_vu(
-        t.turbine_efficiency_target,
-        state_id=state_id,
-    )
-
-    ex_src_val, ex_src_unit = _split_vu(t.exergy_sources, state_id=state_id)
-    ex_sink_val, ex_sink_unit = _split_vu(t.exergy_sinks, state_id=state_id)
-    ex_req_val, ex_req_unit = _split_vu(t.exergy_req_min, state_id=state_id)
-    ex_des_val, ex_des_unit = _split_vu(t.exergy_des_min, state_id=state_id)
 
     tail_columns = {
-        "Utility Cost (value)": util_cost_val,
-        "Utility Cost (unit)": util_cost_unit,
-        "Area (value)": area_val,
-        "Area (unit)": area_unit,
+        **_value_unit_columns("Utility Cost", t.utility_cost, idx=idx),
+        **_value_unit_columns("Area", t.area, idx=idx),
         "Num Units": t.num_units,
-        "Capital Cost": t.capital_cost,
-        "Total Cost": t.total_cost,
-        "Work Target (value)": work_val,
-        "Work Target (unit)": work_unit,
-        "Turbine Eff Target (value)": turb_eff_val,
-        "Turbine Eff Target (unit)": turb_eff_unit,
-        "ETE": t.ETE,
-        "Exergy Sources (value)": ex_src_val,
-        "Exergy Sources (unit)": ex_src_unit,
-        "Exergy Sinks (value)": ex_sink_val,
-        "Exergy Sinks (unit)": ex_sink_unit,
-        "Exergy Req Min (value)": ex_req_val,
-        "Exergy Req Min (unit)": ex_req_unit,
-        "Exergy Des Min (value)": ex_des_val,
-        "Exergy Des Min (unit)": ex_des_unit,
+        **_value_unit_columns("Capital Cost", t.capital_cost, idx=idx),
+        **_value_unit_columns("Total Cost", t.total_cost, idx=idx),
+        **_value_unit_columns("Work Target", t.work_target, idx=idx),
+        **_value_unit_columns(
+            "Turbine Eff Target",
+            t.turbine_efficiency_target,
+            idx=idx,
+        ),
+        **_value_unit_columns("ETE", t.ETE, idx=idx),
+        **_value_unit_columns("Exergy Sources", t.exergy_sources, idx=idx),
+        **_value_unit_columns("Exergy Sinks", t.exergy_sinks, idx=idx),
+        **_value_unit_columns("Exergy Req Min", t.exergy_req_min, idx=idx),
+        **_value_unit_columns("Exergy Des Min", t.exergy_des_min, idx=idx),
+        "HPR Cycle": getattr(t, "hpr_cycle", None),
+        "HPR Success": getattr(t, "hpr_success", None),
+        **_value_unit_columns(
+            "HPR Utility Total",
+            getattr(t, "hpr_utility_total", None),
+            idx=idx,
+        ),
+        **_value_unit_columns("HPR Work", getattr(t, "hpr_work", None), idx=idx),
+        **_value_unit_columns(
+            "HPR External Utility",
+            getattr(t, "hpr_external_utility", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "HPR Ambient Hot",
+            getattr(t, "hpr_ambient_hot", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "HPR Ambient Cold",
+            getattr(t, "hpr_ambient_cold", None),
+            idx=idx,
+        ),
+        **_value_unit_columns("HPR COP", getattr(t, "hpr_cop", None), idx=idx),
+        **_value_unit_columns("HPR Eta HE", getattr(t, "hpr_eta_he", None), idx=idx),
     }
 
     return base_columns | utility_columns | tail_columns
@@ -202,14 +197,14 @@ def _utility_columns(
     hot_utils: Optional[Iterable],
     cold_utils: Optional[Iterable],
     *,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> dict:
     """Return flattened value/unit columns for the provided utilities."""
     columns: dict[str, Any] = {}
 
     def emit(utils):
         for u in utils or []:
-            hf_val, hf_unit = _split_vu(u.heat_flow, state_id=state_id)
+            hf_val, hf_unit = split_report_value(u.heat_flow, idx=idx)
             columns[f"{u.name} (value)"] = hf_val
             columns[f"{u.name} (unit)"] = hf_unit
 

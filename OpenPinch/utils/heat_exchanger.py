@@ -1,5 +1,7 @@
 """Heat-exchanger performance correlations used by area targeting routines."""
 
+from __future__ import annotations
+
 import math
 
 import numpy as np

@@ -36,6 +36,9 @@ _GRAPH_TYPE_ALIASES = {
     "gcc": GT.GCC.value,
     "grand composite": GT.GCC.value,
     "grand composite curve": GT.GCC.value,
+    "gcc_x": GT.GCC_X.value,
+    "exergy gcc": GT.GCC_X.value,
+    "exergetic grand composite curve": GT.GCC_X.value,
     "nlc": GT.NLP.value,
     "net load": GT.NLP.value,
     "net load curve": GT.NLP.value,
@@ -47,6 +50,9 @@ _GRAPH_TYPE_ALIASES = {
     "net_load curves": GT.NLP.value,
     "net_load profile": GT.NLP.value,
     "net_load profiles": GT.NLP.value,
+    "nlp_x": GT.NLP_X.value,
+    "exergy nlp": GT.NLP_X.value,
+    "exergetic net load profiles": GT.NLP_X.value,
     "tsp": GT.TSP.value,
     "total site": GT.TSP.value,
     "total site profiles": GT.TSP.value,
@@ -302,6 +308,23 @@ class _PlotAccessor:
             return_graph_data=return_graph_data,
         )
 
+    def exergetic_grand_composite_curve(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
+    ):
+        """Return the first matching exergetic GCC output or figure."""
+        return self._plot_graph(
+            zone_name=zone_name,
+            graph_type=GT.GCC_X.value,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
+
     def grand_composite_curve_with_heat_pump(
         self,
         *,
@@ -331,6 +354,23 @@ class _PlotAccessor:
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.NLP.value,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
+
+    def exergetic_net_load_profiles(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
+    ):
+        """Return the first matching exergetic NLP payload or figure."""
+        return self._plot_graph(
+            zone_name=zone_name,
+            graph_type=GT.NLP_X.value,
             index=index,
             show=show,
             return_graph_data=return_graph_data,

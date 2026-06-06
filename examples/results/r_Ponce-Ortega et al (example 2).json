@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Ponce-Ortega et al (example 2)/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 82.35000000000002,
                     "unit": "degC"
@@ -95,7 +95,7 @@
         },
         {
             "name": "Medium/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 82.35000000000002,
                     "unit": "degC"
@@ -188,7 +188,7 @@
         },
         {
             "name": "Ponce-Ortega et al (example 2)/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -281,7 +281,7 @@
         },
         {
             "name": "Ponce-Ortega et al (example 2)/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 45.0,
                     "unit": "degC"

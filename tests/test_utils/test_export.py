@@ -12,11 +12,12 @@ from openpyxl import Workbook
 import OpenPinch.utils.export as export_mod
 from OpenPinch.classes import ProblemTable, Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
+from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.utils.export import (
     _autosize_columns,
     _safe_name,
-    _split_vu,
+    build_summary_dataframe,
     export_target_summary_to_excel_with_units,
 )
 
@@ -35,24 +36,26 @@ class VU:
 
 def _make_target(
     name="Base",
-    pinch_cold=VU(85.0, "°C"),
-    pinch_hot=VU(125.0, "°C"),
+    idx=None,
+    state_id=None,
+    pinch_cold=VU(85.0, "degC"),
+    pinch_hot=VU(125.0, "degC"),
     Qh=VU(100.0, "kW"),
     Qc=VU(80.0, "kW"),
     Qr=VU(20.0, "kW"),
-    degree_of_integration=VU(0.7, "-"),
+    degree_of_integration=VU(70.0, "%"),
     utility_cost=VU(1234.0, "$/h"),
-    area=VU(456.0, "m²"),
+    area=VU(456.0, "m^2"),
     work_target=VU(10.0, "kW"),
-    turbine_eff_target=VU(0.8, "-"),
+    turbine_eff_target=VU(80.0, "%"),
     exergy_sources=VU(200.0, "kW"),
     exergy_sinks=VU(180.0, "kW"),
     exergy_req_min=VU(15.0, "kW"),
     exergy_des_min=VU(12.0, "kW"),
     num_units=7,
-    capital_cost=111.0,
-    total_cost=222.0,
-    ETE=0.93,
+    capital_cost=VU(111.0, "$"),
+    total_cost=VU(222.0, "$/y"),
+    ETE=VU(93.0, "%"),
     hot_utils=None,
     cold_utils=None,
 ):
@@ -64,7 +67,9 @@ def _make_target(
 
     return SimpleNamespace(
         name=name,
-        temp_pinch=SimpleNamespace(cold_temp=pinch_cold, hot_temp=pinch_hot),
+        idx=idx,
+        state_id=state_id,
+        pinch_temp=SimpleNamespace(cold_temp=pinch_cold, hot_temp=pinch_hot),
         Qh=Qh,
         Qc=Qc,
         Qr=Qr,
@@ -168,13 +173,16 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
         "Area (value)",
         "Area (unit)",
         "Num Units",
-        "Capital Cost",
-        "Total Cost",
+        "Capital Cost (value)",
+        "Capital Cost (unit)",
+        "Total Cost (value)",
+        "Total Cost (unit)",
         "Work Target (value)",
         "Work Target (unit)",
         "Turbine Eff Target (value)",
         "Turbine Eff Target (unit)",
-        "ETE",
+        "ETE (value)",
+        "ETE (unit)",
         "Exergy Sources (value)",
         "Exergy Sources (unit)",
         "Exergy Sinks (value)",
@@ -183,6 +191,22 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
         "Exergy Req Min (unit)",
         "Exergy Des Min (value)",
         "Exergy Des Min (unit)",
+        "HPR Cycle",
+        "HPR Success",
+        "HPR Utility Total (value)",
+        "HPR Utility Total (unit)",
+        "HPR Work (value)",
+        "HPR Work (unit)",
+        "HPR External Utility (value)",
+        "HPR External Utility (unit)",
+        "HPR Ambient Hot (value)",
+        "HPR Ambient Hot (unit)",
+        "HPR Ambient Cold (value)",
+        "HPR Ambient Cold (unit)",
+        "HPR COP (value)",
+        "HPR COP (unit)",
+        "HPR Eta HE (value)",
+        "HPR Eta HE (unit)",
         # Utility columns come from names:
         "HP Steam (value)",
         "HP Steam (unit)",
@@ -198,7 +222,7 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     # Row for "Base"
     base = df.loc[df["Target"] == "Base"].iloc[0]
     assert pytest.approx(base["Cold Pinch (value)"]) == 85.0
-    assert base["Cold Pinch (unit)"] == "°C"
+    assert base["Cold Pinch (unit)"] == "degC"
     assert pytest.approx(base["Qh (value)"]) == 100.0
     assert base["Qh (unit)"] == "kW"
     assert pytest.approx(base["HP Steam (value)"]) == 75.0
@@ -206,7 +230,10 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert pytest.approx(base["Cooling Water (value)"]) == 60.0
     assert base["Cooling Water (unit)"] == "kW"
     assert int(base["Num Units"]) == 7
-    assert pytest.approx(base["ETE"]) == 0.93
+    assert pytest.approx(base["Capital Cost (value)"]) == 111.0
+    assert base["Capital Cost (unit)"] == "$"
+    assert pytest.approx(base["ETE (value)"]) == 93.0
+    assert base["ETE (unit)"] == "%"
 
     # Row for "Alt A"
     alt = df.loc[df["Target"] == "Alt A"].iloc[0]
@@ -285,21 +312,45 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     assert pytest.approx(sub_df.iloc[0][PT.T.value]) == 40.0
 
 
-# --------------------------------------------------------------------------------------
-# _split_vu
-# --------------------------------------------------------------------------------------
+def test_build_summary_dataframe_resolves_stateful_values_using_idx():
+    target = _make_target(
+        name="Peak",
+        idx=1,
+        state_id="peak",
+        pinch_cold=StatefulValueWithUnit(values=[80.0, 95.0], unit="degC"),
+        pinch_hot=StatefulValueWithUnit(values=[120.0, 135.0], unit="degC"),
+        Qh=StatefulValueWithUnit(values=[100.0, 140.0], unit="kW"),
+        Qc=StatefulValueWithUnit(values=[80.0, 60.0], unit="kW"),
+        Qr=StatefulValueWithUnit(values=[20.0, 30.0], unit="kW"),
+    )
+
+    row = build_summary_dataframe([target]).iloc[0]
+
+    assert row["State ID"] == "peak"
+    assert row["Qh (value)"] == pytest.approx(140.0)
+    assert row["Qc (value)"] == pytest.approx(60.0)
+    assert row["Qr (value)"] == pytest.approx(30.0)
+    assert row["Cold Pinch (value)"] == pytest.approx(95.0)
+    assert row["Hot Pinch (value)"] == pytest.approx(135.0)
 
 
-def test_split_vu_handles_none_plain_number_and_object():
-    assert _split_vu(None) == (None, None)
-    assert _split_vu(3) == (3.0, None)
-    assert _split_vu(3.14) == (3.14, None)
-    assert _split_vu(VU(12.3, "kg/s")) == (12.3, "kg/s")
+def test_target_results_include_idx():
+    target = DirectIntegrationTarget(
+        zone_name="Plant",
+        type="DI",
+        pt=_make_problem_table([10.0]),
+        pt_real=_make_problem_table([30.0]),
+        hot_utility_target=10.0,
+        cold_utility_target=5.0,
+        heat_recovery_target=15.0,
+        state_id="peak",
+        state_idx=1,
+    )
 
+    results = target.to_target_results()
 
-def test_split_vu_non_numeric_unparsable():
-    # Strings that cannot be coerced to float return (None, None)
-    assert _split_vu("not-a-number") == (None, None)
+    assert results.idx == 1
+    assert results.state_id == "peak"
 
 
 # --------------------------------------------------------------------------------------

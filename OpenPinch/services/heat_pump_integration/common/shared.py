@@ -1,5 +1,7 @@
 """Shared helpers for heat pump and refrigeration targeting."""
 
+from __future__ import annotations
+
 from typing import Any, Callable, Tuple
 
 import numpy as np
@@ -24,8 +26,8 @@ from ....lib.schemas.hpr import (
     HPRThermoArtifacts,
 )
 from ....utils.blackbox_minimisers import multiminima
-from ....utils.miscellaneous import (
-    clean_composite_curve_ends,
+from ...common.graph_data import clean_composite_curve_ends
+from ...common.miscellaneous import (
     delta_vals,
     g_ineq_penalty,
 )

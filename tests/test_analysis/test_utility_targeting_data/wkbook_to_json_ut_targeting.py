@@ -34,7 +34,7 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
             "heat_flow",
         ]
     elif sheet_name == "Summary":
-        col_names = ["name", "temp_pinch", "Qh", "Qc", "Qr", "degree_of_integration"]
+        col_names = ["name", "pinch_temp", "Qh", "Qc", "Qr", "degree_of_integration"]
         prefix = "HU::"
         for i in range(6, len(df_full.columns) - 1):
             if (
@@ -239,7 +239,7 @@ def write_targets_to_dict_and_list(df_data: pd.DataFrame, units_map: dict) -> li
                         },
                     }
                 )
-            elif col == "temp_pinch":
+            elif col == "pinch_temp":
                 val = str(value).split("; ")
                 val[0] = float(val[0])
                 val[-1] = float(val[-1])

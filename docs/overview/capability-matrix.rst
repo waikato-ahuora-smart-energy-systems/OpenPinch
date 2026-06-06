@@ -45,6 +45,11 @@ surfaces and outputs.
        service-layer cogeneration entrypoint
      - turbine work and efficiency targets
      - Advanced
+   * - Exergy targeting post-processing
+     - ``problem.target.exergy(...)``,
+       exergetic plot accessors
+     - exergy metrics plus exergetic GCC and NLP graphs
+     - Advanced
    * - Area / cost targeting
      - ``problem.target.area_cost(...)``,
        common area/cost helpers
@@ -58,7 +63,7 @@ surfaces and outputs.
      - zone-type vocabulary and hierarchy support
      - extended multiscale labeling and aggregation structures
      - Experimental / partial
-   * - Exergy and energy transfer side packages
+   * - Energy transfer and lower-level analysis side packages
      - lower-level service modules
      - specialist analysis helpers
      - Experimental / partial

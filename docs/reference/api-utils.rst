@@ -35,14 +35,11 @@ workbook for review or archiving.
 .. automodule:: OpenPinch.utils.export
    :members:
 
-Math, Optimisation, and Targeting Helpers
------------------------------------------
+Math, Optimisation, and Utility Helpers
+---------------------------------------
 
 These modules provide reusable numerical support for targeting and post-
 processing tasks.
-
-.. automodule:: OpenPinch.utils.multiscale_targeting
-   :members:
 
 .. automodule:: OpenPinch.utils.miscellaneous
    :members:

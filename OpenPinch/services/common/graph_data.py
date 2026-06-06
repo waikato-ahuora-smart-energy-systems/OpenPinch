@@ -10,14 +10,17 @@ from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import GT, PT, ArrowHead, LineColour, StreamLoc
 from ...lib.schemas.targets import BaseTargetModel
-from ...utils.miscellaneous import clean_composite_curve
 from .graph_series_meta import GRAPH_SERIES_META, GraphSeriesMeta
 
 DECIMAL_PLACES = 2
 GCC_VERTICAL_TOL = 1e-3
 
 
-__all__ = ["get_output_graph_data"]
+__all__ = [
+    "get_output_graph_data",
+    "clean_composite_curve_ends",
+    "clean_composite_curve",
+]
 
 
 ################################################################################
@@ -38,6 +41,70 @@ def get_output_graph_data(zone: Zone, graph_sets: Optional[dict] = None) -> dict
             graph_sets = get_output_graph_data(subzone, graph_sets)
 
     return graph_sets
+
+
+def clean_composite_curve_ends(
+    y_vals: np.ndarray | list, x_vals: np.ndarray | list
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Remove redundant points in composite curves."""
+    y_vals = np.array(y_vals)
+    x_vals = np.array(x_vals)
+
+    if np.all(np.isclose(x_vals, 0.0, atol=tol)) or np.abs(x_vals.var()) < tol:
+        return np.array([]), np.array([])
+
+    mask_0 = ~np.isclose(x_vals, x_vals[0] * np.ones(len(x_vals)), atol=tol)
+    start = np.flatnonzero(mask_0)[0] - 1
+    mask_1 = ~np.isclose(x_vals, x_vals[-1] * np.ones(len(x_vals)), atol=tol)
+    end = np.flatnonzero(mask_1)[-1] + 1
+
+    x_clean = x_vals[start : end + 1]
+    y_clean = y_vals[start : end + 1]
+    return y_clean, x_clean
+
+
+def clean_composite_curve(
+    y_array: np.ndarray | list, x_array: np.ndarray | list
+) -> Tuple[np.ndarray | list]:
+    """Remove redundant points in composite curves."""
+
+    # Round to avoid tiny numerical errors
+    y_vals, x_vals = clean_composite_curve_ends(y_array, x_array)
+
+    if len(x_vals) <= 2:
+        return y_vals, x_vals
+
+    x_clean, y_clean = [x_vals[0]], [y_vals[0]]
+
+    for i in range(1, len(x_vals) - 1):
+        x1, x2, x3 = x_vals[i - 1], x_vals[i], x_vals[i + 1]
+        y1, y2, y3 = y_vals[i - 1], y_vals[i], y_vals[i + 1]
+
+        if x1 == x3:
+            # All three x are the same; keep x2 only if y2 is different
+            if x1 != x2:
+                x_clean.append(x2)
+                y_clean.append(y2)
+        else:
+            # Linear interpolation check
+            y_interp = y1 + (y3 - y1) * (x2 - x1) / (x3 - x1)
+            if abs(y2 - y_interp) > tol:
+                x_clean.append(x2)
+                y_clean.append(y2)
+
+    x_clean.append(x_vals[-1])
+    y_clean.append(y_vals[-1])
+
+    if abs(x_clean[0] - x_clean[1]) < tol:
+        x_clean.pop(0)
+        y_clean.pop(0)
+
+    i = len(x_clean) - 1
+    if abs(x_clean[i] - x_clean[i - 1]) < tol:
+        x_clean.pop(i)
+        y_clean.pop(i)
+
+    return np.asarray(y_clean), np.asarray(x_clean)
 
 
 ################################################################################
@@ -61,8 +128,14 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.CC.value,
                 data=target_graphs[GT.CC.value],
                 label="Composite Curve",
-                value_field=[PT.H_HOT, PT.H_COLD],
-                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
+                value_field=[
+                    PT.H_HOT,
+                    PT.H_COLD,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                ],
             )
         )
 
@@ -73,8 +146,14 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.SCC.value,
                 data=target_graphs[GT.SCC.value],
                 label="Shifted Composite Curve",
-                value_field=[PT.H_HOT, PT.H_COLD],
-                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
+                value_field=[
+                    PT.H_HOT,
+                    PT.H_COLD,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                ],
             )
         )
 
@@ -124,6 +203,20 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
             )
         )
 
+    if GT.GCC_X.value in target_graphs:
+        graphs.append(
+            _make_gcc_graph(
+                graph_title=graph_title,
+                key=GT.GCC_X.value,
+                data=target_graphs[GT.GCC_X.value],
+                label="Exergetic Grand Composite Curve",
+                value_field=[
+                    PT.X_GCC.value,
+                ],
+                is_utility_profile=[False],
+            )
+        )
+
     if GT.NLP.value in target_graphs:
         graphs.append(
             _make_composite_graph(
@@ -146,6 +239,25 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                     StreamLoc.ColdU,
                     StreamLoc.HotU,
                     StreamLoc.ColdU,
+                ],
+                include_arrows=True,
+            )
+        )
+
+    if GT.NLP_X.value in target_graphs:
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graph_title,
+                key=GT.NLP_X.value,
+                data=target_graphs[GT.NLP_X.value],
+                label="Exergetic Net Load Profiles",
+                value_field=[
+                    PT.X_SUR,
+                    PT.X_DEF,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
                 ],
                 include_arrows=True,
             )
@@ -193,7 +305,10 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
                 key=GT.GCC_HP.value,
                 data=target_graphs[GT.GCC_HP.value],
                 label="Grand Composite Curve with Heat Pump",
-                value_field=[PT.H_NET_W_AIR, PT.H_NET_HP],
+                value_field=[
+                    PT.H_NET_W_AIR,
+                    PT.H_NET_HP,
+                ],
                 is_utility_profile=[False, True],
             )
         )

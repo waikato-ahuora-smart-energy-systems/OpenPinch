@@ -62,8 +62,6 @@ In particular, the package root exposes:
 - :class:`~OpenPinch.classes.pinch_problem.PinchProblem`
 - :class:`~OpenPinch.classes.pinch_workspace.PinchWorkspace`
 - :func:`~OpenPinch.main.pinch_analysis_service`
-- :func:`~OpenPinch.utils.multiscale_targeting.get_targets_for_zone_and_sub_zones`
-- :func:`~OpenPinch.utils.multiscale_targeting.extract_results`
 - :func:`~OpenPinch.utils.stream_linearisation.get_piecewise_linearisation_for_streams`
 
 Package Entrypoints
@@ -89,12 +87,16 @@ modules.
 - :func:`~OpenPinch.main.pinch_analysis_service` validates the incoming input data,
   prepares the zone hierarchy, runs the appropriate direct and indirect
   targeting steps, and returns a structured response.
-- :func:`~OpenPinch.utils.multiscale_targeting.get_targets_for_zone_and_sub_zones` accepts an already prepared
+- :func:`~OpenPinch.classes._problem.run_targeting_for_zone_and_subzones` accepts an already prepared
   :class:`~OpenPinch.classes.zone.Zone` tree and dispatches it to the correct
   zone-level targeting routine.
-- :func:`~OpenPinch.utils.multiscale_targeting.extract_results` converts the solved in-memory zone
+- :func:`~OpenPinch.classes._problem.extract_results` converts the solved in-memory zone
   hierarchy into the dictionary structure consumed by
   :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
+
+.. autofunction:: OpenPinch.classes._problem.run_targeting_for_zone_and_subzones
+
+.. autofunction:: OpenPinch.classes._problem.extract_results
 
 .. automodule:: OpenPinch.main
    :no-members:

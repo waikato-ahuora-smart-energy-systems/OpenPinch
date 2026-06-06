@@ -553,7 +553,7 @@ class Stream:
         target_unit = self._VALUE_UNITS[attr_name]
         if target_unit is None or parsed.unit == target_unit:
             return parsed
-        if len(parsed.unit) == 0:
+        if parsed.unit in {"", "-"}:
             return Value(parsed.value, unit=target_unit)
         return parsed.to(target_unit)
 

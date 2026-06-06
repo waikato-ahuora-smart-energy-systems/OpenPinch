@@ -1,5 +1,7 @@
 """OpenPinch public API."""
 
+from __future__ import annotations
+
 import warnings as _warnings
 
 from . import lib
@@ -55,6 +57,7 @@ from .lib import (
     MaybeVU,
     NonLinearStream,
     PayloadRecordView,
+    PinchTemp,
     PinchWorkspaceBundle,
     ProblemTableColumnKey,
     ProblemTableColumnUpdates,
@@ -82,7 +85,6 @@ from .lib import (
     TargetOutput,
     TargetResults,
     TargetType,
-    TempPinch,
     THSchema,
     TotalProcessTarget,
     TotalSiteTarget,
@@ -178,7 +180,7 @@ __all__ = [
     "ZoneTreeSchema",
     "HeatUtility",
     "TargetResults",
-    "TempPinch",
+    "PinchTemp",
     "AnyTargetModel",
     "BaseTargetModel",
     "DirectHeatPumpTarget",

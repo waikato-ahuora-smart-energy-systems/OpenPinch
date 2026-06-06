@@ -9,7 +9,7 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.services.common.gcc_manipulation import *
-from OpenPinch.utils.miscellaneous import *
+from OpenPinch.services.common.miscellaneous import *
 
 """Tests for gcc manipulation"""
 
