@@ -4,8 +4,6 @@ import math
 
 import pytest
 
-from OpenPinch.lib import *
-from OpenPinch.utils import *
 from OpenPinch.utils.costing import (
     compute_annual_capital_cost,
     compute_capital_cost,
@@ -59,10 +57,6 @@ def test_crf_negative_interest():
     """Negative interest should compute (though rarely used)."""
     result = compute_capital_recovery_factor(-0.01, 10)
     assert isinstance(result, float)
-
-
-# ===== Merged from test_costing_extra.py =====
-"""Additional coverage tests for costing helpers."""
 
 
 def test_compute_capital_cost_matches_formula():

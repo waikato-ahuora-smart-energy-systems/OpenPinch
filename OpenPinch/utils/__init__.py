@@ -28,18 +28,16 @@ from .heat_exchanger import (
     compute_LMTD_from_ts,
     eNTU_slope_Numerical,
 )
-from .input_validation import validate_stream_data, validate_utility_data
-from .miscellaneous import (
-    clean_composite_curve,
-    clean_composite_curve_ends,
-    delta_vals,
-    delta_with_zero_at_start,
-    g_ineq_penalty,
-    get_value,
-    graph_simple_cc_plot,
-    interp_with_plateaus,
-    linear_interpolation,
-    make_monotonic,
+from .input_validation import (
+    validate_stream_data,
+    validate_utility_data,
+)
+from .plots import graph_simple_cc_plot
+from .value_resolution import (
+    evaluate_value_spec,
+    get_scalar_value,
+    get_state_value,
+    resolve_value_array,
 )
 from .water_properties import (
     Tsat_p,
@@ -82,16 +80,11 @@ __all__ = [
     "eNTU_slope_Numerical",
     "validate_stream_data",
     "validate_utility_data",
-    "clean_composite_curve",
-    "clean_composite_curve_ends",
-    "delta_vals",
-    "delta_with_zero_at_start",
-    "g_ineq_penalty",
-    "get_value",
     "graph_simple_cc_plot",
-    "interp_with_plateaus",
-    "linear_interpolation",
-    "make_monotonic",
+    "get_scalar_value",
+    "get_state_value",
+    "evaluate_value_spec",
+    "resolve_value_array",
     "multiminima",
     "Tsat_p",
     "fromSIunit_T",

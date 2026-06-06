@@ -16,6 +16,7 @@ from ..lib.schemas.io import TargetInput, TargetOutput
 from ..lib.schemas.targets import BaseTargetModel
 from ..resources import list_sample_cases, read_sample_case
 from ..services import data_preprocessing_service
+from ..services.common.miscellaneous import get_state_index
 from ..services.input_data_processing._canonicalization import canonical_problem_inputs
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
@@ -25,7 +26,6 @@ from ..utils.export import (
     build_summary_dataframe,
     export_target_summary_to_excel_with_units,
 )
-from ..utils.miscellaneous import get_state_index
 from ..utils.wkbook_to_json import get_problem_from_excel
 from ._problem import (
     JsonDict,

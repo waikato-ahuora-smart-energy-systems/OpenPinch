@@ -7,7 +7,7 @@ from typing import Any, Optional
 import pandas as pd
 
 from ...utils.export import build_summary_dataframe
-from ...utils.miscellaneous import get_value
+from ...utils.value_resolution import get_scalar_value
 
 
 def build_problem_summary_frame(
@@ -21,32 +21,36 @@ def build_problem_summary_frame(
 
     rows = []
     for target in results.targets:
+        idx = getattr(target, "idx", None)
         rows.append(
             {
                 "Target": target.name,
                 "State ID": getattr(target, "state_id", None),
-                "Hot Utility Target": maybe_get_value(
-                    target.Qh, state_id=getattr(target, "state_id", None)
+                "Hot Utility Target": get_scalar_value(
+                    target.Qh,
+                    idx=idx,
                 ),
-                "Cold Utility Target": maybe_get_value(
-                    target.Qc, state_id=getattr(target, "state_id", None)
+                "Cold Utility Target": get_scalar_value(
+                    target.Qc,
+                    idx=idx,
                 ),
-                "Heat Recovery": maybe_get_value(
-                    target.Qr, state_id=getattr(target, "state_id", None)
+                "Heat Recovery": get_scalar_value(
+                    target.Qr,
+                    idx=idx,
                 ),
-                "Hot Pinch": maybe_get_value(
+                "Hot Pinch": get_scalar_value(
                     target.temp_pinch.hot_temp,
-                    state_id=getattr(target, "state_id", None),
+                    idx=idx,
                 ),
-                "Cold Pinch": maybe_get_value(
+                "Cold Pinch": get_scalar_value(
                     target.temp_pinch.cold_temp,
-                    state_id=getattr(target, "state_id", None),
+                    idx=idx,
                 ),
                 "Hot Utilities": ", ".join(
                     format_utility(
                         utility.name,
                         utility.heat_flow,
-                        state_id=getattr(target, "state_id", None),
+                        idx=idx,
                     )
                     for utility in target.hot_utilities
                 ),
@@ -54,7 +58,7 @@ def build_problem_summary_frame(
                     format_utility(
                         utility.name,
                         utility.heat_flow,
-                        state_id=getattr(target, "state_id", None),
+                        idx=idx,
                     )
                     for utility in target.cold_utilities
                 ),
@@ -106,20 +110,13 @@ def build_graph_payload(results: Any) -> Optional[dict[str, Any]]:
     }
 
 
-def maybe_get_value(value: Any, state_id: str | None = None) -> Any:
-    """Return the scalar value for OpenPinch value objects."""
-    if value is None:
-        return None
-    return get_value(value, state_id=state_id)
-
-
 def format_utility(
     name: str,
     heat_flow: Any,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> str:
     """Render one utility summary item."""
-    value = maybe_get_value(heat_flow, state_id=state_id)
+    value = get_scalar_value(heat_flow, idx=idx)
     if value is None:
         return f"{name}: n/a"
     return f"{name}: {value:.2f}"

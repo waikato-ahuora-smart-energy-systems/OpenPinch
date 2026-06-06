@@ -4,11 +4,9 @@ import math
 
 import pytest
 
-from OpenPinch.classes import *
-from OpenPinch.lib import *
-from OpenPinch.services.exergy_analysis.exergy_targeting_entry import *
-from OpenPinch.utils import *
-from OpenPinch.utils.miscellaneous import *
+from OpenPinch.services.exergy_analysis.exergy_targeting_entry import (
+    compute_exergetic_temperature,
+)
 
 """Test cases for the compute_exergetic_temperature function."""
 

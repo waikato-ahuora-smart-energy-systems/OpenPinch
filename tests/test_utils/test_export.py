@@ -12,11 +12,13 @@ from openpyxl import Workbook
 import OpenPinch.utils.export as export_mod
 from OpenPinch.classes import ProblemTable, Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
+from OpenPinch.lib.schemas.common import StatefulValueWithUnit
 from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.utils.export import (
     _autosize_columns,
     _safe_name,
     _split_vu,
+    build_summary_dataframe,
     export_target_summary_to_excel_with_units,
 )
 
@@ -35,6 +37,8 @@ class VU:
 
 def _make_target(
     name="Base",
+    idx=None,
+    state_id=None,
     pinch_cold=VU(85.0, "°C"),
     pinch_hot=VU(125.0, "°C"),
     Qh=VU(100.0, "kW"),
@@ -64,6 +68,8 @@ def _make_target(
 
     return SimpleNamespace(
         name=name,
+        idx=idx,
+        state_id=state_id,
         temp_pinch=SimpleNamespace(cold_temp=pinch_cold, hot_temp=pinch_hot),
         Qh=Qh,
         Qc=Qc,
@@ -300,6 +306,53 @@ def test_split_vu_handles_none_plain_number_and_object():
 def test_split_vu_non_numeric_unparsable():
     # Strings that cannot be coerced to float return (None, None)
     assert _split_vu("not-a-number") == (None, None)
+
+
+def test_split_vu_uses_idx_for_stateful_values():
+    payload = StatefulValueWithUnit(values=[5.0, 8.5], unit="kW")
+
+    assert _split_vu(payload, idx=1) == (8.5, "kW")
+
+
+def test_build_summary_dataframe_resolves_stateful_values_using_idx():
+    target = _make_target(
+        name="Peak",
+        idx=1,
+        state_id="peak",
+        pinch_cold=StatefulValueWithUnit(values=[80.0, 95.0], unit="degC"),
+        pinch_hot=StatefulValueWithUnit(values=[120.0, 135.0], unit="degC"),
+        Qh=StatefulValueWithUnit(values=[100.0, 140.0], unit="kW"),
+        Qc=StatefulValueWithUnit(values=[80.0, 60.0], unit="kW"),
+        Qr=StatefulValueWithUnit(values=[20.0, 30.0], unit="kW"),
+    )
+
+    row = build_summary_dataframe([target]).iloc[0]
+
+    assert row["State ID"] == "peak"
+    assert row["Qh (value)"] == pytest.approx(140.0)
+    assert row["Qc (value)"] == pytest.approx(60.0)
+    assert row["Qr (value)"] == pytest.approx(30.0)
+    assert row["Cold Pinch (value)"] == pytest.approx(95.0)
+    assert row["Hot Pinch (value)"] == pytest.approx(135.0)
+
+
+def test_target_results_include_idx():
+    target = DirectIntegrationTarget(
+        zone_name="Plant",
+        type="DI",
+        pt=_make_problem_table([10.0]),
+        pt_real=_make_problem_table([30.0]),
+        hot_utility_target=10.0,
+        cold_utility_target=5.0,
+        heat_recovery_target=15.0,
+        state_id="peak",
+        state_idx=1,
+    )
+
+    results = target.to_target_results()
+
+    assert results.idx == 1
+    assert results.state_id == "peak"
 
 
 # --------------------------------------------------------------------------------------

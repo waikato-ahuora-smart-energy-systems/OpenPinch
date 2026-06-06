@@ -2,7 +2,7 @@
 
 import pytest
 
-from OpenPinch.utils import linear_interpolation
+from OpenPinch.services.common.miscellaneous import linear_interpolation
 
 """Test cases for linear_interpolation function."""
 

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
 import pandas as pd
 
 from ..streamlit_webviewer.web_graphing import problem_table_to_dataframe
-from .miscellaneous import get_value
+from .value_resolution import get_scalar_value
 
 if TYPE_CHECKING:
     from ..classes.zone import Zone
@@ -81,20 +81,16 @@ def build_summary_dataframe(targets) -> pd.DataFrame:
 
 def _split_vu(
     x: Any,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> Tuple[Optional[float], Optional[str]]:
     """Return ``(value, unit)`` for either a float or ValueWithUnit/None."""
     if x is None:
         return None, None
-    # If it's a pydantic model with attributes
-    if hasattr(x, "value") and hasattr(x, "unit"):
-        return x.value, x.unit
     if hasattr(x, "unit"):
-        return get_value(x, state_id=state_id), x.unit
-    # plain number
+        return get_scalar_value(x, idx=idx), x.unit
     try:
-        return get_value(x, state_id=state_id), None
-    except TypeError, ValueError:
+        return get_scalar_value(x, idx=idx), None
+    except KeyError, TypeError, ValueError:
         return None, None
 
 
@@ -122,20 +118,21 @@ def _safe_name(name: str) -> str:
 
 def _make_summary_row(t) -> dict:
     state_id = getattr(t, "state_id", None)
+    idx = getattr(t, "idx", None)
     cold_val, cold_unit = _split_vu(
         getattr(t.temp_pinch, "cold_temp", None),
-        state_id=state_id,
+        idx=idx,
     )
     hot_val, hot_unit = _split_vu(
         getattr(t.temp_pinch, "hot_temp", None),
-        state_id=state_id,
+        idx=idx,
     )
 
-    Qh_val, Qh_unit = _split_vu(t.Qh, state_id=state_id)
-    Qc_val, Qc_unit = _split_vu(t.Qc, state_id=state_id)
-    Qr_val, Qr_unit = _split_vu(t.Qr, state_id=state_id)
+    Qh_val, Qh_unit = _split_vu(t.Qh, idx=idx)
+    Qc_val, Qc_unit = _split_vu(t.Qc, idx=idx)
+    Qr_val, Qr_unit = _split_vu(t.Qr, idx=idx)
 
-    deg_val, deg_unit = _split_vu(t.degree_of_integration, state_id=state_id)
+    deg_val, deg_unit = _split_vu(t.degree_of_integration, idx=idx)
 
     base_columns = {
         "Target": t.name,
@@ -157,22 +154,22 @@ def _make_summary_row(t) -> dict:
     utility_columns = _utility_columns(
         t.hot_utilities,
         t.cold_utilities,
-        state_id=state_id,
+        idx=idx,
     )
 
-    util_cost_val, util_cost_unit = _split_vu(t.utility_cost, state_id=state_id)
-    area_val, area_unit = _split_vu(t.area, state_id=state_id)
+    util_cost_val, util_cost_unit = _split_vu(t.utility_cost, idx=idx)
+    area_val, area_unit = _split_vu(t.area, idx=idx)
 
-    work_val, work_unit = _split_vu(t.work_target, state_id=state_id)
+    work_val, work_unit = _split_vu(t.work_target, idx=idx)
     turb_eff_val, turb_eff_unit = _split_vu(
         t.turbine_efficiency_target,
-        state_id=state_id,
+        idx=idx,
     )
 
-    ex_src_val, ex_src_unit = _split_vu(t.exergy_sources, state_id=state_id)
-    ex_sink_val, ex_sink_unit = _split_vu(t.exergy_sinks, state_id=state_id)
-    ex_req_val, ex_req_unit = _split_vu(t.exergy_req_min, state_id=state_id)
-    ex_des_val, ex_des_unit = _split_vu(t.exergy_des_min, state_id=state_id)
+    ex_src_val, ex_src_unit = _split_vu(t.exergy_sources, idx=idx)
+    ex_sink_val, ex_sink_unit = _split_vu(t.exergy_sinks, idx=idx)
+    ex_req_val, ex_req_unit = _split_vu(t.exergy_req_min, idx=idx)
+    ex_des_val, ex_des_unit = _split_vu(t.exergy_des_min, idx=idx)
 
     tail_columns = {
         "Utility Cost (value)": util_cost_val,
@@ -204,14 +201,14 @@ def _utility_columns(
     hot_utils: Optional[Iterable],
     cold_utils: Optional[Iterable],
     *,
-    state_id: str | None = None,
+    idx: int | None = None,
 ) -> dict:
     """Return flattened value/unit columns for the provided utilities."""
     columns: dict[str, Any] = {}
 
     def emit(utils):
         for u in utils or []:
-            hf_val, hf_unit = _split_vu(u.heat_flow, state_id=state_id)
+            hf_val, hf_unit = _split_vu(u.heat_flow, idx=idx)
             columns[f"{u.name} (value)"] = hf_val
             columns[f"{u.name} (unit)"] = hf_unit
 

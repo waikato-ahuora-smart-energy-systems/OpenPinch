@@ -8,7 +8,8 @@ from ....classes.problem_table import ProblemTable
 from ....lib.config import Configuration
 from ....lib.enums import PT
 from ....lib.schemas.hpr import HeatPumpTargetInputs
-from ....utils.miscellaneous import clean_composite_curve, linear_interpolation
+from ...common.graph_data import clean_composite_curve
+from ...common.miscellaneous import linear_interpolation
 from .shared import create_stream_collection_of_background_profile
 
 __all__ = ["construct_HPRTargetInputs"]

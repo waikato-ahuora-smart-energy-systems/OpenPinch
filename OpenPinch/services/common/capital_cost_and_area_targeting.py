@@ -10,7 +10,7 @@ from ...lib.enums import PT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...utils.costing import compute_annual_capital_cost, compute_capital_cost
 from ...utils.heat_exchanger import compute_LMTD_from_dts
-from ...utils.miscellaneous import clean_composite_curve_ends
+from .graph_data import clean_composite_curve_ends
 from .temperature_driving_force import get_temperature_driving_forces
 
 __all__ = [

@@ -3,6 +3,56 @@
 import numpy as np
 import plotly.graph_objects as go
 
+__all__ = [
+    "graph_simple_cc_plot",
+    "plot_t_h_curve",
+    "plot_t_h_curve_with_piecewise_and_bounds",
+]
+
+
+def _require_plotly():
+    try:
+        import plotly.graph_objects as go
+    except ImportError as exc:  # pragma: no cover - optional dependency guard
+        raise ImportError(
+            "Plotly is required for graph_simple_cc_plot. "
+            "Install it directly or reinstall OpenPinch with "
+            "'pip install openpinch[notebook]' or 'pip install openpinch[dashboard]'."
+        ) from exc
+    return go
+
+
+def graph_simple_cc_plot(Tc, Hc, Th, Hh):
+    """Render a quick Plotly plot of hot/cold composite curves for debugging."""
+    go = _require_plotly()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=Hc,
+            y=Tc,
+            mode="lines",
+            name="Cold composite",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=Hh,
+            y=Th,
+            mode="lines",
+            name="Hot composite",
+        )
+    )
+    fig.update_layout(
+        title="Balanced Composite Curves",
+        xaxis_title="Enthalpy",
+        yaxis_title="Temperature",
+        template="plotly_white",
+    )
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)")
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)")
+    fig.show()
+    return fig
+
 
 def plot_t_h_curve(points, title: str = "Temperature vs. Enthalpy") -> None:
     """

@@ -30,6 +30,7 @@ class TargetResults(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
+    idx: Optional[int] = None
     state_id: Optional[str] = None
     degree_of_integration: MaybeVU = None
     Qh: ScalarOrVU

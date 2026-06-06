@@ -15,7 +15,7 @@ from ...lib.config import Configuration, tol
 from ...lib.enums import ST
 from ...lib.schemas.common import ValueWithUnit
 from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
-from ...utils.miscellaneous import get_values
+from ...utils.value_resolution import resolve_value_array
 from ._canonicalization import (
     _apply_zone_dt_cont_multiplier,
     _build_zone_config,
@@ -190,9 +190,9 @@ def _assign_process_streams_to_subzones(
 
 def _validate_stream_temperatures(stream: StreamSchema):
     """Validate that supply and target temperatures align with stream type."""
-    t_supply = get_values(stream.t_supply)
-    t_target = get_values(stream.t_target)
-    heat_flow = get_values(stream.heat_flow)
+    t_supply = resolve_value_array(stream.t_supply)
+    t_target = resolve_value_array(stream.t_target)
+    heat_flow = resolve_value_array(stream.heat_flow)
     if np.all((abs(t_supply - t_target) < tol) * (heat_flow != 0.0)):
         raise ValueError(
             f"Process stream '{stream.name}' must classify as Hot or Cold."

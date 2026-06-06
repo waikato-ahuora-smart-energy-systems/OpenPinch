@@ -916,11 +916,6 @@ def test_insert_constant_h_projection_hcc_to_ccc():
             )
 
 
-"""Tests for set_zonal_targets function"""
-
-# --- Fixtures & Helpers ---
-
-
 @pytest.fixture
 def dummy_zone():
     """Return dummy zone data used by this test module."""

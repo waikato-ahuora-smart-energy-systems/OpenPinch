@@ -141,6 +141,7 @@ class UtilitySummaryTarget(BaseTargetModel):
 
         return TargetResults(
             name=self.name,
+            idx=self.state_idx,
             state_id=self.state_id,
             degree_of_integration=degree_of_integration,
             Qh=self.hot_utility_target,

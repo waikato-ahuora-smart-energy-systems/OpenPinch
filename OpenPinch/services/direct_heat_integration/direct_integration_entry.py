@@ -13,7 +13,6 @@ from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import GT, PT, ST, TT
 from ...lib.schemas.targets import DirectIntegrationTarget
-from ...utils.miscellaneous import delta_vals, get_state_index
 from ..common.capital_cost_and_area_targeting import (
     get_area_targets,
     get_balanced_CC,
@@ -21,6 +20,7 @@ from ..common.capital_cost_and_area_targeting import (
     get_min_number_hx,
 )
 from ..common.gcc_manipulation import get_additional_GCCs
+from ..common.miscellaneous import delta_vals, get_state_index
 from ..common.problem_table_analysis import (
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,

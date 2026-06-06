@@ -3,6 +3,7 @@
 import sys
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from OpenPinch.classes import Zone
@@ -13,6 +14,8 @@ from OpenPinch.services.common.graph_data import (
     _create_curve,
     _create_graph_set,
     _graph_cc,
+    clean_composite_curve,
+    clean_composite_curve_ends,
     get_output_graph_data,
 )
 from OpenPinch.services.common.graph_series_meta import GraphSeriesMeta
@@ -269,3 +272,84 @@ def test_get_output_graph_data_keeps_same_target_type_for_multiple_subzones(
     }
     assert result["Site/AreaA/Direct Integration"]["zone_address"] == "Site/AreaA"
     assert result["Site/AreaB/Direct Integration"]["zone_address"] == "Site/AreaB"
+
+
+def test_clean_composite_removes_redundant_points():
+    x_vals = [0, 10, 20, 30, 30]
+    y_vals = [0, 5, 10, 15, 30]
+    y_clean, x_clean = clean_composite_curve(y_vals, x_vals)
+    assert np.allclose(x_clean, [0, 30])
+    assert np.allclose(y_clean, [0, 15])
+
+
+def test_clean_composite_curve_ends_0():
+    x_vals = [30, 50, 0, 30, 30, 30, 30]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert np.allclose(x_clean, [30, 50, 0, 30])
+    assert np.allclose(y_clean, [100, 80, 50, 40])
+
+
+def test_clean_composite_curve_ends_1():
+    x_vals = [10, 10, 60, 10, 0, 10, 10]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert np.allclose(x_clean, [10, 60, 10, 0, 10])
+    assert np.allclose(y_clean, [80, 50, 40, 10, 5])
+
+
+def test_clean_composite_curve_ends_2():
+    x_vals = [10, 0, 0, 0, 0, 0, 0]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert np.allclose(x_clean, [10, 0])
+    assert np.allclose(y_clean, [100, 80])
+
+
+def test_clean_composite_curve_ends_3():
+    x_vals = [0, 0, 0, 0, 0, 0, 50]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert np.allclose(x_clean, [0, 50])
+    assert np.allclose(y_clean, [5, 0])
+
+
+def test_clean_composite_curve_ends_4():
+    x_vals = [0, 0, 0, 0, 0, 0, 0]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert len(x_clean) == 0
+    assert len(y_clean) == 0
+
+
+def test_clean_composite_curve_ends_5():
+    x_vals = [100, 100, 100, 100, 100, 100, 100]
+    y_vals = [100, 80, 50, 40, 10, 5, 0]
+    y_clean, x_clean = clean_composite_curve_ends(y_vals, x_vals)
+    assert len(x_clean) == 0
+    assert len(y_clean) == 0
+
+
+def test_clean_composite_curve_pops_duplicate_edges():
+    y_clean, x_clean = clean_composite_curve(
+        y_array=[0, 1, 2, 3, 4],
+        x_array=[0, 0, 1, 2, 2],
+    )
+    assert np.allclose(x_clean, [0, 2])
+    assert np.allclose(y_clean, [1, 3])
+
+
+def test_clean_composite_curve_forced_duplicate_edges(monkeypatch):
+    monkeypatch.setattr(
+        "OpenPinch.services.common.graph_data.clean_composite_curve_ends",
+        lambda y_array, x_array: (
+            np.array([0.0, 1.0, 2.0, 3.0, 4.0]),
+            np.array([0.0, 0.0, 1.0, 2.0, 2.0]),
+        ),
+    )
+    y_clean, x_clean = clean_composite_curve(
+        y_array=[0.0],
+        x_array=[0.0],
+    )
+    assert np.allclose(x_clean, [0.0, 2.0])
+    assert np.allclose(y_clean, [1.0, 3.0])

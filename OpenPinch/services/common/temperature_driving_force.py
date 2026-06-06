@@ -7,7 +7,7 @@ import math
 import numpy as np
 
 from ...lib.config import tol
-from ...utils.miscellaneous import interp_with_plateaus
+from .miscellaneous import interp_with_plateaus
 
 __all__ = ["get_temperature_driving_forces"]
 

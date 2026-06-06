@@ -5,7 +5,7 @@ from __future__ import annotations
 from ..classes.zone import Zone
 from ..lib.enums import TT
 from ..lib.schemas.io import TargetInput
-from ..utils.miscellaneous import get_state_index
+from .common.miscellaneous import get_state_index
 from .direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,
 )

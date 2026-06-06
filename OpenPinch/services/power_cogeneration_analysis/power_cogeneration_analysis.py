@@ -10,7 +10,9 @@ from ...lib.config import T_CRIT, Configuration, tol
 from ...lib.enums import CogenerationTarget
 from ...utils.water_properties import psat_T
 from ..common.miscellaneous import get_state_index
-from .unit_models.multi_stage_steam_turbine import MultiStageSteamTurbine
+from ..power_cogeneration.unit_models.multi_stage_steam_turbine import (
+    MultiStageSteamTurbine,
+)
 
 if TYPE_CHECKING:
     import numpy as np

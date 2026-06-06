@@ -18,7 +18,7 @@ from ...lib.config import tol
 from ...lib.enums import PT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...services.common.gcc_manipulation import get_additional_GCCs
-from ...utils.miscellaneous import (
+from .miscellaneous import (
     delta_with_zero_at_start,
     linear_interpolation,
 )
@@ -354,15 +354,10 @@ def _get_T_start_on_opposite_cc(
 
     idx = int(transitions[0])
 
-    cc_vals = pt[col_CC]
-    T_vals = pt[col_T]
-
-    T_new = linear_interpolation(
+    return linear_interpolation(
         h0,
-        cc_vals[idx],
-        cc_vals[idx + 1],
-        T_vals[idx],
-        T_vals[idx + 1],
+        pt[col_CC][idx],
+        pt[col_CC][idx + 1],
+        pt[col_T][idx],
+        pt[col_T][idx + 1],
     )
-
-    return T_new

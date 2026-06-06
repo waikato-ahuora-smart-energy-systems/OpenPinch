@@ -10,7 +10,7 @@ from ...classes.problem_table import ProblemTable
 from ...lib.config import tol
 from ...lib.enums import PT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
-from ...utils.miscellaneous import delta_with_zero_at_start, linear_interpolation
+from .miscellaneous import delta_with_zero_at_start, linear_interpolation
 
 __all__ = [
     "get_additional_GCCs",

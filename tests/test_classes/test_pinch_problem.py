@@ -962,6 +962,7 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
         (),
         {
             "name": "Plant/DI",
+            "idx": 1,
             "state_id": "peak",
             "Qh": {"values": [10.0, 25.0], "state_ids": ["0", "peak"], "unit": "kW"},
             "Qc": {"values": [20.0, 15.0], "state_ids": ["0", "peak"], "unit": "kW"},
