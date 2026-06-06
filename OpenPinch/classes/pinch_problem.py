@@ -49,6 +49,7 @@ from ._problem import (
     locate_summary_row as _locate_summary_row,
 )
 from .stream_collection import StreamCollection
+from .value import Value
 from .zone import Zone
 
 ZoneService = Callable[["Zone"], "Zone"]
@@ -509,18 +510,45 @@ class PinchProblem:
             "Hot Pinch",
             "Cold Pinch",
         ]
+        unit_columns = {col: f"{col} (unit)" for col in columns}
+
         comparison = pd.DataFrame(
             [
-                pd.Series({col: base_row.get(col) for col in columns}, name=base_label),
                 pd.Series(
-                    {col: other_row.get(col) for col in columns},
+                    {
+                        col: base_row.get(col)
+                        for col in [*columns, *unit_columns.values()]
+                    },
+                    name=base_label,
+                ),
+                pd.Series(
+                    {
+                        col: other_row.get(col)
+                        for col in [*columns, *unit_columns.values()]
+                    },
                     name=other_label,
                 ),
             ]
         )
-        comparison.loc["Change"] = (
-            comparison.loc[other_label] - comparison.loc[base_label]
-        )
+
+        change_row: dict[str, object] = {}
+        for col in columns:
+            unit_col = unit_columns[col]
+            base_unit = base_row.get(unit_col)
+            other_unit = other_row.get(unit_col)
+            base_value = base_row.get(col)
+            other_value = other_row.get(col)
+            try:
+                base_value = Value(base_value, base_unit)
+                other_value = Value(other_value, other_unit).to(base_unit)
+                other_unit = base_unit
+                change_row[col] = float(other_value) - float(base_value)
+                change_row[unit_col] = base_unit
+            except (TypeError, ValueError):
+                change_row[col] = None
+                change_row[unit_col] = None
+
+        comparison.loc["Change"] = pd.Series(change_row)
         comparison.insert(0, "Target", str(base_row["Target"]))
         comparison.loc["Change", "Target"] = str(base_row["Target"])
         return comparison

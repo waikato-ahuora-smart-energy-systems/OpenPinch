@@ -33,7 +33,7 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
             "heat_flow",
         ]
     elif sheet_name == "Summary":
-        col_names = ["name", "temp_pinch", "Qh", "Qc", "Qr", "degree_of_integration"]
+        col_names = ["name", "pinch_temp", "Qh", "Qc", "Qr", "degree_of_integration"]
         prefix = "HU::"
         for i in range(6, len(df_full.columns) - 1):
             if df_full[i][0] in {"Cold Utility", "Heat Receiver Utility"}:
@@ -205,7 +205,7 @@ def _summary_field_payload(
     project_name: str,
     record_name: str,
 ) -> Any:
-    if column_name == "temp_pinch":
+    if column_name == "pinch_temp":
         return _temp_pinch_payload(
             value,
             unit=unit,
@@ -245,7 +245,7 @@ def _parse_temp_pinch(value: Any) -> tuple[Optional[float], Optional[float]]:
     if len(parts) == 1:
         parts = [parts[0], parts[0]]
     elif len(parts) != 2:
-        raise ValueError(f"Invalid temp_pinch value: {value!r}")
+        raise ValueError(f"Invalid pinch_temp value: {value!r}")
     cold_temp = None if parts[0] == "" else float(parts[0])
     hot_temp = None if parts[1] == "" else float(parts[1])
     return cold_temp, hot_temp

@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Distillery/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 132.70000000000002,
                     "unit": "degC"

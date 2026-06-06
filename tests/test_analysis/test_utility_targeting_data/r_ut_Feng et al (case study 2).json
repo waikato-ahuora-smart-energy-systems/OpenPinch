@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Aromatic hydrocarbon extraction unit/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 85.0,
                     "unit": "degC"
@@ -49,7 +49,7 @@
         },
         {
             "name": "Hydrocracking unit/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 228.3,
                     "unit": "degC"
@@ -96,7 +96,7 @@
         },
         {
             "name": "Isomerization unit/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 238.0,
                     "unit": "degC"

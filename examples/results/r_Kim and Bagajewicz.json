@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Total Integrated Target/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 203.435,
                     "unit": "degC"
@@ -81,7 +81,7 @@
         },
         {
             "name": "Plant/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 203.435,
                     "unit": "degC"
@@ -160,7 +160,7 @@
         },
         {
             "name": "Total Process Target/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -239,7 +239,7 @@
         },
         {
             "name": "Total Site Target/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 150.0,
                     "unit": "degC"

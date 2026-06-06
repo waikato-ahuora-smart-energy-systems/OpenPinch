@@ -42,6 +42,10 @@ _SUMMARY_METRIC_COLUMNS = [
 ]
 
 
+def _unit_column(metric: str) -> str:
+    return f"{metric} (unit)"
+
+
 def invalid_variant_view(
     *,
     variant_name: str,
@@ -161,6 +165,7 @@ def summary_cards(frame: pd.DataFrame) -> list[SummaryCard]:
                     target_name=target_name,
                     label=metric,
                     value=json_safe(row.get(metric)),
+                    unit=maybe_string(row.get(_unit_column(metric))),
                 )
             )
     return cards
@@ -276,6 +281,13 @@ def summary_metric_deltas(
         for metric in _SUMMARY_METRIC_COLUMNS:
             base_value = json_safe(base_row.get(metric))
             variant_value = json_safe(variant_row.get(metric))
+            unit = maybe_string(
+                base_row.get(_unit_column(metric))
+                or variant_row.get(_unit_column(metric))
+            )
+            units_match = base_row.get(_unit_column(metric)) == variant_row.get(
+                _unit_column(metric)
+            )
             deltas.append(
                 VariantMetricDelta(
                     base_variant=base_name,
@@ -285,7 +297,10 @@ def summary_metric_deltas(
                     metric=metric,
                     base_value=base_value,
                     variant_value=variant_value,
-                    delta=numeric_delta(base_value, variant_value),
+                    unit=unit,
+                    delta=numeric_delta(base_value, variant_value)
+                    if units_match
+                    else None,
                 )
             )
     return deltas

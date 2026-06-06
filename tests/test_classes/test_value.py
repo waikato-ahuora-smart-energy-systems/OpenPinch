@@ -53,6 +53,13 @@ def test_value_supports_pytest_approx_comparisons():
     assert pytest.approx(value * 0.5) == result
 
 
+def test_dimensionless_values_use_dash_unit_representation():
+    value = Value(0.5)
+
+    assert value.unit == "-"
+    assert value.to_dict() == {"value": 0.5, "unit": "-"}
+
+
 def test_stateful_arithmetic_requires_matching_state_count():
     left = Value([10.0, 4.0], unit="kW")
     right = Value([1.0, 2.0], unit="kW")

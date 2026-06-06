@@ -8,9 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
+from ...classes.value import Value
 from ..config import Configuration
 from ..enums import SummaryRowType
-from .reporting import HeatUtility, TargetResults, TempPinch
+from ..unit_system import coerce_output_value
+from .reporting import HeatUtility, PinchTemp, TargetResults
 
 
 def _normalise_target_name(
@@ -35,25 +37,55 @@ def _normalise_target_name(
 def _build_temp_pinch(
     cold_pinch: Optional[float],
     hot_pinch: Optional[float],
-) -> TempPinch:
-    if isinstance(cold_pinch, float) and isinstance(hot_pinch, float):
-        return TempPinch(cold_temp=cold_pinch, hot_temp=hot_pinch)
-    if isinstance(cold_pinch, float):
-        return TempPinch(cold_temp=cold_pinch)
-    if isinstance(hot_pinch, float):
-        return TempPinch(hot_temp=hot_pinch)
-    return TempPinch()
+    *,
+    config: Configuration,
+) -> PinchTemp:
+    return PinchTemp(
+        cold_temp=coerce_output_value(
+            cold_pinch,
+            metric_name="cold_temp",
+            config=config,
+        ),
+        hot_temp=coerce_output_value(
+            hot_pinch,
+            metric_name="hot_temp",
+            config=config,
+        ),
+    )
 
 
-def _build_heat_utilities(utilities: StreamCollection) -> list[HeatUtility]:
+def _build_heat_utilities(
+    utilities: StreamCollection,
+    *,
+    config: Configuration,
+) -> list[HeatUtility]:
     return [
-        HeatUtility(name=utility.name, heat_flow=utility.heat_flow)
+        HeatUtility(
+            name=utility.name,
+            heat_flow=coerce_output_value(
+                utility.heat_flow,
+                metric_name="utility_heat_flow",
+                config=config,
+            ),
+        )
         for utility in utilities
     ]
 
 
 def _row_type(isTotal: bool) -> str:
     return SummaryRowType.FOOTER.value if isTotal else SummaryRowType.CONTENT.value
+
+
+def _serialise_report_payload(value: Any) -> Any:
+    if isinstance(value, Value):
+        return value.to_dict()
+    if isinstance(value, dict):
+        return {key: _serialise_report_payload(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [_serialise_report_payload(item) for item in value]
+    if hasattr(value, "model_dump"):
+        return _serialise_report_payload(value.model_dump(mode="python"))
+    return value
 
 
 class BaseTargetModel(BaseModel):
@@ -92,7 +124,9 @@ class BaseTargetModel(BaseModel):
 
     def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
         """Serialise the reporting-schema view of this target to plain Python."""
-        return self.to_target_results(isTotal=isTotal).model_dump(mode="python")
+        return _serialise_report_payload(
+            self.to_target_results(isTotal=isTotal).model_dump(mode="python")
+        )
 
 
 class GraphBackedTarget(BaseTargetModel):
@@ -137,26 +171,73 @@ class UtilitySummaryTarget(BaseTargetModel):
     def _base_target_results(self, isTotal: bool = False) -> TargetResults:
         degree_of_integration = None
         if self.degree_of_int is not None:
-            degree_of_integration = self.degree_of_int * 100
+            degree_of_integration = coerce_output_value(
+                self.degree_of_int,
+                metric_name="degree_of_integration",
+                config=self.config,
+            )
 
         return TargetResults(
             name=self.name,
             idx=self.state_idx,
             state_id=self.state_id,
             degree_of_integration=degree_of_integration,
-            Qh=self.hot_utility_target,
-            Qc=self.cold_utility_target,
-            Qr=self.heat_recovery_target,
-            utility_cost=self.utility_cost,
+            Qh=coerce_output_value(
+                self.hot_utility_target,
+                metric_name="Qh",
+                config=self.config,
+            ),
+            Qc=coerce_output_value(
+                self.cold_utility_target,
+                metric_name="Qc",
+                config=self.config,
+            ),
+            Qr=coerce_output_value(
+                self.heat_recovery_target,
+                metric_name="Qr",
+                config=self.config,
+            ),
+            utility_cost=coerce_output_value(
+                self.utility_cost,
+                metric_name="utility_cost",
+                config=self.config,
+            ),
             row_type=_row_type(isTotal),
-            hot_utilities=_build_heat_utilities(self.hot_utilities),
-            cold_utilities=_build_heat_utilities(self.cold_utilities),
-            temp_pinch=_build_temp_pinch(self.cold_pinch, self.hot_pinch),
-            exergy_sources=self.exergy_sources,
-            exergy_sinks=self.exergy_sinks,
-            ETE=None if self.ETE is None else self.ETE * 100,
-            exergy_req_min=self.exergy_req_min,
-            exergy_des_min=self.exergy_des_min,
+            hot_utilities=_build_heat_utilities(self.hot_utilities, config=self.config),
+            cold_utilities=_build_heat_utilities(
+                self.cold_utilities,
+                config=self.config,
+            ),
+            pinch_temp=_build_temp_pinch(
+                self.cold_pinch,
+                self.hot_pinch,
+                config=self.config,
+            ),
+            exergy_sources=coerce_output_value(
+                self.exergy_sources,
+                metric_name="exergy_sources",
+                config=self.config,
+            ),
+            exergy_sinks=coerce_output_value(
+                self.exergy_sinks,
+                metric_name="exergy_sinks",
+                config=self.config,
+            ),
+            ETE=coerce_output_value(
+                self.ETE,
+                metric_name="ETE",
+                config=self.config,
+            ),
+            exergy_req_min=coerce_output_value(
+                self.exergy_req_min,
+                metric_name="exergy_req_min",
+                config=self.config,
+            ),
+            exergy_des_min=coerce_output_value(
+                self.exergy_des_min,
+                metric_name="exergy_des_min",
+                config=self.config,
+            ),
         )
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
@@ -182,14 +263,32 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={
-                "work_target": self.work_target,
-                "turbine_efficiency_target": None
-                if self.turbine_efficiency_target is None
-                else self.turbine_efficiency_target * 100,
-                "area": self.area,
+                "work_target": coerce_output_value(
+                    self.work_target,
+                    metric_name="work_target",
+                    config=self.config,
+                ),
+                "turbine_efficiency_target": coerce_output_value(
+                    self.turbine_efficiency_target,
+                    metric_name="turbine_efficiency_target",
+                    config=self.config,
+                ),
+                "area": coerce_output_value(
+                    self.area,
+                    metric_name="area",
+                    config=self.config,
+                ),
                 "num_units": self.num_units,
-                "capital_cost": self.capital_cost,
-                "total_cost": self.total_cost,
+                "capital_cost": coerce_output_value(
+                    self.capital_cost,
+                    metric_name="capital_cost",
+                    config=self.config,
+                ),
+                "total_cost": coerce_output_value(
+                    self.total_cost,
+                    metric_name="total_cost",
+                    config=self.config,
+                ),
             }
         )
 
@@ -210,10 +309,16 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={
-                "work_target": self.work_target,
-                "turbine_efficiency_target": None
-                if self.turbine_efficiency_target is None
-                else self.turbine_efficiency_target * 100,
+                "work_target": coerce_output_value(
+                    self.work_target,
+                    metric_name="work_target",
+                    config=self.config,
+                ),
+                "turbine_efficiency_target": coerce_output_value(
+                    self.turbine_efficiency_target,
+                    metric_name="turbine_efficiency_target",
+                    config=self.config,
+                ),
             }
         )
 
@@ -252,18 +357,52 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={
-                "work_target": self.work_target,
-                "turbine_efficiency_target": None
-                if self.turbine_efficiency_target is None
-                else self.turbine_efficiency_target * 100,
+                "work_target": coerce_output_value(
+                    self.work_target,
+                    metric_name="work_target",
+                    config=self.config,
+                ),
+                "turbine_efficiency_target": coerce_output_value(
+                    self.turbine_efficiency_target,
+                    metric_name="turbine_efficiency_target",
+                    config=self.config,
+                ),
                 "hpr_cycle": self.hpr_cycle,
-                "hpr_utility_total": self.hpr_utility_total,
-                "hpr_work": self.hpr_work,
-                "hpr_external_utility": self.hpr_external_utility,
-                "hpr_ambient_hot": self.hpr_ambient_hot,
-                "hpr_ambient_cold": self.hpr_ambient_cold,
-                "hpr_cop": self.hpr_cop,
-                "hpr_eta_he": self.hpr_eta_he,
+                "hpr_utility_total": coerce_output_value(
+                    self.hpr_utility_total,
+                    metric_name="hpr_utility_total",
+                    config=self.config,
+                ),
+                "hpr_work": coerce_output_value(
+                    self.hpr_work,
+                    metric_name="hpr_work",
+                    config=self.config,
+                ),
+                "hpr_external_utility": coerce_output_value(
+                    self.hpr_external_utility,
+                    metric_name="hpr_external_utility",
+                    config=self.config,
+                ),
+                "hpr_ambient_hot": coerce_output_value(
+                    self.hpr_ambient_hot,
+                    metric_name="hpr_ambient_hot",
+                    config=self.config,
+                ),
+                "hpr_ambient_cold": coerce_output_value(
+                    self.hpr_ambient_cold,
+                    metric_name="hpr_ambient_cold",
+                    config=self.config,
+                ),
+                "hpr_cop": coerce_output_value(
+                    self.hpr_cop,
+                    metric_name="hpr_cop",
+                    config=self.config,
+                ),
+                "hpr_eta_he": coerce_output_value(
+                    self.hpr_eta_he,
+                    metric_name="hpr_eta_he",
+                    config=self.config,
+                ),
                 "hpr_success": self.hpr_success,
                 "hpr_hot_streams": self.hpr_hot_streams,
                 "hpr_cold_streams": self.hpr_cold_streams,

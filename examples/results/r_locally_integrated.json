@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "locally_integrated/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 197.5,
                     "unit": "degC"
@@ -109,7 +109,7 @@
         },
         {
             "name": "Chemical Plant[S]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 140.0,
                     "unit": "degC"
@@ -216,7 +216,7 @@
         },
         {
             "name": "Food Plant[S]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 197.5,
                     "unit": "degC"
@@ -323,7 +323,7 @@
         },
         {
             "name": "Hospital[S]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 23.0,
                     "unit": "degC"
@@ -430,7 +430,7 @@
         },
         {
             "name": "Residential[S]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 21.0,
                     "unit": "degC"
@@ -537,7 +537,7 @@
         },
         {
             "name": "locally_integrated/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -644,7 +644,7 @@
         },
         {
             "name": "locally_integrated/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 179.88563239146663,
                     "unit": "degC"

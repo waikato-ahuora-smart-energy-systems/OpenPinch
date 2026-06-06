@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "new_example_2/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 35.0,
                     "unit": "degC"
@@ -53,7 +53,7 @@
         },
         {
             "name": "Flowsheet/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 57.0,
                     "unit": "degC"
@@ -104,7 +104,7 @@
         },
         {
             "name": "Flowsheet\\Module 23/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 133.0,
                     "unit": "degC"
@@ -155,7 +155,7 @@
         },
         {
             "name": "new_example_2/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": NaN,
                     "unit": "degC"
@@ -206,7 +206,7 @@
         },
         {
             "name": "new_example_2/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 10.1,
                     "unit": "degC"

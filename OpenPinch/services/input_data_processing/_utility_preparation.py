@@ -16,6 +16,7 @@ from ...lib.config import Configuration
 from ...lib.enums import ST, StreamLoc
 from ...lib.schemas.common import ValueWithUnit
 from ...lib.schemas.io import UtilitySchema
+from ...lib.unit_system import standardise_input_value
 
 __all__ = [
     "_get_hot_and_cold_utilities",
@@ -81,15 +82,6 @@ def _set_utilities_for_zone_and_subzones(
     return zone
 
 
-def _coerce_value(data, *, unit: str | None = None) -> Value | None:
-    if data is None:
-        return None
-    parsed = Value(data)
-    if unit is None:
-        return parsed
-    return Value(parsed, unit=unit)
-
-
 def _value_is_missing(value: Value | None) -> bool:
     if value is None:
         return True
@@ -103,8 +95,8 @@ def _shift_temperature_value(value: Value, delta: float) -> Value:
 def _utility_temperature_arrays(
     utility: UtilitySchema,
 ) -> tuple[Value, Value]:
-    t_supply = _coerce_value(utility.t_supply, unit="degC")
-    t_target = _coerce_value(utility.t_target, unit="degC")
+    t_supply = standardise_input_value(utility.t_supply, field_name="t_supply")
+    t_target = standardise_input_value(utility.t_target, field_name="t_target")
     if t_supply is None or t_target is None:
         raise ValueError(
             f"Utility '{utility.name}' is missing supply or target temperature."
@@ -149,8 +141,16 @@ def _complete_utility_data(
     add_default_cu = True
 
     for utility in utilities:
-        t_supply = _coerce_value(utility.t_supply, unit="degC")
-        t_target = _coerce_value(utility.t_target, unit="degC")
+        t_supply = standardise_input_value(
+            utility.t_supply,
+            field_name="t_supply",
+            config=zone_config,
+        )
+        t_target = standardise_input_value(
+            utility.t_target,
+            field_name="t_target",
+            config=zone_config,
+        )
         if _value_is_missing(t_target):
             delta = (
                 -zone_config.DT_PHASE_CHANGE
@@ -158,7 +158,11 @@ def _complete_utility_data(
                 else zone_config.DT_PHASE_CHANGE
             )
             utility.t_target = _shift_temperature_value(t_supply, delta).to_dict()
-            t_target = _coerce_value(utility.t_target, unit="degC")
+            t_target = standardise_input_value(
+                utility.t_target,
+                field_name="t_target",
+                config=zone_config,
+            )
         else:
             if np.allclose(
                 t_supply.state_values,
@@ -175,18 +179,38 @@ def _complete_utility_data(
                     t_supply,
                     delta,
                 ).to_dict()
-                t_target = _coerce_value(utility.t_target, unit="degC")
+                t_target = standardise_input_value(
+                    utility.t_target,
+                    field_name="t_target",
+                    config=zone_config,
+                )
 
-        dt_cont = _coerce_value(utility.dt_cont, unit="delta_degC")
+        dt_cont = standardise_input_value(
+            utility.dt_cont,
+            field_name="dt_cont",
+            config=zone_config,
+        )
         if _value_is_missing(dt_cont):
             utility.dt_cont = zone_config.DT_CONT
-            dt_cont = _coerce_value(utility.dt_cont, unit="delta_degC")
+            dt_cont = standardise_input_value(
+                utility.dt_cont,
+                field_name="dt_cont",
+                config=zone_config,
+            )
 
-        price_value = _coerce_value(utility.price, unit="USD/MWh")
+        price_value = standardise_input_value(
+            utility.price,
+            field_name="price",
+            config=zone_config,
+        )
         if _value_is_missing(price_value):
             utility.price = zone_config.UTILITY_PRICE * zone_config.ANNUAL_OP_TIME
 
-        htc_value = _coerce_value(utility.htc, unit="kW/m^2/K")
+        htc_value = standardise_input_value(
+            utility.htc,
+            field_name="htc",
+            config=zone_config,
+        )
         if _value_is_missing(htc_value):
             utility.htc = zone_config.HTC
 
@@ -279,27 +303,27 @@ def _create_default_utility(
 def _validate_dt_cont_value(value, zone_config: Configuration) -> Value:
     """Validate one DT_CONT value and coerce to a non-negative float."""
     if isinstance(value, ValueWithUnit):
-        return Value(value.value, unit="delta_degC")
+        return standardise_input_value(value, field_name="dt_cont", config=zone_config)
     if (
         (value is None)
         or (not isinstance(value, (int, float)))
         or not math.isfinite(value)
     ):
         value = zone_config.DT_CONT
-    return Value(value, unit="delta_degC")
+    return standardise_input_value(value, field_name="dt_cont", config=zone_config)
 
 
 def _validate_htc_value(value, zone_config: Configuration) -> Value:
     """Validate one HTC value and coerce to a positive float."""
     if isinstance(value, ValueWithUnit):
-        return Value(value.value, unit="kW/m^2/delta_degC")
+        return standardise_input_value(value, field_name="htc", config=zone_config)
     if (
         (value is None)
         or (not isinstance(value, (int, float)))
         or not math.isfinite(value)
     ):
         value = zone_config.HTC
-    return Value(value, unit="kW/m^2/delta_degC")
+    return standardise_input_value(value, field_name="htc", config=zone_config)
 
 
 def _create_utilities_list(
@@ -341,7 +365,11 @@ def _create_utilities_list(
                 t_target=target_value,
                 dt_cont=dt_cont,
                 htc=htc,
-                price=selected.price,
+                price=standardise_input_value(
+                    selected.price,
+                    field_name="price",
+                    config=zone_config,
+                ),
                 is_process_stream=False,
             ),
             key,

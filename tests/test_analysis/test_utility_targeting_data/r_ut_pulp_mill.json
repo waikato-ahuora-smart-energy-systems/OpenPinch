@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Bleaching/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 4.4,
                     "unit": "degC"
@@ -84,7 +84,7 @@
         },
         {
             "name": "Causticizing/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 94.6,
                     "unit": "degC"
@@ -166,7 +166,7 @@
         },
         {
             "name": "Digestion/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 100.8,
                     "unit": "degC"
@@ -248,7 +248,7 @@
         },
         {
             "name": "District Heating/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 74.3,
                     "unit": "degC"
@@ -330,7 +330,7 @@
         },
         {
             "name": "Evaporator/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 63.8,
                     "unit": "degC"
@@ -412,7 +412,7 @@
         },
         {
             "name": "Miscellaneous 1/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 62.5,
                     "unit": "degC"
@@ -494,7 +494,7 @@
         },
         {
             "name": "Miscellaneous 2/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 51.1,
                     "unit": "degC"
@@ -576,7 +576,7 @@
         },
         {
             "name": "Miscellaneous 3/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 10.8,
                     "unit": "degC"
@@ -658,7 +658,7 @@
         },
         {
             "name": "Miscellaneous 4/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 97.1,
                     "unit": "degC"
@@ -740,7 +740,7 @@
         },
         {
             "name": "Miscellaneous 5/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 150.9,
                     "unit": "degC"
@@ -822,7 +822,7 @@
         },
         {
             "name": "Miscellaneous 6/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 37.7,
                     "unit": "degC"
@@ -904,7 +904,7 @@
         },
         {
             "name": "Miscellaneous 7/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 4.4,
                     "unit": "degC"
@@ -986,7 +986,7 @@
         },
         {
             "name": "Paper Room/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 4.4,
                     "unit": "degC"
@@ -1068,7 +1068,7 @@
         },
         {
             "name": "Recovery Boiler/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 18.6,
                     "unit": "degC"
@@ -1150,7 +1150,7 @@
         },
         {
             "name": "Stripper/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 66.3,
                     "unit": "degC"
@@ -1232,7 +1232,7 @@
         },
         {
             "name": "Wash/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 84.5,
                     "unit": "degC"

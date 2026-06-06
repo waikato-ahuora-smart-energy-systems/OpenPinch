@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Total Integrated Target/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 25.0,
                     "unit": "degC"
@@ -81,7 +81,7 @@
         },
         {
             "name": "Bioethanol production/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 25.0,
                     "unit": "degC"
@@ -160,7 +160,7 @@
         },
         {
             "name": "Total Process Target/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -239,7 +239,7 @@
         },
         {
             "name": "Total Site Target/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 10.0,
                     "unit": "degC"

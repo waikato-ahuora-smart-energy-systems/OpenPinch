@@ -215,8 +215,8 @@ def test_total_site_serialization_includes_exergy_fields_after_enrichment():
     apply_exergy_targeting(target)
     payload = target.serialize_json()
 
-    assert payload["exergy_sources"] == pytest.approx(target.exergy_sources)
-    assert payload["exergy_sinks"] == pytest.approx(target.exergy_sinks)
-    assert payload["ETE"] == pytest.approx(target.ETE * 100)
-    assert payload["exergy_req_min"] == pytest.approx(target.exergy_req_min)
-    assert payload["exergy_des_min"] == pytest.approx(target.exergy_des_min)
+    assert payload["exergy_sources"] == {"value": target.exergy_sources, "unit": "kW"}
+    assert payload["exergy_sinks"] == {"value": target.exergy_sinks, "unit": "kW"}
+    assert payload["ETE"] == {"value": target.ETE * 100, "unit": "%"}
+    assert payload["exergy_req_min"] == {"value": target.exergy_req_min, "unit": "kW"}
+    assert payload["exergy_des_min"] == {"value": target.exergy_des_min, "unit": "kW"}

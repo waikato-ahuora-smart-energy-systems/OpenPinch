@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Pavao et al (example 2)/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 166.85000000000002,
                     "unit": "degC"
@@ -95,7 +95,7 @@
         },
         {
             "name": "A/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 226.85000000000002,
                     "unit": "degC"
@@ -188,7 +188,7 @@
         },
         {
             "name": "B/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 136.85000000000002,
                     "unit": "degC"
@@ -281,7 +281,7 @@
         },
         {
             "name": "C/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 91.85000000000002,
                     "unit": "degC"
@@ -374,7 +374,7 @@
         },
         {
             "name": "D/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 86.85000000000002,
                     "unit": "degC"
@@ -467,7 +467,7 @@
         },
         {
             "name": "E/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": -58.150000000000006,
                     "unit": "degC"
@@ -560,7 +560,7 @@
         },
         {
             "name": "Pavao et al (example 2)/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -653,7 +653,7 @@
         },
         {
             "name": "Pavao et al (example 2)/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 32.3,
                     "unit": "degC"

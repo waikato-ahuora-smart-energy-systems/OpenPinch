@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Process A - bromine plant/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 115.0,
                     "unit": "degC"
@@ -49,7 +49,7 @@
         },
         {
             "name": "Process B - sodium bromide plant/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 73.5,
                     "unit": "degC"
@@ -96,7 +96,7 @@
         },
         {
             "name": "Process C - residential/commercial area/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 25.0,
                     "unit": "degC"

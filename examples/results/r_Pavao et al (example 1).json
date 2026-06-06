@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Pavao et al (example 1)/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 151.85000000000002,
                     "unit": "degC"
@@ -88,7 +88,7 @@
         },
         {
             "name": "A/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 221.85000000000002,
                     "unit": "degC"
@@ -174,7 +174,7 @@
         },
         {
             "name": "B/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 221.85000000000002,
                     "unit": "degC"
@@ -260,7 +260,7 @@
         },
         {
             "name": "C/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 121.85000000000002,
                     "unit": "degC"
@@ -346,7 +346,7 @@
         },
         {
             "name": "Pavao et al (example 1)/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -432,7 +432,7 @@
         },
         {
             "name": "Pavao et al (example 1)/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 147.8,
                     "unit": "degC"

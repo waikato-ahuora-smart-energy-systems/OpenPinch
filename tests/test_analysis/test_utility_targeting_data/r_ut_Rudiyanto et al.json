@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Plant/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 51.087500000000006,
                     "unit": "degC"

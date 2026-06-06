@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from ...lib.enums import ST
 from ...lib.schemas.io import TargetInput
 from ...lib.schemas.workspace import ValidationIssue, ValidationReport
+from ...lib.unit_system import standardise_input_value
 from ..value import Value
 
 ValidationContext = dict[str, list[dict[str, Any]]]
@@ -116,6 +117,8 @@ def semantic_issues(
 ) -> list[ValidationIssue]:
     """Return semantic validation issues for one validated problem definition."""
     issues: list[ValidationIssue] = []
+    options = problem_inputs.options if isinstance(problem_inputs.options, dict) else {}
+    input_unit_config = {"INPUT_UNITS": options.get("INPUT_UNITS", {})}
 
     if len(problem_inputs.streams) == 0:
         issues.append(
@@ -135,6 +138,7 @@ def semantic_issues(
             record_label=label,
             field_names=("t_supply", "t_target", "heat_flow", "dt_cont", "htc"),
             optional_field_names=("dt_cont", "htc"),
+            config=input_unit_config,
         )
         issues.extend(stream_value_issues)
         issues.extend(
@@ -168,6 +172,7 @@ def semantic_issues(
                 "htc",
                 "price",
             ),
+            config=input_unit_config,
         )
         issues.extend(utility_value_issues)
         issues.extend(
@@ -365,6 +370,7 @@ def _coerce_validation_values(
     record_label: Optional[str],
     field_names: tuple[str, ...],
     optional_field_names: tuple[str, ...] = (),
+    config: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[
     dict[str, Value | None],
     dict[str, tuple[list[str] | None, np.ndarray | None]],
@@ -382,7 +388,11 @@ def _coerce_validation_values(
             values[field_name] = None
             continue
         try:
-            values[field_name] = Value(raw_value)
+            values[field_name] = standardise_input_value(
+                raw_value,
+                field_name=field_name,
+                config=config,
+            )
         except (TypeError, ValueError) as exc:
             values[field_name] = None
             issues.append(

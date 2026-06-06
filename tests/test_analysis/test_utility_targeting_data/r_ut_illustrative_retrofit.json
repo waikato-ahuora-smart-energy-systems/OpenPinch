@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "C1[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 191.666667,
                     "unit": "degC"
@@ -49,7 +49,7 @@
         },
         {
             "name": "C2[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 99.0,
                     "unit": "degC"
@@ -96,7 +96,7 @@
         },
         {
             "name": "E1[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 279.0,
                     "unit": "degC"
@@ -143,7 +143,7 @@
         },
         {
             "name": "E2[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 279.0,
                     "unit": "degC"
@@ -190,7 +190,7 @@
         },
         {
             "name": "H1[O]/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 145.0,
                     "unit": "degC"

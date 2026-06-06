@@ -2,7 +2,11 @@
 
 import pytest
 
-from OpenPinch.lib.schemas.common import StatefulValueWithUnit
+from OpenPinch.classes.value import Value
+from OpenPinch.lib.schemas.common import (
+    StatefulValueWithUnit,
+    ValueWithUnit,
+)
 from OpenPinch.lib.schemas.io import (
     GetInputOutputData,
     ProblemTableDataSchema,
@@ -11,6 +15,7 @@ from OpenPinch.lib.schemas.io import (
     THSchema,
     UtilitySchema,
 )
+from OpenPinch.lib.schemas.reporting import PinchTemp, TargetResults
 
 
 def test_target_input_utilities_default_is_not_shared():
@@ -98,3 +103,29 @@ def test_target_input_rejects_legacy_units_alias():
 
     with pytest.raises(Exception):
         TargetInput.model_validate(payload)
+
+
+def test_target_results_accept_unit_aware_hpr_scalar_and_array_metrics():
+    results = TargetResults(
+        name="Plant/Direct Heat Pump",
+        Qh=ValueWithUnit(value=100.0, unit="kW"),
+        Qc=ValueWithUnit(value=50.0, unit="kW"),
+        Qr=ValueWithUnit(value=25.0, unit="kW"),
+        pinch_temp=PinchTemp(),
+        hpr_utility_total=StatefulValueWithUnit(values=[10.0, 12.0], unit="kW"),
+        hpr_cop=ValueWithUnit(value=3.5, unit="-"),
+        num_units=4,
+        hpr_success=True,
+    )
+
+    assert isinstance(results.Qh, Value)
+    assert results.Qh.value == pytest.approx(100.0)
+    assert results.Qh.unit == "kW"
+    assert isinstance(results.hpr_utility_total, Value)
+    assert results.hpr_utility_total.values == [10.0, 12.0]
+    assert results.hpr_utility_total.unit == "kW"
+    assert isinstance(results.hpr_cop, Value)
+    assert results.hpr_cop.value == pytest.approx(3.5)
+    assert results.hpr_cop.unit == "-"
+    assert results.num_units == 4
+    assert results.hpr_success is True

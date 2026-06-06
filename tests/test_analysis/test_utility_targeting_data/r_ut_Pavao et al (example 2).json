@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "A/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 226.85000000000002,
                     "unit": "degC"
@@ -91,7 +91,7 @@
         },
         {
             "name": "B/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 136.85000000000002,
                     "unit": "degC"
@@ -180,7 +180,7 @@
         },
         {
             "name": "C/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 91.85000000000002,
                     "unit": "degC"
@@ -269,7 +269,7 @@
         },
         {
             "name": "D/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 86.85000000000002,
                     "unit": "degC"
@@ -358,7 +358,7 @@
         },
         {
             "name": "E/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": -58.150000000000006,
                     "unit": "degC"

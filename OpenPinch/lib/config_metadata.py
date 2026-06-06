@@ -57,6 +57,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "DECIMAL_PLACES": ConfigurationFieldSpec(int, 2, "general", numeric_min=0.0),
     "WEIGHTS": ConfigurationFieldSpec(List[float], [1], "general"),
     "STATE_IDS": ConfigurationFieldSpec(List[str], ["0"], "general"),
+    "INPUT_UNITS": ConfigurationFieldSpec(dict[str, str], {}, "general"),
+    "OUTPUT_UNITS": ConfigurationFieldSpec(dict[str, str], {}, "general"),
     "DO_DIRECT_OPERATION_TARGETING": ConfigurationFieldSpec(
         bool,
         False,

@@ -176,26 +176,26 @@ def test_target_model_and_zone_property_branches():
     t.cold_pinch = 120.0
     assert t.hot_pinch == 120.0
     payload_same = t.serialize_json(isTotal=True)
-    assert payload_same["temp_pinch"]["cold_temp"] == 120.0
-    assert payload_same["temp_pinch"]["hot_temp"] == 120.0
+    assert payload_same["pinch_temp"]["cold_temp"] == {"value": 120.0, "unit": "degC"}
+    assert payload_same["pinch_temp"]["hot_temp"] == {"value": 120.0, "unit": "degC"}
 
     t.hot_pinch = None
     t.cold_pinch = 95.0
     payload_cold = t.serialize_json(isTotal=False)
-    assert payload_cold["temp_pinch"]["cold_temp"] == 95.0
+    assert payload_cold["pinch_temp"]["cold_temp"] == {"value": 95.0, "unit": "degC"}
 
     t.hot_pinch = 135.0
     t.cold_pinch = None
     payload_hot = t.serialize_json(isTotal=False)
-    assert payload_hot["temp_pinch"]["hot_temp"] == 135.0
+    assert payload_hot["pinch_temp"]["hot_temp"] == {"value": 135.0, "unit": "degC"}
 
     t.config.DO_TURBINE_WORK = True
     t.config.DO_AREA_TARGETING = True
     t.config.DO_EXERGY_TARGETING = True
     payload_all = t.serialize_json()
-    assert payload_all["work_target"] == 5.0
-    assert payload_all["area"] == 1.0
-    assert payload_all["exergy_sources"] == 6.0
+    assert payload_all["work_target"] == {"value": 5.0, "unit": "kW"}
+    assert payload_all["area"] == {"value": 1.0, "unit": "m^2"}
+    assert payload_all["exergy_sources"] == {"value": 6.0, "unit": "kW"}
 
     z = Zone(name="Root", type="P")
     z.name = "Root2"

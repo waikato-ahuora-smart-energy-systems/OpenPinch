@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Xiao et al/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 136.3,
                     "unit": "degC"
@@ -60,7 +60,7 @@
         },
         {
             "name": "Process/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 136.3,
                     "unit": "degC"
@@ -118,7 +118,7 @@
         },
         {
             "name": "Xiao et al/Total Process Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": null,
                     "unit": "degC"
@@ -176,7 +176,7 @@
         },
         {
             "name": "Xiao et al/Total Site Target",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 40.0,
                     "unit": "degC"

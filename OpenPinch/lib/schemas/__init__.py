@@ -1,6 +1,12 @@
 """Concern-based schema package for OpenPinch."""
 
-from .common import HPRMetric, MaybeVU, ScalarOrVU, StatefulValueWithUnit, ValueWithUnit
+from .common import (
+    HPRMetric,
+    MaybeVU,
+    ScalarOrVU,
+    StatefulValueWithUnit,
+    ValueWithUnit,
+)
 from .graphs import DataPoint, Graph, GraphSet, Segment
 from .hpr import (
     HeatPumpTargetInputs,
@@ -24,7 +30,11 @@ from .io import (
     VisualiseOutput,
     ZoneTreeSchema,
 )
-from .reporting import HeatUtility, TargetResults, TempPinch
+from .reporting import (
+    HeatUtility,
+    PinchTemp,
+    TargetResults,
+)
 from .targets import (
     AnyTargetModel,
     BaseTargetModel,
@@ -90,7 +100,7 @@ __all__ = [
     "ZoneTreeSchema",
     "HeatUtility",
     "TargetResults",
-    "TempPinch",
+    "PinchTemp",
     "AnyTargetModel",
     "BaseTargetModel",
     "DirectHeatPumpTarget",

@@ -15,6 +15,7 @@ from ...lib.config import Configuration, tol
 from ...lib.enums import ST
 from ...lib.schemas.common import ValueWithUnit
 from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
+from ...lib.unit_system import standardise_input_value
 from ...utils.value_resolution import resolve_value_array
 from ._canonicalization import (
     _apply_zone_dt_cont_multiplier,
@@ -202,20 +203,20 @@ def _validate_stream_temperatures(stream: StreamSchema):
 def _validate_dt_cont_value(value, zone_config: Configuration) -> Value:
     """Validate one DT_CONT value and coerce to a non-negative float."""
     if isinstance(value, ValueWithUnit):
-        return Value(value.value, unit="delta_degC")
+        return standardise_input_value(value, field_name="dt_cont", config=zone_config)
     if (
         (value is None)
         or (not isinstance(value, (int, float)))
         or not math.isfinite(value)
     ):
         value = zone_config.DT_CONT
-    return Value(value, unit="delta_degC")
+    return standardise_input_value(value, field_name="dt_cont", config=zone_config)
 
 
 def _validate_htc_value(value, zone_config: Configuration) -> Value:
     """Validate one HTC value and coerce to a positive float."""
     if isinstance(value, ValueWithUnit):
-        return Value(value.value, unit="kW/m^2/delta_degC")
+        return standardise_input_value(value, field_name="htc", config=zone_config)
     if (
         (value is None)
         or (not isinstance(value, (int, float)))
@@ -223,7 +224,7 @@ def _validate_htc_value(value, zone_config: Configuration) -> Value:
         or value <= 0.0
     ):
         value = zone_config.HTC
-    return Value(value, unit="kW/m^2/delta_degC")
+    return standardise_input_value(value, field_name="htc", config=zone_config)
 
 
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
@@ -233,9 +234,21 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     htc = _validate_htc_value(stream.htc, zone.config)
     stream_obj = Stream(
         name=stream.name,
-        t_supply=stream.t_supply,
-        t_target=stream.t_target,
-        heat_flow=stream.heat_flow,
+        t_supply=standardise_input_value(
+            stream.t_supply,
+            field_name="t_supply",
+            config=zone.config,
+        ),
+        t_target=standardise_input_value(
+            stream.t_target,
+            field_name="t_target",
+            config=zone.config,
+        ),
+        heat_flow=standardise_input_value(
+            stream.heat_flow,
+            field_name="heat_flow",
+            config=zone.config,
+        ),
         dt_cont=dt_cont,
         dt_cont_multiplier=zone.dt_cont_multiplier,
         htc=htc,

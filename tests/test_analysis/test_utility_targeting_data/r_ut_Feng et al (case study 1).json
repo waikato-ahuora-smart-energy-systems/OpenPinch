@@ -2,7 +2,7 @@
     "targets": [
         {
             "name": "Aniline unit/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 101.6,
                     "unit": "degC"
@@ -56,7 +56,7 @@
         },
         {
             "name": "Natural gas unit/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 840.4,
                     "unit": "degC"
@@ -110,7 +110,7 @@
         },
         {
             "name": "Nitrobenzene unit/Direct Integration",
-            "temp_pinch": {
+            "pinch_temp": {
                 "cold_temp": {
                     "value": 101.0,
                     "unit": "degC"
