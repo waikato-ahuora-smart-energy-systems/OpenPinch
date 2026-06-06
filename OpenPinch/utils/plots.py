@@ -1,7 +1,6 @@
 """Plotly helper routines for quick temperature-enthalpy visual checks."""
 
 import numpy as np
-import plotly.graph_objects as go
 
 __all__ = [
     "graph_simple_cc_plot",
@@ -61,6 +60,7 @@ def plot_t_h_curve(points, title: str = "Temperature vs. Enthalpy") -> None:
     :param title: Title of the graph.
     :returns: None
     """
+    go = _require_plotly()
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
@@ -92,6 +92,7 @@ def plot_t_h_curve_with_piecewise_and_bounds(
     :param epsilon: Epsilon value for shading.
     :param title: Title of the graph.
     """
+    go = _require_plotly()
     enthalpies, temperatures = points[:, 0], points[:, 1]
     upper_bound = [e + epsilon for e in temperatures]
     lower_bound = [e - epsilon for e in temperatures]
