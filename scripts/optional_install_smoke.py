@@ -39,7 +39,7 @@ def _exercise_cli_help() -> None:
 def _check_core_surface() -> None:
     import OpenPinch
     from OpenPinch import PinchProblem
-    from OpenPinch.services.common.miscellaneous import graph_simple_cc_plot
+    from OpenPinch.utils.plots import graph_simple_cc_plot
     from OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump import (
         SimpleBraytonHeatPumpCycle,
     )
@@ -98,7 +98,7 @@ def _check_notebook_surface() -> None:
     import nbformat
 
     from OpenPinch.resources import copy_notebook, list_notebooks
-    from OpenPinch.services.common.miscellaneous import _require_plotly
+    from OpenPinch.utils.plots import _require_plotly
 
     _exercise_cli_help()
     for module_name in ["plotly", "openpyxl", "pyxlsb", "ipykernel", "nbformat"]:
