@@ -175,7 +175,7 @@ class StreamCollection:
             if idx is None:
                 setattr(stream, attr_name, value)
             else:
-                stream.set_value_attr_at_state_idx(attr_name, value, idx=idx)
+                stream.set_value_attr_at_idx(attr_name, value, idx=idx)
         return self
 
     def set_sort_key(self, key: Union[str, List[str], Callable], reverse: bool = False):

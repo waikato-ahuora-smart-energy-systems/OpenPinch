@@ -329,7 +329,7 @@ class Stream:
         """Activate or deactivate the stream for downstream analysis."""
         self._active = bool(value)
 
-    # === Computed Temperature Bounds ===
+    # === Computed Temperature Properties ===
 
     @property
     def t_min(self) -> Optional[Value]:
@@ -350,6 +350,11 @@ class Stream:
     def t_max_star(self) -> Optional[Value]:
         """Shifted maximum temperature."""
         return self._copy_value(self._t_max_star)
+
+    @property
+    def t_entr_mean(self) -> Optional[Value]:
+        """Entropic mean temperature of supply and target temperatures."""
+        return self._copy_value(self._t_entr_mean)
 
     # === Readable Alias Properties ===
 
@@ -392,6 +397,11 @@ class Stream:
     def shifted_minimum_temperature(self) -> Optional[Value]:
         """Alias for the shifted minimum stream temperature."""
         return self.t_min_star
+
+    @property
+    def entropic_mean_temperature(self) -> Optional[Value]:
+        """Alias for the entropic mean temperature."""
+        return self.t_entr_mean
 
     @property
     def shifted_maximum_temperature(self) -> Optional[Value]:
@@ -485,22 +495,22 @@ class Stream:
                 np.full(int(self._num_states), float(parsed.value), dtype=float),
                 unit=parsed.unit,
             )
-        if self.state_ids is None or (
-            len(self.state_ids) == 1 and len(self.state_ids) != parsed.num_states
+        if self._weights is None or (
+            len(self._weights) == 1 and len(self._weights) != parsed.num_states
         ):
             self._num_states = parsed.num_states
             self._state_ids = {str(i): i for i in range(self._num_states)}
             self._weights = np.ones(self._num_states, dtype=float)
 
-        if len(self.state_ids) > 1 and len(self.state_ids) != parsed.num_states:
-            raise ValueError("State IDs length must match the number of states.")
+        if len(self._weights) > 1 and len(self._weights) != parsed.num_states:
+            raise ValueError("Weights length must match the number of states.")
 
-        setattr(self, internal_name, parsed)
+        setattr(self, internal_name, parsed.to(self._VALUE_UNITS[internal_name]))
         self._validate_num_states()
         if update_derived:
             self.update_derived_properties()
 
-    def set_value_attr_at_state_idx(
+    def set_value_attr_at_idx(
         self,
         attr_name: str,
         value: float | Value | np.ndarray = None,
@@ -560,13 +570,22 @@ class Stream:
     def _calculate_missing_properties(self) -> None:
         """Calculate any missing core properties from available data."""
         if self._t_supply is None:
-            return
-
+            if self._t_target is None:
+                self._t_supply = Value(15, "degC").to(self._VALUE_UNITS["_t_supply"])
+            else:
+                self._t_supply = Value(self._t_target).to(
+                    self._VALUE_UNITS["_t_supply"]
+                )
         if self._t_target is None:
-            self._t_target = Value(self._t_supply)
-
+            self._t_target = Value(self._t_supply).to(self._VALUE_UNITS["_t_target"])
         if self._dt_cont is None:
             self._dt_cont = Value(0.0, unit=self._VALUE_UNITS["_dt_cont"])
+        if self._heat_flow is None:
+            self._heat_flow = Value(0.0, unit=self._VALUE_UNITS["_heat_flow"])
+        if self._htc is None:
+            self._htc = Value(1.0, unit=self._VALUE_UNITS["_htc"])
+        if self._price is None:
+            self._price = Value(0.0, unit=self._VALUE_UNITS["_price"])
 
         state_size = self._state_vector_size()
         if self._heat_flow is None:
@@ -594,66 +613,22 @@ class Stream:
             adjusted_target_arr[hot_mask] = t_supply_arr[hot_mask] - 0.01
             self._t_target = self._build_value(
                 adjusted_target_arr,
-                unit=self._VALUE_UNITS["_t_target"],
-            )
+                unit=self._t_supply.unit,
+            ).to(self._VALUE_UNITS["_t_target"])
 
     def update_derived_properties(self) -> None:
-        if self._t_supply is None:
-            return
-        if self._t_target is None:
-            self._t_target = Value(self._t_supply)
-        if self._dt_cont is None:
-            self._dt_cont = Value(0.0, unit=self._VALUE_UNITS["_dt_cont"])
-        if self._heat_flow is None:
-            self._heat_flow = Value(0.0, unit=self._VALUE_UNITS["_heat_flow"])
-        if self._htc is None:
-            self._htc = Value(1.0, unit=self._VALUE_UNITS["_htc"])
-        if self._price is None:
-            self._price = Value(0.0, unit=self._VALUE_UNITS["_price"])
-
         state_size = self._state_vector_size()
         t_supply = self._value_array(self._t_supply, size=state_size)
         t_target = self._value_array(self._t_target, size=state_size)
         heat_flow = self._value_array(self._heat_flow, size=state_size)
-        dt_cont = self._value_array(self._dt_cont, size=state_size)
         htc = self._value_array(self._htc, size=state_size)
         price = self._value_array(self._price, size=state_size)
 
-        dt_cont_act = dt_cont * float(self._dt_cont_multiplier)
-        self._dt_cont_act = self._build_value(
-            dt_cont_act,
-            unit=self._VALUE_UNITS["_dt_cont_act"],
-        )
+        dt_cont_act = self._dt_cont * float(self._dt_cont_multiplier)
+        self._dt_cont_act = dt_cont_act.to(self._VALUE_UNITS["_dt_cont_act"])
 
         hot_states = t_supply > t_target + _TEMPERATURE_EQUAL_TOL
         cold_states = t_supply < t_target - _TEMPERATURE_EQUAL_TOL
-        neutral_states = ~(hot_states | cold_states)
-        active_classes = {
-            label
-            for label, mask in (
-                (ST.Hot.value, hot_states),
-                (ST.Cold.value, cold_states),
-                (ST.Both.value, neutral_states),
-            )
-            if np.any(mask)
-        }
-        if len(active_classes) > 1:
-            labels = (
-                list(self._state_ids.keys())
-                if self._state_ids is not None and len(self._state_ids) == state_size
-                else [str(idx) for idx in range(state_size)]
-            )
-            hot_state_ids = [sid for sid, active in zip(labels, hot_states) if active]
-            cold_state_ids = [sid for sid, active in zip(labels, cold_states) if active]
-            neutral_state_ids = [
-                sid for sid, active in zip(labels, neutral_states) if active
-            ]
-            raise ValueError(
-                "Stream states must classify consistently. "
-                f"Hot={hot_state_ids}, "
-                f"Cold={cold_state_ids}, "
-                f"Neutral={neutral_state_ids}."
-            )
 
         if np.any(hot_states):
             self._type = ST.Hot.value
@@ -668,7 +643,7 @@ class Stream:
             t_min_star = t_min + dt_cont_act
             t_max_star = t_max + dt_cont_act
         else:
-            self._type = ST.Both.value
+            self._type = ST.Neutral.value
             t_min = t_supply
             t_max = t_target
             t_min_star = t_min.copy()
@@ -702,6 +677,11 @@ class Stream:
         self._t_max_star = self._build_value(
             t_max_star,
             unit=self._VALUE_UNITS["_t_max_star"],
+        )
+        Ts_K = self._t_supply.to("K")
+        Tt_K = self._t_target.to("K")
+        self._t_entr_mean = ((Ts_K - Tt_K) / (np.log(Ts_K) - np.log(Tt_K))).to(
+            self._t_supply.unit
         )
         self._cp = self._build_value(cp, unit=self._VALUE_UNITS["_cp"])
         self._htr = self._build_value(htr, unit=self._VALUE_UNITS["_htr"])
@@ -767,7 +747,7 @@ class Stream:
         *,
         state_id: str | None = None,
     ) -> None:
-        self.set_value_attr_at_state_idx(
+        self.set_value_attr_at_idx(
             attr_name,
             value,
             idx=self.get_state_index(state_id),

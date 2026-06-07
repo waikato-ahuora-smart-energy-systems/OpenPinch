@@ -113,6 +113,7 @@ class StreamType(Enum):
     Hot = "Hot"
     Cold = "Cold"
     Both = "Both"
+    Neutral = "Neutral"
     Unassigned = ""
 
 
