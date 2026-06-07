@@ -195,7 +195,7 @@ def _assign_utility(
             Q_assigned,
         )
         if Q_ut_max > tol:
-            u.set_value_attr_at_state_idx(
+            u.set_value_attr_at_idx(
                 attr_name="heat_flow",
                 value=Q_ut_max,
                 idx=idx,
@@ -242,19 +242,27 @@ def _maximise_utility_duty(
         return 0.0
 
     dt_tar_valid = dt_tar[valid_mask]
-    Q_pot_valid = Q_pot[valid_mask]
-
     if dt_tar_valid.max() < 0:
         return 0.0
 
-    Q_ts_max = Q_pot_valid.max()
+    def _candidate_limit(q_pot_values: np.ndarray) -> tuple[float, float, float]:
+        q_pot_valid = q_pot_values[valid_mask]
+        if q_pot_valid.size == 0:
+            return 0.0, 0.0, np.inf
 
-    Q_tt = np.full_like(Q_pot_valid, np.inf, dtype=float)
-    slope_mask = (-dt_tar_valid) > tol
-    if np.any(slope_mask):
-        Q_tt[slope_mask] = (
-            Q_pot_valid[slope_mask] / (-dt_tar_valid[slope_mask]) * abs(Tt - Ts)
-        )
-    Q_tt_max = Q_tt.min() if Q_tt.size > 0 else np.inf
+        q_ts_max = q_pot_valid.max()
+        q_tt = np.full_like(q_pot_valid, np.inf, dtype=float)
+        slope_mask = (-dt_tar_valid) > tol
+        if np.any(slope_mask):
+            q_tt[slope_mask] = (
+                q_pot_valid[slope_mask] / (-dt_tar_valid[slope_mask]) * abs(Tt - Ts)
+            )
+        q_tt_max = q_tt.min() if q_tt.size > 0 else np.inf
+        return min(q_ts_max, q_tt_max), q_ts_max, q_tt_max
 
-    return min(Q_ts_max, Q_tt_max) if dt_tar_valid.max() >= 0 else 0.0
+    q_adj, q_ts_adj, q_tt_adj = _candidate_limit(Q_pot)
+    q_cur, _, _ = _candidate_limit(current_H - Q_assigned)
+
+    if np.isfinite(q_tt_adj) and q_tt_adj < q_ts_adj:
+        return min(q_adj, q_cur)
+    return q_adj

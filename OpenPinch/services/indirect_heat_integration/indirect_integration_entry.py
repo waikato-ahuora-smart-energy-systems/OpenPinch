@@ -59,7 +59,7 @@ def compute_total_subzone_utility_targets(
         utility_cost += t.utility_cost
 
         for j in range(len(hot_utilities)):
-            hot_utilities[j].set_value_attr_at_state_idx(
+            hot_utilities[j].set_value_attr_at_idx(
                 attr_name="heat_flow",
                 value=hot_utilities[j].heat_flow[idx]
                 + t.hot_utilities[j].heat_flow[idx],
@@ -67,7 +67,7 @@ def compute_total_subzone_utility_targets(
             )
 
         for j in range(len(cold_utilities)):
-            cold_utilities[j].set_value_attr_at_state_idx(
+            cold_utilities[j].set_value_attr_at_idx(
                 attr_name="heat_flow",
                 value=cold_utilities[j].heat_flow[idx]
                 + t.cold_utilities[j].heat_flow[idx],
