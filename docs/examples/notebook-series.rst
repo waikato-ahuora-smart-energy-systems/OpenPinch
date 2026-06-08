@@ -5,7 +5,7 @@ OpenPinch ships with a packaged notebook series that is treated as part of the
 supported learning and regression surface. Each notebook is built around one
 decision question rather than a generic feature tour. The series now spans the
 main single-case API, named multi-case studies, multistate targeting, and the
-typed/service boundary.
+typed/service boundary, and the energy-transfer analysis view.
 
 Included Notebooks
 ------------------
@@ -35,6 +35,12 @@ Included Notebooks
    ``TargetInput`` plus ``pinch_analysis_service(...)``, artifact export, and
    serialized ``PinchWorkspace`` variant views.
 
+``06_energy_transfer_analysis.ipynb``
+   Energy-transfer targeting on ``pulp_mill.json``, including the
+   heat-surplus/deficit table, graph-ready energy-transfer diagram payload,
+   standard plot accessor, and Total Site versus local Direct Integration base
+   target selection.
+
 How To Use Them
 ---------------
 
@@ -63,6 +69,8 @@ Recommended Learning Order
    seasonal variation.
 5. Use the schema/service notebook when you need typed validation, serialized
    workspace views, or repeatable export workflows.
+6. Use the energy-transfer notebook when you need interval-level surplus/deficit
+   accounting or a diagram payload derived from an existing thermal target.
 
 Why These Matter
 ----------------

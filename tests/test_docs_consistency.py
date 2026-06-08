@@ -110,7 +110,7 @@ def test_docs_highlight_interpretation_and_heat_pump_integration():
     assert "03_carnot_hpr_comparison.ipynb" in combined
 
 
-def test_docs_reference_the_current_five_notebook_series():
+def test_docs_reference_the_current_notebook_series():
     combined = "\n".join(
         [
             _read(README),
@@ -126,6 +126,7 @@ def test_docs_reference_the_current_five_notebook_series():
     assert "03_carnot_hpr_comparison.ipynb" in combined
     assert "04_multistate_targeting_and_state_comparison.ipynb" in combined
     assert "05_schema_service_and_output_workflows.ipynb" in combined
+    assert "06_energy_transfer_analysis.ipynb" in combined
     assert "01_basic_pinch_analysis.ipynb" not in combined
     assert "06_target_services_workflow.ipynb" not in combined
     assert "multistate" in combined or 'state_id="' in combined

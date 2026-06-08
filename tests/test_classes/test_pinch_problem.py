@@ -1181,6 +1181,42 @@ def test_plot_helper_can_return_exergy_graph_data(monkeypatch):
     assert nlp_graph == {"type": "Exergetic Net Load Profiles", "name": "NLP_X"}
 
 
+def test_plot_helper_can_build_energy_transfer_diagram(monkeypatch):
+    payload = {
+        "Plant/ET": {
+            "name": "Plant/Energy Transfer Analysis",
+            "zone_name": "Plant",
+            "zone_address": "Plant",
+            "graphs": [
+                {
+                    "type": "Energy Transfer Diagram",
+                    "name": "ETD",
+                    "segments": [],
+                },
+            ],
+        }
+    }
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[_PlotAccessor.__module__],
+        "_build_plotly_graph",
+        lambda graph: {"built": graph["name"]},
+        raising=True,
+    )
+
+    obj = PinchProblem()
+
+    assert obj.plot.energy_transfer_diagram(zone_name="Plant/ET") == {"built": "ETD"}
+    assert obj.plot.energy_transfer_diagram(
+        zone_name="Plant/ET",
+        return_graph_data=True,
+    ) == {
+        "type": "Energy Transfer Diagram",
+        "name": "ETD",
+        "segments": [],
+    }
+
+
 def test_plot_helper_rejects_show_when_returning_graph_data(monkeypatch):
     payload = {
         "Plant/DI": {

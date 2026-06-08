@@ -176,6 +176,31 @@ def test_create_graph_set_includes_real_grand_composite_curve():
     )
 
 
+def test_create_graph_set_includes_energy_transfer_diagram():
+    mock_target = MagicMock()
+    mock_target.name = "ZoneA/Energy Transfer Analysis"
+    mock_target.type = TT.ET.value
+    mock_target.zone_name = "ZoneA"
+    mock_target.graphs = {
+        GT.ETD.value: {
+            PT.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
+            PT.H_NET.value: MagicMock(to_list=lambda: [10, 40, 5]),
+        }
+    }
+    mock_zone = MagicMock(spec=Zone)
+    mock_zone.name = "ZoneA"
+    mock_zone.address = "Site/ZoneA"
+
+    graph_set = _create_graph_set(mock_target, zone=mock_zone)
+
+    assert len(graph_set["graphs"]) == 1
+    assert graph_set["graphs"][0]["type"] == GT.ETD.value
+    assert (
+        graph_set["graphs"][0]["name"]
+        == "Energy Transfer Diagram: ZoneA/Energy Transfer Analysis"
+    )
+
+
 def test_create_graph_set_includes_exergy_graphs():
     mock_target = MagicMock()
     mock_target.name = "ZoneA/Direct Integration"

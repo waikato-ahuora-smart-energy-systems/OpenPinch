@@ -13,6 +13,7 @@ EXPECTED_NOTEBOOKS = [
     "03_carnot_hpr_comparison.ipynb",
     "04_multistate_targeting_and_state_comparison.ipynb",
     "05_schema_service_and_output_workflows.ipynb",
+    "06_energy_transfer_analysis.ipynb",
 ]
 
 
@@ -157,3 +158,20 @@ def test_notebook_5_covers_service_boundary_and_output_workflows(tmp_path: Path)
     assert "save_bundle(" in combined_source
     assert "load_bundle(" in combined_source
     assert "show_dashboard()" in combined_source
+
+
+def test_notebook_6_covers_energy_transfer_analysis(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "06_energy_transfer_analysis.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "pulp_mill.json" in combined_source
+    assert "target.energy_transfer(" in combined_source
+    assert "heat_surplus_deficit_table" in combined_source
+    assert "energy_transfer_diagram" in combined_source
+    assert "plot.energy_transfer_diagram" in combined_source
+    assert '"base_target_type": "Total Site Target"' in combined_source
+    assert '"base_target_type": "Direct Integration"' in combined_source
+    assert 'zone_name="Bleaching"' in combined_source

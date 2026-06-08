@@ -255,7 +255,7 @@ class GraphType(Enum):
     NLP_X = "Exergetic Net Load Profiles"
     GCC_HP = "Grand Composite Curve with Heat Pump"
     NLP = "Net Load Profiles"
-
+    ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"
     SUGCC = "Site Utility Grand Composite Curve"
 

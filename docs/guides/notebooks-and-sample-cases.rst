@@ -54,9 +54,10 @@ The current packaged notebooks stay on the stable public surfaces while using
 real packaged cases or real derivatives of those cases. Notebook 01 starts from
 ``PinchProblem``, notebooks 01 to 03 use ``PinchWorkspace`` where named study
 cases matter, notebook 04 covers named-state targeting, and notebook 05 covers
-the typed and serialized boundaries. The distributed assets are packaged as
-clean sources: no stored Plotly payloads, no cached execution counts, and no
-stale traceback output.
+the typed and serialized boundaries. Notebook 06 covers energy-transfer
+analysis outputs. The distributed assets are packaged as clean sources: no
+stored Plotly payloads, no cached execution counts, and no stale traceback
+output.
 
 Copy the full series with:
 
@@ -86,12 +87,15 @@ Current packaged notebooks:
 3. ``03_carnot_hpr_comparison.ipynb``
 4. ``04_multistate_targeting_and_state_comparison.ipynb``
 5. ``05_schema_service_and_output_workflows.ipynb``
+6. ``06_energy_transfer_analysis.ipynb``
 
 Notebook 04 shows the named-state workflow directly through
 ``problem.target.direct_heat_integration(state_id="peak")`` and
 ``problem.target.indirect_heat_integration(state_id="winter")``. Notebook 05
 shows the typed ``TargetInput`` boundary and the serialized
-``PinchWorkspace`` view layer.
+``PinchWorkspace`` view layer. Notebook 06 shows
+``target.energy_transfer(...)`` with the heat-surplus/deficit table and
+``plot.energy_transfer_diagram(...)``.
 
 Recommended Learning Path
 -------------------------
@@ -107,6 +111,8 @@ Recommended Learning Path
    comparison.
 5. ``basic_pinch.json`` and notebook 05 when you need typed validation,
    exports, or serialized workspace views.
+6. ``pulp_mill.json`` and notebook 06 when you need energy-transfer diagrams
+   or interval surplus/deficit accounting.
 
 Why These Assets Matter
 -----------------------

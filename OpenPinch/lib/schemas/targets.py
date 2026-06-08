@@ -323,6 +323,16 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
         )
 
 
+class EnergyTransferTarget(GraphBackedTarget, UtilitySummaryTarget):
+    """Energy transfer diagram and heat-surplus/deficit table target."""
+
+    pt: ProblemTable
+    base_target_type: str
+    base_target_name: str
+    heat_surplus_deficit_table: list[dict[str, Any]] = Field(default_factory=list)
+    energy_transfer_diagram: dict[str, Any] = Field(default_factory=dict)
+
+
 class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     """Base contract for advanced HPR targets from explicit ``target_*`` methods."""
 
@@ -430,6 +440,7 @@ AnyTargetModel = (
     DirectIntegrationTarget
     | TotalProcessTarget
     | TotalSiteTarget
+    | EnergyTransferTarget
     | DirectHeatPumpTarget
     | IndirectHeatPumpTarget
     | DirectRefrigerationTarget
@@ -443,6 +454,7 @@ __all__ = [
     "DirectHeatPumpTarget",
     "DirectIntegrationTarget",
     "DirectRefrigerationTarget",
+    "EnergyTransferTarget",
     "HeatPumpTargetBase",
     "IndirectHeatPumpTarget",
     "IndirectRefrigerationTarget",

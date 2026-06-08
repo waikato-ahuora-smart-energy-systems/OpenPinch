@@ -33,6 +33,7 @@ The current packaged notebooks are:
 - ``03_carnot_hpr_comparison.ipynb``
 - ``04_multistate_targeting_and_state_comparison.ipynb``
 - ``05_schema_service_and_output_workflows.ipynb``
+- ``06_energy_transfer_analysis.ipynb``
 
 When To Leave the CLI
 ---------------------
