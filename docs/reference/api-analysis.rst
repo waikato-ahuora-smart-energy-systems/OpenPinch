@@ -121,7 +121,7 @@ optimisers and helper modules. The main low-level entrypoints remain
 .. automodule:: OpenPinch.services.common.temperature_driving_force
    :members:
 
-.. automodule:: OpenPinch.services.power_cogeneration.power_cogeneration_analysis
+.. automodule:: OpenPinch.services.power_cogeneration.power_cogeneration_entry
    :members:
 
 Experimental or Partial Analysis Modules
