@@ -178,6 +178,30 @@ def test_sum_heat_flow_returns_total_for_all_streams():
     assert sc.sum_stream_attribute("heat_flow") == pytest.approx(40.0)
 
 
+def test_numeric_view_updates_after_stream_mutation():
+    stream = Stream(name="H1", t_supply=200, t_target=120, heat_flow=80.0)
+    sc = StreamCollection([stream])
+
+    initial = sc.numeric_view()
+    assert initial.cp[0] == pytest.approx(1.0)
+
+    stream.heat_flow = 160.0
+    updated = sc.numeric_view()
+
+    assert updated.cp[0] == pytest.approx(2.0)
+    assert updated is not initial
+
+
+def test_numeric_view_updates_after_collection_mutation(sample_streams):
+    s1, s2, _ = sample_streams
+    sc = StreamCollection([s1])
+    assert sc.numeric_view().cp.shape == (1,)
+
+    sc.add(s2)
+
+    assert sc.numeric_view().cp.shape == (2,)
+
+
 def test_get_hot_streams_filters_and_preserves_sort_settings():
     sc = StreamCollection()
     sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1))

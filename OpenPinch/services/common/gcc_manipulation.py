@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 import numpy as np
 
 from ...classes.problem_table import ProblemTable
@@ -112,7 +110,7 @@ def get_GCC_without_pockets(
     pt: ProblemTable,
     col_H_NP: str | PT = PT.H_NET_NP,
     col_H: str | PT = PT.H_NET,
-) -> Tuple[ProblemTable, ProblemTable]:
+) -> ProblemTable:
     """Flatten GCC pockets by inserting breakpoints so the profile becomes monotonic."""
     pt[col_H_NP] = pt[col_H]
 
@@ -343,7 +341,7 @@ def _remove_pockets_on_one_side_of_the_pinch(
     hot_pinch_loc: int = None,
     cold_pinch_loc: int = None,
     is_above_pinch: bool = True,
-) -> Tuple[ProblemTable, ProblemTable]:
+) -> tuple[ProblemTable, int, int]:
     """Iteratively eliminate pockets above or below the pinch."""
 
     # Settings for removing pocket segments for above/below the pinch

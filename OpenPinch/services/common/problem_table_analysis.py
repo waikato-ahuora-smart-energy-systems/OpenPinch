@@ -8,7 +8,7 @@ deriving zonal targets and plotting data for composite curves.
 from __future__ import annotations
 
 import math
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 
@@ -139,23 +139,35 @@ def create_problem_table_with_t_int(
     """Return a problem table populated with ordered unique temperature intervals."""
     if streams is None:
         streams = StreamCollection()
-    if extra_T_intervals is None:
-        extra_T_intervals = []
-    elif isinstance(extra_T_intervals, (int, float)):
-        extra_T_intervals = [extra_T_intervals]
-    elif isinstance(extra_T_intervals, np.ndarray):
-        extra_T_intervals = extra_T_intervals.tolist()
 
-    if is_shifted:
-        T_vals = [
-            float(t) for s in streams for t in (s.t_min_star[idx], s.t_max_star[idx])
-        ]
+    if isinstance(streams, StreamCollection):
+        numeric = streams.numeric_view(idx)
+        if is_shifted:
+            T_vals = np.concatenate((numeric.t_min_star, numeric.t_max_star))
+        else:
+            T_vals = np.concatenate((numeric.t_min, numeric.t_max))
     else:
-        T_vals = [float(t) for s in streams for t in (s.t_min[idx], s.t_max[idx])]
-    T_vals += extra_T_intervals
+        if is_shifted:
+            T_vals = [
+                float(t)
+                for s in streams
+                for t in (s.t_min_star[idx], s.t_max_star[idx])
+            ]
+        else:
+            T_vals = [float(t) for s in streams for t in (s.t_min[idx], s.t_max[idx])]
+        T_vals = np.asarray(T_vals, dtype=float)
+
+    if extra_T_intervals is not None:
+        extra_vals = np.atleast_1d(np.asarray(extra_T_intervals, dtype=float))
+        if extra_vals.size:
+            T_vals = np.concatenate((T_vals, extra_vals))
+
+    if T_vals.size == 0:
+        return ProblemTable({PT.T: []})
+
     dp = int(-math.log10(tol))
-    T_vals = np.array(T_vals).round(dp)
-    return ProblemTable({PT.T: sorted(set(T_vals), reverse=True)})
+    T_vals = np.round(T_vals[np.isfinite(T_vals)], dp)
+    return ProblemTable({PT.T: np.unique(T_vals)[::-1]})
 
 
 def problem_table_algorithm(
@@ -266,41 +278,47 @@ def _sum_mcp_between_temperature_boundaries(
     streams: StreamCollection,
     is_shifted: bool = True,
     idx: int | None = None,
-) -> Tuple[List[float], List[float], List[float], List[float]]:
+) -> tuple[list[float], list[float]]:
     """Vectorized CP and rCP summation across temperature intervals."""
+    return_lists = not isinstance(streams, StreamCollection)
+    temperatures = np.asarray(temperatures, dtype=float)
+    if temperatures.size == 0:
+        return [], []
+    if len(streams) == 0 or temperatures.size == 1:
+        zeros = np.zeros(temperatures.size, dtype=float)
+        return (zeros.tolist(), zeros.tolist()) if return_lists else (zeros, zeros)
 
-    def calc_active_matrix(streams: StreamCollection, use_shifted: bool) -> np.ndarray:
-        if use_shifted:
-            t_min = np.asarray(
-                [stream.t_min_star[idx] for stream in streams], dtype=float
-            )
-            t_max = np.asarray(
-                [stream.t_max_star[idx] for stream in streams], dtype=float
-            )
-        else:
-            t_min = np.asarray([stream.t_min[idx] for stream in streams], dtype=float)
-            t_max = np.asarray([stream.t_max[idx] for stream in streams], dtype=float)
+    if return_lists:
+        streams = StreamCollection(list(streams))
 
-        lower_bounds = np.array(temperatures[1:])
-        upper_bounds = np.array(temperatures[:-1])
+    numeric = streams.numeric_view(idx)
+    t_min = numeric.t_min_star if is_shifted else numeric.t_min
+    t_max = numeric.t_max_star if is_shifted else numeric.t_max
+    active_streams = numeric.active & np.isfinite(t_min) & np.isfinite(t_max)
+    if not np.any(active_streams):
+        zeros = np.zeros(temperatures.size, dtype=float)
+        return (zeros.tolist(), zeros.tolist()) if return_lists else (zeros, zeros)
 
-        # Shape: (intervals, streams)
-        active = (t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + tol * 10) & (
-            t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - tol * 10
-        )
+    t_min = t_min[active_streams]
+    t_max = t_max[active_streams]
+    cp = numeric.cp[active_streams]
+    rcp = numeric.rcp[active_streams]
+    lower_bounds = temperatures[1:]
+    upper_bounds = temperatures[:-1]
 
-        return active
+    active = (t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + tol * 10) & (
+        t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - tol * 10
+    )
 
-    def sum_cp_rcp(streams: StreamCollection, active: np.ndarray):
-        cp = np.asarray([stream.CP[idx] for stream in streams], dtype=float)
-        rcp = np.asarray([stream.rCP[idx] for stream in streams], dtype=float)
-        cp_sum = active @ cp
-        rcp_sum = active @ rcp
-        return np.insert(cp_sum, 0, 0.0), np.insert(rcp_sum, 0, 0.0)
-
-    is_active = calc_active_matrix(streams, is_shifted)
-    cp_array, rcp_array = sum_cp_rcp(streams, is_active)
-    return cp_array.tolist(), rcp_array.tolist()
+    cp_array = np.empty(temperatures.size, dtype=float)
+    rcp_array = np.empty(temperatures.size, dtype=float)
+    cp_array[0] = 0.0
+    rcp_array[0] = 0.0
+    cp_array[1:] = active @ cp
+    rcp_array[1:] = active @ rcp
+    if return_lists:
+        return cp_array.tolist(), rcp_array.tolist()
+    return cp_array, rcp_array
 
 
 def _shift_pt_to_set_heat_recovery(

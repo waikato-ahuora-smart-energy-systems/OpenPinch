@@ -26,7 +26,10 @@ class _TargetAccessor:
         self._problem = problem
 
     def __call__(
-        self, *, options: Optional[dict[str, Any]] = {}, state_id: Optional[str] = None
+        self,
+        *,
+        options: Optional[dict[str, Any]] = None,
+        state_id: Optional[str] = None,
     ):
         runtime_options = dict(options or {})
         if state_id is not None:

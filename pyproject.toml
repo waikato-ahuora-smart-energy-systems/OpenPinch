@@ -112,7 +112,7 @@ target-version = "py314"
 extend-exclude = ["docs/_build", "dist", "OpenPinch/data/notebooks"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
+select = ["E", "F", "W", "I", "B006"]
 ignore = ["E203"]
 
 [tool.ruff.lint.per-file-ignores]

@@ -374,7 +374,7 @@ class PinchProblem:
         options: Optional[dict[str, Any]],
         *,
         zone: "Zone",
-    ) -> tuple[dict[str, Any], str | None, int]:
+    ) -> tuple[dict[str, Any], str | None]:
         runtime_options = dict(options or {})
         idx, sid = get_state_index(state_ids=zone.state_ids, args=runtime_options)
         runtime_options["idx"] = idx

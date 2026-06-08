@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from functools import lru_cache
 from typing import Callable
 
 from ...lib.enums import ZT
@@ -31,21 +32,26 @@ def run_targeting_for_zone_and_subzones(
 
 def _invoke_service(service_func: Callable, zone: Zone, args: dict | None = None):
     """Call a targeting callback with backward-compatible argument handling."""
-    if not isinstance(service_func, Callable):
+    if not callable(service_func):
         return None
 
-    if args is None:
+    if args is None or not _service_accepts_args(service_func):
         return service_func(zone)
 
+    return service_func(zone, args)
+
+
+@lru_cache(maxsize=64)
+def _service_accepts_args(service_func: Callable) -> bool:
+    """Return whether a service accepts a second positional ``args`` parameter."""
     try:
         signature = inspect.signature(service_func)
     except TypeError, ValueError:
-        return service_func(zone, args)
+        return True
 
     params = list(signature.parameters.values())
-    accepts_varargs = any(
-        param.kind == inspect.Parameter.VAR_POSITIONAL for param in params
-    )
+    if any(param.kind == inspect.Parameter.VAR_POSITIONAL for param in params):
+        return True
     positional_params = [
         param
         for param in params
@@ -55,10 +61,7 @@ def _invoke_service(service_func: Callable, zone: Zone, args: dict | None = None
             inspect.Parameter.POSITIONAL_OR_KEYWORD,
         )
     ]
-
-    if accepts_varargs or len(positional_params) >= 2:
-        return service_func(zone, args)
-    return service_func(zone)
+    return len(positional_params) >= 2
 
 
 def _invoke_target_handler(
@@ -95,7 +98,7 @@ def _get_unit_operation_targets(
             for subzone in zone.subzones.values():
                 if subzone.type == ZT.O.value:
                     if subzone.config.DO_DIRECT_OPERATION_TARGETING:
-                        if isinstance(direct_service_func, Callable):
+                        if callable(direct_service_func):
                             _invoke_service(direct_service_func, subzone, args)
                 else:
                     raise ValueError(
@@ -103,7 +106,7 @@ def _get_unit_operation_targets(
                         "contain other operation zones."
                     )
 
-        if isinstance(direct_service_func, Callable):
+        if callable(direct_service_func):
             _invoke_service(direct_service_func, zone, args)
 
     return zone
@@ -142,10 +145,10 @@ def _get_process_targets(
                 )
 
         if zone.config.DO_INDIRECT_PROCESS_TARGETING:
-            if isinstance(indirect_service_func, Callable):
+            if callable(indirect_service_func):
                 _invoke_service(indirect_service_func, zone, args)
 
-    if isinstance(direct_service_func, Callable):
+    if callable(direct_service_func):
         _invoke_service(direct_service_func, zone, args)
 
     return zone
@@ -159,7 +162,7 @@ def _get_site_targets(
 ):
     """Run site targeting over the full nested zone hierarchy."""
 
-    if isinstance(direct_service_func, Callable):
+    if callable(direct_service_func):
         _invoke_service(direct_service_func, zone, args)
 
     if len(zone.subzones) > 0:
@@ -194,7 +197,7 @@ def _get_site_targets(
                     "site, process, and operation zones."
                 )
 
-        if isinstance(indirect_service_func, Callable):
+        if callable(indirect_service_func):
             _invoke_service(indirect_service_func, zone, args)
 
     return zone

@@ -375,8 +375,10 @@ class Zone:
         if isinstance(target_to_add, BaseTargetModel):
             self._targets[target_to_add.type] = target_to_add
 
-    def add_targets(self, targets: list = []):
+    def add_targets(self, targets: list | None = None):
         """Add multiple targets to a specific zone."""
+        if targets is None:
+            targets = []
         for t in targets:
             self.add_target(t)
 
