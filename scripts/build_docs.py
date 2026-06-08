@@ -12,15 +12,20 @@ from shutil import which
 
 def _build_command(build_dir: Path) -> list[str] | None:
     """Return the preferred command for building the docs in this environment."""
+    sphinx_args = [
+        "-b",
+        "html",
+        "--fail-on-warning",
+        "--keep-going",
+        "docs",
+        str(build_dir),
+    ]
     if find_spec("sphinx") is not None:
         return [
             sys.executable,
             "-m",
             "sphinx",
-            "-b",
-            "html",
-            "docs",
-            str(build_dir),
+            *sphinx_args,
         ]
 
     uv_bin = which("uv")
@@ -35,10 +40,7 @@ def _build_command(build_dir: Path) -> list[str] | None:
         "python",
         "-m",
         "sphinx",
-        "-b",
-        "html",
-        "docs",
-        str(build_dir),
+        *sphinx_args,
     ]
 
 

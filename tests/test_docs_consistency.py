@@ -192,12 +192,34 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     api_lib = _read(API_LIB)
     api_analysis = _read(API_ANALYSIS)
 
-    assert "OpenPinch.classes.vapour_compression_cycle" in api_classes
-    assert "OpenPinch.classes.parallel_vapour_compression_cycles" in api_classes
-    assert "OpenPinch.classes.cascade_vapour_compression_cycle" in api_classes
+    assert (
+        "OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle"
+        in api_classes
+    )
+    assert (
+        "OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles"
+        in api_classes
+    )
+    assert (
+        "OpenPinch.services.heat_pump_integration.unit_models.cascade_vapour_compression_cycle"
+        in api_classes
+    )
+    assert (
+        "OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump"
+        in api_classes
+    )
+    assert (
+        "OpenPinch.services.power_cogeneration.unit_models.multi_stage_steam_turbine"
+        in api_classes
+    )
+    assert "OpenPinch.services.heat_pump_integration.targeting_services" in _read(
+        REPO_ROOT / "docs" / "reference" / "api-heat-pump.rst"
+    )
     assert "OpenPinch.classes.simple_heat_pump" not in api_classes
     assert "OpenPinch.classes.multi_simple_heat_pump" not in api_classes
     assert "OpenPinch.classes.cascade_heat_pump" not in api_classes
+    assert "OpenPinch.classes.brayton_heat_pump" not in api_classes
+    assert "OpenPinch.classes.multi_stage_steam_turbine" not in api_classes
     assert "state_ids" in api_classes
     assert "weights" in api_classes
 
