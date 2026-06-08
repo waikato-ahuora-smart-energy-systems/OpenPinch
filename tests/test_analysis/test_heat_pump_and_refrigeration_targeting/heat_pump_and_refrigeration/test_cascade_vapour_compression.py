@@ -75,6 +75,25 @@ def test_cascade_x0_round_trips_with_ambient_cooling_seed():
     assert np.isnan(vars["Q_cool"][-1])
 
 
+def test_cascade_refrigeration_uses_full_evaporator_duty_seed():
+    args = _base_args(n_cond=2, n_evap=2, is_heat_pumping=False)
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0, 90.0]),
+        Q_cond=np.array([120.0, 80.0]),
+        T_evap=np.array([70.0, 50.0]),
+        Q_evap=np.array([90.0, 60.0]),
+        Q_amb_hot=20.0,
+        Q_amb_cold=0.0,
+    )
+
+    x0, _ = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
+    vars = hp_cascade._parse_cascade_hp_state_variables(x0, args)
+
+    np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
+    np.testing.assert_allclose(vars["Q_cool"], init_res.Q_evap)
+    assert not np.isnan(vars["Q_cool"]).any()
+
+
 def test_cascade_x0_bounds_and_parse(monkeypatch):
     args = _base_args(n_cond=2, n_evap=2)
     init_res = SimpleNamespace(
@@ -180,6 +199,52 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
     assert out["w_net"] == pytest.approx(40.0)
     assert out["cop_h"] == pytest.approx(5.0)
     assert calls["plot"] == 1
+
+
+def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch):
+    args = _base_args(n_cond=1, n_evap=1, is_heat_pumping=False)
+    captured = {}
+    monkeypatch.setattr(
+        hp_cascade,
+        "_parse_cascade_hp_state_variables",
+        lambda _x, _args: {
+            "T_cond": np.array([100.0]),
+            "dT_subcool": np.array([5.0]),
+            "Q_heat": np.array([100.0]),
+            "T_evap": np.array([60.0]),
+            "Q_cool": np.array([80.0]),
+            "Q_amb_hot": 0.0,
+            "Q_amb_cold": 0.0,
+            "dT_ihx_gas_side": np.array([0.0]),
+        },
+    )
+
+    class _FakeCascadeSolved:
+        solved = True
+        work = 20.0
+        work_arr = np.array([20.0])
+        Q_heat_arr = np.array([100.0])
+        Q_cool_arr = np.array([80.0])
+        penalty = 0.0
+
+        def solve(self, **kwargs):
+            captured.update(kwargs)
+
+        def build_stream_collection(self, **kwargs):
+            return _sc(_stream("HP", 90.0, 80.0, 10.0, is_process_stream=False))
+
+    monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
+    seq = iter([_pt_with_hnet(0.0, -1.0), _pt_with_hnet(0.0, -1.0)])
+    monkeypatch.setattr(
+        hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
+    )
+
+    out = hp_cascade._compute_cascade_hp_system_obj(np.array([0.2]), args)
+
+    assert captured["is_heat_pump"] is False
+    np.testing.assert_allclose(captured["Q_heat"], np.array([100.0]))
+    np.testing.assert_allclose(captured["Q_cool"], np.array([80.0]))
+    assert out["cop_h"] == pytest.approx(4.0)
 
 
 def test_cascade_x0_branch_for_single_stage():

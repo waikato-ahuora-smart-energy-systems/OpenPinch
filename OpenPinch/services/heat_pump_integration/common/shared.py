@@ -174,35 +174,104 @@ def solve_hpr_placement(
     args: HeatPumpTargetInputs,
 ) -> HPRBackendResult:
     """Run the configured multistart optimiser and post-process the best result."""
-    local_minima_x = multiminima(
+    x0_arr = _verify_x0_ls(x0_ls)
+    local_minima_x, local_minima_f = multiminima(
         func=f_obj,
         func_kwargs=args,
-        x0_ls=_verify_x0_ls(x0_ls),
+        x0_ls=x0_arr,
         bounds=bnds,
         optimiser_handle=args.bb_minimiser,
         opt_kwargs={"n_runs": max(1, int(args.max_multi_start))},
     )
-    if local_minima_x.size == 0:
+    candidate_x, candidate_f = _merge_candidate_points(
+        local_minima_x=local_minima_x,
+        local_minima_f=local_minima_f,
+        x0_arr=x0_arr,
+        f_obj=f_obj,
+        args=args,
+    )
+    if candidate_x.size == 0:
         raise ValueError(
             "Heat pump and refrigeration targeting "
             f"({args.hpr_type}) failed to return any local minima."
         )
 
-    result = f_obj(local_minima_x[0], args, debug=args.debug)
+    for candidate_idx in np.argsort(candidate_f):
+        result = _evaluate_hpr_candidate(f_obj, candidate_x[candidate_idx], args)
+        if result.success and np.isfinite(float(result.obj)):
+            return result.with_updates(
+                success=True,
+                amb_streams=get_ambient_air_stream(
+                    result.Q_amb_hot, result.Q_amb_cold, args
+                ),
+            )
+
+    raise ValueError(
+        "Heat pump and refrigeration targeting "
+        f"({args.hpr_type}) failed to return an optimal result."
+    )
+
+
+def _merge_candidate_points(
+    local_minima_x: list | np.ndarray,
+    local_minima_f: list | np.ndarray,
+    x0_arr: np.ndarray | None,
+    f_obj: Callable,
+    args: HeatPumpTargetInputs,
+) -> tuple[np.ndarray, np.ndarray]:
+    candidate_blocks = []
+    objective_blocks = []
+    local_minima_arr = np.asarray(local_minima_x, dtype=float)
+    if local_minima_arr.size:
+        if local_minima_arr.ndim == 1:
+            local_minima_arr = local_minima_arr.reshape(1, -1)
+        candidate_blocks.append(local_minima_arr)
+        objective_blocks.append(np.asarray(local_minima_f, dtype=float).reshape(-1))
+    if x0_arr is not None and x0_arr.size:
+        x0_block = np.asarray(x0_arr, dtype=float).reshape(x0_arr.shape[0], -1)
+        candidate_blocks.append(x0_block)
+        objective_blocks.append(
+            np.asarray(
+                [float(f_obj(x0, args, debug=False)["obj"]) for x0 in x0_block],
+                dtype=float,
+            )
+        )
+    if not candidate_blocks:
+        return np.asarray([]), np.asarray([])
+    n_cols = (
+        np.asarray(x0_arr, dtype=float).reshape(x0_arr.shape[0], -1).shape[1]
+        if x0_arr is not None and x0_arr.size
+        else candidate_blocks[0].shape[1]
+    )
+    filtered_blocks = []
+    filtered_objectives = []
+    for block, objectives in zip(candidate_blocks, objective_blocks):
+        if block.shape[1] != n_cols:
+            continue
+        filtered_blocks.append(block)
+        filtered_objectives.append(objectives)
+    if not filtered_blocks:
+        return np.asarray([]), np.asarray([])
+
+    candidate_x = np.vstack(filtered_blocks)
+    candidate_f = np.concatenate(filtered_objectives)
+    _, unique_idx = np.unique(candidate_x, axis=0, return_index=True)
+    unique_idx = np.sort(unique_idx)
+    return candidate_x[unique_idx], candidate_f[unique_idx]
+
+
+def _evaluate_hpr_candidate(
+    f_obj: Callable,
+    x: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> HPRBackendResult:
+    result = f_obj(x, args, debug=args.debug)
     if not isinstance(result, HPRBackendResult):
         raise TypeError(
             "Heat pump and refrigeration objective functions must return "
             "HPRBackendResult."
         )
-    if not result.success:
-        raise ValueError(
-            "Heat pump and refrigeration targeting "
-            f"({args.hpr_type}) failed to return an optimal result."
-        )
-    return result.with_updates(
-        success=True,
-        amb_streams=get_ambient_air_stream(result.Q_amb_hot, result.Q_amb_cold, args),
-    )
+    return result
 
 
 def _normalise_positive_scalar(value: Any) -> float:

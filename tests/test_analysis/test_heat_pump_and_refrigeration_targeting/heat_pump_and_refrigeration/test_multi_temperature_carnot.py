@@ -57,6 +57,37 @@ def test_get_multi_temperature_carnot_stage_duties_and_work_returns_entropic_mea
     )
 
 
+def test_multi_temperature_carnot_heat_engine_split_uses_bounded_scalar_minimiser(
+    monkeypatch,
+):
+    calls = {}
+
+    def fake_minimize_scalar(*, fun, bounds, method):
+        calls["bounds"] = bounds
+        calls["method"] = method
+        return SimpleNamespace(x=0.5)
+
+    monkeypatch.setattr(hp_multi_temp_carnot, "minimize_scalar", fake_minimize_scalar)
+    args, H_hot, H_cold = _build_multi_temperature_profiles(
+        T_cond=np.array([80.0]),
+        Q_cond=np.array([60.0]),
+        T_evap=np.array([120.0]),
+        Q_evap=np.array([80.0]),
+        eta_hp=0.5,
+        eta_he=0.5,
+    )
+
+    _get_multi_temperature_carnot_stage_duties_and_work(
+        T_cond=np.array([80.0]),
+        T_evap=np.array([120.0]),
+        H_hot_with_amb=H_hot,
+        H_cold_with_amb=H_cold,
+        args=args,
+    )
+
+    assert calls == {"bounds": (0, 1), "method": "bounded"}
+
+
 def test_get_multi_temperature_carnot_stage_duties_and_work_positive_lift_scales_evaporator_side():
     T_cond = np.array([80.0])
     Q_cond = np.array([200.0])
@@ -287,7 +318,9 @@ def test_parse_multi_temperature_carnot_cycle_state_variables_respects_cond_evap
 def test_multi_temp_carnot_optimiser_success_and_failure(monkeypatch):
     args = _base_args(n_cond=1, n_evap=1)
     monkeypatch.setattr(
-        hp_shared, "multiminima", lambda **_kwargs: np.array([[0.2, 0.6]])
+        hp_shared,
+        "multiminima",
+        lambda **_kwargs: (np.array([[0.2, 0.6]]), np.array([0.1])),
     )
     monkeypatch.setattr(
         hp_multi_temp_carnot,

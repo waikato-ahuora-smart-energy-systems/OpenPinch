@@ -61,13 +61,15 @@ def test_optimiser_public_api_exports_only_multiminima():
     ],
 )
 def test_multiminima_accepts_supported_handles(optimiser_handle):
-    minima = np.asarray(_run_multiminima(optimiser_handle), dtype=float)
+    minima, f_vals = _run_multiminima(optimiser_handle)
+    minima = np.asarray(minima, dtype=float)
+    f_vals = np.asarray(f_vals, dtype=float)
     assert minima.ndim == 2
     assert minima.shape[0] >= 1
     assert minima.shape[1] == 2
+    assert f_vals.shape == (minima.shape[0],)
 
-    best_f = min(_convex_quadratic(x, {})["obj"] for x in minima)
-    assert best_f < 1e-3
+    assert f_vals.min() < 1e-3
 
 
 @pytest.mark.parametrize(
@@ -80,10 +82,13 @@ def test_multiminima_accepts_supported_handles(optimiser_handle):
     ],
 )
 def test_multiminima_accepts_enum_handles(optimiser_handle):
-    minima = np.asarray(_run_multiminima(optimiser_handle), dtype=float)
+    minima, f_vals = _run_multiminima(optimiser_handle)
+    minima = np.asarray(minima, dtype=float)
+    f_vals = np.asarray(f_vals, dtype=float)
     assert minima.ndim == 2
     assert minima.shape[0] >= 1
     assert minima.shape[1] == 2
+    assert f_vals.shape == (minima.shape[0],)
 
 
 @pytest.mark.parametrize(
@@ -127,7 +132,7 @@ def test_multiminima_uses_enum_to_pick_backend_and_filter_kwargs(
     def _fake_backend(func, x0_ls, bounds, **kwargs):
         captured["kwargs"] = kwargs
         captured["obj_val"] = func(np.array([0.0, 0.0], dtype=float))
-        return np.asarray([[0.0, 0.0]], dtype=float)
+        return np.asarray([[0.0, 0.0]], dtype=float), np.asarray([1.0], dtype=float)
 
     monkeypatch.setattr(optimiser_module, backend_name, _fake_backend)
 
@@ -145,30 +150,33 @@ def test_multiminima_uses_enum_to_pick_backend_and_filter_kwargs(
         },
     )
 
+    minima, f_vals = minima
     minima = np.asarray(minima, dtype=float)
+    f_vals = np.asarray(f_vals, dtype=float)
     # assert np.isclose(np.array([0.4, -0.25]), minima).all()
+    assert f_vals.shape == (1,)
     assert allowed_key in captured["kwargs"]
     assert blocked_key not in captured["kwargs"]
 
 
 def test_multiminima_uses_dual_annealing_by_default():
-    minima = np.asarray(
-        multiminima(
-            func=_convex_quadratic,
-            bounds=((-1.0, 1.0), (-1.0, 1.0)),
-            opt_kwargs={
-                "n_runs": 1,
-                "maxiter": 6,
-                "maxfun": 5_000,
-                "max_minima": 2,
-                "seed": 4,
-            },
-        ),
-        dtype=float,
+    minima, f_vals = multiminima(
+        func=_convex_quadratic,
+        bounds=((-1.0, 1.0), (-1.0, 1.0)),
+        opt_kwargs={
+            "n_runs": 1,
+            "maxiter": 6,
+            "maxfun": 5_000,
+            "max_minima": 2,
+            "seed": 4,
+        },
     )
+    minima = np.asarray(minima, dtype=float)
+    f_vals = np.asarray(f_vals, dtype=float)
     assert minima.ndim == 2
     assert minima.shape[0] >= 1
     assert minima.shape[1] == 2
+    assert f_vals.shape == (minima.shape[0],)
 
 
 def test_multiminima_rejects_invalid_handle():
@@ -217,12 +225,13 @@ def test_get_cma_multiminima_empty_collection(monkeypatch):
         "_collect_cma_candidates",
         lambda **kwargs: (np.asarray([]), np.asarray([])),
     )
-    out = bb_cma._get_cma_multiminima_in_parallel(
+    xs, fs = bb_cma._get_cma_multiminima_in_parallel(
         func=_quadratic,
         bounds=((0.0, 1.0),),
         n_runs=1,
     )
-    assert out.size == 0
+    assert xs.size == 0
+    assert fs.size == 0
 
 
 def test_get_cma_multiminima_empty_polish(monkeypatch):
@@ -237,12 +246,13 @@ def test_get_cma_multiminima_empty_polish(monkeypatch):
         "_polish_candidates",
         lambda **kwargs: (np.asarray([]), np.asarray([])),
     )
-    out = bb_cma._get_cma_multiminima_in_parallel(
+    xs, fs = bb_cma._get_cma_multiminima_in_parallel(
         func=_quadratic,
         bounds=((0.0, 1.0),),
         n_runs=1,
     )
-    assert out.size == 0
+    assert xs.size == 0
+    assert fs.size == 0
 
 
 def test_collect_cma_candidates_reshape_and_pool_path(monkeypatch):
@@ -403,12 +413,13 @@ def test_get_bo_multiminima_empty_paths(monkeypatch):
         "_collect_bo_candidates",
         lambda **kwargs: (np.asarray([]), np.asarray([])),
     )
-    out0 = bb_bo._get_bo_multiminima_in_parallel(
+    xs0, fs0 = bb_bo._get_bo_multiminima_in_parallel(
         func=_quadratic,
         bounds=((0.0, 1.0),),
         n_runs=1,
     )
-    assert out0.size == 0
+    assert xs0.size == 0
+    assert fs0.size == 0
 
     monkeypatch.setattr(
         bb_bo,
@@ -419,12 +430,13 @@ def test_get_bo_multiminima_empty_paths(monkeypatch):
     monkeypatch.setattr(
         bb_bo, "_polish_candidates", lambda **kwargs: (np.asarray([]), np.asarray([]))
     )
-    out1 = bb_bo._get_bo_multiminima_in_parallel(
+    xs1, fs1 = bb_bo._get_bo_multiminima_in_parallel(
         func=_quadratic,
         bounds=((0.0, 1.0),),
         n_runs=1,
     )
-    assert out1.size == 0
+    assert xs1.size == 0
+    assert fs1.size == 0
 
 
 def test_collect_bo_candidates_reshape_and_pool_path(monkeypatch):
@@ -629,12 +641,13 @@ def test_get_rbf_multiminima_empty_paths(monkeypatch):
         "_collect_rbf_surrogate_candidates",
         lambda **kwargs: (np.asarray([]), np.asarray([])),
     )
-    out0 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
+    xs0, fs0 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
         func=_quadratic,
         bounds=((0.0, 1.0),),
         n_runs=1,
     )
-    assert out0.size == 0
+    assert xs0.size == 0
+    assert fs0.size == 0
 
     monkeypatch.setattr(
         bb_rbf,
@@ -645,12 +658,13 @@ def test_get_rbf_multiminima_empty_paths(monkeypatch):
     monkeypatch.setattr(
         bb_rbf, "_polish_candidates", lambda **kwargs: (np.asarray([]), np.asarray([]))
     )
-    out1 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
+    xs1, fs1 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
         func=_quadratic,
         bounds=((0.0, 1.0),),
         n_runs=1,
     )
-    assert out1.size == 0
+    assert xs1.size == 0
+    assert fs1.size == 0
 
 
 def test_collect_rbf_candidates_reshape_and_pool_path(monkeypatch):
@@ -822,6 +836,7 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
         func=_quadratic,
         args=(),
         all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
         basin_reps_idx=[],
         local_method="SLSQP",
         bounds=np.asarray([[0.0, 1.0]], dtype=float),
@@ -832,7 +847,7 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
     monkeypatch.setattr(
         bb_common,
         "_polish_single_candidate",
-        lambda idx, all_x, func, args, local_method, bounds_arg, constraints: (
+        lambda idx, all_x, all_f, func, args, local_method, bounds_arg, constraints: (
             all_x[idx],
             float(idx),
         ),
@@ -842,6 +857,7 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
         func=_quadratic,
         args=(),
         all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
         basin_reps_idx=[0, 1],
         local_method="SLSQP",
         bounds=np.asarray([[0.0, 1.0]], dtype=float),
@@ -856,6 +872,7 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
         func=_quadratic,
         args=(),
         all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
         basin_reps_idx=[0, 1],
         local_method="SLSQP",
         bounds=np.asarray([[0.0, 1.0]], dtype=float),
@@ -863,6 +880,29 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
     )
     assert x2.shape == (2, 1)
     assert f2.shape == (2,)
+
+
+def test_polish_single_candidate_keeps_seed_when_polish_is_worse(monkeypatch):
+    class _WorseResult:
+        success = True
+        x = np.asarray([0.9], dtype=float)
+        fun = 10.0
+
+    monkeypatch.setattr(bb_common, "minimize", lambda **kwargs: _WorseResult())
+
+    x, f = bb_common._polish_single_candidate(
+        idx=0,
+        all_x=np.asarray([[0.2]], dtype=float),
+        all_f=np.asarray([0.04], dtype=float),
+        func=_quadratic,
+        args=(),
+        local_method="SLSQP",
+        bounds_arg=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+
+    np.testing.assert_allclose(x, np.asarray([0.2]))
+    assert f == pytest.approx(0.04)
 
 
 """Regression tests for optimiser benchmarks utility helpers."""
@@ -893,7 +933,7 @@ def _run_benchmark(
 ):
     """Run benchmark for this test module."""
     start = time.perf_counter()
-    minima = multiminima(
+    minima, f_vals = multiminima(
         func=objective,
         bounds=bounds,
         opt_kwargs=opt_kwargs,
@@ -906,7 +946,8 @@ def _run_benchmark(
     assert minima.shape[0] >= 1
     assert minima.shape[1] == len(bounds)
 
-    f_vals = np.asarray([objective(x, {})["obj"] for x in minima], dtype=float)
+    f_vals = np.asarray(f_vals, dtype=float)
+    assert f_vals.shape == (minima.shape[0],)
     return {
         "elapsed_s": float(elapsed),
         "best_f": float(np.min(f_vals)),

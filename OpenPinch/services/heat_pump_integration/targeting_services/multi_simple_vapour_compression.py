@@ -62,6 +62,7 @@ def _get_multi_single_hp_opt_setup(
     init_res: HPRBackendResult | None,
     args: HeatPumpTargetInputs,
 ) -> tuple[np.ndarray | None, list]:
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
     n_units = int(args.n_cond)
     layout = HPRoptVectorLayout(
         n_cond=n_units,
@@ -81,7 +82,11 @@ def _get_multi_single_hp_opt_setup(
     if init_res is None:
         return None, bnds
 
-    Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
+    Q_primary_ex = (
+        args.Q_heat_max + init_res.Q_amb_cold
+        if is_heat_pumping
+        else args.Q_cool_max + init_res.Q_amb_hot
+    )
 
     x_amb = map_Q_amb_to_x(
         init_res.Q_amb_hot,
@@ -95,7 +100,8 @@ def _get_multi_single_hp_opt_setup(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
-    x_heat = map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
+    init_primary_duty = init_res.Q_cond if is_heat_pumping else init_res.Q_evap
+    x_heat = map_Q_arr_to_x_arr(init_primary_duty, Q_primary_ex).tolist()
     x_ihx = [0.0] * int(args.n_cond)
     return layout.pack(
         x_amb=x_amb,
@@ -116,6 +122,7 @@ def _parse_multi_simple_hp_state_temperatures(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> HPRParsedState:
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
     n_units = int(args.n_cond)
     parts = HPRoptVectorLayout(
         n_cond=n_units,
@@ -135,13 +142,19 @@ def _parse_multi_simple_hp_state_temperatures(
     T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
-    Q_cond = map_x_arr_to_Q_arr(x_heat, args.Q_heat_max + Q_amb_cold)
+    Q_primary = map_x_arr_to_Q_arr(
+        x_heat,
+        args.Q_heat_max + Q_amb_cold
+        if is_heat_pumping
+        else args.Q_cool_max + Q_amb_hot,
+    )
     dT_ihx_gas_side = map_x_arr_to_DT_arr(x_ihx, T_cond, T_evap)
     return HPRParsedState(
         T_cond=T_cond,
         dT_subcool=dT_subcool,
-        Q_heat=Q_cond,
+        Q_heat=Q_primary if is_heat_pumping else None,
         T_evap=T_evap,
+        Q_cool=None if is_heat_pumping else Q_primary,
         Q_amb_hot=Q_amb_hot,
         Q_amb_cold=Q_amb_cold,
         dT_ihx_gas_side=dT_ihx_gas_side,
@@ -153,6 +166,7 @@ def _compute_multi_simple_hp_system_obj(
     args: HeatPumpTargetInputs,
     debug: bool = False,
 ) -> HPRBackendResult:
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
     state_vars = _parse_multi_simple_hp_state_temperatures(x, args)
     if not isinstance(state_vars, HPRParsedState):
         state_vars = HPRParsedState.model_validate(state_vars)
@@ -177,6 +191,8 @@ def _compute_multi_simple_hp_system_obj(
             refrigerant=args.refrigerant_ls,
             dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
             Q_heat=state_vars.Q_heat,
+            Q_cool=state_vars.Q_cool,
+            is_heat_pump=is_heat_pumping,
         )
         if not hp.solved:
             return HPRBackendResult.failure(
@@ -192,7 +208,8 @@ def _compute_multi_simple_hp_system_obj(
             dtcont=args.dtcont_hp,
         )
         w_hpr = hp.work
-        cop = hp.Q_heat_arr.sum() / w_hpr if w_hpr > 0 else 1.0
+        primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
+        cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
         return evaluate_vapour_hpr_result(
             args=args,
             state=state_vars,

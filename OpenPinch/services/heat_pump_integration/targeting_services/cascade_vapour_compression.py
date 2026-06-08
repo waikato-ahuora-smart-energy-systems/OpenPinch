@@ -69,14 +69,16 @@ def _get_cascade_hp_opt_setup(
     init_res: HPRBackendResult | None,
     args: HeatPumpTargetInputs,
 ) -> tuple[np.ndarray | None, list]:
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
     n_cond = int(args.n_cond)
     n_evap = int(args.n_evap)
+    n_cool = max(n_evap - 1, 0) if is_heat_pumping else n_evap
     layout = HPRoptVectorLayout(
         n_cond=n_cond,
         n_evap=n_evap,
         n_subcool=n_cond,
         n_heat=n_cond,
-        n_cool=max(n_evap - 1, 0),
+        n_cool=n_cool,
         n_ihx=n_cond + n_evap - 1,
     )
     bnds = layout.build_bounds(
@@ -91,7 +93,6 @@ def _get_cascade_hp_opt_setup(
     if init_res is None:
         return None, bnds
 
-    n_cool = max(int(args.n_evap) - 1, 0)
     Q_cool_ex = args.Q_cool_max + init_res.Q_amb_hot
     Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
 
@@ -108,7 +109,8 @@ def _get_cascade_hp_opt_setup(
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     x_heat = map_Q_arr_to_x_arr(init_res.Q_cond, Q_heat_ex).tolist()
-    x_cool = map_Q_arr_to_x_arr(init_res.Q_evap[:n_cool], Q_cool_ex).tolist()
+    init_cool = init_res.Q_evap[:n_cool] if is_heat_pumping else init_res.Q_evap
+    x_cool = map_Q_arr_to_x_arr(init_cool, Q_cool_ex).tolist()
     x_ihx = [0.0] * (int(args.n_cond) + int(args.n_evap) - 1)
     return layout.pack(
         x_amb=x_amb,
@@ -125,14 +127,16 @@ def _parse_cascade_hp_state_variables(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> HPRParsedState:
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
     n_cond = int(args.n_cond)
     n_evap = int(args.n_evap)
+    n_cool = max(n_evap - 1, 0) if is_heat_pumping else n_evap
     parts = HPRoptVectorLayout(
         n_cond=n_cond,
         n_evap=n_evap,
         n_subcool=n_cond,
         n_heat=n_cond,
-        n_cool=max(n_evap - 1, 0),
+        n_cool=n_cool,
         n_ihx=n_cond + n_evap - 1,
     ).unpack(x)
     x_amb = parts["x_amb"]
@@ -148,9 +152,9 @@ def _parse_cascade_hp_state_variables(
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
     Q_heat = map_x_arr_to_Q_arr(x_heat, args.Q_heat_max + Q_amb_cold)
-    Q_cool = _append_unspecified_final_cascade_cooling_duty(
-        x_cool * (args.Q_cool_max + Q_amb_hot)
-    )
+    Q_cool = x_cool * (args.Q_cool_max + Q_amb_hot)
+    if is_heat_pumping:
+        Q_cool = _append_unspecified_final_cascade_cooling_duty(Q_cool)
     T_cond_all = np.sort(np.concatenate([T_cond - dT_subcool, T_evap[:-1]]))[::-1]
     T_evap_all = np.sort(np.concatenate([(T_cond - dT_subcool)[1:], T_evap]))[::-1]
     dT_ihx_gas_side = map_x_arr_to_DT_arr(x_ihx, T_cond_all, T_evap_all)
@@ -172,6 +176,7 @@ def _compute_cascade_hp_system_obj(
     *,
     debug: bool = False,
 ) -> HPRBackendResult:
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
     state_vars = _parse_cascade_hp_state_variables(x, args)
     if not isinstance(state_vars, HPRParsedState):
         state_vars = HPRParsedState.model_validate(state_vars)
@@ -188,6 +193,7 @@ def _compute_cascade_hp_system_obj(
             eta_comp=args.eta_comp,
             refrigerant=args.refrigerant_ls,
             dt_cascade_hx=args.dt_cascade_hx,
+            is_heat_pump=is_heat_pumping,
         )
         if not hp.solved:
             return HPRBackendResult.failure(
@@ -203,7 +209,8 @@ def _compute_cascade_hp_system_obj(
             dtcont=args.dtcont_hp,
         )
         w_hpr = hp.work
-        cop = hp.Q_heat_arr.sum() / w_hpr if w_hpr > 0 else 1.0
+        primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
+        cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
         return evaluate_vapour_hpr_result(
             args=args,
             state=state_vars,

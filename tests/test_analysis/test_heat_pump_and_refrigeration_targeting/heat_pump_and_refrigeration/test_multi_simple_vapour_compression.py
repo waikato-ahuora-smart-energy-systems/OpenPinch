@@ -8,7 +8,13 @@ from OpenPinch.services.heat_pump_integration.targeting_services import (
     multi_simple_vapour_compression as hp_multi_simple_vapour,
 )
 
-from ..helpers import _base_args, _patch_output_model_validate
+from ..helpers import (
+    _base_args,
+    _patch_output_model_validate,
+    _pt_with_hnet,
+    _sc,
+    _stream,
+)
 
 
 def test_multi_single_hp_x0_and_bounds_shapes_are_consistent():
@@ -65,6 +71,27 @@ def test_multi_single_x0_round_trips_with_ambient_cooling_seed():
     assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
     assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
     np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
+
+
+def test_multi_single_refrigeration_maps_primary_duty_to_cooling():
+    args = _base_args(n_cond=2, n_evap=2, is_heat_pumping=False)
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0, 90.0]),
+        Q_cond=np.array([120.0, 80.0]),
+        T_evap=np.array([70.0, 50.0]),
+        Q_evap=np.array([90.0, 60.0]),
+        Q_amb_hot=20.0,
+        Q_amb_cold=0.0,
+    )
+
+    x0, _ = hp_multi_simple_vapour._get_multi_single_hp_opt_setup(
+        init_res=init_res,
+        args=args,
+    )
+    vars = hp_multi_simple_vapour._parse_multi_simple_hp_state_temperatures(x0, args)
+
+    assert vars["Q_heat"] is None
+    np.testing.assert_allclose(vars["Q_cool"], init_res.Q_evap)
 
 
 def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
@@ -133,6 +160,59 @@ def test_multi_single_x0_bounds_parse_and_performance(monkeypatch):
         np.array([0.9] * 10), args
     )
     assert np.isinf(out_bad["obj"])
+
+
+def test_multi_single_refrigeration_objective_solves_refrigeration_mode(monkeypatch):
+    args = _base_args(n_cond=1, n_evap=1, is_heat_pumping=False)
+    captured = {}
+    monkeypatch.setattr(
+        hp_multi_simple_vapour,
+        "_parse_multi_simple_hp_state_temperatures",
+        lambda _x, _args: {
+            "T_cond": np.array([100.0]),
+            "dT_subcool": np.array([5.0]),
+            "Q_heat": None,
+            "T_evap": np.array([60.0]),
+            "Q_cool": np.array([80.0]),
+            "dT_superheat": np.array([0.0]),
+            "dT_ihx_gas_side": np.array([0.0]),
+            "Q_amb_hot": 0.0,
+            "Q_amb_cold": 0.0,
+        },
+    )
+
+    class _FakeParallelSolved:
+        solved = True
+        work = 20.0
+        work_arr = np.array([20.0])
+        Q_heat_arr = np.array([100.0])
+        Q_cool_arr = np.array([80.0])
+        penalty = 0.0
+
+        def solve(self, **kwargs):
+            captured.update(kwargs)
+
+        def build_stream_collection(self, **kwargs):
+            return _sc(_stream("HP", 90.0, 80.0, 10.0, is_process_stream=False))
+
+    monkeypatch.setattr(
+        hp_multi_simple_vapour,
+        "ParallelVapourCompressionCycles",
+        _FakeParallelSolved,
+    )
+    seq = iter([_pt_with_hnet(0.0, -1.0), _pt_with_hnet(0.0, -1.0)])
+    monkeypatch.setattr(
+        hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
+    )
+
+    out = hp_multi_simple_vapour._compute_multi_simple_hp_system_obj(
+        np.array([0.2]), args
+    )
+
+    assert captured["is_heat_pump"] is False
+    assert captured["Q_heat"] is None
+    np.testing.assert_allclose(captured["Q_cool"], np.array([80.0]))
+    assert out["cop_h"] == pytest.approx(4.0)
 
 
 def test_multi_single_optimiser_allows_missing_initial_seed(monkeypatch):

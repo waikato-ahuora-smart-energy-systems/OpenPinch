@@ -173,7 +173,7 @@ def test_solve_hpr_placement_preserves_missing_initial_guesses(monkeypatch, x0_l
 
     def fake_multiminima(**kwargs):
         captured["x0_ls"] = kwargs["x0_ls"]
-        return np.array([[0.25]])
+        return np.array([[0.25]]), np.array([0.0])
 
     monkeypatch.setattr(hp_shared, "multiminima", fake_multiminima)
 
@@ -198,6 +198,76 @@ def test_solve_hpr_placement_preserves_missing_initial_guesses(monkeypatch, x0_l
     assert captured["x0_ls"] is None
     assert result.success is True
     assert isinstance(result.amb_streams, StreamCollection)
+
+
+def test_solve_hpr_placement_keeps_better_warm_start(monkeypatch):
+    def fake_multiminima(**kwargs):
+        return np.array([[0.8]]), np.array([0.8])
+
+    monkeypatch.setattr(hp_shared, "multiminima", fake_multiminima)
+
+    def objective(x, args, debug=False):
+        obj = float(x[0])
+        return HPRBackendResult(
+            obj=obj,
+            utility_tot=obj,
+            w_net=obj,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            cop_h=1.0,
+            T_cond=np.array([obj]),
+            artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
+        )
+
+    result = hp_shared.solve_hpr_placement(
+        f_obj=objective,
+        x0_ls=np.array([0.2]),
+        bnds=[(0.0, 1.0)],
+        args=_base_args(),
+    )
+
+    assert result.obj == pytest.approx(0.2)
+    np.testing.assert_allclose(result.T_cond, np.array([0.2]))
+
+
+def test_solve_hpr_placement_resolves_candidates_lazily(monkeypatch):
+    monkeypatch.setattr(
+        hp_shared,
+        "multiminima",
+        lambda **kwargs: (
+            np.array([[0.8], [0.2]]),
+            np.array([0.8, 0.2]),
+        ),
+    )
+    calls = []
+
+    def objective(x, args, debug=False):
+        calls.append(float(x[0]))
+        if np.isclose(x[0], 0.8):
+            raise AssertionError("worse candidate should not be resolved")
+        obj = float(x[0])
+        return HPRBackendResult(
+            obj=obj,
+            utility_tot=obj,
+            w_net=obj,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
+        )
+
+    result = hp_shared.solve_hpr_placement(
+        f_obj=objective,
+        x0_ls=None,
+        bnds=[(0.0, 1.0)],
+        args=_base_args(),
+    )
+
+    assert result.obj == pytest.approx(0.2)
+    assert calls == [0.2]
 
 
 def test_get_heat_pump_cascade_helper(monkeypatch):

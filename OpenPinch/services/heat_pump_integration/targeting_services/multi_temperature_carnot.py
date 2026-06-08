@@ -214,7 +214,7 @@ def _get_multi_temperature_carnot_stage_duties_and_work(
         res = minimize_scalar(
             fun=fun,
             bounds=(0, 1),
-            # method='brent',
+            method="bounded",
         )
         Qc_he *= res.x
         Qe_he *= res.x
