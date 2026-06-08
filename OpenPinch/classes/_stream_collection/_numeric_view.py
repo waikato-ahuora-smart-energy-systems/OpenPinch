@@ -29,48 +29,44 @@ class StreamCollectionNumericView:
 
 def build_numeric_view(streams: list[object], idx: int | None = None):
     """Build a dense numeric view from stream objects."""
+    n_streams = len(streams)
+    t_min = np.empty(n_streams, dtype=float)
+    t_max = np.empty(n_streams, dtype=float)
+    t_min_star = np.empty(n_streams, dtype=float)
+    t_max_star = np.empty(n_streams, dtype=float)
+    cp = np.empty(n_streams, dtype=float)
+    rcp = np.empty(n_streams, dtype=float)
+    heat_flow = np.empty(n_streams, dtype=float)
+    dt_cont = np.empty(n_streams, dtype=float)
+    is_hot = np.empty(n_streams, dtype=bool)
+    is_cold = np.empty(n_streams, dtype=bool)
+    active = np.empty(n_streams, dtype=bool)
+
+    for stream_idx, stream in enumerate(streams):
+        t_min[stream_idx] = value_at_idx(stream._t_min, idx)
+        t_max[stream_idx] = value_at_idx(stream._t_max, idx)
+        t_min_star[stream_idx] = value_at_idx(stream._t_min_star, idx)
+        t_max_star[stream_idx] = value_at_idx(stream._t_max_star, idx)
+        cp[stream_idx] = value_at_idx(stream._cp, idx)
+        rcp[stream_idx] = value_at_idx(stream._rcp_prod, idx)
+        heat_flow[stream_idx] = value_at_idx(stream._heat_flow, idx)
+        dt_cont[stream_idx] = value_at_idx(stream._dt_cont, idx)
+        is_hot[stream_idx] = stream.type == ST.Hot.value
+        is_cold[stream_idx] = stream.type == ST.Cold.value
+        active[stream_idx] = bool(stream.active)
+
     return StreamCollectionNumericView(
-        t_min=np.asarray(
-            [value_at_idx(stream._t_min, idx) for stream in streams],
-            dtype=float,
-        ),
-        t_max=np.asarray(
-            [value_at_idx(stream._t_max, idx) for stream in streams],
-            dtype=float,
-        ),
-        t_min_star=np.asarray(
-            [value_at_idx(stream._t_min_star, idx) for stream in streams],
-            dtype=float,
-        ),
-        t_max_star=np.asarray(
-            [value_at_idx(stream._t_max_star, idx) for stream in streams],
-            dtype=float,
-        ),
-        cp=np.asarray(
-            [value_at_idx(stream._cp, idx) for stream in streams],
-            dtype=float,
-        ),
-        rcp=np.asarray(
-            [value_at_idx(stream._rcp_prod, idx) for stream in streams],
-            dtype=float,
-        ),
-        heat_flow=np.asarray(
-            [value_at_idx(stream._heat_flow, idx) for stream in streams],
-            dtype=float,
-        ),
-        dt_cont=np.asarray(
-            [value_at_idx(stream._dt_cont, idx) for stream in streams],
-            dtype=float,
-        ),
-        is_hot=np.asarray(
-            [stream.type == ST.Hot.value for stream in streams],
-            dtype=bool,
-        ),
-        is_cold=np.asarray(
-            [stream.type == ST.Cold.value for stream in streams],
-            dtype=bool,
-        ),
-        active=np.asarray([stream.active for stream in streams], dtype=bool),
+        t_min=t_min,
+        t_max=t_max,
+        t_min_star=t_min_star,
+        t_max_star=t_max_star,
+        cp=cp,
+        rcp=rcp,
+        heat_flow=heat_flow,
+        dt_cont=dt_cont,
+        is_hot=is_hot,
+        is_cold=is_cold,
+        active=active,
     )
 
 
