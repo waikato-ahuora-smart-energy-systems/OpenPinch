@@ -1,6 +1,6 @@
 """Simple vapour-compression heat pump cycle utilities built on CoolProp."""
 
-# from __future__ import annotations
+from __future__ import annotations
 
 import re
 from typing import Any, Optional, Sequence

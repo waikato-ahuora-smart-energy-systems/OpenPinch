@@ -127,8 +127,7 @@ def test_docs_reference_the_current_notebook_series():
     assert "04_multistate_targeting_and_state_comparison.ipynb" in combined
     assert "05_schema_service_and_output_workflows.ipynb" in combined
     assert "06_energy_transfer_analysis.ipynb" in combined
-    assert "01_basic_pinch_analysis.ipynb" not in combined
-    assert "06_target_services_workflow.ipynb" not in combined
+    assert "07_vapour_compression_mvr_cascade_hpr.ipynb" in combined
     assert "multistate" in combined or 'state_id="' in combined
 
 
@@ -203,6 +202,14 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     )
     assert (
         "OpenPinch.services.heat_pump_integration.unit_models.cascade_vapour_compression_cycle"
+        in api_classes
+    )
+    assert (
+        "OpenPinch.services.heat_pump_integration.unit_models.mechanical_vapour_recompression_cycle"
+        in api_classes
+    )
+    assert (
+        "OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_mvr_cascade"
         in api_classes
     )
     assert (

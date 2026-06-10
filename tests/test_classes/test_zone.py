@@ -131,6 +131,19 @@ def test_add_zone_invalid(dummy_zone: Zone):
         dummy_zone.add_zone(object())
 
 
+def test_get_subzone_prefers_direct_child_when_child_matches_parent_name():
+    root = Zone(name="Plant")
+    child = Zone(name="Plant", parent_zone=root)
+    operation = Zone(name="O1", parent_zone=child)
+    child.add_zone(operation)
+    root.add_zone(child)
+
+    assert root.get_subzone() is root
+    assert root.get_subzone("Plant") is child
+    assert root.get_subzone("Plant/O1") is operation
+    assert root.get_subzone("Plant/Plant/O1") is operation
+
+
 # === Site and Process Zones Filtering ===
 
 

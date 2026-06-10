@@ -74,7 +74,10 @@ def construct_HPRTargetInputs(
         hpr_type=zone_config.HPR_TYPE,
         n_cond=zone_config.N_COND,
         n_evap=zone_config.N_EVAP,
+        n_mvr=zone_config.N_MVR,
         eta_comp=zone_config.ETA_COMP,
+        eta_mvr_comp=zone_config.ETA_MVR_COMP,
+        eta_motor=zone_config.ETA_MOTOR,
         eta_exp=zone_config.ETA_EXP,
         eta_ii_hpr_carnot=zone_config.ETA_II_HPR_CARNOT,
         eta_ii_he_carnot=zone_config.ETA_II_HE_CARNOT
@@ -87,6 +90,7 @@ def construct_HPRTargetInputs(
         dt_env_cont=zone_config.DT_ENV_CONT,
         dt_phase_change=zone_config.DT_PHASE_CHANGE,
         refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
+        mvr_fluid_ls=[r.strip() for r in zone_config.MVR_FLUIDS],
         do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
         heat_to_power_ratio=zone_config.PRICE_RATIO_HEAT_TO_ELE,
         cold_to_power_ratio=zone_config.PRICE_RATIO_COLD_TO_ELE,

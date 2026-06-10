@@ -80,6 +80,12 @@ cycle configurations directly.
 .. automodule:: OpenPinch.services.heat_pump_integration.unit_models.cascade_vapour_compression_cycle
    :members:
 
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.mechanical_vapour_recompression_cycle
+   :members:
+
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_mvr_cascade
+   :members:
+
 .. automodule:: OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump
    :members:
 

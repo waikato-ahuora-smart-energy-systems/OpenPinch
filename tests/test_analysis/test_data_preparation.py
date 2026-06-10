@@ -47,6 +47,8 @@ flow directions) to verify internal fallbacks or fail-safes.
 
 """
 
+import warnings
+
 import pytest
 from pydantic import ValidationError
 
@@ -1464,6 +1466,48 @@ def test_flat_single_zone():
     assert operation_zone.name == "O1"
     assert operation_zone.type == ZT.O.value
     assert operation_zone.children is None
+
+
+def test_prepare_problem_allows_stream_zone_matching_project_name_without_warning():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotStream",
+                "zone": "Plant",
+                "t_supply": 200.0,
+                "t_target": 100.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "ColdStream",
+                "zone": "Plant",
+                "t_supply": 50.0,
+                "t_target": 150.0,
+                "heat_flow": -400.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+    ]
+
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        warnings.simplefilter("always")
+        master_zone = prepare_problem(streams=streams, project_name="Plant")
+
+    assert not [
+        warning
+        for warning in caught_warnings
+        if "Subzone" in str(warning.message) and "not found" in str(warning.message)
+    ]
+    assert "Plant" in master_zone.subzones
+    process_zone = master_zone.subzones["Plant"]
+    assert {"O1", "O2"} <= set(process_zone.subzones)
+    assert process_zone.subzones["O1"].dt_cont_multiplier == pytest.approx(1.0)
+    assert process_zone.subzones["O2"].dt_cont_multiplier == pytest.approx(1.0)
 
 
 def test_nested_zone_with_slash():

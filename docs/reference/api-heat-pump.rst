@@ -71,3 +71,6 @@ prepared cascade data. The detailed cycle physics live in the
 
 .. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.multi_temperature_carnot
    :members:
+
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.vapour_compression_mvr
+   :members:

@@ -55,9 +55,9 @@ real packaged cases or real derivatives of those cases. Notebook 01 starts from
 ``PinchProblem``, notebooks 01 to 03 use ``PinchWorkspace`` where named study
 cases matter, notebook 04 covers named-state targeting, and notebook 05 covers
 the typed and serialized boundaries. Notebook 06 covers energy-transfer
-analysis outputs. The distributed assets are packaged as clean sources: no
-stored Plotly payloads, no cached execution counts, and no stale traceback
-output.
+analysis outputs. Notebook 07 covers the vapour-compression plus MVR cascade
+HPR backend. The distributed assets are packaged as clean sources: no stored
+Plotly payloads, no cached execution counts, and no stale traceback output.
 
 Copy the full series with:
 
@@ -88,6 +88,7 @@ Current packaged notebooks:
 4. ``04_multistate_targeting_and_state_comparison.ipynb``
 5. ``05_schema_service_and_output_workflows.ipynb``
 6. ``06_energy_transfer_analysis.ipynb``
+7. ``07_vapour_compression_mvr_cascade_hpr.ipynb``
 
 Notebook 04 shows the named-state workflow directly through
 ``problem.target.direct_heat_integration(state_id="peak")`` and
@@ -95,7 +96,10 @@ Notebook 04 shows the named-state workflow directly through
 shows the typed ``TargetInput`` boundary and the serialized
 ``PinchWorkspace`` view layer. Notebook 06 shows
 ``target.energy_transfer(...)`` with the heat-surplus/deficit table and
-``plot.energy_transfer_diagram(...)``.
+``plot.energy_transfer_diagram(...)``. Notebook 07 shows
+``target.direct_heat_pump(...)`` with
+``HPR_TYPE = "Vapour compression with MVR cascade"`` and the VC+MVR
+configuration fields.
 
 Recommended Learning Path
 -------------------------
@@ -113,6 +117,8 @@ Recommended Learning Path
    exports, or serialized workspace views.
 6. ``pulp_mill.json`` and notebook 06 when you need energy-transfer diagrams
    or interval surplus/deficit accounting.
+7. ``heat_pump_targeting.json`` and notebook 07 when you need the
+   vapour-compression plus MVR cascade HPR backend.
 
 Why These Assets Matter
 -----------------------

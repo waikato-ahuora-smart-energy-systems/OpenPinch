@@ -388,12 +388,19 @@ class Zone:
         if loc is None:
             return zone
         loc_address = loc.split("/", 1)
-        if loc_address[0] == zone.name:
+        sub = loc_address[0]
+        if sub in zone.subzones.keys():
+            if len(loc_address) == 1:
+                return zone.subzones[sub]
+            else:
+                sub_loc = loc_address[-1]
+                return zone.subzones[sub].get_subzone(sub_loc)
+        if sub == zone.name:
             loc_address.pop(0)
             if len(loc_address) == 0:
                 return zone
             loc_address = loc_address[-1].split("/", 1)
-        sub = loc_address[0]
+            sub = loc_address[0]
         if sub in zone.subzones.keys():
             if len(loc_address) == 1:
                 return zone.subzones[sub]

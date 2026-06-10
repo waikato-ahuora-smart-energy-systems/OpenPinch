@@ -93,6 +93,7 @@ class HeatPumpAndRefrigerationCycle(str, Enum):
     Brayton = "Brayton cycle"
     CascadeVapourComp = "Cascade vapour compression cycles"
     MultiSimpleVapourComp = "Multiple simple vapour compression cycles"
+    VapourCompMVR = "Vapour compression with MVR cascade"
 
 
 HPRcycle = HeatPumpAndRefrigerationCycle

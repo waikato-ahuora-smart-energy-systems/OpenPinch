@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...classes.stream_collection import StreamCollection
 
@@ -28,7 +28,10 @@ class HeatPumpTargetInputs(BaseModel):
     H_cold: np.ndarray | list
     n_cond: int
     n_evap: int
+    n_mvr: int = 1
     eta_comp: float
+    eta_mvr_comp: float = 0.7
+    eta_motor: float = 0.95
     eta_exp: float
     dtcont_hp: float
     dt_hp_ihx: float
@@ -43,6 +46,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_ii_hpr_carnot: float
     eta_ii_he_carnot: float
     refrigerant_ls: List[str]
+    mvr_fluid_ls: List[str] = Field(default_factory=lambda: ["Water"])
     do_refrigerant_sort: bool
     initialise_simulated_cycle: bool
     allow_integrated_expander: bool

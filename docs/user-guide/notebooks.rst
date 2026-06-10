@@ -12,10 +12,12 @@ This page has moved, but the packaged notebook workflow still depends on
 - ``04_multistate_targeting_and_state_comparison.ipynb``
 - ``05_schema_service_and_output_workflows.ipynb``
 - ``06_energy_transfer_analysis.ipynb``
+- ``07_vapour_compression_mvr_cascade_hpr.ipynb``
 
 These notebooks now span the main single-case ``PinchProblem`` workflow, named
 ``PinchWorkspace`` studies, real multistate targeting, and the typed/service
-and serialized workspace boundaries, plus energy-transfer analysis.
+and serialized workspace boundaries, plus energy-transfer analysis and the
+vapour-compression plus MVR cascade HPR backend.
 
 Use these pages instead:
 
