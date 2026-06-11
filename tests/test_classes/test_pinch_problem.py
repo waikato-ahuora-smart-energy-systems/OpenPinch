@@ -862,6 +862,23 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
     assert payload.streams == ["s"]
 
 
+def test_validate_rejects_stateful_streams_with_mixed_hot_cold_classification():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "Mixed",
+                "t_supply": {"values": [200.0, 100.0]},
+                "t_target": {"values": [100.0, 200.0]},
+                "heat_flow": {"values": [100.0, 100.0]},
+            }
+        ]
+    }
+
+    with pytest.raises(ValueError, match="Stream states must classify consistently"):
+        PinchProblem(payload).validate()
+
+
 def test_summary_frame_compact_and_detailed(monkeypatch):
     class _Value:
         def __init__(self, value, unit="kW"):

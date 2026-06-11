@@ -121,6 +121,28 @@ class StreamType(Enum):
 ST = StreamType
 
 
+class FluidPhase(str, Enum):
+    """Supported stream fluid-phase flags."""
+
+    sol = "solid"
+    sle = "solid-liquid equilibrium"
+    liq = "liquid"
+    vle = "vapour-liquid equilibrium"
+    sve = "solid-vapour equilibrium"
+    gas = "gas"
+
+    @classmethod
+    def from_code_or_description(cls, value: str | "FluidPhase") -> "FluidPhase":
+        """Resolve a phase from its short code or descriptive label."""
+        if isinstance(value, cls):
+            return value
+        text = str(value).strip().lower()
+        for phase in cls:
+            if text in {phase.name, phase.value.lower()}:
+                return phase
+        raise ValueError(f"Unknown fluid phase: {value!r}.")
+
+
 class StreamID(Enum):
     """Stream identity"""
 
@@ -303,6 +325,7 @@ __all__ = [
     "ArrowHead",
     "BB_Minimiser",
     "CogenerationTarget",
+    "FluidPhase",
     "GraphType",
     "GT",
     "HeatExchangerTypes",

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any, Optional, Sequence
 
 import CoolProp
@@ -11,6 +10,7 @@ from scipy.optimize import brentq
 
 from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
+from ....lib.coolprop_fluids import build_coolprop_abstract_state
 from ....utils.stream_linearisation import get_piecewise_data_points
 
 __all__ = ["VapourCompressionCycle"]
@@ -69,46 +69,7 @@ class VapourCompressionCycle:
     @staticmethod
     def _get_fluid_state(value: str | Any):
         """Build a CoolProp abstract state from a refrigerant spec."""
-        if not isinstance(value, str):
-            return value
-
-        backend, fluid = value.split("::", 1) if "::" in value else ("HEOS", value)
-        fluid = fluid.strip()
-
-        if "[" not in fluid and "]" not in fluid:
-            return CoolProp.AbstractState(backend, fluid)
-
-        fluid_names = []
-        mole_fractions = []
-
-        for component_spec in fluid.split("&"):
-            match = re.fullmatch(r"\s*([^\[\]&]+)\[([^\]]+)\]\s*", component_spec)
-            if match is None:
-                raise ValueError(
-                    "Explicit refrigerant mixtures must use "
-                    "'<component>[<mole_fraction>]' syntax."
-                )
-
-            component_name, mole_fraction = match.groups()
-            mole_fraction = float(mole_fraction)
-
-            if not np.isfinite(mole_fraction) or mole_fraction < 0.0:
-                raise ValueError(
-                    "Refrigerant mole fractions must be finite and non-negative."
-                )
-
-            fluid_names.append(component_name.strip())
-            mole_fractions.append(mole_fraction)
-
-        mole_fraction_total = sum(mole_fractions)
-        if mole_fraction_total <= 0.0:
-            raise ValueError("Refrigerant mole fractions must sum to a positive value.")
-
-        state = CoolProp.AbstractState(backend, "&".join(fluid_names))
-        state.set_mole_fractions(
-            [mole_fraction / mole_fraction_total for mole_fraction in mole_fractions]
-        )
-        return state
+        return build_coolprop_abstract_state(value)
 
     @property
     def system(self) -> dict[str, str]:

@@ -1,8 +1,10 @@
 """Regression tests for public I/O schema defaults."""
 
 import pytest
+from pydantic import ValidationError
 
 from OpenPinch.classes.value import Value
+from OpenPinch.lib.enums import FluidPhase
 from OpenPinch.lib.schemas.common import (
     StatefulValueWithUnit,
     ValueWithUnit,
@@ -88,6 +90,139 @@ def test_target_input_accepts_stateful_value_payloads():
     assert t_target.unit == "degC"
 
 
+def test_target_input_accepts_stream_fluid_pressure_and_enthalpy_fields():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": 150.0,
+                "t_target": 60.0,
+                "p_supply": {"value": 2.0, "unit": "bar"},
+                "p_target": {"value": 150.0, "unit": "kPa"},
+                "h_supply": {"value": 2_800.0, "unit": "kJ/kg"},
+                "h_target": {"value": 2_300_000.0, "unit": "J/kg"},
+                "heat_flow": 100.0,
+                "fluid_name": "HEOS::Water",
+                "fluid_phase": "GAS",
+            }
+        ],
+        "utilities": [
+            {
+                "name": "Steam",
+                "type": "Hot",
+                "t_supply": 180.0,
+                "t_target": 160.0,
+                "p_supply": 800.0,
+                "p_target": 700.0,
+                "h_supply": 2_750.0,
+                "h_target": 700.0,
+                "fluid_name": "Water",
+                "fluid_phase": "vle",
+            }
+        ],
+    }
+
+    validated = TargetInput.model_validate(payload)
+    stream = validated.streams[0]
+    utility = validated.utilities[0]
+
+    assert isinstance(stream.p_supply, ValueWithUnit)
+    assert isinstance(stream.h_target, ValueWithUnit)
+    assert stream.name == "H1"
+    assert stream.stream_name == "H1"
+    assert stream.fluid_name == "HEOS::Water"
+    assert stream.fluid_phase == "gas"
+    assert utility.p_supply == pytest.approx(800.0)
+    assert utility.fluid_name == "Water"
+    assert utility.fluid_phase == "vapour-liquid equilibrium"
+
+
+def test_stream_schema_accepts_stream_name_alias():
+    stream = StreamSchema(
+        zone="Zone A",
+        stream_name="H1",
+        t_supply=150.0,
+        t_target=60.0,
+        heat_flow=100.0,
+    )
+
+    assert stream.name == "H1"
+    assert stream.stream_name == "H1"
+    assert stream.model_dump(mode="python")["name"] == "H1"
+
+
+def test_target_input_accepts_fluid_phase_enum_instances():
+    validated = TargetInput(
+        streams=[
+            StreamSchema(
+                zone="Zone A",
+                name="H1",
+                t_supply=150.0,
+                t_target=60.0,
+                heat_flow=100.0,
+                fluid_phase=FluidPhase.gas,
+            )
+        ]
+    )
+
+    assert validated.streams[0].fluid_phase == "gas"
+
+
+def test_target_input_accepts_fluid_phase_description_strings():
+    validated = TargetInput(
+        streams=[
+            StreamSchema(
+                zone="Zone A",
+                name="H1",
+                t_supply=150.0,
+                t_target=60.0,
+                heat_flow=100.0,
+                fluid_phase="liquid",
+            )
+        ]
+    )
+
+    assert validated.streams[0].fluid_phase == "liquid"
+
+
+def test_target_input_rejects_invalid_stream_fluid_phase():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": 150.0,
+                "t_target": 60.0,
+                "heat_flow": 100.0,
+                "fluid_phase": "plasma",
+            }
+        ]
+    }
+
+    with pytest.raises(ValidationError):
+        TargetInput.model_validate(payload)
+
+
+def test_target_input_defers_fluid_name_validation_to_stream_import():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": 150.0,
+                "t_target": 60.0,
+                "heat_flow": 100.0,
+                "fluid_name": "NotARealCoolPropFluid",
+            }
+        ]
+    }
+
+    validated = TargetInput.model_validate(payload)
+
+    assert validated.streams[0].fluid_name == "NotARealCoolPropFluid"
+
+
 def test_target_input_rejects_legacy_units_alias():
     payload = {
         "streams": [
@@ -101,7 +236,7 @@ def test_target_input_rejects_legacy_units_alias():
         ]
     }
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TargetInput.model_validate(payload)
 
 

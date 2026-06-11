@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from copy import deepcopy
 from typing import List, Tuple
 
@@ -14,7 +13,6 @@ from ...classes.value import Value
 from ...classes.zone import Zone
 from ...lib.config import Configuration
 from ...lib.enums import ST, StreamLoc
-from ...lib.schemas.common import ValueWithUnit
 from ...lib.schemas.io import UtilitySchema
 from ...lib.unit_system import standardise_input_value
 
@@ -94,9 +92,18 @@ def _shift_temperature_value(value: Value, delta: float) -> Value:
 
 def _utility_temperature_arrays(
     utility: UtilitySchema,
+    zone_config: Configuration,
 ) -> tuple[Value, Value]:
-    t_supply = standardise_input_value(utility.t_supply, field_name="t_supply")
-    t_target = standardise_input_value(utility.t_target, field_name="t_target")
+    t_supply = standardise_input_value(
+        utility.t_supply,
+        field_name="t_supply",
+        config=zone_config,
+    )
+    t_target = standardise_input_value(
+        utility.t_target,
+        field_name="t_target",
+        config=zone_config,
+    )
     if t_supply is None or t_target is None:
         raise ValueError(
             f"Utility '{utility.name}' is missing supply or target temperature."
@@ -107,21 +114,22 @@ def _utility_temperature_arrays(
 def _orient_utility_temperatures(
     utility: UtilitySchema,
     utility_type: str,
-) -> tuple[Value, Value]:
-    t_supply, t_target = _utility_temperature_arrays(utility)
+    zone_config: Configuration,
+) -> tuple[Value, Value, bool]:
+    t_supply, t_target = _utility_temperature_arrays(utility, zone_config)
     t_supply_arr = t_supply.state_values
     t_target_arr = t_target.state_values
 
     if utility_type == ST.Hot.value:
         if np.all(t_supply_arr >= t_target_arr - _TEMPERATURE_EQUAL_TOL):
-            return t_supply, t_target
+            return t_supply, t_target, False
         if np.all(t_supply_arr <= t_target_arr + _TEMPERATURE_EQUAL_TOL):
-            return t_target, t_supply
+            return t_target, t_supply, True
     elif utility_type == ST.Cold.value:
         if np.all(t_supply_arr <= t_target_arr + _TEMPERATURE_EQUAL_TOL):
-            return t_supply, t_target
+            return t_supply, t_target, False
         if np.all(t_supply_arr >= t_target_arr - _TEMPERATURE_EQUAL_TOL):
-            return t_target, t_supply
+            return t_target, t_supply, True
 
     raise ValueError(
         f"Utility '{utility.name}' temperatures cannot be oriented consistently as "
@@ -300,32 +308,6 @@ def _create_default_utility(
     )
 
 
-def _validate_dt_cont_value(value, zone_config: Configuration) -> Value:
-    """Validate one DT_CONT value and coerce to a non-negative float."""
-    if isinstance(value, ValueWithUnit):
-        return standardise_input_value(value, field_name="dt_cont", config=zone_config)
-    if (
-        (value is None)
-        or (not isinstance(value, (int, float)))
-        or not math.isfinite(value)
-    ):
-        value = zone_config.DT_CONT
-    return standardise_input_value(value, field_name="dt_cont", config=zone_config)
-
-
-def _validate_htc_value(value, zone_config: Configuration) -> Value:
-    """Validate one HTC value and coerce to a positive float."""
-    if isinstance(value, ValueWithUnit):
-        return standardise_input_value(value, field_name="htc", config=zone_config)
-    if (
-        (value is None)
-        or (not isinstance(value, (int, float)))
-        or not math.isfinite(value)
-    ):
-        value = zone_config.HTC
-    return standardise_input_value(value, field_name="htc", config=zone_config)
-
-
 def _create_utilities_list(
     utilities: List[UtilitySchema],
     utility_type: str,
@@ -336,17 +318,19 @@ def _create_utilities_list(
     created_utilities = StreamCollection()
     unassigned_utilities = utilities
 
-    candidates: list[tuple[float, UtilitySchema, Value, Value]] = []
+    candidates: list[tuple[UtilitySchema, Value, Value, bool]] = []
     for selected in unassigned_utilities:
         if not (selected.active and selected.type in ["Both", utility_type]):
             continue
 
-        supply_value, target_value = _orient_utility_temperatures(
-            selected, utility_type
+        supply_value, target_value, endpoints_swapped = _orient_utility_temperatures(
+            selected,
+            utility_type,
+            zone_config,
         )
-        candidates.append((selected, supply_value, target_value))
+        candidates.append((selected, supply_value, target_value, endpoints_swapped))
 
-    for selected, supply_value, target_value in candidates:
+    for selected, supply_value, target_value, endpoints_swapped in candidates:
         if selected.type == utility_type:
             selected.active = False
 
@@ -356,21 +340,53 @@ def _create_utilities_list(
             else ".".join([StreamLoc.ColdU.value, selected.name])
         )
 
-        dt_cont = _validate_dt_cont_value(selected.dt_cont, zone_config)
-        htc = _validate_htc_value(selected.htc, zone_config)
+        p_supply = selected.p_target if endpoints_swapped else selected.p_supply
+        p_target = selected.p_supply if endpoints_swapped else selected.p_target
+        h_supply = selected.h_target if endpoints_swapped else selected.h_supply
+        h_target = selected.h_supply if endpoints_swapped else selected.h_target
         created_utilities.add(
             Stream(
                 name=selected.name,
                 t_supply=supply_value,
                 t_target=target_value,
-                dt_cont=dt_cont,
-                htc=htc,
+                p_supply=standardise_input_value(
+                    p_supply,
+                    field_name="p_supply",
+                    config=zone_config,
+                ),
+                p_target=standardise_input_value(
+                    p_target,
+                    field_name="p_target",
+                    config=zone_config,
+                ),
+                h_supply=standardise_input_value(
+                    h_supply,
+                    field_name="h_supply",
+                    config=zone_config,
+                ),
+                h_target=standardise_input_value(
+                    h_target,
+                    field_name="h_target",
+                    config=zone_config,
+                ),
+                dt_cont=standardise_input_value(
+                    selected.dt_cont,
+                    field_name="dt_cont",
+                    config=zone_config,
+                ),
+                htc=standardise_input_value(
+                    selected.htc,
+                    field_name="htc",
+                    config=zone_config,
+                ),
                 price=standardise_input_value(
                     selected.price,
                     field_name="price",
                     config=zone_config,
                 ),
                 is_process_stream=False,
+                fluid_name=selected.fluid_name,
+                fluid_phase=selected.fluid_phase,
             ),
             key,
         )

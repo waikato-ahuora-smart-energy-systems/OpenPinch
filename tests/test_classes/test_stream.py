@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from OpenPinch.classes.stream import Stream
-from OpenPinch.lib.enums import ST
+from OpenPinch.lib.enums import ST, FluidPhase
 
 
 def test_scalar_stream_initialisation_computes_derived_fields():
@@ -25,6 +25,52 @@ def test_scalar_stream_initialisation_computes_derived_fields():
     assert float(stream.t_max_star) == pytest.approx(290.0)
     assert float(stream.CP) == pytest.approx(50.0)
     assert float(stream.rCP) == pytest.approx(25.0)
+
+
+def test_stream_accepts_optional_fluid_metadata():
+    stream = Stream(
+        name="Refrigerant",
+        t_supply=30.0,
+        t_target=80.0,
+        heat_flow=100.0,
+        fluid_name="HEOS::R32[0.697615]&R125[0.302385]",
+        fluid_phase="VLE",
+    )
+
+    assert stream.name == "Refrigerant"
+    assert stream.stream_name == "Refrigerant"
+    assert stream.fluid_name == "HEOS::R32[0.697615]&R125[0.302385]"
+    assert stream.fluid_phase == "vle"
+
+    stream.fluid_name = " Water "
+    stream.fluid_phase = "gas"
+    assert stream.fluid_name == "Water"
+    assert stream.fluid_phase == "gas"
+
+    stream.fluid_phase = FluidPhase.liq
+    assert stream.fluid_phase == "liq"
+
+
+def test_stream_rejects_invalid_fluid_phase():
+    with pytest.raises(ValueError, match="fluid_phase must be one of"):
+        Stream(
+            name="Invalid",
+            t_supply=30.0,
+            t_target=80.0,
+            heat_flow=100.0,
+            fluid_phase="plasma",
+        )
+
+
+def test_stream_rejects_invalid_coolprop_fluid_name():
+    with pytest.raises(ValueError, match="Invalid CoolProp fluid_name"):
+        Stream(
+            name="InvalidFluid",
+            t_supply=30.0,
+            t_target=80.0,
+            heat_flow=100.0,
+            fluid_name="NotARealCoolPropFluid",
+        )
 
 
 def test_derived_stream_fields_are_read_only():

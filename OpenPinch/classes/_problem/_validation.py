@@ -17,6 +17,48 @@ from ..value import Value
 
 ValidationContext = dict[str, list[dict[str, Any]]]
 _TEMPERATURE_EQUAL_TOL = 1e-12
+_STREAM_VALUE_FIELDS = (
+    "t_supply",
+    "t_target",
+    "p_supply",
+    "p_target",
+    "h_supply",
+    "h_target",
+    "heat_flow",
+    "dt_cont",
+    "htc",
+)
+_STREAM_OPTIONAL_VALUE_FIELDS = (
+    "p_supply",
+    "p_target",
+    "h_supply",
+    "h_target",
+    "dt_cont",
+    "htc",
+)
+_UTILITY_VALUE_FIELDS = (
+    "t_supply",
+    "t_target",
+    "p_supply",
+    "p_target",
+    "h_supply",
+    "h_target",
+    "heat_flow",
+    "dt_cont",
+    "htc",
+    "price",
+)
+_UTILITY_OPTIONAL_VALUE_FIELDS = (
+    "t_target",
+    "p_supply",
+    "p_target",
+    "h_supply",
+    "h_target",
+    "heat_flow",
+    "dt_cont",
+    "htc",
+    "price",
+)
 
 
 def validate_problem_inputs(
@@ -136,8 +178,8 @@ def semantic_issues(
             section="streams",
             record_index=index,
             record_label=label,
-            field_names=("t_supply", "t_target", "heat_flow", "dt_cont", "htc"),
-            optional_field_names=("dt_cont", "htc"),
+            field_names=_STREAM_VALUE_FIELDS,
+            optional_field_names=_STREAM_OPTIONAL_VALUE_FIELDS,
             config=input_unit_config,
         )
         issues.extend(stream_value_issues)
@@ -157,21 +199,8 @@ def semantic_issues(
             section="utilities",
             record_index=index,
             record_label=label,
-            field_names=(
-                "t_supply",
-                "t_target",
-                "heat_flow",
-                "dt_cont",
-                "htc",
-                "price",
-            ),
-            optional_field_names=(
-                "t_target",
-                "heat_flow",
-                "dt_cont",
-                "htc",
-                "price",
-            ),
+            field_names=_UTILITY_VALUE_FIELDS,
+            optional_field_names=_UTILITY_OPTIONAL_VALUE_FIELDS,
             config=input_unit_config,
         )
         issues.extend(utility_value_issues)
@@ -435,51 +464,16 @@ def _validate_stream_record_states(
     record_label: Optional[str],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    issues.extend(
-        _validate_value_finiteness(
-            values.get("t_supply"),
-            section=section,
-            record_index=record_index,
-            record_label=record_label,
-            field_name="t_supply",
+    for field_name in _STREAM_VALUE_FIELDS:
+        issues.extend(
+            _validate_value_finiteness(
+                values.get(field_name),
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                field_name=field_name,
+            )
         )
-    )
-    issues.extend(
-        _validate_value_finiteness(
-            values.get("t_target"),
-            section=section,
-            record_index=record_index,
-            record_label=record_label,
-            field_name="t_target",
-        )
-    )
-    issues.extend(
-        _validate_value_finiteness(
-            values.get("heat_flow"),
-            section=section,
-            record_index=record_index,
-            record_label=record_label,
-            field_name="heat_flow",
-        )
-    )
-    issues.extend(
-        _validate_value_finiteness(
-            values.get("dt_cont"),
-            section=section,
-            record_index=record_index,
-            record_label=record_label,
-            field_name="dt_cont",
-        )
-    )
-    issues.extend(
-        _validate_value_finiteness(
-            values.get("htc"),
-            section=section,
-            record_index=record_index,
-            record_label=record_label,
-            field_name="htc",
-        )
-    )
     issues.extend(
         _validate_non_negative_states(
             values.get("heat_flow"),
@@ -522,7 +516,7 @@ def _validate_stream_record_states(
     classifications: dict[str, list[str]] = {
         ST.Hot.value: [],
         ST.Cold.value: [],
-        ST.Both.value: [],
+        ST.Neutral.value: [],
     }
 
     num_states = 1
@@ -558,6 +552,10 @@ def _validate_stream_record_states(
                     ),
                 )
             )
+        elif t_supply_value > t_target_value:
+            classifications[ST.Hot.value].append(str(idx))
+        elif t_supply_value < t_target_value:
+            classifications[ST.Cold.value].append(str(idx))
 
     active_classes = {
         stream_type: state_group
@@ -577,7 +575,7 @@ def _validate_stream_record_states(
                     "Stream states must classify consistently. "
                     f"Hot={classifications[ST.Hot.value]}, "
                     f"Cold={classifications[ST.Cold.value]}, "
-                    f"Neutral={classifications[ST.Both.value]}."
+                    f"Neutral={classifications[ST.Neutral.value]}."
                 ),
             )
         )
@@ -593,7 +591,7 @@ def _validate_utility_record_states(
     record_label: Optional[str],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    for field_name in ("t_supply", "t_target", "heat_flow", "dt_cont", "htc", "price"):
+    for field_name in _UTILITY_VALUE_FIELDS:
         issues.extend(
             _validate_value_finiteness(
                 values.get(field_name),

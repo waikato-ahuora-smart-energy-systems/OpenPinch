@@ -8,7 +8,8 @@ from typing import Optional
 
 import numpy as np
 
-from ..lib.enums import ST
+from ..lib.coolprop_fluids import validate_coolprop_fluid_name
+from ..lib.enums import ST, FluidPhase
 from ..lib.schemas.common import MaybeVU
 from .value import Value
 
@@ -88,10 +89,14 @@ class Stream:
         htc: MaybeVU = 1.0,
         price: MaybeVU = 0.0,
         is_process_stream: bool = True,
+        fluid_name: Optional[str] = None,
+        fluid_phase: Optional[str | FluidPhase] = None,
     ):
         """Initialise a stream and infer hot/cold classification."""
         self._name = name
         self._is_process_stream = bool(is_process_stream)
+        self._fluid_name = self._normalise_fluid_name(fluid_name)
+        self._fluid_phase = self._normalise_fluid_phase(fluid_phase)
         self._active = True
         self._dt_cont_multiplier_locked = False
         self._dt_cont_multiplier = float(dt_cont_multiplier or 1.0)
@@ -151,6 +156,15 @@ class Stream:
         self._name = value
 
     @property
+    def stream_name(self) -> str:
+        """Alias for the stream identifier used in input schemas."""
+        return self._name
+
+    @stream_name.setter
+    def stream_name(self, value: str):
+        self._name = value
+
+    @property
     def is_process_stream(self) -> bool:
         """Process or utility stream."""
         return self._is_process_stream
@@ -159,6 +173,24 @@ class Stream:
     def is_process_stream(self, value: bool):
         """Mark whether the stream is treated as process-side or utility-side."""
         self._is_process_stream = value
+
+    @property
+    def fluid_name(self) -> Optional[str]:
+        """CoolProp fluid name or mixture specification."""
+        return self._fluid_name
+
+    @fluid_name.setter
+    def fluid_name(self, value: Optional[str]):
+        self._fluid_name = self._normalise_fluid_name(value)
+
+    @property
+    def fluid_phase(self) -> Optional[str]:
+        """Optional fluid-phase flag: sol, sle, liq, vle, sve, or gas."""
+        return self._fluid_phase
+
+    @fluid_phase.setter
+    def fluid_phase(self, value: Optional[str | FluidPhase]):
+        self._fluid_phase = self._normalise_fluid_phase(value)
 
     @property
     def type(self) -> Optional[str]:
@@ -515,6 +547,29 @@ class Stream:
         self._validate_num_states()
         if update_derived:
             self.update_derived_properties()
+
+    @classmethod
+    def _normalise_fluid_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        validate_coolprop_fluid_name(text)
+        return text
+
+    @classmethod
+    def _normalise_fluid_phase(cls, value: Optional[str | FluidPhase]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        try:
+            return FluidPhase.from_code_or_description(value).name
+        except ValueError as exc:
+            valid = ", ".join(phase.name for phase in FluidPhase)
+            raise ValueError(f"fluid_phase must be one of: {valid}.") from exc
 
     def set_value_attr_at_idx(
         self,
