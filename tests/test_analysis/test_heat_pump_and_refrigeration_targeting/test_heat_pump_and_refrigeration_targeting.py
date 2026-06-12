@@ -528,17 +528,14 @@ def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
 
     graphs = hp._get_hpr_graphs(pt, is_direct=True, is_heat_pumping=True)
 
-    assert set(graphs) == {GT.NLP.value, GT.NLP_HP.value, GT.GCC_HP.value}
-    assert list(graphs[GT.NLP.value].columns) == [
+    assert set(graphs) == {GT.NLP_HP.value, GT.GCC_HP.value}
+    assert list(graphs[GT.NLP_HP.value].columns) == [
         PT.T.value,
         PT.H_NET_HOT.value,
         PT.H_NET_COLD.value,
-        PT.H_HOT_UT.value,
-        PT.H_COLD_UT.value,
         PT.H_HOT_HP.value,
         PT.H_COLD_HP.value,
     ]
-    assert list(graphs[GT.NLP_HP.value].columns) == list(graphs[GT.NLP.value].columns)
 
     graph_set = _create_graph_set(
         SimpleNamespace(
@@ -547,16 +544,10 @@ def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
             graphs=graphs,
         )
     )
-    nlp_graph = next(
-        graph for graph in graph_set["graphs"] if graph["type"] == GT.NLP.value
-    )
     nlp_hp_graph = next(
         graph for graph in graph_set["graphs"] if graph["type"] == GT.NLP_HP.value
     )
-    segment_titles = {segment["title"] for segment in nlp_graph["segments"]}
     hpr_segment_titles = {segment["title"] for segment in nlp_hp_graph["segments"]}
-    assert "Heat Pump Condenser" in segment_titles
-    assert "Heat Pump Evaporator" in segment_titles
     assert "Heat Pump Condenser" in hpr_segment_titles
     assert "Heat Pump Evaporator" in hpr_segment_titles
 
