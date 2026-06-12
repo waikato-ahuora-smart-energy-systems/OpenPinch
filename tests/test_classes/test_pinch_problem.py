@@ -1198,6 +1198,35 @@ def test_plot_helper_can_return_exergy_graph_data(monkeypatch):
     assert nlp_graph == {"type": "Exergetic Net Load Profiles", "name": "NLP_X"}
 
 
+def test_plot_helper_can_return_heat_pump_net_load_graph_data(monkeypatch):
+    payload = {
+        "Plant/DHP": {
+            "name": "Plant/Direct Heat Pump",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [
+                {"type": "Net Load Profiles", "name": "NLP"},
+                {
+                    "type": "Net Load Profiles with Heat Pump",
+                    "name": "NLP_HP",
+                },
+            ],
+        }
+    }
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+
+    obj = PinchProblem()
+    nlp_hp_graph = obj.plot.net_load_profiles_with_heat_pump(
+        zone_name="Plant/DHP",
+        return_graph_data=True,
+    )
+
+    assert nlp_hp_graph == {
+        "type": "Net Load Profiles with Heat Pump",
+        "name": "NLP_HP",
+    }
+
+
 def test_plot_helper_can_build_energy_transfer_diagram(monkeypatch):
     payload = {
         "Plant/ET": {

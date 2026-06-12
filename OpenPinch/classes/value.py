@@ -8,7 +8,7 @@ from functools import lru_cache
 from typing import Any
 
 import numpy as np
-from pint import UnitRegistry
+from pint import UnitRegistry, set_application_registry
 from pint.errors import DimensionalityError
 
 ureg = UnitRegistry()
@@ -20,6 +20,7 @@ try:
     ureg.define("NZD = [currency]")
 except Exception:
     pass
+set_application_registry(ureg)
 Q_ = ureg.Quantity  # type: ignore
 
 _SERIALIZED_SCALAR_KEYS = {"value", "unit"}

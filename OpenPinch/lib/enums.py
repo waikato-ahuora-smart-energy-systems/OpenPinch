@@ -281,6 +281,7 @@ class GraphType(Enum):
     GCC_X = "Exergetic Grand Composite Curve"
     NLP_X = "Exergetic Net Load Profiles"
     GCC_HP = "Grand Composite Curve with Heat Pump"
+    NLP_HP = "Net Load Profiles with Heat Pump"
     NLP = "Net Load Profiles"
     ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"

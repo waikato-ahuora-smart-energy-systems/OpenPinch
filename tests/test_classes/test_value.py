@@ -1,5 +1,7 @@
 """Regression tests for the simplified state-array ``Value`` model."""
 
+import pickle
+
 import numpy as np
 import pytest
 
@@ -58,6 +60,15 @@ def test_dimensionless_values_use_dash_unit_representation():
 
     assert value.unit == "-"
     assert value.to_dict() == {"value": 0.5, "unit": "-"}
+
+
+def test_currency_values_round_trip_through_pint_pickle():
+    value = Value(12.5, "$/y")
+
+    round_tripped = pickle.loads(pickle.dumps(value))
+
+    assert round_tripped.value == pytest.approx(12.5)
+    assert round_tripped.unit == "$/y"
 
 
 def test_stateful_arithmetic_requires_matching_state_count():
