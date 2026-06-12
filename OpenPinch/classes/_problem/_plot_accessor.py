@@ -377,7 +377,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching net load profile with Heat Pump payload or figure."""
+        """Return the first matching net load profile (with Heat Pump) or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.NLP_HP.value,
