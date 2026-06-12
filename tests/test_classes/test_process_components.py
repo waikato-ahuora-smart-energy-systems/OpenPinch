@@ -390,6 +390,10 @@ def test_process_mvr_solves_all_states_for_multistate_streams():
         zone_name="Evaporation Train",
         state_id="peak",
     )
+    peak_target_by_idx = problem.target.direct_heat_integration(
+        zone_name="Evaporation Train",
+        options={"idx": 1},
+    )
 
     assert normal_target.heat_recovery_target != peak_target.heat_recovery_target
     assert normal_target.process_component_work_target == pytest.approx(
@@ -407,5 +411,11 @@ def test_process_mvr_solves_all_states_for_multistate_streams():
         )
     )
     assert normal_target.process_component_work_target != pytest.approx(
+        peak_target.process_component_work_target
+    )
+    assert peak_target_by_idx.heat_recovery_target == pytest.approx(
+        peak_target.heat_recovery_target
+    )
+    assert peak_target_by_idx.process_component_work_target == pytest.approx(
         peak_target.process_component_work_target
     )

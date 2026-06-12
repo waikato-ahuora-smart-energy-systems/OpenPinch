@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from CoolProp.CoolProp import PropsSI
 
-from ...classes.process_components import ProcessComponent
 from ...classes.stream import Stream
 from ...classes.value import Value
 from ...classes.zone import Zone
@@ -21,6 +20,7 @@ from .direct_mvr import (
     coerce_positive_mvr_stage_count,
     solve_direct_gas_mvr_stream,
 )
+from .process_components import ProcessComponent
 
 if TYPE_CHECKING:
     from ...classes.pinch_problem import PinchProblem
@@ -43,6 +43,7 @@ class ProcessMVRStreamRecord:
     replacement_streams: list[Stream]
     replacement_memberships: list[StreamMembership]
     stage_results_by_state: dict[str, list[DirectGasMVRStageResult]]
+    state_label_by_index: dict[int, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -248,6 +249,7 @@ def _build_process_mvr_stream_record(
         replacement_streams=replacement_streams,
         replacement_memberships=[],
         stage_results_by_state=stage_results_by_state,
+        state_label_by_index=state_labels,
     )
 
 
@@ -603,7 +605,7 @@ def _record_stage_results_for_state(
     if state_id is not None and state_id in record.stage_results_by_state:
         return record.stage_results_by_state[state_id]
     if state_idx is not None:
-        idx_label = str(state_idx)
+        idx_label = record.state_label_by_index.get(int(state_idx), str(state_idx))
         if idx_label in record.stage_results_by_state:
             return record.stage_results_by_state[idx_label]
     return next(iter(record.stage_results_by_state.values()), [])
