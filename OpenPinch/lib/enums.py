@@ -128,6 +128,7 @@ class FluidPhase(str, Enum):
     sle = "solid-liquid equilibrium"
     liq = "liquid"
     vle = "vapour-liquid equilibrium"
+    vapour = "vapour"
     sve = "solid-vapour equilibrium"
     gas = "gas"
 
@@ -138,7 +139,10 @@ class FluidPhase(str, Enum):
             return value
         text = str(value).strip().lower()
         for phase in cls:
-            if text in {phase.name, phase.value.lower()}:
+            aliases = {phase.name, phase.value.lower()}
+            if phase is cls.vapour:
+                aliases.add("vapor")
+            if text in aliases:
                 return phase
         raise ValueError(f"Unknown fluid phase: {value!r}.")
 

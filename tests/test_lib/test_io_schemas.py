@@ -186,6 +186,28 @@ def test_target_input_accepts_fluid_phase_description_strings():
     assert validated.streams[0].fluid_phase == "liquid"
 
 
+def test_target_input_accepts_standalone_vapour_phase_aliases():
+    for phase in ("vapour", "vapor"):
+        payload = {
+            "streams": [
+                {
+                    "zone": "Zone A",
+                    "name": "H1",
+                    "t_supply": 100.0,
+                    "t_target": 99.5,
+                    "heat_flow": 100.0,
+                    "fluid_name": "Water",
+                    "fluid_phase": phase,
+                }
+            ],
+            "utilities": [],
+        }
+
+        validated = TargetInput.model_validate(payload)
+
+        assert validated.streams[0].fluid_phase == "vapour"
+
+
 def test_target_input_rejects_invalid_stream_fluid_phase():
     payload = {
         "streams": [

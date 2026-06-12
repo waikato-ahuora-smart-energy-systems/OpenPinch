@@ -152,6 +152,7 @@ class UtilitySummaryTarget(BaseTargetModel):
     utility_cost: float = 0.0
     hot_pinch: Optional[float] = None
     cold_pinch: Optional[float] = None
+    process_component_work_target: Optional[float] = None
     exergy_sinks: Optional[float] = None
     exergy_sources: Optional[float] = None
     exergy_des_min: Optional[float] = None
@@ -200,6 +201,11 @@ class UtilitySummaryTarget(BaseTargetModel):
             utility_cost=coerce_output_value(
                 self.utility_cost,
                 metric_name="utility_cost",
+                config=self.config,
+            ),
+            process_component_work_target=coerce_output_value(
+                self.process_component_work_target,
+                metric_name="work_target",
                 config=self.config,
             ),
             row_type=_row_type(isTotal),
