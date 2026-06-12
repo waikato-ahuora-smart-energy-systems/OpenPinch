@@ -1,6 +1,6 @@
 """Reusable process component service implementations."""
 
-from ...classes.process_components import ProcessComponent
+from .process_components import ProcessComponent
 from .process_mvr import (
     ProcessMVRComponent,
     ProcessMVRStreamRecord,

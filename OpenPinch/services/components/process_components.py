@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .pinch_problem import PinchProblem
-    from .zone import Zone
+    from ...classes.pinch_problem import PinchProblem
+    from ...classes.zone import Zone
 
 
 @dataclass
