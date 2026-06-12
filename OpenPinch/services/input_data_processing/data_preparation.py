@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import math
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
-from ...classes.value import Value
 from ...classes.zone import Zone
-from ...lib.config import Configuration, tol
+from ...lib.config import tol
 from ...lib.enums import ST
-from ...lib.schemas.common import ValueWithUnit
 from ...lib.schemas.io import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ...lib.unit_system import standardise_input_value
 from ...utils.value_resolution import resolve_value_array
@@ -200,38 +197,9 @@ def _validate_stream_temperatures(stream: StreamSchema):
         )
 
 
-def _validate_dt_cont_value(value, zone_config: Configuration) -> Value:
-    """Validate one DT_CONT value and coerce to a non-negative float."""
-    if isinstance(value, ValueWithUnit):
-        return standardise_input_value(value, field_name="dt_cont", config=zone_config)
-    if (
-        (value is None)
-        or (not isinstance(value, (int, float)))
-        or not math.isfinite(value)
-    ):
-        value = zone_config.DT_CONT
-    return standardise_input_value(value, field_name="dt_cont", config=zone_config)
-
-
-def _validate_htc_value(value, zone_config: Configuration) -> Value:
-    """Validate one HTC value and coerce to a positive float."""
-    if isinstance(value, ValueWithUnit):
-        return standardise_input_value(value, field_name="htc", config=zone_config)
-    if (
-        (value is None)
-        or (not isinstance(value, (int, float)))
-        or not math.isfinite(value)
-        or value <= 0.0
-    ):
-        value = zone_config.HTC
-    return standardise_input_value(value, field_name="htc", config=zone_config)
-
-
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
     _validate_stream_temperatures(stream)
-    dt_cont = _validate_dt_cont_value(stream.dt_cont, zone.config)
-    htc = _validate_htc_value(stream.htc, zone.config)
     stream_obj = Stream(
         name=stream.name,
         t_supply=standardise_input_value(
@@ -244,15 +212,45 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
             field_name="t_target",
             config=zone.config,
         ),
+        p_supply=standardise_input_value(
+            stream.p_supply,
+            field_name="p_supply",
+            config=zone.config,
+        ),
+        p_target=standardise_input_value(
+            stream.p_target,
+            field_name="p_target",
+            config=zone.config,
+        ),
+        h_supply=standardise_input_value(
+            stream.h_supply,
+            field_name="h_supply",
+            config=zone.config,
+        ),
+        h_target=standardise_input_value(
+            stream.h_target,
+            field_name="h_target",
+            config=zone.config,
+        ),
         heat_flow=standardise_input_value(
             stream.heat_flow,
             field_name="heat_flow",
             config=zone.config,
         ),
-        dt_cont=dt_cont,
+        dt_cont=standardise_input_value(
+            stream.dt_cont,
+            field_name="dt_cont",
+            config=zone.config,
+        ),
         dt_cont_multiplier=zone.dt_cont_multiplier,
-        htc=htc,
+        htc=standardise_input_value(
+            stream.htc,
+            field_name="htc",
+            config=zone.config,
+        ),
         is_process_stream=True,
+        fluid_name=stream.fluid_name,
+        fluid_phase=stream.fluid_phase,
     )
     return stream_obj
 

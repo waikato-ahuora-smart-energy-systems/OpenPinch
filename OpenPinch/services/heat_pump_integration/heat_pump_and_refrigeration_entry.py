@@ -44,6 +44,9 @@ from .targeting_services.multi_simple_vapour_compression import (
 from .targeting_services.multi_temperature_carnot import (
     optimise_multi_temperature_carnot_heat_pump_placement,
 )
+from .targeting_services.vapour_compression_mvr import (
+    optimise_vapour_compression_mvr_heat_pump_placement,
+)
 
 __all__ = [
     "compute_direct_heat_pump_or_refrigeration_target",
@@ -411,5 +414,6 @@ _HP_PLACEMENT_HANDLERS = {
     ),
     HPRcycle.MultiSimpleVapourComp.value: optimise_multi_simple_heat_pump_placement,
     HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
+    HPRcycle.VapourCompMVR.value: (optimise_vapour_compression_mvr_heat_pump_placement),
     HPRcycle.MultiSimpleCarnot.value: optimise_multi_simple_carnot_heat_pump_placement,
 }

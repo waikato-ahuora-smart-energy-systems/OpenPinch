@@ -16,6 +16,10 @@ Build the HTML documentation from the repository root:
 
 The generated site is written to ``docs/_build/html``.
 
+The helper runs Sphinx with ``--fail-on-warning --keep-going`` so stale
+``automodule`` paths, broken cross references, and other warning-level RTD
+problems fail before publication.
+
 Release Build
 -------------
 
@@ -34,6 +38,12 @@ If you need to run Sphinx directly:
 
    uv run python -m sphinx -b html docs docs/_build/html
 
+Use the stricter form when checking a documentation change:
+
+.. code-block:: bash
+
+   uv run python -m sphinx -b html --fail-on-warning --keep-going docs docs/_build/html
+
 Coverage Expectations
 ---------------------
 
@@ -49,10 +59,10 @@ Current Quality Gates
 
 - CI now runs a docs HTML build alongside the main test workflow.
 - Docs consistency checks run under pytest as part of the normal suite.
+- The docs build helper fails on Sphinx warnings by default.
 
 Recommended Next Gates
 ----------------------
 
-- fail the Sphinx build on warnings once all transient warning sources are removed
 - add link checking
 - keep packaged asset indexes synchronized with the resources module

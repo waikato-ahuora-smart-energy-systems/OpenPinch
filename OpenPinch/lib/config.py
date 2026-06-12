@@ -62,7 +62,7 @@ class Configuration:
             raise TypeError("Configuration options must be provided as a dict.")
 
         for key, value in self._validate_option_keys(options).items():
-            if key == "REFRIGERANTS":
+            if key in {"REFRIGERANTS", "MVR_FLUIDS"}:
                 ref_ls = (
                     value.replace(";", ",").split(",")
                     if isinstance(value, str)

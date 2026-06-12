@@ -13,7 +13,7 @@ from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
-from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
+from OpenPinch.lib.schemas.targets import DirectIntegrationTarget, EnergyTransferTarget
 from OpenPinch.streamlit_webviewer import web_graphing as wg
 
 
@@ -413,6 +413,55 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
 
     assert any("No graphs available" in msg for msg in st.infos)
     assert any("No shifted problem table data" in msg for msg in st.infos)
+    assert any("No real temperature Problem Table data" in msg for msg in st.infos)
+
+
+def test_render_streamlit_dashboard_handles_energy_transfer_target(monkeypatch):
+    st = _StreamlitStubExtra()
+    monkeypatch.setitem(sys.modules, "streamlit", st)
+
+    zone = Zone(name="Plant")
+    target = EnergyTransferTarget(
+        zone_name="Plant",
+        type="Energy Transfer Analysis",
+        pt=ProblemTable({PT.T: [150.0, 100.0], PT.H_NET: [20.0, 0.0]}),
+        cold_pinch=80.0,
+        hot_pinch=120.0,
+        hot_utility_target=20.0,
+        cold_utility_target=0.0,
+        heat_recovery_target=50.0,
+        degree_of_int=1.0,
+        base_target_type="Direct Integration",
+        base_target_name="Plant/Direct Integration",
+    )
+    zone.add_target(target)
+
+    wg.render_streamlit_dashboard(
+        zone,
+        graph_payload={
+            "Plant/Energy Transfer Analysis": {
+                "name": "Plant/Energy Transfer Analysis",
+                "graphs": [
+                    {
+                        "type": "Energy Transfer Diagram",
+                        "name": "ETD",
+                        "segments": [
+                            {
+                                "title": "Transfer 1",
+                                "colour": 0,
+                                "data_points": [
+                                    {"x": 20.0, "y": 150.0},
+                                    {"x": 0.0, "y": 100.0},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        },
+    )
+
+    assert "plotly_chart" in st.calls
     assert any("No real temperature Problem Table data" in msg for msg in st.infos)
 
 

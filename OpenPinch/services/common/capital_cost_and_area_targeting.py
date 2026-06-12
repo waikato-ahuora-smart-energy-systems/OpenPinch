@@ -186,23 +186,28 @@ def get_min_number_hx(
     idx: int | None = None,
 ) -> int:
     """Estimate the minimum number of exchangers using vectorised interval logic."""
-    num_hx: int = 0
     H_net_bal = H_cold_bal - H_hot_bal
     mask = np.isclose(H_net_bal, 0.0, atol=tol)
-    mask_true_positions = np.flatnonzero(mask).tolist()
-    idx_pairs = []
-    for i in range(len(mask_true_positions) - 1):
-        if mask_true_positions[i] + 1 < mask_true_positions[i + 1]:
-            idx_pairs.append((mask_true_positions[i], mask_true_positions[i + 1]))
+    mask_true_positions = np.flatnonzero(mask)
+    if mask_true_positions.size < 2:
+        return 0
 
-    for i0, i1 in idx_pairs:
-        T_high, T_low = T_vals[i0], T_vals[i1]
-        num_hx += _count_crossing(T_low, T_high, hot_streams, idx=idx)
-        num_hx += _count_crossing(T_low, T_high, cold_streams, idx=idx)
-        num_hx += _count_utility_range_container(T_low, T_high, hot_utilities, idx=idx)
-        num_hx += _count_utility_range_container(T_low, T_high, cold_utilities, idx=idx)
+    adjacent = mask_true_positions[:-1] + 1 < mask_true_positions[1:]
+    if not np.any(adjacent):
+        return 0
 
-    return int(num_hx - len(idx_pairs))
+    upper_indices = mask_true_positions[:-1][adjacent]
+    lower_indices = mask_true_positions[1:][adjacent]
+    t_high = np.asarray(T_vals, dtype=float)[upper_indices]
+    t_low = np.asarray(T_vals, dtype=float)[lower_indices]
+
+    num_hx = (
+        _count_crossing_ranges(t_low, t_high, hot_streams, idx=idx)
+        + _count_crossing_ranges(t_low, t_high, cold_streams, idx=idx)
+        + _count_utility_range_containers(t_low, t_high, hot_utilities, idx=idx)
+        + _count_utility_range_containers(t_low, t_high, cold_utilities, idx=idx)
+    )
+    return int(num_hx - t_low.size)
 
 
 ################################################################################
@@ -252,13 +257,36 @@ def _count_crossing(
     idx: int | None = None,
 ):
     """Count process streams intersecting interval ``[T_low, T_high]``."""
-    t_max = np.array([s.t_max_star[idx] for s in streams])
-    t_min = np.array([s.t_min_star[idx] for s in streams])
-    return np.sum(
+    return int(
+        _count_crossing_ranges(
+            np.asarray([T_low], dtype=float),
+            np.asarray([T_high], dtype=float),
+            streams,
+            idx=idx,
+        )
+    )
+
+
+def _count_crossing_ranges(
+    T_low: np.ndarray,
+    T_high: np.ndarray,
+    streams: StreamCollection,
+    idx: int | None = None,
+) -> int:
+    """Count process stream crossings across several temperature intervals."""
+    if len(streams) == 0 or T_low.size == 0:
+        return 0
+    numeric = streams.numeric_view(idx)
+    t_max = numeric.t_max_star[:, np.newaxis]
+    t_min = numeric.t_min_star[:, np.newaxis]
+    T_low = T_low[np.newaxis, :]
+    T_high = T_high[np.newaxis, :]
+    crossings = (
         ((t_max > T_low + tol) & (t_max <= T_high + tol))
         | ((t_min >= T_low - tol) & (t_min < T_high - tol))
         | ((t_min < T_low - tol) & (t_max > T_high + tol))
     )
+    return int(np.sum(crossings))
 
 
 def _count_utility_range_container(
@@ -268,7 +296,30 @@ def _count_utility_range_container(
     idx: int | None = None,
 ):
     """Count utility streams intersecting interval ``[T_low, T_high]``."""
-    t_max = np.array([u.t_max_star[idx] for u in utilities])
-    t_min = np.array([u.t_min_star[idx] for u in utilities])
-    active = np.array([1 if u.heat_flow[idx] > tol else 0 for u in utilities])
-    return np.sum((t_min >= T_low - tol) & (t_max <= T_high + tol) & (active))
+    return int(
+        _count_utility_range_containers(
+            np.asarray([T_low], dtype=float),
+            np.asarray([T_high], dtype=float),
+            utilities,
+            idx=idx,
+        )
+    )
+
+
+def _count_utility_range_containers(
+    T_low: np.ndarray,
+    T_high: np.ndarray,
+    utilities: StreamCollection,
+    idx: int | None = None,
+) -> int:
+    """Count active utilities contained by several temperature intervals."""
+    if len(utilities) == 0 or T_low.size == 0:
+        return 0
+    numeric = utilities.numeric_view(idx)
+    t_max = numeric.t_max_star[:, np.newaxis]
+    t_min = numeric.t_min_star[:, np.newaxis]
+    active = numeric.heat_flow[:, np.newaxis] > tol
+    T_low = T_low[np.newaxis, :]
+    T_high = T_high[np.newaxis, :]
+    contained = (t_min >= T_low - tol) & (t_max <= T_high + tol) & active
+    return int(np.sum(contained))

@@ -82,6 +82,7 @@ class TargetResults(BaseModel):
     cold_utilities: List[HeatUtility] = Field(default_factory=list)
     pinch_temp: PinchTemp
     work_target: Value | None = None
+    process_component_work_target: Value | None = None
     turbine_efficiency_target: Value | None = None
     area: Value | None = None
     num_units: Optional[float] = None
@@ -111,6 +112,7 @@ class TargetResults(BaseModel):
         "Qr",
         "utility_cost",
         "work_target",
+        "process_component_work_target",
         "turbine_efficiency_target",
         "area",
         "capital_cost",

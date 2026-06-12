@@ -59,8 +59,8 @@ state-weighted scenario data.
 .. automodule:: OpenPinch.classes.value
    :members:
 
-Thermal Cycle Classes
----------------------
+Thermal Cycle and Cogeneration Unit Models
+------------------------------------------
 
 These classes support the advanced Heat Pump, refrigeration, and utility system
 workflows documented in
@@ -68,17 +68,26 @@ workflows documented in
 primarily useful for advanced users who want to inspect or construct detailed
 cycle configurations directly.
 
-.. automodule:: OpenPinch.classes.vapour_compression_cycle
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models
+   :no-members:
+
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle
    :members:
 
-.. automodule:: OpenPinch.classes.parallel_vapour_compression_cycles
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles
    :members:
 
-.. automodule:: OpenPinch.classes.cascade_vapour_compression_cycle
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.cascade_vapour_compression_cycle
    :members:
 
-.. automodule:: OpenPinch.classes.brayton_heat_pump
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.mechanical_vapour_recompression_cycle
    :members:
 
-.. automodule:: OpenPinch.classes.multi_stage_steam_turbine
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_mvr_cascade
+   :members:
+
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump
+   :members:
+
+.. automodule:: OpenPinch.services.power_cogeneration.unit_models.multi_stage_steam_turbine
    :members:

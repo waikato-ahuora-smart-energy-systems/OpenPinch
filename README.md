@@ -56,11 +56,14 @@ The packaged notebook series currently includes:
 - `03_carnot_hpr_comparison.ipynb`
 - `04_multistate_targeting_and_state_comparison.ipynb`
 - `05_schema_service_and_output_workflows.ipynb`
+- `06_energy_transfer_analysis.ipynb`
+- `07_vapour_compression_mvr_cascade_hpr.ipynb`
 
 These notebooks are intended to be the main learning path for new users. The
 series now spans the single-case `PinchProblem` front door, named
-`PinchWorkspace` studies, real multistate targeting, and the typed/service plus
-serialized-workspace boundaries.
+`PinchWorkspace` studies, real multistate targeting, the typed/service plus
+serialized-workspace boundaries, energy-transfer analysis, and the simulated
+heat pump targeting backend.
 
 
 ## Python Workflow

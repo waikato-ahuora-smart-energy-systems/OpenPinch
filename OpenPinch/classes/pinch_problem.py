@@ -30,6 +30,7 @@ from ..utils.wkbook_to_json import get_problem_from_excel
 from ._problem import (
     JsonDict,
     PathLike,
+    _ComponentAccessorDescriptor,
     _LoadedProblemSource,
     _PlotAccessorDescriptor,
     _ProblemSourceAdapters,
@@ -65,8 +66,10 @@ class PinchProblem:
     _results: Optional[TargetOutput]
     _validated_data: Optional[TargetInput]
     _master_zone: Optional["Zone"]
+    _process_components: dict[str, Any]
     _input_source_kind: str
     _validation_context: Optional[dict[str, list[dict[str, Any]]]]
+    add_component = _ComponentAccessorDescriptor()
     plot = _PlotAccessorDescriptor()
     target = _TargetAccessorDescriptor()
 
@@ -86,6 +89,7 @@ class PinchProblem:
         self._results = None
         self._validated_data = None
         self._master_zone = None
+        self._process_components = {}
         self.results_dir = None
 
         if source is not None:
@@ -132,6 +136,7 @@ class PinchProblem:
             indirect_service_func=indirect_service_func,
             args=runtime_options,
         )
+        self._attach_process_component_work_targets(zone, runtime_options)
         self._results = TargetOutput.model_validate(extract_results(zone, state_id=sid))
         return self._results
 
@@ -167,6 +172,10 @@ class PinchProblem:
                 direct_service_func(zone, runtime_options)
             if indirect_service_func is not None:
                 indirect_service_func(zone, runtime_options)
+            self._attach_process_component_work_targets(
+                execution_master_zone,
+                runtime_options,
+            )
             self._results = TargetOutput.model_validate(
                 extract_results(execution_master_zone, state_id=sid)
             )
@@ -207,6 +216,10 @@ class PinchProblem:
         else:
             if service_func is not None:
                 service_func(zone, runtime_options)
+            self._attach_process_component_work_targets(
+                execution_master_zone,
+                runtime_options,
+            )
             self._results = TargetOutput.model_validate(
                 extract_results(execution_master_zone, state_id=sid)
             )
@@ -273,6 +286,10 @@ class PinchProblem:
         elif service_func is not None:
             service_func(zone, runtime_options)
 
+        self._attach_process_component_work_targets(
+            execution_master_zone,
+            runtime_options,
+        )
         self._results = TargetOutput.model_validate(
             extract_results(execution_master_zone, state_id=sid)
         )
@@ -307,6 +324,51 @@ class PinchProblem:
         if application_zone is None:
             return selected_master_zone
         return selected_master_zone.get_subzone(application_zone)
+
+    def _attach_process_component_work_targets(
+        self,
+        zone: "Zone",
+        runtime_options: Optional[dict[str, Any]],
+    ) -> None:
+        if not self._process_components:
+            return
+        state_id = (runtime_options or {}).get("state_id")
+        state_idx = (runtime_options or {}).get("idx")
+        for current_zone in self._walk_zone_tree(zone):
+            component_work = self._process_component_work_for_zone(
+                current_zone,
+                state_id=state_id,
+                state_idx=state_idx,
+            )
+            for target in current_zone.targets.values():
+                if hasattr(target, "process_component_work_target"):
+                    target.process_component_work_target = component_work
+                if (
+                    component_work > 0.0
+                    and hasattr(target, "work_target")
+                    and getattr(target, "work_target", None) is None
+                ):
+                    target.work_target = component_work
+
+    def _process_component_work_for_zone(
+        self,
+        zone: "Zone",
+        *,
+        state_id: str | None,
+        state_idx: int | None,
+    ) -> float:
+        total = 0.0
+        for component in self._process_components.values():
+            work_for_zone = getattr(component, "work_for_zone", None)
+            if work_for_zone is None:
+                continue
+            total += float(work_for_zone(zone, state_id=state_id, state_idx=state_idx))
+        return total
+
+    def _walk_zone_tree(self, zone: "Zone"):
+        yield zone
+        for subzone in zone.subzones.values():
+            yield from self._walk_zone_tree(subzone)
 
     def _build_execution_master_zone(self) -> "Zone":
         if self._problem_data is None and self._master_zone is None:
@@ -374,7 +436,7 @@ class PinchProblem:
         options: Optional[dict[str, Any]],
         *,
         zone: "Zone",
-    ) -> tuple[dict[str, Any], str | None, int]:
+    ) -> tuple[dict[str, Any], str | None]:
         runtime_options = dict(options or {})
         idx, sid = get_state_index(state_ids=zone.state_ids, args=runtime_options)
         runtime_options["idx"] = idx
@@ -584,6 +646,11 @@ class PinchProblem:
         return self._master_zone
 
     @property
+    def process_components(self) -> dict[str, Any]:
+        """Memory-only process components applied to the prepared model."""
+        return self._process_components
+
+    @property
     def hot_streams(self) -> StreamCollection:
         """Hot process streams on the root analysis zone."""
         return self._require_prepared_root_zone().hot_streams
@@ -755,6 +822,7 @@ class PinchProblem:
         """Revalidate, reconstruct the zone tree, and clear cached results."""
         self._validated_data = self.validate()
         self._master_zone = self._data_preprocessing()
+        self._process_components = {}
         self._results = None
         return self._master_zone
 

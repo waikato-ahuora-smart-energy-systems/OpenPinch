@@ -154,6 +154,11 @@ def _make_summary_row(t) -> dict:
         **_value_unit_columns("Total Cost", t.total_cost, idx=idx),
         **_value_unit_columns("Work Target", t.work_target, idx=idx),
         **_value_unit_columns(
+            "Process Component Work",
+            getattr(t, "process_component_work_target", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
             "Turbine Eff Target",
             t.turbine_efficiency_target,
             idx=idx,

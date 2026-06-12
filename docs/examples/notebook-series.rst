@@ -4,8 +4,9 @@ Notebook Series
 OpenPinch ships with a packaged notebook series that is treated as part of the
 supported learning and regression surface. Each notebook is built around one
 decision question rather than a generic feature tour. The series now spans the
-main single-case API, named multi-case studies, multistate targeting, and the
-typed/service boundary.
+main single-case API, named multi-case studies, multistate targeting, the
+typed/service boundary, the energy-transfer analysis view, and the
+vapour-compression plus MVR cascade HPR backend.
 
 Included Notebooks
 ------------------
@@ -35,6 +36,18 @@ Included Notebooks
    ``TargetInput`` plus ``pinch_analysis_service(...)``, artifact export, and
    serialized ``PinchWorkspace`` variant views.
 
+``06_energy_transfer_analysis.ipynb``
+   Energy-transfer targeting on ``pulp_mill.json``, including the
+   heat-surplus/deficit table, graph-ready energy-transfer diagram payload,
+   standard plot accessor, and Total Site versus local Direct Integration base
+   target selection.
+
+``07_vapour_compression_mvr_cascade_hpr.ipynb``
+   Heat-pump-only targeting with
+   ``HPR_TYPE = "Vapour compression with MVR cascade"``, including the
+   configuration fields for VC and MVR stages, a solved backend result, and the
+   external stream accounting used for the combined cascade.
+
 How To Use Them
 ---------------
 
@@ -63,6 +76,10 @@ Recommended Learning Order
    seasonal variation.
 5. Use the schema/service notebook when you need typed validation, serialized
    workspace views, or repeatable export workflows.
+6. Use the energy-transfer notebook when you need interval-level surplus/deficit
+   accounting or a diagram payload derived from an existing thermal target.
+7. Use the VC+MVR cascade notebook when you need a refrigerant low stage feeding
+   a serial mechanical-vapour-recompression high stage.
 
 Why These Matter
 ----------------
@@ -70,6 +87,6 @@ Why These Matter
 The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
 hierarchical targeting, graph-based interpretation, real multistate studies,
-and stable programmatic boundaries built on the same packaged assets. The
-distributed copies are also kept output-free so they do not ship stale plots,
-tracebacks, or machine-specific execution state.
+advanced HPR cycle targeting, and stable programmatic boundaries built on the
+same packaged assets. The distributed copies are also kept output-free so they
+do not ship stale plots, tracebacks, or machine-specific execution state.

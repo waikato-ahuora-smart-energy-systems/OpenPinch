@@ -18,6 +18,11 @@ from ._stream_collection._helpers import (
     _sort_by_attrs,
     _stream_attr_value,
 )
+from ._stream_collection._numeric_view import (
+    StreamCollectionNumericView,
+    build_numeric_view,
+    value_at_idx,
+)
 from .stream import Stream
 
 
@@ -43,6 +48,10 @@ class StreamCollection:
         self._sort_reverse: bool = True
         self._sorted_cache: List[object] = []
         self._needs_sort: bool = True
+        self._numeric_cache: dict[
+            tuple[int | None, tuple[tuple[int, int], ...]],
+            StreamCollectionNumericView,
+        ] = {}
         self._num_states: int | None = 1
         if streams is not None:
             self.add_many(streams)
@@ -96,6 +105,7 @@ class StreamCollection:
             num_states=self._num_states,
         )
         self._needs_sort = True
+        self._invalidate_numeric_cache()
         return key
 
     def add_many(
@@ -129,6 +139,7 @@ class StreamCollection:
         if stream_name in self._streams:
             del self._streams[stream_name]
             self._needs_sort = True
+            self._invalidate_numeric_cache()
         else:
             warnings.warn(f"Stream '{stream_name}' not found.")
 
@@ -176,6 +187,7 @@ class StreamCollection:
                 setattr(stream, attr_name, value)
             else:
                 stream.set_value_attr_at_idx(attr_name, value, idx=idx)
+            self._invalidate_numeric_cache()
         return self
 
     def set_sort_key(self, key: Union[str, List[str], Callable], reverse: bool = False):
@@ -214,6 +226,7 @@ class StreamCollection:
                 state_ids=self._state_ids,
                 num_states=self._num_states,
             )
+        self._invalidate_numeric_cache()
 
     def _validate_stream_state_context(self, stream: "Stream") -> None:
         if (
@@ -248,6 +261,35 @@ class StreamCollection:
                 weights=other._weights,
                 num_states=other._num_states,
             )
+
+    def numeric_view(self, idx: int | None = None) -> StreamCollectionNumericView:
+        """Return a cached dense numeric view for stream-analysis kernels."""
+        state_idx = None if idx is None else int(idx)
+        signature = tuple(
+            (id(stream), int(getattr(stream, "_numeric_revision", 0)))
+            for stream in self._streams.values()
+        )
+        cache_key = (state_idx, signature)
+        cached = self._numeric_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        view = self._build_numeric_view(state_idx)
+        self._numeric_cache.clear()
+        self._numeric_cache[cache_key] = view
+        return view
+
+    def _build_numeric_view(
+        self, idx: int | None = None
+    ) -> StreamCollectionNumericView:
+        return build_numeric_view(list(self._streams.values()), idx)
+
+    @staticmethod
+    def _value_at_idx(value, idx: int | None = None) -> float:
+        return value_at_idx(value, idx)
+
+    def _invalidate_numeric_cache(self) -> None:
+        self._numeric_cache.clear()
 
     def get_index(self, stream) -> int:
         """Return the position (index) of a stream object in the sorted stream list."""
@@ -346,6 +388,8 @@ class StreamCollection:
 
     def __setstate__(self, state):
         self.__dict__.update(state)
+        if "_numeric_cache" not in self.__dict__:
+            self._numeric_cache = {}
         self._rebuild_sort_key()
 
     def export_to_csv(self, filename: str = "heat pump streams") -> Path:

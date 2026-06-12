@@ -13,6 +13,9 @@ EXPECTED_NOTEBOOKS = [
     "03_carnot_hpr_comparison.ipynb",
     "04_multistate_targeting_and_state_comparison.ipynb",
     "05_schema_service_and_output_workflows.ipynb",
+    "06_energy_transfer_analysis.ipynb",
+    "07_vapour_compression_mvr_cascade_hpr.ipynb",
+    "08_direct_gas_stream_mvr.ipynb",
 ]
 
 
@@ -157,3 +160,48 @@ def test_notebook_5_covers_service_boundary_and_output_workflows(tmp_path: Path)
     assert "save_bundle(" in combined_source
     assert "load_bundle(" in combined_source
     assert "show_dashboard()" in combined_source
+
+
+def test_notebook_6_covers_energy_transfer_analysis(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "06_energy_transfer_analysis.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "pulp_mill.json" in combined_source
+    assert "target.energy_transfer(" in combined_source
+    assert "heat_surplus_deficit_table" in combined_source
+    assert "energy_transfer_diagram" in combined_source
+    assert "plot.energy_transfer_diagram" in combined_source
+    assert '"base_target_type": "Total Site Target"' in combined_source
+    assert '"base_target_type": "Direct Integration"' in combined_source
+    assert 'zone_name="Bleaching"' in combined_source
+
+
+def test_notebook_8_covers_direct_gas_stream_mvr(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "08_direct_gas_stream_mvr.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "PinchWorkspace" in combined_source
+    assert "copy_case(" in combined_source
+    assert "workspace.case(" in combined_source
+    assert "workspace.compare_cases(" in combined_source
+    assert "add_component.process_mvr(" in combined_source
+    assert "after_mvr_liquid_injection" in combined_source
+    assert "mvr_liquid_injection" in combined_source
+    assert "liquid_injection=True" in combined_source
+    assert "problem.process_components" in combined_source
+    assert "mvr.deactivate()" in combined_source
+    assert "mvr.activate()" in combined_source
+    assert "Evaporator vapour" in combined_source
+    assert "mvr.replacement_streams" in combined_source
+    assert "stage_results_by_state" in combined_source
+    assert "target.direct_heat_integration(" in combined_source
+    assert "target.indirect_heat_integration(" in combined_source
+    assert "summary_frame(case_name=" in combined_source
+    assert "plot.grand_composite_curve(" in combined_source
+    assert "return_graph_data=True" in combined_source

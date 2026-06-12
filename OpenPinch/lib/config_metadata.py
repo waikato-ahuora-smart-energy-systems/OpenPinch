@@ -95,6 +95,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_LOAD_VALUE": ConfigurationFieldSpec(float | str | dict, 1.0, "hpr"),
     "HPR_LOAD_VALUE_TYPE": ConfigurationFieldSpec(str, "fraction", "hpr"),
     "REFRIGERANTS": ConfigurationFieldSpec(List[str], ["water", "ammonia"], "hpr"),
+    "MVR_FLUIDS": ConfigurationFieldSpec(List[str], ["Water"], "hpr"),
     "DO_REFRIGERANT_SORT": ConfigurationFieldSpec(bool, True, "hpr"),
     "PRICE_RATIO_HEAT_TO_ELE": ConfigurationFieldSpec(
         float,
@@ -116,7 +117,9 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     ),
     "N_COND": ConfigurationFieldSpec(int, 3, "hpr", numeric_min=0.0),
     "N_EVAP": ConfigurationFieldSpec(int, 2, "hpr", numeric_min=0.0),
+    "N_MVR": ConfigurationFieldSpec(int, 1, "hpr", numeric_min=1.0),
     "ETA_COMP": ConfigurationFieldSpec(float, 0.7, "hpr", numeric_min=0.0),
+    "ETA_MVR_COMP": ConfigurationFieldSpec(float, 0.7, "hpr", numeric_min=0.0),
     "ETA_EXP": ConfigurationFieldSpec(float, 0.7, "hpr", numeric_min=0.0),
     "ETA_MOTOR": ConfigurationFieldSpec(float, 0.95, "hpr", numeric_min=0.0),
     "ETA_II_HPR_CARNOT": ConfigurationFieldSpec(

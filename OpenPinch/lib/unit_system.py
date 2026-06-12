@@ -34,6 +34,10 @@ _DIMENSIONLESS_UNIT_TOKENS = {"", "-", "dimensionless", "1"}
 INPUT_UNIT_RULES: dict[str, InputUnitRule] = {
     "t_supply": InputUnitRule("degC", aliases=("temperature",)),
     "t_target": InputUnitRule("degC", aliases=("temperature",)),
+    "p_supply": InputUnitRule("kPa", aliases=("pressure",)),
+    "p_target": InputUnitRule("kPa", aliases=("pressure",)),
+    "h_supply": InputUnitRule("kJ/kg", aliases=("enthalpy",)),
+    "h_target": InputUnitRule("kJ/kg", aliases=("enthalpy",)),
     "heat_flow": InputUnitRule("kW", aliases=("heat_flow",)),
     "dt_cont": InputUnitRule(
         "delta_degC",

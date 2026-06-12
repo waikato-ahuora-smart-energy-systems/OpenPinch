@@ -9,13 +9,28 @@ import numpy as np
 
 from ...lib.config import C_to_K, tol
 from ...lib.enums import GT, PT, TT
+from ..common.service_orchestration import (
+    apply_zone_config_overrides,
+    format_selected_state_suffix,
+    record_selected_state,
+    target_matches_requested_state,
+)
 
 __all__ = [
+    "apply_exergy_if_enabled",
     "apply_exergy_targeting",
     "build_exergy_gcc_curve",
     "build_exergy_nlp_curves",
     "compute_exergetic_temperature",
+    "run_exergy_targeting_service",
 ]
+
+_EXERGY_TARGET_ORDER = (
+    TT.TS.value,
+    TT.IHP.value,
+    TT.DHP.value,
+    TT.DI.value,
+)
 
 
 ################################################################################
@@ -252,9 +267,96 @@ def apply_exergy_targeting(target: Any) -> Any:
     return target
 
 
+def apply_exergy_if_enabled(
+    target: Any,
+    zone,
+    *,
+    apply_func=apply_exergy_targeting,
+) -> Any:
+    """Attach exergy outputs to one target when the feature is enabled."""
+    if target is None or not bool(getattr(zone.config, "DO_EXERGY_TARGETING", False)):
+        return target
+    return apply_func(target)
+
+
+def run_exergy_targeting_service(
+    zone,
+    args: dict | None = None,
+    *,
+    apply_func=apply_exergy_targeting,
+):
+    """Enrich the first compatible existing target family with exergy outputs."""
+    apply_zone_config_overrides(zone, args)
+    zone.config.DO_EXERGY_TARGETING = True
+    runtime_args = dict(args or {})
+    runtime_args["DO_EXERGY_TARGETING"] = True
+    explicit_target_type = _normalize_exergy_base_target_type(
+        runtime_args.get("base_target_type")
+    )
+    idx, sid = record_selected_state(zone, runtime_args)
+    runtime_args["idx"] = idx
+    if sid is not None:
+        runtime_args["state_id"] = sid
+    compare_args = dict(args or {}) if isinstance(args, dict) else {}
+    zone._selected_exergy_target_type = None
+
+    for target_type in _get_exergy_candidate_order(explicit_target_type):
+        target = zone.targets.get(target_type)
+        if not target_matches_requested_state(
+            target,
+            args=compare_args,
+            state_ids=getattr(zone, "state_ids", None),
+        ):
+            if explicit_target_type is not None:
+                raise RuntimeError(
+                    "Exergy targeting requires an existing target "
+                    f"{target_type!r} on zone {zone.name!r}"
+                    f"{format_selected_state_suffix(runtime_args)}. "
+                    "Run the corresponding base targeting accessor first."
+                )
+            continue
+
+        zone.add_target(apply_exergy_if_enabled(target, zone, apply_func=apply_func))
+        zone._selected_exergy_target_type = target_type
+        return zone
+
+    raise RuntimeError(
+        "Exergy targeting could not find a compatible existing target for zone "
+        f"{zone.name!r}{format_selected_state_suffix(runtime_args)} "
+        f"using implicit order {' -> '.join(_EXERGY_TARGET_ORDER)}. "
+        "Run a compatible thermal target accessor first."
+    )
+
+
 ################################################################################
 # Helper functions
 ################################################################################
+
+
+def _normalize_exergy_base_target_type(
+    base_target_type: object | None,
+) -> str | None:
+    """Validate an explicit exergy base target override."""
+    if base_target_type is None:
+        return None
+
+    normalized = str(base_target_type)
+    if normalized not in _EXERGY_TARGET_ORDER:
+        supported = ", ".join(_EXERGY_TARGET_ORDER)
+        raise ValueError(
+            "Unsupported exergy base_target_type "
+            f"{normalized!r}. Supported types: {supported}."
+        )
+    return normalized
+
+
+def _get_exergy_candidate_order(
+    base_target_type: str | None,
+) -> tuple[str, ...]:
+    """Return the exact exergy target search order for this call."""
+    if base_target_type is not None:
+        return (base_target_type,)
+    return _EXERGY_TARGET_ORDER
 
 
 def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:

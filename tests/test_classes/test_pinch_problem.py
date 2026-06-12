@@ -862,6 +862,23 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
     assert payload.streams == ["s"]
 
 
+def test_validate_rejects_stateful_streams_with_mixed_hot_cold_classification():
+    payload = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "Mixed",
+                "t_supply": {"values": [200.0, 100.0]},
+                "t_target": {"values": [100.0, 200.0]},
+                "heat_flow": {"values": [100.0, 100.0]},
+            }
+        ]
+    }
+
+    with pytest.raises(ValueError, match="Stream states must classify consistently"):
+        PinchProblem(payload).validate()
+
+
 def test_summary_frame_compact_and_detailed(monkeypatch):
     class _Value:
         def __init__(self, value, unit="kW"):
@@ -1179,6 +1196,42 @@ def test_plot_helper_can_return_exergy_graph_data(monkeypatch):
 
     assert gcc_graph == {"type": "Exergetic Grand Composite Curve", "name": "GCC_X"}
     assert nlp_graph == {"type": "Exergetic Net Load Profiles", "name": "NLP_X"}
+
+
+def test_plot_helper_can_build_energy_transfer_diagram(monkeypatch):
+    payload = {
+        "Plant/ET": {
+            "name": "Plant/Energy Transfer Analysis",
+            "zone_name": "Plant",
+            "zone_address": "Plant",
+            "graphs": [
+                {
+                    "type": "Energy Transfer Diagram",
+                    "name": "ETD",
+                    "segments": [],
+                },
+            ],
+        }
+    }
+    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(
+        sys.modules[_PlotAccessor.__module__],
+        "_build_plotly_graph",
+        lambda graph: {"built": graph["name"]},
+        raising=True,
+    )
+
+    obj = PinchProblem()
+
+    assert obj.plot.energy_transfer_diagram(zone_name="Plant/ET") == {"built": "ETD"}
+    assert obj.plot.energy_transfer_diagram(
+        zone_name="Plant/ET",
+        return_graph_data=True,
+    ) == {
+        "type": "Energy Transfer Diagram",
+        "name": "ETD",
+        "segments": [],
+    }
 
 
 def test_plot_helper_rejects_show_when_returning_graph_data(monkeypatch):

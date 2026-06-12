@@ -47,23 +47,30 @@ Shared Preprocessing and Optimisation Helpers
 .. automodule:: OpenPinch.services.heat_pump_integration.common.shared
    :members:
 
-Cycle Optimisation Modules
---------------------------
+Cycle Optimisation Services
+---------------------------
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles
+These modules place or size Heat Pump and refrigeration cycle models against
+prepared cascade data. The detailed cycle physics live in the
+``unit_models`` modules documented in :doc:`api-classes`.
+
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services
    :no-members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.brayton
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.brayton
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.cascade_vapour_compression
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.cascade_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.multi_simple_carnot
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.multi_simple_carnot
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.multi_simple_vapour_compression
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.multi_simple_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.multi_temperature_carnot
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.multi_temperature_carnot
+   :members:
+
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.vapour_compression_mvr
    :members:
