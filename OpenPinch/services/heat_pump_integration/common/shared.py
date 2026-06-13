@@ -175,14 +175,23 @@ def solve_hpr_placement(
 ) -> HPRBackendResult:
     """Run the configured multistart optimiser and post-process the best result."""
     x0_arr = _verify_x0_ls(x0_ls)
-    local_minima_x, local_minima_f = multiminima(
-        func=f_obj,
-        func_kwargs=args,
-        x0_ls=x0_arr,
-        bounds=bnds,
-        optimiser_handle=args.bb_minimiser,
-        opt_kwargs={"n_runs": max(1, int(args.max_multi_start))},
-    )
+    try:
+        local_minima_x, local_minima_f = multiminima(
+            func=f_obj,
+            func_kwargs=args,
+            x0_ls=x0_arr,
+            bounds=bnds,
+            optimiser_handle=args.bb_minimiser,
+            opt_kwargs={"n_runs": max(1, int(args.max_multi_start))},
+        )
+    except Exception as exc:
+        if x0_arr is None or x0_arr.size == 0:
+            raise ValueError(
+                "Heat pump and refrigeration targeting "
+                f"({args.hpr_type}) failed during optimisation and has no "
+                "initial candidate fallback."
+            ) from exc
+        local_minima_x, local_minima_f = np.asarray([]), np.asarray([])
     candidate_x, candidate_f = _merge_candidate_points(
         local_minima_x=local_minima_x,
         local_minima_f=local_minima_f,
@@ -232,7 +241,7 @@ def _merge_candidate_points(
         candidate_blocks.append(x0_block)
         objective_blocks.append(
             np.asarray(
-                [float(f_obj(x0, args, debug=False)["obj"]) for x0 in x0_block],
+                [_score_hpr_candidate_objective(f_obj, x0, args) for x0 in x0_block],
                 dtype=float,
             )
         )
@@ -258,6 +267,19 @@ def _merge_candidate_points(
     _, unique_idx = np.unique(candidate_x, axis=0, return_index=True)
     unique_idx = np.sort(unique_idx)
     return candidate_x[unique_idx], candidate_f[unique_idx]
+
+
+def _score_hpr_candidate_objective(
+    f_obj: Callable,
+    x: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> float:
+    try:
+        result = f_obj(x, args, debug=False)
+        obj = float(result["obj"])
+    except Exception:
+        return 1e30
+    return obj if np.isfinite(obj) else 1e30
 
 
 def _evaluate_hpr_candidate(

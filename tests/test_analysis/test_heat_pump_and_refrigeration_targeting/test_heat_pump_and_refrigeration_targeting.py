@@ -386,6 +386,128 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
     assert payload["state_idx"] == 1
 
 
+def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans(
+    monkeypatch,
+):
+    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone.targets[TT.TS.value] = SimpleNamespace(
+        pt=ProblemTable(
+            {
+                PT.T: [120.0, 60.0],
+                PT.H_NET_HOT: [np.nan, np.nan],
+                PT.H_NET_COLD: [np.nan, np.nan],
+            }
+        )
+    )
+    utility_profile = ProblemTable(
+        {
+            PT.T: [120.0, 60.0],
+            PT.H_NET_HOT: [0.0, -40.0],
+            PT.H_NET_COLD: [100.0, 0.0],
+        }
+    )
+    captured = {}
+
+    monkeypatch.setattr(
+        hp,
+        "get_process_heat_cascade",
+        lambda **_kwargs: utility_profile,
+    )
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_targets",
+        lambda **kwargs: captured.__setitem__("target_load", kwargs["Q_hpr_target"])
+        or SimpleNamespace(),
+    )
+    monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
+    monkeypatch.setattr(hp, "_get_hpr_graphs", lambda **kwargs: {})
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_target_summary",
+        lambda res, target_zone: {
+            "hpr_cycle": "stub",
+            "hpr_utility_total": 11.0,
+            "hpr_work": 2.0,
+            "hpr_external_utility": 3.0,
+            "hpr_ambient_hot": 4.0,
+            "hpr_ambient_cold": 5.0,
+            "hpr_cop": 6.0,
+            "hpr_eta_he": 7.0,
+            "hpr_success": True,
+            "hpr_hot_streams": StreamCollection(),
+            "hpr_cold_streams": StreamCollection(),
+            "hpr_details": {},
+        },
+    )
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_residual_utility_summary",
+        lambda **kwargs: {
+            "hot_utilities": StreamCollection(),
+            "cold_utilities": StreamCollection(),
+            "hot_utility_target": 0.0,
+            "cold_utility_target": 0.0,
+            "heat_recovery_target": 0.0,
+            "heat_recovery_limit": None,
+            "degree_of_int": None,
+            "utility_cost": 0.0,
+            "hot_pinch": None,
+            "cold_pinch": None,
+        },
+    )
+    monkeypatch.setattr(
+        hp.IndirectHeatPumpTarget,
+        "model_validate",
+        classmethod(lambda cls, value: value),
+    )
+
+    payload = hp.compute_indirect_heat_pump_or_refrigeration_target(
+        zone,
+        is_heat_pumping=True,
+    )
+
+    assert payload["hpr_success"] is True
+    assert captured["target_load"] == pytest.approx(100.0)
+
+
+def test_validate_hpr_required_ignores_nan_load_entries():
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0],
+            PT.H_NET_HOT: [np.nan, -20.0, -40.0],
+            PT.H_NET_COLD: [np.nan, 100.0, 0.0],
+        }
+    )
+    config = Configuration(options={"HPR_LOAD_VALUE": 0.25})
+
+    assert hp._validate_hpr_required(
+        H_net_cold=pt[PT.H_NET_COLD],
+        H_net_hot=pt[PT.H_NET_HOT],
+        is_heat_pumping=True,
+        zone_config=config,
+    ) == pytest.approx(25.0)
+
+
+def test_validate_hpr_required_returns_zero_for_all_nan_load_entries():
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0],
+            PT.H_NET_HOT: [np.nan, np.nan],
+            PT.H_NET_COLD: [np.nan, np.nan],
+        }
+    )
+
+    assert (
+        hp._validate_hpr_required(
+            H_net_cold=pt[PT.H_NET_COLD],
+            H_net_hot=pt[PT.H_NET_HOT],
+            is_heat_pumping=True,
+            zone_config=Configuration(),
+        )
+        == 0.0
+    )
+
+
 def test_hpr_residual_utility_summary_retargets_direct_utilities():
     hot_utilities, cold_utilities = _make_base_utility_collections()
     base_target = SimpleNamespace(

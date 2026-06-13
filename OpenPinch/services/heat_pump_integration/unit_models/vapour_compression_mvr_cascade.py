@@ -316,6 +316,17 @@ class VapourCompressionMvrCascade:
                 is_heat_pump=True,
             )
             self._vc_cycles.append(cycle)
+            if not cycle.solved:
+                failed_work = abs(float(cycle.work or 0.0))
+                failed_work = failed_work if np.isfinite(failed_work) else 1.0
+                self._penalty = np.concatenate(
+                    [
+                        self._penalty,
+                        np.array([max(failed_work, 1.0)], dtype=float),
+                    ]
+                )
+                self._max_work += max(failed_work, 1.0)
+                return self._max_work
 
         T_evap_mvr, T_cond_mvr = self._derive_mvr_temperatures(
             vc_cycle=self._vc_cycles[0],
@@ -358,10 +369,15 @@ class VapourCompressionMvrCascade:
             )
 
             if not cycle.solved:
+                failed_work = abs(float(cycle.work or 0.0))
+                failed_work = failed_work if np.isfinite(failed_work) else 1.0
                 self._penalty = np.concatenate(
-                    [self._penalty, np.array([max(cycle.work, 1.0)], dtype=float)]
+                    [
+                        self._penalty,
+                        np.array([max(failed_work, 1.0)], dtype=float),
+                    ]
                 )
-                self._max_work += max(cycle.work, 1.0)
+                self._max_work += max(failed_work, 1.0)
                 return self._max_work
 
             self._mvr_cycles.append(cycle)
@@ -375,6 +391,12 @@ class VapourCompressionMvrCascade:
             self._mvr_stage_mass_out[j] = m_dot_out
             m_dot_in = m_dot_out
 
+        work = sum(cycle.work for cycle in self.subcycles)
+        if not np.isfinite(float(work)) or float(work) < 0.0:
+            failed_work = abs(float(work))
+            failed_work = failed_work if np.isfinite(failed_work) else 1.0
+            self._max_work = max(failed_work, 1.0)
+            return self._max_work
         self._solved = True
         return self.work
 

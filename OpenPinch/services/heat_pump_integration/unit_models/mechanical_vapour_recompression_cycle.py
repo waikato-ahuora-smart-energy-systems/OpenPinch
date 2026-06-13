@@ -594,6 +594,8 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
         self._q_cas_cool = 0.0
         self._max_work = max(abs(self._work), 1.0)
         self.temperature_unit = "C"
+        if not np.isfinite(float(self._work)) or float(self._work) < 0.0:
+            return self._max_work
         self._solved = True
         self._process_split = process_split
         self._source_heat_is_external = bool(source_heat_is_external)

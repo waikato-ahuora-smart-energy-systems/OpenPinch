@@ -741,6 +741,8 @@ class VapourCompressionCycle:
         # Finish analysis
         self._penalty = np.asarray(self._penalty) * self._m_dot
         self.temperature_unit = "C"
+        if not np.isfinite(float(self._work)) or float(self._work) < 0.0:
+            return self._work
         self._solved = True
         return self._work
 

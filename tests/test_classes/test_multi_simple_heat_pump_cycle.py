@@ -515,6 +515,27 @@ def test_multi_simple_property_arrays_and_helper_error_branches():
         hp._normalize_Q_cool(np.array([[1.0, 2.0]]), n_cycles=2)
 
 
+def test_multi_simple_solve_propagates_unsolved_child_cycle(monkeypatch):
+    class _UnsolvedCycle:
+        solved = False
+        work = -5.0
+
+        def solve(self, **kwargs):
+            return self.work
+
+    monkeypatch.setattr(multi_mod, "VapourCompressionCycle", _UnsolvedCycle)
+
+    hp = ParallelVapourCompressionCycles()
+    work = hp.solve(
+        T_evap=np.array([20.0]),
+        T_cond=np.array([80.0]),
+        Q_heat=np.array([100.0]),
+    )
+
+    assert hp.solved is False
+    assert work == pytest.approx(-5.0)
+
+
 def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
     hp = ParallelVapourCompressionCycles()
     monkeypatch.setattr(multi_mod, "VapourCompressionCycle", _DummyMultiCycle)

@@ -234,17 +234,17 @@ def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
         cycle.solve(**base)
 
 
-def test_cascade_solve_with_defaults_should_work_for_multistage():
-    """Regression: multistage solve should work with documented defaults."""
+def test_cascade_solve_with_defaults_returns_unsolved_for_nonphysical_stage():
     cycle = CascadeVapourCompressionCycle()
-    cycle.solve(
+    work = cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
         dt_cascade_hx=5.0,
         refrigerant="R134a",
     )
     assert cycle.num_cycles == 3
-    assert len(cycle.subcycles) == 3
+    assert cycle.solved is False
+    assert work > 0.0
 
 
 def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
@@ -576,6 +576,29 @@ def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
 
     assert isinstance(work, float)
     assert hp.solved is True
+
+
+def test_cascade_solve_propagates_unsolved_child_cycle(monkeypatch):
+    class _UnsolvedCycle:
+        solved = False
+        work = -5.0
+
+        def solve(self, **kwargs):
+            return self.work
+
+    hp = CascadeVapourCompressionCycle()
+    monkeypatch.setattr(hp, "_validate_T_cond_and_evap", lambda T_cond, T_evap: 0.0)
+    monkeypatch.setattr(cascade_mod, "VapourCompressionCycle", _UnsolvedCycle)
+
+    work = hp.solve(
+        T_evap=np.array([20.0]),
+        T_cond=np.array([80.0]),
+        Q_heat=np.array([100.0]),
+        Q_cool=np.array([None], dtype=object),
+    )
+
+    assert hp.solved is False
+    assert work > 0.0
 
 
 @pytest.mark.parametrize(

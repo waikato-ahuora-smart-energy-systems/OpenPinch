@@ -9,6 +9,17 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.optimize import minimize
 
+__all__ = [
+    "_cluster_candidates",
+    "_collect_candidates_in_parallel",
+    "_evaluate_scalar_objective",
+    "_filter_opt_kwargs",
+    "_objective_from_result_dict",
+    "_polish_candidates",
+    "_postprocess_candidates",
+    "_set_objective_func",
+]
+
 
 def _evaluate_scalar_objective(
     func: Callable,
@@ -23,7 +34,14 @@ def _evaluate_scalar_objective(
 
 def _objective_from_result_dict(x, func, func_kwargs):
     """Adapt a mapping-returning objective to a scalar objective."""
-    return func(x, func_kwargs)["obj"]
+    try:
+        result = func(x, func_kwargs)
+        obj = float(result["obj"])
+    except Exception:
+        return 1e30
+    if not np.isfinite(obj):
+        return 1e30
+    return obj
 
 
 def _set_objective_func(func, func_kwargs):

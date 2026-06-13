@@ -530,10 +530,21 @@ class CascadeVapourCompressionCycle:
                 is_heat_pump=is_heat_pump,
             )
             self._subcycles.append(hp)
+            if not hp.solved:
+                failed_work = abs(float(hp.work or 0.0))
+                failed_work = failed_work if np.isfinite(failed_work) else 1.0
+                self._max_work += max(failed_work, 1.0)
+                return self._max_work
             Q_cas_heat = hp.Q_cas_cool if is_heat_pump else 0.0
             Q_cas_cool = 0.0 if is_heat_pump else hp.Q_cas_heat
 
         # Finish analysis
+        work = sum(cycle.work for cycle in self._subcycles)
+        if not np.isfinite(float(work)) or float(work) < 0.0:
+            failed_work = abs(float(work))
+            failed_work = failed_work if np.isfinite(failed_work) else 1.0
+            self._max_work = max(failed_work, 1.0)
+            return self._max_work
         self._solved = True
         return self.work
 

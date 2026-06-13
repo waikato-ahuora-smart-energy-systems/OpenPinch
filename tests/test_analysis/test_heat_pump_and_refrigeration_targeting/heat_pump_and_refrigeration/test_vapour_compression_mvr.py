@@ -16,6 +16,9 @@ from OpenPinch.services.heat_pump_integration.common.preprocessing import (
 from OpenPinch.services.heat_pump_integration.targeting_services import (
     vapour_compression_mvr as hp_vc_mvr,
 )
+from OpenPinch.services.heat_pump_integration.unit_models import (
+    vapour_compression_mvr_cascade as vcmvr_cascade_mod,
+)
 from OpenPinch.services.heat_pump_integration.unit_models.mechanical_vapour_recompression_cycle import (
     MechanicalVapourRecompressionCycle,
 )
@@ -596,6 +599,35 @@ def test_vc_mvr_cascade_infeasible_ordering_returns_finite_penalty():
 
     assert cascade.solved is False
     assert np.isfinite(work)
+    assert np.any(cascade.penalty > 0.0)
+
+
+def test_vc_mvr_cascade_propagates_unsolved_vc_child_cycle(monkeypatch):
+    class _UnsolvedCycle:
+        solved = False
+        work = -5.0
+
+        def solve(self, **kwargs):
+            return self.work
+
+    monkeypatch.setattr(vcmvr_cascade_mod, "VapourCompressionCycle", _UnsolvedCycle)
+
+    cascade = VapourCompressionMvrCascade()
+    work = cascade.solve(
+        T_evap_vc=np.array([20.0]),
+        T_cond_vc=np.array([80.0]),
+        dT_lift_mvr=np.array([10.0]),
+        Q_heat_vc=np.array([1000.0]),
+        mvr_source_fraction=0.25,
+        dT_subcool_vc=np.array([0.0]),
+        dT_subcool_mvr=np.array([0.0]),
+        dT_ihx_gas_side_vc=np.array([0.0]),
+        refrigerant=["R134A"],
+        mvr_fluid=["Water"],
+    )
+
+    assert cascade.solved is False
+    assert work > 0.0
     assert np.any(cascade.penalty > 0.0)
 
 

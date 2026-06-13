@@ -458,7 +458,7 @@ class ParallelVapourCompressionCycles:
             )
             self._subcycles.append(hp)
 
-        self._solved = np.all([cycle.solved for cycle in self._subcycles])
+        self._solved = bool(np.all([cycle.solved for cycle in self._subcycles]))
         return sum(cycle.work for cycle in self._subcycles)
 
     def build_stream_collection(
