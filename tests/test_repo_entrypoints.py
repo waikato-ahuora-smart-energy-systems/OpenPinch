@@ -95,6 +95,33 @@ def test_build_dist_uses_isolation_when_backend_is_missing(monkeypatch):
     assert command[-2:] == ["--outdir", "/tmp/dist"]
 
 
+def test_build_dist_cleanup_only_removes_owned_artifacts(tmp_path):
+    namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "build_dist.py"))
+    clean_output_dir = namespace["_clean_output_dir"]
+
+    stale_wheel = tmp_path / "openpinch-0.1.0-py3-none-any.whl"
+    stale_sdist = tmp_path / "openpinch-0.1.0.tar.gz"
+    stale_attestation = tmp_path / "openpinch-0.1.0.tar.gz.publish.attestation"
+    unrelated_file = tmp_path / "notes.txt"
+    unrelated_dir = tmp_path / "shared"
+    unrelated_nested_file = unrelated_dir / "keep.txt"
+
+    stale_wheel.write_text("stale wheel", encoding="utf-8")
+    stale_sdist.write_text("stale sdist", encoding="utf-8")
+    stale_attestation.write_text("stale attestation", encoding="utf-8")
+    unrelated_file.write_text("do not delete", encoding="utf-8")
+    unrelated_dir.mkdir()
+    unrelated_nested_file.write_text("do not delete", encoding="utf-8")
+
+    clean_output_dir(tmp_path)
+
+    assert not stale_wheel.exists()
+    assert not stale_sdist.exists()
+    assert not stale_attestation.exists()
+    assert unrelated_file.read_text(encoding="utf-8") == "do not delete"
+    assert unrelated_nested_file.read_text(encoding="utf-8") == "do not delete"
+
+
 def test_optional_install_smoke_script_help_executes(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["python", "--help"])
     namespace = runpy.run_path(str(REPO_ROOT / "scripts" / "optional_install_smoke.py"))

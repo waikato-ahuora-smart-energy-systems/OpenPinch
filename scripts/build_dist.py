@@ -7,7 +7,14 @@ import subprocess
 import sys
 from importlib.util import find_spec
 from pathlib import Path
-from shutil import rmtree, which
+from shutil import which
+
+_DIST_ARTIFACT_PATTERNS = (
+    "openpinch-*.whl",
+    "openpinch-*.tar.gz",
+    "openpinch-*.whl.publish.attestation",
+    "openpinch-*.tar.gz.publish.attestation",
+)
 
 
 def _has_hatchling_backend() -> bool:
@@ -55,14 +62,11 @@ def _build_command(output_dir: Path) -> list[str] | None:
 
 
 def _clean_output_dir(output_dir: Path) -> None:
-    """Remove stale distribution artifacts before building."""
-    for child in output_dir.iterdir():
-        if child.name == ".gitignore":
-            continue
-        if child.is_dir():
-            rmtree(child)
-        else:
-            child.unlink()
+    """Remove stale OpenPinch distribution artifacts before building."""
+    for pattern in _DIST_ARTIFACT_PATTERNS:
+        for child in output_dir.glob(pattern):
+            if child.is_file() or child.is_symlink():
+                child.unlink()
 
 
 def build_parser() -> argparse.ArgumentParser:
