@@ -331,9 +331,7 @@ def test_cascade_carnot_optimiser_success_and_failure(monkeypatch):
         ),
     )
 
-    out = hp_cascade_carnot.optimise_cascade_carnot_heat_pump_placement(
-        args
-    )
+    out = hp_cascade_carnot.optimise_cascade_carnot_heat_pump_placement(args)
     assert out.success is True
     assert isinstance(out.amb_streams, StreamCollection)
 

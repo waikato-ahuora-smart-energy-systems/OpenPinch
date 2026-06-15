@@ -222,9 +222,7 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
         hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )
 
-    out = hp_parallel_vapour._compute_parallel_hp_system_obj(
-        np.array([0.2]), args
-    )
+    out = hp_parallel_vapour._compute_parallel_hp_system_obj(np.array([0.2]), args)
 
     assert captured["is_heat_pump"] is False
     assert captured["Q_heat_base"] is None

@@ -426,9 +426,7 @@ def _calc_hpr_cascade(
 
 _HP_PLACEMENT_HANDLERS = {
     HPRcycle.Brayton.value: optimise_brayton_heat_pump_placement,
-    HPRcycle.CascadeCarnot.value: (
-        optimise_cascade_carnot_heat_pump_placement
-    ),
+    HPRcycle.CascadeCarnot.value: (optimise_cascade_carnot_heat_pump_placement),
     HPRcycle.ParallelVapourComp.value: optimise_parallel_heat_pump_placement,
     HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
     HPRcycle.VapourCompMVR.value: (optimise_vapour_compression_mvr_heat_pump_placement),

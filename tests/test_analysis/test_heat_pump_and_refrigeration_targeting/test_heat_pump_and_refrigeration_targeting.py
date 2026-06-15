@@ -416,8 +416,10 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
     monkeypatch.setattr(
         hp,
         "_get_hpr_targets",
-        lambda **kwargs: captured.__setitem__("target_load", kwargs["Q_hpr_target"])
-        or SimpleNamespace(),
+        lambda **kwargs: (
+            captured.__setitem__("target_load", kwargs["Q_hpr_target"])
+            or SimpleNamespace()
+        ),
     )
     monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
     monkeypatch.setattr(hp, "_get_hpr_graphs", lambda **kwargs: {})
