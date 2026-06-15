@@ -32,17 +32,17 @@ from .common.shared import (
 from .targeting_services.brayton import (
     optimise_brayton_heat_pump_placement,
 )
+from .targeting_services.cascade_carnot import (
+    optimise_cascade_carnot_heat_pump_placement,
+)
 from .targeting_services.cascade_vapour_compression import (
     optimise_cascade_heat_pump_placement,
 )
-from .targeting_services.multi_simple_carnot import (
-    optimise_multi_simple_carnot_heat_pump_placement,
+from .targeting_services.parallel_carnot import (
+    optimise_parallel_carnot_heat_pump_placement,
 )
-from .targeting_services.multi_simple_vapour_compression import (
-    optimise_multi_simple_heat_pump_placement,
-)
-from .targeting_services.multi_temperature_carnot import (
-    optimise_multi_temperature_carnot_heat_pump_placement,
+from .targeting_services.parallel_vapour_compression import (
+    optimise_parallel_heat_pump_placement,
 )
 from .targeting_services.vapour_compression_mvr import (
     optimise_vapour_compression_mvr_heat_pump_placement,
@@ -70,7 +70,8 @@ def compute_direct_heat_pump_or_refrigeration_target(
     base_target = zone.targets[TT.DI.value]
     pt = deepcopy(base_target.pt)
     target_load = _validate_hpr_required(
-        pt,
+        H_net_cold=pt[PT.H_NET_COLD],
+        H_net_hot=pt[PT.H_NET_HOT],
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
@@ -142,7 +143,8 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     )
     # Perform heat pump and/or refrigeration targeting on the correct cascades
     target_load = _validate_hpr_required(
-        pt,
+        H_net_cold=pt_ut_gen[PT.H_NET_COLD],
+        H_net_hot=pt_ut_gen[PT.H_NET_HOT],
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
@@ -202,7 +204,8 @@ def compute_indirect_heat_pump_or_refrigeration_target(
 
 
 def _validate_hpr_required(
-    pt: ProblemTable,
+    H_net_cold: np.ndarray,
+    H_net_hot: np.ndarray,
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
     zone_name: str = None,
@@ -214,11 +217,12 @@ def _validate_hpr_required(
         raise ValueError("zone_config must be provided for HPR targeting.")
 
     if is_heat_pumping:
-        Q_max = np.abs(pt[PT.H_NET_COLD]).max()
+        load_values = H_net_cold
     elif is_refrigeration:
-        Q_max = np.abs(pt[PT.H_NET_HOT]).max()
+        load_values = H_net_hot
     else:
         return 0
+    Q_max = float(np.nanmax(np.abs(load_values), initial=0.0))
 
     Q = Q_max
     hpr_load = zone_config.HPR_LOAD_VALUE if r is None else r
@@ -238,7 +242,8 @@ def _validate_hpr_required(
         hpr_load = literal_eval(hpr_load.strip())
         if isinstance(hpr_load, float | int | dict):
             Q = _validate_hpr_required(
-                pt=pt,
+                H_net_cold=H_net_cold,
+                H_net_hot=H_net_hot,
                 is_heat_pumping=is_heat_pumping,
                 is_refrigeration=is_refrigeration,
                 zone_name=zone_name,
@@ -266,7 +271,7 @@ def _get_hpr_targets(
         is_heat_pumping=is_heat_pumping,
         zone_config=zone_config,
         idx=idx,
-        debug=False,  # True,
+        debug=False,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
     if handler is None:
@@ -306,21 +311,33 @@ def _get_hpr_graphs(
 
     if is_direct:
         return {
-            GT.NLP.value: pt.slice(
+            GT.NLP_HP.value: pt.slice(
                 [
                     PT.T,
                     PT.H_NET_HOT,
                     PT.H_NET_COLD,
-                    PT.H_HOT_UT,
-                    PT.H_COLD_UT,
                     PT.H_HOT_HP,
                     PT.H_COLD_HP,
                 ]
             ),
-            GT.GCC_HP.value: pt.slice([PT.T, PT.H_NET_W_AIR, PT.H_NET_HP]),
+            GT.GCC_HP.value: pt.slice(
+                [
+                    PT.T,
+                    PT.H_NET_W_AIR,
+                    PT.H_NET_HP,
+                ]
+            ),
         }
 
-    return {GT.SUGCC.value: pt.slice([PT.T, PT.H_NET_UT, PT.H_NET_HP])}
+    return {
+        GT.SUGCC.value: pt.slice(
+            [
+                PT.T,
+                PT.H_NET_UT,
+                PT.H_NET_HP,
+            ]
+        )
+    }
 
 
 def _calc_hpr_cascade(
@@ -409,11 +426,9 @@ def _calc_hpr_cascade(
 
 _HP_PLACEMENT_HANDLERS = {
     HPRcycle.Brayton.value: optimise_brayton_heat_pump_placement,
-    HPRcycle.MultiTempCarnot.value: (
-        optimise_multi_temperature_carnot_heat_pump_placement
-    ),
-    HPRcycle.MultiSimpleVapourComp.value: optimise_multi_simple_heat_pump_placement,
+    HPRcycle.CascadeCarnot.value: (optimise_cascade_carnot_heat_pump_placement),
+    HPRcycle.ParallelVapourComp.value: optimise_parallel_heat_pump_placement,
     HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
     HPRcycle.VapourCompMVR.value: (optimise_vapour_compression_mvr_heat_pump_placement),
-    HPRcycle.MultiSimpleCarnot.value: optimise_multi_simple_carnot_heat_pump_placement,
+    HPRcycle.ParallelCarnot.value: optimise_parallel_carnot_heat_pump_placement,
 }

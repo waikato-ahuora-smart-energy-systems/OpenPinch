@@ -232,6 +232,84 @@ def test_solve_hpr_placement_keeps_better_warm_start(monkeypatch):
     np.testing.assert_allclose(result.T_cond, np.array([0.2]))
 
 
+def test_solve_hpr_placement_falls_back_to_warm_start_when_optimizer_fails(
+    monkeypatch,
+):
+    def broken_multiminima(**kwargs):
+        raise RuntimeError("optimizer exploded")
+
+    monkeypatch.setattr(hp_shared, "multiminima", broken_multiminima)
+
+    def objective(x, args, debug=False):
+        obj = float(x[0])
+        return HPRBackendResult(
+            obj=obj,
+            utility_tot=obj,
+            w_net=obj,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
+        )
+
+    result = hp_shared.solve_hpr_placement(
+        f_obj=objective,
+        x0_ls=np.array([0.3]),
+        bnds=[(0.0, 1.0)],
+        args=_base_args(),
+    )
+
+    assert result.success is True
+    assert result.obj == pytest.approx(0.3)
+
+
+def test_solve_hpr_placement_reraises_optimizer_failure_without_warm_start(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        hp_shared,
+        "multiminima",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("optimizer exploded")),
+    )
+
+    with pytest.raises(ValueError, match="no initial candidate fallback"):
+        hp_shared.solve_hpr_placement(
+            f_obj=lambda x, args, debug=False: HPRBackendResult.failure(),
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_base_args(),
+        )
+
+
+def test_merge_candidate_points_scores_failed_warm_start_as_finite():
+    args = _base_args()
+
+    def objective(x, args, debug=False):
+        if float(x[0]) < 0.5:
+            raise ValueError("bad seed")
+        return HPRBackendResult(
+            obj=np.inf,
+            utility_tot=0.0,
+            w_net=0.0,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+        )
+
+    candidate_x, candidate_f = hp_shared._merge_candidate_points(
+        local_minima_x=np.asarray([]),
+        local_minima_f=np.asarray([]),
+        x0_arr=np.array([[0.2], [0.8]]),
+        f_obj=objective,
+        args=args,
+    )
+
+    assert candidate_x.shape == (2, 1)
+    np.testing.assert_allclose(candidate_f, np.array([1e30, 1e30]))
+
+
 def test_solve_hpr_placement_resolves_candidates_lazily(monkeypatch):
     monkeypatch.setattr(
         hp_shared,

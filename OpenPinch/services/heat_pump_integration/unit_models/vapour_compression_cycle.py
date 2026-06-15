@@ -737,10 +737,14 @@ class VapourCompressionCycle:
                 h=state2.hmass() + self._q_heat,
             )
             self._save_cycle_state(state4, 4)
+            self._q_cas_heat = self._q_cond - self._q_heat
+            self._Q_cas_heat = self._Q_cond - self._Q_heat
 
         # Finish analysis
         self._penalty = np.asarray(self._penalty) * self._m_dot
         self.temperature_unit = "C"
+        if not np.isfinite(float(self._work)) or float(self._work) < 0.0:
+            return self._work
         self._solved = True
         return self._work
 

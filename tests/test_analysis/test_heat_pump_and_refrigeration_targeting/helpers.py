@@ -13,7 +13,7 @@ from OpenPinch.services.heat_pump_integration import (
 )
 
 
-def _build_multi_temperature_profiles(
+def _build_cascade_carnot_profiles(
     T_cond, Q_cond, T_evap, Q_evap, *, eta_hp=0.5, eta_he=0.0
 ):
     T_cond = np.asarray(T_cond, dtype=float)
@@ -62,7 +62,7 @@ def _stream(
 
 def _base_args(**overrides):
     args = {
-        "hpr_type": HPRcycle.MultiTempCarnot.value,
+        "hpr_type": HPRcycle.CascadeCarnot.value,
         "Q_hpr_target": 200.0,
         "dt_range_max": 110.0,
         "T_hot": np.array([140.0, 90.0, 40.0]),

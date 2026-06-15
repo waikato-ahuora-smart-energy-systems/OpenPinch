@@ -88,7 +88,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "DO_TURBINE_WORK": ConfigurationFieldSpec(bool, False, "targeting"),
     "HPR_TYPE": ConfigurationFieldSpec(
         str,
-        HPRcycle.MultiTempCarnot.value,
+        HPRcycle.CascadeCarnot.value,
         "hpr",
         enum_cls=HPRcycle,
     ),

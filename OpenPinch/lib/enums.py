@@ -88,11 +88,11 @@ class HeatPump(Enum):
 class HeatPumpAndRefrigerationCycle(str, Enum):
     """Supported heat pump targeting model families."""
 
-    MultiTempCarnot = "Multi-temperature Carnot cycles"
-    MultiSimpleCarnot = "Multiple simple Carnot cycles"
+    CascadeCarnot = "Cascade Carnot cycles"
+    ParallelCarnot = "Parallel Carnot cycles"
     Brayton = "Brayton cycle"
     CascadeVapourComp = "Cascade vapour compression cycles"
-    MultiSimpleVapourComp = "Multiple simple vapour compression cycles"
+    ParallelVapourComp = "Parallel vapour compression cycles"
     VapourCompMVR = "Vapour compression with MVR cascade"
 
 
@@ -281,6 +281,7 @@ class GraphType(Enum):
     GCC_X = "Exergetic Grand Composite Curve"
     NLP_X = "Exergetic Net Load Profiles"
     GCC_HP = "Grand Composite Curve with Heat Pump"
+    NLP_HP = "Net Load Profiles with Heat Pump"
     NLP = "Net Load Profiles"
     ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"

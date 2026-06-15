@@ -53,6 +53,15 @@ direct-versus-indirect comparison over a study range, and use
 ``heat_pump_targeting.json`` when you want a smaller direct HPR screening
 input data.
 
+Start simulated-cycle studies from a Carnot solve where possible. Use
+``HPR_TYPE = "Cascade Carnot cycles"`` for broad screening,
+``HPR_TYPE = "Parallel Carnot cycles"`` when you want one explicit Carnot
+stage per temperature pair, and then move to
+``"Parallel vapour compression cycles"``,
+``"Cascade vapour compression cycles"``, or
+``"Vapour compression with MVR cascade"`` when refrigerant-specific behaviour
+matters.
+
 What To Compare
 ---------------
 
@@ -65,6 +74,12 @@ Start with:
 
 Treat cycle-level quantities as supporting context after the integration-level
 answer looks promising.
+
+For the simulated aggregate backends, optimiser variables named
+``x_heat_base``/``x_cool_base`` set the total cycle scale and
+``x_heat_split``/``x_cool_split`` distribute that scale between stages. The
+backend classes clip requested stage duties to the process availability before
+solving refrigerant or Carnot physics.
 
 Next Steps
 ----------

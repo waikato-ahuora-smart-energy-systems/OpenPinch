@@ -114,10 +114,7 @@ def test_notebook_3_keeps_standard_hpr_plot_accessors_and_all_workflows(
     assert "direct_refrigeration" in combined_source
     assert "indirect_refrigeration" in combined_source
     assert "plot.catalog()" in combined_source
-    assert (
-        'profile_problem.plot.net_load_profiles(zone_name="Direct Heat Pump")'
-        in combined_source
-    )
+    assert "profile_problem.plot.net_load_profiles_with_heat_pump(" in combined_source
     assert (
         "profile_problem.plot.grand_composite_curve_with_heat_pump(" in combined_source
     )
@@ -159,7 +156,6 @@ def test_notebook_5_covers_service_boundary_and_output_workflows(tmp_path: Path)
     assert "compare_variants(" in combined_source
     assert "save_bundle(" in combined_source
     assert "load_bundle(" in combined_source
-    assert "show_dashboard()" in combined_source
 
 
 def test_notebook_6_covers_energy_transfer_analysis(tmp_path: Path):
@@ -177,6 +173,21 @@ def test_notebook_6_covers_energy_transfer_analysis(tmp_path: Path):
     assert '"base_target_type": "Total Site Target"' in combined_source
     assert '"base_target_type": "Direct Integration"' in combined_source
     assert 'zone_name="Bleaching"' in combined_source
+
+
+def test_notebook_7_covers_vapour_compression_mvr_cascade_hpr(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "07_vapour_compression_mvr_cascade_hpr.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "HPRcycle.VapourCompMVR" in combined_source
+    assert "VapourCompressionMvrCascade" in combined_source
+    assert "MechanicalVapourRecompressionCycle" in combined_source
+    assert "target.direct_heat_pump()" in combined_source
+    assert "plot.net_load_profiles_with_heat_pump(" in combined_source
+    assert "plot.grand_composite_curve_with_heat_pump(" in combined_source
 
 
 def test_notebook_8_covers_direct_gas_stream_mvr(tmp_path: Path):

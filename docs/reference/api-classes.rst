@@ -80,6 +80,9 @@ cycle configurations directly.
 .. automodule:: OpenPinch.services.heat_pump_integration.unit_models.cascade_vapour_compression_cycle
    :members:
 
+.. automodule:: OpenPinch.services.heat_pump_integration.unit_models.carnot_cycles
+   :members:
+
 .. automodule:: OpenPinch.services.heat_pump_integration.unit_models.mechanical_vapour_recompression_cycle
    :members:
 

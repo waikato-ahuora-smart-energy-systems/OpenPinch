@@ -53,7 +53,7 @@ from .stream_collection import StreamCollection
 from .value import Value
 from .zone import Zone
 
-ZoneService = Callable[["Zone"], "Zone"]
+ZoneService = Callable[["Zone", Optional[dict[str, Any]]], "Zone"]
 
 
 class PinchProblem:

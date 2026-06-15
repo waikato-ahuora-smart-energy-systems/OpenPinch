@@ -224,7 +224,7 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
         REPO_ROOT / "docs" / "reference" / "api-heat-pump.rst"
     )
     assert "OpenPinch.classes.simple_heat_pump" not in api_classes
-    assert "OpenPinch.classes.multi_simple_heat_pump" not in api_classes
+    assert "OpenPinch.classes.parallel_heat_pump" not in api_classes
     assert "OpenPinch.classes.cascade_heat_pump" not in api_classes
     assert "OpenPinch.classes.brayton_heat_pump" not in api_classes
     assert "OpenPinch.classes.multi_stage_steam_turbine" not in api_classes

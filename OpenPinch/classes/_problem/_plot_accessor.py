@@ -53,6 +53,13 @@ _GRAPH_TYPE_ALIASES = {
     "net_load curves": GT.NLP.value,
     "net_load profile": GT.NLP.value,
     "net_load profiles": GT.NLP.value,
+    "nlp_hp": GT.NLP_HP.value,
+    "net load with heat pump": GT.NLP_HP.value,
+    "net load curve with heat pump": GT.NLP_HP.value,
+    "net load curves with heat pump": GT.NLP_HP.value,
+    "net load profile with heat pump": GT.NLP_HP.value,
+    "net load profiles with heat pump": GT.NLP_HP.value,
+    "net_load_with_heat_pump": GT.NLP_HP.value,
     "nlp_x": GT.NLP_X.value,
     "exergy nlp": GT.NLP_X.value,
     "exergetic net load profiles": GT.NLP_X.value,
@@ -357,6 +364,23 @@ class _PlotAccessor:
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.NLP.value,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
+
+    def net_load_profiles_with_heat_pump(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: float = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
+    ):
+        """Return the first matching net load profile (with Heat Pump) or figure."""
+        return self._plot_graph(
+            zone_name=zone_name,
+            graph_type=GT.NLP_HP.value,
             index=index,
             show=show,
             return_graph_data=return_graph_data,

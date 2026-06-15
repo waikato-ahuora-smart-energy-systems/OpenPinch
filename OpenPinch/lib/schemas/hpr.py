@@ -114,6 +114,14 @@ class HPRParsedState(BaseModel):
     dT_comp: np.ndarray | None = None
     Q_heat: np.ndarray | None = None
     Q_cool: np.ndarray | None = None
+    Q_heat_base: float | None = None
+    Q_cool_base: float | None = None
+    x_heat_split: np.ndarray | None = None
+    x_cool_split: np.ndarray | None = None
+    Q_heat_available: np.ndarray | None = None
+    Q_cool_available: np.ndarray | None = None
+    x_mvr_source_split: float | None = None
+    x_mvr_process_split: np.ndarray | None = None
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)

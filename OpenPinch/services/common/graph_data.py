@@ -244,6 +244,29 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
             )
         )
 
+    if GT.NLP_HP.value in target_graphs:
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graph_title,
+                key=GT.NLP_HP.value,
+                data=target_graphs[GT.NLP_HP.value],
+                label="Net Load Profiles with Heat Pump",
+                value_field=[
+                    PT.H_NET_HOT,
+                    PT.H_NET_COLD,
+                    PT.H_HOT_HP,
+                    PT.H_COLD_HP,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                    StreamLoc.HotU,
+                    StreamLoc.ColdU,
+                ],
+                include_arrows=True,
+            )
+        )
+
     if GT.NLP_X.value in target_graphs:
         graphs.append(
             _make_composite_graph(

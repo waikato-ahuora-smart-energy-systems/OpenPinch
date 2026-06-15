@@ -176,7 +176,7 @@ def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
     case = workspace.copy_case("baseline", "direct_hp_full_load", activate=False)
     case.update_options(
         {
-            "HPR_TYPE": HPRcycle.MultiTempCarnot.value,
+            "HPR_TYPE": HPRcycle.CascadeCarnot.value,
             "HPR_LOAD_VALUE": 1.0,
             "MAX_HP_MULTISTART": 10,
             "N_COND": 3,

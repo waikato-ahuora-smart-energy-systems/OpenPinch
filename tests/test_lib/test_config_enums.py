@@ -4,7 +4,7 @@ import pytest
 
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.config_metadata import configuration_option_status
-from OpenPinch.lib.enums import TT, ZT
+from OpenPinch.lib.enums import TT, ZT, HPRcycle
 
 
 def test_configuration_parses_refrigerant_list_option():
@@ -53,3 +53,37 @@ def test_configuration_option_status_classifies_runtime_roles():
 def test_zone_and_target_enum_str_methods():
     assert str(ZT.S) == ZT.S.value
     assert str(TT.DI) == TT.DI.value
+
+
+def test_configuration_accepts_current_hpr_names_and_rejects_invalid_names():
+    assert [cycle.name for cycle in HPRcycle] == [
+        "CascadeCarnot",
+        "ParallelCarnot",
+        "Brayton",
+        "CascadeVapourComp",
+        "ParallelVapourComp",
+        "VapourCompMVR",
+    ]
+    assert [cycle.value for cycle in HPRcycle] == [
+        "Cascade Carnot cycles",
+        "Parallel Carnot cycles",
+        "Brayton cycle",
+        "Cascade vapour compression cycles",
+        "Parallel vapour compression cycles",
+        "Vapour compression with MVR cascade",
+    ]
+    assert (
+        Configuration(options={"HPR_TYPE": HPRcycle.CascadeCarnot.value}).HPR_TYPE
+        == HPRcycle.CascadeCarnot.value
+    )
+    assert (
+        Configuration(options={"HPR_TYPE": HPRcycle.ParallelCarnot.value}).HPR_TYPE
+        == HPRcycle.ParallelCarnot.value
+    )
+    assert (
+        Configuration(options={"HPR_TYPE": HPRcycle.ParallelVapourComp.value}).HPR_TYPE
+        == HPRcycle.ParallelVapourComp.value
+    )
+
+    with pytest.raises(ValueError, match="Invalid value"):
+        Configuration(options={"HPR_TYPE": "Not a real HPR cycle"})

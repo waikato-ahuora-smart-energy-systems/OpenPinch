@@ -10,11 +10,15 @@ from OpenPinch.services.heat_pump_integration import (
     heat_pump_and_refrigeration_entry as hp,
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
+from OpenPinch.services.heat_pump_integration.common.encoding import decode_duty_splits
 from OpenPinch.services.heat_pump_integration.common.preprocessing import (
     construct_HPRTargetInputs,
 )
 from OpenPinch.services.heat_pump_integration.targeting_services import (
     vapour_compression_mvr as hp_vc_mvr,
+)
+from OpenPinch.services.heat_pump_integration.unit_models import (
+    vapour_compression_mvr_cascade as vcmvr_cascade_mod,
 )
 from OpenPinch.services.heat_pump_integration.unit_models.mechanical_vapour_recompression_cycle import (
     MechanicalVapourRecompressionCycle,
@@ -484,7 +488,7 @@ def test_vc_mvr_cascade_routes_split_and_excludes_internal_streams():
         T_cond_vc=np.array([90.0, 80.0]),
         dT_lift_mvr=np.array([15.0, 12.0]),
         Q_heat_vc=np.array([1000.0, 500.0]),
-        mvr_source_fraction=0.25,
+        mvr_source_split=0.25,
         mvr_process_split=np.array([0.4]),
         dT_subcool_vc=np.array([0.0, 0.0]),
         dT_subcool_mvr=np.array([4.0, 3.0]),
@@ -552,7 +556,7 @@ def test_vc_mvr_cascade_propagates_post_injection_mass_and_component_heat():
         T_cond_vc=np.array([90.0]),
         dT_lift_mvr=np.array([15.0, 12.0]),
         Q_heat_vc=np.array([1000.0]),
-        mvr_source_fraction=0.25,
+        mvr_source_split=0.25,
         mvr_process_split=np.array([0.35]),
         dT_subcool_vc=np.array([0.0]),
         dT_subcool_mvr=np.array([4.0, 3.0]),
@@ -590,12 +594,41 @@ def test_vc_mvr_cascade_infeasible_ordering_returns_finite_penalty():
         T_cond_vc=np.array([80.0]),
         dT_lift_mvr=np.array([25.0]),
         Q_heat_vc=np.array([1000.0]),
-        mvr_source_fraction=0.5,
+        mvr_source_split=0.5,
         dt_cascade_hx=5.0,
     )
 
     assert cascade.solved is False
     assert np.isfinite(work)
+    assert np.any(cascade.penalty > 0.0)
+
+
+def test_vc_mvr_cascade_propagates_unsolved_vc_child_cycle(monkeypatch):
+    class _UnsolvedCycle:
+        solved = False
+        work = -5.0
+
+        def solve(self, **kwargs):
+            return self.work
+
+    monkeypatch.setattr(vcmvr_cascade_mod, "VapourCompressionCycle", _UnsolvedCycle)
+
+    cascade = VapourCompressionMvrCascade()
+    work = cascade.solve(
+        T_evap_vc=np.array([20.0]),
+        T_cond_vc=np.array([80.0]),
+        dT_lift_mvr=np.array([10.0]),
+        Q_heat_vc=np.array([1000.0]),
+        mvr_source_split=0.25,
+        dT_subcool_vc=np.array([0.0]),
+        dT_subcool_mvr=np.array([0.0]),
+        dT_ihx_gas_side_vc=np.array([0.0]),
+        refrigerant=["R134A"],
+        mvr_fluid=["Water"],
+    )
+
+    assert cascade.solved is False
+    assert work > 0.0
     assert np.any(cascade.penalty > 0.0)
 
 
@@ -620,12 +653,17 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     x0, bnds = hp_vc_mvr._get_vc_mvr_opt_setup(init_res=init_res, args=args)
     state = hp_vc_mvr._parse_vc_mvr_state_variables(x0, args)
 
-    assert x0.shape == (17,)
+    assert x0.shape == (18,)
     assert len(bnds) == x0.shape[0]
     unpacked = hp_vc_mvr._unpack_vc_mvr_state(state, args)
     np.testing.assert_allclose(unpacked["T_cond_vc"], init_res.T_cond)
     np.testing.assert_allclose(unpacked["T_evap_vc"], init_res.T_evap)
-    np.testing.assert_allclose(unpacked["Q_heat_vc"], init_res.Q_cond)
+    assert state.Q_heat_base == pytest.approx(init_res.Q_cond.sum())
+    np.testing.assert_allclose(
+        decode_duty_splits(state.x_heat_split, state.Q_heat_base),
+        init_res.Q_cond,
+    )
+    assert state.Q_heat_available.shape == init_res.Q_cond.shape
     np.testing.assert_allclose(state.T_cond[:2], unpacked["T_cond_mvr"])
     np.testing.assert_allclose(state.T_cond[2:], init_res.T_cond)
     np.testing.assert_allclose(state.T_evap[:2], unpacked["T_evap_mvr"])
@@ -635,7 +673,7 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     np.testing.assert_allclose(state.dT_subcool[2:], unpacked["dT_subcool_vc"])
     assert unpacked["T_evap_mvr"].shape == (2,)
     assert unpacked["T_cond_mvr"].shape == (2,)
-    assert unpacked["mvr_source_fraction"] == pytest.approx(0.5)
+    assert unpacked["mvr_source_split"] == pytest.approx(0.5)
     assert unpacked["mvr_process_split"].shape == (1,)
     np.testing.assert_allclose(
         unpacked["T_evap_mvr"][0],
@@ -650,14 +688,12 @@ def test_vc_mvr_heat_duties_use_split_fractions():
     args = _base_args(n_cond=3, n_evap=3, n_mvr=1)
     x = np.ones(hp_vc_mvr._vc_mvr_layout(args).size) * 0.5
     state = hp_vc_mvr._parse_vc_mvr_state_variables(x, args)
-    unpacked = hp_vc_mvr._unpack_vc_mvr_state(state, args)
 
-    assert unpacked["Q_heat_vc"].sum() < args.Q_heat_max + state.Q_amb_cold
+    Q_heat_request = decode_duty_splits(state.x_heat_split, state.Q_heat_base)
+
+    assert Q_heat_request.sum() < args.Q_heat_max + state.Q_amb_cold
     np.testing.assert_allclose(
-        hp_vc_mvr._map_Q_arr_to_split_x_arr(
-            unpacked["Q_heat_vc"],
-            args.Q_heat_max + state.Q_amb_cold,
-        ),
+        state.x_heat_split,
         np.array([0.5, 0.5, 0.5]),
     )
 
@@ -731,7 +767,7 @@ def test_compute_vc_mvr_system_obj_real_cascade_smoke():
         eta_motor=0.95,
         initialise_simulated_cycle=False,
     )
-    x = np.array([0.0, 0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
+    x = np.array([0.0, 0.6, 0.1, 0.1, 0.1, 0.5, 0.5, 0.0, 0.5, 0.5])
 
     out = hp_vc_mvr._compute_vc_mvr_system_obj(x, args, debug=True)
 

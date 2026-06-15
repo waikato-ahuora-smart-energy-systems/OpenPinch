@@ -1,11 +1,11 @@
-"""Regression tests for the multi simple heat pump cycle classes."""
+"""Regression tests for the parallel heat pump cycle classes."""
 
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-import OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles as multi_mod
+import OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles as parallel_mod
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
@@ -393,7 +393,7 @@ class _DummyMultiCycle:
         return self.work
 
 
-def test_multi_simple_property_sweep_and_normalization_branches():
+def test_parallel_property_sweep_and_normalization_branches():
     cycle = ParallelVapourCompressionCycles()
     c1 = _fake_network_cycle()
     c2 = _fake_network_cycle(
@@ -476,7 +476,7 @@ def test_multi_simple_property_sweep_and_normalization_branches():
         cycle._normalize_Q_cool(np.array([object(), 1.0], dtype=object), 2)
 
 
-def test_multi_simple_property_arrays_and_helper_error_branches():
+def test_parallel_property_arrays_and_helper_error_branches():
     hp = ParallelVapourCompressionCycles()
     hp._subcycles = [_DummyMultiCycle(), _DummyMultiCycle()]
     hp._solved = True
@@ -515,9 +515,30 @@ def test_multi_simple_property_arrays_and_helper_error_branches():
         hp._normalize_Q_cool(np.array([[1.0, 2.0]]), n_cycles=2)
 
 
-def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
+def test_parallel_solve_propagates_unsolved_child_cycle(monkeypatch):
+    class _UnsolvedCycle:
+        solved = False
+        work = -5.0
+
+        def solve(self, **kwargs):
+            return self.work
+
+    monkeypatch.setattr(parallel_mod, "VapourCompressionCycle", _UnsolvedCycle)
+
     hp = ParallelVapourCompressionCycles()
-    monkeypatch.setattr(multi_mod, "VapourCompressionCycle", _DummyMultiCycle)
+    work = hp.solve(
+        T_evap=np.array([20.0]),
+        T_cond=np.array([80.0]),
+        Q_heat=np.array([100.0]),
+    )
+
+    assert hp.solved is False
+    assert work == pytest.approx(-5.0)
+
+
+def test_parallel_solve_single_refrigerant_list_branch(monkeypatch):
+    hp = ParallelVapourCompressionCycles()
+    monkeypatch.setattr(parallel_mod, "VapourCompressionCycle", _DummyMultiCycle)
 
     work = hp.solve(
         T_evap=np.array([20.0, 15.0]),
@@ -530,3 +551,26 @@ def test_multi_simple_solve_single_refrigerant_list_branch(monkeypatch):
 
     assert isinstance(work, float)
     assert hp.solved
+
+
+def test_parallel_solve_clips_base_split_duties_before_child_cycles(monkeypatch):
+    hp = ParallelVapourCompressionCycles()
+    monkeypatch.setattr(parallel_mod, "VapourCompressionCycle", _DummyMultiCycle)
+
+    hp.solve(
+        T_evap=np.array([20.0, 15.0]),
+        T_cond=np.array([60.0, 55.0]),
+        refrigerant=["water"],
+        Q_heat_base=200.0,
+        x_heat_split=np.array([0.75, 1.0]),
+        Q_heat_available=np.array([100.0, 60.0]),
+        Q_cool=np.array([None, None]),
+        is_heat_pump=True,
+    )
+
+    assert hp.solved
+    np.testing.assert_allclose(
+        [cycle.Q_heat for cycle in hp.subcycles],
+        np.array([100.0, 50.0]),
+    )
+    assert hp.penalty == pytest.approx(51.0)

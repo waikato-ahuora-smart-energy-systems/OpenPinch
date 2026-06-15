@@ -288,7 +288,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
     )
     monkeypatch.setitem(
         hp._HP_PLACEMENT_HANDLERS,
-        HPRcycle.MultiTempCarnot.value,
+        HPRcycle.CascadeCarnot.value,
         lambda args: SimpleNamespace(to_output_payload=lambda: {"idx": args.idx}),
     )
 
@@ -297,7 +297,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
         T_vals=np.array([120.0, 80.0]),
         H_hot=np.array([0.0, -10.0]),
         H_cold=np.array([10.0, 0.0]),
-        zone_config=SimpleNamespace(HPR_TYPE=HPRcycle.MultiTempCarnot.value),
+        zone_config=SimpleNamespace(HPR_TYPE=HPRcycle.CascadeCarnot.value),
         is_heat_pumping=True,
         idx=2,
     )
@@ -386,6 +386,130 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
     assert payload["state_idx"] == 1
 
 
+def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans(
+    monkeypatch,
+):
+    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone.targets[TT.TS.value] = SimpleNamespace(
+        pt=ProblemTable(
+            {
+                PT.T: [120.0, 60.0],
+                PT.H_NET_HOT: [np.nan, np.nan],
+                PT.H_NET_COLD: [np.nan, np.nan],
+            }
+        )
+    )
+    utility_profile = ProblemTable(
+        {
+            PT.T: [120.0, 60.0],
+            PT.H_NET_HOT: [0.0, -40.0],
+            PT.H_NET_COLD: [100.0, 0.0],
+        }
+    )
+    captured = {}
+
+    monkeypatch.setattr(
+        hp,
+        "get_process_heat_cascade",
+        lambda **_kwargs: utility_profile,
+    )
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_targets",
+        lambda **kwargs: (
+            captured.__setitem__("target_load", kwargs["Q_hpr_target"])
+            or SimpleNamespace()
+        ),
+    )
+    monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
+    monkeypatch.setattr(hp, "_get_hpr_graphs", lambda **kwargs: {})
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_target_summary",
+        lambda res, target_zone: {
+            "hpr_cycle": "stub",
+            "hpr_utility_total": 11.0,
+            "hpr_work": 2.0,
+            "hpr_external_utility": 3.0,
+            "hpr_ambient_hot": 4.0,
+            "hpr_ambient_cold": 5.0,
+            "hpr_cop": 6.0,
+            "hpr_eta_he": 7.0,
+            "hpr_success": True,
+            "hpr_hot_streams": StreamCollection(),
+            "hpr_cold_streams": StreamCollection(),
+            "hpr_details": {},
+        },
+    )
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_residual_utility_summary",
+        lambda **kwargs: {
+            "hot_utilities": StreamCollection(),
+            "cold_utilities": StreamCollection(),
+            "hot_utility_target": 0.0,
+            "cold_utility_target": 0.0,
+            "heat_recovery_target": 0.0,
+            "heat_recovery_limit": None,
+            "degree_of_int": None,
+            "utility_cost": 0.0,
+            "hot_pinch": None,
+            "cold_pinch": None,
+        },
+    )
+    monkeypatch.setattr(
+        hp.IndirectHeatPumpTarget,
+        "model_validate",
+        classmethod(lambda cls, value: value),
+    )
+
+    payload = hp.compute_indirect_heat_pump_or_refrigeration_target(
+        zone,
+        is_heat_pumping=True,
+    )
+
+    assert payload["hpr_success"] is True
+    assert captured["target_load"] == pytest.approx(100.0)
+
+
+def test_validate_hpr_required_ignores_nan_load_entries():
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0],
+            PT.H_NET_HOT: [np.nan, -20.0, -40.0],
+            PT.H_NET_COLD: [np.nan, 100.0, 0.0],
+        }
+    )
+    config = Configuration(options={"HPR_LOAD_VALUE": 0.25})
+
+    assert hp._validate_hpr_required(
+        H_net_cold=pt[PT.H_NET_COLD],
+        H_net_hot=pt[PT.H_NET_HOT],
+        is_heat_pumping=True,
+        zone_config=config,
+    ) == pytest.approx(25.0)
+
+
+def test_validate_hpr_required_returns_zero_for_all_nan_load_entries():
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0],
+            PT.H_NET_HOT: [np.nan, np.nan],
+            PT.H_NET_COLD: [np.nan, np.nan],
+        }
+    )
+
+    assert (
+        hp._validate_hpr_required(
+            H_net_cold=pt[PT.H_NET_COLD],
+            H_net_hot=pt[PT.H_NET_HOT],
+            is_heat_pumping=True,
+            zone_config=Configuration(),
+        )
+        == 0.0
+    )
+
+
 def test_hpr_residual_utility_summary_retargets_direct_utilities():
     hot_utilities, cold_utilities = _make_base_utility_collections()
     base_target = SimpleNamespace(
@@ -414,8 +538,8 @@ def test_hpr_residual_utility_summary_retargets_direct_utilities():
 
     assert summary["hot_utility_target"] == pytest.approx(25.0)
     assert summary["cold_utility_target"] == pytest.approx(20.0)
-    assert summary["heat_recovery_target"] == pytest.approx(25.0)
-    assert summary["degree_of_int"] == pytest.approx(0.5)
+    assert summary["heat_recovery_target"] == pytest.approx(20.0)
+    assert summary["degree_of_int"] == pytest.approx(0.4)
     assert summary["hot_pinch"] == pytest.approx(80.0)
     assert summary["cold_pinch"] == pytest.approx(60.0)
     assert float(summary["hot_utilities"][0].heat_flow[0]) == pytest.approx(25.0)
@@ -426,6 +550,38 @@ def test_hpr_residual_utility_summary_retargets_direct_utilities():
     np.testing.assert_allclose(
         pt[PT.H_NET_COLD_AFTR_HP], np.array([25.0, 0.0, 0.0, 0.0])
     )
+
+
+def test_hpr_residual_utility_summary_removes_direct_hpr_pockets():
+    hot_utilities, cold_utilities = _make_base_utility_collections()
+    base_target = SimpleNamespace(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        hot_utility_target=40.0,
+        cold_utility_target=30.0,
+        heat_recovery_target=10.0,
+        heat_recovery_limit=50.0,
+    )
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0, 20.0],
+            PT.H_NET_W_AIR: [10.0, 500.0, 0.0, 0.0],
+            PT.H_NET_HP: [0.0, 0.0, 0.0, 0.0],
+        }
+    )
+
+    summary = hp._get_hpr_residual_utility_summary(
+        pt=pt,
+        base_target=base_target,
+        idx=0,
+        is_direct=True,
+        is_heat_pumping=True,
+    )
+
+    assert summary["hot_utility_target"] == pytest.approx(10.0)
+    assert summary["cold_utility_target"] == pytest.approx(0.0)
+    assert summary["heat_recovery_target"] == pytest.approx(40.0)
+    assert float(summary["hot_utilities"][0].heat_flow[0]) == pytest.approx(10.0)
 
 
 def test_hpr_residual_utility_summary_retargets_indirect_utilities():
@@ -528,13 +684,11 @@ def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
 
     graphs = hp._get_hpr_graphs(pt, is_direct=True, is_heat_pumping=True)
 
-    assert set(graphs) == {GT.NLP.value, GT.GCC_HP.value}
-    assert list(graphs[GT.NLP.value].columns) == [
+    assert set(graphs) == {GT.NLP_HP.value, GT.GCC_HP.value}
+    assert list(graphs[GT.NLP_HP.value].columns) == [
         PT.T.value,
         PT.H_NET_HOT.value,
         PT.H_NET_COLD.value,
-        PT.H_HOT_UT.value,
-        PT.H_COLD_UT.value,
         PT.H_HOT_HP.value,
         PT.H_COLD_HP.value,
     ]
@@ -546,20 +700,20 @@ def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
             graphs=graphs,
         )
     )
-    nlp_graph = next(
-        graph for graph in graph_set["graphs"] if graph["type"] == GT.NLP.value
+    nlp_hp_graph = next(
+        graph for graph in graph_set["graphs"] if graph["type"] == GT.NLP_HP.value
     )
-    segment_titles = {segment["title"] for segment in nlp_graph["segments"]}
-    assert "Heat Pump Condenser" in segment_titles
-    assert "Heat Pump Evaporator" in segment_titles
+    hpr_segment_titles = {segment["title"] for segment in nlp_hp_graph["segments"]}
+    assert "Heat Pump Condenser" in hpr_segment_titles
+    assert "Heat Pump Evaporator" in hpr_segment_titles
 
 
 @pytest.mark.parametrize(
     "hpr_type",
     [
-        HPRcycle.MultiTempCarnot.value,
-        HPRcycle.MultiSimpleCarnot.value,
-        HPRcycle.MultiSimpleVapourComp.value,
+        HPRcycle.CascadeCarnot.value,
+        HPRcycle.ParallelCarnot.value,
+        HPRcycle.ParallelVapourComp.value,
         HPRcycle.CascadeVapourComp.value,
     ],
 )

@@ -42,6 +42,43 @@ def test_optimiser_public_api_exports_only_multiminima():
     assert optimiser_module.__all__ == ["multiminima"]
 
 
+def test_common_backend_helpers_define_internal_export_surface():
+    assert bb_common.__all__ == [
+        "_cluster_candidates",
+        "_collect_candidates_in_parallel",
+        "_evaluate_scalar_objective",
+        "_filter_opt_kwargs",
+        "_objective_from_result_dict",
+        "_polish_candidates",
+        "_postprocess_candidates",
+        "_set_objective_func",
+    ]
+
+
+def test_objective_adapter_maps_failed_candidates_to_large_finite_value():
+    def bad_objective(x, _):
+        x = np.asarray(x, dtype=float)
+        if x[0] < 0.0:
+            raise ValueError("infeasible")
+        return {"obj": np.nan if x[0] == 0.0 else np.inf}
+
+    assert bb_common._objective_from_result_dict(
+        np.array([-1.0]),
+        bad_objective,
+        {},
+    ) == pytest.approx(1e30)
+    assert bb_common._objective_from_result_dict(
+        np.array([0.0]),
+        bad_objective,
+        {},
+    ) == pytest.approx(1e30)
+    assert bb_common._objective_from_result_dict(
+        np.array([1.0]),
+        bad_objective,
+        {},
+    ) == pytest.approx(1e30)
+
+
 @pytest.mark.parametrize(
     "optimiser_handle",
     [
