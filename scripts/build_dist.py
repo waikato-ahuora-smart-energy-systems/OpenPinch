@@ -7,7 +7,7 @@ import subprocess
 import sys
 from importlib.util import find_spec
 from pathlib import Path
-from shutil import which
+from shutil import rmtree, which
 
 
 def _has_hatchling_backend() -> bool:
@@ -54,6 +54,17 @@ def _build_command(output_dir: Path) -> list[str] | None:
     ]
 
 
+def _clean_output_dir(output_dir: Path) -> None:
+    """Remove stale distribution artifacts before building."""
+    for child in output_dir.iterdir():
+        if child.name == ".gitignore":
+            continue
+        if child.is_dir():
+            rmtree(child)
+        else:
+            child.unlink()
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser for distribution builds."""
     parser = argparse.ArgumentParser(
@@ -77,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
 
     output_dir = args.output_dir if args.output_dir is not None else repo_root / "dist"
     output_dir.mkdir(parents=True, exist_ok=True)
+    _clean_output_dir(output_dir)
 
     command = _build_command(output_dir)
     if command is None:
