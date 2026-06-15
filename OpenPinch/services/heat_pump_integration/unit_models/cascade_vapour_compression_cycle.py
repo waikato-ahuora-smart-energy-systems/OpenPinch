@@ -1,4 +1,4 @@
-"""Cascade heat pump network assembled from multiple simple subcycles."""
+"""Cascade heat pump network assembled from staged subcycles."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import List, Optional
 import numpy as np
 
 from ....classes.stream_collection import StreamCollection
+from ..common.encoding import require_stage_duty_allocation
 from .vapour_compression_cycle import VapourCompressionCycle
 
 __all__ = ["CascadeVapourCompressionCycle"]
@@ -26,6 +27,7 @@ class CascadeVapourCompressionCycle:
         self._dt_diff_max: float = 0.5
         self._solved: bool = False
         self._max_work: float = 0.0
+        self._allocation_penalty = np.empty(0, dtype=float)
 
     @property
     def Q_evap(self) -> Optional[float]:
@@ -117,11 +119,12 @@ class CascadeVapourCompressionCycle:
     def penalty(self) -> Optional[float]:
         """Total penalty for excessive subcooling."""
         if self.solved:
-            return sum(
+            cycle_penalty = sum(
                 cycle.penalty if cycle.solved else 0 for cycle in self._subcycles
             )
+            return cycle_penalty + float(self._allocation_penalty.sum())
         else:
-            return 0
+            return float(self._allocation_penalty.sum())
 
     @property
     def dtcont(self) -> Optional[float]:
@@ -283,29 +286,59 @@ class CascadeVapourCompressionCycle:
         n_heat: int,
         n_cool: int,
     ) -> np.ndarray:
-        if Q_heat is None:
-            arr = np.array([0.0], dtype=float)
-        else:
-            # Preserve NaNs here so we can apply the stage-specific default rule below.
-            arr = self._as_1d_numeric_array(Q_heat, default=np.nan)
         n_cycles = n_heat + n_cool - 1
+        if Q_heat is None:
+            return np.array(
+                [0.0] * max(n_heat - 1, 0) + [None] + [0.0] * (n_cool - 1),
+                dtype=object,
+            )
+
+        arr = np.asarray(Q_heat, dtype=object)
+        if arr.ndim == 0:
+            arr = arr.reshape(1)
+        if arr.ndim != 1:
+            raise ValueError(
+                "Incompatible Q_heat input to solving a cascade heat pump."
+            )
+
         if arr.size == n_cycles:
-            arr_out = arr
+            arr_out = arr.copy()
         elif arr.size == 1:
-            arr_out = np.full(n_cycles, arr.item(), dtype=float)
+            v = arr[0]
+            if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
+                arr_out = np.array(
+                    [0.0] * max(n_heat - 1, 0) + [None] + [0.0] * (n_cool - 1),
+                    dtype=object,
+                )
+            else:
+                arr_out = np.full(n_cycles, float(v), dtype=object)
         elif arr.size == n_heat:
-            arr_out = np.concatenate([arr, np.zeros(n_cool - 1)])
+            arr_out = np.concatenate([arr, np.zeros(n_cool - 1, dtype=object)])
         else:
             raise ValueError(
                 "Incompatible Q_heat input to solving a cascade heat pump."
             )
 
-        # For Q_heat only: NaN defaults to 1 at the first stage and 0 otherwise.
-        nan_mask = np.isnan(arr_out)
-        if np.any(nan_mask):
-            nan_defaults = np.zeros_like(arr_out)
-            nan_defaults[0] = 1.0
-            arr_out = np.where(nan_mask, nan_defaults, arr_out)
+        heat_default_idx = max(n_heat - 1, 0)
+        for i in range(n_cycles):
+            v = arr_out[i]
+            if v is None:
+                if i == heat_default_idx:
+                    arr_out[i] = None
+                    continue
+                raise ValueError("Only the last Q_heat value may be None or np.nan.")
+            try:
+                v_float = float(v)
+            except (TypeError, ValueError) as e:
+                raise ValueError(
+                    "Q_heat values must be numeric, None, or np.nan."
+                ) from e
+            if np.isnan(v_float):
+                if i == heat_default_idx:
+                    arr_out[i] = None
+                    continue
+                raise ValueError("Only the last Q_heat value may be None or np.nan.")
+            arr_out[i] = v_float
 
         return arr_out
 
@@ -405,8 +438,76 @@ class CascadeVapourCompressionCycle:
             return Q_heat_out, Q_cool_out
 
         Q_cool_out = np.asarray(Q_cool if Q_cool is not None else 1.0, dtype=float)
-        Q_heat_out = self._normalize_secondary_process_duty(Q_heat)
+        Q_heat_out = Q_heat
         return Q_heat_out, Q_cool_out
+
+    def _allocate_process_duties(
+        self,
+        *,
+        Q_heat,
+        Q_cool,
+        Q_heat_base: float | None,
+        x_heat_split,
+        Q_heat_available,
+        Q_cool_base: float | None,
+        x_cool_split,
+        Q_cool_available,
+        is_heat_pump: bool,
+    ) -> tuple[np.ndarray | None, np.ndarray | None]:
+        self._allocation_penalty = np.empty(0, dtype=float)
+        if is_heat_pump and Q_heat_base is not None:
+            heat_allocation = require_stage_duty_allocation(
+                Q_base=Q_heat_base,
+                x_split=x_heat_split,
+                Q_available=Q_heat_available,
+                duty_name="heat",
+            )
+            self._allocation_penalty = heat_allocation.Q_excess
+            Q_cool_out = self._normalize_secondary_process_duty(Q_cool)
+            if Q_cool_base is not None:
+                cool_allocation = require_stage_duty_allocation(
+                    Q_base=Q_cool_base,
+                    x_split=x_cool_split,
+                    Q_available=Q_cool_available,
+                    duty_name="cool",
+                )
+                self._allocation_penalty = np.concatenate(
+                    [self._allocation_penalty, cool_allocation.Q_excess]
+                )
+                Q_cool_out = self._normalize_secondary_process_duty(
+                    np.concatenate([cool_allocation.Q_model, np.array([np.nan])])
+                )
+            return heat_allocation.Q_model, Q_cool_out
+
+        if (not is_heat_pump) and Q_cool_base is not None:
+            cool_allocation = require_stage_duty_allocation(
+                Q_base=Q_cool_base,
+                x_split=x_cool_split,
+                Q_available=Q_cool_available,
+                duty_name="cool",
+            )
+            self._allocation_penalty = cool_allocation.Q_excess
+            Q_heat_out = Q_heat
+            if Q_heat_base is not None:
+                heat_allocation = require_stage_duty_allocation(
+                    Q_base=Q_heat_base,
+                    x_split=x_heat_split,
+                    Q_available=Q_heat_available,
+                    duty_name="heat",
+                )
+                self._allocation_penalty = np.concatenate(
+                    [self._allocation_penalty, heat_allocation.Q_excess]
+                )
+                Q_heat_out = self._normalize_secondary_process_duty(
+                    np.concatenate([heat_allocation.Q_model, np.array([np.nan])])
+                )
+            return Q_heat_out, cool_allocation.Q_model
+
+        return self._prepare_process_duty_inputs(
+            Q_heat,
+            Q_cool,
+            is_heat_pump=is_heat_pump,
+        )
 
     def solve(
         self,
@@ -420,6 +521,12 @@ class CascadeVapourCompressionCycle:
         dT_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray = None,
         Q_cool: np.ndarray = None,
+        Q_heat_base: float | None = None,
+        x_heat_split: np.ndarray | None = None,
+        Q_heat_available: np.ndarray | None = None,
+        Q_cool_base: float | None = None,
+        x_cool_split: np.ndarray | None = None,
+        Q_cool_available: np.ndarray | None = None,
         dt_cascade_hx: float = 1.0,
         is_heat_pump: bool = True,
     ) -> float:
@@ -459,9 +566,16 @@ class CascadeVapourCompressionCycle:
         """
         self._solved = False
         self._subcycles = []
-        Q_heat, Q_cool = self._prepare_process_duty_inputs(
-            Q_heat,
-            Q_cool,
+        self._allocation_penalty = np.empty(0, dtype=float)
+        Q_heat, Q_cool = self._allocate_process_duties(
+            Q_heat=Q_heat,
+            Q_cool=Q_cool,
+            Q_heat_base=Q_heat_base,
+            x_heat_split=x_heat_split,
+            Q_heat_available=Q_heat_available,
+            Q_cool_base=Q_cool_base,
+            x_cool_split=x_cool_split,
+            Q_cool_available=Q_cool_available,
             is_heat_pump=is_heat_pump,
         )
         self._dt_cascade_hx = dt_cascade_hx
@@ -469,7 +583,21 @@ class CascadeVapourCompressionCycle:
         T_cond = np.asarray(T_cond, dtype=float)
         T_evap = np.asarray(T_evap, dtype=float)
 
-        self._max_work = Q_heat.sum()
+        def _finite_positive_sum(values) -> float:
+            try:
+                arr = np.asarray(values, dtype=float).reshape(-1)
+            except (TypeError, ValueError):
+                return 0.0
+            finite = arr[np.isfinite(arr)]
+            if finite.size == 0:
+                return 0.0
+            return float(np.maximum(finite, 0.0).sum())
+
+        self._max_work = max(
+            _finite_positive_sum(Q_heat),
+            _finite_positive_sum(Q_cool),
+            1.0,
+        )
         inf = self._validate_T_cond_and_evap(T_cond, T_evap)
         if inf > 0.0:
             self._max_work *= inf + 1

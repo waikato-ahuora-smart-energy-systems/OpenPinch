@@ -8,6 +8,7 @@ import numpy as np
 
 from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
+from ..common.encoding import require_stage_duty_allocation
 from .mechanical_vapour_recompression_cycle import MechanicalVapourRecompressionCycle
 from .vapour_compression_cycle import VapourCompressionCycle
 
@@ -23,7 +24,7 @@ class VapourCompressionMvrCascade:
         """Initialise an unsolved VC+MVR cascade."""
         self._vc_cycles: list[VapourCompressionCycle] = []
         self._mvr_cycles: list[MechanicalVapourRecompressionCycle] = []
-        self._source_fraction = 0.0
+        self._source_split = 0.0
         self._process_split = np.empty(0, dtype=float)
         self._direct_vc_heat = np.empty(0, dtype=float)
         self._internal_heat = np.empty(0, dtype=float)
@@ -63,9 +64,9 @@ class VapourCompressionMvrCascade:
         return [*self._vc_cycles, *self._mvr_cycles]
 
     @property
-    def source_fraction(self) -> float:
-        """Fraction of the hottest VC condenser duty used to generate MVR vapour."""
-        return self._source_fraction
+    def source_split(self) -> float:
+        """Split of the hottest VC condenser duty used to generate MVR vapour."""
+        return self._source_split
 
     @property
     def process_split(self) -> np.ndarray:
@@ -217,9 +218,12 @@ class VapourCompressionMvrCascade:
         T_evap_vc: np.ndarray,
         T_cond_vc: np.ndarray,
         dT_lift_mvr: np.ndarray,
-        Q_heat_vc: np.ndarray,
-        mvr_source_fraction: float,
+        Q_heat_vc: np.ndarray | None = None,
+        mvr_source_split: float = 0.0,
         mvr_process_split: np.ndarray | float | None = None,
+        Q_heat_base: float | None = None,
+        x_heat_split: np.ndarray | None = None,
+        Q_heat_available: np.ndarray | None = None,
         dT_subcool_vc: np.ndarray | float = 0.0,
         dT_subcool_mvr: np.ndarray | float = 0.0,
         dT_ihx_gas_side_vc: np.ndarray | float = 0.0,
@@ -240,7 +244,21 @@ class VapourCompressionMvrCascade:
 
         T_evap_vc = np.asarray(T_evap_vc, dtype=float).reshape(-1)
         T_cond_vc = np.asarray(T_cond_vc, dtype=float).reshape(-1)
-        Q_heat_vc = np.asarray(Q_heat_vc, dtype=float).reshape(-1)
+        if Q_heat_base is not None:
+            allocation = require_stage_duty_allocation(
+                Q_base=Q_heat_base,
+                x_split=x_heat_split,
+                Q_available=Q_heat_available,
+                duty_name="heat",
+            )
+            Q_heat_vc = allocation.Q_model
+            self._penalty = allocation.Q_excess
+        else:
+            if Q_heat_vc is None:
+                raise ValueError(
+                    "Either Q_heat_vc or Q_heat_base/x_heat_split must be provided."
+                )
+            Q_heat_vc = np.asarray(Q_heat_vc, dtype=float).reshape(-1)
         dT_lift_mvr = np.asarray(dT_lift_mvr, dtype=float).reshape(-1)
         n_vc = Q_heat_vc.size
         n_mvr = dT_lift_mvr.size
@@ -284,20 +302,22 @@ class VapourCompressionMvrCascade:
             )
             * self._max_work
         )
-        penalties.append(max(-float(mvr_source_fraction), 0.0) * self._max_work)
-        penalties.append(max(float(mvr_source_fraction) - 1.0, 0.0) * self._max_work)
+        penalties.append(max(-float(mvr_source_split), 0.0) * self._max_work)
+        penalties.append(max(float(mvr_source_split) - 1.0, 0.0) * self._max_work)
         penalties.extend(np.maximum(-process_split, 0.0) * self._max_work)
         penalties.extend(np.maximum(process_split - 1.0, 0.0) * self._max_work)
-        self._penalty = np.asarray(penalties, dtype=float).reshape(-1)
+        self._penalty = np.concatenate(
+            [self._penalty, np.asarray(penalties, dtype=float).reshape(-1)]
+        )
         if np.any(self._penalty > 0.0):
             self._max_work *= 1.0 + float(self._penalty.sum()) / self._max_work
             return self._max_work
 
-        self._source_fraction = float(np.clip(mvr_source_fraction, 0.0, 1.0))
+        self._source_split = float(np.clip(mvr_source_split, 0.0, 1.0))
         self._process_split = np.clip(process_split, 0.0, 1.0)
         self._dT_subcool_mvr = dT_subcool_mvr
         self._internal_heat = np.zeros(n_vc, dtype=float)
-        self._internal_heat[0] = self._source_fraction * Q_heat_vc[0]
+        self._internal_heat[0] = self._source_split * Q_heat_vc[0]
         self._direct_vc_heat = Q_heat_vc.copy()
         self._direct_vc_heat[0] -= self._internal_heat[0]
 

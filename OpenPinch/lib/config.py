@@ -62,6 +62,7 @@ class Configuration:
             raise TypeError("Configuration options must be provided as a dict.")
 
         for key, value in self._validate_option_keys(options).items():
+            spec = CONFIG_FIELD_SPECS[str(key)]
             if key in {"REFRIGERANTS", "MVR_FLUIDS"}:
                 ref_ls = (
                     value.replace(";", ",").split(",")
@@ -70,6 +71,8 @@ class Configuration:
                 )
                 setattr(self, key, ref_ls)
                 continue
+            if spec.enum_cls is not None:
+                value = self._validate_enum_option(str(key), value, spec.enum_cls)
             setattr(self, key, value)
 
     @classmethod
@@ -91,6 +94,20 @@ class Configuration:
             )
 
         return options
+
+    @staticmethod
+    def _validate_enum_option(key: str, value, enum_cls):
+        """Return the enum value for a supported config enum option."""
+        if isinstance(value, enum_cls):
+            return value.value
+        allowed = {item.value for item in enum_cls}
+        if value not in allowed:
+            allowed_str = ", ".join(sorted(str(item) for item in allowed))
+            raise ValueError(
+                f"Invalid value for configuration option {key}: {value!r}. "
+                f"Allowed values are: {allowed_str}."
+            )
+        return value
 
 
 Configuration.__annotations__ = {

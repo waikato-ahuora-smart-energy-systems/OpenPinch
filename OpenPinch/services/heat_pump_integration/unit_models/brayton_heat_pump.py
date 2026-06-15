@@ -1,7 +1,7 @@
 """Brayton-cycle heat pump model used by advanced utility targeting workflows.
 
-The class in this module wraps a TESPy network while exposing a simplified API
-compatible with other OpenPinch heat pump cycle helpers.
+The class in this module wraps a TESPy network while exposing the shared
+OpenPinch heat pump cycle helper API.
 """
 
 from __future__ import annotations
@@ -60,9 +60,8 @@ class SimpleBraytonHeatPumpCycle:
         """Initialize an unsolved Brayton heat pump cycle container."""
         _require_tespy()
 
-        # Keep minimal unit-system compatibility surface (not using CoolProp
-        # unit dicts here); the simple heat pump used a PropertyDict. For
-        # compatibility we accept the same constructor signature.
+        # Brayton does not use the CoolProp unit dictionary used by
+        # vapour-compression cycles.
         self.refrigerant = None
         self._Q_heat: Optional[float] = None
         self._Q_cool: Optional[float] = None
@@ -85,7 +84,7 @@ class SimpleBraytonHeatPumpCycle:
     # -- Properties to mimic the HeatPumpCycle API --------------------------------
     @property
     def cycle_states(self):
-        """Return cycle state data in a compatibility-oriented list structure.
+        """Return cycle state data in cycle-state order.
 
         Returns
         -------
@@ -211,7 +210,7 @@ class SimpleBraytonHeatPumpCycle:
             Whether recuperation is requested. Currently ignored and downgraded
             to a warning.
         refrigerant : Any, optional
-            Working-fluid label accepted for API compatibility.
+            Working-fluid label stored for reporting.
 
         Returns
         -------
@@ -423,7 +422,7 @@ class SimpleBraytonHeatPumpCycle:
         include_evap : bool, default=False
             Include cold-side (gas-heater) streams.
         is_process_stream : bool, default=False
-            Compatibility argument retained for shared API alignment.
+            Accepted for the shared stream-building API.
 
         Returns
         -------

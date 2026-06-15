@@ -1,4 +1,4 @@
-"""Parallel heat pump network assembled from multiple simple subcycles."""
+"""Parallel heat pump network assembled from independent subcycles."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import List, Optional
 import numpy as np
 
 from ....classes.stream_collection import StreamCollection
+from ..common.encoding import require_stage_duty_allocation
 from .vapour_compression_cycle import VapourCompressionCycle
 
 __all__ = ["ParallelVapourCompressionCycles"]
@@ -16,13 +17,14 @@ class ParallelVapourCompressionCycles:
     """Parallel set of vapour-compression heat pumps solved independently."""
 
     def __init__(self):
-        """Initialise an unsolved multi-cycle heat pump model."""
+        """Initialise an unsolved parallel heat pump model."""
         self._subcycles = []
         self._num_cycles = 1
         self._dtcont: float = 0.0
         # Default value used in piecewise approximation of non-linear T-h profiles.
         self._dt_diff_max: float = 0.5
         self._solved: bool = False
+        self._allocation_penalty = np.empty(0, dtype=float)
 
     @property
     def Q_evap(self) -> Optional[float]:
@@ -112,11 +114,12 @@ class ParallelVapourCompressionCycles:
     def penalty(self) -> Optional[float]:
         """Total penalty for excessive subcooling."""
         if self.solved:
-            return sum(
+            cycle_penalty = sum(
                 cycle.penalty if cycle.solved else 0 for cycle in self._subcycles
             )
+            return cycle_penalty + float(self._allocation_penalty.sum())
         else:
-            return 0
+            return float(self._allocation_penalty.sum())
 
     @property
     def dtcont(self) -> Optional[float]:
@@ -226,7 +229,7 @@ class ParallelVapourCompressionCycles:
             arr = arr.reshape(1)
         if arr.ndim != 1:
             raise ValueError(
-                "Incompatible input to solving a multiple simple heat pump system."
+                "Incompatible input to solving a parallel heat pump system."
             )
         if np.isnan(arr).all():
             arr = np.array([default], dtype=float)
@@ -290,7 +293,7 @@ class ParallelVapourCompressionCycles:
             arr_out = np.full(n_cycles, arr.item(), dtype=float)
         else:
             raise ValueError(
-                "Incompatible Q_heat input for solving a multi-cycle heat pump system."
+                "Incompatible Q_heat input for solving a parallel heat pump system."
             )
 
         nan_mask = np.isnan(arr_out)
@@ -312,7 +315,7 @@ class ParallelVapourCompressionCycles:
             arr = arr.reshape(1)
         if arr.ndim != 1:
             raise ValueError(
-                "Incompatible Q_cool input for solving a multi-cycle heat pump system."
+                "Incompatible Q_cool input for solving a parallel heat pump system."
             )
 
         if arr.size == 1:
@@ -325,7 +328,7 @@ class ParallelVapourCompressionCycles:
             arr = arr.copy()
         else:
             raise ValueError(
-                "Incompatible Q_cool input for solving a multi-cycle heat pump system."
+                "Incompatible Q_cool input for solving a parallel heat pump system."
             )
 
         for i in range(n_cycles):
@@ -342,6 +345,46 @@ class ParallelVapourCompressionCycles:
             arr[i] = None if np.isnan(v_float) else v_float
 
         return arr
+
+    def _allocate_process_duties(
+        self,
+        *,
+        n_cycles: int,
+        Q_heat,
+        Q_cool,
+        Q_heat_base: float | None,
+        x_heat_split,
+        Q_heat_available,
+        Q_cool_base: float | None,
+        x_cool_split,
+        Q_cool_available,
+        is_heat_pump: bool,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        self._allocation_penalty = np.empty(0, dtype=float)
+        if is_heat_pump and Q_heat_base is not None:
+            allocation = require_stage_duty_allocation(
+                Q_base=Q_heat_base,
+                x_split=x_heat_split,
+                Q_available=Q_heat_available,
+                duty_name="heat",
+            )
+            self._allocation_penalty = allocation.Q_excess
+            return allocation.Q_model, self._normalize_Q_cool(Q_cool, n_cycles)
+
+        if (not is_heat_pump) and Q_cool_base is not None:
+            allocation = require_stage_duty_allocation(
+                Q_base=Q_cool_base,
+                x_split=x_cool_split,
+                Q_available=Q_cool_available,
+                duty_name="cool",
+            )
+            self._allocation_penalty = allocation.Q_excess
+            return self._normalize_Q_heat(Q_heat, n_cycles), allocation.Q_model
+
+        return (
+            self._normalize_Q_heat(Q_heat, n_cycles),
+            self._normalize_Q_cool(Q_cool, n_cycles),
+        )
 
     def _normalize_refrigerant(
         self,
@@ -384,6 +427,12 @@ class ParallelVapourCompressionCycles:
         dT_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray | float | None = None,
         Q_cool: np.ndarray | float | None = None,
+        Q_heat_base: float | None = None,
+        x_heat_split: np.ndarray | None = None,
+        Q_heat_available: np.ndarray | None = None,
+        Q_cool_base: float | None = None,
+        x_cool_split: np.ndarray | None = None,
+        Q_cool_available: np.ndarray | None = None,
         is_heat_pump: bool = True,
     ) -> float:
         """
@@ -419,6 +468,7 @@ class ParallelVapourCompressionCycles:
         """
         self._solved = False
         self._subcycles = []
+        self._allocation_penalty = np.empty(0, dtype=float)
 
         T_evap_all, T_cond_all = self._normalize_temperature_arrays(T_evap, T_cond)
         self._num_cycles = T_evap_all.size
@@ -435,8 +485,18 @@ class ParallelVapourCompressionCycles:
             default=0.0,
             name="dT_subcool",
         )
-        Q_heat_all = self._normalize_Q_heat(Q_heat, self._num_cycles)
-        Q_cool_all = self._normalize_Q_cool(Q_cool, self._num_cycles)
+        Q_heat_all, Q_cool_all = self._allocate_process_duties(
+            n_cycles=self._num_cycles,
+            Q_heat=Q_heat,
+            Q_cool=Q_cool,
+            Q_heat_base=Q_heat_base,
+            x_heat_split=x_heat_split,
+            Q_heat_available=Q_heat_available,
+            Q_cool_base=Q_cool_base,
+            x_cool_split=x_cool_split,
+            Q_cool_available=Q_cool_available,
+            is_heat_pump=is_heat_pump,
+        )
         refrigerant_all = self._normalize_refrigerant(refrigerant, self._num_cycles)
         ihx_gas_dt_all = self._normalize_dT_ihx_gas_side(
             dT_ihx_gas_side, self._num_cycles

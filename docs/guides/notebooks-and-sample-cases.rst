@@ -56,8 +56,9 @@ real packaged cases or real derivatives of those cases. Notebook 01 starts from
 cases matter, notebook 04 covers named-state targeting, and notebook 05 covers
 the typed and serialized boundaries. Notebook 06 covers energy-transfer
 analysis outputs. Notebook 07 covers the vapour-compression plus MVR cascade
-HPR backend. The distributed assets are packaged as clean sources: no stored
-Plotly payloads, no cached execution counts, and no stale traceback output.
+HPR backend and its split-fraction source/process routing. The distributed
+assets are packaged as clean sources: no stored Plotly payloads, no cached
+execution counts, and no stale traceback output.
 
 Copy the full series with:
 
@@ -99,7 +100,10 @@ shows the typed ``TargetInput`` boundary and the serialized
 ``plot.energy_transfer_diagram(...)``. Notebook 07 shows
 ``target.direct_heat_pump(...)`` with
 ``HPR_TYPE = "Vapour compression with MVR cascade"`` and the VC+MVR
-configuration fields.
+configuration fields. Notebook 03 uses
+``HPR_TYPE = "Cascade Carnot cycles"`` for broad direct/indirect
+screening and notes ``"Parallel Carnot cycles"`` as the explicit staged
+Carnot option.
 
 Recommended Learning Path
 -------------------------

@@ -35,6 +35,12 @@ Public HPR Entrypoints
 Shared Preprocessing and Optimisation Helpers
 ---------------------------------------------
 
+The targeting parsers decode optimiser vectors into temperatures, ambient
+duties, base duty scales, split vectors, and process availability arrays. The
+aggregate backend classes then allocate requested duties from base/split
+coordinates, clip those requests to availability, and add any excess to the
+penalty term. Leaf physical unit models receive only concrete model duties.
+
 .. automodule:: OpenPinch.services.heat_pump_integration.common
    :no-members:
 
@@ -54,6 +60,10 @@ These modules place or size Heat Pump and refrigeration cycle models against
 prepared cascade data. The detailed cycle physics live in the
 ``unit_models`` modules documented in :doc:`api-classes`.
 
+Only the current public cycle names are routed here, for example
+``"Cascade Carnot cycles"``, ``"Parallel Carnot cycles"``, and
+``"Parallel vapour compression cycles"``.
+
 .. automodule:: OpenPinch.services.heat_pump_integration.targeting_services
    :no-members:
 
@@ -63,13 +73,13 @@ prepared cascade data. The detailed cycle physics live in the
 .. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.cascade_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.multi_simple_carnot
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.parallel_carnot
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.multi_simple_vapour_compression
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.parallel_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.multi_temperature_carnot
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.cascade_carnot
    :members:
 
 .. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.vapour_compression_mvr

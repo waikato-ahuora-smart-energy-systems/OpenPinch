@@ -66,10 +66,53 @@ OpenPinch uses shifted process temperatures during targeting. The configured
 temperature margins, not necessarily equipment terminal temperature differences
 from a detailed exchanger design.
 
-Multi-Temperature Carnot Cycles
--------------------------------
+Optimisation Coordinates and Duty Allocation
+--------------------------------------------
 
-``HPR_TYPE = "Multi-temperature Carnot cycles"``
+HPR optimisation variables are deliberately not final physical duties. The
+targeting services decode the optimiser vector into:
+
+- ambient hot/cold duty from ``x_amb``
+- condenser and evaporator temperatures from ``x_cond`` and ``x_evap``
+- approach settings such as subcooling and internal heat-exchanger temperature
+  differences where the selected backend supports them
+- total base duty scales such as ``Q_heat_base`` and ``Q_cool_base``
+- process-side availability arrays such as ``Q_heat_available`` and
+  ``Q_cool_available`` at the candidate stage temperatures
+
+The backend classes then decode bounded split fractions into requested stage
+duties:
+
+.. math::
+
+   Q_{\mathrm{request},i}
+   = f_i\left(Q_\mathrm{base} - \sum_{j<i} Q_{\mathrm{request},j}\right)
+
+where ``f_i`` is the decoded split fraction for stage ``i``. Requested duties
+are clipped to what the process cascade can actually accept or supply:
+
+.. math::
+
+   Q_{\mathrm{model},i}
+   = \min(Q_{\mathrm{request},i}, Q_{\mathrm{available},i})
+
+.. math::
+
+   Q_{\mathrm{excess},i}
+   = \max(Q_{\mathrm{request},i} - Q_{\mathrm{available},i}, 0)
+
+The physical cycle model receives ``Q_model`` only. Excess duty contributes to
+the optimisation penalty instead of being passed into refrigerant or Carnot
+cycle calculations. This is important for robustness: a trial optimiser point
+may request more heat or cooling than one stage can exchange, but the backend
+still solves a physically bounded cycle and reports the over-allocation.
+
+Use the public cycle names exactly as listed in this page.
+
+Cascade Carnot Cycles
+---------------------
+
+``HPR_TYPE = "Cascade Carnot cycles"``
 
 This is the fastest and most robust thermodynamic screening method. It does
 not solve a refrigerant cycle. Instead, it asks how much heat could be moved
@@ -108,14 +151,14 @@ Distributed duties use an entropic mean temperature:
 This method is recommended for early screening, sensitivity studies, and
 warm-starting slower simulated-cycle methods.
 
-Multiple Simple Carnot Cycles
------------------------------
+Parallel Carnot Cycles
+----------------------
 
-``HPR_TYPE = "Multiple simple Carnot cycles"``
+``HPR_TYPE = "Parallel Carnot cycles"``
 
 This method represents several independent Carnot-like heat-pump stages. Each
 stage has one evaporating level and one condensing level. It is less flexible
-than the multi-temperature matrix method, but easier to interpret when the user
+than the cascade matrix method, but easier to interpret when the user
 wants a small number of discrete heat pumps.
 
 For each stage ``k``:
@@ -142,6 +185,12 @@ The total work and useful duties are sums over the active stages:
 
 Use this method when you want a simple, staged conceptual target without
 committing to refrigerant properties.
+
+Internally this method is solved by the
+``ParallelCarnotCycles`` backend class. It receives a total heat base duty,
+stage heat split fractions, and process availability arrays. The backend
+allocates per-stage ``Q_cond`` values before applying COP, heat-engine, or heat
+recovery calculations.
 
 Brayton Cycle
 -------------
@@ -179,10 +228,10 @@ The implementation uses the TESPy-backed Brayton unit model when the optional
 Brayton dependency is installed. Install ``openpinch[brayton_cycle]`` for this
 workflow.
 
-Multiple Simple Vapour-Compression Cycles
------------------------------------------
+Parallel Vapour-Compression Cycles
+----------------------------------
 
-``HPR_TYPE = "Multiple simple vapour compression cycles"``
+``HPR_TYPE = "Parallel vapour compression cycles"``
 
 This backend solves one or more independent vapour-compression cycles using
 CoolProp fluid properties. It is slower than Carnot targeting but captures
@@ -216,6 +265,14 @@ The actual compressor outlet is calculated from an isentropic outlet enthalpy:
 
 Use this backend when refrigerant selection or realistic compressor work
 matters and independent stages are a reasonable process model.
+
+The simulated backend follows the same base/split convention as the Carnot
+backends. The optimiser controls ``x_heat_base`` plus ``x_heat_split`` for heat
+pump solves, or ``x_cool_base`` plus ``x_cool_split`` for refrigeration solves.
+The aggregate backend clips requested duties to process availability before it
+calls the child ``VapourCompressionCycle`` unit models. Child cycles therefore
+receive concrete physical ``Q_heat`` or ``Q_cool`` duties, not optimiser
+fractions.
 
 Cascade Vapour-Compression Cycles
 ---------------------------------
@@ -260,6 +317,12 @@ and total work is:
 
 Use this backend when one refrigerant lift is too large or when a staged
 refrigerant system is physically more plausible than independent cycles.
+
+The cascade backend also owns base/split duty allocation. For heat-pump solves,
+condenser-side split fractions allocate the useful heating pool and the
+evaporator-side split fractions allocate source duty for all explicitly sized
+source stages. The final cascade source stage can still be inferred from the
+coupled heat balance when appropriate.
 
 Vapour Compression with MVR Cascade
 -----------------------------------
@@ -362,6 +425,13 @@ The remaining vapour continues to the next stage:
    \dot{m}_{\mathrm{src},j+1} =
    \dot{m}_{\mathrm{vap},j}(1 - f_j)
 
+The VC stage heat allocation uses the same ``Q_heat_base`` and
+``x_heat_split`` convention as the other heat-pump backends. MVR-specific
+fractions are named as splits as well: ``mvr_source_split`` describes how much
+of the selected VC condenser heat becomes source vapour for the MVR train, and
+``x_mvr_process_split`` controls the process-condensed fraction at each MVR
+stage.
+
 The final stage condenses the remaining vapour. The external stream collection
 includes VC source-side heat, VC direct process heat, and MVR process heat
 profiles. It excludes both the internal VC-to-MVR source heat and the internal
@@ -379,11 +449,11 @@ Use the simplest backend that answers the engineering question:
    * - Question
      - Suggested backend
    * - Early screening, many possible temperature placements
-     - Multi-temperature Carnot cycles
+     - Cascade Carnot cycles
    * - A few easy-to-explain conceptual stages
-     - Multiple simple Carnot cycles
+     - Parallel Carnot cycles
    * - Refrigerant-specific independent cycles
-     - Multiple simple vapour compression cycles
+     - Parallel vapour compression cycles
    * - Large lift split over refrigerant cascade stages
      - Cascade vapour compression cycles
    * - Sensible gas-cycle heat pump with temperature glide

@@ -288,7 +288,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
     )
     monkeypatch.setitem(
         hp._HP_PLACEMENT_HANDLERS,
-        HPRcycle.MultiTempCarnot.value,
+        HPRcycle.CascadeCarnot.value,
         lambda args: SimpleNamespace(to_output_payload=lambda: {"idx": args.idx}),
     )
 
@@ -297,7 +297,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
         T_vals=np.array([120.0, 80.0]),
         H_hot=np.array([0.0, -10.0]),
         H_cold=np.array([10.0, 0.0]),
-        zone_config=SimpleNamespace(HPR_TYPE=HPRcycle.MultiTempCarnot.value),
+        zone_config=SimpleNamespace(HPR_TYPE=HPRcycle.CascadeCarnot.value),
         is_heat_pumping=True,
         idx=2,
     )
@@ -536,8 +536,8 @@ def test_hpr_residual_utility_summary_retargets_direct_utilities():
 
     assert summary["hot_utility_target"] == pytest.approx(25.0)
     assert summary["cold_utility_target"] == pytest.approx(20.0)
-    assert summary["heat_recovery_target"] == pytest.approx(25.0)
-    assert summary["degree_of_int"] == pytest.approx(0.5)
+    assert summary["heat_recovery_target"] == pytest.approx(20.0)
+    assert summary["degree_of_int"] == pytest.approx(0.4)
     assert summary["hot_pinch"] == pytest.approx(80.0)
     assert summary["cold_pinch"] == pytest.approx(60.0)
     assert float(summary["hot_utilities"][0].heat_flow[0]) == pytest.approx(25.0)
@@ -548,6 +548,38 @@ def test_hpr_residual_utility_summary_retargets_direct_utilities():
     np.testing.assert_allclose(
         pt[PT.H_NET_COLD_AFTR_HP], np.array([25.0, 0.0, 0.0, 0.0])
     )
+
+
+def test_hpr_residual_utility_summary_removes_direct_hpr_pockets():
+    hot_utilities, cold_utilities = _make_base_utility_collections()
+    base_target = SimpleNamespace(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        hot_utility_target=40.0,
+        cold_utility_target=30.0,
+        heat_recovery_target=10.0,
+        heat_recovery_limit=50.0,
+    )
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0, 20.0],
+            PT.H_NET_W_AIR: [10.0, 500.0, 0.0, 0.0],
+            PT.H_NET_HP: [0.0, 0.0, 0.0, 0.0],
+        }
+    )
+
+    summary = hp._get_hpr_residual_utility_summary(
+        pt=pt,
+        base_target=base_target,
+        idx=0,
+        is_direct=True,
+        is_heat_pumping=True,
+    )
+
+    assert summary["hot_utility_target"] == pytest.approx(10.0)
+    assert summary["cold_utility_target"] == pytest.approx(0.0)
+    assert summary["heat_recovery_target"] == pytest.approx(40.0)
+    assert float(summary["hot_utilities"][0].heat_flow[0]) == pytest.approx(10.0)
 
 
 def test_hpr_residual_utility_summary_retargets_indirect_utilities():
@@ -677,9 +709,9 @@ def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
 @pytest.mark.parametrize(
     "hpr_type",
     [
-        HPRcycle.MultiTempCarnot.value,
-        HPRcycle.MultiSimpleCarnot.value,
-        HPRcycle.MultiSimpleVapourComp.value,
+        HPRcycle.CascadeCarnot.value,
+        HPRcycle.ParallelCarnot.value,
+        HPRcycle.ParallelVapourComp.value,
         HPRcycle.CascadeVapourComp.value,
     ],
 )

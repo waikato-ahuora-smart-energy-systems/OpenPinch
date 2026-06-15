@@ -8,6 +8,7 @@ from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParse
 from ....utils.decorators import timing_decorator
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
+    encode_base_and_duty_splits,
     map_Q_amb_to_x,
     map_T_arr_to_x_arr,
     map_x_arr_to_DT_arr,
@@ -17,12 +18,13 @@ from ..common.encoding import (
 from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
     evaluate_vapour_hpr_result,
+    get_Q_vals_at_T_hpr_from_bckgrd_profile,
     solve_hpr_placement,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..unit_models.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
-from .multi_temperature_carnot import (
-    optimise_multi_temperature_carnot_heat_pump_placement,
+from .cascade_carnot import (
+    optimise_cascade_carnot_heat_pump_placement,
 )
 
 __all__ = [
@@ -45,7 +47,7 @@ def optimise_vapour_compression_mvr_heat_pump_placement(
 
     n_vc = _num_vc_stages(args)
     init_res = (
-        optimise_multi_temperature_carnot_heat_pump_placement(args)
+        optimise_cascade_carnot_heat_pump_placement(args)
         if args.initialise_simulated_cycle
         else None
     )
@@ -78,7 +80,8 @@ def _vc_mvr_layout(args: HeatPumpTargetInputs) -> HPRoptVectorLayout:
         n_cond=n_vc,
         n_evap=n_vc,
         n_subcool=n_mvr + n_vc,
-        n_heat=n_vc,
+        n_heat_base=1,
+        n_heat_split=n_vc,
         n_ihx=n_vc,
         n_misc=1 + n_mvr + max(n_mvr - 1, 0),
     )
@@ -94,7 +97,8 @@ def _get_vc_mvr_opt_setup(
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
         x_subcool=(0.0, 1.0),
-        x_heat=(0.0, 1.0),
+        x_heat_base=(0.0, 1.0),
+        x_heat_split=(0.0, 1.0),
         x_ihx=(0.0, 1.0),
         x_misc=(0.0, 1.0),
     )
@@ -115,18 +119,22 @@ def _get_vc_mvr_opt_setup(
     x_cond = map_T_arr_to_x_arr(T_cond_seed, args.T_cold[0], args.T_cold[-1])
     x_evap = map_T_arr_to_x_arr(T_evap_seed, args.T_hot[-1], args.T_hot[0])
     x_subcool = np.zeros(n_mvr + n_vc, dtype=float)
-    x_heat = _map_Q_arr_to_split_x_arr(Q_heat_seed, Q_primary_ex)
+    _, x_heat_base, x_heat_split = encode_base_and_duty_splits(
+        Q_heat_seed,
+        Q_primary_ex,
+    )
     x_ihx = np.zeros(n_vc, dtype=float)
-    x_source_fraction = np.array([0.5], dtype=float)
+    x_mvr_source_split = np.array([0.5], dtype=float)
     x_mvr_lift = np.full(n_mvr, 0.5, dtype=float)
     x_mvr_process_split = np.zeros(max(n_mvr - 1, 0), dtype=float)
-    x_misc = np.concatenate([x_source_fraction, x_mvr_lift, x_mvr_process_split])
+    x_misc = np.concatenate([x_mvr_source_split, x_mvr_lift, x_mvr_process_split])
     return layout.pack(
         x_amb=x_amb,
         x_cond=x_cond,
         x_evap=x_evap,
         x_subcool=x_subcool,
-        x_heat=x_heat,
+        x_heat_base=[x_heat_base],
+        x_heat_split=x_heat_split,
         x_ihx=x_ihx,
         x_misc=x_misc,
     ), bnds
@@ -152,18 +160,22 @@ def _parse_vc_mvr_state_variables(
         args.T_hot[-1],
         args.T_hot[0],
     )
-    Q_heat_vc = _map_split_x_arr_to_Q_arr(
-        parts["x_heat"],
-        args.Q_heat_max + Q_amb_cold,
+    H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
+    Q_heat_base = float(parts["x_heat_base"][0]) * (args.Q_heat_max + Q_amb_cold)
+    Q_heat_available = get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        T_cond_vc,
+        args.T_cold,
+        H_cold_with_amb,
+        is_cond=True,
     )
     x_subcool_mvr = parts["x_subcool"][:n_mvr]
     x_subcool_vc = parts["x_subcool"][n_mvr:]
     dT_subcool_vc = map_x_arr_to_DT_arr(x_subcool_vc, T_cond_vc, T_evap_vc)
     dT_ihx_gas_side = map_x_arr_to_DT_arr(parts["x_ihx"], T_cond_vc, T_evap_vc)
     misc = parts["x_misc"]
-    mvr_source_fraction = misc[0]
+    x_mvr_source_split = misc[0]
     dT_lift_mvr = misc[1 : 1 + n_mvr] * MAX_MVR_STAGE_LIFT
-    mvr_process_split = misc[1 + n_mvr :]
+    x_mvr_process_split = misc[1 + n_mvr :]
     T_evap_mvr, T_cond_mvr = _derive_provisional_mvr_temperatures(
         T_cond_vc=T_cond_vc,
         dT_subcool_vc=dT_subcool_vc,
@@ -174,14 +186,16 @@ def _parse_vc_mvr_state_variables(
     return HPRParsedState(
         T_cond=np.concatenate([T_cond_mvr, T_cond_vc]),
         dT_subcool=np.concatenate([dT_subcool_mvr, dT_subcool_vc]),
-        Q_heat=np.concatenate(
-            [Q_heat_vc, np.array([mvr_source_fraction]), mvr_process_split]
-        ),
         T_evap=np.concatenate([T_evap_mvr, T_evap_vc]),
         Q_cool=None,
         Q_amb_hot=Q_amb_hot,
         Q_amb_cold=Q_amb_cold,
         dT_ihx_gas_side=dT_ihx_gas_side,
+        Q_heat_base=Q_heat_base,
+        x_heat_split=parts["x_heat_split"],
+        Q_heat_available=Q_heat_available,
+        x_mvr_source_split=float(x_mvr_source_split),
+        x_mvr_process_split=x_mvr_process_split,
     )
 
 
@@ -210,8 +224,10 @@ def _compute_vc_mvr_system_obj(
             T_evap_vc=parsed["T_evap_vc"],
             T_cond_vc=parsed["T_cond_vc"],
             dT_lift_mvr=parsed["dT_lift_mvr"],
-            Q_heat_vc=parsed["Q_heat_vc"],
-            mvr_source_fraction=parsed["mvr_source_fraction"],
+            Q_heat_base=state_vars.Q_heat_base,
+            x_heat_split=state_vars.x_heat_split,
+            Q_heat_available=state_vars.Q_heat_available,
+            mvr_source_split=parsed["mvr_source_split"],
             mvr_process_split=parsed["mvr_process_split"],
             dT_subcool_vc=parsed["dT_subcool_vc"],
             dT_subcool_mvr=parsed["dT_subcool_mvr"],
@@ -261,7 +277,7 @@ def _compute_vc_mvr_system_obj(
         if debug:
             raise
         parsed = _unpack_vc_mvr_state(state_vars, args)
-        fallback_work = max(float(np.asarray(parsed["Q_heat_vc"]).sum()), 1.0)
+        fallback_work = max(float(state_vars.Q_heat_base or 0.0), 1.0)
         return _finite_failed_vc_mvr_result(
             reason=str(exc),
             state=state_vars,
@@ -387,10 +403,8 @@ def _unpack_vc_mvr_state(
     n_mvr = _num_mvr_stages(args)
     T_cond = np.asarray(state.T_cond, dtype=float).reshape(-1)
     T_evap = np.asarray(state.T_evap, dtype=float).reshape(-1)
-    Q_heat = np.asarray(state.Q_heat, dtype=float).reshape(-1)
     dT_subcool = np.asarray(state.dT_subcool, dtype=float).reshape(-1)
     expected_temperature_size = n_mvr + n_vc
-    expected_heat_size = n_vc + 1 + max(n_mvr - 1, 0)
     if T_cond.size != expected_temperature_size:
         raise ValueError(
             "VC+MVR parsed condenser temperatures must include VC and MVR stages."
@@ -399,9 +413,9 @@ def _unpack_vc_mvr_state(
         raise ValueError(
             "VC+MVR parsed evaporator temperatures must include VC and MVR stages."
         )
-    if Q_heat.size != expected_heat_size:
+    if state.x_heat_split is None or np.asarray(state.x_heat_split).size != n_vc:
         raise ValueError(
-            "VC+MVR parsed heat payload must include VC duties and split fractions."
+            "VC+MVR parsed heat payload must include VC heat split fractions."
         )
     if dT_subcool.size != expected_temperature_size:
         raise ValueError("VC+MVR parsed subcooling must include MVR and VC stages.")
@@ -412,33 +426,7 @@ def _unpack_vc_mvr_state(
         "T_evap_vc": T_evap[n_mvr:],
         "dT_subcool_mvr": dT_subcool[:n_mvr],
         "dT_subcool_vc": dT_subcool[n_mvr:],
-        "Q_heat_vc": Q_heat[:n_vc],
-        "mvr_source_fraction": float(Q_heat[n_vc]),
-        "mvr_process_split": Q_heat[n_vc + 1 :],
+        "mvr_source_split": float(state.x_mvr_source_split),
+        "mvr_process_split": np.asarray(state.x_mvr_process_split, dtype=float),
         "dT_lift_mvr": T_cond[:n_mvr] - T_evap[:n_mvr],
     }
-
-
-def _map_split_x_arr_to_Q_arr(x: np.ndarray, Q_max: float) -> np.ndarray:
-    """Decode stick-breaking duty fractions into nonnegative stage duties."""
-    x = np.asarray(x, dtype=float).reshape(-1)
-    remaining = max(float(Q_max), 0.0)
-    Q = np.zeros_like(x, dtype=float)
-    for i, fraction in enumerate(np.clip(x, 0.0, 1.0)):
-        Q[i] = fraction * remaining
-        remaining -= Q[i]
-    return Q
-
-
-def _map_Q_arr_to_split_x_arr(Q_arr: np.ndarray, Q_max: float) -> np.ndarray:
-    """Encode stage duties as stick-breaking fractions bounded on [0, 1]."""
-    Q_arr = np.maximum(np.asarray(Q_arr, dtype=float).reshape(-1), 0.0)
-    remaining = max(float(Q_max), 0.0)
-    x = np.zeros_like(Q_arr, dtype=float)
-    for i, duty in enumerate(Q_arr):
-        if remaining <= 0.0:
-            break
-        duty = min(float(duty), remaining)
-        x[i] = duty / remaining
-        remaining -= duty
-    return x

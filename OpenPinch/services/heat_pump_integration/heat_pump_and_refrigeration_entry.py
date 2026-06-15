@@ -32,17 +32,17 @@ from .common.shared import (
 from .targeting_services.brayton import (
     optimise_brayton_heat_pump_placement,
 )
+from .targeting_services.cascade_carnot import (
+    optimise_cascade_carnot_heat_pump_placement,
+)
 from .targeting_services.cascade_vapour_compression import (
     optimise_cascade_heat_pump_placement,
 )
-from .targeting_services.multi_simple_carnot import (
-    optimise_multi_simple_carnot_heat_pump_placement,
+from .targeting_services.parallel_carnot import (
+    optimise_parallel_carnot_heat_pump_placement,
 )
-from .targeting_services.multi_simple_vapour_compression import (
-    optimise_multi_simple_heat_pump_placement,
-)
-from .targeting_services.multi_temperature_carnot import (
-    optimise_multi_temperature_carnot_heat_pump_placement,
+from .targeting_services.parallel_vapour_compression import (
+    optimise_parallel_heat_pump_placement,
 )
 from .targeting_services.vapour_compression_mvr import (
     optimise_vapour_compression_mvr_heat_pump_placement,
@@ -426,11 +426,11 @@ def _calc_hpr_cascade(
 
 _HP_PLACEMENT_HANDLERS = {
     HPRcycle.Brayton.value: optimise_brayton_heat_pump_placement,
-    HPRcycle.MultiTempCarnot.value: (
-        optimise_multi_temperature_carnot_heat_pump_placement
+    HPRcycle.CascadeCarnot.value: (
+        optimise_cascade_carnot_heat_pump_placement
     ),
-    HPRcycle.MultiSimpleVapourComp.value: optimise_multi_simple_heat_pump_placement,
+    HPRcycle.ParallelVapourComp.value: optimise_parallel_heat_pump_placement,
     HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
     HPRcycle.VapourCompMVR.value: (optimise_vapour_compression_mvr_heat_pump_placement),
-    HPRcycle.MultiSimpleCarnot.value: optimise_multi_simple_carnot_heat_pump_placement,
+    HPRcycle.ParallelCarnot.value: optimise_parallel_carnot_heat_pump_placement,
 }

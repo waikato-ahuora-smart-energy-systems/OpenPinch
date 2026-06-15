@@ -24,7 +24,9 @@ Included Notebooks
 ``03_carnot_hpr_comparison.ipynb``
    Advanced HPR and refrigeration comparison on ``chocolate_factory.json``
    across the direct heat pump, indirect heat pump, direct refrigeration, and
-   indirect refrigeration workflows.
+   indirect refrigeration workflows. The notebook uses the current
+   ``HPRcycle.CascadeCarnot`` enum value for broad screening and calls out
+   ``HPRcycle.ParallelCarnot`` as the staged Carnot alternative.
 
 ``04_multistate_targeting_and_state_comparison.ipynb``
    Real named-state targeting on ``crude_preheat_train_multistate.json`` and
@@ -45,8 +47,9 @@ Included Notebooks
 ``07_vapour_compression_mvr_cascade_hpr.ipynb``
    Heat-pump-only targeting with
    ``HPR_TYPE = "Vapour compression with MVR cascade"``, including the
-   configuration fields for VC and MVR stages, a solved backend result, and the
-   external stream accounting used for the combined cascade.
+   configuration fields for VC and MVR stages, split-fraction source/process
+   routing, a solved backend result, and the external stream accounting used
+   for the combined cascade.
 
 How To Use Them
 ---------------

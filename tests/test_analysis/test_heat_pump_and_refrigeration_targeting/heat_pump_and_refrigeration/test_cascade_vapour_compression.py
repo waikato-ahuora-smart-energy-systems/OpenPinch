@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
+from OpenPinch.services.heat_pump_integration.common.encoding import decode_duty_splits
 from OpenPinch.services.heat_pump_integration.targeting_services import (
     cascade_vapour_compression as hp_cascade,
 )
@@ -43,7 +44,7 @@ def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
 
     x0, bnds = hp_cascade._get_cascade_hp_opt_setup(init_res=init, args=args)
 
-    assert x0.shape == (13,)
+    assert x0.shape == (15,)
     assert x0[0] == pytest.approx(0.0)
     assert len(bnds) == x0.shape[0]
     assert np.all(
@@ -70,9 +71,16 @@ def test_cascade_x0_round_trips_with_ambient_cooling_seed():
     np.testing.assert_allclose(vars["T_evap"], init_res.T_evap)
     assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
     assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
-    np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
-    np.testing.assert_allclose(vars["Q_cool"][:-1], init_res.Q_evap[:-1])
-    assert np.isnan(vars["Q_cool"][-1])
+    assert vars["Q_heat_base"] == pytest.approx(init_res.Q_cond.sum())
+    np.testing.assert_allclose(
+        decode_duty_splits(vars["x_heat_split"], vars["Q_heat_base"]),
+        init_res.Q_cond,
+    )
+    assert vars["Q_cool_base"] == pytest.approx(init_res.Q_evap[:-1].sum())
+    np.testing.assert_allclose(
+        decode_duty_splits(vars["x_cool_split"], vars["Q_cool_base"]),
+        init_res.Q_evap[:-1],
+    )
 
 
 def test_cascade_refrigeration_uses_full_evaporator_duty_seed():
@@ -89,9 +97,14 @@ def test_cascade_refrigeration_uses_full_evaporator_duty_seed():
     x0, _ = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
     vars = hp_cascade._parse_cascade_hp_state_variables(x0, args)
 
-    np.testing.assert_allclose(vars["Q_heat"], init_res.Q_cond)
-    np.testing.assert_allclose(vars["Q_cool"], init_res.Q_evap)
-    assert not np.isnan(vars["Q_cool"]).any()
+    np.testing.assert_allclose(
+        decode_duty_splits(vars["x_heat_split"], vars["Q_heat_base"]),
+        init_res.Q_cond[:-1],
+    )
+    np.testing.assert_allclose(
+        decode_duty_splits(vars["x_cool_split"], vars["Q_cool_base"]),
+        init_res.Q_evap,
+    )
 
 
 def test_cascade_x0_bounds_and_parse(monkeypatch):
@@ -105,7 +118,7 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         Q_amb_cold=0.0,
     )
     x0, bnds = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
-    assert x0.shape[0] == 13
+    assert x0.shape[0] == 15
     assert np.all(x0[0] >= 0.0)
 
     monkeypatch.setattr(
@@ -113,21 +126,37 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         "PropsSI",
         lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0,
     )
-    assert len(bnds) == 13
+    assert len(bnds) == 15
 
     vars = hp_cascade._parse_cascade_hp_state_variables(
-        np.array([0.1, 0.2, 0.4, 0.3, 0.5, 0.01, 0.02, 0.6, 0.7, 0.8, 0.1, 0.1, 0.1]),
+        np.array(
+            [
+                0.1,
+                0.2,
+                0.4,
+                0.3,
+                0.5,
+                0.01,
+                0.02,
+                0.6,
+                0.7,
+                0.8,
+                0.1,
+                0.1,
+                0.1,
+                0.1,
+                0.1,
+            ]
+        ),
         args,
     )
     np.testing.assert_allclose(vars["T_cond"], np.array([110.0, 78.0]))
     np.testing.assert_allclose(vars["T_evap"], np.array([105.0, 70.0]))
     np.testing.assert_allclose(vars["dT_subcool"], np.array([0.2, 1.04]))
-    np.testing.assert_allclose(
-        vars["Q_heat"],
-        np.array([132.04024184, 154.04694881]),
-    )
-    np.testing.assert_allclose(vars["Q_cool"][:-1], np.array([128.0]))
-    assert np.isnan(vars["Q_cool"][-1])
+    assert vars["Q_heat_base"] == pytest.approx(132.04024184)
+    np.testing.assert_allclose(vars["x_heat_split"], np.array([0.8, 0.1]))
+    assert vars["Q_cool_base"] == pytest.approx(112.0)
+    np.testing.assert_allclose(vars["x_cool_split"], np.array([0.1]))
     assert vars["Q_amb_hot"] == pytest.approx(0.0)
     assert vars["Q_amb_cold"] == pytest.approx(
         max(args.Q_heat_max, args.Q_cool_max) * np.arctanh(0.1)
@@ -143,12 +172,16 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
         lambda _x, _args: {
             "T_cond": np.array([110.0, 90.0]),
             "dT_subcool": np.array([5.0, 5.0]),
-            "Q_heat": np.array([120.0, 80.0]),
             "T_evap": np.array([70.0, 50.0]),
-            "Q_cool": np.array([50.0, np.nan]),
             "Q_amb_hot": 0.0,
             "Q_amb_cold": 0.0,
             "dT_ihx_gas_side": np.array([0.0, 0.0, 0.0]),
+            "Q_heat_base": 200.0,
+            "x_heat_split": np.array([0.6, 1.0]),
+            "Q_heat_available": np.array([120.0, 80.0]),
+            "Q_cool_base": 50.0,
+            "x_cool_split": np.array([1.0]),
+            "Q_cool_available": np.array([50.0]),
         },
     )
 
@@ -210,12 +243,16 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
         lambda _x, _args: {
             "T_cond": np.array([100.0]),
             "dT_subcool": np.array([5.0]),
-            "Q_heat": np.array([100.0]),
             "T_evap": np.array([60.0]),
-            "Q_cool": np.array([80.0]),
             "Q_amb_hot": 0.0,
             "Q_amb_cold": 0.0,
             "dT_ihx_gas_side": np.array([0.0]),
+            "Q_heat_base": None,
+            "x_heat_split": None,
+            "Q_heat_available": None,
+            "Q_cool_base": 80.0,
+            "x_cool_split": np.array([1.0]),
+            "Q_cool_available": np.array([80.0]),
         },
     )
 
@@ -242,8 +279,12 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
     out = hp_cascade._compute_cascade_hp_system_obj(np.array([0.2]), args)
 
     assert captured["is_heat_pump"] is False
-    np.testing.assert_allclose(captured["Q_heat"], np.array([100.0]))
-    np.testing.assert_allclose(captured["Q_cool"], np.array([80.0]))
+    assert captured["Q_heat_base"] is None
+    assert captured["x_heat_split"] is None
+    assert captured["Q_heat_available"] is None
+    assert captured["Q_cool_base"] == pytest.approx(80.0)
+    np.testing.assert_allclose(captured["x_cool_split"], np.array([1.0]))
+    np.testing.assert_allclose(captured["Q_cool_available"], np.array([80.0]))
     assert out["cop_h"] == pytest.approx(4.0)
 
 
@@ -270,7 +311,7 @@ def test_cascade_x0_branch_for_single_stage():
     )
 
     x0, _ = hp_cascade._get_cascade_hp_opt_setup(init_res=init_res, args=args)
-    assert x0.shape == (6,)
+    assert x0.shape == (7,)
 
 
 def test_cascade_optimiser_allows_missing_initial_seed(monkeypatch):

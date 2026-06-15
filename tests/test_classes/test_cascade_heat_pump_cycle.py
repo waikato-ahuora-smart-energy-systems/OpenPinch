@@ -277,7 +277,7 @@ def test_each_cascade_stage_matches_simple_refrigeration_solution():
     dT_ihx_gas_side = np.array([8.0, 6.0, 4.0])
     Q_heat = np.array([500.0, 1e9, 50.0])
     Q_cool = np.array([100.0, 900.0])
-    Q_heat_all = np.array([500.0, 1e9, 0.0])
+    Q_heat_all = np.array([500.0, 1e9, 50.0])
     Q_cool_all = np.array([0.0, 100.0, 900.0])
     refrigerant = ["R134a", "R134a", "R134a"]
     eta_comp = 0.7
@@ -317,7 +317,13 @@ def test_each_cascade_stage_matches_simple_refrigeration_solution():
     for stage in cycle.subcycles:
         assert np.isclose(stage.Q_evap, stage.Q_cool + stage.Q_cas_cool, 0.0)
         assert stage.Q_heat <= stage.Q_cond + 1e-6
-        assert np.isclose(stage.Q_cas_heat, 0.0, 0.0)
+        assert stage.Q_cas_heat >= -1e-8
+        assert np.isclose(
+            stage.Q_cond,
+            stage.Q_heat + stage.Q_cas_heat,
+            rtol=1e-7,
+            atol=1e-8,
+        )
 
     assert np.isclose(cycle.subcycles[0].Q_heat, 0.0, 0.0)
     assert np.isclose(cycle.subcycles[1].Q_heat, cycle.subcycles[1].Q_cond, 0.0)
@@ -490,9 +496,11 @@ def test_cascade_property_sweep_and_normalization_branches():
     with pytest.raises(ValueError):
         cycle._normalize_dT_subcool(np.array([1.0, 2.0, 3.0, 4.0]), 2, 2)
 
-    qh = cycle._normalize_Q_heat(np.array([np.nan, np.nan]), 2, 2)
-    assert qh.tolist() == [1.0, 0.0, 0.0]
+    qh = cycle._normalize_Q_heat(np.array([1.0, np.nan]), 2, 2)
+    assert qh.tolist() == [1.0, None, 0.0]
     assert cycle._normalize_Q_heat(None, 2, 2).shape == (3,)
+    with pytest.raises(ValueError):
+        cycle._normalize_Q_heat(np.array([np.nan, 1.0]), 2, 2)
     with pytest.raises(ValueError):
         cycle._normalize_Q_heat(np.array([1.0, 2.0, 3.0, 4.0]), 2, 2)
 
@@ -627,8 +635,7 @@ def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
         )
 
 
-def test_cascade_q_heat_nan_defaults_to_one_for_first_and_zero_elsewhere():
-    """Q_heat NaN defaults: index 0 -> 1.0, all other indices -> 0.0."""
+def test_cascade_q_heat_allows_last_heat_side_stage_to_be_unspecified():
     cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
@@ -639,9 +646,10 @@ def test_cascade_q_heat_nan_defaults_to_one_for_first_and_zero_elsewhere():
         dT_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a", "R134a"],
-        Q_heat=np.array([np.nan, np.nan]),
+        Q_heat=np.array([0.0, np.nan]),
         Q_cool=np.array([0.0, 900.0]),
+        is_heat_pump=False,
     )
-    assert np.allclose(
-        cycle.Q_heat_arr, np.array([1.0, 0.0, 0.0]), rtol=1e-7, atol=1e-8
-    )
+    assert cycle.Q_heat_arr[0] == pytest.approx(0.0)
+    assert cycle.Q_heat_arr[1] == pytest.approx(cycle.Q_cond_arr[1])
+    assert cycle.Q_heat_arr[2] == pytest.approx(0.0)

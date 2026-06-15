@@ -4,6 +4,11 @@ from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HPRThermoArtif
 from . import encoding, layout, preprocessing, shared
 from .encoding import (
     AMBIENT_X_BOUNDS,
+    DutyAllocation,
+    allocate_stage_duties,
+    decode_duty_splits,
+    encode_base_and_duty_splits,
+    encode_duty_splits,
     map_DT_arr_to_x_arr,
     map_Q_amb_to_x,
     map_Q_arr_to_x_arr,
@@ -12,6 +17,7 @@ from .encoding import (
     map_x_arr_to_Q_arr,
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
+    require_stage_duty_allocation,
 )
 from .layout import HPRoptVectorLayout
 from .preprocessing import construct_HPRTargetInputs
@@ -38,6 +44,11 @@ __all__ = [
     "create_stream_collection_of_background_profile",
     "encoding",
     "AMBIENT_X_BOUNDS",
+    "DutyAllocation",
+    "allocate_stage_duties",
+    "decode_duty_splits",
+    "encode_base_and_duty_splits",
+    "encode_duty_splits",
     "get_Q_vals_at_T_hpr_from_bckgrd_profile",
     "get_ambient_air_stream",
     "get_carnot_hpr_cycle_streams",
@@ -56,6 +67,7 @@ __all__ = [
     "map_x_to_Q_amb",
     "plot_multi_hp_profiles_from_results",
     "preprocessing",
+    "require_stage_duty_allocation",
     "shared",
     "solve_hpr_placement",
     "validate_vapour_hp_refrigerant_ls",

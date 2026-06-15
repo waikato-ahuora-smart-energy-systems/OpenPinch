@@ -6,7 +6,10 @@ import numpy as np
 
 from ....classes.problem_table import ProblemTable
 from ....lib.enums import PT
-from ...common.gcc_manipulation import get_seperated_gcc_heat_load_profiles
+from ...common.gcc_manipulation import (
+    get_GCC_without_pockets,
+    get_seperated_gcc_heat_load_profiles,
+)
 from ...common.utility_targeting import target_utilities_for_load_profiles
 
 
@@ -23,15 +26,20 @@ def _get_hpr_residual_utility_summary(
         is_direct=is_direct,
         is_heat_pumping=is_heat_pumping,
     )
+    utility_T_vals, utility_net = _get_hpr_residual_utility_net_profile(
+        T_vals=pt[PT.T],
+        residual_net=residual_net,
+    )
     hot_profile, cold_profile = _get_hpr_residual_load_profiles(
         pt=pt,
-        residual_net=residual_net,
+        T_vals=utility_T_vals,
+        residual_net=utility_net,
         is_direct=is_direct,
         is_heat_pumping=is_heat_pumping,
     )
     hot_utilities, cold_utilities = _retarget_hpr_residual_utilities(
-        T_vals=pt[PT.T],
-        residual_net=residual_net,
+        T_vals=utility_T_vals,
+        residual_net=utility_net,
         hot_profile=hot_profile,
         cold_profile=cold_profile,
         hot_utilities=base_target.hot_utilities.copy(deep=True),
@@ -47,14 +55,19 @@ def _get_hpr_residual_utility_summary(
     base_hot_utility_target = float(
         getattr(base_target, "hot_utility_target", 0.0) or 0.0
     )
-    heat_recovery_target = base_heat_recovery + (
-        base_hot_utility_target - hot_utility_target
+    base_cold_utility_target = float(
+        getattr(base_target, "cold_utility_target", 0.0) or 0.0
+    )
+    heat_recovery_target = (
+        base_heat_recovery + (base_cold_utility_target - cold_utility_target)
+        if is_direct
+        else base_heat_recovery + (base_hot_utility_target - hot_utility_target)
     )
     heat_recovery_limit = getattr(base_target, "heat_recovery_limit", None)
     hot_pinch, cold_pinch = ProblemTable(
         {
-            PT.T: pt[PT.T],
-            PT.H_NET: residual_net,
+            PT.T: utility_T_vals,
+            PT.H_NET: utility_net,
         }
     ).pinch_temperatures(col_H=PT.H_NET)
 
@@ -87,16 +100,30 @@ def _get_hpr_residual_net_profile(
     return np.asarray(pt[base_col] - pt[hpr_col], dtype=float)
 
 
+def _get_hpr_residual_utility_net_profile(
+    *,
+    T_vals: np.ndarray,
+    residual_net: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    residual_pt = ProblemTable({PT.T: T_vals, PT.H_NET: residual_net})
+    get_GCC_without_pockets(residual_pt)
+    return (
+        np.asarray(residual_pt[PT.T], dtype=float),
+        np.asarray(residual_pt[PT.H_NET_NP], dtype=float),
+    )
+
+
 def _get_hpr_residual_load_profiles(
     *,
     pt: ProblemTable,
+    T_vals: np.ndarray,
     residual_net: np.ndarray,
     is_direct: bool,
     is_heat_pumping: bool,
 ) -> tuple[np.ndarray, np.ndarray]:
     if is_direct:
         updates = get_seperated_gcc_heat_load_profiles(
-            T_col=pt[PT.T],
+            T_col=T_vals,
             H_net=residual_net,
             is_process_stream=True,
         )["updates"]
@@ -117,11 +144,14 @@ def _get_hpr_residual_load_profiles(
     else:
         rcp_net = (
             np.asarray(pt[PT.RCP_UT_NET], dtype=float)
-            if PT.RCP_UT_NET.value in pt.columns
+            if (
+                PT.RCP_UT_NET.value in pt.columns
+                and len(pt[PT.RCP_UT_NET]) == len(T_vals)
+            )
             else np.zeros_like(residual_net)
         )
         updates = get_seperated_gcc_heat_load_profiles(
-            T_col=pt[PT.T],
+            T_col=T_vals,
             H_net=residual_net,
             rcp_net=rcp_net,
             is_process_stream=False,
@@ -139,10 +169,11 @@ def _get_hpr_residual_load_profiles(
             cold_after_col: cold_profile,
         }
 
-    pt.update(
-        T_col=pt[PT.T],
-        updates=stored_profiles,
-    )
+    if len(T_vals) == len(pt[PT.T]) and np.allclose(T_vals, pt[PT.T]):
+        pt.update(
+            T_col=pt[PT.T],
+            updates=stored_profiles,
+        )
     return hot_profile, cold_profile
 
 
