@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 import numpy as np
 
+from ....utils.heat_exchanger import compute_LMTD_from_dts
 from ..array_adapter import PreparedSolverArrays
 from . import backend
 
@@ -115,6 +116,26 @@ class BaseHeatExchangerNetworkModel(ABC):
         if type(variable).__name__ == "GKParameter":
             variable.VALUE.value = [value] if brackets else value
             return
+
+    def _post_process_lmtd(
+        self,
+        delta_1: float,
+        delta_2: float,
+        active: float,
+        *,
+        formula_allowed: bool,
+        fallback_delta: float | None = None,
+    ) -> float:
+        """Return source-compatible post-process LMTD for HEN area metrics.
+
+        HEN synthesis owns the OpenHENS active-unit and dTmin/tolerance gates.
+        Once those gates pass, the shared OpenPinch heat-exchanger utility owns
+        the positive endpoint logarithmic-mean formula.
+        """
+
+        if not formula_allowed:
+            return (delta_1 if fallback_delta is None else fallback_delta) * active
+        return active * float(compute_LMTD_from_dts(delta_1, delta_2))
 
     def get_alpha_values(self) -> list:
         """Calculate source alpha flow-on values in a post-optimisation solve."""

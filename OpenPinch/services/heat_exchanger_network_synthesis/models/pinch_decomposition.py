@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import Literal
 
 import numpy as np
@@ -500,16 +499,20 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.LMTD_r = [
             [
                 [
-                    self.z[i][j][k][0]
-                    * (self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
-                    / math.log(self.theta_1[i][j][k][0] / self.theta_2[i][j][k][0])
-                    if (
-                        abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
-                        > self.tol
-                        and self.theta_1[i][j][k][0] >= self.dTmin
-                        and self.theta_2[i][j][k][0] >= self.dTmin
+                    self._post_process_lmtd(
+                        self.theta_1[i][j][k][0],
+                        self.theta_2[i][j][k][0],
+                        self.z[i][j][k][0],
+                        formula_allowed=(
+                            abs(
+                                self.theta_1[i][j][k][0]
+                                - self.theta_2[i][j][k][0]
+                            )
+                            > self.tol
+                            and self.theta_1[i][j][k][0] >= self.dTmin
+                            and self.theta_2[i][j][k][0] >= self.dTmin
+                        ),
                     )
-                    else self.theta_1[i][j][k][0] * self.z[i][j][k][0]
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
@@ -530,25 +533,20 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             for i in range(self.I)
         ]
         self.LMTD_hu = [
-            self.z_hu[j][0]
-            * (
-                (self.T_hu_in[0] - self.T_c_out[j])
-                - (self.T_hu_out[0] - self.T_c[j][0][0])
+            self._post_process_lmtd(
+                self.T_hu_in[0] - self.T_c_out[j],
+                self.T_hu_out[0] - self.T_c[j][0][0],
+                self.z_hu[j][0],
+                formula_allowed=(
+                    abs(
+                        (self.T_hu_in[0] - self.T_c_out[j])
+                        - (self.T_hu_out[0] - self.T_c[j][0][0])
+                    )
+                    > self.tol
+                    and self.T_hu_in[0] - self.T_c_out[j] >= self.dTmin
+                    and self.T_hu_out[0] - self.T_c[j][0][0] >= self.dTmin
+                ),
             )
-            / math.log(
-                (self.T_hu_in[0] - self.T_c_out[j])
-                / (self.T_hu_out[0] - self.T_c[j][0][0])
-            )
-            if (
-                abs(
-                    (self.T_hu_in[0] - self.T_c_out[j])
-                    - (self.T_hu_out[0] - self.T_c[j][0][0])
-                )
-                > self.tol
-                and self.T_hu_in[0] - self.T_c_out[j] >= self.dTmin
-                and self.T_hu_out[0] - self.T_c[j][0][0] >= self.dTmin
-            )
-            else (self.T_hu_in[0] - self.T_c_out[j]) * self.z_hu[j][0]
             for j in range(self.J)
         ]
         self.area_hu = [
@@ -558,25 +556,21 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             for j in range(self.J)
         ]
         self.LMTD_cu = [
-            self.z_cu[i][0]
-            * (
-                (self.T_h[i][self.S][0] - self.T_cu_out[0])
-                - (self.T_h_out[i] - self.T_cu_in[0])
+            self._post_process_lmtd(
+                self.T_h[i][self.S][0] - self.T_cu_out[0],
+                self.T_h_out[i] - self.T_cu_in[0],
+                self.z_cu[i][0],
+                formula_allowed=(
+                    abs(
+                        (self.T_h[i][self.S][0] - self.T_cu_out[0])
+                        - (self.T_h_out[i] - self.T_cu_in[0])
+                    )
+                    > self.tol
+                    and self.T_h[i][self.S][0] - self.T_cu_out[0] >= self.dTmin
+                    and self.T_h_out[i] - self.T_cu_in[0] >= self.dTmin
+                ),
+                fallback_delta=self.T_h_out[i] - self.T_cu_in[0],
             )
-            / math.log(
-                (self.T_h[i][self.S][0] - self.T_cu_out[0])
-                / (self.T_h_out[i] - self.T_cu_in[0])
-            )
-            if (
-                abs(
-                    (self.T_h[i][self.S][0] - self.T_cu_out[0])
-                    - (self.T_h_out[i] - self.T_cu_in[0])
-                )
-                > self.tol
-                and self.T_h[i][self.S][0] - self.T_cu_out[0] >= self.dTmin
-                and self.T_h_out[i] - self.T_cu_in[0] >= self.dTmin
-            )
-            else (self.T_h_out[i] - self.T_cu_in[0]) * self.z_cu[i][0]
             for i in range(self.I)
         ]
         self.area_cu = [

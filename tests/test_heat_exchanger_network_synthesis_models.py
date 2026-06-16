@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -584,6 +586,61 @@ def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) ->
         problem.load_model()
 
 
+@pytest.mark.parametrize("model_cls", [StageWiseModel, PinchDecompModel])
+def test_lmtd_replacement_preserves_openhens_post_process_metrics(model_cls) -> None:
+    model = _source_shaped_lmtd_post_process_model(model_cls)
+
+    model.get_post_process()
+
+    recovery_lmtd = [
+        _source_openhens_lmtd(70.0, 40.0, 1.0, formula_allowed=True),
+        _source_openhens_lmtd(20.0, 20.0, 1.0, formula_allowed=False),
+    ]
+    hot_utility_lmtd = _source_openhens_lmtd(
+        220.0,
+        320.0,
+        1.0,
+        formula_allowed=True,
+    )
+    cold_utility_lmtd = _source_openhens_lmtd(
+        40.0,
+        40.0,
+        1.0,
+        formula_allowed=False,
+        fallback_delta=40.0,
+    )
+    expected_area_r = [
+        100.0 / 0.5 / recovery_lmtd[0],
+        50.0 / 0.5 / recovery_lmtd[1],
+    ]
+    expected_area_hu = 30.0 / 0.25 / hot_utility_lmtd
+    expected_area_cu = 20.0 / 0.4 / cold_utility_lmtd
+    expected_tac = (
+        2.0 * 30.0
+        + 3.0 * 20.0
+        + 7.0 * 4
+        + 11.0 * sum(area**0.6 for area in expected_area_r)
+        + 13.0 * expected_area_hu**0.6
+        + 17.0 * expected_area_cu**0.6
+    )
+
+    np.testing.assert_allclose(model.LMTD_r, [[[recovery_lmtd[0], recovery_lmtd[1]]]])
+    np.testing.assert_allclose(model.LMTD_hu, [hot_utility_lmtd])
+    np.testing.assert_allclose(model.LMTD_cu, [cold_utility_lmtd])
+    np.testing.assert_allclose(model.area_r, [[[expected_area_r[0], expected_area_r[1]]]])
+    np.testing.assert_allclose(model.area_hu, [expected_area_hu])
+    np.testing.assert_allclose(model.area_cu, [expected_area_cu])
+    assert model.n_recovery_units == 2
+    assert model.n_hu_units == 1
+    assert model.n_cu_units == 1
+    assert model.n_units == 4
+    assert model.Q_r_total == 150.0
+    assert model.Q_hu_total == 30.0
+    assert model.Q_cu_total == 20.0
+    assert model.TAC_model == 123.45
+    assert model.TAC == pytest.approx(expected_tac)
+
+
 def test_extraction_converts_solver_arrays_to_identity_labelled_network() -> None:
     solved = _SolvedCase()
     arrays = _solver_arrays()
@@ -755,6 +812,60 @@ def _source_openhens_models(monkeypatch, tmp_path: Path):
     )
 
     return SourceStageWiseModel, SourcePinchDecompModel
+
+
+def _source_shaped_lmtd_post_process_model(model_cls):
+    model = model_cls.__new__(model_cls)
+    model.mSuccess = 1
+    model.I = 1
+    model.J = 1
+    model.S = 2
+    model.tol = 1e-3
+    model.dTmin = 20.0
+    model.minimisation_goal = "variable total cost"
+    model.Q_r = [[[[100.0], [50.0]]]]
+    model.Q_h = [[30.0]]
+    model.Q_c = [[20.0]]
+    model.z = [[[[1.0], [1.0]]]]
+    model.z_hu = [[1.0]]
+    model.z_cu = [[1.0]]
+    model.theta_1 = [[[[70.0], [20.0]]]]
+    model.theta_2 = [[[[40.0], [20.0]]]]
+    model.U_r = [[0.5]]
+    model.U_hu = [0.25]
+    model.U_cu = [0.4]
+    model.T_h = [[[500.0], [470.0], [360.0]]]
+    model.T_c = [[[300.0], [330.0], [320.0]]]
+    model.T_h_out = [340.0]
+    model.T_c_out = [430.0]
+    model.T_hu_in = [650.0]
+    model.T_hu_out = [620.0]
+    model.T_cu_in = [300.0]
+    model.T_cu_out = [320.0]
+    model.hu_cost = [2.0]
+    model.cu_cost = [3.0]
+    model.unit_cost = [7.0]
+    model.A_coeff = [11.0]
+    model.A_exp = [0.6]
+    model.hu_coeff = [13.0]
+    model.cu_coeff = [17.0]
+    model.alpha = [[[[1.0], [1.0]]]]
+    model.get_alpha_values = lambda: [[[[1.0], [1.0]]]]
+    model.m = SimpleNamespace(options=SimpleNamespace(objfcnval=123.45))
+    return model
+
+
+def _source_openhens_lmtd(
+    delta_1: float,
+    delta_2: float,
+    active: float,
+    *,
+    formula_allowed: bool,
+    fallback_delta: float | None = None,
+) -> float:
+    if not formula_allowed:
+        return (delta_1 if fallback_delta is None else fallback_delta) * active
+    return active * (delta_1 - delta_2) / math.log(delta_1 / delta_2)
 
 
 def _solver_arrays() -> PreparedSolverArrays:
