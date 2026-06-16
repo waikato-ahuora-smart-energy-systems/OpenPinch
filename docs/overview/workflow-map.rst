@@ -20,7 +20,8 @@ Packaged resource workflow
 ``PinchProblem`` workflow
    Use this for notebooks and scripts when you want one object that owns the
    problem definition, validation, prepared zone tree, solved result, graph
-   accessors, summaries, state selection, and exports.
+   accessors, summaries, state selection, process-component mutation, and
+   exports.
 
 ``PinchWorkspace`` workflow
    Use this for notebooks and scripts when you want named study cases,
@@ -58,7 +59,8 @@ Use ``PinchProblem`` when:
 - you want validation, summaries, graphs, exports, and advanced targeting on
   one object
 - you want access to ``problem.plot.*``, ``problem.target.*``,
-  ``problem.state_ids``, or ``problem.target_all_states()``
+  ``problem.add_component.*``, ``problem.state_ids``, or
+  ``problem.target_all_states()``
 
 Use ``PinchWorkspace`` when:
 
@@ -127,6 +129,10 @@ Stateful study
 Advanced HPR study
    ``base case -> problem.target.direct_heat_pump(...) -> compare summary rows
    and GCC / HPR graph surfaces``
+
+Direct process MVR study
+   ``workspace.copy_case -> problem.add_component.process_mvr(...) -> re-solve
+   direct / Total Site targets -> compare cases``
 
 Advanced exergy study
    ``base case -> problem.target.exergy(...) -> inspect enriched target row and

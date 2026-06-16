@@ -438,6 +438,30 @@ profiles. It excludes both the internal VC-to-MVR source heat and the internal
 liquid-injection desuperheating heat unless explicitly requested by lower-level
 model code.
 
+Direct Process Gas/Vapour MVR Components
+----------------------------------------
+
+``problem.add_component.process_mvr(...)``
+
+Direct process MVR is a process-component workflow rather than an HPR target
+backend. It starts from a prepared ``PinchProblem`` case, selects one or more
+hot gas/vapour process streams, solves a direct mechanical-vapour-recompression
+replacement profile, and swaps the original streams out of the active hot
+stream collection. The original streams remain attached to the model with
+``active=False`` while the generated replacement streams become active.
+
+The component can be configured by stage count, saturation-temperature lift or
+pressure ratio, compressor efficiency, motor efficiency, and whether liquid
+injection is represented as an internal desuperheating step. After the
+component is active, ordinary direct and indirect targeting routines consume
+the mutated stream collection and report the added process-component work in
+the solved target summaries.
+
+This workflow is useful when the engineering question is not "where should a
+new HPR cycle be placed?" but "what happens to the integration target if this
+existing vapour stream is recompressed?" Use ``PinchWorkspace`` copies when you
+need baseline, dry MVR, and liquid-injection MVR cases side by side.
+
 Choosing a Method
 -----------------
 
@@ -460,6 +484,8 @@ Use the simplest backend that answers the engineering question:
      - Brayton cycle
    * - VC low stage feeding a serial recompression train
      - Vapour compression with MVR cascade
+   * - Existing vapour stream recompressed before targeting
+     - Direct process gas/vapour MVR component
 
 Recommended Follow-On Pages
 ---------------------------

@@ -2,6 +2,9 @@ Heat Pump Workflows
 ===================
 
 OpenPinch exposes two related but distinct Heat Pump workflow families.
+It also includes a direct process MVR component path for cases where a hot
+gas/vapour stream is recompressed before the normal direct or Total Site
+targeting workflow.
 
 Question This Guide Answers
 ---------------------------
@@ -42,6 +45,30 @@ plot accessor surfaces, especially
 ``problem.plot.net_load_profiles(zone_name="Direct Heat Pump")`` and
 ``problem.plot.grand_composite_curve_with_heat_pump(...)``.
 
+Direct Gas/Vapour MVR Components
+--------------------------------
+
+Use this when the process stream itself is the MVR source. Unlike the HPR
+targeting routines above, direct process MVR mutates a prepared
+``PinchProblem`` by deactivating selected original hot streams and activating
+replacement hot streams generated from the compressed vapour cooling profile.
+The subsequent direct or Total Site target then includes the component work in
+the solved summary.
+
+Typical surface:
+
+- ``problem.add_component.process_mvr(...)``
+
+The packaged notebook:
+
+.. code-block:: bash
+
+   openpinch notebook --name 08_direct_gas_stream_mvr.ipynb -o notebooks
+
+This notebook compares baseline, dry MVR, and liquid-injection MVR cases in a
+``PinchWorkspace``. It also shows ``stage_results_by_state``, replacement
+stream inspection, and component ``activate()`` / ``deactivate()`` behavior.
+
 Current Recommendation
 ----------------------
 
@@ -51,7 +78,9 @@ For supported advanced Heat Pump and refrigeration work today, prefer the
 methods. Use ``chocolate_factory.json`` plus notebook 03 when the question is
 direct-versus-indirect comparison over a study range, and use
 ``heat_pump_targeting.json`` when you want a smaller direct HPR screening
-input data.
+input data. Use notebook 08 when the question is direct recompression of an
+existing process gas/vapour stream before re-solving the base integration
+targets.
 
 Start simulated-cycle studies from a Carnot solve where possible. Use
 ``HPR_TYPE = "Cascade Carnot cycles"`` for broad screening,

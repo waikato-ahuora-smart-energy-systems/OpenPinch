@@ -106,7 +106,9 @@ PinchProblem Convenience Wrapper
 
 :class:`~OpenPinch.classes.pinch_problem.PinchProblem` adds file loading,
 cached execution state, tabular summaries, graph generation, Excel export, and
-Streamlit dashboard integration on top of the core service layer.
+Streamlit dashboard integration on top of the core service layer. It also owns
+the ``add_component`` accessor used for memory-only process mutations such as
+direct gas/vapour MVR before targets are rerun.
 
 Those rendered graph, Excel, and dashboard surfaces require the
 ``openpinch[notebook]`` or ``openpinch[dashboard]`` extra.
@@ -128,6 +130,7 @@ The main user-facing methods are:
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.compare_to`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_excel`
 - :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.show_dashboard`
+- ``problem.add_component.process_mvr(...)``
 
 The wrapper is intentionally light. Once targeting has run, the same solved
 :class:`~OpenPinch.classes.zone.Zone` hierarchy and
@@ -145,3 +148,9 @@ refrigeration targets also surface HPR summary fields such as ``hpr_cycle``,
 For stateful input data, the same named entry points also accept
 ``state_id=...`` and the refreshed summaries, exports, and graph metadata carry
 that selected state context forward.
+
+The ``problem.add_component.*`` accessor is different: it mutates the prepared
+stream model before targeting. The direct process MVR component deactivates
+selected source streams, activates generated compressed-vapour replacement
+streams, stores per-state stage results, and contributes process-component
+work to later target summaries.

@@ -101,6 +101,13 @@ instead of the default root-case solve.
 enriches one existing compatible target family instead of solving a new target
 family of its own.
 
+``problem.add_component``
+   Mutates the prepared process model with memory-only process components
+   before rerunning targets. The current public component surface is
+   ``problem.add_component.process_mvr(...)`` for direct gas/vapour MVR. It
+   deactivates selected original hot streams, activates generated replacement
+   streams, and carries the process-component work into later summaries.
+
 Those accessors are the high-level path into the package's deeper analytical
 power without dropping all the way to the raw service modules.
 

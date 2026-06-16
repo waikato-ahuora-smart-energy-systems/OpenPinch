@@ -56,9 +56,12 @@ real packaged cases or real derivatives of those cases. Notebook 01 starts from
 cases matter, notebook 04 covers named-state targeting, and notebook 05 covers
 the typed and serialized boundaries. Notebook 06 covers energy-transfer
 analysis outputs. Notebook 07 covers the vapour-compression plus MVR cascade
-HPR backend and its split-fraction source/process routing. The distributed
-assets are packaged as clean sources: no stored Plotly payloads, no cached
-execution counts, and no stale traceback output.
+HPR backend and its split-fraction source/process routing. Notebook 08 covers
+the direct gas/vapour MVR process-component workflow, where live
+``PinchProblem`` cases are mutated with replacement hot streams and compared
+in a ``PinchWorkspace``. The distributed assets are packaged as clean sources:
+no stored Plotly payloads, no cached execution counts, and no stale traceback
+output.
 
 Copy the full series with:
 
@@ -90,6 +93,7 @@ Current packaged notebooks:
 5. ``05_schema_service_and_output_workflows.ipynb``
 6. ``06_energy_transfer_analysis.ipynb``
 7. ``07_vapour_compression_mvr_cascade_hpr.ipynb``
+8. ``08_direct_gas_stream_mvr.ipynb``
 
 Notebook 04 shows the named-state workflow directly through
 ``problem.target.direct_heat_integration(state_id="peak")`` and
@@ -103,7 +107,10 @@ shows the typed ``TargetInput`` boundary and the serialized
 configuration fields. Notebook 03 uses
 ``HPR_TYPE = "Cascade Carnot cycles"`` for broad direct/indirect
 screening and notes ``"Parallel Carnot cycles"`` as the explicit staged
-Carnot option.
+Carnot option. Notebook 08 shows ``add_component.process_mvr(...)``,
+``stage_results_by_state``, replacement stream inspection, component
+activation/deactivation, and baseline-versus-MVR comparison through
+``workspace.compare_cases(...)``.
 
 Recommended Learning Path
 -------------------------
@@ -123,6 +130,8 @@ Recommended Learning Path
    or interval surplus/deficit accounting.
 7. ``heat_pump_targeting.json`` and notebook 07 when you need the
    vapour-compression plus MVR cascade HPR backend.
+8. Notebook 08 when you need direct gas/vapour MVR on selected process streams
+   before re-solving direct and Total Site targets.
 
 Why These Assets Matter
 -----------------------
