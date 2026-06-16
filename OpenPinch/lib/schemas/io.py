@@ -7,10 +7,12 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..config_metadata import validate_configuration_options
 from ..enums import ST
 from .common import ScalarOrVU
 from .graphs import GraphSet
 from .reporting import TargetResults
+from .synthesis import HeatExchangerNetworkSynthesisResult
 
 
 class StreamSchema(BaseModel):
@@ -68,6 +70,15 @@ class TargetInput(BaseModel):
     options: Optional[dict] = None
     zone_tree: Optional[ZoneTreeSchema] = None
 
+    @field_validator("options")
+    @classmethod
+    def _validate_options(cls, value: Optional[dict]) -> Optional[dict]:
+        if value is None:
+            return value
+        if not isinstance(value, dict):
+            raise ValueError("TargetInput options must be provided as a dict.")
+        return validate_configuration_options(value)
+
 
 class TargetOutput(BaseModel):
     """Top-level response data returned by :func:`OpenPinch.pinch_analysis_service`."""
@@ -76,6 +87,7 @@ class TargetOutput(BaseModel):
     state_id: Optional[str] = None
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
+    design: Optional[HeatExchangerNetworkSynthesisResult] = None
 
 
 class THSchema(BaseModel):

@@ -35,6 +35,16 @@ from .reporting import (
     PinchTemp,
     TargetResults,
 )
+from .synthesis import (
+    HeatExchangerNetworkSynthesisExportRecord,
+    HeatExchangerNetworkSynthesisManifest,
+    HeatExchangerNetworkSynthesisResult,
+    HeatExchangerNetworkSynthesisTask,
+    HeatExchangerNetworkSynthesisTaskOutcome,
+    SynthesisMethod,
+    SynthesisOutputFormat,
+    SynthesisTaskStatus,
+)
 from .targets import (
     AnyTargetModel,
     BaseTargetModel,
@@ -101,6 +111,14 @@ __all__ = [
     "HeatUtility",
     "TargetResults",
     "PinchTemp",
+    "HeatExchangerNetworkSynthesisExportRecord",
+    "HeatExchangerNetworkSynthesisManifest",
+    "HeatExchangerNetworkSynthesisResult",
+    "HeatExchangerNetworkSynthesisTask",
+    "HeatExchangerNetworkSynthesisTaskOutcome",
+    "SynthesisMethod",
+    "SynthesisOutputFormat",
+    "SynthesisTaskStatus",
     "AnyTargetModel",
     "BaseTargetModel",
     "DirectHeatPumpTarget",

@@ -209,6 +209,24 @@ class ProblemTableLabel(Enum):
 PT = ProblemTableLabel
 
 
+class HeatExchangerNetworkLabel(Enum):
+    """Heat exchanger network metric labels for labelled accessors."""
+
+    RECOVERY_DUTY = "recovery_duty"
+    HOT_UTILITY_DUTY = "hot_utility_duty"
+    COLD_UTILITY_DUTY = "cold_utility_duty"
+    RECOVERY_AREA = "recovery_area"
+    HOT_UTILITY_AREA = "hot_utility_area"
+    COLD_UTILITY_AREA = "cold_utility_area"
+    HOT_RECOVERY_OUTLET_TEMPERATURE = "hot_recovery_outlet_temperature"
+    COLD_RECOVERY_OUTLET_TEMPERATURE = "cold_recovery_outlet_temperature"
+    MATCH_ACTIVE = "match_active"
+    MATCH_ALLOWED = "match_allowed"
+
+
+HEN = HeatExchangerNetworkLabel
+
+
 class StreamDataLabel(Enum):
     """Stream data column header labels"""
 
@@ -304,6 +322,8 @@ __all__ = [
     "CogenerationTarget",
     "GraphType",
     "GT",
+    "HEN",
+    "HeatExchangerNetworkLabel",
     "HeatExchangerTypes",
     "HeatFlowUnits",
     "HeatPump",

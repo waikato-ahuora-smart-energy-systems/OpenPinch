@@ -31,6 +31,9 @@ EXPECTED_EXPORTS = {
         "Configuration",
         "Graph",
         "GraphSet",
+        "HeatExchangerNetworkLabel",
+        "HeatExchangerNetworkSynthesisResult",
+        "HeatExchangerNetworkSynthesisTask",
         "HeatUtility",
         "HeatPumpTargetOutputs",
         "StreamSchema",
@@ -45,6 +48,8 @@ EXPECTED_EXPORTS = {
         "ZoneType",
     },
     "OpenPinch.classes": {
+        "HeatExchanger",
+        "HeatExchangerNetwork",
         "PinchProblem",
         "PinchWorkspace",
         "ProblemTable",
