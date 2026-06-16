@@ -23,19 +23,23 @@ from .extraction import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
+from .pinch_decomposition import PinchDecompModel
 from .problem import (
     InternalHeatExchangerNetworkProblem,
     ModelSliceUnavailableError,
 )
+from .stagewise import StageWiseModel
 
 __all__ = [
     "BaseHeatExchangerNetworkModel",
     "GEKKO_SOLVERS",
     "InternalHeatExchangerNetworkProblem",
     "ModelSliceUnavailableError",
+    "PinchDecompModel",
     "PYOMO_SOLVERS",
     "PYOMO_SOLVER_BINARIES",
     "SolverRun",
+    "StageWiseModel",
     "configure_gekko_solver",
     "create_gekko_model",
     "extract_heat_exchanger_network",

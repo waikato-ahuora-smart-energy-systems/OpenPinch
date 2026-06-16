@@ -230,9 +230,9 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
         ],
         "synthesis",
     ),
-    "HENS_PDM_SOLVER": ConfigurationFieldSpec(str, "gekko", "synthesis"),
-    "HENS_TDM_SOLVER": ConfigurationFieldSpec(str, "gekko", "synthesis"),
-    "HENS_ESM_SOLVER": ConfigurationFieldSpec(str, "pyomo", "synthesis"),
+    "HENS_PDM_SOLVER": ConfigurationFieldSpec(str, "couenne", "synthesis"),
+    "HENS_TDM_SOLVER": ConfigurationFieldSpec(str, "couenne", "synthesis"),
+    "HENS_ESM_SOLVER": ConfigurationFieldSpec(str, "ipopt-pyomo", "synthesis"),
     "HENS_SOLVE_TOLERANCE": ConfigurationFieldSpec(
         float,
         1e-3,
@@ -371,8 +371,7 @@ def _positive_float_grid(name: str, value: Any) -> list[float]:
 
 def _positive_unique_int_grid(name: str, value: Any) -> list[int]:
     stages = [
-        _positive_int(name, item)
-        for item in _sequence(name, value, allow_empty=False)
+        _positive_int(name, item) for item in _sequence(name, value, allow_empty=False)
     ]
     if len(set(stages)) != len(stages):
         raise ValueError(f"{name} values must be unique.")

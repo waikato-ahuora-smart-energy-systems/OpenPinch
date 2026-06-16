@@ -49,54 +49,54 @@ Settled decisions for this task:
 
 ## Requirements Checklist
 
-- [ ] Move StageWise TDM/ESM equation construction into the OpenPinch synthesis
+- [x] Move StageWise TDM/ESM equation construction into the OpenPinch synthesis
       models package.
-- [ ] Move the PDM coordinator into the OpenPinch synthesis models package.
-- [ ] Keep equations, variable names, constraints, objectives, and solver
+- [x] Move the PDM coordinator into the OpenPinch synthesis models package.
+- [x] Keep equations, variable names, constraints, objectives, and solver
       defaults unchanged.
-- [ ] Preserve above-pinch and below-pinch construction behavior.
-- [ ] Preserve manual stage selection behavior.
-- [ ] Preserve hot/cold threshold behavior where utility targets are zero.
-- [ ] Preserve topology restriction semantics from successful PDM outcomes into
+- [x] Preserve above-pinch and below-pinch construction behavior.
+- [x] Preserve manual stage selection behavior.
+- [x] Preserve hot/cold threshold behavior where utility targets are zero.
+- [x] Preserve topology restriction semantics from successful PDM outcomes into
       TDM tasks.
-- [ ] Preserve topology restriction semantics from successful TDM outcomes into
+- [x] Preserve topology restriction semantics from successful TDM outcomes into
       ESM refinement tasks.
-- [ ] Preserve solved parent/topology/problem state needed by downstream
+- [x] Preserve solved parent/topology/problem state needed by downstream
       TDM/ESM warm-start or restriction construction. Do not rebuild downstream
       model state from cold defaults unless parity evidence proves equivalence.
-- [ ] Ensure task IDs remain deterministic across PDM, TDM, and ESM fan-out.
-- [ ] Ensure failed PDM tasks do not spawn TDM tasks.
-- [ ] Ensure failed TDM tasks do not spawn ESM tasks.
-- [ ] Convert every accepted solved topology into `HeatExchangerNetwork`.
-- [ ] Keep raw solver arrays private and diagnostic-only.
-- [ ] Use OpenPinch `ProblemTable` / targeting data only where HENS-04 parity
+- [x] Ensure task IDs remain deterministic across PDM, TDM, and ESM fan-out.
+- [x] Ensure failed PDM tasks do not spawn TDM tasks.
+- [x] Ensure failed TDM tasks do not spawn ESM tasks.
+- [x] Convert every accepted solved topology into `HeatExchangerNetwork`.
+- [x] Keep raw solver arrays private and diagnostic-only.
+- [x] Use OpenPinch `ProblemTable` / targeting data only where HENS-04 parity
       already passed.
-- [ ] Keep duplicate LMTD and costing formulas unchanged unless HENS-10 has
+- [x] Keep duplicate LMTD and costing formulas unchanged unless HENS-10 has
       already replaced them in a separate PR.
-- [ ] Add focused tests for topology restriction requirements.
-- [ ] Add focused tests for above/below-pinch structural fields.
-- [ ] Add Four-stream solver-regression or shadow-run evidence for each moved
+- [x] Add focused tests for topology restriction requirements.
+- [x] Add focused tests for above/below-pinch structural fields.
+- [x] Add Four-stream solver-regression or shadow-run evidence for each moved
       sub-slice.
 
 ## General Standards That Apply
 
-- [ ] Enforce the required OpenPinch workflow from `README.md`; deviations are
+- [x] Enforce the required OpenPinch workflow from `README.md`; deviations are
       not permitted.
-- [ ] Move behavior first; refactor later.
-- [ ] Do not widen tolerances in this task.
-- [ ] Do not make raw arrays public.
-- [ ] Do not introduce an OpenHENS-style public workflow root.
-- [ ] Keep solver imports optional and lazy.
+- [x] Move behavior first; refactor later.
+- [x] Do not widen tolerances in this task.
+- [x] Do not make raw arrays public.
+- [x] Do not introduce an OpenHENS-style public workflow root.
+- [x] Keep solver imports optional and lazy.
 
 ## Verification Checklist
 
-- [ ] Fast task-graph tests pass.
-- [ ] Structural PDM parity tests pass.
-- [ ] Four-stream solver or shadow-run tests pass for the moved PDM slice.
-- [ ] Four-stream solver or shadow-run tests pass for the moved TDM/ESM
+- [x] Fast task-graph tests pass.
+- [x] Structural PDM parity tests pass.
+- [x] Four-stream solver or shadow-run tests pass for the moved PDM slice.
+- [x] Four-stream solver or shadow-run tests pass for the moved TDM/ESM
       stagewise slice.
-- [ ] Import smoke tests still prove normal OpenPinch imports are lightweight.
-- [ ] Existing result-cache tests still pass.
+- [x] Import smoke tests still prove normal OpenPinch imports are lightweight.
+- [x] Existing result-cache tests still pass.
 
 ## Definition of Done
 
@@ -120,4 +120,91 @@ Settled decisions for this task:
 
 ## Implementation Notes
 
-- 
+- Source verification: `rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS rev-parse HEAD`
+  returned `2afc14b7779482fc829edb1c3fa187b918d7fb19`, matching the expected
+  source commit for parity comparison.
+- Moved private model construction into
+  `OpenPinch/services/heat_exchanger_network_synthesis/models/stagewise.py` and
+  `OpenPinch/services/heat_exchanger_network_synthesis/models/pinch_decomposition.py`.
+  The HENS-07 path keeps GEKKO/Pyomo loading behind solver factory calls, keeps
+  raw arrays inside private problem/model objects, and intentionally gates
+  stage reduction/topology evolution with `ModelSliceUnavailableError` for
+  HENS-08.
+- Restored the internal solve path through
+  `InternalHeatExchangerNetworkProblem` and the private `LocalSynthesisExecutor`
+  only behind the existing problem-rooted synthesis service boundary. The local
+  executor preserves deterministic task fan-out, prevents failed PDM outcomes
+  from spawning TDM tasks, prevents failed TDM outcomes from spawning ESM tasks,
+  and carries the solved private parent problem into downstream TDM/ESM
+  construction.
+- Preserved source PDM construction semantics using the HENS-04 pinch snapshot:
+  above/below pinch stream clipping, zero-utility threshold skips, manual
+  above/below stage selection, utility target handoff, and topology restrictions
+  are covered by Four-stream structural shadow tests against the source
+  OpenHENS model.
+- Re-review blocker resolution: added explicit Four-stream ESM StageWise
+  structural shadow coverage against the source OpenHENS model. The ESM test
+  constructs the moved non-isothermal `StageWiseModel` with
+  `framework="ESM"`, `integers=False`, and
+  `minimisation_goal="variable total cost"`, then compares the source dimensions,
+  stream heat totals, `Q_max`, feasibility masks, GEKKO equation/objective
+  counts, common recovery variables, ESM-only `X`/`Y` split variables, split
+  outlet temperature variables, and variable-total-cost intermediates.
+- Re-review blocker resolution: extended the local executor parent-preservation
+  test through the full PDM -> TDM -> ESM task chain. The test now builds ESM
+  tasks from successful TDM outcomes and asserts the private parent problem chain
+  is `TDM parent == PDM` and `ESM parent == TDM`, covering the warm-start context
+  handoff that source OpenHENS requires.
+- Re-review docs blocker resolution: updated the `BaseHeatExchangerNetworkModel`
+  docstring to describe the stable HENS-07 private contract. The base layer now
+  documents ownership of guarded GEKKO setup, source-shaped solver-array
+  normalization, inherited topology restrictions, common diagnostics, and shared
+  helper equations for the moved private `PinchDecompModel` and
+  `StageWiseModel`, while clearly leaving topology evolution and stage reduction
+  to HENS-08.
+- Verification commands and results for the docs blocker:
+  `rtk .venv/bin/ruff check OpenPinch/services/heat_exchanger_network_synthesis/models/base.py`
+  passed; `rtk .venv/bin/python -m py_compile OpenPinch/services/heat_exchanger_network_synthesis/models/base.py`
+  passed; `rtk git diff --check -- . ':(exclude).DS_Store'` passed.
+- Solver defaults now match the source model defaults for this moved slice:
+  PDM/TDM use `couenne`; ESM uses `ipopt-pyomo`.
+- Verification commands and results:
+  `rtk .venv/bin/python -m py_compile OpenPinch/services/heat_exchanger_network_synthesis/models/base.py OpenPinch/services/heat_exchanger_network_synthesis/models/stagewise.py OpenPinch/services/heat_exchanger_network_synthesis/models/pinch_decomposition.py OpenPinch/services/heat_exchanger_network_synthesis/models/problem.py OpenPinch/services/heat_exchanger_network_synthesis/workflow.py`
+  passed.
+- Verification commands and results:
+  `rtk .venv/bin/ruff format OpenPinch/services/heat_exchanger_network_synthesis/models/base.py OpenPinch/services/heat_exchanger_network_synthesis/models/stagewise.py OpenPinch/services/heat_exchanger_network_synthesis/models/pinch_decomposition.py OpenPinch/services/heat_exchanger_network_synthesis/models/problem.py OpenPinch/services/heat_exchanger_network_synthesis/models/__init__.py OpenPinch/services/heat_exchanger_network_synthesis/workflow.py OpenPinch/lib/config_metadata.py tests/test_heat_exchanger_network_synthesis_models.py`
+  reformatted seven files; `rtk .venv/bin/ruff check --fix OpenPinch/services/heat_exchanger_network_synthesis/workflow.py tests/test_heat_exchanger_network_synthesis_models.py`
+  fixed two import-order issues; final
+  `rtk .venv/bin/ruff check OpenPinch/services/heat_exchanger_network_synthesis/models/base.py OpenPinch/services/heat_exchanger_network_synthesis/models/stagewise.py OpenPinch/services/heat_exchanger_network_synthesis/models/pinch_decomposition.py OpenPinch/services/heat_exchanger_network_synthesis/models/problem.py OpenPinch/services/heat_exchanger_network_synthesis/models/__init__.py OpenPinch/services/heat_exchanger_network_synthesis/workflow.py OpenPinch/lib/config_metadata.py tests/test_heat_exchanger_network_synthesis_models.py`
+  passed.
+- Verification commands and results:
+  `rtk .venv/bin/pytest tests/test_heat_exchanger_network_synthesis_models.py -q`
+  passed with `17 passed`; this includes Four-stream TDM StageWise structural
+  parity, Four-stream ESM StageWise structural parity, Four-stream PDM
+  above/below structural parity, manual PDM stage selection parity, missing PDM
+  solver-binary handling, internal parent-context construction, full
+  PDM -> TDM -> ESM local executor parent preservation, and result
+  serialization without solver arrays.
+- Verification commands and results:
+  `rtk .venv/bin/pytest tests/test_heat_exchanger_network_synthesis_workflow.py -q`
+  passed with `10 passed`; this includes deterministic task IDs, task fan-out,
+  topology restriction handoff, failed-task gating, result-cache behavior, and
+  API-boundary assertions.
+- Verification commands and results:
+  `rtk .venv/bin/pytest tests/test_synthesis_dependency_boundaries.py -q`
+  passed with `3 passed`; `rtk .venv/bin/pytest tests/test_lib/test_synthesis_schemas.py tests/test_lib/test_config_enums.py tests/test_package_api_surface.py -q`
+  passed with `34 passed`; `rtk .venv/bin/pytest tests/test_heat_exchanger_network_array_adapter.py -q`
+  passed with `9 passed`; `rtk .venv/bin/pytest tests/test_heat_exchanger_network_pinch_parity.py -q`
+  passed with `83 passed`.
+- Lightweight import evidence:
+  `rtk .venv/bin/python -c "import sys; import OpenPinch; from OpenPinch.services.heat_exchanger_network_synthesis.workflow import LocalSynthesisExecutor; from OpenPinch.services.heat_exchanger_network_synthesis.models import StageWiseModel, PinchDecompModel; forbidden=['gekko','pyomo','pyomo.environ','matplotlib','plotly','openpyxl']; print('loaded', [name for name in forbidden if name in sys.modules])"`
+  printed `loaded []`.
+- Solver-marked full solves were not run locally because `rtk which couenne`
+  and `rtk which ipopt` both exited `1` with no binary on PATH. The added
+  missing-binary test covers the required failure mode; rerun full solver tests
+  in an environment with Couenne and IPOPT available.
+- Whitespace verification:
+  `rtk git diff --check -- . ':(exclude).DS_Store'` passed. The root
+  `.DS_Store` was pre-existing/user-owned and was not edited by this task.
+- Definition of Done checkboxes are left unchecked pending the requested
+  adversarial review and the follow-up re-review.

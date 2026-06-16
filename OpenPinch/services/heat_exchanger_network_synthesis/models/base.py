@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 
@@ -16,11 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 class BaseHeatExchangerNetworkModel(ABC):
-    """Shared mutable state for future PDM/TDM/ESM equation model slices.
+    """Shared private state for migrated PDM/TDM/ESM equation models.
 
     The constructor mirrors the source OpenHENS solver defaults, but it accepts
-    OpenPinch-prepared solver arrays instead of a CSV path. Concrete equation
-    classes are intentionally left to later migration slices.
+    OpenPinch-prepared solver arrays instead of a CSV path. This layer owns the
+    guarded GEKKO backend setup, source-shaped array normalization, inherited
+    topology restrictions, common diagnostics, and helper equations that are
+    stable across the moved private ``PinchDecompModel`` and ``StageWiseModel``.
+    HENS-08 still owns topology evolution and stage-reduction behavior; those
+    remain outside the base contract.
     """
 
     def __init__(
@@ -93,6 +97,450 @@ class BaseHeatExchangerNetworkModel(ABC):
     def get_post_process(self) -> None:
         """Extract solved arrays after a successful concrete solve."""
 
+    def _solver_value(self, value: Any) -> float:
+        try:
+            return float(value[0])
+        except TypeError, IndexError, KeyError:
+            return float(value)
+
+    def _set_value(
+        self, variable: Any, value: float, *, brackets: bool = False
+    ) -> None:
+        """Assign GEKKO values while preserving source bound-clamping behavior."""
+
+        if type(variable).__name__ == "GKVariable":
+            value = max(variable.lower, min(variable.upper, value))
+            variable.VALUE.value = [value] if brackets else value
+            return
+        if type(variable).__name__ == "GKParameter":
+            variable.VALUE.value = [value] if brackets else value
+            return
+
+    def get_alpha_values(self) -> list:
+        """Calculate source alpha flow-on values in a post-optimisation solve."""
+
+        if self.alpha != []:
+            return self.alpha
+
+        model = backend.create_gekko_model(remote=False)
+        model.options.IMODE = 1
+        model.options.SOLVER = 1
+        self.set_alpha_dqda_equations(m=model, postoptimisation=True)
+        try:
+            model.solve(disp=False)
+        except Exception:
+            pass
+        return self.alpha
+
+    def set_alpha_dqda_equations(
+        self,
+        *,
+        m: Any | None = None,
+        postoptimisation: bool = False,
+    ) -> None:
+        """Move the source alpha and dQ/dA equations without changing formulas."""
+
+        if postoptimisation:
+            if m is None:
+                raise ValueError("postoptimisation alpha equations require a model.")
+            if self.non_isothermal_model:
+                self.P_h = [
+                    [
+                        [
+                            (self.T_h[i][k][0] - self.T_h_out_x[i][j][k][0])
+                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                            else 0.0
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                self.P_c = [
+                    [
+                        [
+                            (self.T_c_out_y[j][i][k][0] - self.T_c[j][k + 1][0])
+                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                            else 0.0
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+            else:
+                self.P_h = [
+                    [
+                        [
+                            (self.T_h[i][k][0] - self.T_h[i][k + 1][0])
+                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                            else 0.0
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                self.P_c = [
+                    [
+                        [
+                            (self.T_c[j][k][0] - self.T_c[j][k + 1][0])
+                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                            else 0.0
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+
+            self.Sum_Qr_is = [
+                [
+                    [sum(self.Q_r[i][j][k][0] for j in range(self.J))]
+                    for k in range(self.S)
+                ]
+                for i in range(self.I)
+            ]
+            self.Sum_Qr_js = [
+                [
+                    [sum(self.Q_r[i][j][k][0] for i in range(self.I))]
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            self.beta_h = [
+                [
+                    [
+                        self.Q_r[i][j][k][0] / self.Sum_Qr_is[i][k][0]
+                        if self.Sum_Qr_is[i][k][0] > 0.0
+                        else 0.0
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            self.beta_c = [
+                [
+                    [
+                        self.Q_r[i][j][k][0] / self.Sum_Qr_js[j][k][0]
+                        if self.Sum_Qr_js[j][k][0] > 0.0
+                        else 0.0
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            self.z_i = [
+                [
+                    sum(self.z[i][j][k][0] for i in range(self.I))
+                    / (sum(self.z[i][j][k][0] for i in range(self.I)) + 1e-9)
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            self.z_j = [
+                [
+                    sum(self.z[i][j][k][0] for j in range(self.J))
+                    / (sum(self.z[i][j][k][0] for j in range(self.J)) + 1e-9)
+                    for k in range(self.S)
+                ]
+                for i in range(self.I)
+            ]
+        else:
+            m = self.m
+            if self.non_isothermal_model:
+                self.P_h = [
+                    [
+                        [
+                            m.Intermediate(
+                                (self.T_h[i][k] - self.T_h_out_x[i][j][k])
+                                * self.z[i][j][k]
+                                / (
+                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
+                                    * self.z[i][j][k]
+                                    + 1
+                                )
+                            )
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                self.P_c = [
+                    [
+                        [
+                            m.Intermediate(
+                                (self.T_c_out_y[j][i][k] - self.T_c[j][k + 1])
+                                * self.z[i][j][k]
+                                / (
+                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
+                                    * self.z[i][j][k]
+                                    + 1
+                                )
+                            )
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+            else:
+                self.P_h = [
+                    [
+                        [
+                            m.Intermediate(
+                                (self.T_h[i][k] - self.T_h[i][k + 1])
+                                * self.z[i][j][k]
+                                / (
+                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
+                                    * self.z[i][j][k]
+                                    + 1
+                                )
+                            )
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                self.P_c = [
+                    [
+                        [
+                            m.Intermediate(
+                                (self.T_c[j][k] - self.T_c[j][k + 1])
+                                * self.z[i][j][k]
+                                / (
+                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
+                                    * self.z[i][j][k]
+                                    + 1
+                                )
+                            )
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+
+            self.Sum_Qr_j = [
+                [
+                    m.Intermediate(sum(self.Q_r[i][j][k] for j in range(self.J)))
+                    for k in range(self.S)
+                ]
+                for i in range(self.I)
+            ]
+            self.Sum_Qr_i = [
+                [
+                    m.Intermediate(sum(self.Q_r[i][j][k] for i in range(self.I)))
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            self.beta_h = [
+                [
+                    [
+                        m.Intermediate(
+                            self.Q_r[i][j][k]
+                            / (self.Sum_Qr_j[i][k] + 1 - self.z[i][j][k])
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            self.beta_c = [
+                [
+                    [
+                        m.Intermediate(
+                            self.Q_r[i][j][k]
+                            / (self.Sum_Qr_i[j][k] + 1 - self.z[i][j][k])
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            self.z_i = [
+                [
+                    m.Intermediate(
+                        sum(self.z[i][j][k] for i in range(self.I))
+                        / (sum(self.z[i][j][k] for i in range(self.I)) + 1e-9)
+                    )
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            self.z_j = [
+                [
+                    m.Intermediate(
+                        sum(self.z[i][j][k] for j in range(self.J))
+                        / (sum(self.z[i][j][k] for j in range(self.J)) + 1e-9)
+                    )
+                    for k in range(self.S)
+                ]
+                for i in range(self.I)
+            ]
+
+        self.alpha = [
+            [
+                [
+                    m.Var(
+                        value=0.0,
+                        ub=1.0,
+                        lb=-1.0,
+                        name=f"alpha_H{i}_to_C{j}_at_S{k}",
+                    )
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.gamma_h = [
+            [
+                [
+                    m.Var(
+                        value=0.5,
+                        ub=1.0,
+                        lb=-1.0,
+                        name=f"gamma_h_H{i}_to_C{j}_at_S{k}",
+                    )
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.gamma_c = [
+            [
+                [
+                    m.Var(
+                        value=0.5,
+                        ub=1.0,
+                        lb=-1.0,
+                        name=f"gamma_c_H{i}_to_C{j}_at_S{k}",
+                    )
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+
+        self.gamma_h_eqn = []
+        self.gamma_c_eqn = []
+        for k in range(self.S):
+            for j in range(self.J):
+                for i in range(self.I):
+                    if k + 1 >= self.S:
+                        self.gamma_h_eqn.append(
+                            [m.Equation(self.gamma_h[i][j][k] == 0.0)]
+                        )
+                        self.gamma_c_eqn.append(
+                            [
+                                m.Equation(
+                                    self.gamma_c[i][j][k]
+                                    == sum(
+                                        self.beta_c[i0][j][k - 1]
+                                        * self.P_c[i0][j][k - 1]
+                                        * self.alpha[i0][j][k - 1]
+                                        for i0 in range(self.I)
+                                    )
+                                    + (1 - self.z_i[j][k - 1])
+                                    * self.gamma_c[i][j][k - 1]
+                                )
+                            ]
+                        )
+                    elif k - 1 < 0:
+                        self.gamma_h_eqn.append(
+                            [
+                                m.Equation(
+                                    self.gamma_h[i][j][k]
+                                    == sum(
+                                        self.beta_h[i][j0][k + 1]
+                                        * self.P_h[i][j0][k + 1]
+                                        * self.alpha[i][j0][k + 1]
+                                        for j0 in range(self.J)
+                                    )
+                                    + (1 - self.z_j[i][k + 1])
+                                    * self.gamma_h[i][j][k + 1]
+                                )
+                            ]
+                        )
+                        self.gamma_c_eqn.append(
+                            [m.Equation(self.gamma_c[i][j][k] == 0.0)]
+                        )
+                    else:
+                        self.gamma_h_eqn.append(
+                            [
+                                m.Equation(
+                                    self.gamma_h[i][j][k]
+                                    == sum(
+                                        self.beta_h[i][j0][k + 1]
+                                        * self.P_h[i][j0][k + 1]
+                                        * self.alpha[i][j0][k + 1]
+                                        for j0 in range(self.J)
+                                    )
+                                    + (1 - self.z_j[i][k + 1])
+                                    * self.gamma_h[i][j][k + 1]
+                                )
+                            ]
+                        )
+                        self.gamma_c_eqn.append(
+                            [
+                                m.Equation(
+                                    self.gamma_c[i][j][k]
+                                    == sum(
+                                        self.beta_c[i0][j][k - 1]
+                                        * self.P_c[i0][j][k - 1]
+                                        * self.alpha[i0][j][k - 1]
+                                        for i0 in range(self.I)
+                                    )
+                                    + (1 - self.z_i[j][k - 1])
+                                    * self.gamma_c[i][j][k - 1]
+                                )
+                            ]
+                        )
+
+        self.alpha_eqn = [
+            m.Equation(
+                self.alpha[i][j][k]
+                == (1 - 0.5 * (self.gamma_h[i][j][k] + self.gamma_c[i][j][k]))
+            )
+            for k in range(self.S)
+            for j in range(self.J)
+            for i in range(self.I)
+            if postoptimisation or self.z_allowed[i][j][k] > 0
+        ]
+        if not postoptimisation:
+            self.alpha_dQ_dA_eqn = [
+                m.Equation(
+                    (
+                        self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
+                        - self.alpha[i][j][k]
+                        * self.theta_1[i][j][k]
+                        * self.theta_2[i][j][k]
+                        * self.U_r[i][j]
+                    )
+                    * self.z[i][j][k]
+                    <= 0.0
+                )
+                if self.z_allowed[i][j][k] > 0
+                else None
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+
     def set_blank_input_parameters(self) -> None:
         """Initialize the solver-array attributes expected by source equations."""
 
@@ -141,6 +589,8 @@ class BaseHeatExchangerNetworkModel(ABC):
     def set_match_restrictions(self, restrictions) -> None:
         """Apply inherited topology restrictions in the source array shape."""
 
+        if restrictions is None:
+            restrictions = [None, None, None]
         z_restriction, zhu_restriction, zcu_restriction = (
             restrictions[0],
             restrictions[1],
@@ -192,13 +642,11 @@ class BaseHeatExchangerNetworkModel(ABC):
         if zhu_restriction is not None:
             if isinstance(zhu_restriction[0], int):
                 self.z_hu_allowed = [
-                    1 if zhu_restriction[j] > self.tol else 0
-                    for j in range(self.J)
+                    1 if zhu_restriction[j] > self.tol else 0 for j in range(self.J)
                 ]
             else:
                 self.z_hu_allowed = [
-                    1 if zhu_restriction[j][0] > self.tol else 0
-                    for j in range(self.J)
+                    1 if zhu_restriction[j][0] > self.tol else 0 for j in range(self.J)
                 ]
         else:
             self.z_hu_allowed = self.z_hu_feasible
@@ -206,13 +654,11 @@ class BaseHeatExchangerNetworkModel(ABC):
         if zcu_restriction is not None:
             if isinstance(zcu_restriction[0], int):
                 self.z_cu_allowed = [
-                    1 if zcu_restriction[i] > self.tol else 0
-                    for i in range(self.I)
+                    1 if zcu_restriction[i] > self.tol else 0 for i in range(self.I)
                 ]
             else:
                 self.z_cu_allowed = [
-                    1 if zcu_restriction[i][0] > self.tol else 0
-                    for i in range(self.I)
+                    1 if zcu_restriction[i][0] > self.tol else 0 for i in range(self.I)
                 ]
         else:
             self.z_cu_allowed = self.z_cu_feasible

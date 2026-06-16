@@ -1,4 +1,4 @@
-"""HENS-06 private model-boundary tests."""
+"""Private HEN synthesis model-boundary tests."""
 
 from __future__ import annotations
 
@@ -8,8 +8,10 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+from OpenPinch import PinchProblem
 from OpenPinch.classes.heat_exchanger import HeatExchangerKind
 from OpenPinch.lib.config import tol
 from OpenPinch.services.heat_exchanger_network_synthesis._dependencies import (
@@ -18,17 +20,41 @@ from OpenPinch.services.heat_exchanger_network_synthesis._dependencies import (
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
     PreparedSolverArrays,
+    problem_to_solver_arrays,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.models import backend
 from OpenPinch.services.heat_exchanger_network_synthesis.models.extraction import (
     extract_heat_exchanger_network,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.models.pinch_decomposition import (
+    PinchDecompModel,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.models.problem import (
     InternalHeatExchangerNetworkProblem,
     ModelSliceUnavailableError,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.models.stagewise import (
+    StageWiseModel,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.pinch_decomposition import (
+    build_pinch_decomposition_snapshot,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
+    LocalSynthesisExecutor,
+    build_energy_stage_refinement_tasks,
+    build_pinch_decomposition_tasks,
+    build_topology_design_tasks,
+    workflow_settings_from_problem,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+OPENHENS_ROOT = Path("/Users/ca107/Desktop/ahuora/OpenHENS")
+OPENHENS_FOUR_STREAM_CSV = (
+    OPENHENS_ROOT / "examples/cases/Four-stream-Yee-and-Grossmann-1990-1.csv"
+)
+FOUR_STREAM_JSON = (
+    REPO_ROOT / "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json"
+)
 SYNTHESIS_ONLY_MODULES = [
     "gekko",
     "pyomo",
@@ -129,7 +155,7 @@ def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> No
 
 
 @pytest.mark.parametrize("framework", ["PDM", "TDM", "ESM"])
-def test_internal_problem_rejects_concrete_model_loads_in_hens06(
+def test_internal_problem_rejects_hens08_evolution(
     framework: str,
 ) -> None:
     problem = InternalHeatExchangerNetworkProblem(
@@ -140,37 +166,369 @@ def test_internal_problem_rejects_concrete_model_loads_in_hens06(
 
     with pytest.raises(
         ModelSliceUnavailableError,
-        match=r"HENS-06.*Concrete PDM/TDM/ESM.*HENS-07.*HENS-08",
+        match=r"HENS-07.*HENS-08",
     ):
+        problem.get_solution(evolution=True)
+
+
+def test_stagewise_construction_matches_source_four_stream_structural_fields(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    SourceStageWiseModel, _SourcePinchDecompModel = _source_openhens_models(
+        monkeypatch,
+        tmp_path,
+    )
+    moved = StageWiseModel(
+        name="moved-stagewise",
+        framework="TDM",
+        solver="apopt",
+        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 0.1),
+        stages=3,
+        dTmin=0.1,
+        z_restriction=None,
+        min_dqda=0.5,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+    )
+    source = SourceStageWiseModel(
+        name="source-stagewise",
+        framework="TDM",
+        solver="apopt",
+        import_file=OPENHENS_FOUR_STREAM_CSV,
+        stages=3,
+        dTmin=0.1,
+        z_restriction=[None, None, None],
+        min_dqda=0.5,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+    )
+
+    assert (moved.I, moved.J, moved.S, moved.K) == (
+        source.I,
+        source.J,
+        source.S,
+        source.K,
+    )
+    np.testing.assert_allclose(moved.Qtot_sh, source.Qtot_sh)
+    np.testing.assert_allclose(moved.Qtot_sc, source.Qtot_sc)
+    np.testing.assert_allclose(moved.Q_max, source.Q_max)
+    assert moved.z_feasible == source.z_feasible
+    assert moved.z_hu_feasible == source.z_hu_feasible
+    assert moved.z_cu_feasible == source.z_cu_feasible
+    assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
+    assert moved.theta_1[0][0][0].name == source.theta_1[0][0][0].name
+    assert moved.z[0][0][0].name == source.z[0][0][0].name
+
+
+def test_esm_stagewise_construction_matches_source_four_stream_structural_fields(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    SourceStageWiseModel, _SourcePinchDecompModel = _source_openhens_models(
+        monkeypatch,
+        tmp_path,
+    )
+    moved = StageWiseModel(
+        name="moved-esm-stagewise",
+        framework="ESM",
+        solver="apopt",
+        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 0.1),
+        stages=3,
+        dTmin=0.1,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="variable total cost",
+        non_isothermal_model=True,
+        integers=False,
+        tol=1e-3,
+    )
+    source = SourceStageWiseModel(
+        name="source-esm-stagewise",
+        framework="ESM",
+        solver="apopt",
+        import_file=OPENHENS_FOUR_STREAM_CSV,
+        stages=3,
+        dTmin=0.1,
+        z_restriction=[None, None, None],
+        min_dqda=0.0,
+        minimisation_goal="variable total cost",
+        non_isothermal_model=True,
+        integers=False,
+        tol=1e-3,
+    )
+
+    assert (moved.I, moved.J, moved.S, moved.K) == (
+        source.I,
+        source.J,
+        source.S,
+        source.K,
+    )
+    assert moved.non_isothermal_model is source.non_isothermal_model is True
+    assert moved.integers is source.integers is False
+    assert moved.minimisation_goal == source.minimisation_goal == "variable total cost"
+    np.testing.assert_allclose(moved.Qtot_sh, source.Qtot_sh)
+    np.testing.assert_allclose(moved.Qtot_sc, source.Qtot_sc)
+    np.testing.assert_allclose(moved.Q_max, source.Q_max)
+    assert moved.z_feasible == source.z_feasible
+    assert moved.z_hu_feasible == source.z_hu_feasible
+    assert moved.z_cu_feasible == source.z_cu_feasible
+    assert len(moved.m._equations) == len(source.m._equations)
+    assert len(moved.m._objectives) == len(source.m._objectives)
+    assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
+    assert moved.theta_1[0][0][0].name == source.theta_1[0][0][0].name
+    assert moved.z[0][0][0].name == source.z[0][0][0].name
+    assert moved.X[0][0][0].name == source.X[0][0][0].name
+    assert moved.Y[0][0][0].name == source.Y[0][0][0].name
+    assert moved.T_h_out_x[0][0][0].name == source.T_h_out_x[0][0][0].name
+    assert moved.T_c_out_y[0][0][0].name == source.T_c_out_y[0][0][0].name
+    assert moved.hu_cost_total.name == source.hu_cost_total.name
+    assert moved.cu_cost_total.name == source.cu_cost_total.name
+    assert moved.hu_area_cost_total.name == source.hu_area_cost_total.name
+    assert moved.cu_area_cost_total.name == source.cu_area_cost_total.name
+    assert (
+        moved.recovery_area_cost_filtered[0][0].name
+        == source.recovery_area_cost_filtered[0][0].name
+    )
+    assert not hasattr(moved, "utility_unit_cost_total")
+    assert not hasattr(source, "utility_unit_cost_total")
+
+
+def test_pdm_construction_matches_source_four_stream_above_below_fields(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _SourceStageWiseModel, SourcePinchDecompModel = _source_openhens_models(
+        monkeypatch,
+        tmp_path,
+    )
+    moved_above, moved_below = _moved_pdm_models()
+    source_above = SourcePinchDecompModel(
+        name="source-above",
+        framework="PDM",
+        solver="apopt",
+        import_file=OPENHENS_FOUR_STREAM_CSV,
+        dTmin=14.0,
+        z_restriction=[None, None, None],
+        min_dqda=0,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc="above",
+        stage_selection="automated",
+    )
+    source_below = SourcePinchDecompModel(
+        name="source-below",
+        framework="PDM",
+        solver="apopt",
+        import_file=OPENHENS_FOUR_STREAM_CSV,
+        dTmin=14.0,
+        z_restriction=[None, None, None],
+        min_dqda=0,
+        minimisation_goal="cold utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc="below",
+        stage_selection="automated",
+    )
+
+    for moved, source in (
+        (moved_above, source_above),
+        (moved_below, source_below),
+    ):
+        assert moved.HU_target == pytest.approx(source.HU_target)
+        assert moved.CU_target == pytest.approx(source.CU_target)
+        assert moved.T_pinch == pytest.approx(source.T_pinch)
+        assert (moved.I, moved.J, moved.S, moved.K) == (
+            source.I,
+            source.J,
+            source.S,
+            source.K,
+        )
+        assert moved.z_i_active == source.z_i_active
+        assert moved.z_j_active == source.z_j_active
+        np.testing.assert_allclose(moved.T_h_in, source.T_h_in)
+        np.testing.assert_allclose(moved.T_h_out, source.T_h_out)
+        np.testing.assert_allclose(moved.T_c_in, source.T_c_in)
+        np.testing.assert_allclose(moved.T_c_out, source.T_c_out)
+        np.testing.assert_allclose(moved.Q_max, source.Q_max)
+        assert moved.z_feasible == source.z_feasible
+        assert moved.z_hu_feasible == source.z_hu_feasible
+        assert moved.z_cu_feasible == source.z_cu_feasible
+        assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
+        assert moved.T_h[0][0].name == source.T_h[0][0].name
+
+
+def test_pdm_manual_above_below_stage_selection_matches_source(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _SourceStageWiseModel, SourcePinchDecompModel = _source_openhens_models(
+        monkeypatch,
+        tmp_path,
+    )
+    moved_above, moved_below = _moved_pdm_models(stage_selection=[2, 3])
+    source_above = SourcePinchDecompModel(
+        name="source-above-manual",
+        framework="PDM",
+        solver="apopt",
+        import_file=OPENHENS_FOUR_STREAM_CSV,
+        dTmin=14.0,
+        z_restriction=[None, None, None],
+        min_dqda=0,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc="above",
+        stage_selection=[2, 3],
+    )
+    source_below = SourcePinchDecompModel(
+        name="source-below-manual",
+        framework="PDM",
+        solver="apopt",
+        import_file=OPENHENS_FOUR_STREAM_CSV,
+        dTmin=14.0,
+        z_restriction=[None, None, None],
+        min_dqda=0,
+        minimisation_goal="cold utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc="below",
+        stage_selection=[2, 3],
+    )
+
+    assert moved_above.S == source_above.S == 2
+    assert moved_below.S == source_below.S == 3
+    assert moved_above.K == source_above.K == 3
+    assert moved_below.K == source_below.K == 4
+
+
+def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
+    pdm_problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 14.0),
+        name="pdm",
+        framework="PDM",
+        solver="apopt",
+        dTmin=14.0,
+        pinch_snapshots=_pdm_snapshots(_four_stream_problem(), dTmin=14.0),
+    )
+    parent = InternalHeatExchangerNetworkProblem(
+        solver_arrays=_solver_arrays(),
+        synthesis_task_id="parent-task",
+    )
+    parent.case = _ParentCase()
+    child = InternalHeatExchangerNetworkProblem(
+        solver_arrays=_solver_arrays(),
+        name="child",
+        framework="ESM",
+        parent=parent,
+    )
+
+    pdm_problem.load_model()
+    child.load_model(model_factories={"stagewise": _RecordingStageWise})
+
+    assert pdm_problem.above.pinch_loc == "above"
+    assert pdm_problem.below.pinch_loc == "below"
+    assert child.case.stages == parent.case.stages
+    assert child.case.initialised_from is parent.case
+
+
+def test_local_executor_uses_parent_problem_for_downstream_tasks(monkeypatch) -> None:
+    problem = _four_stream_problem(
+        options={
+            "HENS_APPROACH_TEMPERATURES": [14.0],
+            "HENS_DERIVATIVE_THRESHOLDS": [0.5],
+            "HENS_STAGE_SELECTION": [3],
+            "HENS_RUN_ID": "hens-07-parent-test",
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+    executor = LocalSynthesisExecutor()
+    parent_links = []
+
+    def fake_get_solution(
+        self, *, print_output=True, evolution=None, model_factories=None
+    ):
+        del print_output, evolution, model_factories
+        if self.parent is not None:
+            parent_links.append((self.synthesis_task_id, self.parent.synthesis_task_id))
+        self.case = _SolvedCase()
+        self.case.S = self.stages or 3
+        self.case.stages = self.case.S
+        self.case.mSuccess = 1
+        return self.case
+
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem,
+        "get_solution",
+        fake_get_solution,
+    )
+    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_outcomes = executor.execute(
+        pdm_tasks,
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=1,
+    )
+    tdm_tasks = build_topology_design_tasks(settings, pdm_outcomes)
+    tdm_outcomes = executor.execute(
+        tdm_tasks,
+        problem=problem,
+        parent_outcomes={
+            outcome.task.task_id: outcome
+            for outcome in pdm_outcomes
+            if outcome.task.task_id is not None
+        },
+        max_parallel=1,
+    )
+    upstream_outcomes = {
+        outcome.task.task_id: outcome
+        for outcome in (*pdm_outcomes, *tdm_outcomes)
+        if outcome.task.task_id is not None
+    }
+    esm_tasks = build_energy_stage_refinement_tasks(settings, tdm_outcomes)
+    esm_outcomes = executor.execute(
+        esm_tasks,
+        problem=problem,
+        parent_outcomes=upstream_outcomes,
+        max_parallel=1,
+    )
+
+    assert pdm_outcomes[0].status == "success"
+    assert tdm_outcomes[0].status == "success"
+    assert esm_outcomes[0].status == "success"
+    assert parent_links == [
+        (tdm_tasks[0].task_id, pdm_tasks[0].task_id),
+        (esm_tasks[0].task_id, tdm_tasks[0].task_id),
+    ]
+
+
+def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) -> None:
+    def missing_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        raise MissingSynthesisSolverError(
+            f"The {binary_name!r} solver executable is required for {purpose}."
+        )
+
+    monkeypatch.setattr(backend, "require_solver_binary", missing_binary)
+    snapshots = _pdm_snapshots(_four_stream_problem(), dTmin=14.0)
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 14.0),
+        framework="PDM",
+        solver="couenne",
+        dTmin=14.0,
+        pinch_snapshots=snapshots,
+    )
+
+    with pytest.raises(MissingSynthesisSolverError, match="couenne.*synthesis solves"):
         problem.load_model()
-
-
-@pytest.mark.parametrize(
-    ("framework", "factory_name"),
-    [
-        ("PDM", "pinch_decomposition"),
-        ("TDM", "stagewise"),
-        ("ESM", "stagewise"),
-    ],
-)
-def test_internal_problem_rejects_registered_factories_before_they_can_run(
-    framework: str,
-    factory_name: str,
-) -> None:
-    problem = InternalHeatExchangerNetworkProblem(
-        solver_arrays=_solver_arrays(),
-        framework=framework,
-        stages=2,
-    )
-
-    def forbidden_factory(*_args, **_kwargs):
-        raise AssertionError("HENS-06 must not call concrete model factories")
-
-    with pytest.raises(
-        ModelSliceUnavailableError,
-        match=rf"Factory registrations were ignored: {factory_name}",
-    ):
-        problem.get_solution(model_factories={factory_name: forbidden_factory})
 
 
 def test_extraction_converts_solver_arrays_to_identity_labelled_network() -> None:
@@ -254,6 +612,98 @@ def test_internal_problem_result_serializes_without_solver_arrays() -> None:
     assert "Q_c" not in encoded
 
 
+def _four_stream_problem(*, options: dict | None = None) -> PinchProblem:
+    payload = json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8"))
+    if options:
+        payload["options"] = {**payload["options"], **options}
+    return PinchProblem(source=payload, project_name="HENS-07 Four-stream")
+
+
+def _pdm_snapshots(
+    problem: PinchProblem,
+    *,
+    dTmin: float,
+    stage_selection="automated",
+):
+    return {
+        "above": build_pinch_decomposition_snapshot(
+            problem,
+            dTmin,
+            pinch_location="above",
+            stage_selection=stage_selection,
+        ),
+        "below": build_pinch_decomposition_snapshot(
+            problem,
+            dTmin,
+            pinch_location="below",
+            stage_selection=stage_selection,
+        ),
+    }
+
+
+def _moved_pdm_models(stage_selection="automated"):
+    problem = _four_stream_problem()
+    arrays = problem_to_solver_arrays(problem, 14.0)
+    snapshots = _pdm_snapshots(
+        problem,
+        dTmin=14.0,
+        stage_selection=stage_selection,
+    )
+    above = PinchDecompModel(
+        name="moved-above",
+        framework="PDM",
+        solver="apopt",
+        solver_arrays=arrays,
+        dTmin=14.0,
+        z_restriction=None,
+        min_dqda=0,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc="above",
+        pinch_snapshot=snapshots["above"],
+        stage_selection=stage_selection,
+    )
+    below = PinchDecompModel(
+        name="moved-below",
+        framework="PDM",
+        solver="apopt",
+        solver_arrays=arrays,
+        dTmin=14.0,
+        z_restriction=None,
+        min_dqda=0,
+        minimisation_goal="cold utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc="below",
+        pinch_snapshot=snapshots["below"],
+        stage_selection=stage_selection,
+    )
+    return above, below
+
+
+def _source_openhens_models(monkeypatch, tmp_path: Path):
+    if not OPENHENS_ROOT.exists() or not OPENHENS_FOUR_STREAM_CSV.exists():
+        pytest.skip("source OpenHENS checkout is not available")
+
+    monkeypatch.setenv("MPLCONFIGDIR", str(tmp_path / "matplotlib"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    source_root = str(OPENHENS_ROOT)
+    if source_root not in sys.path:
+        sys.path.insert(0, source_root)
+
+    from openhens.classes.pinch_decomp_model import (  # noqa: PLC0415
+        PinchDecompModel as SourcePinchDecompModel,
+    )
+    from openhens.classes.stage_wise_model import (  # noqa: PLC0415
+        StageWiseModel as SourceStageWiseModel,
+    )
+
+    return SourceStageWiseModel, SourcePinchDecompModel
+
+
 def _solver_arrays() -> PreparedSolverArrays:
     return PreparedSolverArrays(
         arrays={},
@@ -292,6 +742,21 @@ class _FakeGekkoModel:
     def __init__(self) -> None:
         self.options = _FakeOptions()
         self.solver_options = []
+
+
+class _ParentCase:
+    stages = 3
+    S = 3
+
+
+class _RecordingStageWise:
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+        self.stages = kwargs["stages"]
+        self.initialised_from = None
+
+    def set_initial_values_for_variables(self, parent_case) -> None:
+        self.initialised_from = parent_case
 
 
 class _SolvedCase:
@@ -382,8 +847,11 @@ def test_extraction_uses_tolerance_for_binary_and_duty_activity() -> None:
         include_inactive=False,
     )
 
-    assert network.exchanger_between(
-        source_stream="hot-utility",
-        sink_stream="cold-B",
-        kind=HeatExchangerKind.HOT_UTILITY,
-    ) is None
+    assert (
+        network.exchanger_between(
+            source_stream="hot-utility",
+            sink_stream="cold-B",
+            kind=HeatExchangerKind.HOT_UTILITY,
+        )
+        is None
+    )

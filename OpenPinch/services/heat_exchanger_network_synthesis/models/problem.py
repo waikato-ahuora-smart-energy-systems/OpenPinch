@@ -8,23 +8,24 @@ from typing import Any, Literal, Mapping
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
 from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
 from ..array_adapter import PreparedSolverArrays
+from ..pinch_decomposition import PinchDecompositionSnapshot
 from .extraction import extract_heat_exchanger_network, extract_network_synthesis_result
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
 
 
 class ModelSliceUnavailableError(NotImplementedError):
-    """Raised when HENS-06 is asked to run deferred equation-model slices."""
+    """Raised when a later migration slice is asked to run too early."""
 
 
 @dataclass
 class InternalHeatExchangerNetworkProblem:
-    """OpenPinch-owned replacement for the source ``HeatExchangerNetworkProblem``.
+    """OpenPinch-owned replacement for source ``HeatExchangerNetworkProblem``.
 
-    This object is private solver state. HENS-06 records the source
-    task-to-model arguments and emits OpenPinch network/result payloads at the
-    extraction boundary. Concrete PDM/TDM/ESM construction and solving stay
-    unavailable until the later migration slices move their source semantics.
+    This object is private solver state. HENS-07 constructs moved PDM and
+    StageWise models from OpenPinch-prepared solver arrays and emits OpenPinch
+    network/result payloads at the extraction boundary. HENS-08 still owns
+    stage reduction and topology evolution.
     """
 
     solver_arrays: PreparedSolverArrays
@@ -42,15 +43,32 @@ class InternalHeatExchangerNetworkProblem:
     stage_selection: str | list[str] = "automated"
     stages: int | None = None
     synthesis_task_id: str | None = None
+    pinch_snapshots: Mapping[str, PinchDecompositionSnapshot] | None = None
 
     def load_model(
         self,
         *,
         model_factories: Mapping[str, Any] | None = None,
     ) -> None:
-        """Reject concrete model loading until deferred source semantics move."""
+        """Construct the private PDM or StageWise model for this task."""
 
-        self._raise_deferred_model_error(model_factories=model_factories)
+        self.args = {
+            "name": self.name,
+            "framework": self.framework,
+            "solver": self.solver,
+            "solver_arrays": self.solver_arrays,
+            "dTmin": self.dTmin,
+            "min_dqda": self.min_dqda,
+            "z_restriction": self.z_restriction,
+            "minimisation_goal": self.minimisation_goal,
+            "non_isothermal_model": self.non_isothermal_model,
+            "integers": self.integers,
+            "tol": self.tol,
+        }
+        if self.framework == "PDM":
+            self._build_pdm(model_factories=model_factories)
+            return
+        self._build_stage_wise(model_factories=model_factories)
 
     def get_solution(
         self,
@@ -59,10 +77,23 @@ class InternalHeatExchangerNetworkProblem:
         evolution: bool | None = None,
         model_factories: Mapping[str, Any] | None = None,
     ) -> Any:
-        """Reject concrete solves until PDM/stagewise behavior is fully moved."""
+        """Load, solve, and return the private solved model for this task."""
 
-        del print_output, evolution
-        self._raise_deferred_model_error(model_factories=model_factories)
+        if evolution:
+            raise ModelSliceUnavailableError(
+                "HENS-07 moved PDM and StageWise model construction only. "
+                "Stage reduction and topology evolution are reserved for HENS-08."
+            )
+        try:
+            self.load_model(model_factories=model_factories)
+            if self.framework == "PDM":
+                self._solve_pdm(print_output=print_output)
+            else:
+                self.case.optimise(print_output=print_output)
+            return self.case
+        except ValueError as exc:
+            self.solution_failure_reason = str(exc)
+            return None
 
     def extract_network(self, *, run_id: str) -> HeatExchangerNetwork:
         """Convert the solved private case into an OpenPinch network result."""
@@ -99,21 +130,115 @@ class InternalHeatExchangerNetworkProblem:
             stage_count=getattr(self.case, "S", self.stages),
         )
 
-    def _raise_deferred_model_error(
+    def _build_pdm(
         self,
         *,
         model_factories: Mapping[str, Any] | None,
     ) -> None:
-        if model_factories:
-            attempted = ", ".join(sorted(model_factories))
-            detail = f" Factory registrations were ignored: {attempted}."
-        else:
-            detail = ""
-        raise ModelSliceUnavailableError(
-            "HENS-06 moved only the base equation-kernel boundary, backend "
-            "guards, private problem shell, and solution extraction. Concrete "
-            "PDM/TDM/ESM model construction and solving remain unavailable "
-            "until HENS-07 moves the source PDM/stagewise semantics and "
-            "HENS-08 moves stage reduction/topology evolution unchanged."
-            f"{detail}"
+        """Construct source PDM above/below models with private snapshots."""
+
+        snapshots = dict(self.pinch_snapshots or {})
+        if "above" not in snapshots or "below" not in snapshots:
+            raise ValueError(
+                "PDM construction requires above and below pinch decomposition "
+                "snapshots from the OpenPinch targeting boundary."
+            )
+        factory = self._model_factory(
+            model_factories,
+            "pinch_decomposition",
+            default="PinchDecompModel",
         )
+        base_args = dict(self.args)
+        self.above = factory(
+            **(
+                base_args
+                | {
+                    "name": f"above pinch {self.dTmin}",
+                    "pinch_loc": "above",
+                    "minimisation_goal": "hot utility",
+                    "pinch_snapshot": snapshots["above"],
+                    "stage_selection": self.stage_selection,
+                }
+            )
+        )
+        self.below = factory(
+            **(
+                base_args
+                | {
+                    "name": f"below pinch {self.dTmin}",
+                    "pinch_loc": "below",
+                    "minimisation_goal": "cold utility",
+                    "pinch_snapshot": snapshots["below"],
+                    "stage_selection": self.stage_selection,
+                }
+            )
+        )
+
+    def _build_stage_wise(
+        self,
+        *,
+        model_factories: Mapping[str, Any] | None,
+    ) -> None:
+        """Construct a TDM/ESM model from explicit or parent stage state."""
+
+        stages = self.stages
+        if stages is None and self.parent is not None:
+            stages = getattr(
+                self.parent.case,
+                "stages",
+                getattr(self.parent.case, "S", None),
+            )
+        if stages is None:
+            raise ValueError(
+                "Stage-wise models require an explicit stage count or a parent "
+                "solution."
+            )
+        factory = self._model_factory(
+            model_factories,
+            "stagewise",
+            default="StageWiseModel",
+        )
+        self.case = factory(**self.args, stages=stages)
+        if self.parent is not None:
+            self.case.set_initial_values_for_variables(self.parent.case)
+
+    def _solve_pdm(self, *, print_output: bool = True) -> None:
+        """Solve PDM sides and amalgamate them without HENS-08 reduction."""
+
+        if self.above.HU_target > 0:
+            self.above.optimise(print_output=print_output)
+        if self.below.CU_target > 0:
+            self.below.optimise(print_output=print_output)
+        self.case = self.above.amalgamate_networks(
+            below_case=self.below,
+            above_case=self.above,
+        )
+        self.case.get_post_process()
+        if print_output:
+            self.case.output_to_cmd_line()
+        self.args.update(
+            {
+                "name": f"PDM amalgamated {self.dTmin}",
+                "minimisation_goal": "total utility",
+                "tol": self.tol,
+            }
+        )
+
+    def _model_factory(
+        self,
+        model_factories: Mapping[str, Any] | None,
+        factory_name: str,
+        *,
+        default: str,
+    ) -> Any:
+        if model_factories and factory_name in model_factories:
+            return model_factories[factory_name]
+        if default == "PinchDecompModel":
+            from .pinch_decomposition import PinchDecompModel
+
+            return PinchDecompModel
+        if default == "StageWiseModel":
+            from .stagewise import StageWiseModel
+
+            return StageWiseModel
+        raise ValueError(f"Unknown HEN model factory {default!r}.")

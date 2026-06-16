@@ -26,6 +26,9 @@ from ...lib.schemas.synthesis import (
     HeatExchangerNetworkTopologyRestriction,
     SynthesisMethod,
 )
+from .array_adapter import PreparedSolverArrays, problem_to_solver_arrays
+from .models.problem import InternalHeatExchangerNetworkProblem
+from .pinch_decomposition import build_pinch_decomposition_snapshot
 
 _METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
     "pinch_decomposition",
@@ -144,6 +147,141 @@ class FakeSynthesisExecutor:
                 )
             )
         return tuple(outcomes)
+
+
+class LocalSynthesisExecutor:
+    """Internal sequential executor for moved PDM/TDM/ESM model slices."""
+
+    def __init__(self, *, print_output: bool = False, evolution: bool = False) -> None:
+        self.print_output = print_output
+        self.evolution = evolution
+        self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
+        self.stage_order: list[SynthesisMethod] = []
+        self.problems_by_task_id: dict[str, InternalHeatExchangerNetworkProblem] = {}
+
+    def execute(
+        self,
+        tasks: Sequence[HeatExchangerNetworkSynthesisTask],
+        *,
+        problem,
+        parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
+        max_parallel: int,
+    ) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
+        del max_parallel
+        if tasks:
+            self.stage_order.append(tasks[0].method)
+
+        outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome] = []
+        for task in tasks:
+            self.executed_tasks.append(task)
+            try:
+                internal_problem = self._build_problem(
+                    task,
+                    problem=problem,
+                    parent_outcomes=parent_outcomes,
+                )
+                solved = internal_problem.get_solution(
+                    print_output=self.print_output,
+                    evolution=self.evolution,
+                )
+                if solved is None or getattr(solved, "mSuccess", 0) != 1:
+                    reason = getattr(
+                        internal_problem,
+                        "solution_failure_reason",
+                        "solver did not return a successful HEN model",
+                    )
+                    outcomes.append(_failed_task_outcome(task, reason))
+                    continue
+
+                network = internal_problem.extract_network(run_id=task.run_id)
+                if task.task_id is not None:
+                    self.problems_by_task_id[task.task_id] = internal_problem
+                outcomes.append(
+                    HeatExchangerNetworkSynthesisTaskOutcome(
+                        task=task,
+                        status="success",
+                        network=network,
+                        objective_value=network.total_annual_cost,
+                        solver_status=_solver_status(internal_problem),
+                    )
+                )
+            except Exception as exc:
+                outcomes.append(_failed_task_outcome(task, str(exc)))
+        return tuple(outcomes)
+
+    def _build_problem(
+        self,
+        task: HeatExchangerNetworkSynthesisTask,
+        *,
+        problem,
+        parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
+    ) -> InternalHeatExchangerNetworkProblem:
+        parent_problem = self._parent_problem(task, parent_outcomes)
+        dTmin = _legacy_task_dTmin(task)
+        arrays = problem_to_solver_arrays(problem, dTmin)
+        stage_selection = _legacy_pdm_stage_selection(problem)
+        snapshots = None
+        if task.method == "pinch_decomposition":
+            snapshots = {
+                "above": build_pinch_decomposition_snapshot(
+                    problem,
+                    task.approach_temperature,
+                    pinch_location="above",
+                    stage_selection=stage_selection,
+                ),
+                "below": build_pinch_decomposition_snapshot(
+                    problem,
+                    task.approach_temperature,
+                    pinch_location="below",
+                    stage_selection=stage_selection,
+                ),
+            }
+
+        return InternalHeatExchangerNetworkProblem(
+            solver_arrays=arrays,
+            name=_legacy_task_name(task),
+            framework=_legacy_framework(task.method),
+            solver=_solver_for_task(problem, task.method),
+            dTmin=dTmin,
+            min_dqda=0.0
+            if task.derivative_threshold is None
+            else float(task.derivative_threshold),
+            z_restriction=_legacy_z_restriction(task, arrays),
+            minimisation_goal=_legacy_objective(task.method),
+            non_isothermal_model=task.method == "energy_stage_refinement",
+            integers=task.method != "energy_stage_refinement",
+            parent=parent_problem,
+            tol=_solve_tolerance(problem),
+            stage_selection=stage_selection,
+            stages=task.stage_count,
+            synthesis_task_id=task.task_id,
+            pinch_snapshots=snapshots,
+        )
+
+    def _parent_problem(
+        self,
+        task: HeatExchangerNetworkSynthesisTask,
+        parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
+    ) -> InternalHeatExchangerNetworkProblem | None:
+        if task.parent_task_id is None:
+            return None
+        parent_outcome = parent_outcomes.get(task.parent_task_id)
+        if parent_outcome is None:
+            raise WorkflowContractError(
+                f"Missing parent outcome for task {task.task_id}: {task.parent_task_id}"
+            )
+        if parent_outcome.status != "success":
+            raise WorkflowContractError(
+                f"Cannot build task {task.task_id} from failed parent "
+                f"{task.parent_task_id}."
+            )
+        parent_problem = self.problems_by_task_id.get(task.parent_task_id)
+        if parent_problem is None:
+            raise WorkflowContractError(
+                f"Successful parent task {task.parent_task_id} has no private "
+                "solver problem for StageWise warm-start."
+            )
+        return parent_problem
 
 
 def workflow_settings_from_problem(
@@ -360,8 +498,7 @@ def build_synthesis_result(
             "task_id": accepted.task.task_id,
             "state_id": settings.state_id,
             "method": accepted.task.method,
-            "stage_count": accepted.network.stage_count
-            or accepted.task.stage_count,
+            "stage_count": accepted.network.stage_count or accepted.task.stage_count,
         }
     )
     objective_values = {
@@ -416,9 +553,11 @@ def _accepted_outcome(
         if candidates:
             return min(
                 candidates,
-                key=lambda outcome: float("inf")
-                if outcome.objective_value is None
-                else outcome.objective_value,
+                key=lambda outcome: (
+                    float("inf")
+                    if outcome.objective_value is None
+                    else outcome.objective_value
+                ),
             )
     raise WorkflowContractError("HEN synthesis produced no successful task outcomes.")
 
@@ -566,3 +705,102 @@ def _temperature(value, unit: str) -> float | None:
     if hasattr(value, "to"):
         return float(value.to(unit).value)
     return float(value)
+
+
+def _failed_task_outcome(
+    task: HeatExchangerNetworkSynthesisTask,
+    reason: str,
+) -> HeatExchangerNetworkSynthesisTaskOutcome:
+    return HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task,
+        status="failed",
+        solver_status="failed",
+        error=reason or "HEN synthesis task failed",
+    )
+
+
+def _legacy_framework(method: SynthesisMethod) -> str:
+    return {
+        "pinch_decomposition": "PDM",
+        "topology_design": "TDM",
+        "energy_stage_refinement": "ESM",
+    }[method]
+
+
+def _legacy_objective(method: SynthesisMethod) -> str:
+    if method == "energy_stage_refinement":
+        return "variable total cost"
+    return "hot utility"
+
+
+def _legacy_task_dTmin(task: HeatExchangerNetworkSynthesisTask) -> float:
+    if task.method == "pinch_decomposition":
+        return float(task.approach_temperature)
+    return 0.1
+
+
+def _legacy_task_name(task: HeatExchangerNetworkSynthesisTask) -> str:
+    if task.method == "pinch_decomposition":
+        return f"P-+--PDM-{task.approach_temperature}"
+    if task.method == "topology_design":
+        stages = task.stage_count if task.stage_count is not None else "unknown"
+        return f"P-S{stages}--TDM-{task.derivative_threshold}"
+    stages = task.stage_count if task.stage_count is not None else "unknown"
+    return f"P-S{stages}-Synheat-Iso-NLP"
+
+
+def _solver_for_task(problem, method: SynthesisMethod) -> str:
+    config = problem.master_zone.config
+    if method == "pinch_decomposition":
+        return str(config.HENS_PDM_SOLVER)
+    if method == "topology_design":
+        return str(config.HENS_TDM_SOLVER)
+    return str(config.HENS_ESM_SOLVER)
+
+
+def _solve_tolerance(problem) -> float:
+    return float(problem.master_zone.config.HENS_SOLVE_TOLERANCE)
+
+
+def _legacy_pdm_stage_selection(problem) -> str | list[int]:
+    selection = [
+        int(value) for value in problem.master_zone.config.HENS_STAGE_SELECTION
+    ]
+    if len(selection) == 2:
+        return selection
+    return "automated"
+
+
+def _legacy_z_restriction(
+    task: HeatExchangerNetworkSynthesisTask,
+    arrays: PreparedSolverArrays,
+) -> list:
+    if not task.topology_restrictions:
+        return [None, None, None]
+
+    hot_axis = arrays.axis_maps["hot_process_streams"]
+    cold_axis = arrays.axis_maps["cold_process_streams"]
+    stage_count = task.stage_count or max(
+        restriction.stage for restriction in task.topology_restrictions
+    )
+    recovery = [
+        [[0.0 for _k in range(stage_count)] for _j in range(len(cold_axis))]
+        for _i in range(len(hot_axis))
+    ]
+    for restriction in task.topology_restrictions:
+        i = hot_axis[restriction.source_stream]
+        j = cold_axis[restriction.sink_stream]
+        k = restriction.stage - 1
+        recovery[i][j][k] = float(restriction.duty)
+    return [recovery, None, None]
+
+
+def _solver_status(problem: InternalHeatExchangerNetworkProblem) -> str:
+    solver_run = getattr(problem.case, "solver_run", None)
+    failure_reason = getattr(solver_run, "failure_reason", None)
+    if failure_reason:
+        return str(failure_reason)
+    status = getattr(solver_run, "status", None)
+    if status is not None:
+        return str(status)
+    return "success"
