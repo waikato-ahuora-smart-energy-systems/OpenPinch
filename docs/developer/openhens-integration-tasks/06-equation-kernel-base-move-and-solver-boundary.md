@@ -47,60 +47,60 @@ Settled decisions for this task:
 
 ## Requirements Checklist
 
-- [ ] Move the equation-kernel base and backend setup into
+- [x] Move the equation-kernel base and backend setup into
       `OpenPinch/services/heat_exchanger_network_synthesis/models` or the
       agreed equivalent.
-- [ ] Move `HeatExchangerNetworkProblem` internally, renaming only where needed
+- [x] Move `HeatExchangerNetworkProblem` internally, renaming only where needed
       for OpenPinch-native private naming.
-- [ ] Keep GEKKO variable names unchanged in this task unless a mechanical
+- [x] Keep GEKKO variable names unchanged in this task unless a mechanical
       rename is required by packaging.
-- [ ] Keep objective formulas unchanged.
-- [ ] Keep solver defaults unchanged.
-- [ ] Keep tolerance defaults unchanged.
-- [ ] Keep stage-reduction and evolution behavior out of this task unless it is
+- [x] Keep objective formulas unchanged.
+- [x] Keep solver defaults unchanged.
+- [x] Keep tolerance defaults unchanged.
+- [x] Keep stage-reduction and evolution behavior out of this task unless it is
       required for the base class to import.
-- [ ] Update imports to use OpenPinch-owned schemas, adapters, solver wrappers,
+- [x] Update imports to use OpenPinch-owned schemas, adapters, solver wrappers,
       and verification modules created by earlier tasks.
-- [ ] Keep GEKKO/Pyomo imports inside optional backend modules or functions.
-- [ ] Add import guards with actionable errors for missing optional packages.
-- [ ] Add actionable errors for missing external solver binaries.
-- [ ] Do not import solver factories at package import time.
-- [ ] Convert solved `Q_r`, `Q_h`, `Q_c`, temperature, area, and binary arrays
+- [x] Keep GEKKO/Pyomo imports inside optional backend modules or functions.
+- [x] Add import guards with actionable errors for missing optional packages.
+- [x] Add actionable errors for missing external solver binaries.
+- [x] Do not import solver factories at package import time.
+- [x] Convert solved `Q_r`, `Q_h`, `Q_c`, temperature, area, and binary arrays
       into `HeatExchangerNetwork` at the solution extraction boundary.
-- [ ] Keep raw arrays only as private diagnostic/parity data while benchmark
+- [x] Keep raw arrays only as private diagnostic/parity data while benchmark
       tests still need them.
-- [ ] Ensure extracted exchangers use stable OpenPinch stream identities and
+- [x] Ensure extracted exchangers use stable OpenPinch stream identities and
       correct source/sink direction.
-- [ ] Ensure exported task outcomes do not persist live GEKKO/Pyomo objects.
-- [ ] Do not move `grid_diagram.py`, plot rendering, or optional visualization
+- [x] Ensure exported task outcomes do not persist live GEKKO/Pyomo objects.
+- [x] Do not move `grid_diagram.py`, plot rendering, or optional visualization
       code in this task.
-- [ ] Add focused tests proving the moved base code imports only through the
+- [x] Add focused tests proving the moved base code imports only through the
       optional synthesis path.
-- [ ] Add tests proving normal `import OpenPinch` does not import solver
+- [x] Add tests proving normal `import OpenPinch` does not import solver
       dependencies.
-- [ ] Add smoke tests proving missing solver dependencies fail with the new
+- [x] Add smoke tests proving missing solver dependencies fail with the new
       actionable error messages.
 
 ## General Standards That Apply
 
-- [ ] Enforce the required OpenPinch workflow from `README.md`; deviations are
+- [x] Enforce the required OpenPinch workflow from `README.md`; deviations are
       not permitted.
-- [ ] Behavior preservation is mandatory. Do not mix algorithm cleanup into the
+- [x] Behavior preservation is mandatory. Do not mix algorithm cleanup into the
       first model move.
-- [ ] Core OpenPinch import remains lightweight.
-- [ ] Solver arrays stay private.
-- [ ] Results crossing the service boundary are OpenPinch-native
+- [x] Core OpenPinch import remains lightweight.
+- [x] Solver arrays stay private.
+- [x] Results crossing the service boundary are OpenPinch-native
       `HeatExchangerNetwork` / result payloads.
-- [ ] Public API remains problem-rooted and OpenPinch-native.
+- [x] Public API remains problem-rooted and OpenPinch-native.
 
 ## Verification Checklist
 
-- [ ] Base model import tests pass with synthesis dependencies installed.
-- [ ] Core import smoke tests pass without synthesis dependencies.
-- [ ] Missing dependency and missing solver-binary tests show actionable errors.
-- [ ] Solution extraction tests prove arrays become `HeatExchangerNetwork`
+- [x] Base model import tests pass with synthesis dependencies installed.
+- [x] Core import smoke tests pass without synthesis dependencies.
+- [x] Missing dependency and missing solver-binary tests show actionable errors.
+- [x] Solution extraction tests prove arrays become `HeatExchangerNetwork`
       records with stable stream identities.
-- [ ] Existing fast OpenPinch tests pass.
+- [x] Existing fast OpenPinch tests pass.
 
 ## Definition of Done
 
@@ -121,4 +121,54 @@ Settled decisions for this task:
 
 ## Implementation Notes
 
-- 
+- 2026-06-16 HENS-06 implementation stopped before adversarial review. Verified
+  the source OpenHENS checkout before relying on migrated source behavior:
+  `rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS rev-parse HEAD` returned
+  `2afc14b7779482fc829edb1c3fa187b918d7fb19`; source status was clean.
+- Added the private
+  `OpenPinch/services/heat_exchanger_network_synthesis/models/` package:
+  `backend.py` carries lazy GEKKO/Pyomo backend setup and actionable solver
+  binary guards; `base.py` carries the migrated base model setup against
+  `PreparedSolverArrays`; `problem.py` carries the private
+  `InternalHeatExchangerNetworkProblem`; `extraction.py` converts solved solver
+  arrays into OpenPinch `HeatExchangerNetwork` / synthesis result payloads.
+- Kept the model move scoped to HENS-06: no `StageWiseModel`,
+  `PinchDecompModel`, stage-reduction logic, topology evolution,
+  `grid_diagram.py`, plotting, public OpenHENS compatibility API, or public
+  service/root export was added.
+- Added `tests/test_heat_exchanger_network_synthesis_models.py` covering
+  lazy model-package imports, missing optional dependency errors, missing
+  external solver-binary errors, preserved APOPT backend defaults, intentional
+  later-slice unavailability for concrete model factories, solver-array
+  extraction into stable stream identities, and serialization without raw
+  solver arrays or live solver objects.
+- Local dependency check:
+  `rtk uv run python -c "import importlib.util; print('gekko', importlib.util.find_spec('gekko') is not None); print('pyomo.environ', importlib.util.find_spec('pyomo.environ') is not None)"`
+  returned `gekko True` and `pyomo.environ True`.
+- Focused verification:
+  `rtk uv run pytest tests/test_synthesis_dependency_boundaries.py tests/test_heat_exchanger_network_array_adapter.py tests/test_heat_exchanger_network_synthesis_workflow.py tests/test_package_api_surface.py tests/test_heat_exchanger_network_synthesis_models.py`
+  passed with `32 passed in 6.71s`.
+- Full fast-suite verification: `rtk uv run pytest` passed with
+  `1101 passed, 31 warnings in 192.41s`.
+- Static/whitespace verification: `rtk uv run ruff check` returned
+  `All checks passed!`; `rtk git diff --check -- . ':(exclude).DS_Store'`
+  returned success. The pre-existing root `.DS_Store` dirty state was not
+  touched.
+- 2026-06-16 re-review fix: addressed the HENS-06 adversarial review blockers
+  in `reviews/hens-06-review.md`. `InternalHeatExchangerNetworkProblem` now
+  keeps concrete `load_model(...)` / `get_solution(...)` unavailable with a
+  `ModelSliceUnavailableError` even when PDM or stagewise factories are passed,
+  so HENS-06 cannot bypass deferred source PDM above/below-pinch construction,
+  PDM/TDM stage reduction, or topology-evolution semantics.
+- Added focused migration-gate tests for PDM, TDM, and ESM load attempts plus
+  registered-factory solve attempts. `rtk uv run pytest
+  tests/test_heat_exchanger_network_synthesis_models.py` passed with
+  `13 passed in 2.96s`.
+- Re-review verification: `rtk uv run pytest
+  tests/test_synthesis_dependency_boundaries.py
+  tests/test_heat_exchanger_network_array_adapter.py
+  tests/test_heat_exchanger_network_synthesis_workflow.py
+  tests/test_package_api_surface.py
+  tests/test_heat_exchanger_network_synthesis_models.py` passed with
+  `37 passed in 5.74s`; `rtk uv run ruff check` returned `All checks passed!`;
+  `rtk git diff --check -- . ':(exclude).DS_Store'` returned success.
