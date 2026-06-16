@@ -46,6 +46,8 @@ The main schema modules are:
 - :mod:`OpenPinch.lib.schemas.io` for public request and response models
 - :mod:`OpenPinch.lib.schemas.reporting` for summary and report-facing models
 - :mod:`OpenPinch.lib.schemas.hpr` for lower-level heat pump solver data models
+- :mod:`OpenPinch.lib.schemas.synthesis` for HEN synthesis task, manifest,
+  optional export, and design-result payloads
 - :mod:`OpenPinch.lib.schemas.targets` for runtime target models stored on
   solved zones
 - :mod:`OpenPinch.lib.schemas.turbine` for turbine solve result models
@@ -90,6 +92,9 @@ linearisation requests, and legacy visualisation data structures.
    :members:
 
 .. automodule:: OpenPinch.lib.schemas.reporting
+   :members:
+
+.. automodule:: OpenPinch.lib.schemas.synthesis
    :members:
 
 .. automodule:: OpenPinch.lib.schemas.targets

@@ -34,7 +34,7 @@ def heat_exchanger_network_synthesis_service(
             "heat_exchanger_network_synthesis_service requires a live PinchProblem."
         )
 
-    runtime_options = dict(options or {})
+    runtime_options = _normalise_runtime_options(options)
     state_id = _optional_text(runtime_options.get("state_id"))
     target_output = _ensure_target_results(problem, runtime_options, state_id)
     settings = workflow_settings_from_problem(
@@ -74,6 +74,27 @@ def _ensure_target_results(
     ):
         return cached
     return TargetOutput.model_validate(problem.target(options=runtime_options))
+
+
+def _normalise_runtime_options(options: dict[str, Any] | None) -> dict[str, Any]:
+    if options is None:
+        return {}
+    if not isinstance(options, dict):
+        raise TypeError(
+            "HEN synthesis runtime options must be supplied as a dict. "
+            "Persistent HEN controls belong in TargetInput.options before the "
+            "PinchProblem is loaded."
+        )
+
+    hens_overrides = sorted(str(key) for key in options if str(key).startswith("HENS_"))
+    if hens_overrides:
+        raise ValueError(
+            "HEN synthesis configuration must be loaded through "
+            "TargetInput.options / prepared Configuration, not passed as "
+            "separate design options: "
+            + ", ".join(hens_overrides)
+        )
+    return dict(options)
 
 
 def _optional_text(value: Any) -> str | None:

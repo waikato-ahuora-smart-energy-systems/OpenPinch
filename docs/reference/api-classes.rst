@@ -48,6 +48,19 @@ These classes represent the solved hierarchy and its numerical results.
 .. automodule:: OpenPinch.classes.problem_table
    :members:
 
+Heat Exchanger Network Design Records
+-------------------------------------
+
+These classes are the OpenPinch-native public result model for HEN design
+outcomes. They expose exchanger links by source and sink stream identity; raw
+solver axis positions remain internal implementation details.
+
+.. automodule:: OpenPinch.classes.heat_exchanger
+   :members:
+
+.. automodule:: OpenPinch.classes.heat_exchanger_network
+   :members:
+
 Units and Scalar Helpers
 ------------------------
 

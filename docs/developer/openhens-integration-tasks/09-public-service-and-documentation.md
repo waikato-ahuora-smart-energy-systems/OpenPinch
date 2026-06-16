@@ -46,62 +46,62 @@ Settled decisions for this task:
 
 ## Requirements Checklist
 
-- [ ] Document that the internal service boundary is
+- [x] Document that the internal service boundary is
       `heat_exchanger_network_synthesis_service(problem)` and that users should
       call `problem.design.heat_exchanger_network_synthesis(...)` or workspace
       dispatch instead.
-- [ ] Ensure the internal service requires a live `PinchProblem`.
-- [ ] Ensure the internal service reads persistent HEN configuration from
+- [x] Ensure the internal service requires a live `PinchProblem`.
+- [x] Ensure the internal service reads persistent HEN configuration from
       `TargetInput.options` / prepared `Configuration`.
-- [ ] Ensure the internal service does not accept raw CSV rows, raw stream
+- [x] Ensure the internal service does not accept raw CSV rows, raw stream
       lists, raw utility lists, `TargetInput`, separate design-options objects,
       or public case/study objects.
-- [ ] If an object-oriented runner is added, use an OpenPinch-native name such
+- [x] If an object-oriented runner is added, use an OpenPinch-native name such
       as `HeatExchangerNetworkSynthesis(problem).solve()`.
-- [ ] Ensure any runner requires a live `PinchProblem` and cannot own/reload
+- [x] Ensure any runner requires a live `PinchProblem` and cannot own/reload
       streams, utilities, variants, cases, or workspace state.
-- [ ] Add root exports only for stable, intended public names.
-- [ ] Add negative API tests proving the internal service is not root-exported
+- [x] Add root exports only for stable, intended public names.
+- [x] Add negative API tests proving the internal service is not root-exported
       as a public execution path.
-- [ ] Add public API snapshot tests proving only intended names are exported.
-- [ ] Add negative API tests proving no `OpenHENS` facade, no import-path shim,
+- [x] Add public API snapshot tests proving only intended names are exported.
+- [x] Add negative API tests proving no `OpenHENS` facade, no import-path shim,
       no OpenHENS field alias contract, and no command parity contract.
-- [ ] Document `PinchProblem(...) -> problem.design.heat_exchanger_network_synthesis(...)`.
-- [ ] Document
+- [x] Document `PinchProblem(...) -> problem.design.heat_exchanger_network_synthesis(...)`.
+- [x] Document
       `PinchWorkspace(...).solve_variant(..., workflow="heat_exchanger_network_synthesis")`.
-- [ ] Document how results appear in `problem.results` /
+- [x] Document how results appear in `problem.results` /
       `TargetOutput.design`.
-- [ ] Document how optional JSON/CSV exports are generated from results.
-- [ ] Add examples converted from the current OpenHENS README using
+- [x] Document how optional JSON/CSV exports are generated from results.
+- [x] Add examples converted from the current OpenHENS README using
       OpenPinch-compatible JSON or native `TargetInput`.
-- [ ] Add a name-mapping guide from OpenHENS concepts to OpenPinch-native names.
-- [ ] Ensure the mapping is documentation-only and does not imply import aliases
+- [x] Add a name-mapping guide from OpenHENS concepts to OpenPinch-native names.
+- [x] Ensure the mapping is documentation-only and does not imply import aliases
       or field aliases.
-- [ ] Document synthesis optional dependency installation and solver test
+- [x] Document synthesis optional dependency installation and solver test
       requirements.
-- [ ] Document missing-solver error expectations and marked solver-test
+- [x] Document missing-solver error expectations and marked solver-test
       commands.
 
 ## General Standards That Apply
 
-- [ ] Enforce the required OpenPinch workflow from `README.md`; deviations are
+- [x] Enforce the required OpenPinch workflow from `README.md`; deviations are
       not permitted.
-- [ ] Public API is conservative and OpenPinch-native.
-- [ ] The result is a `HeatExchangerNetwork` reachable through
+- [x] Public API is conservative and OpenPinch-native.
+- [x] The result is a `HeatExchangerNetwork` reachable through
       `TargetOutput.design`.
-- [ ] Documentation can explain OpenHENS history but cannot preserve it as a
+- [x] Documentation can explain OpenHENS history but cannot preserve it as a
       runtime contract.
-- [ ] Examples should start with OpenPinch primitives, not source CSVs.
+- [x] Examples should start with OpenPinch primitives, not source CSVs.
 
 ## Verification Checklist
 
-- [ ] Public API snapshot tests pass.
-- [ ] Negative compatibility-surface tests pass.
-- [ ] Negative public-service-export tests pass.
-- [ ] Documentation examples run or are covered by doctest/example tests where
+- [x] Public API snapshot tests pass.
+- [x] Negative compatibility-surface tests pass.
+- [x] Negative public-service-export tests pass.
+- [x] Documentation examples run or are covered by doctest/example tests where
       practical.
-- [ ] Docs build passes.
-- [ ] Optional dependency installation docs match packaging metadata.
+- [x] Docs build passes.
+- [x] Optional dependency installation docs match packaging metadata.
 
 ## Definition of Done
 
@@ -125,4 +125,70 @@ Settled decisions for this task:
 
 ## Implementation Notes
 
-- 
+- 2026-06-16: Added `docs/guides/heat-exchanger-network-synthesis.rst` and
+  linked it from `docs/guides/index.rst`. The guide documents the
+  `PinchProblem.design.heat_exchanger_network_synthesis(...)` and
+  `PinchWorkspace.solve_variant(...,
+  workflow="heat_exchanger_network_synthesis")` paths, names
+  `heat_exchanger_network_synthesis_service(problem)` only as the internal
+  problem-rooted service boundary, documents `TargetOutput.design`,
+  `HeatExchangerNetwork` source/sink links, optional JSON/CSV exports from
+  `problem.results`, dependency installation, missing-solver expectations, and
+  marked `synthesis`/`solver` test commands.
+- 2026-06-16: Added HEN reference entries to
+  `docs/reference/api-classes.rst` and `docs/reference/api-lib.rst` for the
+  public network records and synthesis schemas.
+- 2026-06-16: Tightened
+  `OpenPinch/services/heat_exchanger_network_synthesis/service.py` so runtime
+  options must be a dict and `HENS_*` design controls are rejected when passed
+  directly to the service/design call. Persistent controls remain loaded
+  through `TargetInput.options` / prepared `Configuration`.
+- 2026-06-16: Added
+  `tests/test_heat_exchanger_network_public_service.py` covering exact
+  HEN-related public export snapshots, absence of the root/service-exported
+  internal service, absence of OpenHENS facade/import shims/command parity,
+  rejection of OpenHENS field aliases, rejection of raw CSV rows, raw stream
+  lists, raw utility lists, `TargetInput`, separate design options, and
+  public case/study objects. The same test file runs problem, native
+  `TargetInput`, and workspace examples from the converted Four-stream
+  OpenPinch JSON fixture.
+- 2026-06-16: Added docs consistency coverage for the new guide, including the
+  documentation-only OpenHENS-to-OpenPinch mapping, no compatibility-shim
+  cutover, optional dependency install command, and marked solver-test
+  commands.
+- 2026-06-16: No object-oriented runner was added. No root HEN exports were
+  added. No runtime CSV ingestion, OpenHENS facade, import-path shim, command
+  parity contract, public case/study root, raw-input runner, or root-exported
+  internal service was added.
+- 2026-06-16: Verification command
+  `rtk uv run pytest tests/test_heat_exchanger_network_public_service.py tests/test_docs_consistency.py tests/test_heat_exchanger_network_synthesis_workflow.py tests/test_package_api_surface.py tests/test_lib/test_synthesis_schemas.py -q`
+  passed with `64 passed in 4.19s` after rerunning with filesystem access to
+  the existing uv cache. The initial sandboxed attempt was blocked by
+  `/Users/ca107/.cache/uv` permissions before tests ran.
+- 2026-06-16: Documentation build command `rtk uv run scripts/build_docs.py`
+  exited 0 and wrote HTML to `docs/_build/html`; Sphinx reported the existing
+  autodoc warnings for missing heat-pump/cycle utility modules.
+- 2026-06-16: Ruff command
+  `rtk uv run ruff check OpenPinch tests/test_heat_exchanger_network_public_service.py tests/test_docs_consistency.py`
+  passed with `All checks passed!`.
+- 2026-06-16: Diff hygiene command
+  `rtk git diff --check -- . ':!.DS_Store'` passed with no output.
+- 2026-06-16: `rtk git status --short` still shows root `.DS_Store` as
+  pre-existing/user-owned dirty state; this HENS-09 slice did not touch it.
+- 2026-06-16 re-review fix: Resolved the public-accessor bypass found in
+  `docs/developer/openhens-integration-tasks/reviews/hens-09-review.md`.
+  `OpenPinch/classes/_problem/_design_accessor.py` now validates the raw
+  `options` object before adding `state_id`, so `TargetInput` and other
+  model-like objects cannot be coerced into a dict before the service guard.
+- 2026-06-16 re-review fix: Added public-path negative coverage for
+  `problem.design.heat_exchanger_network_synthesis(options=TargetInput(...))`,
+  an iterable design-options object that old `dict(options)` coercion would
+  have accepted, and case/study-like objects.
+- 2026-06-16 re-review verification:
+  `rtk uv run pytest tests/test_heat_exchanger_network_public_service.py tests/test_heat_exchanger_network_synthesis_workflow.py tests/test_package_api_surface.py tests/test_lib/test_synthesis_schemas.py -q`
+  passed with `55 passed in 8.70s`.
+- 2026-06-16 re-review verification:
+  `rtk uv run ruff check OpenPinch tests/test_heat_exchanger_network_public_service.py tests/test_heat_exchanger_network_synthesis_workflow.py`
+  passed with `All checks passed!`.
+- 2026-06-16 re-review verification:
+  `rtk git diff --check -- . ':!.DS_Store'` passed with no output.

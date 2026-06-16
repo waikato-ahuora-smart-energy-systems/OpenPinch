@@ -16,6 +16,9 @@ GUIDE_NOTEBOOKS_AND_CASES = (
     REPO_ROOT / "docs" / "guides" / "notebooks-and-sample-cases.rst"
 )
 GUIDE_EXPORTING_RESULTS = REPO_ROOT / "docs" / "guides" / "exporting-results.rst"
+GUIDE_HEN_SYNTHESIS = (
+    REPO_ROOT / "docs" / "guides" / "heat-exchanger-network-synthesis.rst"
+)
 GUIDE_GRAPHING = REPO_ROOT / "docs" / "guides" / "graphing-and-interpretation.rst"
 FUNDAMENTALS_GRAPHS = (
     REPO_ROOT / "docs" / "fundamentals" / "graphs-and-interpretation.rst"
@@ -187,6 +190,30 @@ def test_docs_expose_pinchworkspace_as_the_named_study_surface():
     assert "compare_cases" in combined
 
 
+def test_docs_explain_hen_synthesis_public_workflow_and_cutover():
+    guide = _read(GUIDE_HEN_SYNTHESIS)
+
+    assert "problem.design.heat_exchanger_network_synthesis()" in guide
+    assert 'workflow="heat_exchanger_network_synthesis"' in guide
+    assert "heat_exchanger_network_synthesis_service(problem)" in guide
+    assert "internal and" in guide
+    assert "TargetInput.options" in guide
+    assert "``Configuration``" in guide
+    assert "TargetOutput.design" in guide
+    assert "export_heat_exchanger_network_synthesis_results" in guide
+    assert "CaseStudy.from_csv" in guide
+    assert "OpenPinch does not provide runtime import" in guide
+    assert "aliases, OpenHENS field aliases" in guide
+    assert "OpenHENS field aliases" in guide
+    assert "command parity" in guide
+    assert "Source OpenHENS CSV files are migration" in guide
+    assert "source material only" in guide
+    assert 'python -m pip install "openpinch[synthesis]"' in guide
+    assert 'rtk uv run pytest -m "not synthesis and not solver"' in guide
+    assert "rtk uv run pytest -m synthesis" in guide
+    assert "rtk uv run pytest -m solver" in guide
+
+
 def test_reference_docs_match_current_heat_pump_and_schema_surface():
     api_classes = _read(API_CLASSES)
     api_lib = _read(API_LIB)
@@ -200,10 +227,13 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "OpenPinch.classes.cascade_heat_pump" not in api_classes
     assert "state_ids" in api_classes
     assert "weights" in api_classes
+    assert "OpenPinch.classes.heat_exchanger" in api_classes
+    assert "OpenPinch.classes.heat_exchanger_network" in api_classes
 
     assert "compute_direct_heat_pump_or_refrigeration_target" in api_analysis
     assert "compute_indirect_heat_pump_or_refrigeration_target" in api_analysis
     assert "HeatPumpTargetOutputs" in api_lib
+    assert "OpenPinch.lib.schemas.synthesis" in api_lib
     assert "OpenPinch.services.input_data_processing.data_preparation" in api_analysis
     assert "OpenPinch.services.data_preparation" not in api_analysis
 

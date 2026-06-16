@@ -24,10 +24,11 @@ class _DesignAccessor:
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run HEN synthesis and cache the result on ``problem.results.design``."""
         from ...services.heat_exchanger_network_synthesis.service import (
+            _normalise_runtime_options,
             heat_exchanger_network_synthesis_service,
         )
 
-        runtime_options = dict(options or {})
+        runtime_options = _normalise_runtime_options(options)
         if state_id is not None:
             runtime_options["state_id"] = state_id
         return heat_exchanger_network_synthesis_service(
