@@ -31,7 +31,6 @@ from OpenPinch.services.heat_exchanger_network_synthesis.models.pinch_decomposit
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.models.problem import (
     InternalHeatExchangerNetworkProblem,
-    ModelSliceUnavailableError,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.models.stagewise import (
     StageWiseModel,
@@ -154,21 +153,66 @@ def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> No
     assert calls == ["gekko"]
 
 
-@pytest.mark.parametrize("framework", ["PDM", "TDM", "ESM"])
-def test_internal_problem_rejects_hens08_evolution(
-    framework: str,
-) -> None:
+def test_internal_problem_runs_stage_reduction_before_evolution(monkeypatch) -> None:
     problem = InternalHeatExchangerNetworkProblem(
         solver_arrays=_solver_arrays(),
-        framework=framework,
+        framework="ESM",
         stages=2,
     )
+    case = _EvolutionCase()
 
-    with pytest.raises(
-        ModelSliceUnavailableError,
-        match=r"HENS-07.*HENS-08",
-    ):
-        problem.get_solution(evolution=True)
+    def fake_load_model(*, model_factories=None):
+        del model_factories
+        problem.case = case
+
+    monkeypatch.setattr(problem, "load_model", fake_load_model)
+
+    solved = problem.get_solution(print_output=False, evolution=True)
+
+    assert solved is case
+    assert case.calls == ["optimise", "evolution"]
+
+
+def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None:
+    problem = InternalHeatExchangerNetworkProblem(solver_arrays=_solver_arrays())
+    case = _StageReductionCase(stage_duties=[90.0, 4.0, 6.0, 0.0])
+
+    assert problem._utilisation_threshold(3) == 0.1
+    assert problem._utilisation_threshold(5) == 5.0
+    assert problem._utilisation_threshold(8) == 8.0
+    assert problem._utilisation_threshold(10) == 10.0
+    assert problem._utilisation_threshold(11) == 0.0
+    assert problem._get_active_stages(case) == [0, 2]
+
+
+def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
+    model = StageWiseModel.__new__(StageWiseModel)
+    failed = _CandidateModel(mSuccess=0, TAC=999.0)
+    minus = _CandidateModel(mSuccess=1, TAC=90.0)
+    plus = _CandidateModel(mSuccess=1, TAC=80.0)
+
+    assert model._select_best_candidate(model, minus, plus) is plus
+    assert model._select_best_candidate(model, minus, failed) is minus
+    assert model._select_best_candidate(model, failed, failed) is None
+
+    ranking_model = StageWiseModel.__new__(StageWiseModel)
+    ranking_model.I = 1
+    ranking_model.J = 2
+    ranking_model.S = 2
+    ranking_model.z = [[[[1], [0]], [[1], [0]]]]
+    ranking_model.Q_r = [[[[10.0], [0.0]], [[20.0], [0.0]]]]
+    ranking_model.alpha = [[[[0.1], [0.0]], [[0.2], [0.0]]]]
+    ranking_model.hu_cost = [5.0]
+    ranking_model.cu_cost = [5.0]
+    ranking_model.unit_cost = [50.0]
+    ranking_model.A_coeff = [2.0]
+    ranking_model.A_exp = [1.0]
+    ranking_model.area_r = [[[5.0, 0.0], [15.0, 0.0]]]
+    ranking_model.alpha_dqda = [[[0.0, 3.0], [0.0, 9.0]]]
+    ranking_model.z_feasible = [[[1, 1], [1, 1]]]
+
+    assert ranking_model.get_lowest_benefit_HX() == [[0, 0, 0]]
+    assert ranking_model.get_max_benefit_HX() == [[0, 1, 1]]
 
 
 def test_stagewise_construction_matches_source_four_stream_structural_fields(
@@ -441,7 +485,9 @@ def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
     assert child.case.initialised_from is parent.case
 
 
-def test_local_executor_uses_parent_problem_for_downstream_tasks(monkeypatch) -> None:
+def test_local_executor_preserves_parent_links_and_esm_only_evolution(
+    monkeypatch,
+) -> None:
     problem = _four_stream_problem(
         options={
             "HENS_APPROACH_TEMPERATURES": [14.0],
@@ -451,13 +497,15 @@ def test_local_executor_uses_parent_problem_for_downstream_tasks(monkeypatch) ->
         }
     )
     settings = workflow_settings_from_problem(problem)
-    executor = LocalSynthesisExecutor()
+    executor = LocalSynthesisExecutor(evolution=True)
     parent_links = []
+    evolution_flags = []
 
     def fake_get_solution(
         self, *, print_output=True, evolution=None, model_factories=None
     ):
-        del print_output, evolution, model_factories
+        del print_output, model_factories
+        evolution_flags.append((self.synthesis_task_id, evolution))
         if self.parent is not None:
             parent_links.append((self.synthesis_task_id, self.parent.synthesis_task_id))
         self.case = _SolvedCase()
@@ -508,6 +556,11 @@ def test_local_executor_uses_parent_problem_for_downstream_tasks(monkeypatch) ->
     assert parent_links == [
         (tdm_tasks[0].task_id, pdm_tasks[0].task_id),
         (esm_tasks[0].task_id, tdm_tasks[0].task_id),
+    ]
+    assert evolution_flags == [
+        (pdm_tasks[0].task_id, False),
+        (tdm_tasks[0].task_id, False),
+        (esm_tasks[0].task_id, True),
     ]
 
 
@@ -747,6 +800,45 @@ class _FakeGekkoModel:
 class _ParentCase:
     stages = 3
     S = 3
+
+
+class _EvolutionCase:
+    framework = "ESM"
+    name = "evolution"
+    stages = 2
+    tol = 1e-3
+    mSuccess = 1
+
+    Q_r = [[[[10.0], [10.0]]]]
+
+    def __init__(self) -> None:
+        self.I = 1
+        self.J = 1
+        self.S = 2
+        self.calls = []
+
+    def optimise(self, print_output: bool) -> None:
+        assert print_output is False
+        self.calls.append("optimise")
+
+    def get_net_benefit_evolution(self, print_output: bool):
+        assert print_output is False
+        self.calls.append("evolution")
+        return self
+
+
+class _StageReductionCase:
+    def __init__(self, *, stage_duties: list[float]) -> None:
+        self.I = 1
+        self.J = 1
+        self.S = 4
+        self.Q_r = [[[[duty] for duty in stage_duties]]]
+
+
+class _CandidateModel:
+    def __init__(self, *, mSuccess: int, TAC: float) -> None:
+        self.mSuccess = mSuccess
+        self.TAC = TAC
 
 
 class _RecordingStageWise:

@@ -10,6 +10,7 @@ from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
 from ..array_adapter import PreparedSolverArrays
 from ..pinch_decomposition import PinchDecompositionSnapshot
 from .extraction import extract_heat_exchanger_network, extract_network_synthesis_result
+from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
 
@@ -79,17 +80,20 @@ class InternalHeatExchangerNetworkProblem:
     ) -> Any:
         """Load, solve, and return the private solved model for this task."""
 
-        if evolution:
-            raise ModelSliceUnavailableError(
-                "HENS-07 moved PDM and StageWise model construction only. "
-                "Stage reduction and topology evolution are reserved for HENS-08."
-            )
         try:
             self.load_model(model_factories=model_factories)
             if self.framework == "PDM":
                 self._solve_pdm(print_output=print_output)
             else:
                 self.case.optimise(print_output=print_output)
+            if self.framework in {"PDM", "TDM"}:
+                self.case = self.remove_unused_stages(self.case)
+            if evolution:
+                evolved = self.case.get_net_benefit_evolution(
+                    print_output=print_output
+                )
+                if evolved is not None:
+                    self.case = evolved
             return self.case
         except ValueError as exc:
             self.solution_failure_reason = str(exc)
@@ -203,7 +207,7 @@ class InternalHeatExchangerNetworkProblem:
             self.case.set_initial_values_for_variables(self.parent.case)
 
     def _solve_pdm(self, *, print_output: bool = True) -> None:
-        """Solve PDM sides and amalgamate them without HENS-08 reduction."""
+        """Solve PDM sides and amalgamate them before stage reduction."""
 
         if self.above.HU_target > 0:
             self.above.optimise(print_output=print_output)
@@ -224,6 +228,127 @@ class InternalHeatExchangerNetworkProblem:
             }
         )
 
+    def remove_unused_stages(self, case) -> StageWiseModel:
+        """Apply the source stage-utilisation reduction after PDM/TDM solves."""
+
+        if case.mSuccess != 1:
+            return case
+
+        active_stages = self._get_active_stages(case)
+        if len(active_stages) == case.S:
+            return case
+
+        active_locations = [
+            [[None for _k in range(len(active_stages))] for _j in range(case.J)]
+            for _i in range(case.I)
+        ]
+        for new_k, old_k in enumerate(active_stages):
+            for i in range(case.I):
+                for j in range(case.J):
+                    active_locations[i][j][new_k] = (
+                        1 if case.Q_r[i][j][old_k][0] > case.tol else 0
+                    )
+
+        f_case = StageWiseModel(
+            name=f"reduced-{case.name}",
+            framework=case.framework,
+            solver="apopt",
+            solver_arrays=case.solver_arrays,
+            stages=len(active_stages),
+            dTmin=case.dTmin,
+            z_restriction=[active_locations, None, None],
+            min_dqda=case.min_dqda,
+            minimisation_goal=case.minimisation_goal,
+            non_isothermal_model=case.non_isothermal_model,
+            integers=False,
+            tol=case.tol,
+        )
+
+        for new_k, old_k in enumerate(active_stages):
+            for i in range(case.I):
+                for j in range(case.J):
+                    q_val = (
+                        case.Q_r[i][j][old_k][0]
+                        if case.Q_r[i][j][old_k][0] > case.tol
+                        else 0.0
+                    )
+                    _assign(f_case.Q_r[i][j][new_k], q_val)
+                    _assign_binary(f_case.z[i][j][new_k], q_val)
+                    _assign(f_case.theta_1[i][j][new_k], case.theta_1[i][j][old_k][0])
+                    _assign(f_case.theta_2[i][j][new_k], case.theta_2[i][j][old_k][0])
+
+                    if case.non_isothermal_model:
+                        _assign(f_case.X[i][j][new_k], case.X[i][j][old_k][0])
+                        _assign(f_case.Y[j][i][new_k], case.Y[j][i][old_k][0])
+                        _assign(
+                            f_case.T_h_out_x[i][j][new_k],
+                            case.T_h_out_x[i][j][old_k][0],
+                        )
+                        _assign(
+                            f_case.T_c_out_y[j][i][new_k],
+                            case.T_c_out_y[j][i][old_k][0],
+                        )
+
+        reduced_boundaries = [0] + [stage + 1 for stage in active_stages]
+        for i in range(case.I):
+            for new_k, old_k in enumerate(reduced_boundaries):
+                _assign(f_case.T_h[i][new_k], case.T_h[i][old_k][0])
+
+        for j in range(case.J):
+            for new_k, old_k in enumerate(reduced_boundaries):
+                _assign(f_case.T_c[j][new_k], case.T_c[j][old_k][0])
+
+        for i in range(case.I):
+            _assign(f_case.Q_c[i], case.Q_c[i][0])
+            _assign_binary(f_case.z_cu[i], case.Q_c[i][0])
+
+        for j in range(case.J):
+            _assign(f_case.Q_h[j], case.Q_h[j][0])
+            _assign_binary(f_case.z_hu[j], case.Q_h[j][0])
+
+        f_case.TAC_model = case.TAC_model
+        f_case.TAC = case.TAC
+        f_case.solve_time = case.solve_time
+        f_case.mSuccess = case.mSuccess
+
+        f_case.optimise(print_output=False)
+        if f_case.mSuccess != 1:
+            return case
+        return f_case
+
+    def _get_active_stages(self, case) -> list[int]:
+        q_total = sum(
+            case.Q_r[i][j][k][0]
+            for i in range(case.I)
+            for j in range(case.J)
+            for k in range(case.S)
+        )
+        q_per_stage = [
+            sum(
+                case.Q_r[i][j][k][0]
+                for i in range(case.I)
+                for j in range(case.J)
+            )
+            for k in range(case.S)
+        ]
+        threshold = self._utilisation_threshold(case.S)
+        return [
+            k
+            for k, q_stage in enumerate(q_per_stage)
+            if q_stage / q_total * 100 >= threshold
+        ]
+
+    def _utilisation_threshold(self, stage_count: int) -> float:
+        if stage_count <= 3:
+            return 0.1
+        if stage_count <= 5:
+            return 5.0
+        if stage_count <= 8:
+            return 8.0
+        if stage_count <= 10:
+            return 10.0
+        return 0.0
+
     def _model_factory(
         self,
         model_factories: Mapping[str, Any] | None,
@@ -238,7 +363,15 @@ class InternalHeatExchangerNetworkProblem:
 
             return PinchDecompModel
         if default == "StageWiseModel":
-            from .stagewise import StageWiseModel
-
             return StageWiseModel
         raise ValueError(f"Unknown HEN model factory {default!r}.")
+
+
+def _assign(variable: Any, value: float) -> None:
+    if type(variable).__name__ != "GKParameter":
+        value = max(variable.lower, min(variable.upper, value))
+    variable.VALUE.value = value
+
+
+def _assign_binary(variable: Any, value: float) -> None:
+    variable.VALUE.value = 1 if value > 0 else 0

@@ -182,7 +182,7 @@ class LocalSynthesisExecutor:
                 )
                 solved = internal_problem.get_solution(
                     print_output=self.print_output,
-                    evolution=self.evolution,
+                    evolution=task.method == "energy_stage_refinement",
                 )
                 if solved is None or getattr(solved, "mSuccess", 0) != 1:
                     reason = getattr(

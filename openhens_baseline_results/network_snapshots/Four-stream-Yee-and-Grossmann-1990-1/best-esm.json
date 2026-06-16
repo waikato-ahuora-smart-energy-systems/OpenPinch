@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "case_id": "Four-stream-Yee-and-Grossmann-1990-1",
+  "source_artifact": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/results/esm-b520e740f0d6.json",
+  "source_summary_artifact": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json",
+  "task_id": "esm-b520e740f0d6",
+  "method": "energy_stage_refinement",
+  "expected": {
+    "total_annual_cost": 154853.8518602861,
+    "best_dTmin": 14.0,
+    "best_derivative_threshold": 0.5,
+    "stage_count": 3,
+    "recovery_unit_count": 3,
+    "hot_utility_unit_count": 1,
+    "cold_utility_unit_count": 2,
+    "total_unit_count": 6,
+    "hot_utility_load": 481.1427882996221,
+    "cold_utility_load": 2131.1427882996218
+  },
+  "tolerances": {
+    "duty_abs": 1.0,
+    "duty_rel": 0.0001,
+    "area_abs": 1.0,
+    "area_rel": 0.0001,
+    "total_annual_cost_abs": 1.0,
+    "total_annual_cost_rel": 0.0001
+  },
+  "exchangers": [
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Raw Milk",
+      "sink_stream": "Process A.Milk Concentrate",
+      "stage": 1,
+      "duty": 690.0297126705291,
+      "area": 75.75413122137749
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Raw Milk",
+      "sink_stream": "Process A.CIP Water",
+      "stage": 3,
+      "duty": 1949.9999977682694,
+      "area": 70.28459367913743
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.HT Flash",
+      "sink_stream": "Process A.Milk Concentrate",
+      "stage": 3,
+      "duty": 2428.827404411686,
+      "area": 141.03879505464408
+    },
+    {
+      "kind": "hot_utility",
+      "source_stream": "Hot Utility.HPS",
+      "sink_stream": "Process A.Milk Concentrate",
+      "stage": null,
+      "duty": 481.1427860678915,
+      "area": 13.088970922444771
+    },
+    {
+      "kind": "cold_utility",
+      "source_stream": "Process A.Raw Milk",
+      "sink_stream": "Cold Utility.CW",
+      "stage": null,
+      "duty": 159.97027384546135,
+      "area": 4.706470401224032
+    },
+    {
+      "kind": "cold_utility",
+      "source_stream": "Process A.HT Flash",
+      "sink_stream": "Cold Utility.CW",
+      "stage": null,
+      "duty": 1971.1725144541606,
+      "area": 37.76228519998539
+    }
+  ]
+}

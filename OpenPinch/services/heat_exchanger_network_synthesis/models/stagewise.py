@@ -7,6 +7,8 @@ solver arrays instead of source CSV rows.
 
 from __future__ import annotations
 
+import copy
+import logging
 import math
 from typing import Literal
 
@@ -14,6 +16,8 @@ import numpy as np
 
 from ..array_adapter import PreparedSolverArrays
 from .base import BaseHeatExchangerNetworkModel
+
+logger = logging.getLogger(__name__)
 
 
 class StageWiseModel(BaseHeatExchangerNetworkModel):
@@ -770,10 +774,193 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 brackets=brackets,
                             )
                             self._set_value(
-                                self.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
-                            )
+                            self.T_c_out_y[j][i][k],
+                            init_solution.T_c[j][k].VALUE[0],
+                            brackets=brackets,
+                        )
+
+    def get_net_benefit_evolution(
+        self,
+        print_output: bool,
+        max_depth: int = 5,
+    ):
+        """Evolve topology using the source add/remove net-benefit heuristic."""
+
+        if self.mSuccess != 1:
+            logger.warning("Initial model was not successful; skipping evolution.")
+            return self
+
+        model = self
+        best_model = self
+
+        for unit in range(max_depth):
+            logger.debug(
+                "Evolution step %s/%s: current TAC %s",
+                unit + 1,
+                max_depth,
+                getattr(model, "TAC", None),
+            )
+            model_minus_one = self.get_n_minus_one_evolution(
+                print_output=print_output,
+                unit=unit,
+                prev_case=model,
+            )
+            model_plus_one = self.get_n_plus_one_evolution(
+                print_output=print_output,
+                unit=unit,
+                prev_case=model,
+            )
+
+            model = self._select_best_candidate(model, model_minus_one, model_plus_one)
+            if model is None:
+                logger.debug("No viable evolution model found.")
+                break
+
+            if model.TAC < best_model.TAC:
+                best_model = model
+                logger.debug(
+                    "New best evolution model %s with TAC %.6f",
+                    model.name,
+                    best_model.TAC,
+                )
+
+        if best_model.mSuccess and best_model.TAC < self.TAC:
+            self._update_with_best_model(best_model)
+        else:
+            logger.debug("No evolution improvement found over original model.")
+        self.m.cleanup()
+        return self
+
+    def _select_best_candidate(
+        self,
+        current_model,
+        model_minus_one,
+        model_plus_one,
+    ):
+        """Select the source plus/minus evolution candidate for the next step."""
+
+        del current_model
+        if not model_minus_one.mSuccess and not model_plus_one.mSuccess:
+            return None
+        if model_minus_one.mSuccess and not model_plus_one.mSuccess:
+            return model_minus_one
+        if not model_minus_one.mSuccess and model_plus_one.mSuccess:
+            return model_plus_one
+        logger.debug(
+            "TAC comparison -1: %.6f, +1: %.6f",
+            model_minus_one.TAC,
+            model_plus_one.TAC,
+        )
+        return min(
+            [model_minus_one, model_plus_one],
+            key=lambda candidate: candidate.TAC,
+        )
+
+    def _update_with_best_model(self, best_model) -> None:
+        """Adopt the selected evolved topology while retaining this model object."""
+
+        best_model.verify()
+        self.alpha = [
+            [
+                [best_model.alpha[i][j][k] for k in range(self.S)]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.z_allowed = [
+            [
+                [best_model.z_allowed[i][j][k] for k in range(self.S)]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.set_initial_values_for_variables(best_model, brackets=True)
+
+        self.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
+        self.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
+        self.recovery_area_cost_filtered = copy.deepcopy(
+            best_model.recovery_area_cost_filtered
+        )
+        self.hu_area_cost_total = copy.deepcopy(best_model.hu_area_cost_total)
+        self.cu_area_cost_total = copy.deepcopy(best_model.cu_area_cost_total)
+        self.get_post_process()
+
+    def get_n_minus_one_evolution(self, print_output: bool, unit: int, prev_case):
+        """Build and solve the source minus-one topology evolution candidate."""
+
+        low_pos = prev_case.get_lowest_benefit_HX()
+        z_allowed_removed = copy.deepcopy(prev_case.z)
+        for i, j, k in low_pos:
+            logger.debug("worst selected position i,j,k %s", [i, j, k])
+            if isinstance(z_allowed_removed[0][0][0], int):
+                z_allowed_removed[i][j][k] = 0
+            else:
+                z_allowed_removed[i][j][k][0] = 0
+
+        logger.debug(
+            "number in z_allowed_removed %s",
+            _count_allowed_matches(z_allowed_removed),
+        )
+        model_minus_one = StageWiseModel(
+            name=f"{self.name}-n_minus 1 evolution model {unit}",
+            framework=prev_case.framework,
+            solver="ipopt-pyomo",
+            solver_arrays=prev_case.solver_arrays,
+            stages=prev_case.stages,
+            dTmin=prev_case.dTmin,
+            z_restriction=[z_allowed_removed, None, None],
+            min_dqda=prev_case.min_dqda,
+            minimisation_goal=prev_case.minimisation_goal,
+            non_isothermal_model=prev_case.non_isothermal_model,
+            integers=False,
+            tol=1e-3,
+        )
+
+        for i, j, k in low_pos:
+            model_minus_one.Q_r[i][j][k].VALUE.value = 0.0
+            model_minus_one.z[i][j][k].VALUE.value = 0
+            model_minus_one.theta_1[i][j][k].VALUE.value = self.dTmin
+            model_minus_one.theta_2[i][j][k].VALUE.value = self.dTmin
+
+        model_minus_one.optimise(print_output=print_output)
+        return model_minus_one
+
+    def get_n_plus_one_evolution(self, print_output: bool, unit: int, prev_case):
+        """Build and solve the source plus-one topology evolution candidate."""
+
+        high_pos = prev_case.get_max_benefit_HX()
+        z_allowed_added = copy.deepcopy(prev_case.z)
+        for i, j, k in high_pos:
+            logger.debug("best non-selected position i,j,k %s", [i, j, k])
+            if isinstance(z_allowed_added[0][0][0], int):
+                z_allowed_added[i][j][k] = 1
+            else:
+                z_allowed_added[i][j][k][0] = 1
+
+        logger.debug(
+            "number in z_allowed_added %s",
+            _count_allowed_matches(z_allowed_added),
+        )
+        model_plus_one = StageWiseModel(
+            name=f"{self.name}-n_plus 1 evolution model {unit}",
+            framework=prev_case.framework,
+            solver="ipopt-pyomo",
+            solver_arrays=prev_case.solver_arrays,
+            stages=prev_case.stages,
+            dTmin=prev_case.dTmin,
+            z_restriction=[z_allowed_added, None, None],
+            min_dqda=prev_case.min_dqda,
+            minimisation_goal=prev_case.minimisation_goal,
+            non_isothermal_model=prev_case.non_isothermal_model,
+            integers=False,
+            tol=1e-3,
+        )
+
+        for i, j, k in high_pos:
+            model_plus_one.z[i][j][k].VALUE.value = 1
+
+        model_plus_one.optimise(print_output=print_output)
+        return model_plus_one
 
     def set_obj(self) -> None:
         """Attach source StageWise objective expressions unchanged."""
@@ -1140,5 +1327,216 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             * sum(self.area_cu[i] ** self.A_exp[0] for i in range(self.I))
         )
 
+    def get_lowest_benefit_HX(self) -> list[list[int]]:
+        """Return the active exchanger with the lowest source net benefit."""
+
+        self.net_benefit = np.array(
+            [
+                [[0.0 for _k in range(self.S)] for _j in range(self.J)]
+                for _i in range(self.I)
+            ]
+        )
+        smallest_net_benefit = float("inf")
+        low_pos: list[list[int]] = []
+        for k in range(self.S):
+            for j in range(self.J):
+                for i in range(self.I):
+                    if self.z[i][j][k][0] == 1:
+                        self.net_benefit[i][j][k] = (
+                            self.Q_r[i][j][k][0]
+                            * self.alpha[i][j][k][0]
+                            * (self.hu_cost[0] + self.cu_cost[0])
+                            - (
+                                self.unit_cost[0]
+                                + self.A_coeff[0]
+                                * (self.area_r[i][j][k] ** self.A_exp[0])
+                            )
+                        )
+                        if self.net_benefit[i][j][k] < smallest_net_benefit:
+                            smallest_net_benefit = self.net_benefit[i][j][k]
+                            low_pos = [[i, j, k]]
+        return low_pos
+
+    def get_max_benefit_HX(self) -> list[list[int]]:
+        """Return the inactive feasible exchanger with the highest alpha-dQ/dA."""
+
+        self.net_benefit = np.array(
+            [
+                [[0.0 for _k in range(self.S)] for _j in range(self.J)]
+                for _i in range(self.I)
+            ]
+        )
+        highest_net_benefit = 0.0
+        high_pos: list[list[int]] = []
+        for k in range(self.S):
+            for j in range(self.J):
+                for i in range(self.I):
+                    if (
+                        self.alpha_dqda[i][j][k] > highest_net_benefit
+                        and self.z_feasible[i][j][k]
+                    ):
+                        highest_net_benefit = self.alpha_dqda[i][j][k]
+                        high_pos = [[i, j, k]]
+        return high_pos
+
+    def verify(self) -> tuple[bool, list[str]]:
+        """Run the source solution checks used by topology evolution."""
+
+        failures = []
+        if not _check_temperatures(self):
+            failures.append("temperature")
+        if self.minimisation_goal in {"total cost", "variable total cost"}:
+            if not _check_utility_costs(self):
+                failures.append("cost")
+            if not _check_area_costs(self):
+                failures.append("area")
+        return len(failures) == 0, failures
+
 
 __all__ = ["StageWiseModel"]
+
+
+def _count_allowed_matches(values) -> int:
+    count = 0
+    for layer in values:
+        for row in layer:
+            for element in row:
+                if isinstance(element, int):
+                    count += 1 if element == 1 else 0
+                else:
+                    count += 1 if element[0] == 1 else 0
+    return count
+
+
+def _check_temperatures(
+    case,
+    *,
+    rel_tol: float = 1e-3,
+    abs_tol: float = 1e-2,
+    q_tol: float = 1e-2,
+) -> bool:
+    issues = False
+    for i in range(case.I):
+        for j in range(case.J):
+            for k in range(case.S):
+                if case.Q_r[i][j][k][0] <= q_tol:
+                    continue
+                if case.non_isothermal_model:
+                    t_h_in = case.T_h[i][k][0]
+                    t_c_out_y = case.T_c_out_y[j][i][k][0]
+                    theta_1 = case.theta_1[i][j][k][0]
+                    if (
+                        not math.isclose(
+                            t_h_in,
+                            t_c_out_y + theta_1,
+                            rel_tol=rel_tol,
+                            abs_tol=abs_tol,
+                        )
+                        or t_h_in < t_c_out_y
+                    ):
+                        issues = True
+
+                    t_h_out = case.T_h_out_x[i][j][k][0]
+                    t_c_in = case.T_c[j][k + 1][0]
+                    theta_2 = case.theta_2[i][j][k][0]
+                    if (
+                        not math.isclose(
+                            t_h_out,
+                            t_c_in + theta_2,
+                            rel_tol=rel_tol,
+                            abs_tol=abs_tol,
+                        )
+                        or t_h_out < t_c_in
+                    ):
+                        issues = True
+                else:
+                    if case.T_h[i][k][0] < case.T_c[j][k][0]:
+                        issues = True
+                    if case.T_h[i][k + 1][0] < case.T_c[j][k + 1][0]:
+                        issues = True
+    return not issues
+
+
+def _check_utility_costs(
+    case,
+    *,
+    rel_tol: float = 0.1,
+    abs_tol: float = 1.0,
+) -> bool:
+    post_hot_utility = case.hu_cost[0] * sum(case.Q_h[j][0] for j in range(case.J))
+    post_cold_utility = case.cu_cost[0] * sum(case.Q_c[i][0] for i in range(case.I))
+    model_hot_utility = _value(case.hu_cost_total)
+    model_cold_utility = _value(case.cu_cost_total)
+    return math.isclose(
+        post_hot_utility,
+        model_hot_utility,
+        rel_tol=rel_tol,
+        abs_tol=abs_tol,
+    ) and math.isclose(
+        post_cold_utility,
+        model_cold_utility,
+        rel_tol=rel_tol,
+        abs_tol=abs_tol,
+    )
+
+
+def _check_area_costs(
+    case,
+    *,
+    rel_tol: float = 0.1,
+    abs_tol: float = 1.0,
+    q_tol: float = 1e-2,
+) -> bool:
+    for k in range(case.S):
+        for j in range(case.J):
+            allowed_hots = [
+                i for i in range(case.I) if case.z_allowed[i][j][k] > 0
+            ]
+            if not allowed_hots:
+                continue
+
+            total_duty = sum(case.Q_r[i][j][k][0] for i in allowed_hots)
+            if abs(total_duty) <= q_tol:
+                continue
+
+            post_area_chen = (
+                sum(
+                    (
+                        case.Q_r[n][j][k][0]
+                        / (
+                            case.U_r[n][j]
+                            * (
+                                (
+                                    case.theta_1[n][j][k][0]
+                                    * case.theta_2[n][j][k][0]
+                                    * (
+                                        case.theta_1[n][j][k][0]
+                                        + case.theta_2[n][j][k][0]
+                                    )
+                                    / 2
+                                    + 1e-3
+                                )
+                                ** (1 / 3)
+                            )
+                        )
+                    )
+                    ** case.A_exp[0]
+                    for n in allowed_hots
+                )
+                * case.A_coeff[0]
+            )
+            model_area = _value(case.recovery_area_cost_filtered[k][j])
+            if not math.isclose(
+                post_area_chen,
+                model_area,
+                rel_tol=rel_tol,
+                abs_tol=abs_tol,
+            ):
+                return False
+    return True
+
+
+def _value(value) -> float:
+    if isinstance(value, int | float):
+        return float(value)
+    return float(value.value[0])
