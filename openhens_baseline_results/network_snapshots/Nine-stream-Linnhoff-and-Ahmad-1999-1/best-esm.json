@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "case_id": "Nine-stream-Linnhoff-and-Ahmad-1999-1",
+  "source_artifact": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/results/esm-187ea46995ce.json",
+  "source_summary_artifact": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json",
+  "task_id": "esm-187ea46995ce",
+  "method": "energy_stage_refinement",
+  "expected": {
+    "total_annual_cost": 2905807.275299348,
+    "best_dTmin": 18,
+    "best_derivative_threshold": 1.7,
+    "stage_count": 4,
+    "recovery_unit_count": 11,
+    "hot_utility_unit_count": 3,
+    "cold_utility_unit_count": 3,
+    "total_unit_count": 17,
+    "hot_utility_load": 24026.3483298705,
+    "cold_utility_load": 31746.3483298705
+  },
+  "tolerances": {
+    "duty_abs": 1.0,
+    "duty_rel": 0.0001,
+    "area_abs": 1.0,
+    "area_rel": 0.0001,
+    "total_annual_cost_abs": 1.0,
+    "total_annual_cost_rel": 0.0001
+  },
+  "exchangers": [
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 1 N",
+      "sink_stream": "Process A.Cold 1 N",
+      "stage": 1,
+      "duty": 8545.489790776994,
+      "area": 1134.6125061105874
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 1 N",
+      "sink_stream": "Process A.Cold 1 N",
+      "stage": 2,
+      "duty": 10496.286838805945,
+      "area": 1727.8436360808337
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 1 N",
+      "sink_stream": "Process A.Cold 2 N",
+      "stage": 4,
+      "duty": 5192.790708324977,
+      "area": 662.6118234180367
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 1 N",
+      "sink_stream": "Process A.Cold 5 N",
+      "stage": 2,
+      "duty": 1013.8918067684288,
+      "area": 149.7624223066182
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 2 N",
+      "sink_stream": "Process A.Cold 4 N",
+      "stage": 2,
+      "duty": 1268.543225946467,
+      "area": 361.67476939150475
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 2 N",
+      "sink_stream": "Process A.Cold 5 N",
+      "stage": 2,
+      "duty": 8331.456766797679,
+      "area": 1316.2313580207183
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 3 N",
+      "sink_stream": "Process A.Cold 2 N",
+      "stage": 2,
+      "duty": 2028.6668066583393,
+      "area": 324.724965793008
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 3 N",
+      "sink_stream": "Process A.Cold 4 N",
+      "stage": 4,
+      "duty": 4917.983062516396,
+      "area": 1588.7138475134745
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 4 N",
+      "sink_stream": "Process A.Cold 2 N",
+      "stage": 3,
+      "duty": 1808.5424543009601,
+      "area": 399.8073616639123
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 4 N",
+      "sink_stream": "Process A.Cold 3 N",
+      "stage": 3,
+      "duty": 11145.753029779897,
+      "area": 2735.76243331541
+    },
+    {
+      "kind": "recovery",
+      "source_stream": "Process A.Hot 4 N",
+      "sink_stream": "Process A.Cold 3 N",
+      "stage": 4,
+      "duty": 7404.246960506251,
+      "area": 1735.3474223248943
+    },
+    {
+      "kind": "hot_utility",
+      "source_stream": "Hot Utility.HPS",
+      "sink_stream": "Process A.Cold 1 N",
+      "stage": null,
+      "duty": 958.2232103359518,
+      "area": 155.14090072105884
+    },
+    {
+      "kind": "hot_utility",
+      "source_stream": "Hot Utility.HPS",
+      "sink_stream": "Process A.Cold 4 N",
+      "stage": null,
+      "duty": 413.473672506559,
+      "area": 31.568785717496592
+    },
+    {
+      "kind": "hot_utility",
+      "source_stream": "Hot Utility.HPS",
+      "sink_stream": "Process A.Cold 5 N",
+      "stage": null,
+      "duty": 22654.65142643389,
+      "area": 1863.05979288856
+    },
+    {
+      "kind": "cold_utility",
+      "source_stream": "Process A.Hot 1 N",
+      "sink_stream": "Cold Utility.CW",
+      "stage": null,
+      "duty": 3451.5406575184265,
+      "area": 408.16966468515153
+    },
+    {
+      "kind": "cold_utility",
+      "source_stream": "Process A.Hot 3 N",
+      "sink_stream": "Cold Utility.CW",
+      "stage": null,
+      "duty": 2653.350111244836,
+      "area": 415.4135223236758
+    },
+    {
+      "kind": "cold_utility",
+      "source_stream": "Process A.Hot 4 N",
+      "sink_stream": "Cold Utility.CW",
+      "stage": null,
+      "duty": 25641.45755385138,
+      "area": 2700.2445809807014
+    }
+  ]
+}
