@@ -30,6 +30,7 @@ from ..utils.wkbook_to_json import get_problem_from_excel
 from ._problem import (
     JsonDict,
     PathLike,
+    _DesignAccessorDescriptor,
     _LoadedProblemSource,
     _PlotAccessorDescriptor,
     _ProblemSourceAdapters,
@@ -67,6 +68,7 @@ class PinchProblem:
     _master_zone: Optional["Zone"]
     _input_source_kind: str
     _validation_context: Optional[dict[str, list[dict[str, Any]]]]
+    design = _DesignAccessorDescriptor()
     plot = _PlotAccessorDescriptor()
     target = _TargetAccessorDescriptor()
 

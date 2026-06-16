@@ -38,6 +38,9 @@ class HeatExchangerNetworkSynthesisTask(BaseModel):
     workspace_variant: str | None = None
     state_id: str | None = None
     parent_task_id: str | None = None
+    topology_restrictions: tuple[
+        "HeatExchangerNetworkTopologyRestriction", ...
+    ] = Field(default_factory=tuple)
 
     @field_validator("run_id")
     @classmethod
@@ -86,11 +89,46 @@ class HeatExchangerNetworkSynthesisTask(BaseModel):
             "run_id": self.run_id,
             "stage_count": self.stage_count,
             "state_id": self.state_id,
+            "topology_restrictions": [
+                restriction.model_dump(mode="json")
+                for restriction in self.topology_restrictions
+            ],
             "workspace_variant": self.workspace_variant,
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         digest = hashlib.sha256(encoded).hexdigest()[:16]
         return f"hens-task-{digest}"
+
+
+class HeatExchangerNetworkTopologyRestriction(BaseModel):
+    """OpenPinch stream-link topology inherited by downstream synthesis tasks."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    source_stream: str
+    sink_stream: str
+    stage: int
+    duty: float
+
+    @field_validator("source_stream", "sink_stream")
+    @classmethod
+    def _validate_stream_identity(cls, value: str) -> str:
+        validated = _validate_optional_identity(value)
+        if validated is None:
+            raise ValueError("stream identities must be non-empty strings")
+        return validated
+
+    @field_validator("stage")
+    @classmethod
+    def _validate_stage(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("stage must be a positive integer")
+        return int(value)
+
+    @field_validator("duty")
+    @classmethod
+    def _validate_duty(cls, value: float) -> float:
+        return _validate_non_negative_finite(value)
 
 
 class HeatExchangerNetworkSynthesisExportRecord(BaseModel):
@@ -328,12 +366,14 @@ __all__ = [
     "HeatExchangerNetworkSynthesisResult",
     "HeatExchangerNetworkSynthesisTask",
     "HeatExchangerNetworkSynthesisTaskOutcome",
+    "HeatExchangerNetworkTopologyRestriction",
     "SynthesisMethod",
     "SynthesisOutputFormat",
     "SynthesisTaskStatus",
 ]
 
 
+HeatExchangerNetworkTopologyRestriction.model_rebuild()
 HeatExchangerNetworkSynthesisTask.model_rebuild()
 HeatExchangerNetworkSynthesisExportRecord.model_rebuild()
 HeatExchangerNetworkSynthesisManifest.model_rebuild()

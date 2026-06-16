@@ -17,7 +17,10 @@ _WORKFLOW_SUPPORT_LEVELS = {
     "indirect_refrigeration": "advanced",
     "cogeneration": "advanced",
     "area_cost": "advanced",
+    "heat_exchanger_network_synthesis": "advanced",
 }
+
+_DESIGN_WORKFLOWS = {"heat_exchanger_network_synthesis"}
 
 
 @dataclass
@@ -53,12 +56,35 @@ def run_problem_workflow(
     problem: PinchProblem,
     workflow: str,
     workflow_options: dict[str, Any],
+    *,
+    workspace_variant: str | None = None,
 ) -> None:
     """Execute one named workflow against a live :class:`PinchProblem`."""
     normalized = normalise_workflow_name(workflow)
     if normalized == "target":
         problem.target()
         return
+
+    if normalized in _DESIGN_WORKFLOWS:
+        if not hasattr(problem.design, normalized):
+            raise WorkspaceExecutionError(
+                category="unsupported_workflow",
+                message=(
+                    f"Unknown design workflow {workflow!r}. Supported workflows "
+                    f"include: {', '.join(sorted(_WORKFLOW_SUPPORT_LEVELS))}."
+                ),
+            )
+        try:
+            method = getattr(problem.design, normalized)
+            method(**workflow_options, workspace_variant=workspace_variant)
+            return
+        except WorkspaceExecutionError:
+            raise
+        except Exception as exc:
+            raise WorkspaceExecutionError(
+                category="workflow_runtime",
+                message=str(exc),
+            ) from exc
 
     if not hasattr(problem.target, normalized):
         raise WorkspaceExecutionError(

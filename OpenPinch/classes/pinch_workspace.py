@@ -234,7 +234,12 @@ class PinchWorkspace:
 
         try:
             problem = self.case(name)
-            run_problem_workflow(problem, workflow, resolved_options)
+            run_problem_workflow(
+                problem,
+                workflow,
+                resolved_options,
+                workspace_variant=name,
+            )
         except WorkspaceExecutionError as exc:
             view = error_variant_view(
                 variant_name=name,
@@ -329,6 +334,8 @@ class PinchWorkspace:
         payload = deepcopy(self._variant_payloads[resolved_name])
         project_name = self.project_name or project_name_from_payload(payload) or "Site"
         problem = PinchProblem(source=payload, project_name=project_name)
+        if self.project_name:
+            problem.project_name = self.project_name
         self._case_cache[resolved_name] = problem
         return problem
 
