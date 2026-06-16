@@ -65,6 +65,15 @@ dashboard = [
 brayton_cycle = [
   "tespy",
 ]
+synthesis = [
+  "pyomo>=6.10.0",
+  "gekko>=1.3.2",
+  "matplotlib>=3.10.9",
+  "plotly>=6.8.0",
+  "kaleido>=1.3.0",
+  "openpyxl>=3.1.5",
+  "wakepy>=1.0.0",
+]
 notebook = [
   "ipykernel>=7.2.0",
   "nbformat>=5.10.4",

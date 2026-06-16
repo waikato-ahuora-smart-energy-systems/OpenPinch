@@ -57,6 +57,11 @@ def _check_core_surface() -> None:
         "tespy",
         "ipykernel",
         "nbformat",
+        "pyomo",
+        "gekko",
+        "matplotlib",
+        "kaleido",
+        "wakepy",
     ]:
         _assert_module_absent(module_name)
 
@@ -124,6 +129,15 @@ def _check_brayton_cycle_surface() -> None:
     assert SimpleBraytonHeatPumpCycle() is not None
 
 
+def _check_synthesis_surface() -> None:
+    from OpenPinch.services.heat_exchanger_network_synthesis._dependencies import (
+        require_declared_synthesis_dependencies,
+    )
+
+    _exercise_cli_help()
+    assert require_declared_synthesis_dependencies()
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser for smoke checks."""
     parser = argparse.ArgumentParser(
@@ -132,7 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "surface",
-        choices=["core", "dashboard", "notebook", "brayton_cycle"],
+        choices=["core", "dashboard", "notebook", "brayton_cycle", "synthesis"],
         help="Install surface to verify.",
     )
     return parser
@@ -151,6 +165,8 @@ def main(argv: list[str] | None = None) -> int:
         _check_notebook_surface()
     elif args.surface == "brayton_cycle":
         _check_brayton_cycle_surface()
+    elif args.surface == "synthesis":
+        _check_synthesis_surface()
 
     print(f"OpenPinch optional install smoke passed for: {args.surface}")
     return 0
