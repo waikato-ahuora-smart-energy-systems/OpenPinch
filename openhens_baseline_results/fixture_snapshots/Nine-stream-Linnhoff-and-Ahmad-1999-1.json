@@ -1,0 +1,184 @@
+{
+  "adapter_array_shapes": {
+    "A_coeff": [
+      1
+    ],
+    "A_exp": [
+      1
+    ],
+    "T_c_cont": [
+      5
+    ],
+    "T_c_in": [
+      5
+    ],
+    "T_c_out": [
+      5
+    ],
+    "T_cu_in": [
+      1
+    ],
+    "T_cu_out": [
+      1
+    ],
+    "T_h_cont": [
+      4
+    ],
+    "T_h_in": [
+      4
+    ],
+    "T_h_out": [
+      4
+    ],
+    "T_hu_in": [
+      2
+    ],
+    "T_hu_out": [
+      2
+    ],
+    "c_cost": [
+      5
+    ],
+    "cold_names": [
+      5
+    ],
+    "cu_coeff": [
+      1
+    ],
+    "cu_cost": [
+      1
+    ],
+    "cu_exp": [
+      1
+    ],
+    "cu_unit_cost": [
+      1
+    ],
+    "f_c": [
+      5
+    ],
+    "f_h": [
+      4
+    ],
+    "h_cost": [
+      4
+    ],
+    "hot_names": [
+      4
+    ],
+    "htc_c": [
+      5
+    ],
+    "htc_cu": [
+      1
+    ],
+    "htc_h": [
+      4
+    ],
+    "htc_hu": [
+      2
+    ],
+    "hu_coeff": [
+      1
+    ],
+    "hu_cost": [
+      2
+    ],
+    "hu_exp": [
+      1
+    ],
+    "hu_unit_cost": [
+      1
+    ],
+    "unit_cost": [
+      1
+    ]
+  },
+  "axis_maps": {
+    "cold_process_streams": {
+      "Process A.Cold 1 N": 1,
+      "Process A.Cold 2 N": 4,
+      "Process A.Cold 3 N": 2,
+      "Process A.Cold 4 N": 3,
+      "Process A.Cold 5 N": 0
+    },
+    "cold_utilities": {
+      "Cold Utility.CW": 0
+    },
+    "hot_process_streams": {
+      "Process A.Hot 1 N": 0,
+      "Process A.Hot 2 N": 1,
+      "Process A.Hot 3 N": 2,
+      "Process A.Hot 4 N": 3
+    },
+    "hot_utilities": {
+      "Hot Utility.HPS": 0,
+      "Hot Utility.HU": 1
+    },
+    "stages": {
+      "1": 0,
+      "2": 1,
+      "3": 2,
+      "4": 3
+    }
+  },
+  "case_id": "Nine-stream-Linnhoff-and-Ahmad-1999-1",
+  "covered_dTmin_values": [
+    18.0
+  ],
+  "design_grid_task_counts": {
+    "pdm_grid_count": 10,
+    "solved_esm_count_from_baseline_summary": 71,
+    "solver_execution_in_hens_03": "not run",
+    "tdm_threshold_count_per_successful_pdm": 10,
+    "total_cases_attempted_from_baseline_summary": 1155,
+    "total_cases_solved_from_baseline_summary": 886
+  },
+  "economic_mapping": {
+    "exchanger_area_coefficient": "Configuration.VARIABLE_COST",
+    "exchanger_area_exponent": "Configuration.COST_EXP",
+    "exchanger_fixed_cost": "Configuration.FIXED_COST",
+    "process_stream_costs": "audited as non-algorithmic for active source equations; kept out of StreamSchema fixture payloads",
+    "utility_costs": "UtilitySchema.price"
+  },
+  "migrated_fixture_path": "tests/fixtures/openhens/Nine-stream-Linnhoff-and-Ahmad-1999-1.json",
+  "migrated_fixture_sha256": "84a7affd5177d339029f9592cc88c5b9559ad2c347c90b8ba45a39af5001a378",
+  "preparation": {
+    "pinch_problem_class": "PinchProblem",
+    "pinch_problem_load": "passed",
+    "prepare_problem": "created Zone, StreamCollection, and Stream objects",
+    "prepared_zone_class": "Zone",
+    "process_stream_collection_class": "StreamCollection",
+    "stream_class": "Stream",
+    "zone_name": "Site"
+  },
+  "process_stream_count": 9,
+  "schema_version": "openpinch-openhens-fixture-snapshot/v1",
+  "source_csv_path": "/Users/ca107/Desktop/ahuora/OpenHENS/examples/cases/Nine-stream-Linnhoff-and-Ahmad-1999-1.csv",
+  "source_csv_sha256": "fbf065509f355584623bfdfd5c38478410ddbab2a7c696e49bb3c15df3161b10",
+  "stream_identities": {
+    "cold_process_streams": [
+      "Process A.Cold 5 N",
+      "Process A.Cold 1 N",
+      "Process A.Cold 3 N",
+      "Process A.Cold 4 N",
+      "Process A.Cold 2 N"
+    ],
+    "hot_process_streams": [
+      "Process A.Hot 1 N",
+      "Process A.Hot 2 N",
+      "Process A.Hot 3 N",
+      "Process A.Hot 4 N"
+    ]
+  },
+  "utility_count": 2,
+  "utility_identities": {
+    "cold_utilities": [
+      "Cold Utility.CW"
+    ],
+    "hot_utilities": [
+      "Hot Utility.HPS",
+      "Hot Utility.HU"
+    ]
+  }
+}

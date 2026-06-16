@@ -1,0 +1,200 @@
+"""Fixture and private-array adapter tests for the OpenHENS migration."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+import OpenPinch
+from OpenPinch.classes.pinch_problem import PinchProblem
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.classes.zone import Zone
+from OpenPinch.lib.schemas.io import TargetInput
+from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
+from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
+    problem_to_solver_arrays,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
+SNAPSHOT_ROOT = REPO_ROOT / "openhens_baseline_results"
+CASE_DTMIN = {
+    "Four-stream-Yee-and-Grossmann-1990-1": 14.0,
+    "Nine-stream-Linnhoff-and-Ahmad-1999-1": 18.0,
+}
+
+
+@pytest.mark.parametrize(
+    ("case_id", "stream_count", "utility_count"),
+    [
+        ("Four-stream-Yee-and-Grossmann-1990-1", 4, 2),
+        ("Nine-stream-Linnhoff-and-Ahmad-1999-1", 9, 2),
+    ],
+)
+def test_converted_openhens_json_loads_through_prepared_pinch_problem(
+    case_id: str,
+    stream_count: int,
+    utility_count: int,
+) -> None:
+    fixture_path = FIXTURE_ROOT / f"{case_id}.json"
+    payload = json.loads(fixture_path.read_text())
+
+    target_input = TargetInput.model_validate(payload)
+    problem = PinchProblem(source=fixture_path)
+    arrays = problem_to_solver_arrays(problem, CASE_DTMIN[case_id])
+
+    assert len(target_input.streams) == stream_count
+    assert len(target_input.utilities) == utility_count
+    assert all(stream.t_supply.unit == "K" for stream in target_input.streams)
+    assert all(stream.t_target.unit == "K" for stream in target_input.streams)
+    assert all("price" not in stream for stream in payload["streams"])
+    assert all(utility.price.unit == "$/MWh" for utility in target_input.utilities)
+    assert isinstance(problem.master_zone, Zone)
+    assert isinstance(problem.master_zone.process_streams, StreamCollection)
+    assert all(isinstance(stream, Stream) for stream in problem.hot_streams)
+    assert all(isinstance(stream, Stream) for stream in problem.cold_streams)
+    assert arrays.preparation["prepared_zone_class"] == "Zone"
+    assert arrays.configuration["HENS_RUN_ID"] == case_id
+
+
+def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
+    case_id = "Four-stream-Yee-and-Grossmann-1990-1"
+    fixture_path = FIXTURE_ROOT / f"{case_id}.json"
+    snapshot_path = SNAPSHOT_ROOT / "adapter_snapshots" / case_id / "dTmin-14.json"
+    snapshot = json.loads(snapshot_path.read_text())
+    payload = problem_to_solver_arrays(PinchProblem(source=fixture_path), 14.0)
+    current = payload.to_json_dict()
+
+    assert current["array_shapes"] == snapshot["array_shapes"]
+    assert current["axis_maps"] == snapshot["axis_maps"]
+    assert current["stream_identities"] == snapshot["stream_identities"]
+    assert current["utility_identities"] == snapshot["utility_identities"]
+
+    for name, expected in snapshot["arrays"].items():
+        actual = current["arrays"][name]
+        if name.endswith("_names"):
+            assert actual == expected
+        else:
+            np.testing.assert_allclose(actual, expected)
+
+    for name, expected in snapshot["source_openhens_arrays"].items():
+        actual = current["arrays"][name]
+        if name.endswith("_names"):
+            assert [item.strip() for item in actual] == [
+                item.strip() for item in expected
+            ]
+        else:
+            np.testing.assert_allclose(actual, expected)
+
+
+@pytest.mark.parametrize("case_id", CASE_DTMIN)
+def test_reordered_fixtures_keep_same_prepared_adapter_semantics(case_id: str) -> None:
+    base = problem_to_solver_arrays(
+        PinchProblem(source=FIXTURE_ROOT / f"{case_id}.json"),
+        CASE_DTMIN[case_id],
+    )
+    reordered = problem_to_solver_arrays(
+        PinchProblem(source=FIXTURE_ROOT / f"{case_id}.reordered.json"),
+        CASE_DTMIN[case_id],
+    )
+
+    assert reordered.axis_maps == base.axis_maps
+    assert reordered.stream_identities == base.stream_identities
+    assert reordered.utility_identities == base.utility_identities
+    for name, expected in base.arrays.items():
+        actual = reordered.arrays[name]
+        if expected.dtype.kind in {"U", "S", "O"}:
+            assert actual.tolist() == expected.tolist()
+        else:
+            np.testing.assert_allclose(actual, expected)
+
+
+def test_adapter_requires_prepared_pinch_problem_and_rejects_bypass_payloads() -> None:
+    good_problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    cached_arrays = problem_to_solver_arrays(good_problem, 14.0)
+    manifest = HeatExchangerNetworkSynthesisManifest(
+        run_id="run-1",
+        approach_temperatures=(14.0,),
+        derivative_thresholds=(0.5,),
+        stage_selection=(1,),
+    )
+    bypass_values = [
+        [{"Designation": "Hot"}],
+        TargetInput(streams=[]),
+        manifest,
+        cached_arrays,
+        cached_arrays.to_json_dict(),
+    ]
+
+    with pytest.raises(RuntimeError, match="requires PinchProblem.load"):
+        problem_to_solver_arrays(PinchProblem(), 14.0)
+
+    for value in bypass_values:
+        with pytest.raises(TypeError, match="prepared PinchProblem"):
+            problem_to_solver_arrays(value, 14.0)  # type: ignore[arg-type]
+
+
+def test_adapter_rejects_non_positive_dtmin() -> None:
+    problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+
+    with pytest.raises(ValueError, match="dTmin"):
+        problem_to_solver_arrays(problem, -1.0)
+
+
+def test_conversion_errors_include_row_and_field_context(tmp_path: Path) -> None:
+    converter = _load_converter_module()
+    source = tmp_path / "bad-openhens-case.csv"
+    source.write_text(
+        "\n".join(
+            [
+                "Number;Subsystem;Description;Designation;Supply Temp;Target Temp;Flow heat capacity;HTC;Stream cost",
+                ";;;;T_in;T_out;f;htc;_cost",
+                ";;;;K;K;kW/K;kW/m2-K;$/kW-y",
+                "1;Process A;Hot A;Hot;650;370;not-a-number;1;0",
+                "1;Process A;Cold A;Cold;410;650;15;1;0",
+                "1;Utility;HPS;Hot Utility;680;680;;5;80",
+                "1;Utility;CW;Cold Utility;300;320;;1;15",
+                ";;;;;;;;",
+                "Number;Subsystem;Description;Designation;HX unit cost;HX area coefficient;HX area exponent;;",
+                ";;;;unit_cost;_coeff;A_exp;;",
+                "1;Process A;Process-process HX;Exchange;5500;150;1;;",
+                "1;Utility;Process-heater HX;Heating;5500;150;1;;",
+                "1;Utility;Process-cooler HX;Cooling;5500;150;1;;",
+            ]
+        )
+    )
+
+    with pytest.raises(
+        converter.ConversionError,
+        match="process streams row 4: Flow heat capacity must be numeric",
+    ):
+        converter.parse_openhens_csv(source)
+
+
+def test_openhens_csv_conversion_is_not_public_runtime_api() -> None:
+    assert not hasattr(OpenPinch, "convert_openhens_fixtures")
+    assert not hasattr(OpenPinch, "problem_to_solver_arrays")
+
+
+def _load_converter_module():
+    converter_path = REPO_ROOT / "scripts" / "convert_openhens_fixtures.py"
+    spec = importlib.util.spec_from_file_location(
+        "_openhens_fixture_converter",
+        converter_path,
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("could not load converter script module")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module

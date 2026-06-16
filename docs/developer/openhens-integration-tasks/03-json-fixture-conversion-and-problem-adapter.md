@@ -51,94 +51,94 @@ Settled decisions for this task:
 
 ## Requirements Checklist
 
-- [ ] Use the case acceptance matrix in `README.md` as the source of required
+- [x] Use the case acceptance matrix in `README.md` as the source of required
       fixture scope. Do not choose additional cases unless HENS-00/HENS-11 first
       names their exact source paths, tiers, grids, and thresholds.
-- [ ] Recreate
+- [x] Recreate
       `Four-stream-Yee-and-Grossmann-1990-1` as an OpenPinch-compatible fixture.
-- [ ] Recreate
+- [x] Recreate
       `Nine-stream-Linnhoff-and-Ahmad-1999-1` as an OpenPinch-compatible fixture.
-- [ ] Convert each matrix-required case into standard OpenPinch JSON using
+- [x] Convert each matrix-required case into standard OpenPinch JSON using
       `TargetInput`.
-- [ ] Put process stream data in `StreamSchema`.
-- [ ] Put utility data in `UtilitySchema`.
-- [ ] Put hot utility and cold utility operating costs into
+- [x] Put process stream data in `StreamSchema`.
+- [x] Put utility data in `UtilitySchema`.
+- [x] Put hot utility and cold utility operating costs into
       `UtilitySchema.price`.
-- [ ] Put HEN search, method, solver, tolerance, output, run id, and best-count
+- [x] Put HEN search, method, solver, tolerance, output, run id, and best-count
       controls into `TargetInput.options`.
-- [ ] Add or update `CONFIG_FIELD_SPECS` before any converted fixture relies on
+- [x] Add or update `CONFIG_FIELD_SPECS` before any converted fixture relies on
       a new HEN option.
-- [ ] Map exchanger capital-cost coefficients to existing OpenPinch costing
+- [x] Map exchanger capital-cost coefficients to existing OpenPinch costing
       configuration where possible.
 - [ ] If per-exchanger-kind capital-cost coefficients are needed, extend the
       general OpenPinch costing configuration/schema instead of adding a HEN-only
       economics object.
-- [ ] Audit OpenHENS process stream cost fields `h_cost` and `c_cost`.
+- [x] Audit OpenHENS process stream cost fields `h_cost` and `c_cost`.
 - [ ] If process stream costs affect the algorithm, add a general
       OpenPinch-owned representation such as `StreamSchema.price` or another
       existing costing path.
-- [ ] If process stream costs do not affect the algorithm, document the evidence
+- [x] If process stream costs do not affect the algorithm, document the evidence
       and keep them out of the runtime fixture schema.
-- [ ] Require explicit units for Kelvin source temperatures. Do not rely on
+- [x] Require explicit units for Kelvin source temperatures. Do not rely on
       OpenPinch default temperature units.
-- [ ] Load every converted JSON through `PinchProblem`.
-- [ ] Confirm `PinchProblem.load(...)` and `prepare_problem(...)` create a
+- [x] Load every converted JSON through `PinchProblem`.
+- [x] Confirm `PinchProblem.load(...)` and `prepare_problem(...)` create a
       prepared execution `Zone`, `StreamCollection`, and `Stream` objects.
-- [ ] Create private `problem_to_solver_arrays(problem, dTmin)` under the
+- [x] Create private `problem_to_solver_arrays(problem, dTmin)` under the
       synthesis service package.
-- [ ] Ensure the adapter derives arrays only from the live prepared `Zone` owned
+- [x] Ensure the adapter derives arrays only from the live prepared `Zone` owned
       by the `PinchProblem` being solved, or from an immutable prepared-zone
       snapshot created by `prepare_problem(...)` and stored on that same
       `PinchProblem`.
-- [ ] Preserve source OpenHENS behavior where missing temperature contributions
+- [x] Preserve source OpenHENS behavior where missing temperature contributions
       become `dTmin / 2` inside the private adapter.
-- [ ] Include HEN option values, utility prices, costing coefficients, stage
+- [x] Include HEN option values, utility prices, costing coefficients, stage
       selection, and solver controls in the adapter output where the moved
       equation models expect them.
-- [ ] Store labelled axis maps with the adapter output:
+- [x] Store labelled axis maps with the adapter output:
       hot process stream key -> `i`, cold process stream key -> `j`,
       stage -> `k`, hot utility key -> utility index, and cold utility key ->
       utility index.
-- [ ] Add adapter snapshot tests comparing migrated Four-stream arrays to source
+- [x] Add adapter snapshot tests comparing migrated Four-stream arrays to source
       OpenHENS solver-array payloads for the same case and `dTmin`.
-- [ ] Add adapter snapshot artifacts or exact extraction commands before
+- [x] Add adapter snapshot artifacts or exact extraction commands before
       marking adapter work complete. Snapshots must include array shapes, axis
       maps, unit conventions, stream identities, utility identities, and covered
       `dTmin` values.
-- [ ] Add fixture validation tests for the recreated Nine-stream example, but do
+- [x] Add fixture validation tests for the recreated Nine-stream example, but do
       not require it as the routine adapter baseline unless the task explicitly
       needs final verification.
-- [ ] Add tests that fail if arrays are built directly from converted fixture
+- [x] Add tests that fail if arrays are built directly from converted fixture
       rows, raw `TargetInput`, or HEN schemas while bypassing `PinchProblem`.
-- [ ] Add tests that fail if arrays are built from independent cached array
+- [x] Add tests that fail if arrays are built from independent cached array
       payloads, standalone solver-input DTOs, or snapshots not stored on the
       same `PinchProblem`.
-- [ ] Add row and field context to conversion and validation errors.
-- [ ] Keep conversion tooling out of the public runtime API.
+- [x] Add row and field context to conversion and validation errors.
+- [x] Keep conversion tooling out of the public runtime API.
 
 ## General Standards That Apply
 
-- [ ] Enforce the required OpenPinch workflow from `README.md`; deviations are
+- [x] Enforce the required OpenPinch workflow from `README.md`; deviations are
       not permitted.
-- [ ] Runtime synthesis starts from JSON, `TargetInput`, or `PinchProblem`, not
+- [x] Runtime synthesis starts from JSON, `TargetInput`, or `PinchProblem`, not
       CSV.
-- [ ] Public entry points do not accept raw stream lists, raw utility lists,
+- [x] Public entry points do not accept raw stream lists, raw utility lists,
       CSV rows, or `TargetInput` directly for synthesis.
-- [ ] Private arrays are a migration bridge and should shrink as solver models
+- [x] Private arrays are a migration bridge and should shrink as solver models
       become OpenPinch-native.
-- [ ] Fixture conversion must preserve current OpenHENS scientific behavior
+- [x] Fixture conversion must preserve current OpenHENS scientific behavior
       before later replacement work starts.
 
 ## Verification Checklist
 
-- [ ] Converted fixture validation tests pass for every matrix-required
+- [x] Converted fixture validation tests pass for every matrix-required
       OpenHENS case.
-- [ ] Adapter snapshots match source OpenHENS arrays for each required case and
+- [x] Adapter snapshots match source OpenHENS arrays for each required case and
       `dTmin`.
-- [ ] Unit conversion tests cover Kelvin source inputs.
-- [ ] Negative bypass tests prove adapter construction requires a prepared
+- [x] Unit conversion tests cover Kelvin source inputs.
+- [x] Negative bypass tests prove adapter construction requires a prepared
       `PinchProblem`.
-- [ ] Bad row values fail with row and field context.
+- [x] Bad row values fail with row and field context.
 
 ## Definition of Done
 
@@ -160,4 +160,49 @@ Settled decisions for this task:
 
 ## Implementation Notes
 
-- 
+- 2026-06-16: Implemented the HENS-03 slice with the README acceptance matrix
+  scope only: `Four-stream-Yee-and-Grossmann-1990-1` and
+  `Nine-stream-Linnhoff-and-Ahmad-1999-1`.
+- Converted fixtures live at
+  `tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json` and
+  `tests/fixtures/openhens/Nine-stream-Linnhoff-and-Ahmad-1999-1.json`, with
+  reordered variants at the HENS-00 paths. Payloads validate as `TargetInput`,
+  use `StreamSchema` and `UtilitySchema`, carry explicit `K` temperature units,
+  put utility costs in `UtilitySchema.price`, and put HEN controls plus shared
+  exchanger costing in `TargetInput.options` / existing `CONFIG_FIELD_SPECS`.
+- Added dev-only conversion tooling at `scripts/convert_openhens_fixtures.py`.
+  The generation command used was
+  `rtk uv run python scripts/convert_openhens_fixtures.py --openhens-root /Users/ca107/Desktop/ahuora/OpenHENS --write`.
+  The script is outside the `OpenPinch` package namespace and is covered by a
+  negative public-runtime API test.
+- Added the private adapter
+  `OpenPinch/services/heat_exchanger_network_synthesis/array_adapter.py`.
+  `problem_to_solver_arrays(problem, dTmin)` accepts only a prepared
+  `PinchProblem`, reads arrays from the live prepared `Zone` stream collections,
+  returns labelled axis maps and solver-array metadata, and falls back to
+  `dTmin / 2` when prepared temperature contributions are absent.
+- Added HENS-00 structural snapshots:
+  `openhens_baseline_results/fixture_snapshots/Four-stream-Yee-and-Grossmann-1990-1.json`
+  and
+  `openhens_baseline_results/fixture_snapshots/Nine-stream-Linnhoff-and-Ahmad-1999-1.json`.
+  Added the routine adapter snapshot
+  `openhens_baseline_results/adapter_snapshots/Four-stream-Yee-and-Grossmann-1990-1/dTmin-14.json`.
+- Process stream cost audit: source OpenHENS emits `h_cost` and `c_cost` in
+  `CaseStudy.to_legacy_arrays(...)` and initializes blank model attributes in
+  `GenericHENModel`, but active PDM/stage-wise objective, post-processing, and
+  verification equations use `hu_cost`, `cu_cost`, and exchanger area/fixed
+  costs. No active equation references `h_cost` or `c_cost`, so process stream
+  costs remain out of the runtime fixture schema for this slice. The conditional
+  checklist item for adding a general `StreamSchema.price` remains unchecked as
+  not applicable.
+- Per-exchanger-kind capital-cost schema extension remains unchecked as not
+  applicable: both matrix-required cases use equal exchange/heating/cooling
+  fixed cost, area coefficient, and exponent, so the fixtures map to existing
+  `FIXED_COST`, `VARIABLE_COST`, and `COST_EXP`.
+- Verification:
+  `rtk uv run pytest tests/test_heat_exchanger_network_array_adapter.py tests/test_lib/test_synthesis_schemas.py tests/test_analysis/test_data_preparation.py`
+  passed with 101 tests and 3 existing data-preparation warnings.
+  `rtk uv run ruff check .` passed.
+  `rtk git diff --check -- . ':!.DS_Store'` passed.
+- Definition of Done checkboxes are intentionally left unchecked pending
+  adversarial review.
