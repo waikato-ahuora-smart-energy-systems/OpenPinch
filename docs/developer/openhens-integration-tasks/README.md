@@ -370,6 +370,12 @@ Required review checks:
 - [ ] Confirm documentation and examples describe the OpenPinch-native workflow
       directly and do not imply import aliases, field aliases, command parity,
       or a wrapper package.
+- [ ] Confirm public docs, examples, and code comments explain stable
+      OpenPinch contracts, public/library semantics, non-obvious domain
+      invariants, and migration constraints. Comments should clarify why a rule
+      must hold or what contract future callers can rely on; they should not
+      merely narrate incidental implementation mechanics, private array shapes,
+      or temporary adapter details.
 - [ ] Confirm task checkboxes and `Implementation Notes` are updated with
       reproducible evidence before the task is marked done.
 - [ ] Confirm unrelated local files, generated caches, lockfile version bumps,
@@ -382,13 +388,19 @@ Review severity guidance:
       compatibility surface, runtime CSV synthesis path, alternate state owner,
       artifact-first result path, eager solver dependency import, missing
       baseline evidence for solver behavior, missing required snapshot artifact,
-      or unreviewed scientific change.
+      unreviewed scientific change, or documentation/commentary that creates,
+      endorses, or hides one of those public-contract violations.
 - [ ] Mark as high severity any missing negative API test, missing
       row-order/identity test, missing result-cache test, missing fixture
-      validation, missing optional-dependency guard, or missing task fan-out
-      coverage when the touched code requires it.
-- [ ] Mark as medium severity incomplete documentation, unclear evidence notes,
-      weak error messages, or insufficient export snapshot coverage.
+      validation, missing optional-dependency guard, missing task fan-out
+      coverage, or missing/misleading documentation and comments for stable
+      public semantics, domain invariants, migration constraints, or reviewer
+      obligations when the touched code requires them. Treat comments that
+      substitute implementation noise for contract-level guidance as high
+      severity when they leave future maintainers without the stable rule.
+- [ ] Mark as medium severity localized documentation polish gaps that do not
+      obscure public/library semantics, unclear evidence notes, weak error
+      messages, or insufficient export snapshot coverage.
 
 The adversarial review output should list findings first, ordered by severity
 and grounded in file/line references. If there are no findings, the reviewer
