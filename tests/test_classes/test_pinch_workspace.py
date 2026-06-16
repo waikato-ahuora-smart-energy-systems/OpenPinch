@@ -40,7 +40,7 @@ def test_pinch_workspace_returns_real_cases_and_delegates_to_pinchproblem():
     assert not summary.empty
     assert not workspace.plot.catalog().empty
 
-    workspace.copy_case("baseline", "wide_dt", activate=False)
+    workspace.copy_case(source_name="baseline", new_name="wide_dt", activate=False)
     workspace.set_dt_cont_multiplier(2.0, case_name="wide_dt")
     workspace.use_case("wide_dt")
 
@@ -56,7 +56,7 @@ def test_pinch_workspace_returns_real_cases_and_delegates_to_pinchproblem():
 
 def test_pinch_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: Path):
     workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
-    workspace.copy_case("baseline", "wide_dt", activate=False)
+    workspace.copy_case(source_name="baseline", new_name="wide_dt", activate=False)
     workspace.update_options({"DT_CONT": 15}, case_name="wide_dt")
 
     bundle_path = workspace.save_bundle(tmp_path / "pinch_workspace_bundle.json")
@@ -173,7 +173,7 @@ def test_pinch_workspace_reports_error_category_for_unsupported_workflow():
 
 def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
     workspace = PinchWorkspace(_chocolate_payload(), project_name="Site")
-    case = workspace.copy_case("baseline", "direct_hp_full_load", activate=False)
+    case = workspace.copy_case(source_name="baseline", new_name="direct_hp_full_load", activate=False)
     case.update_options(
         {
             "HPR_TYPE": HPRcycle.CascadeCarnot.value,

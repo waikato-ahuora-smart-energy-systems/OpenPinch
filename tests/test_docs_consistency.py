@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from OpenPinch.resources import list_notebooks
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 README = REPO_ROOT / "README.md"
 GETTING_STARTED = REPO_ROOT / "docs" / "getting-started.rst"
@@ -128,7 +130,12 @@ def test_docs_reference_the_current_notebook_series():
     assert "05_schema_service_and_output_workflows.ipynb" in combined
     assert "06_energy_transfer_analysis.ipynb" in combined
     assert "07_vapour_compression_mvr_cascade_hpr.ipynb" in combined
+    assert "08_direct_gas_stream_mvr.ipynb" in combined
+    for notebook_name in list_notebooks():
+        assert notebook_name in combined
     assert "multistate" in combined or 'state_id="' in combined
+    assert "direct gas/vapour" in combined
+    assert "add_component.process_mvr" in combined
 
 
 def test_docs_reference_current_packaged_sample_cases():
@@ -223,6 +230,8 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "OpenPinch.services.heat_pump_integration.targeting_services" in _read(
         REPO_ROOT / "docs" / "reference" / "api-heat-pump.rst"
     )
+    assert "OpenPinch.services.components.process_mvr" in api_classes
+    assert "OpenPinch.services.components.direct_mvr.direct_gas_mvr" in api_classes
     assert "OpenPinch.classes.simple_heat_pump" not in api_classes
     assert "OpenPinch.classes.parallel_heat_pump" not in api_classes
     assert "OpenPinch.classes.cascade_heat_pump" not in api_classes
