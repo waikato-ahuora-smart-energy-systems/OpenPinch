@@ -264,9 +264,12 @@ same reviewed change.
 
 Adversarial review subagents must review each implementation against the plan,
 the assigned task file, and the required workflow above. The review should
-prioritize correctness, ownership boundaries, regression risk, and missing
-tests. Style-only findings should not displace behavioral or architectural
-findings.
+prioritize correctness, ownership boundaries, regression risk, missing tests,
+and documentation/comment quality for touched library-facing surfaces.
+Style-only findings should not displace behavioral or architectural findings,
+but misleading or shallow documentation is not a style-only issue when it
+obscures a public contract, domain invariant, migration constraint, or future
+maintainer obligation.
 
 Reviewers should treat any violation of the required workflow as a blocking
 finding. A change is not acceptable if it works by adding an easier side path
@@ -278,6 +281,14 @@ Required review checks:
       `PinchProblem` / `PinchWorkspace` -> `problem.design` -> synthesis service
       -> private adapter only where needed -> `TargetOutput.design` -> optional
       exports from `problem.results`.
+- [ ] Confirm public docs, examples, docstrings, and code comments introduced or
+      touched by the slice read like maintainable library guidance: they explain
+      stable OpenPinch contracts, public semantics, non-obvious domain
+      invariants, ownership boundaries, and migration constraints where those
+      facts matter. Comments should clarify why a rule must hold or what future
+      callers can rely on; they should not merely expose incidental
+      implementation mechanics, private solver-array shapes, or temporary
+      adapter details.
 - [ ] Confirm the synthesis service is internal and not root-exported or
       documented as a user-facing execution path.
 - [ ] Confirm there is no public `OpenHENS`, `CaseStudy`, `SynthesisStudy`,
@@ -370,12 +381,6 @@ Required review checks:
 - [ ] Confirm documentation and examples describe the OpenPinch-native workflow
       directly and do not imply import aliases, field aliases, command parity,
       or a wrapper package.
-- [ ] Confirm public docs, examples, and code comments explain stable
-      OpenPinch contracts, public/library semantics, non-obvious domain
-      invariants, and migration constraints. Comments should clarify why a rule
-      must hold or what contract future callers can rely on; they should not
-      merely narrate incidental implementation mechanics, private array shapes,
-      or temporary adapter details.
 - [ ] Confirm task checkboxes and `Implementation Notes` are updated with
       reproducible evidence before the task is marked done.
 - [ ] Confirm unrelated local files, generated caches, lockfile version bumps,
@@ -395,9 +400,10 @@ Review severity guidance:
       validation, missing optional-dependency guard, missing task fan-out
       coverage, or missing/misleading documentation and comments for stable
       public semantics, domain invariants, migration constraints, or reviewer
-      obligations when the touched code requires them. Treat comments that
-      substitute implementation noise for contract-level guidance as high
-      severity when they leave future maintainers without the stable rule.
+      obligations when the touched code requires them. Treat library-facing docs
+      or comments that substitute implementation noise for contract-level
+      guidance as high severity when they leave future maintainers without the
+      stable rule.
 - [ ] Mark as medium severity localized documentation polish gaps that do not
       obscure public/library semantics, unclear evidence notes, weak error
       messages, or insufficient export snapshot coverage.
