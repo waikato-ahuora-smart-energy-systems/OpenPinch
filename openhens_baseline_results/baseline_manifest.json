@@ -1,0 +1,262 @@
+{
+  "artifact_schema_version": "openhens-baseline-manifest/v1",
+  "created_at_utc": "2026-06-16T00:41:55Z",
+  "purpose": "HENS-00 baseline provenance and acceptance metadata for OpenHENS-to-OpenPinch migration work before production solver code moves.",
+  "reproducibility_status": "source_provenance_captured_solver_rerun_blocked",
+  "reproducibility_notes": [
+    "Existing aggregate comparison artifacts identify the refactor artifact-generation worktree as dirty at 92e942fec148d5e6a1e052bb3d207b95a4f85379.",
+    "The stored patch artifact openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch captures the binary Git diff from that recorded refactor base to the later clean parity commit 2afc14b7779482fc829edb1c3fa187b918d7fb19.",
+    "The patch SHA256 is cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33 and `rtk git -C ../OpenHENS apply --check --reverse <patch>` passed against the clean 2afc14b checkout.",
+    "The current local environment still cannot rerun the marked solver regressions because Couenne and IPOPT are not on PATH."
+  ],
+  "repositories": {
+    "openpinch": {
+      "repository_url": "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch.git",
+      "manifest_capture_branch": "codex/openhens-migration-plan",
+      "manifest_capture_head": "e670a1a8ebdd9fe2c90d8ef445af1d69c67aef2e",
+      "manifest_capture_worktree": "dirty: HENS-00 documentation/artifact files were under review; pre-existing .DS_Store and docs/developer/index.rst changes were present and excluded from the HENS-00 implementation slice",
+      "excluded_dirty_tracked_files": [".DS_Store", "docs/developer/index.rst"],
+      "stored_dirty_patch_artifact": "not_applicable_for_openhens_solver_artifact_provenance",
+      "dirty_patch_sha256": null,
+      "dirty_patch_status": "not required for the OpenHENS solver artifact baseline because the unrelated dirty tracked OpenPinch files are excluded from the HENS-00 task slice",
+      "python_version": "3.14.2",
+      "dependency_lock_path": "uv.lock",
+      "dependency_lock_sha256": "dc8ccfa6a2aa445deaeb769aa3cab84692f89d6915c69c584a49cb376cadd828",
+      "relevant_package_versions": {
+        "OpenPinch": "0.2.3",
+        "numpy": "2.4.6",
+        "pydantic": "2.13.4",
+        "scipy": "1.17.1",
+        "matplotlib": "3.10.9",
+        "plotly": "6.8.0",
+        "networkx": "NOT_INSTALLED"
+      }
+    },
+    "openhens": {
+      "repository_url": "https://github.com/waikato-ahuora-smart-energy-systems/OpenHENS.git",
+      "current_clean_branch": "codex/refactor-architecture",
+      "current_clean_head": "2afc14b7779482fc829edb1c3fa187b918d7fb19",
+      "current_clean_head_message": "Restore OpenHENS solver parity",
+      "artifact_branch_snapshots": {
+        "main": "fbf237bd3bdfbd8cf32698a137f68c0f0db5c1e6",
+        "refactor_base": "92e942fec148d5e6a1e052bb3d207b95a4f85379",
+        "refactor_current_head_recorded_by_existing_artifacts": "92e942fec148d5e6a1e052bb3d207b95a4f85379",
+        "refactor_dirty_worktree_recorded_by_existing_artifacts": true,
+        "later_clean_commit_with_parity_fix": "2afc14b7779482fc829edb1c3fa187b918d7fb19",
+        "stored_dirty_patch_artifact": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
+        "stored_dirty_patch_sha256_artifact": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch.sha256"
+      },
+      "stored_dirty_patch_artifact": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
+      "dirty_patch_sha256": "cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33",
+      "dirty_patch_status": "stored patch captures the recorded dirty refactor artifact source delta from 92e942fec148d5e6a1e052bb3d207b95a4f85379 to clean parity commit 2afc14b7779482fc829edb1c3fa187b918d7fb19",
+      "dirty_patch_verification": {
+        "command": "rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS apply --check --reverse /Users/ca107/Desktop/ahuora/OpenPinch/openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
+        "result": "passed against current clean OpenHENS checkout at 2afc14b7779482fc829edb1c3fa187b918d7fb19"
+      },
+      "python_version_at_manifest_capture": "3.14.2",
+      "legacy_main_python_note": "Existing baseline README records that the main snapshot was run from a temporary Python 3.12 environment because legacy main failed under Python 3.14.",
+      "dependency_lock_path": "../OpenHENS/uv.lock",
+      "dependency_lock_sha256": "0b7fddd39ae202d8889462a4910202e5fd88f073051965623bfbc172883998b0",
+      "relevant_package_versions": {
+        "OpenHENS": "0.5.0",
+        "numpy": "2.4.4",
+        "pandas": "3.0.3",
+        "pyomo": "6.10.0",
+        "gekko": "1.3.2",
+        "matplotlib": "3.10.9",
+        "plotly": "6.7.0",
+        "kaleido": "1.3.0",
+        "openpyxl": "3.1.5",
+        "wakepy": "1.0.0"
+      }
+    }
+  },
+  "source_cases": [
+    {
+      "case_id": "Four-stream-Yee-and-Grossmann-1990-1",
+      "role": "routine_solver_baseline",
+      "source_csv_path": "../OpenHENS/examples/cases/Four-stream-Yee-and-Grossmann-1990-1.csv",
+      "source_csv_sha256": "0c0a7f9592e7d8e27d35aef523530d70c11826c407dcbe4adba7fff86f4835f2",
+      "required_migrated_fixture_path": "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json",
+      "required_order_invariance_fixture_path": "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.reordered.json",
+      "routine_dTmin": 14,
+      "routine_min_dQ": 0.5,
+      "full_source_dTmin_grid": [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+      "full_source_min_dQ_grid": [0.5, 0.9, 1.3, 1.7, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0]
+    },
+    {
+      "case_id": "Nine-stream-Linnhoff-and-Ahmad-1999-1",
+      "role": "final_verification_solver_baseline",
+      "source_csv_path": "../OpenHENS/examples/cases/Nine-stream-Linnhoff-and-Ahmad-1999-1.csv",
+      "source_csv_sha256": "fbf065509f355584623bfdfd5c38478410ddbab2a7c696e49bb3c15df3161b10",
+      "required_migrated_fixture_path": "tests/fixtures/openhens/Nine-stream-Linnhoff-and-Ahmad-1999-1.json",
+      "required_order_invariance_fixture_path": "tests/fixtures/openhens/Nine-stream-Linnhoff-and-Ahmad-1999-1.reordered.json",
+      "routine_dTmin": null,
+      "routine_min_dQ": null,
+      "final_verification_dTmin": 18,
+      "final_verification_min_dQ": 1.7,
+      "full_source_dTmin_grid": [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+      "full_source_min_dQ_grid": [0.5, 0.9, 1.3, 1.7, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0]
+    }
+  ],
+  "artifact_generation": {
+    "artifact_generator": {
+      "repository": "OpenHENS",
+      "path": "openhens/artifacts.py",
+      "sha256_at_manifest_capture": "bf415783e20a86061e026f94a14e284e1ceb949f1c1bd8c14f40ead0b5a2bed2",
+      "package_version": "0.5.0"
+    },
+    "artifact_root": "openhens_baseline_results",
+    "existing_artifact_generation_command_status": "source provenance is captured by the stored dirty-worktree patch; local solver rerun remains blocked by missing Couenne/IPOPT",
+    "canonical_regeneration_commands": [
+      {
+        "cwd": "../OpenHENS",
+        "command": "rtk uv run pytest -m solver",
+        "description": "Regenerate the Four-stream and Nine-stream solver regression JSON/CSV artifacts through OpenHENS' marked solver tests."
+      },
+      {
+        "cwd": "../OpenHENS",
+        "command": "rtk uv run pytest -m \"not solver\"",
+        "description": "Run OpenHENS fast tests before solver artifact regeneration."
+      },
+      {
+        "cwd": ".",
+        "command": "rtk uv run pytest",
+        "description": "Run OpenPinch fast tests for the migration branch."
+      },
+      {
+        "cwd": ".",
+        "command": "rtk uv run scripts/build_docs.py",
+        "description": "Run OpenPinch documentation build for the migration branch."
+      }
+    ],
+    "solver_binary_status_at_manifest_capture": [
+      {
+        "name": "couenne",
+        "required_for": ["PDM", "TDM"],
+        "path": null,
+        "version": null,
+        "status": "missing from PATH; `rtk which couenne` exited 1"
+      },
+      {
+        "name": "ipopt",
+        "required_for": ["ESM through ipopt-pyomo"],
+        "path": null,
+        "version": null,
+        "status": "missing from PATH; `rtk which ipopt` exited 1"
+      },
+      {
+        "name": "apopt",
+        "required_for": ["GEKKO fallback tasks in existing OpenHENS metadata"],
+        "path": "GEKKO-managed solver",
+        "version": "gekko 1.3.2",
+        "status": "standalone binary version not probed"
+      }
+    ]
+  },
+  "expected_artifact_paths": {
+    "comparison_json": "openhens_baseline_results/comparison.json",
+    "comparison_csv": "openhens_baseline_results/comparison.csv",
+    "refactor_branch_summary": "openhens_baseline_results/refactor/branch_summary.json",
+    "main_branch_summary": "openhens_baseline_results/main/branch_summary.json",
+    "openhens_refactor_dirty_patch": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
+    "openhens_refactor_dirty_patch_sha256": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch.sha256",
+    "four_stream": {
+      "summary": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json",
+      "manifest": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/manifest.json",
+      "run_summary_csv": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/run_summary.csv",
+      "solution_metrics_csv": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/solution_metrics.csv",
+      "generated_result_jsons": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/results/*.json"
+    },
+    "nine_stream": {
+      "summary": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json",
+      "manifest": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/manifest.json",
+      "run_summary_csv": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/run_summary.csv",
+      "solution_metrics_csv": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/solution_metrics.csv",
+      "generated_result_jsons": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/results/*.json"
+    },
+    "future_adapter_snapshots": "openhens_baseline_results/adapter_snapshots/<case-id>/dTmin-<value>.json",
+    "future_curated_network_snapshots": "openhens_baseline_results/network_snapshots/<case-id>/best-esm.json"
+  },
+  "baseline_metrics": {
+    "Four-stream-Yee-and-Grossmann-1990-1": {
+      "best_solution": 154853.8518602861,
+      "quartile_1": 154853.8601589499,
+      "quartile_2": 159038.71986626228,
+      "quartile_3": 163556.12518498677,
+      "solved_esm_count": 100,
+      "total_cases_attempted": 1210,
+      "total_cases_solved": 1210,
+      "within_2_percent": 37,
+      "within_5_percent": 64,
+      "within_10_percent": 100,
+      "best_dTmin": 14,
+      "best_min_dQ": 0.5,
+      "best_stages": 3,
+      "best_recovery_units": 3,
+      "best_cu_units": 2,
+      "best_hu_units": 1
+    },
+    "Nine-stream-Linnhoff-and-Ahmad-1999-1": {
+      "best_solution": 2905807.275299348,
+      "quartile_1": 2947087.026205118,
+      "quartile_2": 2954844.749379795,
+      "quartile_3": 2969362.7969760075,
+      "solved_esm_count": 71,
+      "total_cases_attempted": 1155,
+      "total_cases_solved": 886,
+      "within_2_percent": 46,
+      "within_5_percent": 68,
+      "within_10_percent": 70,
+      "best_dTmin": 18,
+      "best_min_dQ": 1.7,
+      "best_stages": 4,
+      "best_recovery_units": 11,
+      "best_cu_units": 3,
+      "best_hu_units": 3
+    }
+  },
+  "acceptance_tolerances": {
+    "TAC_REL_TOL": 0.0001,
+    "TAC_ABS_TOL": 1.0,
+    "MAX_REGRESSION_REL_TOL": 0.01,
+    "threshold_bucket_allowance": "exact counts, except one-count allowance only for a documented numerical tie at a threshold boundary"
+  },
+  "verification_at_manifest_capture": [
+    {
+      "cwd": ".",
+      "command": "rtk uv run pytest",
+      "result": "passed: 954 passed, 31 warnings in 204.39s"
+    },
+    {
+      "cwd": ".",
+      "command": "rtk uv run scripts/build_docs.py",
+      "result": "passed: docs build succeeded with 25 warnings"
+    },
+    {
+      "cwd": "../OpenHENS",
+      "command": "rtk uv run pytest -m \"not solver\"",
+      "result": "passed: 56 passed, 2 deselected in 8.09s"
+    },
+    {
+      "cwd": "../OpenHENS",
+      "command": "rtk uv run pytest -m solver --collect-only",
+      "result": "passed collection: 2 selected solver regression tests for Four-stream and Nine-stream"
+    },
+    {
+      "cwd": "../OpenHENS",
+      "command": "rtk uv run pytest -m solver",
+      "result": "blocked: Couenne and IPOPT are missing from PATH in this environment"
+    },
+    {
+      "cwd": ".",
+      "command": "rtk shasum -a 256 openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
+      "result": "passed: cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33"
+    },
+    {
+      "cwd": ".",
+      "command": "rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS apply --check --reverse /Users/ca107/Desktop/ahuora/OpenPinch/openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
+      "result": "passed: patch reverses cleanly from OpenHENS 2afc14b7779482fc829edb1c3fa187b918d7fb19 to the recorded 92e942f base"
+    }
+  ]
+}

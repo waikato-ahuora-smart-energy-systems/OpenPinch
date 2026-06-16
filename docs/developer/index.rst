@@ -9,3 +9,4 @@ surface around the core analysis code.
 
    docs-conventions
    build-and-coverage
+   openhens-integration-task-files
