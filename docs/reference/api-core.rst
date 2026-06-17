@@ -145,6 +145,11 @@ entrypoint family. Each named workflow returns the affected
 refrigeration targets also surface HPR summary fields such as ``hpr_cycle``,
 ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``, and
 ``StreamCollection`` objects on ``hpr_hot_streams`` and ``hpr_cold_streams``.
+Simulated-cycle targets also expose annualized cost fields:
+``hpr_operating_cost``, ``hpr_capital_cost``,
+``hpr_annualized_capital_cost``, ``hpr_total_annualized_cost``,
+``hpr_compressor_capital_cost``, and
+``hpr_heat_exchanger_capital_cost``.
 For stateful input data, the same named entry points also accept
 ``state_id=...`` and the refreshed summaries, exports, and graph metadata carry
 that selected state context forward.

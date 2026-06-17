@@ -40,6 +40,10 @@ duties, base duty scales, split vectors, and process availability arrays. The
 aggregate backend classes then allocate requested duties from base/split
 coordinates, clip those requests to availability, and add any excess to the
 penalty term. Leaf physical unit models receive only concrete model duties.
+Simulated vapour-compression backends then combine the HPR streams with the
+background and ambient streams into one residual GCC. The pocket-free GCC end
+points provide residual external utilities for operating-cost accounting;
+cycle penalties remain separate feasibility terms.
 
 .. automodule:: OpenPinch.services.heat_pump_integration.common
    :no-members:
@@ -52,6 +56,21 @@ penalty term. Leaf physical unit models receive only concrete model duties.
 
 .. automodule:: OpenPinch.services.heat_pump_integration.common.shared
    :members:
+
+HPR Schemas
+-----------
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.HeatPumpTargetInputs
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.HPRBackendResult
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.SimulatedHPRAnnualizedCostAccounting
+   :members:
+   :no-index:
 
 Cycle Optimisation Services
 ---------------------------

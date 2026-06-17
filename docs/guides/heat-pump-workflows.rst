@@ -96,6 +96,7 @@ What To Compare
 
 Start with:
 
+- total annualized HPR cost for simulated-cycle backends
 - hot utility target change
 - cold utility target change
 - heat recovery change
@@ -103,6 +104,23 @@ Start with:
 
 Treat cycle-level quantities as supporting context after the integration-level
 answer looks promising.
+
+For ``"Parallel vapour compression cycles"``,
+``"Cascade vapour compression cycles"``, and
+``"Vapour compression with MVR cascade"``, OpenPinch reports unit-aware HPR
+cost fields:
+
+- ``hpr_operating_cost`` in ``$/y``
+- ``hpr_capital_cost`` in ``$``
+- ``hpr_annualized_capital_cost`` in ``$/y``
+- ``hpr_total_annualized_cost`` in ``$/y``
+- ``hpr_compressor_capital_cost`` in ``$``
+- ``hpr_heat_exchanger_capital_cost`` in ``$``
+
+The simulated-cycle objective minimises ``hpr_total_annualized_cost`` plus
+feasibility penalties. Remaining external utility at the ends of the combined
+residual GCC is costed as operating cost. Residual GCC pockets, opposite
+utility regression, and cycle allocation penalties are the feasibility terms.
 
 For the simulated aggregate backends, optimiser variables named
 ``x_heat_base``/``x_cool_base`` set the total cycle scale and
