@@ -238,6 +238,7 @@ def _compute_parallel_hp_system_obj(
         hp.solve(
             T_evap=state_vars.T_evap,
             T_cond=state_vars.T_cond,
+            dtcont=args.dtcont_hp,
             dT_subcool=state_vars.dT_subcool,
             eta_comp=args.eta_comp,
             refrigerant=args.refrigerant_ls,

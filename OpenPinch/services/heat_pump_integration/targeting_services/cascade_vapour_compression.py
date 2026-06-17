@@ -251,6 +251,7 @@ def _compute_cascade_hp_system_obj(
         hp.solve(
             T_evap=state_vars.T_evap,
             T_cond=state_vars.T_cond,
+            dtcont=args.dtcont_hp,
             Q_heat_base=state_vars.Q_heat_base,
             x_heat_split=state_vars.x_heat_split,
             Q_heat_available=state_vars.Q_heat_available,

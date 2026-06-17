@@ -20,6 +20,7 @@ pytest.importorskip("CoolProp")
 def _assert_stage_matches_simple(parallel, i, *, T_evap, T_cond, **kwargs):
     """Assert that stage matches simple for this test module."""
     ref = VapourCompressionCycle()
+    kwargs.setdefault("dtcont", 0.0)
     ref.solve(T_evap=T_evap, T_cond=T_cond, **kwargs)
 
     stage = parallel.subcycles[i]
@@ -44,6 +45,7 @@ def test_parallel_rejects_mismatched_temperature_lengths():
         cycle.solve(
             T_evap=np.array([20.0, 0.0]),
             T_cond=np.array([80.0, 60.0, 45.0]),
+            dtcont=0.0,
             refrigerant="R134a",
         )
 
@@ -53,6 +55,7 @@ def test_parallel_solve_with_defaults_should_work_for_multiple_units():
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
+        dtcont=0.0,
         refrigerant="R134a",
     )
     assert cycle.num_cycles == 2
@@ -74,6 +77,7 @@ def test_each_parallel_stage_matches_simple_heat_pump_solution():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=dT_ihx_gas_side,
@@ -105,6 +109,7 @@ def test_parallel_aggregates_match_sum_of_stage_results():
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
+        dtcont=0.0,
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
         dT_ihx_gas_side=np.array([5.0, 5.0]),
@@ -136,6 +141,7 @@ def test_parallel_build_stream_collection_is_union_of_stage_streams():
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
+        dtcont=0.0,
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
         dT_ihx_gas_side=np.array([5.0, 5.0]),
@@ -167,6 +173,7 @@ def test_parallel_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
     base = dict(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
+        dtcont=0.0,
         Q_heat=np.array([1200.0, 700.0]),
         Q_cool=np.array([900.0, 500.0]),
         refrigerant=["R134a", "R134a"],
@@ -185,6 +192,7 @@ def test_parallel_q_cool_nan_and_none_are_allowed_for_any_cycle():
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
+        dtcont=0.0,
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
         dT_ihx_gas_side=np.array([5.0, 5.0]),
@@ -203,6 +211,7 @@ def test_parallel_q_heat_nan_defaults_to_one_for_each_stage():
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
+        dtcont=0.0,
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
         dT_ihx_gas_side=np.array([5.0, 5.0]),
@@ -219,6 +228,7 @@ def test_parallel_streams_match_aggregate_heat():
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
         T_cond=np.array([80.0, 60.0]),
+        dtcont=0.0,
         dT_superheat=np.array([5.0, 5.0]),
         dT_subcool=np.array([2.0, 2.0]),
         dT_ihx_gas_side=np.array([5.0, 5.0]),
@@ -253,6 +263,7 @@ def test_each_parallel_stage_matches_simple_refrigeration_solution():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=dT_ihx_gas_side,
@@ -293,6 +304,7 @@ def test_parallel_refrigeration_streams_and_aggregates_match():
     cycle.solve(
         T_evap=np.array([-10.0, -15.0]),
         T_cond=np.array([35.0, 30.0]),
+        dtcont=0.0,
         dT_superheat=np.array([4.0, 3.0]),
         dT_subcool=np.array([2.0, 1.0]),
         dT_ihx_gas_side=np.array([5.0, 4.0]),
@@ -529,6 +541,7 @@ def test_parallel_solve_propagates_unsolved_child_cycle(monkeypatch):
     work = hp.solve(
         T_evap=np.array([20.0]),
         T_cond=np.array([80.0]),
+        dtcont=0.0,
         Q_heat=np.array([100.0]),
     )
 
@@ -543,6 +556,7 @@ def test_parallel_solve_single_refrigerant_list_branch(monkeypatch):
     work = hp.solve(
         T_evap=np.array([20.0, 15.0]),
         T_cond=np.array([60.0, 55.0]),
+        dtcont=0.0,
         refrigerant=["water"],
         Q_heat=np.array([1.0, 2.0]),
         Q_cool=np.array([None, None]),
@@ -560,6 +574,7 @@ def test_parallel_solve_clips_base_split_duties_before_child_cycles(monkeypatch)
     hp.solve(
         T_evap=np.array([20.0, 15.0]),
         T_cond=np.array([60.0, 55.0]),
+        dtcont=0.0,
         refrigerant=["water"],
         Q_heat_base=200.0,
         x_heat_split=np.array([0.75, 1.0]),

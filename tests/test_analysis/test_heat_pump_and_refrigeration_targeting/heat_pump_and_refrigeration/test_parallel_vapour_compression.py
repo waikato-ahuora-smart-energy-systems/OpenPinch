@@ -224,6 +224,7 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
 
     out = hp_parallel_vapour._compute_parallel_hp_system_obj(np.array([0.2]), args)
 
+    assert captured["dtcont"] == pytest.approx(args.dtcont_hp)
     assert captured["is_heat_pump"] is False
     assert captured["Q_heat_base"] is None
     assert captured["Q_heat_available"] is None

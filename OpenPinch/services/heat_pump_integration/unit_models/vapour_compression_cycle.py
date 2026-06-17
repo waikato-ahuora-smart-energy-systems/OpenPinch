@@ -494,6 +494,7 @@ class VapourCompressionCycle:
         T_evap: float,
         T_cond: float,
         *,
+        dtcont: float,
         dT_superheat: float = 0.0,
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
@@ -514,6 +515,8 @@ class VapourCompressionCycle:
             Liquid saturation temperature in the evaporator [deg C].
         T_cond : float
             Gas saturation temperature in the condenser [deg C].
+        dtcont : float
+            Minimum temperature approach used by HPR targeting [K].
         dT_superheat : float, optional
             Degree of superheating of the suction gas, supplied by the process [K].
         dT_subcool : float, optional
@@ -553,6 +556,7 @@ class VapourCompressionCycle:
         self._refrigerant = refrigerant
         self._T_evap = self._convert_C_to_K(T_evap)
         self._T_cond = self._convert_C_to_K(T_cond)
+        self._dtcont = float(dtcont)
         self._dT_superheat = dT_superheat
         self._dT_subcool = dT_subcool
 

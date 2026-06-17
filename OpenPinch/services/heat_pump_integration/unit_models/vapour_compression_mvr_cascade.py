@@ -326,6 +326,7 @@ class VapourCompressionMvrCascade:
             cycle.solve(
                 T_evap=T_evap_vc[i],
                 T_cond=T_cond_vc[i],
+                dtcont=self._dtcont,
                 dT_subcool=dT_subcool_vc[i],
                 eta_comp=eta_comp,
                 refrigerant=refrigerant_all[i],
