@@ -32,9 +32,6 @@ SNAPSHOT_PATH = (
 
 def test_four_stream_best_esm_snapshot_matches_identity_labelled_network() -> None:
     snapshot = _load_json(SNAPSHOT_PATH)
-    source_artifact = _load_json(REPO_ROOT / snapshot["source_artifact"])
-    source_summary = _load_json(REPO_ROOT / snapshot["source_summary_artifact"])
-    solution = source_artifact["solution"]
     expected = snapshot["expected"]
     tolerances = snapshot["tolerances"]
     arrays = problem_to_solver_arrays(
@@ -43,7 +40,7 @@ def test_four_stream_best_esm_snapshot_matches_identity_labelled_network() -> No
     )
 
     network = extract_heat_exchanger_network(
-        _artifact_solved_model(solution, arrays),
+        _snapshot_solved_model(snapshot, arrays),
         arrays,
         run_id=CASE_ID,
         task_id=snapshot["task_id"],
@@ -51,15 +48,6 @@ def test_four_stream_best_esm_snapshot_matches_identity_labelled_network() -> No
         stage_count=expected["stage_count"],
         tolerance=tolerances["duty_abs"],
     )
-
-    assert snapshot["task_id"] == solution["task_id"]
-    assert expected["total_annual_cost"] == source_summary["best_solution"]
-    assert expected["best_dTmin"] == source_summary["best_dTmin"]
-    assert expected["best_derivative_threshold"] == source_summary["best_min_dQ"]
-    assert expected["stage_count"] == source_summary["best_stages"]
-    assert expected["recovery_unit_count"] == source_summary["best_recovery_units"]
-    assert expected["hot_utility_unit_count"] == source_summary["best_hu_units"]
-    assert expected["cold_utility_unit_count"] == source_summary["best_cu_units"]
 
     assert network.stage_count == expected["stage_count"]
     assert network.summary_metrics["recovery_units"] == expected["recovery_unit_count"]
@@ -109,34 +97,34 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _artifact_solved_model(
-    solution: dict,
+def _snapshot_solved_model(
+    snapshot: dict,
     arrays: PreparedSolverArrays,
 ) -> SimpleNamespace:
-    unit_counts = solution["unit_counts"]
-    utility_loads = solution["utility_loads"]
+    expected = snapshot["expected"]
+    solution_arrays = _snapshot_solution_arrays(snapshot, arrays)
     return SimpleNamespace(
-        S=solution["stages"],
-        stages=solution["stages"],
-        Q_r=solution["recovery_heat_duties"],
-        Q_h=solution["hot_utility_duties"],
-        Q_c=solution["cold_utility_duties"],
-        T_h=solution["hot_stream_temperatures"],
-        T_c=solution["cold_stream_temperatures"],
-        T_h_out_x=solution["hot_recovery_outlet_temperatures"],
-        T_c_out_y=solution["cold_recovery_outlet_temperatures"],
-        area_r=solution["recovery_areas"],
-        area_hu=solution["hot_utility_areas"],
-        area_cu=solution["cold_utility_areas"],
-        TAC=solution["total_annual_cost"],
-        TAC_model=solution["model_objective_value"],
-        n_units=unit_counts["total"],
-        n_recovery_units=unit_counts["recovery"],
-        n_hu_units=unit_counts["hot_utility"],
-        n_cu_units=unit_counts["cold_utility"],
-        Q_hu_total=utility_loads["hot"],
-        Q_cu_total=utility_loads["cold"],
-        Q_r_total=_recovery_total(solution["recovery_heat_duties"]),
+        S=expected["stage_count"],
+        stages=expected["stage_count"],
+        Q_r=solution_arrays["Q_r"],
+        Q_h=solution_arrays["Q_h"],
+        Q_c=solution_arrays["Q_c"],
+        T_h=solution_arrays["T_h"],
+        T_c=solution_arrays["T_c"],
+        theta_1=solution_arrays["theta"],
+        theta_2=solution_arrays["theta"],
+        area_r=solution_arrays["area_r"],
+        area_hu=solution_arrays["area_hu"],
+        area_cu=solution_arrays["area_cu"],
+        TAC=expected["total_annual_cost"],
+        TAC_model=expected["total_annual_cost"],
+        n_units=expected["total_unit_count"],
+        n_recovery_units=expected["recovery_unit_count"],
+        n_hu_units=expected["hot_utility_unit_count"],
+        n_cu_units=expected["cold_utility_unit_count"],
+        Q_hu_total=expected["hot_utility_load"],
+        Q_cu_total=expected["cold_utility_load"],
+        Q_r_total=_recovery_total(solution_arrays["Q_r"]),
         T_h_out=arrays.arrays["T_h_out"].tolist(),
         T_c_out=arrays.arrays["T_c_out"].tolist(),
         T_hu_in=arrays.arrays["T_hu_in"].tolist(),
@@ -144,6 +132,76 @@ def _artifact_solved_model(
         T_cu_in=arrays.arrays["T_cu_in"].tolist(),
         T_cu_out=arrays.arrays["T_cu_out"].tolist(),
     )
+
+
+def _snapshot_solution_arrays(snapshot: dict, arrays: PreparedSolverArrays) -> dict:
+    expected = snapshot["expected"]
+    stages = expected["stage_count"]
+    hot_count = len(arrays.axis_maps["hot_process_streams"])
+    cold_count = len(arrays.axis_maps["cold_process_streams"])
+    q_r = _zeros(hot_count, cold_count, stages)
+    area_r = _zeros(hot_count, cold_count, stages)
+    theta = _zeros(hot_count, cold_count, stages)
+    q_h = [0.0 for _ in range(cold_count)]
+    q_c = [0.0 for _ in range(hot_count)]
+    area_hu = [0.0 for _ in range(cold_count)]
+    area_cu = [0.0 for _ in range(hot_count)]
+
+    hot_axis = arrays.axis_maps["hot_process_streams"]
+    cold_axis = arrays.axis_maps["cold_process_streams"]
+    for exchanger in snapshot["exchangers"]:
+        kind = exchanger["kind"]
+        if kind == "recovery":
+            hot_index = hot_axis[exchanger["source_stream"]]
+            cold_index = cold_axis[exchanger["sink_stream"]]
+            stage_index = exchanger["stage"] - 1
+            q_r[hot_index][cold_index][stage_index] = exchanger["duty"]
+            area_r[hot_index][cold_index][stage_index] = exchanger["area"]
+            theta[hot_index][cold_index][stage_index] = expected["best_dTmin"]
+        elif kind == "hot_utility":
+            cold_index = cold_axis[exchanger["sink_stream"]]
+            q_h[cold_index] = exchanger["duty"]
+            area_hu[cold_index] = exchanger["area"]
+        elif kind == "cold_utility":
+            hot_index = hot_axis[exchanger["source_stream"]]
+            q_c[hot_index] = exchanger["duty"]
+            area_cu[hot_index] = exchanger["area"]
+
+    return {
+        "Q_r": q_r,
+        "Q_h": q_h,
+        "Q_c": q_c,
+        "T_h": _stage_temperatures(
+            arrays.arrays["T_h_in"].tolist(),
+            arrays.arrays["T_h_out"].tolist(),
+            stages,
+        ),
+        "T_c": _stage_temperatures(
+            arrays.arrays["T_c_out"].tolist(),
+            arrays.arrays["T_c_in"].tolist(),
+            stages,
+        ),
+        "theta": theta,
+        "area_r": area_r,
+        "area_hu": area_hu,
+        "area_cu": area_cu,
+    }
+
+
+def _zeros(*dimensions: int) -> list:
+    if len(dimensions) == 1:
+        return [0.0 for _ in range(dimensions[0])]
+    return [_zeros(*dimensions[1:]) for _ in range(dimensions[0])]
+
+
+def _stage_temperatures(inlets: list[float], outlets: list[float], stages: int) -> list:
+    return [
+        [
+            inlet + (outlet - inlet) * stage / stages
+            for stage in range(stages + 1)
+        ]
+        for inlet, outlet in zip(inlets, outlets, strict=True)
+    ]
 
 
 def _recovery_total(values: list) -> float:

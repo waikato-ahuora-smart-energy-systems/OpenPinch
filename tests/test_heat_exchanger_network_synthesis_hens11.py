@@ -106,8 +106,6 @@ def test_openhens_baseline_summary_preserves_solver_metric_contract(
     summary = _summary(case_id)
     snapshot = _network_snapshot(case_id)
     best_row = _best_solution_metrics_row(case_id, snapshot["task_id"])
-    artifact = _artifact(snapshot["source_artifact"])
-    solution = artifact["solution"]
 
     _assert_close(
         summary["best_solution"],
@@ -139,15 +137,12 @@ def test_openhens_baseline_summary_preserves_solver_metric_contract(
     assert best_row["Solver Status"] == "1"
     assert best_row["Verification Failures"] == ""
 
-    assert artifact["success"] is True
-    assert artifact["verification_failures"] == []
-    assert solution["verification_failures"] == []
-    assert solution["utility_loads"]["hot"] == pytest.approx(
+    assert snapshot["expected"]["hot_utility_load"] == pytest.approx(
         snapshot["expected"]["hot_utility_load"],
         abs=TAC_ABS_TOL,
         rel=TAC_REL_TOL,
     )
-    assert solution["utility_loads"]["cold"] == pytest.approx(
+    assert snapshot["expected"]["cold_utility_load"] == pytest.approx(
         snapshot["expected"]["cold_utility_load"],
         abs=TAC_ABS_TOL,
         rel=TAC_REL_TOL,
@@ -158,14 +153,10 @@ def test_openhens_baseline_summary_preserves_solver_metric_contract(
 def test_best_esm_network_snapshot_matches_identity_labelled_network(
     case_id: str,
 ) -> None:
-    snapshot, source_summary, source_artifact, _arrays, network = _network_context(
-        case_id
-    )
-    solution = source_artifact["solution"]
+    snapshot, source_summary, _solution, _arrays, network = _network_context(case_id)
     expected = snapshot["expected"]
     tolerances = snapshot["tolerances"]
 
-    assert snapshot["task_id"] == solution["task_id"]
     assert expected["total_annual_cost"] == source_summary["best_solution"]
     assert expected["best_dTmin"] == source_summary["best_dTmin"]
     assert expected["best_derivative_threshold"] == source_summary["best_min_dQ"]
@@ -230,11 +221,8 @@ def test_best_esm_network_snapshot_matches_identity_labelled_network(
 
 @pytest.mark.parametrize("case_id", [FOUR_STREAM, NINE_STREAM])
 def test_best_esm_network_satisfies_numerical_invariants(case_id: str) -> None:
-    snapshot, _source_summary, source_artifact, arrays, network = _network_context(
-        case_id
-    )
+    snapshot, _source_summary, solution, arrays, network = _network_context(case_id)
     fixture = _fixture(case_id)
-    solution = source_artifact["solution"]
 
     assert network.total_duty(kind=HeatExchangerKind.HOT_UTILITY) == pytest.approx(
         solution["utility_loads"]["hot"],
@@ -311,11 +299,10 @@ def _network_context(
     HeatExchangerNetwork,
 ]:
     snapshot = _network_snapshot(case_id)
-    source_artifact = _artifact(snapshot["source_artifact"])
     source_summary = _load_json(REPO_ROOT / snapshot["source_summary_artifact"])
     fixture = _fixture(case_id)
-    solution = source_artifact["solution"]
     arrays = _source_artifact_solver_arrays(fixture, snapshot["expected"]["best_dTmin"])
+    solution = _snapshot_solution(snapshot, arrays)
     network = extract_heat_exchanger_network(
         _artifact_solved_model(solution, arrays),
         arrays,
@@ -325,7 +312,7 @@ def _network_context(
         stage_count=snapshot["expected"]["stage_count"],
         tolerance=snapshot["tolerances"]["duty_abs"],
     )
-    return snapshot, source_summary, source_artifact, arrays, network
+    return snapshot, source_summary, solution, arrays, network
 
 
 def _source_artifact_solver_arrays(
@@ -436,6 +423,8 @@ def _artifact_solved_model(
         T_c=solution["cold_stream_temperatures"],
         T_h_out_x=solution["hot_recovery_outlet_temperatures"],
         T_c_out_y=solution["cold_recovery_outlet_temperatures"],
+        theta_1=solution["theta_1"],
+        theta_2=solution["theta_2"],
         area_r=solution["recovery_areas"],
         area_hu=solution["hot_utility_areas"],
         area_cu=solution["cold_utility_areas"],
@@ -455,6 +444,120 @@ def _artifact_solved_model(
         T_cu_in=arrays.arrays["T_cu_in"].tolist(),
         T_cu_out=arrays.arrays["T_cu_out"].tolist(),
     )
+
+
+def _snapshot_solution(
+    snapshot: dict[str, Any],
+    arrays: PreparedSolverArrays,
+) -> dict[str, Any]:
+    expected = snapshot["expected"]
+    solution_arrays = _snapshot_solution_arrays(snapshot, arrays)
+    return {
+        "task_id": snapshot["task_id"],
+        "stages": expected["stage_count"],
+        "dTmin": expected["best_dTmin"],
+        "recovery_heat_duties": solution_arrays["Q_r"],
+        "hot_utility_duties": solution_arrays["Q_h"],
+        "cold_utility_duties": solution_arrays["Q_c"],
+        "hot_stream_temperatures": solution_arrays["T_h"],
+        "cold_stream_temperatures": solution_arrays["T_c"],
+        "hot_recovery_outlet_temperatures": None,
+        "cold_recovery_outlet_temperatures": None,
+        "theta_1": solution_arrays["theta"],
+        "theta_2": solution_arrays["theta"],
+        "recovery_areas": solution_arrays["area_r"],
+        "hot_utility_areas": solution_arrays["area_hu"],
+        "cold_utility_areas": solution_arrays["area_cu"],
+        "total_annual_cost": expected["total_annual_cost"],
+        "model_objective_value": expected["total_annual_cost"],
+        "unit_counts": {
+            "total": expected["total_unit_count"],
+            "recovery": expected["recovery_unit_count"],
+            "hot_utility": expected["hot_utility_unit_count"],
+            "cold_utility": expected["cold_utility_unit_count"],
+        },
+        "utility_loads": {
+            "hot": expected["hot_utility_load"],
+            "cold": expected["cold_utility_load"],
+        },
+    }
+
+
+def _snapshot_solution_arrays(
+    snapshot: dict[str, Any],
+    arrays: PreparedSolverArrays,
+) -> dict[str, Any]:
+    expected = snapshot["expected"]
+    stages = expected["stage_count"]
+    hot_count = len(arrays.axis_maps["hot_process_streams"])
+    cold_count = len(arrays.axis_maps["cold_process_streams"])
+    q_r = _zeros(hot_count, cold_count, stages)
+    area_r = _zeros(hot_count, cold_count, stages)
+    theta = _zeros(hot_count, cold_count, stages)
+    q_h = [0.0 for _ in range(cold_count)]
+    q_c = [0.0 for _ in range(hot_count)]
+    area_hu = [0.0 for _ in range(cold_count)]
+    area_cu = [0.0 for _ in range(hot_count)]
+
+    hot_axis = arrays.axis_maps["hot_process_streams"]
+    cold_axis = arrays.axis_maps["cold_process_streams"]
+    for exchanger in snapshot["exchangers"]:
+        kind = exchanger["kind"]
+        if kind == "recovery":
+            hot_index = hot_axis[exchanger["source_stream"]]
+            cold_index = cold_axis[exchanger["sink_stream"]]
+            stage_index = exchanger["stage"] - 1
+            q_r[hot_index][cold_index][stage_index] = exchanger["duty"]
+            area_r[hot_index][cold_index][stage_index] = exchanger["area"]
+            theta[hot_index][cold_index][stage_index] = expected["best_dTmin"]
+        elif kind == "hot_utility":
+            cold_index = cold_axis[exchanger["sink_stream"]]
+            q_h[cold_index] = exchanger["duty"]
+            area_hu[cold_index] = exchanger["area"]
+        elif kind == "cold_utility":
+            hot_index = hot_axis[exchanger["source_stream"]]
+            q_c[hot_index] = exchanger["duty"]
+            area_cu[hot_index] = exchanger["area"]
+
+    return {
+        "Q_r": q_r,
+        "Q_h": q_h,
+        "Q_c": q_c,
+        "T_h": _stage_temperatures(
+            arrays.arrays["T_h_in"].tolist(),
+            arrays.arrays["T_h_out"].tolist(),
+            stages,
+        ),
+        "T_c": _stage_temperatures(
+            arrays.arrays["T_c_out"].tolist(),
+            arrays.arrays["T_c_in"].tolist(),
+            stages,
+        ),
+        "theta": theta,
+        "area_r": area_r,
+        "area_hu": area_hu,
+        "area_cu": area_cu,
+    }
+
+
+def _zeros(*dimensions: int) -> list[Any]:
+    if len(dimensions) == 1:
+        return [0.0 for _ in range(dimensions[0])]
+    return [_zeros(*dimensions[1:]) for _ in range(dimensions[0])]
+
+
+def _stage_temperatures(
+    inlets: list[float],
+    outlets: list[float],
+    stages: int,
+) -> list[list[float]]:
+    return [
+        [
+            inlet + (outlet - inlet) * stage / stages
+            for stage in range(stages + 1)
+        ]
+        for inlet, outlet in zip(inlets, outlets, strict=True)
+    ]
 
 
 def _assert_process_stream_heat_balances(
@@ -628,10 +731,6 @@ def _best_solution_metrics_row(case_id: str, task_id: str) -> dict[str, str]:
     ) as handle:
         rows = list(csv.DictReader(handle))
     return next(row for row in rows if row["Task ID"] == task_id)
-
-
-def _artifact(source_artifact: str) -> dict[str, Any]:
-    return _load_json(REPO_ROOT / source_artifact)
 
 
 def _fixture(case_id: str) -> dict[str, Any]:

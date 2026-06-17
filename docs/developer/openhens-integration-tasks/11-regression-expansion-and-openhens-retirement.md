@@ -138,10 +138,9 @@ Settled decisions for this task:
 
 - 2026-06-16: Added
   `openhens_baseline_results/network_snapshots/Nine-stream-Linnhoff-and-Ahmad-1999-1/best-esm.json`
-  from the checked-in
-  `openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/results/esm-187ea46995ce.json`
-  best ESM artifact and
-  `openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json`.
+  as a curated best-ESM network snapshot backed by
+  `openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json`
+  and `solution_metrics.csv`.
   The snapshot records stream-identity source/sink links, duty, area, unit
   counts, utility loads, and TAC tolerances for the final-verification
   Nine-stream baseline.

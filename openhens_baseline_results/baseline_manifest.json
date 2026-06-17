@@ -158,22 +158,17 @@
     "comparison_json": "openhens_baseline_results/comparison.json",
     "comparison_csv": "openhens_baseline_results/comparison.csv",
     "refactor_branch_summary": "openhens_baseline_results/refactor/branch_summary.json",
-    "main_branch_summary": "openhens_baseline_results/main/branch_summary.json",
     "openhens_refactor_dirty_patch": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
     "openhens_refactor_dirty_patch_sha256": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch.sha256",
     "four_stream": {
       "summary": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json",
-      "manifest": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/manifest.json",
       "run_summary_csv": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/run_summary.csv",
-      "solution_metrics_csv": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/solution_metrics.csv",
-      "generated_result_jsons": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/results/*.json"
+      "solution_metrics_csv": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/solution_metrics.csv"
     },
     "nine_stream": {
       "summary": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json",
-      "manifest": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/manifest.json",
       "run_summary_csv": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/run_summary.csv",
-      "solution_metrics_csv": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/solution_metrics.csv",
-      "generated_result_jsons": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/results/*.json"
+      "solution_metrics_csv": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/solution_metrics.csv"
     },
     "future_adapter_snapshots": "openhens_baseline_results/adapter_snapshots/<case-id>/dTmin-<value>.json",
     "future_curated_network_snapshots": "openhens_baseline_results/network_snapshots/<case-id>/best-esm.json"

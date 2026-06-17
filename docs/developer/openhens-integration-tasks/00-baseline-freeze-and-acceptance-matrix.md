@@ -160,9 +160,9 @@ Generated artifact paths:
 
 | Case | Expected paths |
 | --- | --- |
-| Four-stream | `openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json`, `manifest.json`, `run_summary.csv`, `solution_metrics.csv`, and `results/*.json`. |
-| Nine-stream | `openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json`, `manifest.json`, `run_summary.csv`, `solution_metrics.csv`, and `results/*.json`. |
-| Cross-branch parity | `openhens_baseline_results/comparison.json`, `openhens_baseline_results/comparison.csv`, `openhens_baseline_results/main/branch_summary.json`, and `openhens_baseline_results/refactor/branch_summary.json`. |
+| Four-stream | `openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json`, `run_summary.csv`, `solution_metrics.csv`, and the curated `network_snapshots/Four-stream-Yee-and-Grossmann-1990-1/best-esm.json`. |
+| Nine-stream | `openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json`, `run_summary.csv`, `solution_metrics.csv`, and the curated `network_snapshots/Nine-stream-Linnhoff-and-Ahmad-1999-1/best-esm.json`. |
+| Cross-branch parity | `openhens_baseline_results/comparison.json`, `openhens_baseline_results/comparison.csv`, and `openhens_baseline_results/refactor/branch_summary.json`. |
 | OpenHENS dirty-source provenance | `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch` and `.patch.sha256`. |
 
 ## Fixture And Artifact Policy
@@ -177,14 +177,11 @@ Generated artifact paths:
   `prepare_problem(...)` -> prepared `Zone` and `StreamCollection` -> internal
   adapter/service. Tests must fail if arrays are built directly from converted
   fixture rows, raw `TargetInput`, or a HEN result schema.
-- Generated OpenHENS JSON/CSV solver artifacts under
+- Compact OpenHENS summary CSV/JSON files under
   `openhens_baseline_results/refactor/<case-id>/` are migration reference
-  artifacts and test evidence only. They are not the terminal output of the
-  future OpenPinch workflow.
-- Large historical workbooks, pickles, plots, and generated solver traces are
-  test-only reference material unless a later task explicitly promotes a small
-  curated sample output. They must not be included in OpenPinch wheels or public
-  runtime examples without a reviewed docs/packaging decision.
+  artifacts and test evidence only. Raw generated solver traces, pickles,
+  workbooks, plots, and timestamped per-run JSON dumps are excluded from the
+  branch and must be regenerated outside version control when needed.
 - Optional migrated exports must be generated from `problem.results` /
   `TargetOutput.design`, identify OpenPinch problem or workspace variant
   identity, and stay outside the core in-memory workflow.
