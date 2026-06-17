@@ -415,7 +415,7 @@ def _unpack_vc_mvr_state(
         )
     if state.x_heat_split is None or np.asarray(state.x_heat_split).size != n_vc:
         raise ValueError(
-            "VC+MVR parsed heat payload must include VC heat split fractions."
+            "VC+MVR parsed heat state must include VC heat split fractions."
         )
     if dT_subcool.size != expected_temperature_size:
         raise ValueError("VC+MVR parsed subcooling must include MVR and VC stages.")

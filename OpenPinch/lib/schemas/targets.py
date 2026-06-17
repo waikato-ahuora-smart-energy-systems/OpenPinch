@@ -363,6 +363,12 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     hpr_ambient_cold: Any
     hpr_cop: Any
     hpr_eta_he: Any
+    hpr_operating_cost: Any = None
+    hpr_capital_cost: Any = None
+    hpr_annualized_capital_cost: Any = None
+    hpr_total_annualized_cost: Any = None
+    hpr_compressor_capital_cost: Any = None
+    hpr_heat_exchanger_capital_cost: Any = None
     hpr_success: bool
     hpr_hot_streams: StreamCollection
     hpr_cold_streams: StreamCollection
@@ -417,6 +423,36 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
                 "hpr_eta_he": coerce_output_value(
                     self.hpr_eta_he,
                     metric_name="hpr_eta_he",
+                    config=self.config,
+                ),
+                "hpr_operating_cost": coerce_output_value(
+                    self.hpr_operating_cost,
+                    metric_name="hpr_operating_cost",
+                    config=self.config,
+                ),
+                "hpr_capital_cost": coerce_output_value(
+                    self.hpr_capital_cost,
+                    metric_name="hpr_capital_cost",
+                    config=self.config,
+                ),
+                "hpr_annualized_capital_cost": coerce_output_value(
+                    self.hpr_annualized_capital_cost,
+                    metric_name="hpr_annualized_capital_cost",
+                    config=self.config,
+                ),
+                "hpr_total_annualized_cost": coerce_output_value(
+                    self.hpr_total_annualized_cost,
+                    metric_name="hpr_total_annualized_cost",
+                    config=self.config,
+                ),
+                "hpr_compressor_capital_cost": coerce_output_value(
+                    self.hpr_compressor_capital_cost,
+                    metric_name="hpr_compressor_capital_cost",
+                    config=self.config,
+                ),
+                "hpr_heat_exchanger_capital_cost": coerce_output_value(
+                    self.hpr_heat_exchanger_capital_cost,
+                    metric_name="hpr_heat_exchanger_capital_cost",
                     config=self.config,
                 ),
                 "hpr_success": self.hpr_success,

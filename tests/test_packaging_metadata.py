@@ -125,9 +125,9 @@ def test_lockfile_project_version_matches_pyproject():
 
 
 def test_testpypi_publish_skips_existing_files_but_pypi_publish_does_not():
-    workflow = (
-        REPO_ROOT / ".github" / "workflows" / "ci-publish.yml"
-    ).read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
     testpypi_block = workflow.split("publish-testpypi:", 1)[1].split(
         "publish-pypi:", 1
     )[0]

@@ -5,9 +5,23 @@ import pytest
 
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.classes.value import Value
 from OpenPinch.lib.enums import PT
-from OpenPinch.lib.schemas.hpr import HPRBackendResult, HPRThermoArtifacts
+from OpenPinch.lib.schemas.hpr import (
+    HPRBackendResult,
+    HPRThermoArtifacts,
+    SimulatedHPRAnnualizedCostAccounting,
+)
+from OpenPinch.services.heat_pump_integration.common import (
+    preprocessing as hp_preprocessing,
+)
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
+from OpenPinch.services.heat_pump_integration.common._shared import (
+    plotting as hp_plotting,
+)
+from OpenPinch.services.heat_pump_integration.common._shared import (
+    streams as hp_streams,
+)
 
 from ..helpers import _base_args, _sc, _stream
 
@@ -29,7 +43,7 @@ def test_compute_entropic_average_temperature_in_K_zero_net_duty_uses_arithmetic
 
 
 def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty():
-    T_out, Q_out = hp_shared._get_carnot_hpr_cycle_cascade_profile(
+    T_out, Q_out = hp_streams._get_carnot_hpr_cycle_cascade_profile(
         [150.0, 149.7, 130.0], [10.0, 5.0, 20.0], dT_phase_change=1.0, is_hot=True
     )
     np.testing.assert_allclose(T_out, np.array([150.0, 130.0]))
@@ -37,7 +51,7 @@ def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty():
 
 
 def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty_consecutively():
-    T_out, Q_out = hp_shared._get_carnot_hpr_cycle_cascade_profile(
+    T_out, Q_out = hp_streams._get_carnot_hpr_cycle_cascade_profile(
         [150.0, 149.7, 149.01, 130.0],
         [10.0, 2.0, 3.0, 20.0],
         dT_phase_change=1.0,
@@ -48,7 +62,7 @@ def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty_consecutive
 
 
 def test_prepare_latent_hp_profile_merges_cold_segments_with_lower_temperature():
-    T_out, Q_out = hp_shared._get_carnot_hpr_cycle_cascade_profile(
+    T_out, Q_out = hp_streams._get_carnot_hpr_cycle_cascade_profile(
         [60.0, 45.0, 30.4, 30.0],
         [12.5, 10.0, 7.5, 5.0],
         dT_phase_change=1.0,
@@ -59,7 +73,7 @@ def test_prepare_latent_hp_profile_merges_cold_segments_with_lower_temperature()
 
 
 def test_prepare_latent_hp_profile_merges_cold_segments_with_complex_temperature():
-    T_out, Q_out = hp_shared._get_carnot_hpr_cycle_cascade_profile(
+    T_out, Q_out = hp_streams._get_carnot_hpr_cycle_cascade_profile(
         [31.5, 30.8, 30.4, 30.0],
         [12.5, 10.0, 7.5, 5.0],
         dT_phase_change=1.0,
@@ -70,7 +84,7 @@ def test_prepare_latent_hp_profile_merges_cold_segments_with_complex_temperature
 
 
 def test_prepare_latent_hp_profile_keeps_unique_sequences_unchanged():
-    T_out, Q_out = hp_shared._get_carnot_hpr_cycle_cascade_profile(
+    T_out, Q_out = hp_streams._get_carnot_hpr_cycle_cascade_profile(
         [180.0, 160.0, 140.0], [8.0, 6.0, 4.0], dT_phase_change=0.5, is_hot=True
     )
     np.testing.assert_allclose(T_out, np.array([180.0, 160.0, 140.0]))
@@ -78,7 +92,7 @@ def test_prepare_latent_hp_profile_keeps_unique_sequences_unchanged():
 
 
 def test_prepare_latent_hp_profile_handles_empty_input():
-    T_out, Q_out = hp_shared._get_carnot_hpr_cycle_cascade_profile(
+    T_out, Q_out = hp_streams._get_carnot_hpr_cycle_cascade_profile(
         [], [], dT_phase_change=1.0, is_hot=True
     )
     assert len(T_out) == 0
@@ -112,23 +126,23 @@ def test_validate_vapour_hp_refrigerant_ls_extends_to_match_n_cond():
 
 def test_misc_heat_pump_helpers_and_stream_builders():
     with pytest.raises(ValueError, match="Infeasible temperature interval"):
-        hp_shared.create_stream_collection_of_background_profile(
+        hp_preprocessing._create_stream_collection_of_background_profile(
             T_vals=np.array([100.0, 100.0]),
             H_vals=np.array([0.0, 10.0]),
         )
 
-    hot = hp_shared.create_stream_collection_of_background_profile(
+    hot = hp_preprocessing._create_stream_collection_of_background_profile(
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_vals=np.array([0.0, -30.0, 20.0]),
     )
-    cold = hp_shared.create_stream_collection_of_background_profile(
+    cold = hp_preprocessing._create_stream_collection_of_background_profile(
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_vals=np.array([0.0, 30.0, -20.0]),
     )
     assert isinstance(hot, StreamCollection)
     assert isinstance(cold, StreamCollection)
 
-    q_vals = hp_shared.get_Q_vals_at_T_hpr_from_bckgrd_profile(
+    q_vals = hp_streams.get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_hpr=np.array([100.0, 60.0]),
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_vals=np.array([100.0, 50.0, 0.0]),
@@ -146,7 +160,7 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     )
     assert refs == ["R134A"]
 
-    streams = hp_shared._build_latent_streams(
+    streams = hp_streams._build_latent_streams(
         T_ls=np.array([110.0, 109.2, 80.0]),
         dT_phase_change=1.0,
         Q_ls=np.array([20.0, 10.0, 30.0]),
@@ -155,9 +169,9 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     )
     assert len(streams) >= 2
 
-    amb0 = hp_shared.get_ambient_air_stream(0.0, 0.0, _base_args())
-    amb_pos = hp_shared.get_ambient_air_stream(10.0, 0.0, _base_args())
-    amb_neg = hp_shared.get_ambient_air_stream(0.0, 10.0, _base_args())
+    amb0 = hp_streams.get_ambient_air_stream(0.0, 0.0, _base_args())
+    amb_pos = hp_streams.get_ambient_air_stream(10.0, 0.0, _base_args())
+    amb_neg = hp_streams.get_ambient_air_stream(0.0, 10.0, _base_args())
     assert len(amb0) == 0
     assert len(amb_pos) == 1
     assert len(amb_neg) == 1
@@ -165,6 +179,76 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     assert hp_shared.calc_hpr_obj(
         10.0, 5.0, 0.0, 100.0, heat_to_power_ratio=2.0, penalty=1.0
     ) == pytest.approx(0.21)
+
+
+def test_simulated_hpr_annualized_costs_use_value_units_and_duty_based_hx_cost():
+    streams = _sc(
+        _stream("cond", 120.0, 100.0, 20.0, is_process_stream=False),
+        _stream("evap", 40.0, 60.0, 10.0, is_process_stream=False),
+    )
+    args = _base_args(
+        ele_price=100.0,
+        annual_op_time=1000.0,
+        heat_to_power_ratio=0.5,
+        cold_to_power_ratio=0.25,
+        hpr_comp_fixed_cost=100.0,
+        hpr_comp_variable_cost=10.0,
+        hpr_comp_cost_exp=1.0,
+        hpr_hx_fixed_cost=50.0,
+        hpr_hx_variable_cost=2.0,
+        hpr_hx_cost_exp=1.0,
+        discount_rate=0.1,
+        serv_life=10.0,
+    )
+
+    costs = hp_shared.calc_simulated_hpr_annualized_costs(
+        work=10.0,
+        work_arr=np.array([6.0, 4.0]),
+        Q_ext_heat=8.0,
+        Q_ext_cold=4.0,
+        hpr_streams=streams,
+        hx_units=len(streams.get_hot_utility_streams())
+        + len(streams.get_cold_utility_streams()),
+        penalty_power_equivalent=2.0,
+        args=args,
+    )
+
+    assert isinstance(costs, SimulatedHPRAnnualizedCostAccounting)
+    assert isinstance(costs.hpr_operating_cost, Value)
+    assert costs.hpr_operating_cost.unit == "$/y"
+    assert costs.hpr_operating_cost.value == pytest.approx(1500.0)
+    assert costs.hpr_compressor_capital_cost.unit == "$"
+    assert costs.hpr_compressor_capital_cost.value == pytest.approx(300.0)
+    assert costs.hpr_heat_exchanger_capital_cost.unit == "$"
+    assert costs.hpr_heat_exchanger_capital_cost.value == pytest.approx(160.0)
+    assert costs.hpr_capital_cost.value == pytest.approx(460.0)
+    assert costs.hpr_total_annualized_cost.unit == "$/y"
+    assert costs.feasibility_penalty.unit == "$/y"
+    assert costs.feasibility_penalty.value == pytest.approx(200.0)
+
+
+def test_cycle_penalty_ignores_missing_and_negative_terms():
+    args = _base_args(eta_penalty=0.001, rho_penalty=10.0)
+
+    assert hp_shared._cycle_penalty(args=args) == 0.0
+    assert (
+        hp_shared._cycle_penalty(
+            args=args,
+            cycle_penalty_terms=[-1.0, 0.0],
+        )
+        == 0.0
+    )
+
+
+def test_cycle_penalty_scores_only_cycle_terms():
+    args = _base_args(eta_penalty=0.0, rho_penalty=2.0)
+
+    penalty = hp_shared._cycle_penalty(
+        args=args,
+        cycle_penalty_terms=[3.0, -10.0, 4.0],
+    )
+
+    assert penalty == pytest.approx(50.0)
 
 
 @pytest.mark.parametrize("x0_ls", [None, [], np.array([])])
@@ -353,7 +437,7 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
     cold = _sc(_stream("C", 70.0, 80.0, 5.0, is_process_stream=False))
 
     monkeypatch.setattr(
-        hp_shared,
+        hp_plotting,
         "create_problem_table_with_t_int",
         lambda streams, is_shifted, idx: ProblemTable(
             {
@@ -364,7 +448,7 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        hp_shared,
+        hp_plotting,
         "get_utility_heat_cascade",
         lambda *args, **kwargs: {
             "T_col": np.array([120.0, 80.0]),
@@ -375,7 +459,7 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         },
     )
 
-    out = hp_shared._get_hpr_cascade(hot, cold)
+    out = hp_plotting._get_hpr_cascade(hot, cold)
     assert len(out) == 3
 
 

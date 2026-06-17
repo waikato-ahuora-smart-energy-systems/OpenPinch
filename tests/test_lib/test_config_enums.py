@@ -12,6 +12,32 @@ def test_configuration_parses_refrigerant_list_option():
     assert cfg.REFRIGERANTS == ["water", "ammonia", "co2"]
 
 
+def test_configuration_exposes_normalised_hpr_backend_options():
+    cfg = Configuration(
+        options={
+            "REFRIGERANTS": " water ; ammonia, co2 ",
+            "MVR_FLUIDS": " Water ; R134A, ",
+            "ETA_II_HE_CARNOT": 0.4,
+            "ALLOW_INTEGRATED_EXPANDER": True,
+        }
+    )
+
+    assert cfg.hpr_refrigerants == ["WATER", "AMMONIA", "CO2"]
+    assert cfg.hpr_mvr_fluids == ["Water", "R134A"]
+    assert cfg.effective_eta_ii_he_carnot == pytest.approx(0.4)
+
+
+def test_configuration_disables_effective_hpr_heat_engine_efficiency_by_default():
+    cfg = Configuration(
+        options={
+            "ETA_II_HE_CARNOT": 0.4,
+            "ALLOW_INTEGRATED_EXPANDER": False,
+        }
+    )
+
+    assert cfg.effective_eta_ii_he_carnot == pytest.approx(0.0)
+
+
 def test_configuration_accepts_input_and_output_unit_maps():
     cfg = Configuration(
         options={

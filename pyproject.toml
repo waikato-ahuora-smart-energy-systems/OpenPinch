@@ -117,6 +117,7 @@ ignore = ["E203"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["F403", "F405", "E501"]
+"OpenPinch/lib/config_metadata.py" = ["E501"]
 "OpenPinch/services/energy_transfer_analysis/energy_transfer_analysis.py" = ["E501"]
 "OpenPinch/services/exergy_analysis/exergy_targeting_entry.py" = ["E501"]
 

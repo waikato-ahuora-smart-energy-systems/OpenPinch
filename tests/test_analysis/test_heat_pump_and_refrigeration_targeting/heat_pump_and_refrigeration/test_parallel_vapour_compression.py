@@ -217,7 +217,7 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
         "ParallelVapourCompressionCycles",
         _FakeParallelSolved,
     )
-    seq = iter([_pt_with_hnet(0.0, -1.0), _pt_with_hnet(0.0, -1.0)])
+    seq = iter([_pt_with_hnet(1.0, 1.0), _pt_with_hnet(1.0, 1.0)])
     monkeypatch.setattr(
         hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )

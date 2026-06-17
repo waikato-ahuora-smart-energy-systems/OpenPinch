@@ -4,8 +4,10 @@ import math
 
 import pytest
 
+from OpenPinch.classes.value import Value
 from OpenPinch.utils.costing import (
     compute_annual_capital_cost,
+    compute_annual_energy_cost,
     compute_capital_cost,
     compute_capital_recovery_factor,
 )
@@ -66,9 +68,10 @@ def test_compute_capital_cost_matches_formula():
     variable = 80.0
     exponent = 0.65
     expected = num_units * fixed + num_units * variable * (area / num_units) ** exponent
-    assert compute_capital_cost(
-        area, num_units, fixed, variable, exponent
-    ) == pytest.approx(expected)
+    result = compute_capital_cost(area, num_units, fixed, variable, exponent)
+    assert isinstance(result, Value)
+    assert result.unit == "$"
+    assert result.value == pytest.approx(expected)
 
 
 def test_compute_annual_capital_cost_matches_crf_product():
@@ -78,6 +81,30 @@ def test_compute_annual_capital_cost_matches_crf_product():
     expected = capital_cost * compute_capital_recovery_factor(
         discount_rate, service_life
     )
-    assert compute_annual_capital_cost(
-        capital_cost, discount_rate, service_life
-    ) == pytest.approx(expected)
+    result = compute_annual_capital_cost(capital_cost, discount_rate, service_life)
+    assert isinstance(result, Value)
+    assert result.unit == "$/y"
+    assert result.value == pytest.approx(expected)
+
+
+def test_compute_annual_capital_cost_clamps_nonpositive_economic_inputs():
+    result = compute_annual_capital_cost(Value(50000.0, "$"), 0.0, 0.0)
+
+    expected = 50000.0 * compute_capital_recovery_factor(1e-6, 1.0)
+    assert result.unit == "$/y"
+    assert result.value == pytest.approx(expected)
+
+
+def test_compute_annual_energy_cost_converts_kw_hours_and_mwh_price():
+    result = compute_annual_energy_cost(10.0, 100.0, 1000.0)
+
+    assert isinstance(result, Value)
+    assert result.unit == "$/y"
+    assert result.value == pytest.approx(1000.0)
+
+
+def test_compute_annual_energy_cost_clamps_negative_inputs():
+    result = compute_annual_energy_cost(-10.0, -100.0, -1000.0)
+
+    assert result.unit == "$/y"
+    assert result.value == pytest.approx(0.0)

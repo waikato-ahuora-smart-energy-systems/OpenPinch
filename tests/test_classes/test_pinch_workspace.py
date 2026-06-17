@@ -173,7 +173,9 @@ def test_pinch_workspace_reports_error_category_for_unsupported_workflow():
 
 def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
     workspace = PinchWorkspace(_chocolate_payload(), project_name="Site")
-    case = workspace.copy_case(source_name="baseline", new_name="direct_hp_full_load", activate=False)
+    case = workspace.copy_case(
+        source_name="baseline", new_name="direct_hp_full_load", activate=False
+    )
     case.update_options(
         {
             "HPR_TYPE": HPRcycle.CascadeCarnot.value,

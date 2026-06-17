@@ -214,7 +214,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
             return _sc(_stream("HP", 100.0, 90.0, 10.0, is_process_stream=False))
 
     monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
-    seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
+    seq = iter([_pt_with_hnet(5.0, 1.0), _pt_with_hnet(6.0, 2.0)])
     monkeypatch.setattr(
         hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )
@@ -227,8 +227,8 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
 
     out = hp_cascade._compute_cascade_hp_system_obj(x, args, debug=True)
     assert "hpr_hot_streams" in out
-    assert out["Q_ext"] == pytest.approx(5.0)
-    assert out["utility_tot"] == pytest.approx(45.0)
+    assert out["Q_ext"] == pytest.approx(6.0)
+    assert out["utility_tot"] == pytest.approx(46.0)
     assert out["w_net"] == pytest.approx(40.0)
     assert out["cop_h"] == pytest.approx(5.0)
     assert calls["plot"] == 1
@@ -271,7 +271,7 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
             return _sc(_stream("HP", 90.0, 80.0, 10.0, is_process_stream=False))
 
     monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
-    seq = iter([_pt_with_hnet(0.0, -1.0), _pt_with_hnet(0.0, -1.0)])
+    seq = iter([_pt_with_hnet(1.0, 1.0), _pt_with_hnet(1.0, 1.0)])
     monkeypatch.setattr(
         hp_shared, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )

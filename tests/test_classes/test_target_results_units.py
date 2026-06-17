@@ -176,6 +176,12 @@ def test_heat_pump_results_include_unit_aware_hpr_metrics(factory):
     target.hpr_ambient_cold = 5.0
     target.hpr_cop = 3.5
     target.hpr_eta_he = 0.25
+    target.hpr_operating_cost = Value(1000.0, "$/y")
+    target.hpr_capital_cost = Value(5000.0, "$")
+    target.hpr_annualized_capital_cost = Value(600.0, "$/y")
+    target.hpr_total_annualized_cost = Value(1600.0, "$/y")
+    target.hpr_compressor_capital_cost = Value(3000.0, "$")
+    target.hpr_heat_exchanger_capital_cost = Value(2000.0, "$")
 
     results = target.to_target_results()
 
@@ -192,6 +198,12 @@ def test_heat_pump_results_include_unit_aware_hpr_metrics(factory):
     _assert_scalar_payload(results.hpr_ambient_cold, 5.0, "kW")
     _assert_scalar_payload(results.hpr_cop, 3.5, "-")
     _assert_scalar_payload(results.hpr_eta_he, 25.0, "%")
+    _assert_scalar_payload(results.hpr_operating_cost, 1000.0, "$/y")
+    _assert_scalar_payload(results.hpr_capital_cost, 5000.0, "$")
+    _assert_scalar_payload(results.hpr_annualized_capital_cost, 600.0, "$/y")
+    _assert_scalar_payload(results.hpr_total_annualized_cost, 1600.0, "$/y")
+    _assert_scalar_payload(results.hpr_compressor_capital_cost, 3000.0, "$")
+    _assert_scalar_payload(results.hpr_heat_exchanger_capital_cost, 2000.0, "$")
 
 
 def test_target_results_apply_configured_output_unit_overrides():

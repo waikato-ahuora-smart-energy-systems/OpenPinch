@@ -193,6 +193,36 @@ def _make_summary_row(t) -> dict:
         ),
         **_value_unit_columns("HPR COP", getattr(t, "hpr_cop", None), idx=idx),
         **_value_unit_columns("HPR Eta HE", getattr(t, "hpr_eta_he", None), idx=idx),
+        **_value_unit_columns(
+            "HPR Operating Cost",
+            getattr(t, "hpr_operating_cost", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "HPR Capital Cost",
+            getattr(t, "hpr_capital_cost", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "HPR Annualized Capital Cost",
+            getattr(t, "hpr_annualized_capital_cost", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "HPR Total Annualized Cost",
+            getattr(t, "hpr_total_annualized_cost", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "HPR Compressor Capital Cost",
+            getattr(t, "hpr_compressor_capital_cost", None),
+            idx=idx,
+        ),
+        **_value_unit_columns(
+            "HPR Heat Exchanger Capital Cost",
+            getattr(t, "hpr_heat_exchanger_capital_cost", None),
+            idx=idx,
+        ),
     }
 
     return base_columns | utility_columns | tail_columns

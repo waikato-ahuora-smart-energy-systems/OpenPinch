@@ -108,6 +108,7 @@ def test_compute_parallel_carnot_objective_handles_mixed_lift_without_ambiguous_
         Q_cool_max=260.0,
         heat_to_power_ratio=1.0,
         cold_to_power_ratio=0.0,
+        eta_penalty=0.001,
         rho_penalty=10,
         allow_integrated_expander=False,
     )
@@ -138,6 +139,7 @@ def test_compute_parallel_carnot_utility_total_includes_residual_cold_utility():
         Q_cool_max=20.0,
         heat_to_power_ratio=1.0,
         cold_to_power_ratio=1.0,
+        eta_penalty=0.001,
         rho_penalty=10.0,
     )
 

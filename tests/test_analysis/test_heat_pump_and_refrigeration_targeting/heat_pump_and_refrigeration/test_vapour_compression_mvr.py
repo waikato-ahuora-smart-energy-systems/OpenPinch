@@ -737,7 +737,7 @@ def test_compute_vc_mvr_system_obj_solved(monkeypatch):
             return _sc(_stream("HP", 100.0, 90.0, 10.0, is_process_stream=False))
 
     monkeypatch.setattr(hp_vc_mvr, "VapourCompressionMvrCascade", _FakeCascadeSolved)
-    seq = iter([_pt_with_hnet(5.0, -1.0), _pt_with_hnet(6.0, -2.0)])
+    seq = iter([_pt_with_hnet(5.0, 1.0), _pt_with_hnet(6.0, 2.0)])
     monkeypatch.setattr(
         hp_shared,
         "get_process_heat_cascade",

@@ -110,7 +110,7 @@ def require_stage_duty_allocation(
     Q_available: np.ndarray | None,
     duty_name: str,
 ) -> DutyAllocation:
-    """Validate and allocate one base/split/availability duty payload."""
+    """Validate and allocate one base/split/availability duty input set."""
     if x_split is None or Q_available is None:
         raise ValueError(
             f"Q_{duty_name}_base requires x_{duty_name}_split "

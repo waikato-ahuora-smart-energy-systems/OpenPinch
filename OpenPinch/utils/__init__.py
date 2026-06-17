@@ -8,6 +8,7 @@ performance critical routines.
 from .blackbox_minimisers import multiminima
 from .costing import (
     compute_annual_capital_cost,
+    compute_annual_energy_cost,
     compute_capital_cost,
     compute_capital_recovery_factor,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "compute_capital_recovery_factor",
     "compute_capital_cost",
     "compute_annual_capital_cost",
+    "compute_annual_energy_cost",
     "get_problem_from_csv",
     "get_results_from_csv",
     "timing_decorator",

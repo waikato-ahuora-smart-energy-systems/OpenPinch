@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from ...classes.stream_collection import StreamCollection
+from ...classes.value import Value
 
 
 class HeatPumpTargetInputs(BaseModel):
@@ -22,16 +23,16 @@ class HeatPumpTargetInputs(BaseModel):
     z_amb_hot: np.ndarray
     z_amb_cold: np.ndarray
     dt_range_max: float
-    T_hot: np.ndarray | list
-    H_hot: np.ndarray | list
-    T_cold: np.ndarray | list
-    H_cold: np.ndarray | list
+    T_hot: np.ndarray
+    H_hot: np.ndarray
+    T_cold: np.ndarray
+    H_cold: np.ndarray
     n_cond: int
     n_evap: int
-    n_mvr: int = 1
+    n_mvr: int
     eta_comp: float
-    eta_mvr_comp: float = 0.7
-    eta_motor: float = 0.95
+    eta_mvr_comp: float
+    eta_motor: float
     eta_exp: float
     dtcont_hp: float
     dt_hp_ihx: float
@@ -39,6 +40,16 @@ class HeatPumpTargetInputs(BaseModel):
     dt_phase_change: float
     heat_to_power_ratio: float
     cold_to_power_ratio: float
+    ele_price: float
+    annual_op_time: float
+    discount_rate: float
+    serv_life: float
+    hpr_comp_fixed_cost: float
+    hpr_comp_variable_cost: float
+    hpr_comp_cost_exp: float
+    hpr_hx_fixed_cost: float
+    hpr_hx_variable_cost: float
+    hpr_hx_cost_exp: float
     is_heat_pumping: bool
     max_multi_start: int
     T_env: float
@@ -46,17 +57,15 @@ class HeatPumpTargetInputs(BaseModel):
     eta_ii_hpr_carnot: float
     eta_ii_he_carnot: float
     refrigerant_ls: List[str]
-    mvr_fluid_ls: List[str] = Field(default_factory=lambda: ["Water"])
+    mvr_fluid_ls: List[str]
     do_refrigerant_sort: bool
     initialise_simulated_cycle: bool
     allow_integrated_expander: bool
-    dT_subcool: Optional[np.ndarray] = None
-    dT_superheat: Optional[np.ndarray] = None
-    bckgrd_hot_streams: Optional[StreamCollection] = None
-    bckgrd_cold_streams: Optional[StreamCollection] = None
-    bb_minimiser: Optional[str] = None
-    eta_penalty: Optional[float] = 0.01
-    rho_penalty: Optional[float] = 10
+    bckgrd_hot_streams: StreamCollection
+    bckgrd_cold_streams: StreamCollection
+    bb_minimiser: str
+    eta_penalty: float
+    rho_penalty: float
     idx: int = 0
     debug: bool
 
@@ -72,6 +81,12 @@ class HeatPumpTargetOutputs(BaseModel):
     w_he: Optional[float | list | np.ndarray] = None
     heat_recovery: Optional[float | list | np.ndarray] = None
     Q_ext: float
+    hpr_operating_cost: Optional[Any] = None
+    hpr_capital_cost: Optional[Any] = None
+    hpr_annualized_capital_cost: Optional[Any] = None
+    hpr_total_annualized_cost: Optional[Any] = None
+    hpr_compressor_capital_cost: Optional[Any] = None
+    hpr_heat_exchanger_capital_cost: Optional[Any] = None
     Q_amb_hot: float
     Q_amb_cold: float
     cop_h: Optional[float | list | np.ndarray] = None
@@ -97,8 +112,22 @@ class HeatPumpTargetOutputs(BaseModel):
     model: Optional[Any] = None
 
 
+class SimulatedHPRAnnualizedCostAccounting(BaseModel):
+    """Unit-aware annualized cost accounting for simulated HPR candidates."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    hpr_operating_cost: Value
+    hpr_capital_cost: Value
+    hpr_annualized_capital_cost: Value
+    hpr_total_annualized_cost: Value
+    hpr_compressor_capital_cost: Value
+    hpr_heat_exchanger_capital_cost: Value
+    feasibility_penalty: Value
+
+
 class HPRParsedState(BaseModel):
-    """Internal parsed optimisation-state payload across HPR backends."""
+    """Internal parsed optimisation-state data across HPR backends."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -153,6 +182,13 @@ class HPRBackendResult(BaseModel):
     w_net: float | list | np.ndarray
     Q_ext_heat: float
     Q_ext_cold: float
+    hpr_operating_cost: Any = None
+    hpr_capital_cost: Any = None
+    hpr_annualized_capital_cost: Any = None
+    hpr_total_annualized_cost: Any = None
+    hpr_compressor_capital_cost: Any = None
+    hpr_heat_exchanger_capital_cost: Any = None
+    feasibility_penalty: float = 0.0
     Q_amb_hot: float
     Q_amb_cold: float
     success: bool = True
@@ -239,14 +275,20 @@ class HPRBackendResult(BaseModel):
             return True
         return hasattr(self, key)
 
-    def to_output_payload(self) -> dict[str, Any]:
-        payload = {
+    def to_output_fields(self) -> dict[str, Any]:
+        output_values = {
             "utility_tot": self.utility_tot,
             "w_net": self.w_net,
             "w_hpr": self.w_hpr,
             "w_he": self.w_he,
             "heat_recovery": self.heat_recovery,
             "Q_ext": self.Q_ext,
+            "hpr_operating_cost": self.hpr_operating_cost,
+            "hpr_capital_cost": self.hpr_capital_cost,
+            "hpr_annualized_capital_cost": self.hpr_annualized_capital_cost,
+            "hpr_total_annualized_cost": self.hpr_total_annualized_cost,
+            "hpr_compressor_capital_cost": self.hpr_compressor_capital_cost,
+            "hpr_heat_exchanger_capital_cost": self.hpr_heat_exchanger_capital_cost,
             "Q_amb_hot": self.Q_amb_hot,
             "Q_amb_cold": self.Q_amb_cold,
             "cop_h": self.cop_h,
@@ -271,7 +313,7 @@ class HPRBackendResult(BaseModel):
             "Q_cool": self.Q_cool,
             "model": self.model,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return {key: value for key, value in output_values.items() if value is not None}
 
     @classmethod
     def failure(
@@ -297,6 +339,7 @@ class HPRBackendResult(BaseModel):
 __all__ = [
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",
+    "SimulatedHPRAnnualizedCostAccounting",
     "HPRParsedState",
     "HPRThermoArtifacts",
     "HPRBackendResult",
@@ -305,6 +348,7 @@ __all__ = [
 
 HeatPumpTargetInputs.model_rebuild()
 HeatPumpTargetOutputs.model_rebuild()
+SimulatedHPRAnnualizedCostAccounting.model_rebuild()
 HPRParsedState.model_rebuild()
 HPRThermoArtifacts.model_rebuild()
 HPRBackendResult.model_rebuild()
