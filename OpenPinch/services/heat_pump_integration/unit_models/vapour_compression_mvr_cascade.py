@@ -192,7 +192,7 @@ class VapourCompressionMvrCascade:
         """Finite infeasibility and soft-constraint penalties."""
         if self.solved:
             cycle_penalties = [
-                np.asarray(cycle.penalty, dtype=float).reshape(-1)
+                cycle.penalty
                 for cycle in self.subcycles
                 if cycle.penalty is not None
             ]
@@ -307,7 +307,7 @@ class VapourCompressionMvrCascade:
         penalties.extend(np.maximum(-process_split, 0.0) * self._max_work)
         penalties.extend(np.maximum(process_split - 1.0, 0.0) * self._max_work)
         self._penalty = np.concatenate(
-            [self._penalty, np.asarray(penalties, dtype=float).reshape(-1)]
+            [self._penalty, np.asarray(penalties, dtype=float)]
         )
         if np.any(self._penalty > 0.0):
             self._max_work *= 1.0 + float(self._penalty.sum()) / self._max_work

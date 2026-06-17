@@ -143,9 +143,9 @@ def _merge_candidate_points(
         if local_minima_arr.ndim == 1:
             local_minima_arr = local_minima_arr.reshape(1, -1)
         candidate_blocks.append(local_minima_arr)
-        objective_blocks.append(np.asarray(local_minima_f, dtype=float).reshape(-1))
+        objective_blocks.append(np.asarray(local_minima_f, dtype=float))
     if x0_arr is not None and x0_arr.size:
-        x0_block = np.asarray(x0_arr, dtype=float).reshape(x0_arr.shape[0], -1)
+        x0_block = x0_arr.reshape(x0_arr.shape[0], -1)
         candidate_blocks.append(x0_block)
         objective_blocks.append(
             np.asarray(
@@ -156,7 +156,7 @@ def _merge_candidate_points(
     if not candidate_blocks:
         return np.asarray([]), np.asarray([])
     n_cols = (
-        np.asarray(x0_arr, dtype=float).reshape(x0_arr.shape[0], -1).shape[1]
+        x0_arr.shape[1]
         if x0_arr is not None and x0_arr.size
         else candidate_blocks[0].shape[1]
     )
@@ -253,14 +253,12 @@ def _build_hpr_accounting(
 def _cycle_penalty(
     *,
     args: HeatPumpTargetInputs,
-    cycle_penalty_terms: Any = None,
+    cycle_penalty_terms: np.ndarray | None = None,
 ) -> float:
-    cycle_terms = np.maximum(
-        np.asarray(
-            [] if cycle_penalty_terms is None else cycle_penalty_terms, dtype=float
-        ).reshape(-1),
-        0.0,
-    )
+    if cycle_penalty_terms is None:
+        cycle_terms = np.array([])
+    else:
+        cycle_terms = np.maximum(cycle_penalty_terms, 0.0)
     if not cycle_terms.size:
         return 0.0
     return float(
@@ -276,7 +274,7 @@ def _cycle_penalty(
 def calc_simulated_hpr_annualized_costs(
     *,
     work: float,
-    work_arr: float | list | np.ndarray | None,
+    work_arr: np.ndarray | None,
     Q_ext_heat: float,
     Q_ext_cold: float,
     hpr_streams: StreamCollection,
@@ -296,9 +294,7 @@ def calc_simulated_hpr_annualized_costs(
         + compute_annual_energy_cost(Q_ext_cold, cold_price, annual_hours)
     ).to("$/y")
 
-    work_values = np.asarray([] if work_arr is None else work_arr, dtype=float).reshape(
-        -1
-    )
+    work_values = np.array([]) if work_arr is None else work_arr
     compressor_capital = compute_capital_cost(
         work,
         max(int(np.count_nonzero(work_values > tol)), 1),
@@ -371,10 +367,8 @@ def evaluate_carnot_hpr_result(
 
     Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(
         work=float(w_net),
-        Q_ext_heat=np.abs(H_cold_with_amb[0])
-        - np.asarray(Q_cond_total, dtype=float).sum(),
-        Q_ext_cold=np.abs(H_hot_with_amb[-1])
-        - np.asarray(Q_evap_total, dtype=float).sum(),
+        Q_ext_heat=np.abs(H_cold_with_amb[0]) - Q_cond_total.sum(),
+        Q_ext_cold=np.abs(H_hot_with_amb[-1]) - Q_evap_total.sum(),
         args=args,
         penalty_terms=penalty_terms,
         penalise_external_cold_when_refrigerating=True,
@@ -434,13 +428,13 @@ def evaluate_vapour_hpr_result(
     args: HeatPumpTargetInputs,
     state: HPRParsedState,
     work: float,
-    work_arr: float | list | np.ndarray,
+    work_arr: np.ndarray,
     Q_heat: np.ndarray,
     Q_cool: np.ndarray,
     cop_h: float,
     hpr_streams: StreamCollection,
     model: Any = None,
-    penalty_terms: Any = None,
+    penalty_terms: np.ndarray | None = None,
     dT_subcool: np.ndarray | None = None,
     dT_superheat: np.ndarray | None = None,
     debug: bool = False,

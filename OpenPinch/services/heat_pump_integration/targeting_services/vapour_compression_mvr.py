@@ -401,9 +401,11 @@ def _unpack_vc_mvr_state(
 ) -> dict[str, np.ndarray]:
     n_vc = _num_vc_stages(args)
     n_mvr = _num_mvr_stages(args)
-    T_cond = np.asarray(state.T_cond, dtype=float).reshape(-1)
-    T_evap = np.asarray(state.T_evap, dtype=float).reshape(-1)
-    dT_subcool = np.asarray(state.dT_subcool, dtype=float).reshape(-1)
+    T_cond = state.T_cond
+    T_evap = state.T_evap
+    dT_subcool = state.dT_subcool
+    if T_cond is None or T_evap is None or dT_subcool is None:
+        raise ValueError("VC+MVR parsed state must include stage temperature arrays.")
     expected_temperature_size = n_mvr + n_vc
     if T_cond.size != expected_temperature_size:
         raise ValueError(
@@ -413,7 +415,7 @@ def _unpack_vc_mvr_state(
         raise ValueError(
             "VC+MVR parsed evaporator temperatures must include VC and MVR stages."
         )
-    if state.x_heat_split is None or np.asarray(state.x_heat_split).size != n_vc:
+    if state.x_heat_split is None or state.x_heat_split.size != n_vc:
         raise ValueError(
             "VC+MVR parsed heat state must include VC heat split fractions."
         )
@@ -427,6 +429,6 @@ def _unpack_vc_mvr_state(
         "dT_subcool_mvr": dT_subcool[:n_mvr],
         "dT_subcool_vc": dT_subcool[n_mvr:],
         "mvr_source_split": float(state.x_mvr_source_split),
-        "mvr_process_split": np.asarray(state.x_mvr_process_split, dtype=float),
+        "mvr_process_split": state.x_mvr_process_split,
         "dT_lift_mvr": T_cond[:n_mvr] - T_evap[:n_mvr],
     }
