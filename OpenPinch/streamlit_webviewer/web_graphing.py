@@ -320,7 +320,8 @@ def render_streamlit_dashboard(
 
     with tabs[2]:
         pt_real_df = problem_table_to_dataframe(
-            target.pt_real, round_decimals=value_rounding
+            getattr(target, "pt_real", None),
+            round_decimals=value_rounding,
         )
         if pt_real_df.empty:
             st.info("No real temperature Problem Table data available.")

@@ -34,6 +34,10 @@ _DIMENSIONLESS_UNIT_TOKENS = {"", "-", "dimensionless", "1"}
 INPUT_UNIT_RULES: dict[str, InputUnitRule] = {
     "t_supply": InputUnitRule("degC", aliases=("temperature",)),
     "t_target": InputUnitRule("degC", aliases=("temperature",)),
+    "p_supply": InputUnitRule("kPa", aliases=("pressure",)),
+    "p_target": InputUnitRule("kPa", aliases=("pressure",)),
+    "h_supply": InputUnitRule("kJ/kg", aliases=("enthalpy",)),
+    "h_target": InputUnitRule("kJ/kg", aliases=("enthalpy",)),
     "heat_flow": InputUnitRule("kW", aliases=("heat_flow",)),
     "dt_cont": InputUnitRule(
         "delta_degC",
@@ -68,8 +72,8 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
     "area": OutputUnitRule("m^2", "m^2", aliases=("area",)),
     "capital_cost": OutputUnitRule("$", "$", aliases=("capital_cost", "currency")),
     "total_cost": OutputUnitRule(
-        "USD/year",
-        "USD/year",
+        "$/y",
+        "$/y",
         aliases=("annual_cost", "currency"),
     ),
     "exergy_sources": OutputUnitRule("kW", "kW", aliases=("heat_flow",)),
@@ -95,6 +99,36 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
         "dimensionless",
         "%",
         aliases=("percent", "fraction"),
+    ),
+    "hpr_operating_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        aliases=("annual_cost", "currency"),
+    ),
+    "hpr_capital_cost": OutputUnitRule(
+        "$",
+        "$",
+        aliases=("capital_cost", "currency"),
+    ),
+    "hpr_annualized_capital_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        aliases=("annual_cost", "currency"),
+    ),
+    "hpr_total_annualized_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        aliases=("annual_cost", "currency"),
+    ),
+    "hpr_compressor_capital_cost": OutputUnitRule(
+        "$",
+        "$",
+        aliases=("capital_cost", "currency"),
+    ),
+    "hpr_heat_exchanger_capital_cost": OutputUnitRule(
+        "$",
+        "$",
+        aliases=("capital_cost", "currency"),
     ),
 }
 

@@ -101,6 +101,32 @@ workflows depend on.
 .. automodule:: OpenPinch.services.common.graph_data
    :members:
 
+Process Component Services
+--------------------------
+
+Process components mutate a prepared in-memory model before a target is
+rerun. They sit below ``PinchProblem.add_component`` and are most useful for
+workspace before/after studies where the active stream set changes between
+cases.
+
+.. automodule:: OpenPinch.services.components
+   :no-members:
+
+.. automodule:: OpenPinch.services.components.process_components
+   :members:
+   :no-index:
+
+.. automodule:: OpenPinch.services.components.process_mvr
+   :members:
+   :no-index:
+
+.. automodule:: OpenPinch.services.components.direct_mvr
+   :no-members:
+
+.. automodule:: OpenPinch.services.components.direct_mvr.direct_gas_mvr
+   :members:
+   :no-index:
+
 Advanced Add-On Analyses
 ------------------------
 
@@ -121,7 +147,7 @@ optimisers and helper modules. The main low-level entrypoints remain
 .. automodule:: OpenPinch.services.common.temperature_driving_force
    :members:
 
-.. automodule:: OpenPinch.services.power_cogeneration.power_cogeneration_analysis
+.. automodule:: OpenPinch.services.power_cogeneration.power_cogeneration_entry
    :members:
 
 Experimental or Partial Analysis Modules

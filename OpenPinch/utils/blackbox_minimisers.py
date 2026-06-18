@@ -183,8 +183,14 @@ def multiminima(
     bounds: Optional[tuple] = None,
     opt_kwargs: Optional[dict] = None,
     optimiser_handle: Optional[str | BB_Minimiser] = _DEFAULT_MULTIMINIMA_HANDLE,
-) -> list:
-    """Run a selected multi-start optimizer by handle."""
+) -> tuple:
+    """Run a selected multi-start optimizer by handle.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Candidate minimizer vectors and their scalar objective values.
+    """
     func_kwargs = {} if func_kwargs is None else func_kwargs
     opt_kwargs = {} if opt_kwargs is None else opt_kwargs
     objective = _set_objective_func(func=func, func_kwargs=func_kwargs)

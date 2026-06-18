@@ -346,14 +346,14 @@ class PinchWorkspace:
 
     def copy_case(
         self,
-        source_name: str,
-        new_name: str,
         *,
+        source_name: str = "baseline",
+        new_name: str = "new",
         activate: bool = False,
     ) -> PinchProblem:
         """Clone one existing case into a new named case."""
-        payload = self.get_case_payload(source_name, canonical=True)
-        return self.load(payload, case_name=new_name, activate=activate)
+        data_source = self.get_case_payload(source_name, canonical=True)
+        return self.load(data_source, case_name=new_name, activate=activate)
 
     def get_case_payload(
         self,

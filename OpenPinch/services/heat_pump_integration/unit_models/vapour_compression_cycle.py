@@ -1,8 +1,7 @@
 """Simple vapour-compression heat pump cycle utilities built on CoolProp."""
 
-# from __future__ import annotations
+from __future__ import annotations
 
-import re
 from typing import Any, Optional, Sequence
 
 import CoolProp
@@ -11,6 +10,7 @@ from scipy.optimize import brentq
 
 from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
+from ....lib.coolprop_fluids import build_coolprop_abstract_state
 from ....utils.stream_linearisation import get_piecewise_data_points
 
 __all__ = ["VapourCompressionCycle"]
@@ -69,46 +69,7 @@ class VapourCompressionCycle:
     @staticmethod
     def _get_fluid_state(value: str | Any):
         """Build a CoolProp abstract state from a refrigerant spec."""
-        if not isinstance(value, str):
-            return value
-
-        backend, fluid = value.split("::", 1) if "::" in value else ("HEOS", value)
-        fluid = fluid.strip()
-
-        if "[" not in fluid and "]" not in fluid:
-            return CoolProp.AbstractState(backend, fluid)
-
-        fluid_names = []
-        mole_fractions = []
-
-        for component_spec in fluid.split("&"):
-            match = re.fullmatch(r"\s*([^\[\]&]+)\[([^\]]+)\]\s*", component_spec)
-            if match is None:
-                raise ValueError(
-                    "Explicit refrigerant mixtures must use "
-                    "'<component>[<mole_fraction>]' syntax."
-                )
-
-            component_name, mole_fraction = match.groups()
-            mole_fraction = float(mole_fraction)
-
-            if not np.isfinite(mole_fraction) or mole_fraction < 0.0:
-                raise ValueError(
-                    "Refrigerant mole fractions must be finite and non-negative."
-                )
-
-            fluid_names.append(component_name.strip())
-            mole_fractions.append(mole_fraction)
-
-        mole_fraction_total = sum(mole_fractions)
-        if mole_fraction_total <= 0.0:
-            raise ValueError("Refrigerant mole fractions must sum to a positive value.")
-
-        state = CoolProp.AbstractState(backend, "&".join(fluid_names))
-        state.set_mole_fractions(
-            [mole_fraction / mole_fraction_total for mole_fraction in mole_fractions]
-        )
-        return state
+        return build_coolprop_abstract_state(value)
 
     @property
     def system(self) -> dict[str, str]:
@@ -533,6 +494,7 @@ class VapourCompressionCycle:
         T_evap: float,
         T_cond: float,
         *,
+        dtcont: float,
         dT_superheat: float = 0.0,
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
@@ -553,6 +515,8 @@ class VapourCompressionCycle:
             Liquid saturation temperature in the evaporator [deg C].
         T_cond : float
             Gas saturation temperature in the condenser [deg C].
+        dtcont : float
+            Minimum temperature approach used by HPR targeting [K].
         dT_superheat : float, optional
             Degree of superheating of the suction gas, supplied by the process [K].
         dT_subcool : float, optional
@@ -592,6 +556,7 @@ class VapourCompressionCycle:
         self._refrigerant = refrigerant
         self._T_evap = self._convert_C_to_K(T_evap)
         self._T_cond = self._convert_C_to_K(T_cond)
+        self._dtcont = float(dtcont)
         self._dT_superheat = dT_superheat
         self._dT_subcool = dT_subcool
 
@@ -776,10 +741,14 @@ class VapourCompressionCycle:
                 h=state2.hmass() + self._q_heat,
             )
             self._save_cycle_state(state4, 4)
+            self._q_cas_heat = self._q_cond - self._q_heat
+            self._Q_cas_heat = self._Q_cond - self._Q_heat
 
         # Finish analysis
         self._penalty = np.asarray(self._penalty) * self._m_dot
         self.temperature_unit = "C"
+        if not np.isfinite(float(self._work)) or float(self._work) < 0.0:
+            return self._work
         self._solved = True
         return self._work
 

@@ -88,11 +88,12 @@ class HeatPump(Enum):
 class HeatPumpAndRefrigerationCycle(str, Enum):
     """Supported heat pump targeting model families."""
 
-    MultiTempCarnot = "Multi-temperature Carnot cycles"
-    MultiSimpleCarnot = "Multiple simple Carnot cycles"
+    CascadeCarnot = "Cascade Carnot cycles"
+    ParallelCarnot = "Parallel Carnot cycles"
     Brayton = "Brayton cycle"
     CascadeVapourComp = "Cascade vapour compression cycles"
-    MultiSimpleVapourComp = "Multiple simple vapour compression cycles"
+    ParallelVapourComp = "Parallel vapour compression cycles"
+    VapourCompMVR = "Vapour compression with MVR cascade"
 
 
 HPRcycle = HeatPumpAndRefrigerationCycle
@@ -118,6 +119,32 @@ class StreamType(Enum):
 
 
 ST = StreamType
+
+
+class FluidPhase(str, Enum):
+    """Supported stream fluid-phase flags."""
+
+    sol = "solid"
+    sle = "solid-liquid equilibrium"
+    liq = "liquid"
+    vle = "vapour-liquid equilibrium"
+    vapour = "vapour"
+    sve = "solid-vapour equilibrium"
+    gas = "gas"
+
+    @classmethod
+    def from_code_or_description(cls, value: str | "FluidPhase") -> "FluidPhase":
+        """Resolve a phase from its short code or descriptive label."""
+        if isinstance(value, cls):
+            return value
+        text = str(value).strip().lower()
+        for phase in cls:
+            aliases = {phase.name, phase.value.lower()}
+            if phase is cls.vapour:
+                aliases.add("vapor")
+            if text in aliases:
+                return phase
+        raise ValueError(f"Unknown fluid phase: {value!r}.")
 
 
 class StreamID(Enum):
@@ -272,8 +299,9 @@ class GraphType(Enum):
     GCC_X = "Exergetic Grand Composite Curve"
     NLP_X = "Exergetic Net Load Profiles"
     GCC_HP = "Grand Composite Curve with Heat Pump"
+    NLP_HP = "Net Load Profiles with Heat Pump"
     NLP = "Net Load Profiles"
-
+    ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"
     SUGCC = "Site Utility Grand Composite Curve"
 
@@ -320,6 +348,7 @@ __all__ = [
     "ArrowHead",
     "BB_Minimiser",
     "CogenerationTarget",
+    "FluidPhase",
     "GraphType",
     "GT",
     "HEN",

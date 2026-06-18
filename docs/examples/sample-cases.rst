@@ -32,8 +32,9 @@ Included Cases
    Larger site-style example used in the packaged Total Site notebook.
 
 ``heat_pump_targeting.json``
-   Compact HPR screening input data for direct Heat Pump experimentation without
-   the larger multi-case notebook flow.
+   Compact HPR screening input data for direct Heat Pump experimentation,
+   including the current ``Parallel vapour compression cycles`` option,
+   without the larger multi-case notebook flow.
 
 ``chocolate_factory.json``
    Advanced direct-versus-indirect Carnot HPR and refrigeration example used in

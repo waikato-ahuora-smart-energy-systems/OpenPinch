@@ -47,6 +47,8 @@ flow directions) to verify internal fallbacks or fail-safes.
 
 """
 
+import warnings
+
 import pytest
 from pydantic import ValidationError
 
@@ -204,6 +206,116 @@ def test_stream_attributes_are_computed_correctly(dummy_streams):
     assert cold.t_min_star[0] == cold.t_supply[0] + cold.dt_cont_act[0]
 
 
+def test_prepare_problem_preserves_stream_fluid_pressure_and_enthalpy_fields():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "H1",
+                "zone": "Z1",
+                "t_supply": 250,
+                "t_target": 100,
+                "p_supply": ValueWithUnit(value=2.0, unit="bar"),
+                "p_target": ValueWithUnit(value=150.0, unit="kPa"),
+                "h_supply": ValueWithUnit(value=2_800_000.0, unit="J/kg"),
+                "h_target": ValueWithUnit(value=2_300.0, unit="kJ/kg"),
+                "heat_flow": 10_000,
+                "fluid_name": "HEOS::Water",
+                "fluid_phase": "gas",
+            }
+        )
+    ]
+
+    site = prepare_problem(streams=streams)
+    hot = next(s for s in site.subzones["Z1"].hot_streams if s.name == "H1")
+
+    assert hot.fluid_name == "HEOS::Water"
+    assert hot.fluid_phase == "gas"
+    assert hot.p_supply.value == pytest.approx(200.0)
+    assert hot.p_supply.unit == "kPa"
+    assert hot.p_target.value == pytest.approx(150.0)
+    assert hot.h_supply.value == pytest.approx(2_800.0)
+    assert hot.h_supply.unit == "kJ/kg"
+    assert hot.h_target.value == pytest.approx(2_300.0)
+
+
+def test_prepare_problem_preserves_utility_fluid_pressure_and_enthalpy_fields(
+    dummy_streams,
+):
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "Steam",
+                "type": "Hot",
+                "t_supply": 300,
+                "t_target": 250,
+                "p_supply": ValueWithUnit(value=8.0, unit="bar"),
+                "p_target": ValueWithUnit(value=7.0, unit="bar"),
+                "h_supply": ValueWithUnit(value=2_750.0, unit="kJ/kg"),
+                "h_target": ValueWithUnit(value=700_000.0, unit="J/kg"),
+                "fluid_name": "Water",
+                "fluid_phase": "vle",
+            }
+        )
+    ]
+
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)
+    steam = next(s for s in site.hot_utilities if s.name == "Steam")
+
+    assert steam.fluid_name == "Water"
+    assert steam.fluid_phase == "vle"
+    assert steam.p_supply.value == pytest.approx(800.0)
+    assert steam.p_target.value == pytest.approx(700.0)
+    assert steam.h_supply.value == pytest.approx(2_750.0)
+    assert steam.h_target.value == pytest.approx(700.0)
+
+
+def test_prepare_problem_rejects_invalid_coolprop_stream_fluid_name():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "H1",
+                "zone": "Z1",
+                "t_supply": 250,
+                "t_target": 100,
+                "heat_flow": 10_000,
+                "fluid_name": "NotARealCoolPropFluid",
+            }
+        )
+    ]
+
+    with pytest.raises(ValueError, match="Invalid CoolProp fluid_name"):
+        prepare_problem(streams=streams)
+
+
+def test_prepare_problem_orients_utility_pressure_and_enthalpy_with_temperature(
+    dummy_streams,
+):
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "Cooling",
+                "type": "Cold",
+                "t_supply": 80,
+                "t_target": 20,
+                "p_supply": 800,
+                "p_target": 700,
+                "h_supply": 80,
+                "h_target": 20,
+            }
+        )
+    ]
+
+    site = prepare_problem(streams=dummy_streams, utilities=utilities)
+    cooling = next(s for s in site.cold_utilities if s.name == "Cooling")
+
+    assert cooling.t_supply.value == pytest.approx(20.0)
+    assert cooling.t_target.value == pytest.approx(80.0)
+    assert cooling.p_supply.value == pytest.approx(700.0)
+    assert cooling.p_target.value == pytest.approx(800.0)
+    assert cooling.h_supply.value == pytest.approx(20.0)
+    assert cooling.h_target.value == pytest.approx(80.0)
+
+
 def test_zone_names_and_ordering(dummy_streams):
     site = prepare_problem(streams=dummy_streams)
     zone_names = list(site.subzones.keys())
@@ -291,19 +403,98 @@ def test_prepare_problem_applies_configured_input_unit_defaults():
             }
         ),
     ]
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "HU_K",
+                "type": "Hot",
+                "t_supply": 573.15,
+                "t_target": 523.15,
+                "heat_flow": 0.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+        UtilitySchema.model_validate(
+            {
+                "name": "CU_K",
+                "type": "Cold",
+                "t_supply": 293.15,
+                "t_target": 313.15,
+                "heat_flow": 0.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+    ]
 
     site = prepare_problem(
         streams=streams,
-        options={"INPUT_UNITS": {"temperature": "K"}},
+        utilities=utilities,
+        options={
+            "INPUT_UNITS": {
+                "temperature": "K",
+                "dt_cont": "K",
+                "htc": "W/m^2/K",
+            }
+        },
     )
     z1 = site.subzones["Z1"]
     hot = next(s for s in z1.hot_streams if s.name == "H1")
     cold = next(s for s in z1.cold_streams if s.name == "C1")
+    hot_utility = next(u for u in site.hot_utilities if u.name == "HU_K")
+    cold_utility = next(u for u in site.cold_utilities if u.name == "CU_K")
 
     assert float(hot.t_supply) == pytest.approx(250.0)
     assert float(hot.t_target) == pytest.approx(100.0)
     assert float(cold.t_supply) == pytest.approx(30.0)
     assert float(cold.t_target) == pytest.approx(150.0)
+    assert float(hot_utility.t_supply) == pytest.approx(300.0)
+    assert float(hot_utility.t_target) == pytest.approx(250.0)
+    assert float(hot_utility.dt_cont) == pytest.approx(10.0)
+    assert float(hot_utility.htc) == pytest.approx(0.5)
+    assert float(cold_utility.t_supply) == pytest.approx(20.0)
+    assert float(cold_utility.t_target) == pytest.approx(40.0)
+    assert float(cold_utility.dt_cont) == pytest.approx(10.0)
+    assert float(cold_utility.htc) == pytest.approx(0.5)
+
+
+def test_prepare_problem_preserves_stateful_dt_cont_and_htc_values():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "H_stateful",
+                "zone": "Z1",
+                "t_supply": {"values": [250.0, 260.0]},
+                "t_target": {"values": [100.0, 120.0]},
+                "heat_flow": {"values": [10_000.0, 11_000.0]},
+                "dt_cont": {"values": [2.0, 3.0]},
+                "htc": {"values": [400.0, 500.0], "unit": "W/m^2/K"},
+            }
+        )
+    ]
+    utilities = [
+        UtilitySchema.model_validate(
+            {
+                "name": "HU_stateful",
+                "type": "Hot",
+                "t_supply": {"values": [300.0, 310.0]},
+                "t_target": {"values": [250.0, 255.0]},
+                "heat_flow": {"values": [0.0, 0.0]},
+                "dt_cont": {"values": [4.0, 5.0]},
+                "htc": {"values": [600.0, 700.0], "unit": "W/m^2/K"},
+            }
+        )
+    ]
+
+    site = prepare_problem(streams=streams, utilities=utilities)
+    stream = next(s for s in site.subzones["Z1"].hot_streams if s.name == "H_stateful")
+    utility = next(u for u in site.hot_utilities if u.name == "HU_stateful")
+
+    assert stream.dt_cont.state_values.tolist() == pytest.approx([2.0, 3.0])
+    assert stream.htc.state_values.tolist() == pytest.approx([0.4, 0.5])
+    assert utility.dt_cont.state_values.tolist() == pytest.approx([4.0, 5.0])
+    assert utility.htc.state_values.tolist() == pytest.approx([0.6, 0.7])
 
 
 # ---------------- Invalid Input Tests ---------------- #
@@ -469,7 +660,7 @@ def test_heat_flow_negative_but_temps_suggest_hot():
     assert z.hot_streams[0].name == "MismatchHot"
 
 
-def test_htc_zero_stream():
+def test_htc_zero_stream_is_preserved():
     streams = [
         StreamSchema.model_validate(
             {
@@ -485,7 +676,7 @@ def test_htc_zero_stream():
     ]
     site = prepare_problem(streams=streams)
     stream = site.subzones["Z1"].hot_streams[0]
-    assert stream.htc[0] == 1.0
+    assert stream.htc[0] == 0.0
     assert stream.name == "ZeroHTC"
 
 
@@ -1464,6 +1655,48 @@ def test_flat_single_zone():
     assert operation_zone.name == "O1"
     assert operation_zone.type == ZT.O.value
     assert operation_zone.children is None
+
+
+def test_prepare_problem_allows_stream_zone_matching_project_name_without_warning():
+    streams = [
+        StreamSchema.model_validate(
+            {
+                "name": "HotStream",
+                "zone": "Plant",
+                "t_supply": 200.0,
+                "t_target": 100.0,
+                "heat_flow": 500.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+        StreamSchema.model_validate(
+            {
+                "name": "ColdStream",
+                "zone": "Plant",
+                "t_supply": 50.0,
+                "t_target": 150.0,
+                "heat_flow": -400.0,
+                "dt_cont": 10.0,
+                "htc": 500.0,
+            }
+        ),
+    ]
+
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        warnings.simplefilter("always")
+        master_zone = prepare_problem(streams=streams, project_name="Plant")
+
+    assert not [
+        warning
+        for warning in caught_warnings
+        if "Subzone" in str(warning.message) and "not found" in str(warning.message)
+    ]
+    assert "Plant" in master_zone.subzones
+    process_zone = master_zone.subzones["Plant"]
+    assert {"O1", "O2"} <= set(process_zone.subzones)
+    assert process_zone.subzones["O1"].dt_cont_multiplier == pytest.approx(1.0)
+    assert process_zone.subzones["O2"].dt_cont_multiplier == pytest.approx(1.0)
 
 
 def test_nested_zone_with_slash():

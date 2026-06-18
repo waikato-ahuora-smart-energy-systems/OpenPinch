@@ -9,6 +9,17 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.optimize import minimize
 
+__all__ = [
+    "_cluster_candidates",
+    "_collect_candidates_in_parallel",
+    "_evaluate_scalar_objective",
+    "_filter_opt_kwargs",
+    "_objective_from_result_dict",
+    "_polish_candidates",
+    "_postprocess_candidates",
+    "_set_objective_func",
+]
+
 
 def _evaluate_scalar_objective(
     func: Callable,
@@ -23,7 +34,14 @@ def _evaluate_scalar_objective(
 
 def _objective_from_result_dict(x, func, func_kwargs):
     """Adapt a mapping-returning objective to a scalar objective."""
-    return func(x, func_kwargs)["obj"]
+    try:
+        result = func(x, func_kwargs)
+        obj = float(result["obj"])
+    except Exception:
+        return 1e30
+    if not np.isfinite(obj):
+        return 1e30
+    return obj
 
 
 def _set_objective_func(func, func_kwargs):
@@ -34,6 +52,7 @@ def _set_objective_func(func, func_kwargs):
 def _polish_single_candidate(
     idx: int,
     all_x: np.ndarray,
+    all_f: np.ndarray,
     func: Callable,
     args,
     local_method: str,
@@ -42,15 +61,27 @@ def _polish_single_candidate(
 ) -> tuple[np.ndarray, float]:
     """Run local optimization from one candidate point."""
     x0 = all_x[idx]
-    res_loc = minimize(
-        fun=func,
-        x0=x0,
-        args=args,
-        method=local_method,
-        bounds=bounds_arg,
-        constraints=constraints,
-    )
-    return np.array(res_loc.x, dtype=float), float(res_loc.fun)
+    f0 = float(all_f[idx])
+    try:
+        res_loc = minimize(
+            fun=func,
+            x0=x0,
+            args=args,
+            method=local_method,
+            bounds=bounds_arg,
+            constraints=constraints,
+        )
+    except Exception:
+        return np.array(x0, dtype=float), f0
+
+    f_loc = float(res_loc.fun)
+    if (
+        not getattr(res_loc, "success", False)
+        or not np.isfinite(f_loc)
+        or (np.isfinite(f0) and f_loc > f0)
+    ):
+        return np.array(x0, dtype=float), f0
+    return np.array(res_loc.x, dtype=float), f_loc
 
 
 def _cluster_candidates(
@@ -97,6 +128,7 @@ def _polish_candidates(
     func: Callable,
     args: dict,
     all_x: np.ndarray,
+    all_f: np.ndarray,
     basin_reps_idx: list,
     local_method: str,
     bounds: np.ndarray,
@@ -112,6 +144,7 @@ def _polish_candidates(
     worker_fn = partial(
         _polish_single_candidate,
         all_x=all_x,
+        all_f=all_f,
         func=func,
         args=args,
         local_method=local_method,
@@ -175,10 +208,10 @@ def _postprocess_candidates(
     local_method: str,
     cluster_fn: Callable = _cluster_candidates,
     polish_fn: Callable = _polish_candidates,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """Apply shared sort/cluster/polish/deduplicate pipeline to candidates."""
     if all_x.size == 0:
-        return np.asarray([])
+        return np.asarray([]), np.asarray([])
 
     bounds = np.asarray(bounds, dtype=float)
     lb = bounds[:, 0]
@@ -202,13 +235,14 @@ def _postprocess_candidates(
         func=func,
         args=args,
         all_x=all_x,
+        all_f=all_f,
         basin_reps_idx=basin_reps_idx,
         local_method=local_method,
         bounds=bounds,
         constraints=constraints,
     )
     if polished_x.size == 0:
-        return polished_x
+        return polished_x, polished_f
 
     local_minima_idx = cluster_fn(
         xs=polished_x,
@@ -217,7 +251,9 @@ def _postprocess_candidates(
         ub=ub,
         tol_norm=cluster_tol,
     )
-    return np.asarray(polished_x[local_minima_idx])
+    return np.asarray(polished_x[local_minima_idx]), np.asarray(
+        polished_f[local_minima_idx]
+    )
 
 
 def _filter_opt_kwargs(opt_kwargs: dict, allowed_keys: frozenset) -> dict:

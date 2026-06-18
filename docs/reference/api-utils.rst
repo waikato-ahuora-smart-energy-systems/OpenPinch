@@ -41,7 +41,7 @@ Math, Optimisation, and Utility Helpers
 These modules provide reusable numerical support for targeting and post-
 processing tasks.
 
-.. automodule:: OpenPinch.utils.miscellaneous
+.. automodule:: OpenPinch.services.common.miscellaneous
    :members:
 
 .. automodule:: OpenPinch.utils.blackbox_minimisers

@@ -35,7 +35,7 @@ def test_notebook_command_copies_full_series(tmp_path: Path, capsys):
     assert cli.main(["notebook", "-o", str(notebook_dir)]) == 0
 
     captured = capsys.readouterr()
-    assert "Copied 5 notebook(s)" in captured.out
+    assert f"Copied {len(list_notebooks())} notebook(s)" in captured.out
     copied = sorted(path.name for path in notebook_dir.glob("*.ipynb"))
     assert copied == list_notebooks()
 

@@ -7,12 +7,16 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ...lib.config import T_CRIT, Configuration, tol
-from ...lib.enums import CogenerationTarget
+from ...lib.enums import TT, CogenerationTarget
 from ...utils.water_properties import psat_T
 from ..common.miscellaneous import get_state_index
-from ..power_cogeneration.unit_models.multi_stage_steam_turbine import (
-    MultiStageSteamTurbine,
+from ..common.service_orchestration import (
+    apply_zone_config_overrides,
+    format_selected_state_suffix,
+    record_selected_state,
+    target_matches_requested_state,
 )
+from .unit_models.multi_stage_steam_turbine import MultiStageSteamTurbine
 
 if TYPE_CHECKING:
     import numpy as np
@@ -22,7 +26,17 @@ if TYPE_CHECKING:
 __all__ = [
     "get_power_cogeneration_above_pinch",
     "get_power_cogeneration_below_pinch",
+    "run_power_cogeneration_service",
 ]
+
+_COGENERATION_TARGET_ORDER = (
+    TT.TS.value,
+    TT.IHP.value,
+    TT.IR.value,
+    TT.DHP.value,
+    TT.DR.value,
+    TT.DI.value,
+)
 
 
 def get_power_cogeneration_above_pinch(
@@ -82,6 +96,112 @@ def get_power_cogeneration_below_pinch(
         mech_eff=turbine_params["mech_eff"],
         is_high_p_cond_flash=turbine_params["is_high_p_cond_flash"],
     )
+
+
+def run_power_cogeneration_service(
+    zone,
+    args: dict | None = None,
+    *,
+    refresh_services: dict[str, object],
+    cogeneration_func=get_power_cogeneration_above_pinch,
+):
+    """Post-process one compatible target in service preference order."""
+    apply_zone_config_overrides(zone, args)
+    runtime_args = dict(args or {})
+    explicit_target_type = _normalize_cogeneration_base_target_type(
+        runtime_args.get("base_target_type")
+    )
+    idx, sid = record_selected_state(zone, runtime_args)
+    runtime_args["idx"] = idx
+    if sid is not None:
+        runtime_args["state_id"] = sid
+    compare_args = dict(args or {}) if isinstance(args, dict) else {}
+    zone._selected_cogeneration_target_type = None
+
+    for target_type in _get_cogeneration_candidate_order(explicit_target_type):
+        target = _ensure_cogeneration_target(
+            zone,
+            target_type=target_type,
+            refresh_args=runtime_args,
+            compare_args=compare_args,
+            refresh_services=refresh_services,
+        )
+        if target is None:
+            if explicit_target_type is not None:
+                raise RuntimeError(
+                    "Cogeneration could not produce target "
+                    f"{target_type!r} for zone {zone.name!r}"
+                    f"{format_selected_state_suffix(runtime_args)}."
+                )
+            continue
+
+        cogeneration_func(target, args=runtime_args)
+        zone._selected_cogeneration_target_type = target_type
+        return zone
+
+    raise RuntimeError(
+        "Cogeneration could not find a compatible target for zone "
+        f"{zone.name!r}{format_selected_state_suffix(runtime_args)} "
+        f"using implicit order {' -> '.join(_COGENERATION_TARGET_ORDER)}."
+    )
+
+
+def _normalize_cogeneration_base_target_type(
+    base_target_type: object | None,
+) -> str | None:
+    """Validate an explicit cogeneration base target override."""
+    if base_target_type is None:
+        return None
+
+    normalized = str(base_target_type)
+    if normalized not in _COGENERATION_TARGET_ORDER:
+        supported = ", ".join(_COGENERATION_TARGET_ORDER)
+        raise ValueError(
+            "Unsupported cogeneration base_target_type "
+            f"{normalized!r}. Supported types: {supported}."
+        )
+    return normalized
+
+
+def _get_cogeneration_candidate_order(
+    base_target_type: str | None,
+) -> tuple[str, ...]:
+    """Return the exact cogeneration target search order for this call."""
+    if base_target_type is not None:
+        return (base_target_type,)
+    return _COGENERATION_TARGET_ORDER
+
+
+def _ensure_cogeneration_target(
+    zone,
+    *,
+    target_type: str,
+    refresh_args: dict | None,
+    compare_args: dict | None,
+    refresh_services: dict[str, object],
+):
+    """Ensure one compatible target family exists for the requested state."""
+    target = zone.targets.get(target_type)
+    if target_matches_requested_state(
+        target,
+        args=compare_args,
+        state_ids=getattr(zone, "state_ids", None),
+    ):
+        return target
+
+    refresh_service = refresh_services.get(target_type)
+    if refresh_service is None:
+        return None
+
+    refresh_service(zone, refresh_args)
+    refreshed_target = zone.targets.get(target_type)
+    if target_matches_requested_state(
+        refreshed_target,
+        args=compare_args,
+        state_ids=getattr(zone, "state_ids", None),
+    ):
+        return refreshed_target
+    return None
 
 
 def _prepare_turbine_parameters(zone_config: Configuration) -> dict:

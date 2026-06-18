@@ -1806,7 +1806,7 @@
     "options": {
         "DO_PROCESS_HP_TARGETING": true,
         "DO_UTILITY_HP_TARGETING": true,
-        "HPR_TYPE": "Multiple simple vapour compression cycles",
+        "HPR_TYPE": "Parallel vapour compression cycles",
         "HPR_LOAD_VALUE": "{\"multiply\": 1} ",
         "REFRIGERANTS": "R601,R600",
         "N_COND": 2,

@@ -15,6 +15,7 @@ from OpenPinch.lib.schemas.targets import (
     DirectHeatPumpTarget,
     DirectIntegrationTarget,
     DirectRefrigerationTarget,
+    EnergyTransferTarget,
     IndirectHeatPumpTarget,
     IndirectRefrigerationTarget,
     TotalSiteTarget,
@@ -63,6 +64,21 @@ def _make_target(
             hot_utility_target=0.0,
             cold_utility_target=0.0,
             heat_recovery_target=0.0,
+        )
+    if target_type == TT.ET.value:
+        return EnergyTransferTarget(
+            zone_name=zone.name,
+            state_id=state_id,
+            state_idx=state_idx,
+            type=target_type,
+            parent_zone=zone.parent_zone,
+            config=zone.config,
+            pt=_dummy_problem_table(),
+            hot_utility_target=0.0,
+            cold_utility_target=0.0,
+            heat_recovery_target=0.0,
+            base_target_type=TT.DI.value,
+            base_target_name=f"{zone.name}/{TT.DI.value}",
         )
     if target_type in {
         TT.DHP.value,
@@ -452,6 +468,164 @@ def test_cogeneration_and_area_cost_services_update_direct_integration_target(
     assert zone.targets[TT.DI.value].work_target == 12.0
     assert zone.targets[TT.DI.value].turbine_efficiency_target == 0.42
     assert zone._selected_cogeneration_target_type == TT.DI.value
+
+
+def test_energy_transfer_service_bootstraps_direct_target_on_leaf(monkeypatch):
+    zone = _make_zone()
+    calls = {"direct": 0}
+
+    def fake_direct_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
+        calls["direct"] += 1
+        target_zone.add_target(_make_target(target_zone, TT.DI.value))
+        return target_zone
+
+    monkeypatch.setattr(
+        svc,
+        "direct_heat_integration_service",
+        fake_direct_heat_integration_service,
+    )
+
+    out = svc.energy_transfer_analysis_service(zone)
+
+    assert out is zone
+    assert calls["direct"] == 1
+    assert TT.ET.value in zone.targets
+    assert zone.targets[TT.ET.value].base_target_type == TT.DI.value
+    assert zone._selected_energy_transfer_base_target_type == TT.DI.value
+
+
+def test_energy_transfer_service_prefers_existing_total_site_target():
+    zone = _make_zone()
+    zone.add_target(_make_target(zone, TT.TS.value))
+    zone.add_target(_make_target(zone, TT.DI.value))
+
+    out = svc.energy_transfer_analysis_service(zone)
+
+    assert out is zone
+    assert zone.targets[TT.ET.value].base_target_type == TT.TS.value
+    assert zone._selected_energy_transfer_base_target_type == TT.TS.value
+
+
+def test_energy_transfer_total_site_bootstrap_solves_parent_and_child_di(
+    monkeypatch,
+):
+    zone = _make_zone()
+    subzone = Zone(name="Bleaching", type=ZT.P.value, zone_config=zone.config)
+    zone.add_zone(subzone)
+    calls: list[tuple[str, str]] = []
+
+    def fake_direct_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
+        calls.append((TT.DI.value, target_zone.name))
+        target_zone.add_target(_make_target(target_zone, TT.DI.value))
+        return target_zone
+
+    def fake_indirect_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
+        calls.append((TT.TS.value, target_zone.name))
+        assert TT.DI.value in target_zone.targets
+        assert TT.DI.value in subzone.targets
+        target_zone.add_target(_make_target(target_zone, TT.TS.value))
+        return target_zone
+
+    monkeypatch.setattr(
+        svc,
+        "direct_heat_integration_service",
+        fake_direct_heat_integration_service,
+    )
+    monkeypatch.setattr(
+        svc,
+        "indirect_heat_integration_service",
+        fake_indirect_heat_integration_service,
+    )
+
+    out = svc.energy_transfer_analysis_service(
+        zone,
+        {"base_target_type": TT.TS.value},
+    )
+
+    assert out is zone
+    assert calls == [
+        (TT.DI.value, "Plant"),
+        (TT.DI.value, "Bleaching"),
+        (TT.TS.value, "Plant"),
+    ]
+    assert zone.targets[TT.ET.value].base_target_type == TT.TS.value
+
+
+def test_energy_transfer_total_site_uses_one_subzone_layer_of_gccs(monkeypatch):
+    zone = _make_zone()
+    area = Zone(name="Area", type=ZT.S.value, zone_config=zone.config)
+    unit = Zone(name="Unit", type=ZT.P.value, zone_config=zone.config)
+    zone.add_zone(area)
+    area.add_zone(unit)
+    calls: list[tuple[str, str]] = []
+    source_names: list[str] = []
+
+    def fake_direct_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
+        calls.append((TT.DI.value, target_zone.name))
+        target_zone.add_target(_make_target(target_zone, TT.DI.value))
+        return target_zone
+
+    def fake_indirect_heat_integration_service(
+        target_zone: Zone,
+        args: dict | None = None,
+    ) -> Zone:
+        calls.append((TT.TS.value, target_zone.name))
+        assert TT.DI.value in target_zone.targets
+        assert TT.DI.value in area.targets
+        assert TT.DI.value not in unit.targets
+        target_zone.add_target(_make_target(target_zone, TT.TS.value))
+        return target_zone
+
+    def fake_compute_energy_transfer_target(base_target, source_targets=None):
+        for source in source_targets:
+            source_names.append(source["name"])
+            assert source["target"].zone_name == "Area"
+        target = _make_target(zone, TT.ET.value)
+        target.base_target_type = base_target.type
+        target.base_target_name = base_target.name
+        return target
+
+    monkeypatch.setattr(
+        svc,
+        "direct_heat_integration_service",
+        fake_direct_heat_integration_service,
+    )
+    monkeypatch.setattr(
+        svc,
+        "indirect_heat_integration_service",
+        fake_indirect_heat_integration_service,
+    )
+    monkeypatch.setattr(
+        svc,
+        "compute_energy_transfer_target",
+        fake_compute_energy_transfer_target,
+    )
+
+    out = svc.energy_transfer_analysis_service(
+        zone,
+        {"base_target_type": TT.TS.value},
+    )
+
+    assert out is zone
+    assert calls == [
+        (TT.DI.value, "Plant"),
+        (TT.DI.value, "Area"),
+        (TT.TS.value, "Plant"),
+    ]
+    assert source_names == ["Plant/Area"]
+    assert zone.targets[TT.ET.value].base_target_type == TT.TS.value
 
 
 def test_cogeneration_service_prefers_total_site_before_direct_integration(

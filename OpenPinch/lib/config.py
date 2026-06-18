@@ -62,7 +62,8 @@ class Configuration:
             raise TypeError("Configuration options must be provided as a dict.")
 
         for key, value in self._validate_options(options).items():
-            if key == "REFRIGERANTS":
+            spec = CONFIG_FIELD_SPECS[str(key)]
+            if key in {"REFRIGERANTS", "MVR_FLUIDS"}:
                 ref_ls = (
                     value.replace(";", ",").split(",")
                     if isinstance(value, str)
@@ -70,6 +71,8 @@ class Configuration:
                 )
                 setattr(self, key, ref_ls)
                 continue
+            if spec.enum_cls is not None:
+                value = self._validate_enum_option(str(key), value, spec.enum_cls)
             setattr(self, key, value)
 
     @classmethod
@@ -81,6 +84,43 @@ class Configuration:
     def _validate_options(cls, options: dict) -> dict:
         """Fail fast on unsupported keys and invalid option values."""
         return validate_configuration_options(options)
+
+    @staticmethod
+    def _validate_enum_option(key: str, value, enum_cls):
+        """Return the enum value for a supported config enum option."""
+        if isinstance(value, enum_cls):
+            return value.value
+        allowed = {item.value for item in enum_cls}
+        if value not in allowed:
+            allowed_str = ", ".join(sorted(str(item) for item in allowed))
+            raise ValueError(
+                f"Invalid value for configuration option {key}: {value!r}. "
+                f"Allowed values are: {allowed_str}."
+            )
+        return value
+
+    @staticmethod
+    def _normalise_config_list(values, *, uppercase: bool = False) -> list[str]:
+        """Return stripped, non-empty string values from a config list option."""
+        normalised = [str(value).strip() for value in values if str(value).strip()]
+        if uppercase:
+            return [value.upper() for value in normalised]
+        return normalised
+
+    @property
+    def hpr_refrigerants(self) -> list[str]:
+        """Return HPR refrigerant names normalised for thermodynamic backends."""
+        return self._normalise_config_list(self.REFRIGERANTS, uppercase=True)
+
+    @property
+    def hpr_mvr_fluids(self) -> list[str]:
+        """Return MVR fluid names normalised for thermodynamic backends."""
+        return self._normalise_config_list(self.MVR_FLUIDS) or ["Water"]
+
+    @property
+    def effective_eta_ii_he_carnot(self) -> float:
+        """Return the usable Carnot heat-engine efficiency for HPR targeting."""
+        return float(self.ETA_II_HE_CARNOT) if self.ALLOW_INTEGRATED_EXPANDER else 0.0
 
 
 Configuration.__annotations__ = {

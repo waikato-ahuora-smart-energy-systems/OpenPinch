@@ -244,6 +244,29 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
             )
         )
 
+    if GT.NLP_HP.value in target_graphs:
+        graphs.append(
+            _make_composite_graph(
+                graph_title=graph_title,
+                key=GT.NLP_HP.value,
+                data=target_graphs[GT.NLP_HP.value],
+                label="Net Load Profiles with Heat Pump",
+                value_field=[
+                    PT.H_NET_HOT,
+                    PT.H_NET_COLD,
+                    PT.H_HOT_HP,
+                    PT.H_COLD_HP,
+                ],
+                stream_type=[
+                    StreamLoc.HotS,
+                    StreamLoc.ColdS,
+                    StreamLoc.HotU,
+                    StreamLoc.ColdU,
+                ],
+                include_arrows=True,
+            )
+        )
+
     if GT.NLP_X.value in target_graphs:
         graphs.append(
             _make_composite_graph(
@@ -313,6 +336,14 @@ def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
             )
         )
 
+    if GT.ETD.value in target_graphs:
+        graphs.append(
+            _make_energy_transfer_diagram_graph(
+                graph_title=graph_title,
+                target_graphs=target_graphs,
+            )
+        )
+
     return {
         "name": graph_title,
         "target_type": getattr(t, "type", None),
@@ -362,6 +393,31 @@ def _make_composite_graph(
     return {
         "type": key,
         "name": name or f"{label}: {graph_title}",
+        "segments": segments,
+    }
+
+
+def _make_energy_transfer_diagram_graph(graph_title: str, target_graphs: dict) -> dict:
+    diagram = target_graphs[GT.ETD.value]
+    temperatures = diagram.get("temperatures", [])
+    segments: List[dict] = []
+    for operation in diagram.get("operations", []):
+        segments.append(
+            _create_curve(
+                title=str(operation.get("name", "Operation")),
+                colour=_streamloc_colour(StreamLoc.Unassigned.value),
+                x_vals=operation.get("stacked_heat", []),
+                y_vals=temperatures,
+                arrow=ArrowHead.NO_ARROW.value,
+                series_label=str(operation.get("name", "Operation")),
+                series_id=f"{GT.ETD.value}:{operation.get('name', 'Operation')}",
+                series_description=f"{operation.get('mode', 'R')} cascade",
+            )
+        )
+
+    return {
+        "type": GT.ETD.value,
+        "name": f"Energy Transfer Diagram: {graph_title}",
         "segments": segments,
     }
 
@@ -715,6 +771,8 @@ def _streamloc_colour(stream_loc: StreamLoc) -> int:
         return LineColour.HotU.value
     if stream_loc == StreamLoc.ColdU:
         return LineColour.ColdU.value
+    if stream_loc == StreamLoc.Unassigned:
+        return LineColour.Black.value
     return LineColour.Other.value
 
 

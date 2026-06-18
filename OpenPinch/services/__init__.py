@@ -29,6 +29,7 @@ __all__ = [
     "indirect_refrigeration_service",
     "power_cogeneration_service",
     "area_cost_targeting_service",
+    "energy_transfer_analysis_service",
     "get_area_targets",
     "get_capital_cost_targets",
     "get_output_graph_data",
@@ -96,3 +97,8 @@ def power_cogeneration_service(zone: "Zone", args: dict = None) -> "Zone":
 def area_cost_targeting_service(zone: "Zone", args: dict = None) -> "Zone":
     """Recompute direct integration targets with area/cost targeting enabled."""
     return _load_services_entry_module().area_cost_targeting_service(zone, args)
+
+
+def energy_transfer_analysis_service(zone: "Zone", args: dict = None) -> "Zone":
+    """Create energy-transfer diagram and surplus/deficit table outputs."""
+    return _load_services_entry_module().energy_transfer_analysis_service(zone, args)

@@ -4,8 +4,10 @@ Notebook Series
 OpenPinch ships with a packaged notebook series that is treated as part of the
 supported learning and regression surface. Each notebook is built around one
 decision question rather than a generic feature tour. The series now spans the
-main single-case API, named multi-case studies, multistate targeting, and the
-typed/service boundary.
+main single-case API, named multi-case studies, multistate targeting, the
+typed/service boundary, the energy-transfer analysis view, and the
+vapour-compression plus MVR cascade HPR backend. It also covers direct
+gas/vapour stream MVR as a process-component workflow on live workspace cases.
 
 Included Notebooks
 ------------------
@@ -23,7 +25,9 @@ Included Notebooks
 ``03_carnot_hpr_comparison.ipynb``
    Advanced HPR and refrigeration comparison on ``chocolate_factory.json``
    across the direct heat pump, indirect heat pump, direct refrigeration, and
-   indirect refrigeration workflows.
+   indirect refrigeration workflows. The notebook uses the current
+   ``HPRcycle.CascadeCarnot`` enum value for broad screening and calls out
+   ``HPRcycle.ParallelCarnot`` as the staged Carnot alternative.
 
 ``04_multistate_targeting_and_state_comparison.ipynb``
    Real named-state targeting on ``crude_preheat_train_multistate.json`` and
@@ -34,6 +38,27 @@ Included Notebooks
    ``copy_sample_case(...)``, local-file ``PinchProblem``, typed
    ``TargetInput`` plus ``pinch_analysis_service(...)``, artifact export, and
    serialized ``PinchWorkspace`` variant views.
+
+``06_energy_transfer_analysis.ipynb``
+   Energy-transfer targeting on ``pulp_mill.json``, including the
+   heat-surplus/deficit table, graph-ready energy-transfer diagram payload,
+   standard plot accessor, and Total Site versus local Direct Integration base
+   target selection.
+
+``07_vapour_compression_mvr_cascade_hpr.ipynb``
+   Heat-pump-only targeting with
+   ``HPR_TYPE = "Vapour compression with MVR cascade"``, including the
+   configuration fields for VC and MVR stages, split-fraction source/process
+   routing, a solved backend result, and the external stream accounting used
+   for the combined cascade.
+
+``08_direct_gas_stream_mvr.ipynb``
+   Direct gas/vapour process MVR on an in-memory ``PinchWorkspace`` study,
+   including baseline, dry MVR, and liquid-injection MVR cases. The notebook
+   adds memory-only ``problem.add_component.process_mvr(...)`` components,
+   solves direct and Total Site targets after the stream mutation, compares
+   target summaries, inspects replacement streams, and toggles the component
+   active state.
 
 How To Use Them
 ---------------
@@ -63,6 +88,12 @@ Recommended Learning Order
    seasonal variation.
 5. Use the schema/service notebook when you need typed validation, serialized
    workspace views, or repeatable export workflows.
+6. Use the energy-transfer notebook when you need interval-level surplus/deficit
+   accounting or a diagram payload derived from an existing thermal target.
+7. Use the VC+MVR cascade notebook when you need a refrigerant low stage feeding
+   a serial mechanical-vapour-recompression high stage.
+8. Use the direct gas/vapour MVR notebook when a process vapour stream itself
+   is the recompression source and you need before/after workspace comparison.
 
 Why These Matter
 ----------------
@@ -70,6 +101,7 @@ Why These Matter
 The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
 hierarchical targeting, graph-based interpretation, real multistate studies,
-and stable programmatic boundaries built on the same packaged assets. The
-distributed copies are also kept output-free so they do not ship stale plots,
-tracebacks, or machine-specific execution state.
+advanced HPR cycle targeting, process-component MVR mutation, and stable
+programmatic boundaries built on the same packaged assets. The distributed
+copies are also kept output-free so they do not ship stale plots, tracebacks,
+or machine-specific execution state.

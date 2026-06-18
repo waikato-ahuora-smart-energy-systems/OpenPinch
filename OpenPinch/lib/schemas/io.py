@@ -5,10 +5,10 @@ from __future__ import annotations
 import math
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from ..config_metadata import validate_configuration_options
-from ..enums import ST
+from ..enums import ST, FluidPhase
 from .common import ScalarOrVU
 from .graphs import GraphSet
 from .reporting import TargetResults
@@ -19,13 +19,49 @@ class StreamSchema(BaseModel):
     """Process stream definition supplied to the targeting service."""
 
     zone: str
-    name: str
+    name: str = Field(
+        validation_alias=AliasChoices("name", "stream_name"),
+        serialization_alias="name",
+    )
     t_supply: ScalarOrVU
     t_target: ScalarOrVU
+    p_supply: Optional[ScalarOrVU] = None
+    p_target: Optional[ScalarOrVU] = None
+    h_supply: Optional[ScalarOrVU] = None
+    h_target: Optional[ScalarOrVU] = None
     heat_flow: ScalarOrVU
     dt_cont: Optional[ScalarOrVU] = 0.0
     htc: Optional[ScalarOrVU] = 1.0
+    fluid_name: Optional[str] = None
+    fluid_phase: Optional[FluidPhase] = None
     active: bool = True
+
+    model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
+
+    @property
+    def stream_name(self) -> str:
+        """Alias for the canonical stream identifier."""
+        return self.name
+
+    @stream_name.setter
+    def stream_name(self, value: str) -> None:
+        self.name = value
+
+    @field_validator("fluid_name")
+    @classmethod
+    def _validate_fluid_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @field_validator("fluid_phase", mode="before")
+    @classmethod
+    def _normalise_fluid_phase(cls, value):
+        if value is None:
+            return None
+        text = str(value).strip()
+        return FluidPhase.from_code_or_description(value) if text else None
 
 
 class UtilitySchema(BaseModel):
@@ -35,13 +71,35 @@ class UtilitySchema(BaseModel):
     type: ST
     t_supply: ScalarOrVU
     t_target: Optional[ScalarOrVU] = None
+    p_supply: Optional[ScalarOrVU] = None
+    p_target: Optional[ScalarOrVU] = None
+    h_supply: Optional[ScalarOrVU] = None
+    h_target: Optional[ScalarOrVU] = None
     heat_flow: Optional[ScalarOrVU] = None
     dt_cont: Optional[ScalarOrVU] = 0.0
     htc: Optional[ScalarOrVU] = 1.0
     price: Optional[ScalarOrVU] = 1.0
+    fluid_name: Optional[str] = None
+    fluid_phase: Optional[FluidPhase] = None
     active: bool = True
 
     model_config = ConfigDict(use_enum_values=True)
+
+    @field_validator("fluid_name")
+    @classmethod
+    def _validate_fluid_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @field_validator("fluid_phase", mode="before")
+    @classmethod
+    def _normalise_fluid_phase(cls, value):
+        if value is None:
+            return None
+        text = str(value).strip()
+        return FluidPhase.from_code_or_description(value) if text else None
 
 
 class ZoneTreeSchema(BaseModel):

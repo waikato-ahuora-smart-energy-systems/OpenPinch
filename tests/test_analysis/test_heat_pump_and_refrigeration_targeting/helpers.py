@@ -13,7 +13,7 @@ from OpenPinch.services.heat_pump_integration import (
 )
 
 
-def _build_multi_temperature_profiles(
+def _build_cascade_carnot_profiles(
     T_cond, Q_cond, T_evap, Q_evap, *, eta_hp=0.5, eta_he=0.0
 ):
     T_cond = np.asarray(T_cond, dtype=float)
@@ -62,7 +62,7 @@ def _stream(
 
 def _base_args(**overrides):
     args = {
-        "hpr_type": HPRcycle.MultiTempCarnot.value,
+        "hpr_type": HPRcycle.CascadeCarnot.value,
         "Q_hpr_target": 200.0,
         "dt_range_max": 110.0,
         "T_hot": np.array([140.0, 90.0, 40.0]),
@@ -81,6 +81,16 @@ def _base_args(**overrides):
         "dt_phase_change": 1.0,
         "heat_to_power_ratio": 1.0,
         "cold_to_power_ratio": 0.0,
+        "ele_price": 200.0,
+        "annual_op_time": 8300.0,
+        "discount_rate": 0.07,
+        "serv_life": 20.0,
+        "hpr_comp_fixed_cost": 0.0,
+        "hpr_comp_variable_cost": 10000.0,
+        "hpr_comp_cost_exp": 1.0,
+        "hpr_hx_fixed_cost": 0.0,
+        "hpr_hx_variable_cost": 10000.0,
+        "hpr_hx_cost_exp": 1.0,
         "is_heat_pumping": True,
         "max_multi_start": 2,
         "T_env": 20.0,
@@ -91,8 +101,6 @@ def _base_args(**overrides):
         "do_refrigerant_sort": False,
         "initialise_simulated_cycle": True,
         "allow_integrated_expander": True,
-        "dT_subcool": None,
-        "dT_superheat": None,
         "bckgrd_hot_streams": _sc(
             Stream(name="H", t_supply=120.0, t_target=80.0, heat_flow=50.0)
         ),

@@ -35,6 +35,16 @@ Public HPR Entrypoints
 Shared Preprocessing and Optimisation Helpers
 ---------------------------------------------
 
+The targeting parsers decode optimiser vectors into temperatures, ambient
+duties, base duty scales, split vectors, and process availability arrays. The
+aggregate backend classes then allocate requested duties from base/split
+coordinates, clip those requests to availability, and add any excess to the
+penalty term. Leaf physical unit models receive only concrete model duties.
+Simulated vapour-compression backends then combine the HPR streams with the
+background and ambient streams into one residual GCC. The pocket-free GCC end
+points provide residual external utilities for operating-cost accounting;
+cycle penalties remain separate feasibility terms.
+
 .. automodule:: OpenPinch.services.heat_pump_integration.common
    :no-members:
 
@@ -47,23 +57,49 @@ Shared Preprocessing and Optimisation Helpers
 .. automodule:: OpenPinch.services.heat_pump_integration.common.shared
    :members:
 
-Cycle Optimisation Modules
---------------------------
+HPR Schemas
+-----------
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles
+.. autoclass:: OpenPinch.lib.schemas.hpr.HeatPumpTargetInputs
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.HPRBackendResult
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.SimulatedHPRAnnualizedCostAccounting
+   :members:
+   :no-index:
+
+Cycle Optimisation Services
+---------------------------
+
+These modules place or size Heat Pump and refrigeration cycle models against
+prepared cascade data. The detailed cycle physics live in the
+``unit_models`` modules documented in :doc:`api-classes`.
+
+Only the current public cycle names are routed here, for example
+``"Cascade Carnot cycles"``, ``"Parallel Carnot cycles"``, and
+``"Parallel vapour compression cycles"``.
+
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services
    :no-members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.brayton
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.brayton
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.cascade_vapour_compression
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.cascade_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.multi_simple_carnot
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.parallel_carnot
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.multi_simple_vapour_compression
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.parallel_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.cycles.multi_temperature_carnot
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.cascade_carnot
+   :members:
+
+.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.vapour_compression_mvr
    :members:

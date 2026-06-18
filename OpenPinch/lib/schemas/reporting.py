@@ -82,6 +82,7 @@ class TargetResults(BaseModel):
     cold_utilities: List[HeatUtility] = Field(default_factory=list)
     pinch_temp: PinchTemp
     work_target: Value | None = None
+    process_component_work_target: Value | None = None
     turbine_efficiency_target: Value | None = None
     area: Value | None = None
     num_units: Optional[float] = None
@@ -100,6 +101,12 @@ class TargetResults(BaseModel):
     hpr_ambient_cold: Value | None = None
     hpr_cop: Value | None = None
     hpr_eta_he: Value | None = None
+    hpr_operating_cost: Value | None = None
+    hpr_capital_cost: Value | None = None
+    hpr_annualized_capital_cost: Value | None = None
+    hpr_total_annualized_cost: Value | None = None
+    hpr_compressor_capital_cost: Value | None = None
+    hpr_heat_exchanger_capital_cost: Value | None = None
     hpr_success: Optional[bool] = None
     hpr_hot_streams: Optional[StreamCollection] = None
     hpr_cold_streams: Optional[StreamCollection] = None
@@ -111,6 +118,7 @@ class TargetResults(BaseModel):
         "Qr",
         "utility_cost",
         "work_target",
+        "process_component_work_target",
         "turbine_efficiency_target",
         "area",
         "capital_cost",
@@ -127,6 +135,12 @@ class TargetResults(BaseModel):
         "hpr_ambient_cold",
         "hpr_cop",
         "hpr_eta_he",
+        "hpr_operating_cost",
+        "hpr_capital_cost",
+        "hpr_annualized_capital_cost",
+        "hpr_total_annualized_cost",
+        "hpr_compressor_capital_cost",
+        "hpr_heat_exchanger_capital_cost",
         mode="before",
     )
     @classmethod

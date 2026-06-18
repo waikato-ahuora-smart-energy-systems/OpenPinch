@@ -8,7 +8,8 @@ from typing import Optional
 
 import numpy as np
 
-from ..lib.enums import ST
+from ..lib.coolprop_fluids import validate_coolprop_fluid_name
+from ..lib.enums import ST, FluidPhase
 from ..lib.schemas.common import MaybeVU
 from .value import Value
 
@@ -88,13 +89,18 @@ class Stream:
         htc: MaybeVU = 1.0,
         price: MaybeVU = 0.0,
         is_process_stream: bool = True,
+        fluid_name: Optional[str] = None,
+        fluid_phase: Optional[str | FluidPhase] = None,
     ):
         """Initialise a stream and infer hot/cold classification."""
         self._name = name
         self._is_process_stream = bool(is_process_stream)
+        self._fluid_name = self._normalise_fluid_name(fluid_name)
+        self._fluid_phase = self._normalise_fluid_phase(fluid_phase)
         self._active = True
         self._dt_cont_multiplier_locked = False
         self._dt_cont_multiplier = float(dt_cont_multiplier or 1.0)
+        self._numeric_revision = 0
 
         self._state_ids: dict[str, int] | None = None
         self._weights: np.ndarray | None = None
@@ -150,6 +156,15 @@ class Stream:
         self._name = value
 
     @property
+    def stream_name(self) -> str:
+        """Alias for the stream identifier used in input schemas."""
+        return self._name
+
+    @stream_name.setter
+    def stream_name(self, value: str):
+        self._name = value
+
+    @property
     def is_process_stream(self) -> bool:
         """Process or utility stream."""
         return self._is_process_stream
@@ -158,6 +173,24 @@ class Stream:
     def is_process_stream(self, value: bool):
         """Mark whether the stream is treated as process-side or utility-side."""
         self._is_process_stream = value
+
+    @property
+    def fluid_name(self) -> Optional[str]:
+        """CoolProp fluid name or mixture specification."""
+        return self._fluid_name
+
+    @fluid_name.setter
+    def fluid_name(self, value: Optional[str]):
+        self._fluid_name = self._normalise_fluid_name(value)
+
+    @property
+    def fluid_phase(self) -> Optional[str]:
+        """Optional fluid-phase flag: sol, sle, liq, vle, sve, or gas."""
+        return self._fluid_phase
+
+    @fluid_phase.setter
+    def fluid_phase(self, value: Optional[str | FluidPhase]):
+        self._fluid_phase = self._normalise_fluid_phase(value)
 
     @property
     def type(self) -> Optional[str]:
@@ -255,6 +288,7 @@ class Stream:
         """Set the effective shifted-temperature contribution in active use."""
         if not self._dt_cont_multiplier_locked:
             self._dt_cont_multiplier = float(value)
+            self._bump_numeric_revision()
             self.update_derived_properties()
         else:
             warnings.warn(
@@ -328,6 +362,7 @@ class Stream:
     def active(self, value: bool):
         """Activate or deactivate the stream for downstream analysis."""
         self._active = bool(value)
+        self._bump_numeric_revision()
 
     # === Computed Temperature Properties ===
 
@@ -479,6 +514,7 @@ class Stream:
         internal_name = self._resolve_attr_name(attr_name)
         if value is None:
             setattr(self, internal_name, None)
+            self._bump_numeric_revision()
             if update_derived:
                 self.update_derived_properties()
             return
@@ -486,6 +522,7 @@ class Stream:
         parsed = self._coerce_to_value(value, internal_name)
         if parsed is None:
             setattr(self, internal_name, None)
+            self._bump_numeric_revision()
             if update_derived:
                 self.update_derived_properties()
             return
@@ -506,9 +543,33 @@ class Stream:
             raise ValueError("Weights length must match the number of states.")
 
         setattr(self, internal_name, parsed.to(self._VALUE_UNITS[internal_name]))
+        self._bump_numeric_revision()
         self._validate_num_states()
         if update_derived:
             self.update_derived_properties()
+
+    @classmethod
+    def _normalise_fluid_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        validate_coolprop_fluid_name(text)
+        return text
+
+    @classmethod
+    def _normalise_fluid_phase(cls, value: Optional[str | FluidPhase]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        try:
+            return FluidPhase.from_code_or_description(value).name
+        except ValueError as exc:
+            valid = ", ".join(phase.name for phase in FluidPhase)
+            raise ValueError(f"fluid_phase must be one of: {valid}.") from exc
 
     def set_value_attr_at_idx(
         self,
@@ -537,6 +598,7 @@ class Stream:
             setattr(self, internal_name, current)
 
         current[idx if current.num_states > 1 else 0] = value
+        self._bump_numeric_revision()
         self._validate_num_states()
         if update_derived:
             self.update_derived_properties()
@@ -624,8 +686,12 @@ class Stream:
         htc = self._value_array(self._htc, size=state_size)
         price = self._value_array(self._price, size=state_size)
 
-        dt_cont_act = self._dt_cont * float(self._dt_cont_multiplier)
-        self._dt_cont_act = dt_cont_act.to(self._VALUE_UNITS["_dt_cont_act"])
+        dt_cont = self._value_array(self._dt_cont, size=state_size)
+        dt_cont_act = dt_cont * float(self._dt_cont_multiplier)
+        self._dt_cont_act = self._build_value(
+            dt_cont_act,
+            unit=self._VALUE_UNITS["_dt_cont_act"],
+        )
 
         hot_states = t_supply > t_target + _TEMPERATURE_EQUAL_TOL
         cold_states = t_supply < t_target - _TEMPERATURE_EQUAL_TOL
@@ -661,12 +727,10 @@ class Stream:
         rcp_prod = np.zeros_like(cp, dtype=float)
         rcp_prod[valid_htc] = cp[valid_htc] * htr[valid_htc]
 
-        price_value = self._build_value(price, unit=self._VALUE_UNITS["_price"])
-        heat_flow_value = self._build_value(
-            heat_flow,
-            unit=self._VALUE_UNITS["_heat_flow"],
+        cost = self._build_value(
+            price * heat_flow / 1000.0,
+            unit=self._VALUE_UNITS["_cost"],
         )
-        cost = (price_value * heat_flow_value).to(self._VALUE_UNITS["_cost"])
 
         self._t_min = self._build_value(t_min, unit=self._VALUE_UNITS["_t_min"])
         self._t_max = self._build_value(t_max, unit=self._VALUE_UNITS["_t_max"])
@@ -678,10 +742,15 @@ class Stream:
             t_max_star,
             unit=self._VALUE_UNITS["_t_max_star"],
         )
-        Ts_K = self._t_supply.to("K")
-        Tt_K = self._t_target.to("K")
-        self._t_entr_mean = ((Ts_K - Tt_K) / (np.log(Ts_K) - np.log(Tt_K))).to(
-            self._t_supply.unit
+        t_supply_k = t_supply + 273.15
+        t_target_k = t_target + 273.15
+        with np.errstate(divide="ignore", invalid="ignore"):
+            t_entr_mean = (
+                (t_supply_k - t_target_k) / (np.log(t_supply_k) - np.log(t_target_k))
+            ) - 273.15
+        self._t_entr_mean = self._build_value(
+            t_entr_mean,
+            unit=self._VALUE_UNITS["_t_supply"],
         )
         self._cp = self._build_value(cp, unit=self._VALUE_UNITS["_cp"])
         self._htr = self._build_value(htr, unit=self._VALUE_UNITS["_htr"])
@@ -690,6 +759,7 @@ class Stream:
             unit=self._VALUE_UNITS["_rcp_prod"],
         )
         self._cost = cost
+        self._bump_numeric_revision()
 
     def _validate_num_states(self):
         counts = np.asarray(
@@ -721,6 +791,7 @@ class Stream:
         self._p_supply, self._p_target = self._p_target, self._p_supply
         self._h_supply, self._h_target = self._h_target, self._h_supply
         self._is_process_stream = True
+        self._bump_numeric_revision()
         self.update_derived_properties()
 
     def get_state_index(self, state_id: str | None = None) -> int:
@@ -769,6 +840,10 @@ class Stream:
             raise ValueError(
                 "Length of state_ids and weights must match eachother in length."
             )
+        self._bump_numeric_revision()
+
+    def _bump_numeric_revision(self) -> None:
+        self._numeric_revision = getattr(self, "_numeric_revision", 0) + 1
 
     def _state_vector_size(self) -> int:
         counts = [

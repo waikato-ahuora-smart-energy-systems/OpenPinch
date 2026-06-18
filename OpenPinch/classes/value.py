@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
-from pint import UnitRegistry
+from pint import UnitRegistry, set_application_registry
 from pint.errors import DimensionalityError
 
 ureg = UnitRegistry()
@@ -19,10 +20,37 @@ try:
     ureg.define("NZD = [currency]")
 except Exception:
     pass
+set_application_registry(ureg)
 Q_ = ureg.Quantity  # type: ignore
 
 _SERIALIZED_SCALAR_KEYS = {"value", "unit"}
 _SERIALIZED_STATEFUL_KEYS = {"values", "state_ids", "weights", "unit"}
+
+
+@lru_cache(maxsize=256)
+def _normalise_unit_text(unit: str | None) -> str | None:
+    if unit is None:
+        return None
+    text = str(unit).strip().replace("$", "USD")
+    if text in {"", "-", "dimensionless", "1"}:
+        return "dimensionless"
+    if text == "fraction":
+        return "dimensionless"
+    if text in {"USD/y", "USD/yr", "USD/year"}:
+        return "USD/year"
+    if text in {"C", "°C"}:
+        return "degC"
+    if text == "degK":
+        return "K"
+    text = re.sub(r"(?<=[A-Za-z])2(?=($|[./*]))", "^2", text)
+    text = re.sub(r"(?<=[A-Za-z])3(?=($|[./*]))", "^3", text)
+    text = text.replace(".K", "/K").replace(".degC", "/degC")
+    return text
+
+
+@lru_cache(maxsize=256)
+def _unit_object(unit: str):
+    return ureg.Unit(unit)
 
 
 def _is_value_with_unit(data: Any) -> bool:
@@ -460,12 +488,20 @@ class Value:
             raise TypeError("Boolean values are not supported.")
         resolved_unit = self._normalise_unit_input(unit)
         magnitude = np.asarray([data], dtype=float)
-        return Q_(magnitude, resolved_unit) if resolved_unit else Q_(magnitude)
+        return (
+            Q_(magnitude, self._unit_from_normalised(resolved_unit))
+            if resolved_unit
+            else Q_(magnitude)
+        )
 
     def _missing_or_zero_quantity(self, data, unit: str | None):
         resolved_unit = self._normalise_unit_input(unit)
         magnitude = np.asarray([np.nan if data is None else data], dtype=float)
-        return Q_(magnitude, resolved_unit) if resolved_unit else Q_(magnitude)
+        return (
+            Q_(magnitude, self._unit_from_normalised(resolved_unit))
+            if resolved_unit
+            else Q_(magnitude)
+        )
 
     def _quantity_from_values(self, data, unit: str | None):
         values_list = list(data)
@@ -475,7 +511,11 @@ class Value:
             label="values",
         )
         resolved_unit = self._normalise_unit_input(unit)
-        return Q_(magnitudes, resolved_unit) if resolved_unit else Q_(magnitudes)
+        return (
+            Q_(magnitudes, self._unit_from_normalised(resolved_unit))
+            if resolved_unit
+            else Q_(magnitudes)
+        )
 
     def _coerce_quantity_to_unit(self, quantity, unit: str | None):
         copied = Q_(
@@ -485,14 +525,15 @@ class Value:
         if unit is None:
             return copied
         resolved_unit = self._normalise_unit_input(unit)
+        unit_obj = self._unit_from_normalised(resolved_unit)
         try:
-            return copied.to(resolved_unit)
+            return copied.to(unit_obj)
         except DimensionalityError, TypeError, ValueError:
             if self._quantity_is_dimensionless(copied) or self._same_dimensionality(
                 copied, resolved_unit
             ):
                 return Q_(
-                    np.asarray(copied.magnitude, dtype=float).reshape(-1), resolved_unit
+                    np.asarray(copied.magnitude, dtype=float).reshape(-1), unit_obj
                 )
             raise
 
@@ -583,23 +624,11 @@ class Value:
 
     @staticmethod
     def _normalise_unit_input(unit: str | None) -> str | None:
-        if unit is None:
-            return None
-        text = str(unit).strip().replace("$", "USD")
-        if text in {"", "-", "dimensionless", "1"}:
-            return "dimensionless"
-        if text == "fraction":
-            return "dimensionless"
-        if text in {"USD/y", "USD/yr", "USD/year"}:
-            return "USD/year"
-        if text in {"C", "°C"}:
-            return "degC"
-        if text == "degK":
-            return "K"
-        text = re.sub(r"(?<=[A-Za-z])2(?=($|[./*]))", "^2", text)
-        text = re.sub(r"(?<=[A-Za-z])3(?=($|[./*]))", "^3", text)
-        text = text.replace(".K", "/K").replace(".degC", "/degC")
-        return text
+        return _normalise_unit_text(unit)
+
+    @staticmethod
+    def _unit_from_normalised(unit: str):
+        return _unit_object(unit)
 
     @staticmethod
     def _quantity_is_dimensionless(quantity) -> bool:
@@ -608,7 +637,7 @@ class Value:
     @staticmethod
     def _same_dimensionality(quantity, unit: str) -> bool:
         try:
-            return quantity.dimensionality == Q_(1.0, unit).dimensionality
+            return quantity.dimensionality == Q_(1.0, _unit_object(unit)).dimensionality
         except Exception:
             return False
 

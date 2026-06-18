@@ -5,12 +5,13 @@ from typing import Tuple
 import numpy as np
 
 from ....classes.problem_table import ProblemTable
-from ....lib.config import Configuration
+from ....classes.stream import Stream
+from ....classes.stream_collection import StreamCollection
+from ....lib.config import Configuration, tol
 from ....lib.enums import PT
 from ....lib.schemas.hpr import HeatPumpTargetInputs
 from ...common.graph_data import clean_composite_curve
-from ...common.miscellaneous import linear_interpolation
-from .shared import create_stream_collection_of_background_profile
+from ...common.miscellaneous import delta_vals, linear_interpolation
 
 __all__ = ["construct_HPRTargetInputs"]
 
@@ -55,46 +56,60 @@ def construct_HPRTargetInputs(
     )
 
     return HeatPumpTargetInputs(
+        # Derived targeting state.
         Q_hpr_target=Q_hpr_target,
         Q_heat_max=H_cold[0],
         Q_cool_max=-H_hot[-1],
+        dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
         T_hot=T_hot,
         H_hot=H_hot,
         z_amb_hot=z_amb_hot,
         T_cold=T_cold,
         H_cold=H_cold,
         z_amb_cold=z_amb_cold,
-        dt_range_max=max(T_cold[0], T_hot[0]) - min(T_cold[-1], T_hot[-1]),
-        is_heat_pumping=bool(is_heat_pumping),
-        eta_penalty=0.001,
-        rho_penalty=10,
         bckgrd_hot_streams=s_hot,
         bckgrd_cold_streams=s_cold,
+        is_heat_pumping=bool(is_heat_pumping),
         debug=debug,
+        idx=idx,
+        # Direct zone_config pass-through.
         hpr_type=zone_config.HPR_TYPE,
+        hpr_comp_fixed_cost=zone_config.HPR_COMP_FIXED_COST,
+        hpr_comp_variable_cost=zone_config.HPR_COMP_VARIABLE_COST,
+        hpr_comp_cost_exp=zone_config.HPR_COMP_COST_EXP,
+        hpr_hx_fixed_cost=zone_config.HPR_HX_FIXED_COST,
+        hpr_hx_variable_cost=zone_config.HPR_HX_VARIABLE_COST,
+        hpr_hx_cost_exp=zone_config.HPR_HX_COST_EXP,
         n_cond=zone_config.N_COND,
         n_evap=zone_config.N_EVAP,
+        n_mvr=zone_config.N_MVR,
+        refrigerant_ls=zone_config.hpr_refrigerants,
+        mvr_fluid_ls=zone_config.hpr_mvr_fluids,
+        do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
         eta_comp=zone_config.ETA_COMP,
+        eta_mvr_comp=zone_config.ETA_MVR_COMP,
+        eta_motor=zone_config.ETA_MOTOR,
         eta_exp=zone_config.ETA_EXP,
         eta_ii_hpr_carnot=zone_config.ETA_II_HPR_CARNOT,
-        eta_ii_he_carnot=zone_config.ETA_II_HE_CARNOT
-        if zone_config.ALLOW_INTEGRATED_EXPANDER
-        else 0.0,
+        eta_ii_he_carnot=zone_config.effective_eta_ii_he_carnot,
         dtcont_hp=zone_config.DT_CONT_HP,
         dt_hp_ihx=zone_config.DT_HPR_IHX,
         dt_cascade_hx=zone_config.DT_HPR_CASCADE_HX,
         T_env=zone_config.T_ENV,
         dt_env_cont=zone_config.DT_ENV_CONT,
         dt_phase_change=zone_config.DT_PHASE_CHANGE,
-        refrigerant_ls=[r.strip().upper() for r in zone_config.REFRIGERANTS],
-        do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
-        heat_to_power_ratio=zone_config.PRICE_RATIO_HEAT_TO_ELE,
-        cold_to_power_ratio=zone_config.PRICE_RATIO_COLD_TO_ELE,
+        eta_penalty=zone_config.ETA_PENALTY,
+        rho_penalty=zone_config.RHO_PENALTY,
         max_multi_start=zone_config.MAX_HP_MULTISTART,
         bb_minimiser=zone_config.BB_MINIMISER,
         allow_integrated_expander=zone_config.ALLOW_INTEGRATED_EXPANDER,
         initialise_simulated_cycle=zone_config.INITIALISE_SIMULATED_CYCLE,
-        idx=idx,
+        heat_to_power_ratio=zone_config.PRICE_RATIO_HEAT_TO_ELE,
+        cold_to_power_ratio=zone_config.PRICE_RATIO_COLD_TO_ELE,
+        ele_price=zone_config.ELE_PRICE,
+        annual_op_time=zone_config.ANNUAL_OP_TIME,
+        discount_rate=zone_config.DISCOUNT_RATE,
+        serv_life=zone_config.SERV_LIFE,
     )
 
 
@@ -130,8 +145,43 @@ def _prepare_hpr_background_profile(
         T_vals,
         H_vals,
         z_amb,
-        create_stream_collection_of_background_profile(T_vals, H_vals),
+        _create_stream_collection_of_background_profile(T_vals, H_vals),
     )
+
+
+def _create_stream_collection_of_background_profile(
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+) -> StreamCollection:
+    """Convert a temperature-enthalpy profile into piecewise stream segments."""
+    s = StreamCollection()
+
+    T_vals = np.asarray(T_vals)
+    H_vals = np.abs(np.asarray(H_vals))
+
+    if delta_vals(T_vals).min() < tol:
+        raise ValueError("Infeasible temperature interval detected in _store_TSP_data")
+
+    dh_vals = delta_vals(H_vals)
+    dh_indices = np.argwhere(np.abs(dh_vals) > tol).flatten()
+    for i in dh_indices:
+        if dh_vals[i] > tol:
+            s.add(
+                Stream(
+                    t_supply=T_vals[i + 1],
+                    t_target=T_vals[i],
+                    heat_flow=dh_vals[i],
+                )
+            )
+        elif -dh_vals[i] > tol:
+            s.add(
+                Stream(
+                    t_supply=T_vals[i],
+                    t_target=T_vals[i + 1],
+                    heat_flow=-dh_vals[i],
+                )
+            )
+    return s
 
 
 def _apply_temperature_shift_for_hpr_stream_dtmin_cont(

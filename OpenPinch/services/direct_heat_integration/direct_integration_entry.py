@@ -46,17 +46,18 @@ def compute_direct_integration_targets(
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
     idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
+    all_streams = zone.all_streams
     pt = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
-        all_streams=zone.all_streams,
+        all_streams=all_streams,
         is_shifted=True,
         idx=idx,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
-        all_streams=zone.all_streams,
+        all_streams=all_streams,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
         idx=idx,
@@ -186,11 +187,18 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     net_hot_streams = StreamCollection()
     net_cold_streams = StreamCollection()
 
-    if (
-        hot_utilities.sum_stream_attribute("heat_flow", idx=idx)
-        + cold_utilities.sum_stream_attribute("heat_flow", idx=idx)
-        < tol
-    ):
+    hot_utilities_seq = list(hot_utilities)
+    cold_utilities_seq = list(cold_utilities)
+    hot_remaining = [
+        StreamCollection._value_at_idx(utility._heat_flow, idx)
+        for utility in hot_utilities_seq
+    ]
+    cold_remaining = [
+        StreamCollection._value_at_idx(utility._heat_flow, idx)
+        for utility in cold_utilities_seq
+    ]
+
+    if np.nansum(hot_remaining) + np.nansum(cold_remaining) < tol:
         # If no utility is needed, there is no net streams for indirect integration.
         return net_hot_streams, net_cold_streams
 
@@ -199,11 +207,6 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
 
     T_vals = T_vals
     dh_vals = delta_vals(H_vals)
-
-    hot_utilities_seq = list(hot_utilities)
-    cold_utilities_seq = list(cold_utilities)
-    hot_remaining = [float(u.heat_flow[idx]) for u in hot_utilities_seq]
-    cold_remaining = [float(u.heat_flow[idx]) for u in cold_utilities_seq]
 
     hu_idx = _initialise_utility_index(hot_utilities_seq, hot_remaining)
     cu_idx = _initialise_utility_index(cold_utilities_seq, cold_remaining)
@@ -250,70 +253,59 @@ def _add_net_segment_stateful(
     j: int = 0,
     idx: int | None = None,
 ) -> Tuple[int, int]:
-    """Adds a net utility segment and recursively handles segmentation if needed."""
+    """Add net utility segments, splitting iteratively across utilities."""
     if curr_idx < 0 or not utilities or dh_req <= tol:
         return curr_idx, k
 
-    curr_u = utilities[curr_idx]
-    available = float(remaining[curr_idx]) if curr_idx < len(remaining) else 0.0
+    segment_upper = float(T_ub)
+    segment_lower = float(T_lb)
+    remaining_dh = float(dh_req)
+    split_idx = int(j)
 
-    if available <= tol:
-        next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
-        if next_idx == curr_idx:
-            return curr_idx, k
-        return _add_net_segment_stateful(
-            T_ub=T_ub,
-            T_lb=T_lb,
-            curr_idx=next_idx,
-            dh_req=dh_req,
-            utilities=utilities,
-            remaining=remaining,
-            net_streams=net_streams,
-            k=k,
-            j=j,
-            idx=idx,
+    while remaining_dh > tol and curr_idx >= 0:
+        available = float(remaining[curr_idx]) if curr_idx < len(remaining) else 0.0
+        if available <= tol:
+            next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
+            if next_idx == curr_idx:
+                break
+            curr_idx = next_idx
+            continue
+
+        curr_u = utilities[curr_idx]
+        dh_curr = float(min(remaining_dh, available))
+        remaining[curr_idx] = max(available - dh_curr, 0.0)
+
+        span = segment_upper - segment_lower
+        split_temp = (
+            segment_upper - (dh_curr / remaining_dh) * span
+            if span and remaining_dh > tol
+            else segment_lower
         )
 
-    dh_curr = float(min(dh_req, available))
-    remaining[curr_idx] = max(available - dh_curr, 0.0)
-    dh_next = dh_req - dh_curr
-
-    T_span = T_ub - T_lb
-    T_i = T_ub - (dh_curr / dh_req) * T_span if T_span and dh_req > tol else T_lb
-
-    net_streams.add(
-        Stream(
-            name=f"Segment {k}" if j == 0 else f"Segment {k}-{j}",
-            t_supply=T_i if curr_u.type == ST.Hot.value else T_ub,
-            t_target=T_ub if curr_u.type == ST.Hot.value else T_i,
-            heat_flow=dh_curr,
-            dt_cont=float(curr_u.dt_cont[idx]),
-            dt_cont_multiplier=curr_u.dt_cont_multiplier,
-            htc=1.0,
-            is_process_stream=True,
+        net_streams.add(
+            Stream(
+                name=f"Segment {k}" if split_idx == 0 else f"Segment {k}-{split_idx}",
+                t_supply=split_temp if curr_u.type == ST.Hot.value else segment_upper,
+                t_target=segment_upper if curr_u.type == ST.Hot.value else split_temp,
+                heat_flow=dh_curr,
+                dt_cont=StreamCollection._value_at_idx(curr_u._dt_cont, idx),
+                dt_cont_multiplier=curr_u.dt_cont_multiplier,
+                htc=1.0,
+                is_process_stream=True,
+            )
         )
-    )
 
-    if dh_next > tol:
-        next_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
-        if next_idx == curr_idx:
-            return curr_idx, k + 1
-        return _add_net_segment_stateful(
-            T_ub=T_i,
-            T_lb=T_lb,
-            curr_idx=next_idx,
-            dh_req=dh_next,
-            utilities=utilities,
-            remaining=remaining,
-            net_streams=net_streams,
-            k=k,
-            j=j + 1,
-            idx=idx,
-        )
+        remaining_dh -= dh_curr
+        if remaining_dh <= tol:
+            break
+
+        segment_upper = split_temp
+        curr_idx = _find_next_available_utility(curr_idx + 1, utilities, remaining)
+        split_idx += 1
 
     next_idx = (
         curr_idx
-        if remaining[curr_idx] > tol
+        if 0 <= curr_idx < len(remaining) and remaining[curr_idx] > tol
         else _find_next_available_utility(curr_idx + 1, utilities, remaining)
     )
     return next_idx, k + 1

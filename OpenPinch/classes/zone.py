@@ -375,8 +375,10 @@ class Zone:
         if isinstance(target_to_add, BaseTargetModel):
             self._targets[target_to_add.type] = target_to_add
 
-    def add_targets(self, targets: list = []):
+    def add_targets(self, targets: list | None = None):
         """Add multiple targets to a specific zone."""
+        if targets is None:
+            targets = []
         for t in targets:
             self.add_target(t)
 
@@ -386,12 +388,19 @@ class Zone:
         if loc is None:
             return zone
         loc_address = loc.split("/", 1)
-        if loc_address[0] == zone.name:
+        sub = loc_address[0]
+        if sub in zone.subzones.keys():
+            if len(loc_address) == 1:
+                return zone.subzones[sub]
+            else:
+                sub_loc = loc_address[-1]
+                return zone.subzones[sub].get_subzone(sub_loc)
+        if sub == zone.name:
             loc_address.pop(0)
             if len(loc_address) == 0:
                 return zone
             loc_address = loc_address[-1].split("/", 1)
-        sub = loc_address[0]
+            sub = loc_address[0]
         if sub in zone.subzones.keys():
             if len(loc_address) == 1:
                 return zone.subzones[sub]

@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from OpenPinch.classes.stream_collection import StreamCollection
+from OpenPinch.lib.config import Configuration
 from OpenPinch.services.heat_pump_integration.common import (
     preprocessing as hp_pre,
 )
@@ -103,6 +104,33 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
     assert np.max(H_out) <= 150.0
     assert z_amb.shape == T_out.shape
     assert isinstance(streams, StreamCollection)
+
+
+def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
+    zone_config = Configuration(
+        options={
+            "ETA_PENALTY": 0.123,
+            "RHO_PENALTY": 4.5,
+            "REFRIGERANTS": " water ; r134a ",
+            "MVR_FLUIDS": " Water ; R245FA ",
+            "ETA_II_HE_CARNOT": 0.42,
+            "ALLOW_INTEGRATED_EXPANDER": True,
+        }
+    )
+
+    args = hp_pre.construct_HPRTargetInputs(
+        Q_hpr_target=50.0,
+        T_vals=np.array([120.0, 80.0, 40.0]),
+        H_hot=np.array([0.0, -50.0, -100.0]),
+        H_cold=np.array([100.0, 50.0, 0.0]),
+        zone_config=zone_config,
+    )
+
+    assert args.eta_penalty == pytest.approx(0.123)
+    assert args.rho_penalty == pytest.approx(4.5)
+    assert args.refrigerant_ls == ["WATER", "R134A"]
+    assert args.mvr_fluid_ls == ["Water", "R245FA"]
+    assert args.eta_ii_he_carnot == pytest.approx(0.42)
 
 
 def test_add_t_amb_interval_aligns_profile_to_ambient_breakpoints():

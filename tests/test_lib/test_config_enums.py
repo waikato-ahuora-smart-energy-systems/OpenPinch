@@ -4,12 +4,38 @@ import pytest
 
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.config_metadata import configuration_option_status
-from OpenPinch.lib.enums import TT, ZT
+from OpenPinch.lib.enums import TT, ZT, HPRcycle
 
 
 def test_configuration_parses_refrigerant_list_option():
     cfg = Configuration(options={"REFRIGERANTS": "water;ammonia,co2"})
     assert cfg.REFRIGERANTS == ["water", "ammonia", "co2"]
+
+
+def test_configuration_exposes_normalised_hpr_backend_options():
+    cfg = Configuration(
+        options={
+            "REFRIGERANTS": " water ; ammonia, co2 ",
+            "MVR_FLUIDS": " Water ; R134A, ",
+            "ETA_II_HE_CARNOT": 0.4,
+            "ALLOW_INTEGRATED_EXPANDER": True,
+        }
+    )
+
+    assert cfg.hpr_refrigerants == ["WATER", "AMMONIA", "CO2"]
+    assert cfg.hpr_mvr_fluids == ["Water", "R134A"]
+    assert cfg.effective_eta_ii_he_carnot == pytest.approx(0.4)
+
+
+def test_configuration_disables_effective_hpr_heat_engine_efficiency_by_default():
+    cfg = Configuration(
+        options={
+            "ETA_II_HE_CARNOT": 0.4,
+            "ALLOW_INTEGRATED_EXPANDER": False,
+        }
+    )
+
+    assert cfg.effective_eta_ii_he_carnot == pytest.approx(0.0)
 
 
 def test_configuration_accepts_input_and_output_unit_maps():
@@ -53,3 +79,37 @@ def test_configuration_option_status_classifies_runtime_roles():
 def test_zone_and_target_enum_str_methods():
     assert str(ZT.S) == ZT.S.value
     assert str(TT.DI) == TT.DI.value
+
+
+def test_configuration_accepts_current_hpr_names_and_rejects_invalid_names():
+    assert [cycle.name for cycle in HPRcycle] == [
+        "CascadeCarnot",
+        "ParallelCarnot",
+        "Brayton",
+        "CascadeVapourComp",
+        "ParallelVapourComp",
+        "VapourCompMVR",
+    ]
+    assert [cycle.value for cycle in HPRcycle] == [
+        "Cascade Carnot cycles",
+        "Parallel Carnot cycles",
+        "Brayton cycle",
+        "Cascade vapour compression cycles",
+        "Parallel vapour compression cycles",
+        "Vapour compression with MVR cascade",
+    ]
+    assert (
+        Configuration(options={"HPR_TYPE": HPRcycle.CascadeCarnot.value}).HPR_TYPE
+        == HPRcycle.CascadeCarnot.value
+    )
+    assert (
+        Configuration(options={"HPR_TYPE": HPRcycle.ParallelCarnot.value}).HPR_TYPE
+        == HPRcycle.ParallelCarnot.value
+    )
+    assert (
+        Configuration(options={"HPR_TYPE": HPRcycle.ParallelVapourComp.value}).HPR_TYPE
+        == HPRcycle.ParallelVapourComp.value
+    )
+
+    with pytest.raises(ValueError, match="Invalid value"):
+        Configuration(options={"HPR_TYPE": "Not a real HPR cycle"})

@@ -24,6 +24,7 @@ Use the service layer when you need to:
   boundary
 - prepare a zone hierarchy once and run multiple advanced studies against it
 - inspect the prepared model before solving
+- mutate a live prepared model with process components before rerunning targets
 - bypass file handling entirely and work with typed inputs
 - apply exergy or cogeneration as post-processing on already solved targets
 
@@ -91,6 +92,8 @@ Choosing Between Interfaces
 
 - Use :func:`OpenPinch.main.pinch_analysis_service` when you want a typed
   request/response contract.
+- Use ``problem.add_component.process_mvr(...)`` when the study needs direct
+  gas/vapour MVR stream replacement before ordinary target reruns.
 - Use :mod:`OpenPinch.services` when you want to prepare a zone once and run
   several advanced analyses against the same prepared state.
 - Use :class:`~OpenPinch.classes.pinch_problem.PinchProblem` when you want a

@@ -7,6 +7,7 @@ from ...services import (
     direct_heat_integration_service,
     direct_heat_pump_service,
     direct_refrigeration_service,
+    energy_transfer_analysis_service,
     exergy_targeting_service,
     indirect_heat_integration_service,
     indirect_heat_pump_service,
@@ -25,7 +26,10 @@ class _TargetAccessor:
         self._problem = problem
 
     def __call__(
-        self, *, options: Optional[dict[str, Any]] = {}, state_id: Optional[str] = None
+        self,
+        *,
+        options: Optional[dict[str, Any]] = None,
+        state_id: Optional[str] = None,
     ):
         runtime_options = dict(options or {})
         if state_id is not None:
@@ -217,6 +221,26 @@ class _TargetAccessor:
             options=runtime_options,
             include_subzones=include_subzones,
             service_func=exergy_targeting_service,
+        )
+
+    def energy_transfer(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        include_subzones: bool = False,
+        state_id: Optional[str] = None,
+    ) -> BaseTargetModel:
+        """Create energy-transfer diagram and heat-surplus/deficit outputs."""
+        runtime_options = dict(options or {})
+        if state_id is not None:
+            runtime_options["state_id"] = state_id
+        return self._problem._execute_targeting(
+            target_id=TT.ET.value,
+            application_zone=zone_name,
+            options=runtime_options,
+            include_subzones=include_subzones,
+            direct_service_func=energy_transfer_analysis_service,
         )
 
 

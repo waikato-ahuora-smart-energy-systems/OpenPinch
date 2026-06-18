@@ -40,6 +40,12 @@ surfaces and outputs.
        refrigeration companions
      - target models with HPR summary fields and graph effects
      - Advanced
+   * - Direct gas/vapour process MVR
+     - ``problem.add_component.process_mvr(...)`` on a prepared
+       ``PinchProblem`` case
+     - replacement hot streams, MVR stage results, process-component work in
+       target summaries
+     - Advanced
    * - Cogeneration targeting
      - ``problem.target.cogeneration(...)``,
        service-layer cogeneration entrypoint

@@ -57,7 +57,7 @@ def _utility_collection():
 def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     calls = []
 
-    def direct(z):
+    def direct(z, args=None):
         calls.append(z.name)
 
     valid = Zone(name="UO", type=ZT.O.value)
@@ -83,16 +83,16 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
 
     calls = []
 
-    def direct(z):
+    def direct(z, args=None):
         calls.append(f"direct:{z.name}")
 
-    def indirect(z):
+    def indirect(z, args=None):
         calls.append(f"indirect:{z.name}")
 
     monkeypatch.setattr(
         td,
         "_get_unit_operation_targets",
-        lambda z, direct_service_func=None, indirect_service_func=None: (
+        lambda z, direct_service_func=None, indirect_service_func=None, args=None: (
             calls.append(f"uo:{z.name}") or z
         ),
     )
@@ -125,23 +125,23 @@ def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
 
     calls = []
 
-    def direct(z):
+    def direct(z, args=None):
         calls.append(f"direct:{z.name}")
 
-    def indirect(z):
+    def indirect(z, args=None):
         calls.append(f"indirect:{z.name}")
 
     monkeypatch.setattr(
         td,
         "_get_unit_operation_targets",
-        lambda z, direct_service_func=None, indirect_service_func=None: (
+        lambda z, direct_service_func=None, indirect_service_func=None, args=None: (
             calls.append(f"uo:{z.name}") or z
         ),
     )
     monkeypatch.setattr(
         td,
         "_get_process_targets",
-        lambda z, direct_service_func=None, indirect_service_func=None: (
+        lambda z, direct_service_func=None, indirect_service_func=None, args=None: (
             calls.append(f"proc:{z.name}") or z
         ),
     )
@@ -173,7 +173,7 @@ def test_community_and_regional_dispatch(monkeypatch):
     monkeypatch.setattr(
         td,
         "_get_site_targets",
-        lambda z, direct_service_func=None, indirect_service_func=None: (
+        lambda z, direct_service_func=None, indirect_service_func=None, args=None: (
             calls.append(f"site:{z.name}") or z
         ),
     )
@@ -182,8 +182,8 @@ def test_community_and_regional_dispatch(monkeypatch):
     community.add_zone(Zone(name="S1", type=ZT.S.value))
     out_c = td._get_community_targets(
         community,
-        direct_service_func=lambda z: z,
-        indirect_service_func=lambda z: z,
+        direct_service_func=lambda z, args=None: z,
+        indirect_service_func=lambda z, args=None: z,
     )
     assert out_c is community
     assert "site:S1" in calls
@@ -191,7 +191,7 @@ def test_community_and_regional_dispatch(monkeypatch):
     monkeypatch.setattr(
         td,
         "_get_community_targets",
-        lambda z, direct_service_func=None, indirect_service_func=None: (
+        lambda z, direct_service_func=None, indirect_service_func=None, args=None: (
             calls.append(f"community:{z.name}") or z
         ),
     )
@@ -199,8 +199,8 @@ def test_community_and_regional_dispatch(monkeypatch):
     regional.add_zone(Zone(name="C1", type=ZT.C.value))
     out_r = td._get_regional_targets(
         regional,
-        direct_service_func=lambda z: z,
-        indirect_service_func=lambda z: z,
+        direct_service_func=lambda z, args=None: z,
+        indirect_service_func=lambda z, args=None: z,
     )
     assert out_r is regional
     assert "community:C1" in calls

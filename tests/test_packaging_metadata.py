@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
+UV_LOCK = REPO_ROOT / "uv.lock"
 PYTHON_VERSION = REPO_ROOT / ".python-version"
 PYTEST_INI = REPO_ROOT / "pytest.ini"
 UPDATE_TOOLCHAIN = REPO_ROOT / "scripts" / "update_toolchain.py"
@@ -19,6 +20,11 @@ WORKFLOWS = [
 
 def _read_pyproject() -> dict:
     with PYPROJECT.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def _read_uv_lock() -> dict:
+    with UV_LOCK.open("rb") as handle:
         return tomllib.load(handle)
 
 
@@ -160,3 +166,28 @@ def test_pytest_marker_policy_declares_synthesis_and_solver_tiers():
         "solver: tests that require external solver binaries such as Couenne or IPOPT"
         in pytest_ini
     )
+
+
+def test_lockfile_project_version_matches_pyproject():
+    project_version = _read_pyproject()["project"]["version"]
+    lock = _read_uv_lock()
+    package = next(
+        package
+        for package in lock["package"]
+        if package["name"] == "openpinch" and package["source"] == {"editable": "."}
+    )
+
+    assert package["version"] == project_version
+
+
+def test_testpypi_publish_skips_existing_files_but_pypi_publish_does_not():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
+    testpypi_block = workflow.split("publish-testpypi:", 1)[1].split(
+        "publish-pypi:", 1
+    )[0]
+    pypi_block = workflow.split("publish-pypi:", 1)[1]
+
+    assert "skip-existing: true" in testpypi_block
+    assert "skip-existing: true" not in pypi_block

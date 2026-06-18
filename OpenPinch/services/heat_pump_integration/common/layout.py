@@ -18,8 +18,10 @@ class HPRoptVectorLayout:
     n_cond: int = 0
     n_evap: int = 0
     n_subcool: int = 0
-    n_heat: int = 0
-    n_cool: int = 0
+    n_heat_base: int = 0
+    n_cool_base: int = 0
+    n_heat_split: int = 0
+    n_cool_split: int = 0
     n_ihx: int = 0
     n_misc: int = 0
     _size: int = field(init=False, repr=False)
@@ -27,8 +29,10 @@ class HPRoptVectorLayout:
     _cond_slice: slice = field(init=False, repr=False)
     _evap_slice: slice = field(init=False, repr=False)
     _subcool_slice: slice = field(init=False, repr=False)
-    _heat_slice: slice = field(init=False, repr=False)
-    _cool_slice: slice = field(init=False, repr=False)
+    _heat_base_slice: slice = field(init=False, repr=False)
+    _cool_base_slice: slice = field(init=False, repr=False)
+    _heat_split_slice: slice = field(init=False, repr=False)
+    _cool_split_slice: slice = field(init=False, repr=False)
     _ihx_slice: slice = field(init=False, repr=False)
     _misc_slice: slice = field(init=False, repr=False)
 
@@ -38,8 +42,10 @@ class HPRoptVectorLayout:
             "n_cond",
             "n_evap",
             "n_subcool",
-            "n_heat",
-            "n_cool",
+            "n_heat_base",
+            "n_cool_base",
+            "n_heat_split",
+            "n_cool_split",
             "n_ihx",
             "n_misc",
         ):
@@ -52,8 +58,10 @@ class HPRoptVectorLayout:
             ("cond", self.n_cond),
             ("evap", self.n_evap),
             ("subcool", self.n_subcool),
-            ("heat", self.n_heat),
-            ("cool", self.n_cool),
+            ("heat_base", self.n_heat_base),
+            ("cool_base", self.n_cool_base),
+            ("heat_split", self.n_heat_split),
+            ("cool_split", self.n_cool_split),
             ("ihx", self.n_ihx),
             ("misc", self.n_misc),
         ):
@@ -84,12 +92,20 @@ class HPRoptVectorLayout:
         return self._subcool_slice
 
     @property
-    def heat_slice(self) -> slice:
-        return self._heat_slice
+    def heat_base_slice(self) -> slice:
+        return self._heat_base_slice
 
     @property
-    def cool_slice(self) -> slice:
-        return self._cool_slice
+    def cool_base_slice(self) -> slice:
+        return self._cool_base_slice
+
+    @property
+    def heat_split_slice(self) -> slice:
+        return self._heat_split_slice
+
+    @property
+    def cool_split_slice(self) -> slice:
+        return self._cool_split_slice
 
     @property
     def ihx_slice(self) -> slice:
@@ -106,8 +122,10 @@ class HPRoptVectorLayout:
         x_cond: Sequence[float] = (),
         x_evap: Sequence[float] = (),
         x_subcool: Sequence[float] = (),
-        x_heat: Sequence[float] = (),
-        x_cool: Sequence[float] = (),
+        x_heat_base: float | Sequence[float] = (),
+        x_cool_base: float | Sequence[float] = (),
+        x_heat_split: Sequence[float] = (),
+        x_cool_split: Sequence[float] = (),
         x_ihx: Sequence[float] = (),
         x_misc: Sequence[float] = (),
     ) -> np.ndarray:
@@ -117,8 +135,10 @@ class HPRoptVectorLayout:
             self._coerce_block("x_cond", x_cond, self.n_cond),
             self._coerce_block("x_evap", x_evap, self.n_evap),
             self._coerce_block("x_subcool", x_subcool, self.n_subcool),
-            self._coerce_block("x_heat", x_heat, self.n_heat),
-            self._coerce_block("x_cool", x_cool, self.n_cool),
+            self._coerce_block("x_heat_base", x_heat_base, self.n_heat_base),
+            self._coerce_block("x_cool_base", x_cool_base, self.n_cool_base),
+            self._coerce_block("x_heat_split", x_heat_split, self.n_heat_split),
+            self._coerce_block("x_cool_split", x_cool_split, self.n_cool_split),
             self._coerce_block("x_ihx", x_ihx, self.n_ihx),
             self._coerce_block("x_misc", x_misc, self.n_misc),
         ]
@@ -140,8 +160,10 @@ class HPRoptVectorLayout:
             "x_cond": vec[self.cond_slice],
             "x_evap": vec[self.evap_slice],
             "x_subcool": vec[self.subcool_slice],
-            "x_heat": vec[self.heat_slice],
-            "x_cool": vec[self.cool_slice],
+            "x_heat_base": vec[self.heat_base_slice],
+            "x_cool_base": vec[self.cool_base_slice],
+            "x_heat_split": vec[self.heat_split_slice],
+            "x_cool_split": vec[self.cool_split_slice],
             "x_ihx": vec[self.ihx_slice],
             "x_misc": vec[self.misc_slice],
         }
@@ -153,8 +175,10 @@ class HPRoptVectorLayout:
         x_cond: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_evap: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_subcool: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
-        x_heat: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
-        x_cool: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
+        x_heat_base: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
+        x_cool_base: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
+        x_heat_split: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
+        x_cool_split: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_ihx: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_misc: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
     ) -> list[tuple[float, float]]:
@@ -164,8 +188,14 @@ class HPRoptVectorLayout:
         bounds.extend(self._coerce_bounds("x_cond", x_cond, self.n_cond))
         bounds.extend(self._coerce_bounds("x_evap", x_evap, self.n_evap))
         bounds.extend(self._coerce_bounds("x_subcool", x_subcool, self.n_subcool))
-        bounds.extend(self._coerce_bounds("x_heat", x_heat, self.n_heat))
-        bounds.extend(self._coerce_bounds("x_cool", x_cool, self.n_cool))
+        bounds.extend(self._coerce_bounds("x_heat_base", x_heat_base, self.n_heat_base))
+        bounds.extend(self._coerce_bounds("x_cool_base", x_cool_base, self.n_cool_base))
+        bounds.extend(
+            self._coerce_bounds("x_heat_split", x_heat_split, self.n_heat_split)
+        )
+        bounds.extend(
+            self._coerce_bounds("x_cool_split", x_cool_split, self.n_cool_split)
+        )
         bounds.extend(self._coerce_bounds("x_ihx", x_ihx, self.n_ihx))
         bounds.extend(self._coerce_bounds("x_misc", x_misc, self.n_misc))
         return bounds

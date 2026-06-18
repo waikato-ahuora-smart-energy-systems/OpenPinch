@@ -1,5 +1,6 @@
 """Private helpers for the :mod:`OpenPinch.classes.pinch_problem` surface."""
 
+from ._component_accessor import _ComponentAccessorDescriptor
 from ._design_accessor import _DesignAccessorDescriptor
 from ._loading import (
     JsonDict,
@@ -29,6 +30,7 @@ __all__ = [
     "_DesignAccessorDescriptor",
     "PathLike",
     "_ProblemSourceAdapters",
+    "_ComponentAccessorDescriptor",
     "_PlotAccessorDescriptor",
     "_TargetAccessorDescriptor",
     "_validate_problem_semantics",

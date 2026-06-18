@@ -15,7 +15,7 @@ from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import PT, TT
 from OpenPinch.lib.schemas.targets import DirectHeatPumpTarget
 from OpenPinch.services.power_cogeneration import (
-    power_cogeneration_analysis as pca,
+    power_cogeneration_entry as pca,
 )
 
 
