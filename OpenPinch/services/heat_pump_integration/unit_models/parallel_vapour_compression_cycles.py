@@ -420,6 +420,7 @@ class ParallelVapourCompressionCycles:
         T_evap: np.ndarray,
         T_cond: np.ndarray,
         *,
+        dtcont: float,
         dT_superheat: np.ndarray = 0.0,
         dT_subcool: np.ndarray = 0.0,
         eta_comp: float = 0.7,
@@ -444,6 +445,8 @@ class ParallelVapourCompressionCycles:
             Liquid saturation temperatures in the evaporator [deg C].
         T_cond : np.ndarray
             Gas saturation temperatures in the condenser [deg C].
+        dtcont : float
+            Minimum temperature approach used by HPR targeting [K].
         dT_superheat : np.ndarray, optional
             Degree of superheating of the suction gas [K].
         dT_subcool : np.ndarray, optional
@@ -469,6 +472,7 @@ class ParallelVapourCompressionCycles:
         self._solved = False
         self._subcycles = []
         self._allocation_penalty = np.empty(0, dtype=float)
+        self._dtcont = float(dtcont)
 
         T_evap_all, T_cond_all = self._normalize_temperature_arrays(T_evap, T_cond)
         self._num_cycles = T_evap_all.size
@@ -507,6 +511,7 @@ class ParallelVapourCompressionCycles:
             hp.solve(
                 T_evap=T_evap_all[i],
                 T_cond=T_cond_all[i],
+                dtcont=self._dtcont,
                 dT_superheat=dT_superheat_all[i],
                 dT_subcool=dT_subcool_all[i],
                 eta_comp=eta_comp,

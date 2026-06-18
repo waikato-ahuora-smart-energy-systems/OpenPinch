@@ -19,6 +19,9 @@ from OpenPinch.services.heat_pump_integration import (
     heat_pump_and_refrigeration_entry as hp,
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
+from OpenPinch.services.heat_pump_integration.common._shared import (
+    plotting as hp_plotting,
+)
 
 from .helpers import _base_args, _patch_output_model_validate, _pt_with_hnet
 
@@ -289,7 +292,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
     monkeypatch.setitem(
         hp._HP_PLACEMENT_HANDLERS,
         HPRcycle.CascadeCarnot.value,
-        lambda args: SimpleNamespace(to_output_payload=lambda: {"idx": args.idx}),
+        lambda args: SimpleNamespace(to_output_fields=lambda: {"idx": args.idx}),
     )
 
     out = hp._get_hpr_targets(
@@ -374,7 +377,7 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
         classmethod(lambda cls, value: value),
     )
 
-    payload = hp.compute_indirect_heat_pump_or_refrigeration_target(
+    target_result = hp.compute_indirect_heat_pump_or_refrigeration_target(
         zone,
         is_heat_pumping=True,
         args={"state_id": "peak", "idx": 1},
@@ -382,8 +385,8 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
 
     assert calls["profile_kwargs"]["idx"] == 1
     assert "state_id" not in calls["profile_kwargs"]
-    assert payload["state_id"] == "peak"
-    assert payload["state_idx"] == 1
+    assert target_result["state_id"] == "peak"
+    assert target_result["state_idx"] == 1
 
 
 def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans(
@@ -463,12 +466,12 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
         classmethod(lambda cls, value: value),
     )
 
-    payload = hp.compute_indirect_heat_pump_or_refrigeration_target(
+    target_result = hp.compute_indirect_heat_pump_or_refrigeration_target(
         zone,
         is_heat_pumping=True,
     )
 
-    assert payload["hpr_success"] is True
+    assert target_result["hpr_success"] is True
     assert captured["target_load"] == pytest.approx(100.0)
 
 
@@ -630,7 +633,7 @@ def test_hpr_residual_utility_summary_retargets_indirect_utilities():
 def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
     shown = {"called": False}
     monkeypatch.setattr(
-        hp_shared.go.Figure,
+        hp_plotting.go.Figure,
         "show",
         lambda self: shown.__setitem__("called", True),
     )
@@ -667,7 +670,7 @@ def test_public_heat_pump_service_package_does_not_export_profile_helper():
     assert not hasattr(hp_pkg, "plot_multi_hp_profiles_from_results")
 
 
-def test_direct_heat_pump_graph_payloads_include_nlp_and_hpr_overlay():
+def test_direct_heat_pump_graphs_include_nlp_and_hpr_overlay():
     pt = ProblemTable(
         {
             PT.T: [120.0, 80.0],

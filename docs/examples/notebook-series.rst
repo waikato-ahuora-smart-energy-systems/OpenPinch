@@ -6,7 +6,8 @@ supported learning and regression surface. Each notebook is built around one
 decision question rather than a generic feature tour. The series now spans the
 main single-case API, named multi-case studies, multistate targeting, the
 typed/service boundary, the energy-transfer analysis view, and the
-vapour-compression plus MVR cascade HPR backend.
+vapour-compression plus MVR cascade HPR backend. It also covers direct
+gas/vapour stream MVR as a process-component workflow on live workspace cases.
 
 Included Notebooks
 ------------------
@@ -51,6 +52,14 @@ Included Notebooks
    routing, a solved backend result, and the external stream accounting used
    for the combined cascade.
 
+``08_direct_gas_stream_mvr.ipynb``
+   Direct gas/vapour process MVR on an in-memory ``PinchWorkspace`` study,
+   including baseline, dry MVR, and liquid-injection MVR cases. The notebook
+   adds memory-only ``problem.add_component.process_mvr(...)`` components,
+   solves direct and Total Site targets after the stream mutation, compares
+   target summaries, inspects replacement streams, and toggles the component
+   active state.
+
 How To Use Them
 ---------------
 
@@ -83,6 +92,8 @@ Recommended Learning Order
    accounting or a diagram payload derived from an existing thermal target.
 7. Use the VC+MVR cascade notebook when you need a refrigerant low stage feeding
    a serial mechanical-vapour-recompression high stage.
+8. Use the direct gas/vapour MVR notebook when a process vapour stream itself
+   is the recompression source and you need before/after workspace comparison.
 
 Why These Matter
 ----------------
@@ -90,6 +101,7 @@ Why These Matter
 The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
 hierarchical targeting, graph-based interpretation, real multistate studies,
-advanced HPR cycle targeting, and stable programmatic boundaries built on the
-same packaged assets. The distributed copies are also kept output-free so they
-do not ship stale plots, tracebacks, or machine-specific execution state.
+advanced HPR cycle targeting, process-component MVR mutation, and stable
+programmatic boundaries built on the same packaged assets. The distributed
+copies are also kept output-free so they do not ship stale plots, tracebacks,
+or machine-specific execution state.

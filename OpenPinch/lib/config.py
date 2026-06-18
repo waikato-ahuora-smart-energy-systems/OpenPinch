@@ -109,6 +109,29 @@ class Configuration:
             )
         return value
 
+    @staticmethod
+    def _normalise_config_list(values, *, uppercase: bool = False) -> list[str]:
+        """Return stripped, non-empty string values from a config list option."""
+        normalised = [str(value).strip() for value in values if str(value).strip()]
+        if uppercase:
+            return [value.upper() for value in normalised]
+        return normalised
+
+    @property
+    def hpr_refrigerants(self) -> list[str]:
+        """Return HPR refrigerant names normalised for thermodynamic backends."""
+        return self._normalise_config_list(self.REFRIGERANTS, uppercase=True)
+
+    @property
+    def hpr_mvr_fluids(self) -> list[str]:
+        """Return MVR fluid names normalised for thermodynamic backends."""
+        return self._normalise_config_list(self.MVR_FLUIDS) or ["Water"]
+
+    @property
+    def effective_eta_ii_he_carnot(self) -> float:
+        """Return the usable Carnot heat-engine efficiency for HPR targeting."""
+        return float(self.ETA_II_HE_CARNOT) if self.ALLOW_INTEGRATED_EXPANDER else 0.0
+
 
 Configuration.__annotations__ = {
     name: spec.annotation for name, spec in CONFIG_FIELD_SPECS.items()

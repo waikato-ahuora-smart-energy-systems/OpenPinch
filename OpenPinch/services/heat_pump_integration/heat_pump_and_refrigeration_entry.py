@@ -277,7 +277,7 @@ def _get_hpr_targets(
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
     result = handler(args)
-    return HeatPumpTargetOutputs.model_validate(result.to_output_payload())
+    return HeatPumpTargetOutputs.model_validate(result.to_output_fields())
 
 
 def _get_hpr_target_summary(
@@ -293,6 +293,12 @@ def _get_hpr_target_summary(
         "hpr_ambient_cold": res.Q_amb_cold,
         "hpr_cop": res.cop_h,
         "hpr_eta_he": res.eta_he,
+        "hpr_operating_cost": res.hpr_operating_cost,
+        "hpr_capital_cost": res.hpr_capital_cost,
+        "hpr_annualized_capital_cost": res.hpr_annualized_capital_cost,
+        "hpr_total_annualized_cost": res.hpr_total_annualized_cost,
+        "hpr_compressor_capital_cost": res.hpr_compressor_capital_cost,
+        "hpr_heat_exchanger_capital_cost": res.hpr_heat_exchanger_capital_cost,
         "hpr_success": res.success,
         "hpr_hot_streams": res.hpr_hot_streams,
         "hpr_cold_streams": res.hpr_cold_streams,

@@ -23,6 +23,12 @@ Core Objects
    Numerical temperature-interval table behind composite curves, pinch
    temperatures, utility cascades, and several advanced targeting routines.
 
+``ProcessComponent``
+   Memory-only component attached to a prepared problem when the model needs
+   to be mutated before targeting. The direct process MVR component uses this
+   layer to replace selected hot gas/vapour streams with compressed
+   replacement streams.
+
 These are the objects you inspect when you need to understand how a case was
 prepared or why a target changed after mutating the in-memory model.
 
@@ -42,6 +48,21 @@ Key Classes
    :no-index:
 
 .. autoclass:: OpenPinch.classes.problem_table.ProblemTable
+   :members:
+   :no-index:
+
+Process Components
+------------------
+
+Process components are attached to a live ``PinchProblem`` and are not part of
+the external input schema. They are useful for before/after studies where a
+specific unit operation changes the active process stream set before targeting.
+
+.. autoclass:: OpenPinch.services.components.process_components.ProcessComponent
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.services.components.process_mvr.ProcessMVRComponent
    :members:
    :no-index:
 

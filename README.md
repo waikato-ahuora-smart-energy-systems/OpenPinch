@@ -58,12 +58,15 @@ The packaged notebook series currently includes:
 - `05_schema_service_and_output_workflows.ipynb`
 - `06_energy_transfer_analysis.ipynb`
 - `07_vapour_compression_mvr_cascade_hpr.ipynb`
+- `08_direct_gas_stream_mvr.ipynb`
 
 These notebooks are intended to be the main learning path for new users. The
 series now spans the single-case `PinchProblem` front door, named
 `PinchWorkspace` studies, real multistate targeting, the typed/service plus
 serialized-workspace boundaries, energy-transfer analysis, and the simulated
-heat pump targeting backend.
+heat pump targeting backend. The direct gas/vapour MVR notebook adds the
+process-component workflow, where an MVR component mutates selected hot vapour
+streams in live `PinchProblem` cases before direct and Total Site targeting.
 
 
 ## Python Workflow
@@ -184,6 +187,7 @@ problem.show_dashboard()
 - Excel workbook import and Excel summary export
 - Packaged sample cases and notebook workflows
 - Pydantic schema models for validated programmatic usage
+- Direct process gas/vapour MVR components for workspace comparisons
 
 ## Documentation
 

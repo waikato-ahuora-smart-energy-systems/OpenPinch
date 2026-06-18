@@ -99,7 +99,7 @@ def test_notebook_2_uses_only_packaged_pulp_mill_assets_and_real_zones(
     assert 'state_id="0"' not in combined_source
 
 
-def test_notebook_3_keeps_standard_hpr_plot_accessors_and_all_workflows(
+def test_notebook_3_compares_direct_indirect_and_carnot_backends(
     tmp_path: Path,
 ):
     notebook = _copied_notebook(
@@ -111,12 +111,15 @@ def test_notebook_3_keeps_standard_hpr_plot_accessors_and_all_workflows(
     assert "plot_multi_hp_profiles_from_results" not in combined_source
     assert "direct_heat_pump" in combined_source
     assert "indirect_heat_pump" in combined_source
-    assert "direct_refrigeration" in combined_source
-    assert "indirect_refrigeration" in combined_source
+    assert "direct_refrigeration" not in combined_source
+    assert "indirect_refrigeration" not in combined_source
+    assert "HPRcycle.CascadeCarnot" in combined_source
+    assert "HPRcycle.ParallelCarnot" in combined_source
+    assert "SOLVED_TARGETS" in combined_source
     assert "plot.catalog()" in combined_source
-    assert "profile_problem.plot.net_load_profiles_with_heat_pump(" in combined_source
+    assert "selected_problem.plot.net_load_profiles_with_heat_pump(" in combined_source
     assert (
-        "profile_problem.plot.grand_composite_curve_with_heat_pump(" in combined_source
+        "selected_problem.plot.grand_composite_curve_with_heat_pump(" in combined_source
     )
     assert "compare_cases(" in combined_source
 

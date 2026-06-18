@@ -514,6 +514,7 @@ class CascadeVapourCompressionCycle:
         T_evap: np.ndarray,
         T_cond: np.ndarray,
         *,
+        dtcont: float,
         dT_superheat: np.ndarray = 0.0,
         dT_subcool: np.ndarray = 0.0,
         eta_comp: float = 0.7,
@@ -539,6 +540,8 @@ class CascadeVapourCompressionCycle:
             Liquid saturation temperature in the evaporator [deg C].
         T_cond : np.ndarray
             Gas saturation temperature in the condenser [deg C].
+        dtcont : float
+            Minimum temperature approach used by HPR targeting [K].
         dT_superheat : np.ndarray, optional
             Degree of superheating of the suction gas, supplied by the process [K].
         dT_subcool : np.ndarray, optional
@@ -567,6 +570,7 @@ class CascadeVapourCompressionCycle:
         self._solved = False
         self._subcycles = []
         self._allocation_penalty = np.empty(0, dtype=float)
+        self._dtcont = float(dtcont)
         Q_heat, Q_cool = self._allocate_process_duties(
             Q_heat=Q_heat,
             Q_cool=Q_cool,
@@ -646,6 +650,7 @@ class CascadeVapourCompressionCycle:
             hp.solve(
                 T_evap=T_evap_all[i],
                 T_cond=T_cond_all[i],
+                dtcont=self._dtcont,
                 dT_superheat=dT_superheat_all[i],
                 dT_subcool=dT_subcool_all[i],
                 eta_comp=eta_comp,

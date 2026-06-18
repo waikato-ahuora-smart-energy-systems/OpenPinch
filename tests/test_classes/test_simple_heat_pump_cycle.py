@@ -56,6 +56,7 @@ def test_heat_pump_cycle_case_1():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=5.0,
@@ -68,6 +69,13 @@ def test_heat_pump_cycle_case_1():
     _validate_results(cycle, T_evap, T_cond, dT_superheat, dT_subcool)
 
 
+def test_heat_pump_cycle_requires_dtcont():
+    cycle = VapourCompressionCycle()
+
+    with pytest.raises(TypeError, match="dtcont"):
+        cycle.solve(T_evap=-15.0, T_cond=35.0, refrigerant="R134a")
+
+
 def test_heat_pump_cycle_case_2():
     T_evap = -15  # degC, evaporator saturation temperature
     T_cond = 35  # degC, condenser saturation temperature
@@ -78,6 +86,7 @@ def test_heat_pump_cycle_case_2():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_ihx_gas_side=5.0,
         eta_comp=0.75,
         refrigerant="R134a",
@@ -98,6 +107,7 @@ def test_heat_pump_cycle_case_3():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_ihx_gas_side=5.0,
         eta_comp=0.75,
         refrigerant="R134a",
@@ -118,6 +128,7 @@ def test_heat_pump_cycle_case_4():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=0,
@@ -140,6 +151,7 @@ def test_heat_pump_cycle_case_5():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=0,
@@ -162,6 +174,7 @@ def test_heat_pump_cycle_case_6():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=0,
@@ -184,6 +197,7 @@ def test_heat_pump_cycle_case_7():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=10,
@@ -206,6 +220,7 @@ def test_heat_pump_cycle_case_8():
     cycle1.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=10,
@@ -221,6 +236,7 @@ def test_heat_pump_cycle_case_8():
     cycle2.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=10,
@@ -247,6 +263,7 @@ def test_heat_pump_cycle_case_9():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=10,
@@ -280,6 +297,7 @@ def test_heat_pump_cycle_case_10():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=10,
@@ -313,6 +331,7 @@ def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=5.0,
@@ -357,6 +376,7 @@ def test_heat_pump_cycle_with_binary_mole_fraction_refrigerant_solves():
     cycle.solve(
         T_evap=0.0,
         T_cond=35.0,
+        dtcont=0.0,
         dT_superheat=5.0,
         dT_subcool=3.0,
         dT_ihx_gas_side=5.0,
@@ -391,6 +411,7 @@ def test_refrigeration_cycle_uses_q_cool_as_primary_duty():
     cycle.solve(
         T_evap=T_evap,
         T_cond=T_cond,
+        dtcont=0.0,
         dT_superheat=dT_superheat,
         dT_subcool=dT_subcool,
         dT_ihx_gas_side=5.0,
@@ -424,6 +445,7 @@ def test_refrigeration_cycle_caps_q_heat_to_available_q_cond():
     cycle.solve(
         T_evap=-10.0,
         T_cond=30.0,
+        dtcont=0.0,
         dT_superheat=3.0,
         dT_subcool=2.0,
         dT_ihx_gas_side=5.0,

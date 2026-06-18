@@ -59,6 +59,23 @@ state-weighted scenario data.
 .. automodule:: OpenPinch.classes.value
    :members:
 
+Process Component Models
+------------------------
+
+Process components are live model mutations attached after preparation and
+before rerunning targets. The direct process MVR component owns the original
+stream records, replacement streams, per-state stage results, and
+activation/deactivation state used by workspace comparison studies.
+
+.. automodule:: OpenPinch.services.components.process_components
+   :members:
+
+.. automodule:: OpenPinch.services.components.process_mvr
+   :members:
+
+.. automodule:: OpenPinch.services.components.direct_mvr.direct_gas_mvr
+   :members:
+
 Thermal Cycle and Cogeneration Unit Models
 ------------------------------------------
 

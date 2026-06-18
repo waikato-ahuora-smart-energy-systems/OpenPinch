@@ -31,19 +31,41 @@ Indirect HPR
    layer.
 
 In both cases, OpenPinch evaluates the HPR as additional hot and cold utility
-streams and recomputes process heat cascades. A simplified objective has the
-form:
+streams and recomputes the residual process heat cascade.
+
+Carnot screening remains a thermodynamic screening workflow. The simulated
+vapour-compression backends use an annualized total-cost objective:
 
 .. math::
 
-   J = \frac{W_\mathrm{HPR} + Q_\mathrm{ext,hot}
-       + Q_\mathrm{ext,cold} + P}{Q_\mathrm{target}}
+   J =
+   C_{\mathrm{HPR,annualized}}
+   + P_{\mathrm{feasibility}}
 
-where ``W_HPR`` is electrical work, ``Q_ext,hot`` and ``Q_ext,cold`` are
-remaining external utilities after integration, and ``P`` is the feasibility
-penalty. The exact accounting may include user-configured heat-to-power and
-cold-to-power price ratios in higher-level comparisons, but the physical
-interpretation is the same: lower external utility and lower work are better.
+The annualized cost includes compressor electricity, residual external hot and
+cold utilities, compressor capital, and HPR heat-exchanger capital. Compressor
+capital is based on installed work capacity. HPR heat-exchanger capital is
+based on installed heat-transfer duty, using the summed condenser and
+evaporator external duties. Capital is annualized with the configured discount
+rate and service life.
+
+Simulated-cycle integration accounting uses one combined residual GCC. The
+hot side includes background hot streams, HPR condenser streams, and ambient
+hot streams. The cold side includes background cold streams, HPR evaporator
+streams, and ambient cold streams. The first and last points of the
+pocket-free residual GCC define the remaining external hot and cold utility
+duties. Those duties are priced as operating cost; ordinary residual utility
+shortfall is not treated as a feasibility penalty.
+
+Feasibility penalties are reserved for integration or cycle-model problems:
+
+- residual GCC pockets introduced by the HPR candidate
+- opposite-utility regression relative to the baseline residual GCC
+- cycle allocation, subcooling, or related backend penalties
+
+For heat-pump solves, opposite-utility regression means increasing residual
+cold utility above the baseline. For refrigeration solves, it means increasing
+residual hot utility above the baseline.
 
 Temperature and Duty Conventions
 --------------------------------
@@ -438,6 +460,30 @@ profiles. It excludes both the internal VC-to-MVR source heat and the internal
 liquid-injection desuperheating heat unless explicitly requested by lower-level
 model code.
 
+Direct Process Gas/Vapour MVR Components
+----------------------------------------
+
+``problem.add_component.process_mvr(...)``
+
+Direct process MVR is a process-component workflow rather than an HPR target
+backend. It starts from a prepared ``PinchProblem`` case, selects one or more
+hot gas/vapour process streams, solves a direct mechanical-vapour-recompression
+replacement profile, and swaps the original streams out of the active hot
+stream collection. The original streams remain attached to the model with
+``active=False`` while the generated replacement streams become active.
+
+The component can be configured by stage count, saturation-temperature lift or
+pressure ratio, compressor efficiency, motor efficiency, and whether liquid
+injection is represented as an internal desuperheating step. After the
+component is active, ordinary direct and indirect targeting routines consume
+the mutated stream collection and report the added process-component work in
+the solved target summaries.
+
+This workflow is useful when the engineering question is not "where should a
+new HPR cycle be placed?" but "what happens to the integration target if this
+existing vapour stream is recompressed?" Use ``PinchWorkspace`` copies when you
+need baseline, dry MVR, and liquid-injection MVR cases side by side.
+
 Choosing a Method
 -----------------
 
@@ -460,6 +506,8 @@ Use the simplest backend that answers the engineering question:
      - Brayton cycle
    * - VC low stage feeding a serial recompression train
      - Vapour compression with MVR cascade
+   * - Existing vapour stream recompressed before targeting
+     - Direct process gas/vapour MVR component
 
 Recommended Follow-On Pages
 ---------------------------

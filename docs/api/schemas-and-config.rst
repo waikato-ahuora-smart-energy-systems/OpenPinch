@@ -65,6 +65,26 @@ returned to users or exported.
    :members:
    :no-index:
 
+HPR Schemas
+-----------
+
+The HPR schema layer carries the prepared configuration values, parsed backend
+state, and simulated-cycle annualized cost accounting used by the targeting
+services. Report-facing HPR cost fields use ``Value`` instances with public
+units ``$`` and ``$/y``.
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.HeatPumpTargetInputs
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.HPRBackendResult
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.hpr.SimulatedHPRAnnualizedCostAccounting
+   :members:
+   :no-index:
+
 Enums and Typed Constants
 -------------------------
 

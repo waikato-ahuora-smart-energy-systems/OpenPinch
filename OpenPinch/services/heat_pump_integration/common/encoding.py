@@ -40,7 +40,6 @@ class DutyAllocation:
 
 def decode_duty_splits(x_split: np.ndarray, Q_base: float) -> np.ndarray:
     """Decode stick-breaking split fractions into nonnegative stage duties."""
-    x_split = np.asarray(x_split, dtype=float).reshape(-1)
     remaining = max(float(Q_base), 0.0)
     Q_request = np.zeros_like(x_split, dtype=float)
     for i, fraction in enumerate(np.clip(x_split, 0.0, 1.0)):
@@ -51,7 +50,7 @@ def decode_duty_splits(x_split: np.ndarray, Q_base: float) -> np.ndarray:
 
 def encode_duty_splits(Q_request: np.ndarray, Q_base: float) -> np.ndarray:
     """Encode nonnegative stage duties as bounded stick-breaking fractions."""
-    Q_request = np.maximum(np.asarray(Q_request, dtype=float).reshape(-1), 0.0)
+    Q_request = np.maximum(Q_request, 0.0)
     remaining = max(float(Q_base), 0.0)
     x_split = np.zeros_like(Q_request, dtype=float)
     for i, duty in enumerate(Q_request):
@@ -68,7 +67,6 @@ def encode_base_and_duty_splits(
     Q_limit: float,
 ) -> tuple[float, float, np.ndarray]:
     """Encode a seed duty vector into base-duty scale and split fractions."""
-    Q_request = np.asarray(Q_request, dtype=float).reshape(-1)
     Q_request = np.where(np.isfinite(Q_request), np.maximum(Q_request, 0.0), 0.0)
     Q_limit = float(Q_limit) if np.isfinite(Q_limit) and Q_limit > 0.0 else 0.0
     Q_request_sum = float(Q_request.sum())
@@ -87,7 +85,7 @@ def allocate_stage_duties(
 ) -> DutyAllocation:
     """Decode and availability-limit per-stage model duties."""
     Q_request = decode_duty_splits(x_split, Q_base)
-    Q_available = np.maximum(np.asarray(Q_available, dtype=float).reshape(-1), 0.0)
+    Q_available = np.maximum(Q_available, 0.0)
     if Q_available.size != Q_request.size:
         raise ValueError(
             "Q_available must have the same length as the duty split vector."
@@ -110,7 +108,7 @@ def require_stage_duty_allocation(
     Q_available: np.ndarray | None,
     duty_name: str,
 ) -> DutyAllocation:
-    """Validate and allocate one base/split/availability duty payload."""
+    """Validate and allocate one base/split/availability duty input set."""
     if x_split is None or Q_available is None:
         raise ValueError(
             f"Q_{duty_name}_base requires x_{duty_name}_split "
@@ -118,7 +116,7 @@ def require_stage_duty_allocation(
         )
     return allocate_stage_duties(
         Q_base,
-        np.asarray(x_split, dtype=float).reshape(-1),
+        x_split,
         Q_available,
     )
 
