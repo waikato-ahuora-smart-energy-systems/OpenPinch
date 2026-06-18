@@ -86,6 +86,19 @@ BASELINE_EXPECTATIONS = {
     },
 }
 
+CURRENT_OPENHENS_LIVE_EXPECTATIONS = {
+    NINE_STREAM: {
+        "best_solution": 2905508.6335796523,
+        "total_cases_attempted": 1133,
+        "total_cases_solved_min": 840,
+        "solved_esm_count_min": 67,
+        "best_stages": 4,
+        "best_recovery_units": 11,
+        "best_cu_units": 3,
+        "best_hu_units": 2,
+    },
+}
+
 INTEGER_SUMMARY_FIELDS = (
     "solved_esm_count",
     "total_cases_attempted",
@@ -300,16 +313,84 @@ def test_four_stream_live_solver_winning_branch_matches_checked_in_summary() -> 
 
 
 @pytest.mark.solver
-@pytest.mark.parametrize("case_id", [FOUR_STREAM, NINE_STREAM])
+@pytest.mark.parametrize("case_id", [FOUR_STREAM])
 def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None:
+    _assert_live_solver_case_matches_checked_in_summary(case_id)
+
+
+@pytest.mark.solver
+def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -> None:
+    _require_live_solver_environment()
+    expected = CURRENT_OPENHENS_LIVE_EXPECTATIONS[NINE_STREAM]
+    problem = PinchProblem(source=FIXTURE_ROOT / f"{NINE_STREAM}.json")
+    problem.target()
+    settings = replace(
+        workflow_settings_from_problem(problem),
+        max_parallel=8,
+    )
+
+    design = _execute_synthesis_workflow(
+        problem,
+        settings,
+        executor=LocalSynthesisExecutor(print_output=False),
+    ).accepted_result
+    network = design.network
+
+    _assert_close(
+        design.objective_values["total_annual_cost"],
+        expected["best_solution"],
+        abs_tol=TAC_ABS_TOL,
+        rel_tol=TAC_REL_TOL,
+    )
+    assert (
+        _weighted_solver_job_count(design.task_outcomes)
+        == expected["total_cases_attempted"]
+    )
+    assert (
+        _weighted_solver_job_count(
+            outcome for outcome in design.task_outcomes if outcome.status == "success"
+        )
+        >= expected["total_cases_solved_min"]
+    )
+    assert (
+        sum(
+            outcome.status == "success"
+            and outcome.task.method == "energy_stage_refinement"
+            for outcome in design.task_outcomes
+        )
+        >= expected["solved_esm_count_min"]
+    )
+    assert network.stage_count == expected["best_stages"]
+    assert network.summary_metrics["recovery_units"] == expected["best_recovery_units"]
+    assert network.summary_metrics["hot_utility_units"] == expected["best_hu_units"]
+    assert network.summary_metrics["cold_utility_units"] == expected["best_cu_units"]
+
+
+def _assert_live_solver_case_matches_checked_in_summary(
+    case_id: str,
+    *,
+    max_parallel: int | None = None,
+) -> None:
     _require_live_solver_environment()
     expected = BASELINE_EXPECTATIONS[case_id]
     problem = PinchProblem(source=FIXTURE_ROOT / f"{case_id}.json")
 
-    design = heat_exchanger_network_synthesis_service(
-        problem,
-        executor=LocalSynthesisExecutor(print_output=False),
-    )
+    if max_parallel is None:
+        design = heat_exchanger_network_synthesis_service(
+            problem,
+            executor=LocalSynthesisExecutor(print_output=False),
+        )
+    else:
+        problem.target()
+        settings = replace(
+            workflow_settings_from_problem(problem),
+            max_parallel=max_parallel,
+        )
+        design = _execute_synthesis_workflow(
+            problem,
+            settings,
+            executor=LocalSynthesisExecutor(print_output=False),
+        ).accepted_result
     network = design.network
 
     _assert_close(

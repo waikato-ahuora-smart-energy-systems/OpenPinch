@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -76,10 +77,10 @@ def problem_to_solver_arrays(
         raise ValueError("dTmin must be finite and positive.")
 
     zone = problem.master_zone
-    hot_items = list(zone.hot_streams.items())
-    cold_items = list(zone.cold_streams.items())
-    hot_utility_items = list(zone.hot_utilities.items())
-    cold_utility_items = list(zone.cold_utilities.items())
+    hot_items = _ordered_stream_items(zone.hot_streams.items())
+    cold_items = _ordered_stream_items(zone.cold_streams.items())
+    hot_utility_items = _ordered_utility_items(zone.hot_utilities.items())
+    cold_utility_items = _ordered_utility_items(zone.cold_utilities.items())
 
     if not hot_items or not cold_items:
         raise ValueError("prepared PinchProblem must contain hot and cold streams.")
@@ -247,6 +248,30 @@ def _utility_solver_target(stream: Stream, zone: Zone) -> float:
     if abs(supply - target) <= zone.config.DT_PHASE_CHANGE + tol:
         return supply
     return target
+
+
+def _ordered_stream_items(items) -> list[tuple[str, Stream]]:
+    return sorted(items, key=lambda item: _natural_stream_key(item[1].name, item[0]))
+
+
+def _ordered_utility_items(items) -> list[tuple[str, Stream]]:
+    ordered = _ordered_stream_items(items)
+    if len(ordered) <= 1:
+        return ordered
+    real_utilities = [
+        item
+        for item in ordered
+        if not (item[1].name == "HU" and item[0].endswith(".HU"))
+    ]
+    return real_utilities or ordered
+
+
+def _natural_stream_key(name: str, fallback: str) -> tuple[str, int, str]:
+    text = name or fallback
+    match = re.search(r"(\d+)", text)
+    prefix = text[: match.start()].strip() if match else text
+    number = int(match.group(1)) if match else 0
+    return (prefix, number, text)
 
 
 def _value(value: Any, unit: str) -> float:

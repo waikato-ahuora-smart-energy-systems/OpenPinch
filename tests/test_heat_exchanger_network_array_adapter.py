@@ -93,6 +93,26 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
             np.testing.assert_allclose(actual, expected)
 
 
+def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
+    case_id = "Nine-stream-Linnhoff-and-Ahmad-1999-1"
+    payload = problem_to_solver_arrays(
+        PinchProblem(source=FIXTURE_ROOT / f"{case_id}.json"),
+        10.0,
+    )
+
+    assert payload.stream_identities["cold_process_streams"] == [
+        "Process A.Cold 1 N",
+        "Process A.Cold 2 N",
+        "Process A.Cold 3 N",
+        "Process A.Cold 4 N",
+        "Process A.Cold 5 N",
+    ]
+    assert payload.utility_identities["hot_utilities"] == ["Hot Utility.HPS"]
+    np.testing.assert_allclose(payload.arrays["T_c_in"], [373.15, 308.15, 358.15, 333.15, 413.15])
+    np.testing.assert_allclose(payload.arrays["f_c"], [100.0, 70.0, 350.0, 60.0, 200.0])
+    np.testing.assert_allclose(payload.arrays["hu_cost"], [60.0])
+
+
 @pytest.mark.parametrize("case_id", CASE_DTMIN)
 def test_reordered_fixtures_keep_same_prepared_adapter_semantics(case_id: str) -> None:
     base = problem_to_solver_arrays(

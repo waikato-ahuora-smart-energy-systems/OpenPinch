@@ -8,9 +8,11 @@ stream, utility, or configuration state.
 
 from __future__ import annotations
 
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Protocol, Sequence
+from typing import Callable, Protocol, Sequence
 
 from ...classes.heat_exchanger import (
     HeatExchanger,
@@ -35,6 +37,15 @@ _METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
     "topology_design",
     "energy_stage_refinement",
 )
+
+
+def _process_pool(max_workers: int) -> ProcessPoolExecutor:
+    """Create solver workers with inherited local-package import state."""
+
+    return ProcessPoolExecutor(
+        max_workers=max_workers,
+        mp_context=multiprocessing.get_context("fork"),
+    )
 
 
 class WorkflowContractError(RuntimeError):
@@ -150,11 +161,18 @@ class FakeSynthesisExecutor:
 
 
 class LocalSynthesisExecutor:
-    """Internal sequential executor for moved PDM/TDM/ESM model slices."""
+    """Internal executor for moved PDM/TDM/ESM model slices."""
 
-    def __init__(self, *, print_output: bool = False, evolution: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        print_output: bool = False,
+        evolution: bool = False,
+        worker_pool_factory: Callable[[int], object] | None = None,
+    ) -> None:
         self.print_output = print_output
         self.evolution = evolution
+        self.worker_pool_factory = worker_pool_factory or _process_pool
         self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
         self.stage_order: list[SynthesisMethod] = []
         self.problems_by_task_id: dict[str, InternalHeatExchangerNetworkProblem] = {}
@@ -167,46 +185,72 @@ class LocalSynthesisExecutor:
         parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
         max_parallel: int,
     ) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
-        del max_parallel
         if tasks:
             self.stage_order.append(tasks[0].method)
 
-        outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome] = []
+        built: list[
+            tuple[
+                HeatExchangerNetworkSynthesisTask,
+                InternalHeatExchangerNetworkProblem,
+            ]
+        ] = []
+        failed: dict[str, HeatExchangerNetworkSynthesisTaskOutcome] = {}
         for task in tasks:
-            self.executed_tasks.append(task)
             try:
-                internal_problem = self._build_problem(
-                    task,
-                    problem=problem,
-                    parent_outcomes=parent_outcomes,
-                )
-                solved = internal_problem.get_solution(
-                    print_output=self.print_output,
-                    evolution=task.method == "energy_stage_refinement",
-                )
-                if solved is None or getattr(solved, "mSuccess", 0) != 1:
-                    reason = getattr(
-                        internal_problem,
-                        "solution_failure_reason",
-                        "solver did not return a successful HEN model",
-                    )
-                    outcomes.append(_failed_task_outcome(task, reason))
-                    continue
-
-                network = internal_problem.extract_network(run_id=task.run_id)
-                if task.task_id is not None:
-                    self.problems_by_task_id[task.task_id] = internal_problem
-                outcomes.append(
-                    HeatExchangerNetworkSynthesisTaskOutcome(
-                        task=task,
-                        status="success",
-                        network=network,
-                        objective_value=network.total_annual_cost,
-                        solver_status=_solver_status(internal_problem),
+                built.append(
+                    (
+                        task,
+                        self._build_problem(
+                            task,
+                            problem=problem,
+                            parent_outcomes=parent_outcomes,
+                        ),
                     )
                 )
             except Exception as exc:
-                outcomes.append(_failed_task_outcome(task, str(exc)))
+                if task.task_id is not None:
+                    failed[task.task_id] = _failed_task_outcome(task, str(exc))
+
+        worker_count = max(1, min(int(max_parallel), len(built)))
+        solve_inputs = (
+            (task, internal_problem, self.print_output)
+            for task, internal_problem in built
+        )
+        if worker_count == 1:
+            solved_results = tuple(
+                _solve_built_task(payload) for payload in solve_inputs
+            )
+        else:
+            with self.worker_pool_factory(worker_count) as pool:
+                solved_results = tuple(pool.map(_solve_built_task, solve_inputs))
+
+        results_by_task_id = {
+            task.task_id: (task, outcome, internal_problem)
+            for task, outcome, internal_problem in solved_results
+            if task.task_id is not None
+        }
+
+        outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome] = []
+        for task in tasks:
+            result = results_by_task_id.get(task.task_id)
+            if result is None:
+                outcome = failed.get(task.task_id)
+                if outcome is None:
+                    outcome = _failed_task_outcome(
+                        task,
+                        "solver worker did not return a result",
+                    )
+                internal_problem = None
+            else:
+                _task, outcome, internal_problem = result
+            self.executed_tasks.append(task)
+            if (
+                internal_problem is not None
+                and outcome.status == "success"
+                and task.task_id is not None
+            ):
+                self.problems_by_task_id[task.task_id] = internal_problem
+            outcomes.append(outcome)
         return tuple(outcomes)
 
     def _build_problem(
@@ -282,6 +326,56 @@ class LocalSynthesisExecutor:
                 "solver problem for StageWise warm-start."
             )
         return parent_problem
+
+
+def _solve_built_task(
+    payload: tuple[
+        HeatExchangerNetworkSynthesisTask,
+        InternalHeatExchangerNetworkProblem,
+        bool,
+    ],
+) -> tuple[
+    HeatExchangerNetworkSynthesisTask,
+    HeatExchangerNetworkSynthesisTaskOutcome,
+    InternalHeatExchangerNetworkProblem | None,
+]:
+    task, internal_problem, print_output = payload
+    try:
+        solved = internal_problem.get_solution(
+            print_output=print_output,
+            evolution=task.method == "energy_stage_refinement",
+        )
+        if solved is None or getattr(solved, "mSuccess", 0) != 1:
+            reason = getattr(
+                internal_problem,
+                "solution_failure_reason",
+                "solver did not return a successful HEN model",
+            )
+            return task, _failed_task_outcome(task, reason), None
+        verify = getattr(solved, "verify", None)
+        if callable(verify):
+            is_valid, reasons = verify()
+            if not is_valid:
+                reason = "verification failed: " + ", ".join(
+                    str(reason) for reason in reasons
+                )
+                internal_problem.solution_failure_reason = reason
+                return task, _failed_task_outcome(task, reason), internal_problem
+
+        network = internal_problem.extract_network(run_id=task.run_id)
+        return (
+            task,
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=task,
+                status="success",
+                network=network,
+                objective_value=network.total_annual_cost,
+                solver_status=_solver_status(internal_problem),
+            ),
+            internal_problem,
+        )
+    except Exception as exc:
+        return task, _failed_task_outcome(task, str(exc)), None
 
 
 def workflow_settings_from_problem(

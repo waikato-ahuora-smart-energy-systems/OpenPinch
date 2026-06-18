@@ -6,6 +6,9 @@ import json
 import math
 import subprocess
 import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -153,6 +156,16 @@ def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> No
     assert model.options.RTOL == 1e-2
     assert model.options.OTOL == 1e-2
     assert calls == ["gekko"]
+
+
+def test_couenne_option_file_preserves_openhens_runtime_limits() -> None:
+    couenne_options = (REPO_ROOT / "couenne.opt").read_text(encoding="utf-8")
+
+    assert "node_limit 2000" in couenne_options
+    assert "feas_tolerance 0.01" in couenne_options
+    assert "allowable_gap 0.01" in couenne_options
+    assert "allowable_fraction_gap 0.1" in couenne_options
+    assert "delete_redundant yes" in couenne_options
 
 
 def test_internal_problem_runs_stage_reduction_before_evolution(monkeypatch) -> None:
@@ -564,6 +577,58 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
         (tdm_tasks[0].task_id, False),
         (esm_tasks[0].task_id, True),
     ]
+
+
+def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> None:
+    problem = _four_stream_problem(
+        options={
+            "HENS_APPROACH_TEMPERATURES": [14.0, 16.0],
+            "HENS_DERIVATIVE_THRESHOLDS": [0.5],
+            "HENS_STAGE_SELECTION": [3],
+            "HENS_RUN_ID": "hens-parallel-test",
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+    executor = LocalSynthesisExecutor(worker_pool_factory=ThreadPoolExecutor)
+    active_count = 0
+    max_active_count = 0
+    lock = threading.Lock()
+
+    def fake_get_solution(
+        self, *, print_output=True, evolution=None, model_factories=None
+    ):
+        nonlocal active_count, max_active_count
+        del print_output, evolution, model_factories
+        with lock:
+            active_count += 1
+            max_active_count = max(max_active_count, active_count)
+        try:
+            time.sleep(0.05)
+            self.case = _SolvedCase()
+            self.case.S = self.stages or 3
+            self.case.stages = self.case.S
+            self.case.mSuccess = 1
+            return self.case
+        finally:
+            with lock:
+                active_count -= 1
+
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem,
+        "get_solution",
+        fake_get_solution,
+    )
+    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_outcomes = executor.execute(
+        pdm_tasks,
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=2,
+    )
+
+    assert [outcome.status for outcome in pdm_outcomes] == ["success", "success"]
+    assert executor.executed_tasks == list(pdm_tasks)
+    assert max_active_count == 2
 
 
 def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) -> None:
