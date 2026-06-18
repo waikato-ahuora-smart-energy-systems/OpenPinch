@@ -22,6 +22,9 @@ from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis import __all__ as hens_all
+from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
+    problem_to_solver_arrays,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.exports import (
     export_heat_exchanger_network_synthesis_results,
 )
@@ -145,6 +148,41 @@ def test_fake_outcomes_serialize_without_live_solver_objects() -> None:
     assert "solver_model" not in payload
 
 
+def test_legacy_z_restriction_handoff_uses_source_shaped_duty_values() -> None:
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_outcomes = FakeSynthesisExecutor().execute(
+        pdm_tasks,
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=settings.max_parallel,
+    )
+    tdm_task = build_topology_design_tasks(settings, pdm_outcomes)[0]
+    arrays = problem_to_solver_arrays(problem, dTmin=0.1)
+
+    z_restriction, zhu_restriction, zcu_restriction = (
+        workflow_module._legacy_z_restriction(tdm_task, arrays)
+    )
+    flat_restriction_cells = [
+        cell
+        for hot_matches in z_restriction
+        for cold_matches in hot_matches
+        for cell in cold_matches
+    ]
+    flat_restriction_values = [cell[0] for cell in flat_restriction_cells]
+
+    assert zhu_restriction is None
+    assert zcu_restriction is None
+    assert all(
+        isinstance(cell, list) and len(cell) == 1 for cell in flat_restriction_cells
+    )
+    assert 0.0 in flat_restriction_values
+    assert max(flat_restriction_values) == max(
+        restriction.duty for restriction in tdm_task.topology_restrictions
+    )
+
+
 def test_direct_design_run_populates_results_cache_and_preserves_targets() -> None:
     problem = _small_problem()
     target_output = problem.target()
@@ -204,7 +242,9 @@ def test_optional_exports_round_trip_from_problem_results(tmp_path: Path) -> Non
         manifest_path.read_text(encoding="utf-8")
     )
     first_task_record = next(
-        record for record in manifest.export_records if record.record_id.startswith("task:")
+        record
+        for record in manifest.export_records
+        if record.record_id.startswith("task:")
     )
     task_outcome = HeatExchangerNetworkSynthesisTaskOutcome.model_validate_json(
         (tmp_path / first_task_record.path).read_text(encoding="utf-8")

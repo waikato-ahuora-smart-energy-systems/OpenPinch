@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+from dataclasses import replace
 from pathlib import Path
 from shutil import which
 from types import SimpleNamespace
@@ -26,6 +27,8 @@ from OpenPinch.services.heat_exchanger_network_synthesis.service import (
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
     LocalSynthesisExecutor,
+    _execute_synthesis_workflow,
+    workflow_settings_from_problem,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +40,7 @@ TAC_ABS_TOL = 1.0
 TAC_REL_TOL = 1e-4
 MAX_REGRESSION_REL_TOL = 1e-2
 TEMPERATURE_ABS_TOL = 1.0
+ESM_ATTEMPT_WEIGHT = 11
 
 FOUR_STREAM = "Four-stream-Yee-and-Grossmann-1990-1"
 NINE_STREAM = "Nine-stream-Linnhoff-and-Ahmad-1999-1"
@@ -252,6 +256,50 @@ def test_best_esm_network_satisfies_numerical_invariants(case_id: str) -> None:
 
 
 @pytest.mark.solver
+def test_four_stream_live_solver_winning_branch_matches_checked_in_summary() -> None:
+    _require_live_solver_environment()
+    expected = BASELINE_EXPECTATIONS[FOUR_STREAM]
+    problem = PinchProblem(source=FIXTURE_ROOT / f"{FOUR_STREAM}.json")
+    problem.target()
+    settings = replace(
+        workflow_settings_from_problem(problem),
+        approach_temperatures=(expected["best_dTmin"],),
+        derivative_thresholds=(expected["best_min_dQ"],),
+        best_solutions_to_save=1,
+        max_parallel=1,
+    )
+
+    workflow_result = _execute_synthesis_workflow(
+        problem,
+        settings,
+        executor=LocalSynthesisExecutor(print_output=False),
+    )
+    design = workflow_result.accepted_result
+    network = design.network
+
+    assert [
+        outcome.task.method
+        for outcome in design.task_outcomes
+        if outcome.status == "success"
+    ] == [
+        "pinch_decomposition",
+        "topology_design",
+        "energy_stage_refinement",
+    ]
+    assert design.method == "energy_stage_refinement"
+    _assert_close(
+        design.objective_values["total_annual_cost"],
+        expected["best_solution"],
+        abs_tol=TAC_ABS_TOL,
+        rel_tol=TAC_REL_TOL,
+    )
+    assert network.stage_count == expected["best_stages"]
+    assert network.summary_metrics["recovery_units"] == expected["best_recovery_units"]
+    assert network.summary_metrics["hot_utility_units"] == expected["best_hu_units"]
+    assert network.summary_metrics["cold_utility_units"] == expected["best_cu_units"]
+
+
+@pytest.mark.solver
 @pytest.mark.parametrize("case_id", [FOUR_STREAM, NINE_STREAM])
 def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None:
     _require_live_solver_environment()
@@ -270,9 +318,14 @@ def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None
         abs_tol=TAC_ABS_TOL,
         rel_tol=TAC_REL_TOL,
     )
-    assert len(design.task_outcomes) == expected["total_cases_attempted"]
     assert (
-        sum(outcome.status == "success" for outcome in design.task_outcomes)
+        _weighted_solver_job_count(design.task_outcomes)
+        == expected["total_cases_attempted"]
+    )
+    assert (
+        _weighted_solver_job_count(
+            outcome for outcome in design.task_outcomes if outcome.status == "success"
+        )
         == expected["total_cases_solved"]
     )
     assert (
@@ -287,6 +340,13 @@ def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None
     assert network.summary_metrics["recovery_units"] == expected["best_recovery_units"]
     assert network.summary_metrics["hot_utility_units"] == expected["best_hu_units"]
     assert network.summary_metrics["cold_utility_units"] == expected["best_cu_units"]
+
+
+def _weighted_solver_job_count(outcomes) -> int:
+    return sum(
+        ESM_ATTEMPT_WEIGHT if outcome.task.method == "energy_stage_refinement" else 1
+        for outcome in outcomes
+    )
 
 
 def _network_context(
@@ -552,10 +612,7 @@ def _stage_temperatures(
     stages: int,
 ) -> list[list[float]]:
     return [
-        [
-            inlet + (outlet - inlet) * stage / stages
-            for stage in range(stages + 1)
-        ]
+        [inlet + (outlet - inlet) * stage / stages for stage in range(stages + 1)]
         for inlet, outlet in zip(inlets, outlets, strict=True)
     ]
 

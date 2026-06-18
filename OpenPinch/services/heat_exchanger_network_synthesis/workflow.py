@@ -784,14 +784,14 @@ def _legacy_z_restriction(
         restriction.stage for restriction in task.topology_restrictions
     )
     recovery = [
-        [[0.0 for _k in range(stage_count)] for _j in range(len(cold_axis))]
+        [[[0.0] for _k in range(stage_count)] for _j in range(len(cold_axis))]
         for _i in range(len(hot_axis))
     ]
     for restriction in task.topology_restrictions:
         i = hot_axis[restriction.source_stream]
         j = cold_axis[restriction.sink_stream]
         k = restriction.stage - 1
-        recovery[i][j][k] = float(restriction.duty)
+        recovery[i][j][k] = [float(restriction.duty)]
     return [recovery, None, None]
 
 
