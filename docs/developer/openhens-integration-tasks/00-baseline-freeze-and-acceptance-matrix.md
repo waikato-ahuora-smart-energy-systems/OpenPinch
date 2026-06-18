@@ -104,10 +104,7 @@ Checked-in manifest:
 
 - `openhens_baseline_results/baseline_manifest.json`
 
-Checked-in OpenHENS source provenance patch:
-
-- `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch`
-- `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch.sha256`
+OpenHENS source provenance is recorded as repository commit metadata. The dirty patch artifacts are intentionally not retained in this OpenPinch PR.
 
 Manifest schema:
 
@@ -124,7 +121,7 @@ Recorded source repository state:
 | OpenPinch | `https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch.git` | `codex/openhens-migration-plan` | Manifest captured at `e670a1a8ebdd9fe2c90d8ef445af1d69c67aef2e`; root `.DS_Store` and docs-index changes are pre-existing dirty tracked files excluded from the HENS-00 implementation slice. |
 | OpenHENS current checkout | `https://github.com/waikato-ahuora-smart-energy-systems/OpenHENS.git` | `codex/refactor-architecture` | Clean at `2afc14b7779482fc829edb1c3fa187b918d7fb19` (`Restore OpenHENS solver parity`). |
 | OpenHENS artifact main snapshot | `https://github.com/waikato-ahuora-smart-energy-systems/OpenHENS.git` | Existing artifact metadata | `fbf237bd3bdfbd8cf32698a137f68c0f0db5c1e6`; existing README records that this run used a temporary Python 3.12 environment because legacy main failed under Python 3.14. |
-| OpenHENS artifact refactor snapshot | `https://github.com/waikato-ahuora-smart-energy-systems/OpenHENS.git` | Existing artifact metadata | `92e942fec148d5e6a1e052bb3d207b95a4f85379` with `working_tree=dirty` in `openhens_baseline_results/refactor/branch_summary.json`; stored patch `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch` captures the dirty-source delta to clean parity commit `2afc14b7779482fc829edb1c3fa187b918d7fb19`. |
+| OpenHENS artifact refactor snapshot | `https://github.com/waikato-ahuora-smart-energy-systems/OpenHENS.git` | Existing artifact metadata | `92e942fec148d5e6a1e052bb3d207b95a4f85379` with `working_tree=dirty` in `openhens_baseline_results/refactor/branch_summary.json`; the later clean parity commit is `2afc14b7779482fc829edb1c3fa187b918d7fb19`. |
 
 Dependency and solver provenance:
 
@@ -137,7 +134,7 @@ Dependency and solver provenance:
 | OpenHENS lock | `../OpenHENS/uv.lock` SHA256 `0b7fddd39ae202d8889462a4910202e5fd88f073051965623bfbc172883998b0`. |
 | OpenHENS package versions | `OpenHENS==0.5.0`, `numpy==2.4.4`, `pandas==3.0.3`, `pyomo==6.10.0`, `gekko==1.3.2`, `matplotlib==3.10.9`, `plotly==6.7.0`, `kaleido==1.3.0`, `openpyxl==3.1.5`, `wakepy==1.0.0`. |
 | Solver binaries | `rtk which couenne` and `rtk which ipopt` exited 1 with no path. Solver reruns are blocked locally until Couenne and IPOPT are installed and on PATH. |
-| OpenHENS dirty patch | `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch` SHA256 `cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33`; `rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS apply --check --reverse /Users/ca107/Desktop/ahuora/OpenPinch/openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch` passed against clean `2afc14b7779482fc829edb1c3fa187b918d7fb19`. |
+| OpenHENS dirty snapshot | `openhens_baseline_results/refactor/branch_summary.json` records the dirty artifact-generation snapshot at `92e942fec148d5e6a1e052bb3d207b95a4f85379`; retained provenance now uses commit metadata only. |
 
 Baseline generation commands:
 
@@ -163,7 +160,6 @@ Generated artifact paths:
 | Four-stream | `openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json`, `run_summary.csv`, `solution_metrics.csv`, and the curated `network_snapshots/Four-stream-Yee-and-Grossmann-1990-1/best-esm.json`. |
 | Nine-stream | `openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json`, `run_summary.csv`, `solution_metrics.csv`, and the curated `network_snapshots/Nine-stream-Linnhoff-and-Ahmad-1999-1/best-esm.json`. |
 | Cross-branch parity | `openhens_baseline_results/comparison.json`, `openhens_baseline_results/comparison.csv`, and `openhens_baseline_results/refactor/branch_summary.json`. |
-| OpenHENS dirty-source provenance | `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch` and `.patch.sha256`. |
 
 ## Fixture And Artifact Policy
 
@@ -386,24 +382,14 @@ or all solved ESM rows.
   metrics, and canonical regeneration commands.
 - 2026-06-16: Existing generated artifact provenance records
   `working_tree=dirty` for the refactor artifact snapshot at
-  `92e942fec148d5e6a1e052bb3d207b95a4f85379`. Stored
-  `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch`
-  as the dirty-source provenance artifact to the later clean parity commit
-  `2afc14b7779482fc829edb1c3fa187b918d7fb19`.
-- 2026-06-16: `rtk shasum -a 256
-  openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch`
-  returned
-  `cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33`.
-- 2026-06-16: `rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS apply
-  --check --reverse
-  /Users/ca107/Desktop/ahuora/OpenPinch/openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch`
-  passed against clean OpenHENS checkout
-  `2afc14b7779482fc829edb1c3fa187b918d7fb19`, proving the stored patch matches
-  the clean source tree used for the parity fix.
+  `92e942fec148d5e6a1e052bb3d207b95a4f85379`; retained provenance now records
+  that dirty snapshot plus the later clean parity commit
+  `2afc14b7779482fc829edb1c3fa187b918d7fb19` without storing dirty patch
+  artifacts in this OpenPinch PR.
 - 2026-06-16: Updated
   `openhens_baseline_results/refactor/branch_summary.json` so the recorded
-  dirty refactor snapshot points directly to the stored patch artifact, patch
-  SHA256, and clean target head.
+  dirty refactor snapshot records the later clean target head while omitting
+  patch artifacts from this OpenPinch PR.
 - 2026-06-16: Root `.DS_Store` remains a modified tracked binary file, but it
   was already present in the dirty worktree before this HENS-00 implementation
   slice and is unrelated to the baseline metadata. It is excluded from the

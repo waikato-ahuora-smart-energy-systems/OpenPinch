@@ -40,12 +40,11 @@
   },
   "snapshot": {
     "branch": "codex/refactor-architecture",
-    "dirty_patch_artifact": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
-    "dirty_patch_sha256": "cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33",
     "dirty_patch_target_clean_head": "2afc14b7779482fc829edb1c3fa187b918d7fb19",
     "head": "92e942fec148d5e6a1e052bb3d207b95a4f85379",
     "pytest_artifact_root": "/private/var/folders/wy/xn1cwcqn4kv9pj411m092m0000693n/T/pytest-of-ca107/pytest-33",
     "repo": "/Users/ca107/Desktop/ahuora/OpenHENS",
-    "working_tree": "dirty"
+    "working_tree": "dirty",
+    "dirty_patch_artifact_status": "removed from OpenPinch PR; retained provenance is commit metadata only"
   }
 }

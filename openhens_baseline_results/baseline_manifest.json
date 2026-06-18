@@ -2,12 +2,11 @@
   "artifact_schema_version": "openhens-baseline-manifest/v1",
   "created_at_utc": "2026-06-16T00:41:55Z",
   "purpose": "HENS-00 baseline provenance and acceptance metadata for OpenHENS-to-OpenPinch migration work before production solver code moves.",
-  "reproducibility_status": "source_provenance_captured_solver_rerun_blocked",
+  "reproducibility_status": "source_commit_metadata_captured_solver_rerun_blocked",
   "reproducibility_notes": [
     "Existing aggregate comparison artifacts identify the refactor artifact-generation worktree as dirty at 92e942fec148d5e6a1e052bb3d207b95a4f85379.",
-    "The stored patch artifact openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch captures the binary Git diff from that recorded refactor base to the later clean parity commit 2afc14b7779482fc829edb1c3fa187b918d7fb19.",
-    "The patch SHA256 is cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33 and `rtk git -C ../OpenHENS apply --check --reverse <patch>` passed against the clean 2afc14b checkout.",
-    "The current local environment still cannot rerun the marked solver regressions because Couenne and IPOPT are not on PATH."
+    "The dirty patch artifacts were removed from this OpenPinch PR; retained provenance records the source repository, dirty artifact snapshot, and later clean parity commit 2afc14b7779482fc829edb1c3fa187b918d7fb19.",
+    "The current local environment used for manifest capture could not rerun the marked solver regressions because Couenne and IPOPT were not on PATH."
   ],
   "repositories": {
     "openpinch": {
@@ -15,7 +14,10 @@
       "manifest_capture_branch": "codex/openhens-migration-plan",
       "manifest_capture_head": "e670a1a8ebdd9fe2c90d8ef445af1d69c67aef2e",
       "manifest_capture_worktree": "dirty: HENS-00 documentation/artifact files were under review; pre-existing .DS_Store and docs/developer/index.rst changes were present and excluded from the HENS-00 implementation slice",
-      "excluded_dirty_tracked_files": [".DS_Store", "docs/developer/index.rst"],
+      "excluded_dirty_tracked_files": [
+        ".DS_Store",
+        "docs/developer/index.rst"
+      ],
       "stored_dirty_patch_artifact": "not_applicable_for_openhens_solver_artifact_provenance",
       "dirty_patch_sha256": null,
       "dirty_patch_status": "not required for the OpenHENS solver artifact baseline because the unrelated dirty tracked OpenPinch files are excluded from the HENS-00 task slice",
@@ -42,17 +44,11 @@
         "refactor_base": "92e942fec148d5e6a1e052bb3d207b95a4f85379",
         "refactor_current_head_recorded_by_existing_artifacts": "92e942fec148d5e6a1e052bb3d207b95a4f85379",
         "refactor_dirty_worktree_recorded_by_existing_artifacts": true,
-        "later_clean_commit_with_parity_fix": "2afc14b7779482fc829edb1c3fa187b918d7fb19",
-        "stored_dirty_patch_artifact": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
-        "stored_dirty_patch_sha256_artifact": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch.sha256"
+        "later_clean_commit_with_parity_fix": "2afc14b7779482fc829edb1c3fa187b918d7fb19"
       },
-      "stored_dirty_patch_artifact": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
-      "dirty_patch_sha256": "cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33",
-      "dirty_patch_status": "stored patch captures the recorded dirty refactor artifact source delta from 92e942fec148d5e6a1e052bb3d207b95a4f85379 to clean parity commit 2afc14b7779482fc829edb1c3fa187b918d7fb19",
-      "dirty_patch_verification": {
-        "command": "rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS apply --check --reverse /Users/ca107/Desktop/ahuora/OpenPinch/openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
-        "result": "passed against current clean OpenHENS checkout at 2afc14b7779482fc829edb1c3fa187b918d7fb19"
-      },
+      "stored_dirty_patch_artifact": null,
+      "dirty_patch_sha256": null,
+      "dirty_patch_status": "dirty patch artifacts removed from OpenPinch PR; retained provenance is commit metadata only",
       "python_version_at_manifest_capture": "3.14.2",
       "legacy_main_python_note": "Existing baseline README records that the main snapshot was run from a temporary Python 3.12 environment because legacy main failed under Python 3.14.",
       "dependency_lock_path": "../OpenHENS/uv.lock",
@@ -81,8 +77,30 @@
       "required_order_invariance_fixture_path": "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.reordered.json",
       "routine_dTmin": 14,
       "routine_min_dQ": 0.5,
-      "full_source_dTmin_grid": [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
-      "full_source_min_dQ_grid": [0.5, 0.9, 1.3, 1.7, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0]
+      "full_source_dTmin_grid": [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20
+      ],
+      "full_source_min_dQ_grid": [
+        0.5,
+        0.9,
+        1.3,
+        1.7,
+        2.1,
+        2.4,
+        2.8,
+        3.2,
+        3.6,
+        4.0
+      ]
     },
     {
       "case_id": "Nine-stream-Linnhoff-and-Ahmad-1999-1",
@@ -95,8 +113,30 @@
       "routine_min_dQ": null,
       "final_verification_dTmin": 18,
       "final_verification_min_dQ": 1.7,
-      "full_source_dTmin_grid": [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
-      "full_source_min_dQ_grid": [0.5, 0.9, 1.3, 1.7, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0]
+      "full_source_dTmin_grid": [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20
+      ],
+      "full_source_min_dQ_grid": [
+        0.5,
+        0.9,
+        1.3,
+        1.7,
+        2.1,
+        2.4,
+        2.8,
+        3.2,
+        3.6,
+        4.0
+      ]
     }
   ],
   "artifact_generation": {
@@ -133,21 +173,28 @@
     "solver_binary_status_at_manifest_capture": [
       {
         "name": "couenne",
-        "required_for": ["PDM", "TDM"],
+        "required_for": [
+          "PDM",
+          "TDM"
+        ],
         "path": null,
         "version": null,
         "status": "missing from PATH; `rtk which couenne` exited 1"
       },
       {
         "name": "ipopt",
-        "required_for": ["ESM through ipopt-pyomo"],
+        "required_for": [
+          "ESM through ipopt-pyomo"
+        ],
         "path": null,
         "version": null,
         "status": "missing from PATH; `rtk which ipopt` exited 1"
       },
       {
         "name": "apopt",
-        "required_for": ["GEKKO fallback tasks in existing OpenHENS metadata"],
+        "required_for": [
+          "GEKKO fallback tasks in existing OpenHENS metadata"
+        ],
         "path": "GEKKO-managed solver",
         "version": "gekko 1.3.2",
         "status": "standalone binary version not probed"
@@ -158,8 +205,6 @@
     "comparison_json": "openhens_baseline_results/comparison.json",
     "comparison_csv": "openhens_baseline_results/comparison.csv",
     "refactor_branch_summary": "openhens_baseline_results/refactor/branch_summary.json",
-    "openhens_refactor_dirty_patch": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
-    "openhens_refactor_dirty_patch_sha256": "openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch.sha256",
     "four_stream": {
       "summary": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json",
       "run_summary_csv": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/run_summary.csv",
@@ -242,16 +287,6 @@
       "cwd": "../OpenHENS",
       "command": "rtk uv run pytest -m solver",
       "result": "blocked: Couenne and IPOPT are missing from PATH in this environment"
-    },
-    {
-      "cwd": ".",
-      "command": "rtk shasum -a 256 openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
-      "result": "passed: cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33"
-    },
-    {
-      "cwd": ".",
-      "command": "rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS apply --check --reverse /Users/ca107/Desktop/ahuora/OpenPinch/openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch",
-      "result": "passed: patch reverses cleanly from OpenHENS 2afc14b7779482fc829edb1c3fa187b918d7fb19 to the recorded 92e942f base"
     }
   ]
 }

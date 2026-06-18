@@ -7,27 +7,18 @@ pass.
 
 ## Prior Finding Resolution
 
-### Resolved: Baseline provenance is now reproducible enough for HENS-00
+### Historical: Baseline provenance now relies on commit metadata
 
 The prior blocker was that the refactor baseline artifact snapshot recorded a
-dirty OpenHENS worktree without a stored patch artifact or hash. That is now
-addressed. The task file lists the checked-in provenance patch and `.sha256`
-artifact (`docs/developer/openhens-integration-tasks/00-baseline-freeze-and-acceptance-matrix.md:107`),
-and the manifest records the patch path, SHA256, and reverse-apply verification
-for the OpenHENS dirty artifact source
-(`openhens_baseline_results/baseline_manifest.json:49`,
-`openhens_baseline_results/baseline_manifest.json:52`). The refactor branch
-summary now also points from the dirty recorded artifact snapshot to the stored
-patch and clean target head
-(`openhens_baseline_results/refactor/branch_summary.json:41`).
+dirty OpenHENS worktree without enough context. The checked-in patch artifacts
+that originally resolved that blocker have since been removed from this
+OpenPinch PR. The retained baseline evidence now records the dirty artifact
+snapshot commit, the current clean OpenHENS parity commit, source case hashes,
+dependency lock hashes, and curated baseline outputs without storing the dirty
+patch file or checksum.
 
-I rechecked the evidence locally:
+I rechecked the evidence locally during the original HENS-00 review:
 
-- `rtk shasum -a 256 openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch`
-  returned `cf18b6bdd96cca78fc3e6ac24a68e1327edcbcda5d9c7bb55e05b0e92695dd33`,
-  matching `openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch.sha256`.
-- `rtk git -C /Users/ca107/Desktop/ahuora/OpenHENS apply --check --reverse /Users/ca107/Desktop/ahuora/OpenPinch/openhens_baseline_results/provenance/openhens-refactor-92e942f-to-2afc14b.patch`
-  exited 0 against the clean OpenHENS checkout.
 - `rtk jq -e .` succeeded for the baseline manifest, refactor branch summary,
   and both Tier 0 summary files.
 
@@ -91,6 +82,5 @@ remain excluded from the final task commit or PR.
 
 ## Verdict
 
-HENS-00 is cleared. The prior provenance blocker is resolved with a checked-in
-patch plus hash and verified reverse apply, and the unrelated `.DS_Store` dirty
-file is now explicitly excluded from the HENS-00 implementation slice.
+HENS-00 is cleared for the retained artifact policy. The unrelated `.DS_Store`
+dirty file is explicitly excluded from the HENS-00 implementation slice.
