@@ -119,8 +119,7 @@ def test_notebook_3_compares_direct_indirect_and_carnot_backends(
     assert "plot.catalog()" in combined_source
     assert "selected_problem.plot.net_load_profiles_with_heat_pump(" in combined_source
     assert (
-        "selected_problem.plot.grand_composite_curve_with_heat_pump("
-        in combined_source
+        "selected_problem.plot.grand_composite_curve_with_heat_pump(" in combined_source
     )
     assert "compare_cases(" in combined_source
 

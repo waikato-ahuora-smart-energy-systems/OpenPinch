@@ -6,6 +6,7 @@ import numpy as np
 
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
+from ..common._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
     encode_base_and_duty_splits,
@@ -100,8 +101,13 @@ def _get_cascade_hp_opt_setup(
     if init_res is None:
         return None, bnds
 
-    Q_cool_ex = args.Q_cool_max + init_res.Q_amb_hot
-    Q_heat_ex = args.Q_heat_max + init_res.Q_amb_cold
+    ambient = preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=init_res.Q_amb_hot,
+        Q_amb_cold=init_res.Q_amb_cold,
+    )
+    Q_cool_ex = ambient.Q_cool_capacity
+    Q_heat_ex = ambient.Q_heat_capacity
 
     x_amb = map_Q_amb_to_x(
         init_res.Q_amb_hot,
@@ -174,21 +180,22 @@ def _parse_cascade_hp_state_variables(
     x_ihx = parts["x_ihx"]
 
     Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
+    ambient = preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=Q_amb_hot,
+        Q_amb_cold=Q_amb_cold,
+    )
+    H_cold_with_amb = ambient.H_cold_with_residual_ambient(args)
+    H_hot_with_amb = ambient.H_hot_with_residual_ambient(args)
     T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
-    Q_heat_base = (
-        float(x_heat_base[0]) * (args.Q_heat_max + Q_amb_cold) if n_heat else None
-    )
-    Q_cool_base = (
-        float(x_cool_base[0]) * (args.Q_cool_max + Q_amb_hot) if n_cool else None
-    )
+    Q_heat_base = float(x_heat_base[0]) * ambient.Q_heat_capacity if n_heat else None
+    Q_cool_base = float(x_cool_base[0]) * ambient.Q_cool_capacity if n_cool else None
     Q_heat_available = (
         get_Q_vals_at_T_hpr_from_bckgrd_profile(
             T_cond if is_heat_pumping else T_cond[:n_heat],
-            args.T_cold,
+            ambient.T_cold_residual,
             H_cold_with_amb,
             is_cond=True,
         )
@@ -198,7 +205,7 @@ def _parse_cascade_hp_state_variables(
     Q_cool_available = (
         get_Q_vals_at_T_hpr_from_bckgrd_profile(
             T_evap[:n_cool] if is_heat_pumping else T_evap,
-            args.T_hot,
+            ambient.T_hot_residual,
             H_hot_with_amb,
             is_cond=False,
         )
@@ -214,6 +221,10 @@ def _parse_cascade_hp_state_variables(
         T_evap=T_evap,
         Q_amb_hot=Q_amb_hot,
         Q_amb_cold=Q_amb_cold,
+        Q_amb_hot_direct=ambient.Q_amb_hot_direct,
+        Q_amb_cold_direct=ambient.Q_amb_cold_direct,
+        Q_amb_hot_residual=ambient.Q_amb_hot_residual,
+        Q_amb_cold_residual=ambient.Q_amb_cold_residual,
         dT_ihx_gas_side=dT_ihx_gas_side,
         Q_heat_base=Q_heat_base,
         Q_cool_base=Q_cool_base,

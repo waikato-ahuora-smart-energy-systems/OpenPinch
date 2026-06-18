@@ -30,6 +30,7 @@ from ...common.problem_table_analysis import (
     get_process_heat_cascade,
     get_utility_heat_cascade,
 )
+from ._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ._shared.plotting import plot_multi_hp_profiles_from_results
 from ._shared.streams import (
     get_ambient_air_stream,
@@ -253,12 +254,12 @@ def _build_hpr_accounting(
 def _cycle_penalty(
     *,
     args: HeatPumpTargetInputs,
-    cycle_penalty_terms: np.ndarray | None = None,
+    cycle_penalty_terms: list[float] | None = None,
 ) -> float:
     if cycle_penalty_terms is None:
         cycle_terms = np.array([])
     else:
-        cycle_terms = np.maximum(cycle_penalty_terms, 0.0)
+        cycle_terms = np.maximum(np.asarray(cycle_penalty_terms, dtype=float), 0.0)
     if not cycle_terms.size:
         return 0.0
     return float(
@@ -434,37 +435,62 @@ def evaluate_vapour_hpr_result(
     cop_h: float,
     hpr_streams: StreamCollection,
     model: Any = None,
-    penalty_terms: np.ndarray | None = None,
+    penalty_terms: list[float] | None = None,
     dT_subcool: np.ndarray | None = None,
     dT_superheat: np.ndarray | None = None,
     debug: bool = False,
 ) -> HPRBackendResult:
     """Shared simulated-vapour accounting, plotting, and result assembly."""
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * state.Q_amb_hot
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * state.Q_amb_cold
+    ambient_prealloc = preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=state.Q_amb_hot,
+        Q_amb_cold=state.Q_amb_cold,
+    )
+    H_hot_with_amb = ambient_prealloc.H_hot_with_residual_ambient(args)
+    H_cold_with_amb = ambient_prealloc.H_cold_with_residual_ambient(args)
 
-    hot_streams = (
-        hpr_streams.get_hot_utility_streams()
-        + args.bckgrd_hot_streams
-        + get_ambient_air_stream(Q_amb_hot=state.Q_amb_hot, args=args)
+    cond_hot_streams = hpr_streams.get_hot_utility_streams()
+    cond_cold_streams = ambient_prealloc.bckgrd_cold_streams + get_ambient_air_stream(
+        Q_amb_cold=ambient_prealloc.Q_amb_cold_residual, args=args
     )
-    cold_streams = (
-        hpr_streams.get_cold_utility_streams()
-        + args.bckgrd_cold_streams
-        + get_ambient_air_stream(Q_amb_cold=state.Q_amb_cold, args=args)
+    if len(cond_hot_streams) or len(cond_cold_streams):
+        pt_cond = get_process_heat_cascade(
+            hot_streams=cond_hot_streams,
+            cold_streams=cond_cold_streams,
+            is_shifted=True,
+            idx=args.idx,
+        )
+        Q_ext_heat = float(pt_cond[PT.H_NET][0])
+        cond_wrong_side = float(pt_cond[PT.H_NET][-1])
+    else:
+        Q_ext_heat = 0.0
+        cond_wrong_side = 0.0
+    evap_hot_streams = ambient_prealloc.bckgrd_hot_streams + get_ambient_air_stream(
+        Q_amb_hot=ambient_prealloc.Q_amb_hot_residual, args=args
     )
-    pt = get_process_heat_cascade(
-        hot_streams=hot_streams,
-        cold_streams=cold_streams,
-        is_shifted=True,
-        idx=args.idx,
+    evap_cold_streams = hpr_streams.get_cold_utility_streams()
+    if len(evap_hot_streams) or len(evap_cold_streams):
+        pt_evap = get_process_heat_cascade(
+            hot_streams=evap_hot_streams,
+            cold_streams=evap_cold_streams,
+            is_shifted=True,
+            idx=args.idx,
+        )
+        Q_ext_cold = float(pt_evap[PT.H_NET][-1])
+        evap_wrong_side = float(pt_evap[PT.H_NET][0])
+    else:
+        Q_ext_cold = 0.0
+        evap_wrong_side = 0.0
+    hx_units = (
+        len(cond_hot_streams)
+        + len(cond_cold_streams)
+        + len(evap_hot_streams)
+        + len(evap_cold_streams)
     )
-    Q_ext_heat = float(pt[PT.H_NET][0])
-    Q_ext_cold = float(pt[PT.H_NET][-1])
-    hx_units = len(hot_streams) + len(cold_streams)
+    all_penalty_terms = [*(penalty_terms or []), cond_wrong_side, evap_wrong_side]
     penalty_power_equivalent = _cycle_penalty(
         args=args,
-        cycle_penalty_terms=penalty_terms,
+        cycle_penalty_terms=all_penalty_terms,
     )
     cost_accounting = calc_simulated_hpr_annualized_costs(
         work=float(work),
@@ -482,9 +508,9 @@ def evaluate_vapour_hpr_result(
     debug_figure = None
     if debug:
         debug_figure = plot_multi_hp_profiles_from_results(
-            args.T_hot,
+            ambient_prealloc.T_hot_residual,
             H_hot_with_amb,
-            args.T_cold,
+            ambient_prealloc.T_cold_residual,
             H_cold_with_amb,
             hpr_streams.get_hot_utility_streams(),
             hpr_streams.get_cold_utility_streams(),

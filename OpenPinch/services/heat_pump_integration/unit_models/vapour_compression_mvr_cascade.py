@@ -40,7 +40,7 @@ class VapourCompressionMvrCascade:
         self._solved = False
         self._dtcont = 0.0
         self._dt_diff_max = 0.5
-        self._penalty = np.empty(0, dtype=float)
+        self._penalty: list[float] = []
         self._max_work = 0.0
 
     @property
@@ -188,17 +188,14 @@ class VapourCompressionMvrCascade:
         return self.Q_heat / self.work
 
     @property
-    def penalty(self) -> np.ndarray:
+    def penalty(self) -> list[float]:
         """Finite infeasibility and soft-constraint penalties."""
+        penalties = list(self._penalty)
         if self.solved:
-            cycle_penalties = [
-                cycle.penalty
-                for cycle in self.subcycles
-                if cycle.penalty is not None
-            ]
-            if cycle_penalties:
-                return np.concatenate([self._penalty, *cycle_penalties])
-        return self._penalty
+            for cycle in self.subcycles:
+                if cycle.penalty is not None:
+                    penalties.extend(self._as_penalty_list(cycle.penalty))
+        return penalties
 
     @property
     def T_evap(self) -> np.ndarray:
@@ -239,7 +236,7 @@ class VapourCompressionMvrCascade:
         self._solved = False
         self._vc_cycles = []
         self._mvr_cycles = []
-        self._penalty = np.empty(0, dtype=float)
+        self._penalty = []
         self._dtcont = float(dtcont)
 
         T_evap_vc = np.asarray(T_evap_vc, dtype=float).reshape(-1)
@@ -252,7 +249,7 @@ class VapourCompressionMvrCascade:
                 duty_name="heat",
             )
             Q_heat_vc = allocation.Q_model
-            self._penalty = allocation.Q_excess
+            self._penalty.extend(self._as_penalty_list(allocation.Q_excess))
         else:
             if Q_heat_vc is None:
                 raise ValueError(
@@ -306,11 +303,9 @@ class VapourCompressionMvrCascade:
         penalties.append(max(float(mvr_source_split) - 1.0, 0.0) * self._max_work)
         penalties.extend(np.maximum(-process_split, 0.0) * self._max_work)
         penalties.extend(np.maximum(process_split - 1.0, 0.0) * self._max_work)
-        self._penalty = np.concatenate(
-            [self._penalty, np.asarray(penalties, dtype=float)]
-        )
-        if np.any(self._penalty > 0.0):
-            self._max_work *= 1.0 + float(self._penalty.sum()) / self._max_work
+        self._penalty.extend(self._as_penalty_list(penalties))
+        if any(penalty > 0.0 for penalty in self._penalty):
+            self._max_work *= 1.0 + sum(self._penalty) / self._max_work
             return self._max_work
 
         self._source_split = float(np.clip(mvr_source_split, 0.0, 1.0))
@@ -340,12 +335,7 @@ class VapourCompressionMvrCascade:
             if not cycle.solved:
                 failed_work = abs(float(cycle.work or 0.0))
                 failed_work = failed_work if np.isfinite(failed_work) else 1.0
-                self._penalty = np.concatenate(
-                    [
-                        self._penalty,
-                        np.array([max(failed_work, 1.0)], dtype=float),
-                    ]
-                )
+                self._penalty.append(max(failed_work, 1.0))
                 self._max_work += max(failed_work, 1.0)
                 return self._max_work
 
@@ -392,12 +382,7 @@ class VapourCompressionMvrCascade:
             if not cycle.solved:
                 failed_work = abs(float(cycle.work or 0.0))
                 failed_work = failed_work if np.isfinite(failed_work) else 1.0
-                self._penalty = np.concatenate(
-                    [
-                        self._penalty,
-                        np.array([max(failed_work, 1.0)], dtype=float),
-                    ]
-                )
+                self._penalty.append(max(failed_work, 1.0))
                 self._max_work += max(failed_work, 1.0)
                 return self._max_work
 
@@ -499,6 +484,13 @@ class VapourCompressionMvrCascade:
     ) -> None:
         for stream in streams:
             stream.name = stream.name.rsplit("_H", 1)[0] + f"_H{stage_index}"
+
+    @staticmethod
+    def _as_penalty_list(values) -> list[float]:
+        return [
+            float(value)
+            for value in np.asarray(values, dtype=float).reshape(-1)
+        ]
 
     @staticmethod
     def _normalise_stage_array(values, size: int) -> np.ndarray:

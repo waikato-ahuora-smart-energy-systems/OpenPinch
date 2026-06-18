@@ -9,6 +9,7 @@ from OpenPinch.classes.value import Value
 from OpenPinch.lib.enums import PT
 from OpenPinch.lib.schemas.hpr import (
     HPRBackendResult,
+    HPRParsedState,
     HPRThermoArtifacts,
     SimulatedHPRAnnualizedCostAccounting,
 )
@@ -249,6 +250,240 @@ def test_cycle_penalty_scores_only_cycle_terms():
     )
 
     assert penalty == pytest.approx(50.0)
+
+
+def test_direct_ambient_sink_preallocation_reduces_background_hot_profile():
+    args = _base_args()
+
+    ambient = hp_shared.preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=0.0,
+        Q_amb_cold=50.0,
+    )
+
+    assert ambient.Q_amb_cold_direct == pytest.approx(50.0)
+    assert ambient.Q_amb_cold_residual == pytest.approx(0.0)
+    np.testing.assert_allclose(
+        ambient.T_hot_residual,
+        np.array([140.0, 90.0, 71.25, 40.0]),
+    )
+    np.testing.assert_allclose(
+        ambient.H_hot_residual,
+        np.array([0.0, -80.0, -110.0, -110.0]),
+    )
+    np.testing.assert_allclose(ambient.T_cold_residual, args.T_cold)
+    np.testing.assert_allclose(ambient.H_cold_residual, args.H_cold)
+
+
+def test_direct_ambient_source_preallocation_reduces_background_cold_profile():
+    args = _base_args(T_env=90.0)
+
+    ambient = hp_shared.preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=50.0,
+        Q_amb_cold=0.0,
+    )
+
+    assert ambient.Q_amb_hot_direct == pytest.approx(50.0)
+    assert ambient.Q_amb_hot_residual == pytest.approx(0.0)
+    np.testing.assert_allclose(
+        ambient.T_cold_residual,
+        np.array([130.0, 90.0, 80.0, 55.0, 30.0]),
+    )
+    np.testing.assert_allclose(
+        ambient.H_cold_residual,
+        np.array([150.0, 70.0, 50.0, 0.0, 0.0]),
+    )
+    np.testing.assert_allclose(ambient.T_hot_residual, args.T_hot)
+    np.testing.assert_allclose(ambient.H_hot_residual, args.H_hot)
+
+
+def test_direct_ambient_preallocation_keeps_excess_as_residual():
+    args = _base_args()
+
+    ambient = hp_shared.preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=0.0,
+        Q_amb_cold=200.0,
+    )
+
+    assert ambient.Q_amb_cold_direct == pytest.approx(160.0)
+    assert ambient.Q_amb_cold_residual == pytest.approx(40.0)
+    np.testing.assert_allclose(ambient.T_hot_residual, args.T_hot)
+    np.testing.assert_allclose(ambient.H_hot_residual, np.zeros(3))
+
+
+def test_direct_ambient_preallocation_zero_duty_leaves_profiles_unchanged():
+    args = _base_args()
+
+    ambient = hp_shared.preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=0.0,
+        Q_amb_cold=0.0,
+    )
+
+    assert ambient.Q_amb_hot_direct == pytest.approx(0.0)
+    assert ambient.Q_amb_cold_direct == pytest.approx(0.0)
+    np.testing.assert_allclose(ambient.T_hot_residual, args.T_hot)
+    np.testing.assert_allclose(ambient.H_hot_residual, args.H_hot)
+    np.testing.assert_allclose(ambient.T_cold_residual, args.T_cold)
+    np.testing.assert_allclose(ambient.H_cold_residual, args.H_cold)
+
+
+def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():
+    args = _base_args(
+        T_hot=np.array([100.0, 50.0]),
+        H_hot=np.array([0.0, -100.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([100.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        Q_heat_max=100.0,
+        Q_cool_max=100.0,
+    )
+
+    result = hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+        ),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=StreamCollection(),
+    )
+
+    assert result.Q_ext_heat == pytest.approx(100.0)
+    assert result.Q_ext_cold == pytest.approx(100.0)
+
+
+def test_vapour_evaluator_penalises_hpr_self_match_without_one_point_cascade():
+    args = _base_args(
+        T_hot=np.array([100.0, 50.0]),
+        H_hot=np.array([0.0, 0.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([0.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        Q_heat_max=0.0,
+        Q_cool_max=0.0,
+    )
+    hpr_streams = _sc(
+        _stream("cond", 120.0, 100.0, 100.0, is_process_stream=False),
+        _stream("evap", 40.0, 60.0, 100.0, is_process_stream=False),
+    )
+
+    result = hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+        ),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([100.0]),
+        Q_cool=np.array([100.0]),
+        cop_h=1.0,
+        hpr_streams=hpr_streams,
+    )
+
+    assert result.Q_ext == pytest.approx(0.0)
+    assert result.feasibility_penalty > 0.0
+
+
+def test_vapour_evaluator_counts_direct_ambient_sink_once():
+    args = _base_args(
+        T_hot=np.array([100.0, 50.0]),
+        H_hot=np.array([0.0, -100.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([0.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        Q_heat_max=0.0,
+        Q_cool_max=100.0,
+        T_env=20.0,
+    )
+
+    result = hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=60.0,
+        ),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=StreamCollection(),
+    )
+
+    assert result.Q_amb_cold == pytest.approx(60.0)
+    assert result.Q_ext_cold == pytest.approx(40.0)
+
+
+def test_carnot_debug_plot_uses_unmodified_background_profiles(monkeypatch):
+    args = _base_args()
+
+    def fake_plot(T_hot, H_hot, T_cold, H_cold, *_args, **_kwargs):
+        assert len(T_hot) == len(H_hot)
+        assert len(T_cold) == len(H_cold)
+        np.testing.assert_allclose(T_hot, args.T_hot)
+        np.testing.assert_allclose(T_cold, args.T_cold)
+        return "figure"
+
+    monkeypatch.setattr(hp_shared, "plot_multi_hp_profiles_from_results", fake_plot)
+
+    result = hp_shared.evaluate_carnot_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            T_cond=np.array([100.0]),
+            T_evap=np.array([60.0]),
+        ),
+        w_net=10.0,
+        w_hpr=np.array([10.0]),
+        Q_cond_total=np.array([40.0]),
+        Q_evap_total=np.array([30.0]),
+        debug=True,
+    )
+
+    assert result.artifacts.debug_figure == "figure"
+
+
+def test_vapour_debug_plot_uses_residual_profiles_after_direct_ambient(monkeypatch):
+    args = _base_args()
+    seen = {}
+
+    def fake_plot(T_hot, H_hot, T_cold, H_cold, *_args, **_kwargs):
+        seen["T_hot"] = T_hot
+        assert len(T_hot) == len(H_hot)
+        assert len(T_cold) == len(H_cold)
+        return "figure"
+
+    monkeypatch.setattr(hp_shared, "plot_multi_hp_profiles_from_results", fake_plot)
+
+    result = hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=50.0,
+        ),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=StreamCollection(),
+        debug=True,
+    )
+
+    assert result.artifacts.debug_figure == "figure"
+    assert len(seen["T_hot"]) > len(args.T_hot)
 
 
 @pytest.mark.parametrize("x0_ls", [None, [], np.array([])])

@@ -24,10 +24,15 @@ def test_parallel_hp_x0_and_bounds_shapes_are_consistent():
     args = SimpleNamespace(
         T_cold=np.array([140.0, 80.0, 20.0]),
         T_hot=np.array([130.0, 70.0, 10.0]),
+        H_cold=np.array([1000.0, 500.0, 0.0]),
+        H_hot=np.array([0.0, -500.0, -1000.0]),
+        z_amb_cold=np.zeros(3),
+        z_amb_hot=np.zeros(3),
         n_cond=2,
         n_evap=2,
         dt_range_max=130.0,
         dt_phase_change=1.0,
+        T_env=20.0,
         Q_hpr_target=1000.0,
         refrigerant_ls=["R134A", "R134A"],
         Q_cool_max=1000.0,
@@ -71,6 +76,8 @@ def test_parallel_x0_round_trips_with_ambient_cooling_seed():
     np.testing.assert_allclose(vars["T_evap"], init_res.T_evap)
     assert vars["Q_amb_hot"] == pytest.approx(init_res.Q_amb_hot)
     assert vars["Q_amb_cold"] == pytest.approx(init_res.Q_amb_cold)
+    assert vars["Q_amb_cold_direct"] == pytest.approx(init_res.Q_amb_cold)
+    assert vars["Q_amb_cold_residual"] == pytest.approx(0.0)
     assert vars["Q_heat_base"] == pytest.approx(init_res.Q_cond.sum())
     np.testing.assert_allclose(
         decode_duty_splits(vars["x_heat_split"], vars["Q_heat_base"]),

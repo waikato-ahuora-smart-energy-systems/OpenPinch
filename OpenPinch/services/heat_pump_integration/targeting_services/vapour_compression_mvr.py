@@ -6,6 +6,7 @@ import numpy as np
 
 from ....lib.schemas.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
 from ....utils.decorators import timing_decorator
+from ..common._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
     encode_base_and_duty_splits,
@@ -107,7 +108,12 @@ def _get_vc_mvr_opt_setup(
 
     n_vc = _num_vc_stages(args)
     n_mvr = _num_mvr_stages(args)
-    Q_primary_ex = args.Q_heat_max + init_res.Q_amb_cold
+    ambient = preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=init_res.Q_amb_hot,
+        Q_amb_cold=init_res.Q_amb_cold,
+    )
+    Q_primary_ex = ambient.Q_heat_capacity
     x_amb = map_Q_amb_to_x(
         init_res.Q_amb_hot,
         init_res.Q_amb_cold,
@@ -160,11 +166,16 @@ def _parse_vc_mvr_state_variables(
         args.T_hot[-1],
         args.T_hot[0],
     )
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
-    Q_heat_base = float(parts["x_heat_base"][0]) * (args.Q_heat_max + Q_amb_cold)
+    ambient = preallocate_direct_ambient_duties(
+        args=args,
+        Q_amb_hot=Q_amb_hot,
+        Q_amb_cold=Q_amb_cold,
+    )
+    H_cold_with_amb = ambient.H_cold_with_residual_ambient(args)
+    Q_heat_base = float(parts["x_heat_base"][0]) * ambient.Q_heat_capacity
     Q_heat_available = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond_vc,
-        args.T_cold,
+        ambient.T_cold_residual,
         H_cold_with_amb,
         is_cond=True,
     )
@@ -190,6 +201,10 @@ def _parse_vc_mvr_state_variables(
         Q_cool=None,
         Q_amb_hot=Q_amb_hot,
         Q_amb_cold=Q_amb_cold,
+        Q_amb_hot_direct=ambient.Q_amb_hot_direct,
+        Q_amb_cold_direct=ambient.Q_amb_cold_direct,
+        Q_amb_hot_residual=ambient.Q_amb_hot_residual,
+        Q_amb_cold_residual=ambient.Q_amb_cold_residual,
         dT_ihx_gas_side=dT_ihx_gas_side,
         Q_heat_base=Q_heat_base,
         x_heat_split=parts["x_heat_split"],
@@ -269,7 +284,7 @@ def _compute_vc_mvr_system_obj(
             cop_h=cop,
             hpr_streams=hpr_streams,
             model=hp,
-            penalty_terms=[hp.penalty],
+            penalty_terms=hp.penalty,
             dT_subcool=solved_state.dT_subcool,
             debug=debug,
         )
@@ -292,7 +307,7 @@ def _finite_failed_vc_mvr_result(
     reason: str,
     state: HPRParsedState,
     work: float,
-    penalty_terms,
+    penalty_terms: list[float],
     args: HeatPumpTargetInputs,
 ) -> HPRBackendResult:
     work = max(float(work), 1.0)

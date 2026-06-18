@@ -133,6 +133,10 @@ class HPRParsedState(BaseModel):
 
     Q_amb_hot: float = 0.0
     Q_amb_cold: float = 0.0
+    Q_amb_hot_direct: float = 0.0
+    Q_amb_cold_direct: float = 0.0
+    Q_amb_hot_residual: float = 0.0
+    Q_amb_cold_residual: float = 0.0
     T_cond: np.ndarray | None = None
     T_evap: np.ndarray | None = None
     dT_subcool: np.ndarray | None = None

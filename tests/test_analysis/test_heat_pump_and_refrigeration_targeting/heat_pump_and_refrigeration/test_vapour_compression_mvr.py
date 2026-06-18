@@ -600,7 +600,7 @@ def test_vc_mvr_cascade_infeasible_ordering_returns_finite_penalty():
 
     assert cascade.solved is False
     assert np.isfinite(work)
-    assert np.any(cascade.penalty > 0.0)
+    assert any(penalty > 0.0 for penalty in cascade.penalty)
 
 
 def test_vc_mvr_cascade_propagates_unsolved_vc_child_cycle(monkeypatch):
@@ -629,7 +629,7 @@ def test_vc_mvr_cascade_propagates_unsolved_vc_child_cycle(monkeypatch):
 
     assert cascade.solved is False
     assert work > 0.0
-    assert np.any(cascade.penalty > 0.0)
+    assert any(penalty > 0.0 for penalty in cascade.penalty)
 
 
 def test_vc_mvr_x0_bounds_parse_round_trip():
@@ -682,6 +682,8 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     np.testing.assert_allclose(unpacked["T_evap_mvr"][1], unpacked["T_cond_mvr"][0])
     assert np.all(unpacked["dT_lift_mvr"] <= 20.0)
     assert state.Q_amb_cold == pytest.approx(init_res.Q_amb_cold)
+    assert state.Q_amb_cold_direct == pytest.approx(init_res.Q_amb_cold)
+    assert state.Q_amb_cold_residual == pytest.approx(0.0)
 
 
 def test_vc_mvr_heat_duties_use_split_fractions():
@@ -724,7 +726,7 @@ def test_compute_vc_mvr_system_obj_solved(monkeypatch):
         Q_heat = 200.0
         Q_heat_arr = np.array([80.0, 120.0])
         Q_cool_arr = np.array([90.0, 0.0])
-        penalty = np.array([0.0])
+        penalty = [0.0]
         T_cond_mvr = np.array([100.0])
         T_evap_mvr = np.array([90.0])
         mvr_cycles = [SimpleNamespace(dT_subcool=1.0)]
