@@ -608,7 +608,7 @@ class PinchProblem:
                 other_unit = base_unit
                 change_row[col] = float(other_value) - float(base_value)
                 change_row[unit_col] = base_unit
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 change_row[col] = None
                 change_row[unit_col] = None
 

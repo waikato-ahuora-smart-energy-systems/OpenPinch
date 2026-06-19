@@ -51,8 +51,7 @@ def heat_exchanger_network_synthesis_service(
     verification_failures = verify_synthesis_result(design)
     if verification_failures:
         raise RuntimeError(
-            "HEN synthesis verification failed: "
-            + "; ".join(verification_failures)
+            "HEN synthesis verification failed: " + "; ".join(verification_failures)
         )
 
     problem._results = TargetOutput.model_validate(
@@ -91,8 +90,7 @@ def _normalise_runtime_options(options: dict[str, Any] | None) -> dict[str, Any]
         raise ValueError(
             "HEN synthesis configuration must be loaded through "
             "TargetInput.options / prepared Configuration, not passed as "
-            "separate design options: "
-            + ", ".join(hens_overrides)
+            "separate design options: " + ", ".join(hens_overrides)
         )
     return dict(options)
 

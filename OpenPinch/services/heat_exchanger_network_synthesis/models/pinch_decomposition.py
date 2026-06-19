@@ -506,10 +506,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         self.theta_2[i][j][k][0],
                         self.z[i][j][k][0],
                         formula_allowed=(
-                            abs(
-                                self.theta_1[i][j][k][0]
-                                - self.theta_2[i][j][k][0]
-                            )
+                            abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
                             > self.tol
                             and self.theta_1[i][j][k][0] >= self.dTmin
                             and self.theta_2[i][j][k][0] >= self.dTmin

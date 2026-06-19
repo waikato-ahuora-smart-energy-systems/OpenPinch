@@ -24,9 +24,7 @@ from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
 REGRESSION_ARTIFACT_ROOT = FIXTURE_ROOT / "regression_artifacts"
-ADAPTER_ARRAY_SNAPSHOT_ROOT = (
-    REGRESSION_ARTIFACT_ROOT / "adapter_array_snapshots"
-)
+ADAPTER_ARRAY_SNAPSHOT_ROOT = REGRESSION_ARTIFACT_ROOT / "adapter_array_snapshots"
 CASE_DTMIN = {
     "Four-stream-Yee-and-Grossmann-1990-1": 14.0,
     "Nine-stream-Linnhoff-and-Ahmad-1999-1": 18.0,
@@ -131,7 +129,9 @@ def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
         "Process A.Cold 5 N",
     ]
     assert payload.utility_identities["hot_utilities"] == ["Hot Utility.HPS"]
-    np.testing.assert_allclose(payload.arrays["T_c_in"], [373.15, 308.15, 358.15, 333.15, 413.15])
+    np.testing.assert_allclose(
+        payload.arrays["T_c_in"], [373.15, 308.15, 358.15, 333.15, 413.15]
+    )
     np.testing.assert_allclose(payload.arrays["f_c"], [100.0, 70.0, 350.0, 60.0, 200.0])
     np.testing.assert_allclose(payload.arrays["hu_cost"], [60.0])
 

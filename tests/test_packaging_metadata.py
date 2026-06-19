@@ -85,7 +85,9 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
     ]
 
     synthesis_only = {"pyomo", "gekko", "matplotlib", "kaleido", "wakepy"}
-    core_deps = {_dependency_name(dep) for dep in _read_pyproject()["project"]["dependencies"]}
+    core_deps = {
+        _dependency_name(dep) for dep in _read_pyproject()["project"]["dependencies"]
+    }
     full_deps = {_dependency_name(dep) for dep in optional_deps["full"]}
     unrelated_optional_deps = {
         _dependency_name(dep)
@@ -114,9 +116,7 @@ def test_full_extra_aggregates_optional_runtime_surfaces():
 def test_full_extra_does_not_include_solver_synthesis_stack():
     full_deps = {_dependency_name(dep) for dep in _optional_deps()["full"]}
 
-    assert {"pyomo", "gekko", "matplotlib", "kaleido", "wakepy"}.isdisjoint(
-        full_deps
-    )
+    assert {"pyomo", "gekko", "matplotlib", "kaleido", "wakepy"}.isdisjoint(full_deps)
 
 
 def test_dev_dependency_group_retains_notebook_dependencies():

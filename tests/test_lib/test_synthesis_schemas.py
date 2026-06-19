@@ -135,9 +135,7 @@ def test_target_output_accepts_design_result_payload():
     round_tripped = TargetOutput.model_validate_json(output.model_dump_json())
 
     assert round_tripped.design is not None
-    assert round_tripped.design.network.total_duty(stream="H1") == pytest.approx(
-        100.0
-    )
+    assert round_tripped.design.network.total_duty(stream="H1") == pytest.approx(100.0)
 
 
 @pytest.mark.parametrize(

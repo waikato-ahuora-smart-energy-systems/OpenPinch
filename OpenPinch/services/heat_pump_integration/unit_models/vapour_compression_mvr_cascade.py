@@ -487,10 +487,7 @@ class VapourCompressionMvrCascade:
 
     @staticmethod
     def _as_penalty_list(values) -> list[float]:
-        return [
-            float(value)
-            for value in np.asarray(values, dtype=float).reshape(-1)
-        ]
+        return [float(value) for value in np.asarray(values, dtype=float).reshape(-1)]
 
     @staticmethod
     def _normalise_stage_array(values, size: int) -> np.ndarray:

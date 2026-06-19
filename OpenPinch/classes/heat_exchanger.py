@@ -99,10 +99,7 @@ class HeatExchanger(BaseModel):
         value: tuple[float, ...],
     ) -> tuple[float, ...]:
         for approach_temperature in value:
-            if (
-                not math.isfinite(approach_temperature)
-                or approach_temperature < 0.0
-            ):
+            if not math.isfinite(approach_temperature) or approach_temperature < 0.0:
                 raise ValueError(
                     "approach temperatures must be finite non-negative values"
                 )

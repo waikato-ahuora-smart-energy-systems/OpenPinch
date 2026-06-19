@@ -776,10 +776,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 brackets=brackets,
                             )
                             self._set_value(
-                            self.T_c_out_y[j][i][k],
-                            init_solution.T_c[j][k].VALUE[0],
-                            brackets=brackets,
-                        )
+                                self.T_c_out_y[j][i][k],
+                                init_solution.T_c[j][k].VALUE[0],
+                                brackets=brackets,
+                            )
 
     def get_net_benefit_evolution(
         self,
@@ -863,10 +863,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
 
         best_model.verify()
         self.alpha = [
-            [
-                [best_model.alpha[i][j][k] for k in range(self.S)]
-                for j in range(self.J)
-            ]
+            [[best_model.alpha[i][j][k] for k in range(self.S)] for j in range(self.J)]
             for i in range(self.I)
         ]
         self.z_allowed = [
@@ -1177,15 +1174,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         self.theta_2[i][j][k][0],
                         self.z[i][j][k][0],
                         formula_allowed=(
-                            abs(
-                                self.theta_1[i][j][k][0]
-                                - self.theta_2[i][j][k][0]
-                            )
+                            abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
                             > self.tol
-                            and abs(self.theta_1[i][j][k][0] - self.dTmin)
-                            >= self.tol
-                            and abs(self.theta_2[i][j][k][0] - self.dTmin)
-                            >= self.tol
+                            and abs(self.theta_1[i][j][k][0] - self.dTmin) >= self.tol
+                            and abs(self.theta_2[i][j][k][0] - self.dTmin) >= self.tol
                         ),
                     )
                     for k in range(self.S)
@@ -1218,10 +1210,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         - (self.T_hu_out[0] - self.T_c[j][0][0])
                     )
                     > self.tol
-                    and (self.T_hu_in[0] - self.T_c_out[j] - self.dTmin)
-                    >= self.tol
-                    and (self.T_hu_out[0] - self.T_c[j][0][0] - self.dTmin)
-                    >= self.tol
+                    and (self.T_hu_in[0] - self.T_c_out[j] - self.dTmin) >= self.tol
+                    and (self.T_hu_out[0] - self.T_c[j][0][0] - self.dTmin) >= self.tol
                 ),
             )
             for j in range(self.J)
@@ -1245,8 +1235,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                     > self.tol
                     and (self.T_h[i][self.S][0] - self.T_cu_out[0] - self.dTmin)
                     >= self.tol
-                    and (self.T_h_out[i] - self.T_cu_in[0] - self.dTmin)
-                    >= self.tol
+                    and (self.T_h_out[i] - self.T_cu_in[0] - self.dTmin) >= self.tol
                 ),
                 fallback_delta=self.T_h_out[i] - self.T_cu_in[0],
             )
@@ -1347,15 +1336,11 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             for j in range(self.J):
                 for i in range(self.I):
                     if self.z[i][j][k][0] == 1:
-                        self.net_benefit[i][j][k] = (
-                            self.Q_r[i][j][k][0]
-                            * self.alpha[i][j][k][0]
-                            * (self.hu_cost[0] + self.cu_cost[0])
-                            - (
-                                self.unit_cost[0]
-                                + self.A_coeff[0]
-                                * (self.area_r[i][j][k] ** self.A_exp[0])
-                            )
+                        self.net_benefit[i][j][k] = self.Q_r[i][j][k][0] * self.alpha[
+                            i
+                        ][j][k][0] * (self.hu_cost[0] + self.cu_cost[0]) - (
+                            self.unit_cost[0]
+                            + self.A_coeff[0] * (self.area_r[i][j][k] ** self.A_exp[0])
                         )
                         if self.net_benefit[i][j][k] < smallest_net_benefit:
                             smallest_net_benefit = self.net_benefit[i][j][k]
@@ -1494,9 +1479,7 @@ def _check_area_costs(
 ) -> bool:
     for k in range(case.S):
         for j in range(case.J):
-            allowed_hots = [
-                i for i in range(case.I) if case.z_allowed[i][j][k] > 0
-            ]
+            allowed_hots = [i for i in range(case.I) if case.z_allowed[i][j][k] > 0]
             if not allowed_hots:
                 continue
 

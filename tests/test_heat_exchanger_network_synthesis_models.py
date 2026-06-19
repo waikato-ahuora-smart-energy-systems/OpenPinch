@@ -52,10 +52,6 @@ from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OPENHENS_ROOT = Path("/Users/ca107/Desktop/ahuora/OpenHENS")
-OPENHENS_FOUR_STREAM_CSV = (
-    OPENHENS_ROOT / "examples/cases/Four-stream-Yee-and-Grossmann-1990-1.csv"
-)
 FOUR_STREAM_JSON = (
     REPO_ROOT / "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json"
 )
@@ -282,281 +278,6 @@ def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
 
     assert ranking_model.get_lowest_benefit_HX() == [[0, 0, 0]]
     assert ranking_model.get_max_benefit_HX() == [[0, 1, 1]]
-
-
-def test_stagewise_construction_matches_source_four_stream_structural_fields(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    SourceStageWiseModel, _SourcePinchDecompModel = _source_openhens_models(
-        monkeypatch,
-        tmp_path,
-    )
-    moved = StageWiseModel(
-        name="moved-stagewise",
-        framework="TDM",
-        solver="apopt",
-        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 0.1),
-        stages=3,
-        dTmin=0.1,
-        z_restriction=None,
-        min_dqda=0.5,
-        minimisation_goal="hot utility",
-        non_isothermal_model=False,
-        integers=True,
-        tol=1e-3,
-    )
-    source = SourceStageWiseModel(
-        name="source-stagewise",
-        framework="TDM",
-        solver="apopt",
-        import_file=OPENHENS_FOUR_STREAM_CSV,
-        stages=3,
-        dTmin=0.1,
-        z_restriction=[None, None, None],
-        min_dqda=0.5,
-        minimisation_goal="hot utility",
-        non_isothermal_model=False,
-        integers=True,
-        tol=1e-3,
-    )
-
-    assert (moved.I, moved.J, moved.S, moved.K) == (
-        source.I,
-        source.J,
-        source.S,
-        source.K,
-    )
-    hot_order = _axis_order(source.Qtot_sh, moved.Qtot_sh)
-    cold_order = _axis_order(source.Qtot_sc, moved.Qtot_sc)
-    np.testing.assert_allclose(moved.Qtot_sh, _take(source.Qtot_sh, hot_order))
-    np.testing.assert_allclose(moved.Qtot_sc, _take(source.Qtot_sc, cold_order))
-    np.testing.assert_allclose(
-        moved.Q_max,
-        _take(_take(source.Q_max, hot_order, axis=0), cold_order, axis=1),
-    )
-    assert moved.z_feasible == _take(
-        _take(source.z_feasible, hot_order, axis=0),
-        cold_order,
-        axis=1,
-    ).tolist()
-    assert moved.z_hu_feasible == _take(source.z_hu_feasible, cold_order).tolist()
-    assert moved.z_cu_feasible == _take(source.z_cu_feasible, hot_order).tolist()
-    assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
-    assert moved.theta_1[0][0][0].name == source.theta_1[0][0][0].name
-    assert moved.z[0][0][0].name == source.z[0][0][0].name
-
-
-def test_esm_stagewise_construction_matches_source_four_stream_structural_fields(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    SourceStageWiseModel, _SourcePinchDecompModel = _source_openhens_models(
-        monkeypatch,
-        tmp_path,
-    )
-    moved = StageWiseModel(
-        name="moved-esm-stagewise",
-        framework="ESM",
-        solver="apopt",
-        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 0.1),
-        stages=3,
-        dTmin=0.1,
-        z_restriction=None,
-        min_dqda=0.0,
-        minimisation_goal="variable total cost",
-        non_isothermal_model=True,
-        integers=False,
-        tol=1e-3,
-    )
-    source = SourceStageWiseModel(
-        name="source-esm-stagewise",
-        framework="ESM",
-        solver="apopt",
-        import_file=OPENHENS_FOUR_STREAM_CSV,
-        stages=3,
-        dTmin=0.1,
-        z_restriction=[None, None, None],
-        min_dqda=0.0,
-        minimisation_goal="variable total cost",
-        non_isothermal_model=True,
-        integers=False,
-        tol=1e-3,
-    )
-
-    assert (moved.I, moved.J, moved.S, moved.K) == (
-        source.I,
-        source.J,
-        source.S,
-        source.K,
-    )
-    assert moved.non_isothermal_model is source.non_isothermal_model is True
-    assert moved.integers is source.integers is False
-    assert moved.minimisation_goal == source.minimisation_goal == "variable total cost"
-    hot_order = _axis_order(source.Qtot_sh, moved.Qtot_sh)
-    cold_order = _axis_order(source.Qtot_sc, moved.Qtot_sc)
-    np.testing.assert_allclose(moved.Qtot_sh, _take(source.Qtot_sh, hot_order))
-    np.testing.assert_allclose(moved.Qtot_sc, _take(source.Qtot_sc, cold_order))
-    np.testing.assert_allclose(
-        moved.Q_max,
-        _take(_take(source.Q_max, hot_order, axis=0), cold_order, axis=1),
-    )
-    assert moved.z_feasible == _take(
-        _take(source.z_feasible, hot_order, axis=0),
-        cold_order,
-        axis=1,
-    ).tolist()
-    assert moved.z_hu_feasible == _take(source.z_hu_feasible, cold_order).tolist()
-    assert moved.z_cu_feasible == _take(source.z_cu_feasible, hot_order).tolist()
-    assert len(moved.m._equations) == len(source.m._equations)
-    assert len(moved.m._objectives) == len(source.m._objectives)
-    assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
-    assert moved.theta_1[0][0][0].name == source.theta_1[0][0][0].name
-    assert moved.z[0][0][0].name == source.z[0][0][0].name
-    assert moved.X[0][0][0].name == source.X[0][0][0].name
-    assert moved.Y[0][0][0].name == source.Y[0][0][0].name
-    assert moved.T_h_out_x[0][0][0].name == source.T_h_out_x[0][0][0].name
-    assert moved.T_c_out_y[0][0][0].name == source.T_c_out_y[0][0][0].name
-    assert moved.hu_cost_total.name == source.hu_cost_total.name
-    assert moved.cu_cost_total.name == source.cu_cost_total.name
-    assert moved.hu_area_cost_total.name == source.hu_area_cost_total.name
-    assert moved.cu_area_cost_total.name == source.cu_area_cost_total.name
-    assert (
-        moved.recovery_area_cost_filtered[0][0].name
-        == source.recovery_area_cost_filtered[0][0].name
-    )
-    assert not hasattr(moved, "utility_unit_cost_total")
-    assert not hasattr(source, "utility_unit_cost_total")
-
-
-def test_pdm_construction_matches_source_four_stream_above_below_fields(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    _SourceStageWiseModel, SourcePinchDecompModel = _source_openhens_models(
-        monkeypatch,
-        tmp_path,
-    )
-    moved_above, moved_below = _moved_pdm_models()
-    source_above = SourcePinchDecompModel(
-        name="source-above",
-        framework="PDM",
-        solver="apopt",
-        import_file=OPENHENS_FOUR_STREAM_CSV,
-        dTmin=14.0,
-        z_restriction=[None, None, None],
-        min_dqda=0,
-        minimisation_goal="hot utility",
-        non_isothermal_model=False,
-        integers=True,
-        tol=1e-3,
-        pinch_loc="above",
-        stage_selection="automated",
-    )
-    source_below = SourcePinchDecompModel(
-        name="source-below",
-        framework="PDM",
-        solver="apopt",
-        import_file=OPENHENS_FOUR_STREAM_CSV,
-        dTmin=14.0,
-        z_restriction=[None, None, None],
-        min_dqda=0,
-        minimisation_goal="cold utility",
-        non_isothermal_model=False,
-        integers=True,
-        tol=1e-3,
-        pinch_loc="below",
-        stage_selection="automated",
-    )
-
-    for moved, source in (
-        (moved_above, source_above),
-        (moved_below, source_below),
-    ):
-        assert moved.HU_target == pytest.approx(source.HU_target)
-        assert moved.CU_target == pytest.approx(source.CU_target)
-        assert moved.T_pinch == pytest.approx(source.T_pinch)
-        assert (moved.I, moved.J, moved.S, moved.K) == (
-            source.I,
-            source.J,
-            source.S,
-            source.K,
-        )
-        hot_order = _row_order(
-            np.column_stack([source.T_h_in, source.T_h_out]),
-            np.column_stack([moved.T_h_in, moved.T_h_out]),
-        )
-        cold_order = _row_order(
-            np.column_stack([source.T_c_in, source.T_c_out]),
-            np.column_stack([moved.T_c_in, moved.T_c_out]),
-        )
-        assert moved.z_i_active == _take(source.z_i_active, hot_order).tolist()
-        assert moved.z_j_active == _take(source.z_j_active, cold_order).tolist()
-        np.testing.assert_allclose(moved.T_h_in, _take(source.T_h_in, hot_order))
-        np.testing.assert_allclose(moved.T_h_out, _take(source.T_h_out, hot_order))
-        np.testing.assert_allclose(moved.T_c_in, _take(source.T_c_in, cold_order))
-        np.testing.assert_allclose(moved.T_c_out, _take(source.T_c_out, cold_order))
-        np.testing.assert_allclose(
-            _sorted_values(moved.Q_max),
-            _sorted_values(source.Q_max),
-        )
-        np.testing.assert_array_equal(
-            _sorted_values(moved.z_feasible),
-            _sorted_values(source.z_feasible),
-        )
-        assert moved.z_hu_feasible == _take(source.z_hu_feasible, cold_order).tolist()
-        np.testing.assert_array_equal(
-            _sorted_values(moved.z_cu_feasible),
-            _sorted_values(source.z_cu_feasible),
-        )
-        assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
-        assert moved.T_h[0][0].name == source.T_h[0][0].name
-
-
-def test_pdm_manual_above_below_stage_selection_matches_source(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    _SourceStageWiseModel, SourcePinchDecompModel = _source_openhens_models(
-        monkeypatch,
-        tmp_path,
-    )
-    moved_above, moved_below = _moved_pdm_models(stage_selection=[2, 3])
-    source_above = SourcePinchDecompModel(
-        name="source-above-manual",
-        framework="PDM",
-        solver="apopt",
-        import_file=OPENHENS_FOUR_STREAM_CSV,
-        dTmin=14.0,
-        z_restriction=[None, None, None],
-        min_dqda=0,
-        minimisation_goal="hot utility",
-        non_isothermal_model=False,
-        integers=True,
-        tol=1e-3,
-        pinch_loc="above",
-        stage_selection=[2, 3],
-    )
-    source_below = SourcePinchDecompModel(
-        name="source-below-manual",
-        framework="PDM",
-        solver="apopt",
-        import_file=OPENHENS_FOUR_STREAM_CSV,
-        dTmin=14.0,
-        z_restriction=[None, None, None],
-        min_dqda=0,
-        minimisation_goal="cold utility",
-        non_isothermal_model=False,
-        integers=True,
-        tol=1e-3,
-        pinch_loc="below",
-        stage_selection=[2, 3],
-    )
-
-    assert moved_above.S == source_above.S == 2
-    assert moved_below.S == source_below.S == 3
-    assert moved_above.K == source_above.K == 3
-    assert moved_below.K == source_below.K == 4
 
 
 def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
@@ -809,7 +530,9 @@ def test_lmtd_replacement_preserves_openhens_post_process_metrics(model_cls) -> 
     np.testing.assert_allclose(model.LMTD_r, [[[recovery_lmtd[0], recovery_lmtd[1]]]])
     np.testing.assert_allclose(model.LMTD_hu, [hot_utility_lmtd])
     np.testing.assert_allclose(model.LMTD_cu, [cold_utility_lmtd])
-    np.testing.assert_allclose(model.area_r, [[[expected_area_r[0], expected_area_r[1]]]])
+    np.testing.assert_allclose(
+        model.area_r, [[[expected_area_r[0], expected_area_r[1]]]]
+    )
     np.testing.assert_allclose(model.area_hu, [expected_area_hu])
     np.testing.assert_allclose(model.area_cu, [expected_area_cu])
     assert model.n_recovery_units == 2
@@ -976,26 +699,6 @@ def _moved_pdm_models(stage_selection="automated"):
     return above, below
 
 
-def _source_openhens_models(monkeypatch, tmp_path: Path):
-    if not OPENHENS_ROOT.exists() or not OPENHENS_FOUR_STREAM_CSV.exists():
-        pytest.skip("source OpenHENS checkout is not available")
-
-    monkeypatch.setenv("MPLCONFIGDIR", str(tmp_path / "matplotlib"))
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    source_root = str(OPENHENS_ROOT)
-    if source_root not in sys.path:
-        sys.path.insert(0, source_root)
-
-    from openhens.classes.pinch_decomp_model import (  # noqa: PLC0415
-        PinchDecompModel as SourcePinchDecompModel,
-    )
-    from openhens.classes.stage_wise_model import (  # noqa: PLC0415
-        StageWiseModel as SourceStageWiseModel,
-    )
-
-    return SourceStageWiseModel, SourcePinchDecompModel
-
-
 def _source_shaped_lmtd_post_process_model(model_cls):
     model = model_cls.__new__(model_cls)
     model.mSuccess = 1
@@ -1035,46 +738,6 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.get_alpha_values = lambda: [[[[1.0], [1.0]]]]
     model.m = SimpleNamespace(options=SimpleNamespace(objfcnval=123.45))
     return model
-
-
-def _axis_order(source_values, target_values) -> list[int]:
-    source = np.asarray(source_values, dtype=float)
-    target = np.asarray(target_values, dtype=float)
-    remaining = list(range(len(source)))
-    order: list[int] = []
-    for target_value in target:
-        for source_index in remaining:
-            if np.isclose(source[source_index], target_value):
-                order.append(source_index)
-                remaining.remove(source_index)
-                break
-        else:
-            raise AssertionError(f"missing source value for {target_value!r}")
-    return order
-
-
-def _row_order(source_rows, target_rows) -> list[int]:
-    source = np.asarray(source_rows, dtype=float)
-    target = np.asarray(target_rows, dtype=float)
-    remaining = list(range(len(source)))
-    order: list[int] = []
-    for target_row in target:
-        for source_index in remaining:
-            if np.allclose(source[source_index], target_row):
-                order.append(source_index)
-                remaining.remove(source_index)
-                break
-        else:
-            raise AssertionError(f"missing source row for {target_row!r}")
-    return order
-
-
-def _take(values, order: list[int], *, axis: int = 0):
-    return np.take(np.asarray(values), order, axis=axis)
-
-
-def _sorted_values(values):
-    return np.asarray(sorted(np.asarray(values).ravel().tolist()))
 
 
 def _source_openhens_lmtd(

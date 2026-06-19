@@ -453,7 +453,7 @@ def _allowed(value: Any) -> bool:
 def _third_dimension(values: Any) -> int:
     try:
         return len(values[0][0])
-    except (TypeError, IndexError, KeyError):
+    except TypeError, IndexError, KeyError:
         return 0
 
 
@@ -466,7 +466,7 @@ def _index(values: Any, *indexes: int | None) -> Any:
             return None
         try:
             current = current[index]
-        except (TypeError, IndexError, KeyError):
+        except TypeError, IndexError, KeyError:
             return None
     return current
 
@@ -476,11 +476,11 @@ def _optional_float(value: Any) -> float | None:
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         pass
     try:
         return _optional_float(value[0])
-    except (TypeError, IndexError, KeyError):
+    except TypeError, IndexError, KeyError:
         pass
     value_attr = getattr(value, "value", None)
     if value_attr is not None:

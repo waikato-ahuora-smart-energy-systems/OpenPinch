@@ -28,7 +28,11 @@ from OpenPinch.services.heat_exchanger_network_synthesis.service import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FOUR_STREAM_FIXTURE = (
-    REPO_ROOT / "tests" / "fixtures" / "openhens" / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    REPO_ROOT
+    / "tests"
+    / "fixtures"
+    / "openhens"
+    / "Four-stream-Yee-and-Grossmann-1990-1.json"
 )
 
 FORBIDDEN_PUBLIC_NAMES = {
@@ -105,7 +109,9 @@ def test_hen_public_exports_match_intended_snapshot() -> None:
     }
 
     for module_name, module in modules.items():
-        assert _hen_related_public_names(module) == HEN_PUBLIC_NAME_SNAPSHOT[module_name]
+        assert (
+            _hen_related_public_names(module) == HEN_PUBLIC_NAME_SNAPSHOT[module_name]
+        )
 
 
 def test_no_openhens_compatibility_surface_or_import_shim() -> None:

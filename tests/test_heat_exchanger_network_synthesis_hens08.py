@@ -197,10 +197,7 @@ def _zeros(*dimensions: int) -> list:
 
 def _stage_temperatures(inlets: list[float], outlets: list[float], stages: int) -> list:
     return [
-        [
-            inlet + (outlet - inlet) * stage / stages
-            for stage in range(stages + 1)
-        ]
+        [inlet + (outlet - inlet) * stage / stages for stage in range(stages + 1)]
         for inlet, outlet in zip(inlets, outlets, strict=True)
     ]
 

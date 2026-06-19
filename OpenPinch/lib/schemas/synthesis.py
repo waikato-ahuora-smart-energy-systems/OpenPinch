@@ -38,9 +38,9 @@ class HeatExchangerNetworkSynthesisTask(BaseModel):
     workspace_variant: str | None = None
     state_id: str | None = None
     parent_task_id: str | None = None
-    topology_restrictions: tuple[
-        "HeatExchangerNetworkTopologyRestriction", ...
-    ] = Field(default_factory=tuple)
+    topology_restrictions: tuple["HeatExchangerNetworkTopologyRestriction", ...] = (
+        Field(default_factory=tuple)
+    )
 
     @field_validator("run_id")
     @classmethod

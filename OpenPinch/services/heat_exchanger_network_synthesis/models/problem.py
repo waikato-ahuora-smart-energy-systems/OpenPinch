@@ -91,9 +91,7 @@ class InternalHeatExchangerNetworkProblem:
             if self.framework in {"PDM", "TDM"}:
                 self.case = self.remove_unused_stages(self.case)
             if evolution:
-                evolved = self.case.get_net_benefit_evolution(
-                    print_output=print_output
-                )
+                evolved = self.case.get_net_benefit_evolution(print_output=print_output)
                 if evolved is not None:
                     self.case = evolved
             return self.case
@@ -326,11 +324,7 @@ class InternalHeatExchangerNetworkProblem:
             for k in range(case.S)
         )
         q_per_stage = [
-            sum(
-                case.Q_r[i][j][k][0]
-                for i in range(case.I)
-                for j in range(case.J)
-            )
+            sum(case.Q_r[i][j][k][0] for i in range(case.I) for j in range(case.J))
             for k in range(case.S)
         ]
         threshold = self._utilisation_threshold(case.S)

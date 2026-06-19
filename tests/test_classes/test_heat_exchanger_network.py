@@ -119,11 +119,14 @@ def test_heat_exchanger_network_labelled_access_and_totals():
         },
     )
 
-    assert network.exchanger_between(
-        source_stream="H1",
-        sink_stream="C1",
-        stage=1,
-    ) == network.exchangers[0]
+    assert (
+        network.exchanger_between(
+            source_stream="H1",
+            sink_stream="C1",
+            stage=1,
+        )
+        == network.exchangers[0]
+    )
     assert network.labelled_value(
         HEN.RECOVERY_DUTY,
         source_stream="H1",
@@ -158,9 +161,7 @@ def test_network_serialization_round_trip_preserves_public_result_fields():
         solver_axis_metadata={"hot_process_streams": {"H1": 0}},
     )
 
-    round_tripped = HeatExchangerNetwork.model_validate_json(
-        network.model_dump_json()
-    )
+    round_tripped = HeatExchangerNetwork.model_validate_json(network.model_dump_json())
 
     assert round_tripped.model_dump() == network.model_dump()
     assert round_tripped.summary_metrics == {"recovery_units": 1, "verified": True}

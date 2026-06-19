@@ -35,9 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
 REGRESSION_ARTIFACT_ROOT = FIXTURE_ROOT / "regression_artifacts"
 OPENHENS_SOLVER_RUN_ROOT = REGRESSION_ARTIFACT_ROOT / "openhens_solver_runs"
-NETWORK_DESIGN_SNAPSHOT_ROOT = (
-    REGRESSION_ARTIFACT_ROOT / "network_design_snapshots"
-)
+NETWORK_DESIGN_SNAPSHOT_ROOT = REGRESSION_ARTIFACT_ROOT / "network_design_snapshots"
 
 TAC_ABS_TOL = 1.0
 TAC_REL_TOL = 1e-4
