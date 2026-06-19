@@ -10,7 +10,8 @@ from __future__ import annotations
 import copy
 import logging
 import math
-from typing import Literal
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 import numpy as np
 
@@ -47,6 +48,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         non_isothermal_model: bool,
         integers: bool,
         tol: float,
+        solver_options: Mapping[str, Any] | Sequence[str] | None = None,
     ) -> None:
         self.stages = stages
         super().__init__(
@@ -61,7 +63,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             non_isothermal_model=non_isothermal_model,
             integers=integers,
             tol=tol,
-            solver_options=[],
+            solver_options=solver_options,
         )
 
     def setup(self) -> None:
@@ -914,6 +916,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             non_isothermal_model=prev_case.non_isothermal_model,
             integers=False,
             tol=1e-3,
+            solver_options=self.solver_options,
         )
 
         for i, j, k in low_pos:
@@ -954,6 +957,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             non_isothermal_model=prev_case.non_isothermal_model,
             integers=False,
             tol=1e-3,
+            solver_options=self.solver_options,
         )
 
         for i, j, k in high_pos:

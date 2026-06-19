@@ -12,7 +12,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Callable, Protocol, Sequence
+from typing import Any, Callable, Protocol, Sequence
 
 from ...classes.heat_exchanger import (
     HeatExchanger,
@@ -68,6 +68,9 @@ class SynthesisWorkflowSettings:
     pdm_solver: str
     tdm_solver: str
     esm_solver: str
+    pdm_solver_options: dict[str, Any]
+    tdm_solver_options: dict[str, Any]
+    esm_solver_options: dict[str, Any]
     problem_id: str | None = None
     workspace_variant: str | None = None
     state_id: str | None = None
@@ -81,6 +84,16 @@ class SynthesisWorkflowSettings:
         if method == "energy_stage_refinement":
             return self.esm_solver
         return None
+
+    def solver_options_for(self, method: SynthesisMethod | None) -> dict[str, Any]:
+        """Return user-provided solver options for one workflow method."""
+        if method == "pinch_decomposition":
+            return dict(self.pdm_solver_options)
+        if method == "topology_design":
+            return dict(self.tdm_solver_options)
+        if method == "energy_stage_refinement":
+            return dict(self.esm_solver_options)
+        return {}
 
 
 @dataclass(frozen=True)
@@ -296,6 +309,7 @@ class LocalSynthesisExecutor:
             integers=task.method != "energy_stage_refinement",
             parent=parent_problem,
             tol=_solve_tolerance(problem),
+            solver_options=_solver_options_for_task(problem, task.method),
             stage_selection=stage_selection,
             stages=task.stage_count,
             synthesis_task_id=task.task_id,
@@ -406,6 +420,9 @@ def workflow_settings_from_problem(
         pdm_solver=str(config.HENS_PDM_SOLVER),
         tdm_solver=str(config.HENS_TDM_SOLVER),
         esm_solver=str(config.HENS_ESM_SOLVER),
+        pdm_solver_options=dict(config.HENS_PDM_SOLVER_OPTIONS),
+        tdm_solver_options=dict(config.HENS_TDM_SOLVER_OPTIONS),
+        esm_solver_options=dict(config.HENS_ESM_SOLVER_OPTIONS),
         problem_id=problem.project_name,
         workspace_variant=workspace_variant,
         state_id=state_id,
@@ -850,6 +867,15 @@ def _solver_for_task(problem, method: SynthesisMethod) -> str:
     if method == "topology_design":
         return str(config.HENS_TDM_SOLVER)
     return str(config.HENS_ESM_SOLVER)
+
+
+def _solver_options_for_task(problem, method: SynthesisMethod) -> dict[str, Any]:
+    config = problem.master_zone.config
+    if method == "pinch_decomposition":
+        return dict(config.HENS_PDM_SOLVER_OPTIONS)
+    if method == "topology_design":
+        return dict(config.HENS_TDM_SOLVER_OPTIONS)
+    return dict(config.HENS_ESM_SOLVER_OPTIONS)
 
 
 def _solve_tolerance(problem) -> float:

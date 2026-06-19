@@ -20,10 +20,11 @@ from OpenPinch.services.heat_exchanger_network_synthesis.models.extraction impor
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_ID = "Four-stream-Yee-and-Grossmann-1990-1"
-FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "openhens" / f"{CASE_ID}.json"
+FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
+FIXTURE_PATH = FIXTURE_ROOT / f"{CASE_ID}.json"
 SNAPSHOT_PATH = (
-    REPO_ROOT
-    / "openhens_baseline_results"
+    FIXTURE_ROOT
+    / "solver_baselines"
     / "network_snapshots"
     / CASE_ID
     / "best-esm.json"

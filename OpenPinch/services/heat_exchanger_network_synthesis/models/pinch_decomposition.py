@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 import numpy as np
 
@@ -41,6 +42,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         pinch_loc: Literal["above", "below"],
         pinch_snapshot: PinchDecompositionSnapshot,
         stage_selection: Literal["automated"] | list[int] | tuple[int, int],
+        solver_options: Mapping[str, Any] | Sequence[str] | None = None,
     ) -> None:
         self.pinch_loc = pinch_loc
         self.pinch_snapshot = pinch_snapshot
@@ -57,7 +59,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             non_isothermal_model=non_isothermal_model,
             integers=integers,
             tol=tol,
-            solver_options=[],
+            solver_options=solver_options,
         )
 
     def setup(self) -> None:
@@ -666,6 +668,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             non_isothermal_model=self.non_isothermal_model,
             integers=True,
             tol=1e-3,
+            solver_options=self.solver_options,
         )
         if (above_case.HU_target > 0 and above_case.mSuccess == 0) or (
             below_case.CU_target > 0 and below_case.mSuccess == 0

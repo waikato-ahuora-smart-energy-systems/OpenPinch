@@ -240,6 +240,9 @@ def test_hen_config_field_specs_use_openpinch_names():
         "HENS_PDM_SOLVER",
         "HENS_TDM_SOLVER",
         "HENS_ESM_SOLVER",
+        "HENS_PDM_SOLVER_OPTIONS",
+        "HENS_TDM_SOLVER_OPTIONS",
+        "HENS_ESM_SOLVER_OPTIONS",
         "HENS_SOLVE_TOLERANCE",
         "HENS_MAX_PARALLEL",
         "HENS_LOG_LEVEL",
@@ -269,6 +272,9 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
         "HENS_MAX_PARALLEL": 2,
         "HENS_RUN_ID": "run-1",
         "HENS_BEST_SOLUTIONS_TO_SAVE": 3,
+        "HENS_PDM_SOLVER_OPTIONS": {"node_limit": 50},
+        "HENS_TDM_SOLVER_OPTIONS": {"feas_tolerance": 0.02},
+        "HENS_ESM_SOLVER_OPTIONS": {"max_iter": 500},
     }
 
     cfg = Configuration(options=options)
@@ -278,6 +284,8 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
     assert cfg.HENS_OUTPUT_FORMATS == ["json", "csv"]
     assert target_input.options["HENS_DERIVATIVE_THRESHOLDS"] == [0.5, 0.9]
     assert target_input.options["HENS_STAGE_SELECTION"] == [2, 3]
+    assert cfg.HENS_PDM_SOLVER_OPTIONS == {"node_limit": 50}
+    assert target_input.options["HENS_ESM_SOLVER_OPTIONS"] == {"max_iter": 500}
 
 
 @pytest.mark.parametrize(
@@ -290,6 +298,8 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
         {"HENS_OUTPUT_FORMATS": ["xml"]},
         {"HENS_SOLVE_TOLERANCE": 0.0},
         {"HENS_RUN_ID": "bad run id"},
+        {"HENS_PDM_SOLVER_OPTIONS": ["node_limit 50"]},
+        {"HENS_TDM_SOLVER_OPTIONS": {"": 50}},
     ],
 )
 def test_hen_config_options_reject_invalid_values_on_canonical_paths(options):

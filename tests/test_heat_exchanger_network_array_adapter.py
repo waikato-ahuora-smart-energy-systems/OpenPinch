@@ -23,10 +23,42 @@ from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
-SNAPSHOT_ROOT = REPO_ROOT / "openhens_baseline_results"
+SNAPSHOT_ROOT = FIXTURE_ROOT / "solver_baselines"
 CASE_DTMIN = {
     "Four-stream-Yee-and-Grossmann-1990-1": 14.0,
     "Nine-stream-Linnhoff-and-Ahmad-1999-1": 18.0,
+}
+AXIS_ARRAY_NAMES = {
+    "cold_process_streams": {
+        "T_c_cont",
+        "T_c_in",
+        "T_c_out",
+        "c_cost",
+        "cold_names",
+        "f_c",
+        "htc_c",
+    },
+    "cold_utilities": {
+        "T_cu_in",
+        "T_cu_out",
+        "cu_cost",
+        "htc_cu",
+    },
+    "hot_process_streams": {
+        "T_h_cont",
+        "T_h_in",
+        "T_h_out",
+        "f_h",
+        "h_cost",
+        "hot_names",
+        "htc_h",
+    },
+    "hot_utilities": {
+        "T_hu_in",
+        "T_hu_out",
+        "htc_hu",
+        "hu_cost",
+    },
 }
 
 
@@ -72,25 +104,13 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     current = payload.to_json_dict()
 
     assert current["array_shapes"] == snapshot["array_shapes"]
-    assert current["axis_maps"] == snapshot["axis_maps"]
-    assert current["stream_identities"] == snapshot["stream_identities"]
-    assert current["utility_identities"] == snapshot["utility_identities"]
+    _assert_axis_identities_match(current, snapshot)
 
     for name, expected in snapshot["arrays"].items():
-        actual = current["arrays"][name]
-        if name.endswith("_names"):
-            assert actual == expected
-        else:
-            np.testing.assert_allclose(actual, expected)
+        _assert_array_matches_by_identity(name, current, expected, snapshot)
 
     for name, expected in snapshot["source_openhens_arrays"].items():
-        actual = current["arrays"][name]
-        if name.endswith("_names"):
-            assert [item.strip() for item in actual] == [
-                item.strip() for item in expected
-            ]
-        else:
-            np.testing.assert_allclose(actual, expected)
+        _assert_array_matches_by_identity(name, current, expected, snapshot)
 
 
 def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
@@ -218,3 +238,54 @@ def _load_converter_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _assert_axis_identities_match(current: dict, snapshot: dict) -> None:
+    assert set(current["axis_maps"]) == set(snapshot["axis_maps"])
+    for axis_name, current_axis in current["axis_maps"].items():
+        snapshot_axis = snapshot["axis_maps"][axis_name]
+        if axis_name == "stages":
+            assert current_axis == snapshot_axis
+        else:
+            assert set(current_axis) == set(snapshot_axis)
+
+    for identity_group in ("stream_identities", "utility_identities"):
+        assert set(current[identity_group]) == set(snapshot[identity_group])
+        for axis_name, identities in current[identity_group].items():
+            assert set(identities) == set(snapshot[identity_group][axis_name])
+
+
+def _assert_array_matches_by_identity(
+    name: str,
+    current: dict,
+    expected: list,
+    snapshot: dict,
+) -> None:
+    actual = current["arrays"][name]
+    expected = _reordered_expected_array(name, current, expected, snapshot)
+    if name.endswith("_names"):
+        assert _normalised_names(actual) == _normalised_names(expected)
+    else:
+        np.testing.assert_allclose(actual, expected)
+
+
+def _reordered_expected_array(
+    name: str,
+    current: dict,
+    expected: list,
+    snapshot: dict,
+) -> list:
+    for axis_name, array_names in AXIS_ARRAY_NAMES.items():
+        if name not in array_names:
+            continue
+        current_identities = current["stream_identities"].get(
+            axis_name,
+            current["utility_identities"].get(axis_name, []),
+        )
+        snapshot_axis = snapshot["axis_maps"][axis_name]
+        return [expected[snapshot_axis[identity]] for identity in current_identities]
+    return expected
+
+
+def _normalised_names(values: list) -> list[str]:
+    return [str(value).strip() for value in values]

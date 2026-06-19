@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, Sequence
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
 from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
@@ -41,6 +41,7 @@ class InternalHeatExchangerNetworkProblem:
     integers: bool = True
     parent: "InternalHeatExchangerNetworkProblem | None" = None
     tol: float = 1e-3
+    solver_options: Mapping[str, Any] | Sequence[str] | None = None
     stage_selection: str | list[str] = "automated"
     stages: int | None = None
     synthesis_task_id: str | None = None
@@ -65,6 +66,7 @@ class InternalHeatExchangerNetworkProblem:
             "non_isothermal_model": self.non_isothermal_model,
             "integers": self.integers,
             "tol": self.tol,
+            "solver_options": self.solver_options,
         }
         if self.framework == "PDM":
             self._build_pdm(model_factories=model_factories)

@@ -32,8 +32,8 @@ from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BASELINE_ROOT = REPO_ROOT / "openhens_baseline_results"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
+BASELINE_ROOT = FIXTURE_ROOT / "solver_baselines"
 NETWORK_SNAPSHOT_ROOT = BASELINE_ROOT / "network_snapshots"
 
 TAC_ABS_TOL = 1.0
@@ -89,6 +89,7 @@ BASELINE_EXPECTATIONS = {
 CURRENT_OPENHENS_LIVE_EXPECTATIONS = {
     NINE_STREAM: {
         "best_solution": 2905508.6335796523,
+        "best_dTmin": 18,
         "total_cases_attempted": 1133,
         "total_cases_solved_min": 840,
         "solved_esm_count_min": 67,
@@ -154,16 +155,10 @@ def test_openhens_baseline_summary_preserves_solver_metric_contract(
     assert best_row["Solver Status"] == "1"
     assert best_row["Verification Failures"] == ""
 
-    assert snapshot["expected"]["hot_utility_load"] == pytest.approx(
-        snapshot["expected"]["hot_utility_load"],
-        abs=TAC_ABS_TOL,
-        rel=TAC_REL_TOL,
-    )
-    assert snapshot["expected"]["cold_utility_load"] == pytest.approx(
-        snapshot["expected"]["cold_utility_load"],
-        abs=TAC_ABS_TOL,
-        rel=TAC_REL_TOL,
-    )
+    assert "hot_utility_load" in snapshot["expected"]
+    assert "cold_utility_load" in snapshot["expected"]
+    assert snapshot["expected"]["hot_utility_load"] > 0.0
+    assert snapshot["expected"]["cold_utility_load"] > 0.0
 
 
 @pytest.mark.parametrize("case_id", [FOUR_STREAM, NINE_STREAM])
@@ -310,6 +305,13 @@ def test_four_stream_live_solver_winning_branch_matches_checked_in_summary() -> 
     assert network.summary_metrics["recovery_units"] == expected["best_recovery_units"]
     assert network.summary_metrics["hot_utility_units"] == expected["best_hu_units"]
     assert network.summary_metrics["cold_utility_units"] == expected["best_cu_units"]
+    _assert_network_matches_snapshot(network, _network_snapshot(FOUR_STREAM))
+    _assert_live_design_satisfies_heat_and_cost_contract(
+        FOUR_STREAM,
+        network,
+        expected_total=expected["best_solution"],
+        d_tmin=expected["best_dTmin"],
+    )
 
 
 @pytest.mark.solver
@@ -364,6 +366,12 @@ def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -
     assert network.summary_metrics["recovery_units"] == expected["best_recovery_units"]
     assert network.summary_metrics["hot_utility_units"] == expected["best_hu_units"]
     assert network.summary_metrics["cold_utility_units"] == expected["best_cu_units"]
+    _assert_live_design_satisfies_heat_and_cost_contract(
+        NINE_STREAM,
+        network,
+        expected_total=expected["best_solution"],
+        d_tmin=expected["best_dTmin"],
+    )
 
 
 def _assert_live_solver_case_matches_checked_in_summary(
@@ -421,12 +429,112 @@ def _assert_live_solver_case_matches_checked_in_summary(
     assert network.summary_metrics["recovery_units"] == expected["best_recovery_units"]
     assert network.summary_metrics["hot_utility_units"] == expected["best_hu_units"]
     assert network.summary_metrics["cold_utility_units"] == expected["best_cu_units"]
+    _assert_network_summary_matches_snapshot(network, _network_snapshot(case_id))
+    _assert_live_design_satisfies_heat_and_cost_contract(
+        case_id,
+        network,
+        expected_total=expected["best_solution"],
+        d_tmin=expected["best_dTmin"],
+    )
 
 
 def _weighted_solver_job_count(outcomes) -> int:
     return sum(
         ESM_ATTEMPT_WEIGHT if outcome.task.method == "energy_stage_refinement" else 1
         for outcome in outcomes
+    )
+
+
+def _assert_network_matches_snapshot(
+    network: HeatExchangerNetwork,
+    snapshot: dict[str, Any],
+) -> None:
+    _assert_network_summary_matches_snapshot(network, snapshot)
+
+    tolerances = snapshot["tolerances"]
+
+    assert len(network.exchangers) == len(snapshot["exchangers"])
+    for expected_exchanger in snapshot["exchangers"]:
+        exchanger = network.exchanger_between(
+            source_stream=expected_exchanger["source_stream"],
+            sink_stream=expected_exchanger["sink_stream"],
+            stage=expected_exchanger["stage"],
+            kind=HeatExchangerKind(expected_exchanger["kind"]),
+        )
+        assert exchanger is not None, expected_exchanger
+        assert exchanger.kind.value == expected_exchanger["kind"]
+        assert exchanger.source_stream == expected_exchanger["source_stream"]
+        assert exchanger.sink_stream == expected_exchanger["sink_stream"]
+        assert exchanger.stage == expected_exchanger["stage"]
+        _assert_close(
+            exchanger.duty,
+            expected_exchanger["duty"],
+            abs_tol=tolerances["duty_abs"],
+            rel_tol=tolerances["duty_rel"],
+        )
+        _assert_close(
+            exchanger.area,
+            expected_exchanger["area"],
+            abs_tol=tolerances["area_abs"],
+            rel_tol=tolerances["area_rel"],
+        )
+
+
+def _assert_network_summary_matches_snapshot(
+    network: HeatExchangerNetwork,
+    snapshot: dict[str, Any],
+) -> None:
+    expected = snapshot["expected"]
+    tolerances = snapshot["tolerances"]
+
+    assert network.stage_count == expected["stage_count"]
+    assert network.summary_metrics["recovery_units"] == expected["recovery_unit_count"]
+    assert (
+        network.summary_metrics["hot_utility_units"]
+        == expected["hot_utility_unit_count"]
+    )
+    assert (
+        network.summary_metrics["cold_utility_units"]
+        == expected["cold_utility_unit_count"]
+    )
+    assert network.summary_metrics["hot_utility_load"] == pytest.approx(
+        expected["hot_utility_load"],
+        abs=tolerances["duty_abs"],
+        rel=tolerances["duty_rel"],
+    )
+    assert network.summary_metrics["cold_utility_load"] == pytest.approx(
+        expected["cold_utility_load"],
+        abs=tolerances["duty_abs"],
+        rel=tolerances["duty_rel"],
+    )
+    _assert_close(
+        network.total_annual_cost,
+        expected["total_annual_cost"],
+        abs_tol=tolerances["total_annual_cost_abs"],
+        rel_tol=tolerances["total_annual_cost_rel"],
+    )
+
+
+def _assert_live_design_satisfies_heat_and_cost_contract(
+    case_id: str,
+    network: HeatExchangerNetwork,
+    *,
+    expected_total: float,
+    d_tmin: float,
+) -> None:
+    fixture = _fixture(case_id)
+    arrays = _source_artifact_solver_arrays(fixture, d_tmin)
+
+    _assert_live_network_utility_loads_match_summary(network)
+    _assert_process_stream_heat_balances(network, arrays)
+    _assert_temperature_feasibility(
+        network,
+        _network_solver_d_tmin(network, fallback=d_tmin),
+    )
+    _assert_network_cost_recomputes(
+        network,
+        fixture,
+        expected_total=expected_total,
     )
 
 
@@ -440,7 +548,7 @@ def _network_context(
     HeatExchangerNetwork,
 ]:
     snapshot = _network_snapshot(case_id)
-    source_summary = _load_json(REPO_ROOT / snapshot["source_summary_artifact"])
+    source_summary = _load_json(BASELINE_ROOT / snapshot["source_summary_artifact"])
     fixture = _fixture(case_id)
     arrays = _source_artifact_solver_arrays(fixture, snapshot["expected"]["best_dTmin"])
     solution = _snapshot_solution(snapshot, arrays)
@@ -578,6 +686,7 @@ def _artifact_solved_model(
         Q_hu_total=utility_loads["hot"],
         Q_cu_total=utility_loads["cold"],
         Q_r_total=_nested_sum(solution["recovery_heat_duties"]),
+        dTmin=solution["dTmin"],
         T_h_out=arrays.arrays["T_h_out"].tolist(),
         T_c_out=arrays.arrays["T_c_out"].tolist(),
         T_hu_in=arrays.arrays["T_hu_in"].tolist(),
@@ -772,6 +881,19 @@ def _assert_temperature_feasibility(
             assert min(approach_temperatures) + TEMPERATURE_ABS_TOL >= d_tmin
 
 
+def _network_solver_d_tmin(
+    network: HeatExchangerNetwork,
+    *,
+    fallback: float,
+) -> float:
+    if not network.source_metadata:
+        return fallback
+    value = network.source_metadata.get("solver_dTmin")
+    if value is None:
+        return fallback
+    return float(value)
+
+
 def _assert_cost_recomputation(
     network: HeatExchangerNetwork,
     fixture: dict[str, Any],
@@ -808,6 +930,65 @@ def _assert_cost_recomputation(
         rel=TAC_REL_TOL,
     )
     assert solution["total_annual_cost"] - utility_cost == pytest.approx(
+        area_cost,
+        abs=TAC_ABS_TOL,
+        rel=TAC_REL_TOL,
+    )
+
+
+def _assert_live_network_utility_loads_match_summary(
+    network: HeatExchangerNetwork,
+) -> None:
+    assert network.total_duty(kind=HeatExchangerKind.HOT_UTILITY) == pytest.approx(
+        network.summary_metrics["hot_utility_load"],
+        abs=TAC_ABS_TOL,
+        rel=TAC_REL_TOL,
+    )
+    assert network.total_duty(kind=HeatExchangerKind.COLD_UTILITY) == pytest.approx(
+        network.summary_metrics["cold_utility_load"],
+        abs=TAC_ABS_TOL,
+        rel=TAC_REL_TOL,
+    )
+
+
+def _assert_network_cost_recomputes(
+    network: HeatExchangerNetwork,
+    fixture: dict[str, Any],
+    *,
+    expected_total: float,
+) -> None:
+    options = fixture["options"]
+    fixed_cost = float(options["FIXED_COST"])
+    variable_cost = float(options["VARIABLE_COST"])
+    cost_exp = float(options["COST_EXP"])
+    hot_utility_price = _utility_price(fixture, "Hot")
+    cold_utility_price = _utility_price(fixture, "Cold")
+    total_annual_cost = network.total_annual_cost
+
+    assert total_annual_cost is not None
+
+    utility_cost = (
+        hot_utility_price * network.summary_metrics["hot_utility_load"]
+        + cold_utility_price * network.summary_metrics["cold_utility_load"]
+    )
+    area_cost = variable_cost * sum(
+        float(exchanger.area) ** cost_exp
+        for exchanger in network.exchangers
+        if exchanger.area is not None
+    )
+    area_cost += fixed_cost * len(network.exchangers)
+
+    assert total_annual_cost == pytest.approx(
+        expected_total,
+        abs=TAC_ABS_TOL,
+        rel=TAC_REL_TOL,
+    )
+    assert total_annual_cost - area_cost == pytest.approx(
+        utility_cost,
+        abs=TAC_ABS_TOL,
+        rel=TAC_REL_TOL,
+    )
+    assert total_annual_cost - utility_cost == pytest.approx(
         area_cost,
         abs=TAC_ABS_TOL,
         rel=TAC_REL_TOL,
@@ -863,7 +1044,7 @@ def _utility_price(fixture: dict[str, Any], utility_type: str) -> float:
 
 
 def _best_solution_metrics_row(case_id: str, task_id: str) -> dict[str, str]:
-    with (BASELINE_ROOT / "refactor" / case_id / "solution_metrics.csv").open(
+    with (BASELINE_ROOT / case_id / "solution_metrics.csv").open(
         encoding="utf-8",
         newline="",
     ) as handle:
@@ -876,7 +1057,7 @@ def _fixture(case_id: str) -> dict[str, Any]:
 
 
 def _summary(case_id: str) -> dict[str, Any]:
-    return _load_json(BASELINE_ROOT / "refactor" / case_id / "summary.json")
+    return _load_json(BASELINE_ROOT / case_id / "summary.json")
 
 
 def _network_snapshot(case_id: str) -> dict[str, Any]:

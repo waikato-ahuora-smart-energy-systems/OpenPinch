@@ -10,4 +10,3 @@ surface around the core analysis code.
    docs-conventions
    build-and-coverage
    synthesis-dependency-policy
-   openhens-integration-task-files

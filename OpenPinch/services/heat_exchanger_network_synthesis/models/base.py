@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -48,7 +49,7 @@ class BaseHeatExchangerNetworkModel(ABC):
         non_isothermal_model: bool,
         integers: bool,
         tol: float,
-        solver_options: list[str] | None = None,
+        solver_options: Mapping[str, Any] | Sequence[str] | None = None,
         import_file: Path | None = None,
     ) -> None:
         self.name = name
@@ -63,7 +64,7 @@ class BaseHeatExchangerNetworkModel(ABC):
         self.non_isothermal_model = non_isothermal_model
         self.integers = integers
         self.tol = tol
-        self.solver_options = list(solver_options or [])
+        self.solver_options = solver_options
 
         self.solve_time = None
         self.solver_run = None
@@ -76,7 +77,11 @@ class BaseHeatExchangerNetworkModel(ABC):
 
         self.m = backend.create_gekko_model(remote=False)
         self.mSuccess: int = 0
-        self.solver_run = backend.configure_gekko_solver(self.m, self.solver)
+        self.solver_run = backend.configure_gekko_solver(
+            self.m,
+            self.solver,
+            solver_options=self.solver_options,
+        )
 
     @abstractmethod
     def setup(self) -> None:

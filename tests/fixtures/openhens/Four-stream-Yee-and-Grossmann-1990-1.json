@@ -28,6 +28,7 @@
       4.0
     ],
     "HENS_ESM_SOLVER": "ipopt-pyomo",
+    "HENS_ESM_SOLVER_OPTIONS": {},
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
     "HENS_METHOD_SEQUENCE": [
@@ -35,12 +36,13 @@
       "topology_design",
       "energy_stage_refinement"
     ],
-    "HENS_OUTPUT_FOLDER": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1",
+    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Four-stream-Yee-and-Grossmann-1990-1",
     "HENS_OUTPUT_FORMATS": [
       "json",
       "csv"
     ],
     "HENS_PDM_SOLVER": "couenne",
+    "HENS_PDM_SOLVER_OPTIONS": {},
     "HENS_RUN_ID": "Four-stream-Yee-and-Grossmann-1990-1",
     "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_STAGE_SELECTION": [
@@ -50,6 +52,7 @@
       4
     ],
     "HENS_TDM_SOLVER": "couenne",
+    "HENS_TDM_SOLVER_OPTIONS": {},
     "VARIABLE_COST": 150.0
   },
   "streams": [

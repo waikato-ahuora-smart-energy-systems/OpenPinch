@@ -1,7 +1,0 @@
-problem_print_level 3
-node_limit 2000
-feas_tolerance 0.01
-allowable_gap 0.01
-allowable_fraction_gap 0.1
-#time_limit 5000
-delete_redundant yes

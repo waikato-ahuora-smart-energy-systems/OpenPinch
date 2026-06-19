@@ -234,6 +234,7 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
             "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
             "HENS_DERIVATIVE_THRESHOLDS": OPENHENS_DQDA_GRID,
             "HENS_ESM_SOLVER": "ipopt-pyomo",
+            "HENS_ESM_SOLVER_OPTIONS": {},
             "HENS_LOG_LEVEL": "WARNING",
             "HENS_MAX_PARALLEL": 10,
             "HENS_METHOD_SEQUENCE": [
@@ -242,14 +243,16 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
                 "energy_stage_refinement",
             ],
             "HENS_OUTPUT_FOLDER": (
-                f"openhens_baseline_results/refactor/{parsed.case_id}"
+                f"tests/fixtures/openhens/solver_baselines/{parsed.case_id}"
             ),
             "HENS_OUTPUT_FORMATS": ["json", "csv"],
             "HENS_PDM_SOLVER": "couenne",
+            "HENS_PDM_SOLVER_OPTIONS": {},
             "HENS_RUN_ID": parsed.case_id,
             "HENS_SOLVE_TOLERANCE": 1e-3,
             "HENS_STAGE_SELECTION": [1, 2, 3, 4],
             "HENS_TDM_SOLVER": "couenne",
+            "HENS_TDM_SOLVER_OPTIONS": {},
             "VARIABLE_COST": exchange.area_coefficient,
         },
         "zone_tree": {
@@ -280,7 +283,6 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
         reordered = dict(target_input)
         reordered["streams"] = list(reversed(target_input["streams"]))
         _write_json(reordered_path, reordered)
-        _write_fixture_snapshot(parsed, fixture_path, repo_root)
 
     _write_adapter_snapshot(
         parse_openhens_csv(
@@ -292,79 +294,6 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
         ),
         repo_root,
         dTmin=14.0,
-    )
-
-
-def _write_fixture_snapshot(
-    parsed: ParsedOpenHENSCase,
-    fixture_path: Path,
-    repo_root: Path,
-) -> None:
-    target_input = json.loads(fixture_path.read_text())
-    problem = PinchProblem(source=target_input)
-    adapter = problem_to_solver_arrays(problem, DTMIN_BY_CASE[parsed.case_id])
-    baseline_summary_path = (
-        repo_root
-        / "openhens_baseline_results"
-        / "refactor"
-        / parsed.case_id
-        / "summary.json"
-    )
-    baseline_summary = json.loads(baseline_summary_path.read_text())
-    snapshot = {
-        "schema_version": "openpinch-openhens-fixture-snapshot/v1",
-        "case_id": parsed.case_id,
-        "source_csv_path": _display_path(parsed.source_csv, repo_root),
-        "source_csv_sha256": _sha256(parsed.source_csv),
-        "migrated_fixture_path": _display_path(fixture_path, repo_root),
-        "migrated_fixture_sha256": _sha256(fixture_path),
-        "process_stream_count": len(parsed.hot_streams) + len(parsed.cold_streams),
-        "utility_count": len(parsed.hot_utilities) + len(parsed.cold_utilities),
-        "economic_mapping": {
-            "process_stream_costs": (
-                "audited as non-algorithmic for active source equations; "
-                "kept out of StreamSchema fixture payloads"
-            ),
-            "utility_costs": "UtilitySchema.price",
-            "exchanger_fixed_cost": "Configuration.FIXED_COST",
-            "exchanger_area_coefficient": "Configuration.VARIABLE_COST",
-            "exchanger_area_exponent": "Configuration.COST_EXP",
-        },
-        "design_grid_task_counts": {
-            "pdm_grid_count": len(
-                target_input["options"]["HENS_APPROACH_TEMPERATURES"]
-            ),
-            "tdm_threshold_count_per_successful_pdm": len(
-                target_input["options"]["HENS_DERIVATIVE_THRESHOLDS"]
-            ),
-            "solved_esm_count_from_baseline_summary": baseline_summary[
-                "solved_esm_count"
-            ],
-            "total_cases_attempted_from_baseline_summary": baseline_summary[
-                "total_cases_attempted"
-            ],
-            "total_cases_solved_from_baseline_summary": baseline_summary[
-                "total_cases_solved"
-            ],
-            "solver_execution_in_hens_03": "not run",
-        },
-        "covered_dTmin_values": [DTMIN_BY_CASE[parsed.case_id]],
-        "adapter_array_shapes": adapter.array_shapes,
-        "axis_maps": adapter.axis_maps,
-        "preparation": adapter.preparation
-        | {
-            "pinch_problem_load": "passed",
-            "prepare_problem": "created Zone, StreamCollection, and Stream objects",
-        },
-        "stream_identities": adapter.stream_identities,
-        "utility_identities": adapter.utility_identities,
-    }
-    _write_json(
-        repo_root
-        / "openhens_baseline_results"
-        / "fixture_snapshots"
-        / f"{parsed.case_id}.json",
-        snapshot,
     )
 
 
@@ -401,7 +330,10 @@ def _write_adapter_snapshot(
     }
     _write_json(
         repo_root
-        / "openhens_baseline_results"
+        / "tests"
+        / "fixtures"
+        / "openhens"
+        / "solver_baselines"
         / "adapter_snapshots"
         / parsed.case_id
         / "dTmin-14.json",

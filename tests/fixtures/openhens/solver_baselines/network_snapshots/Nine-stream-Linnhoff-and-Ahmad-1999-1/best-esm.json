@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "case_id": "Nine-stream-Linnhoff-and-Ahmad-1999-1",
-  "source_summary_artifact": "openhens_baseline_results/refactor/Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json",
+  "source_summary_artifact": "Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json",
   "task_id": "esm-187ea46995ce",
   "method": "energy_stage_refinement",
   "expected": {

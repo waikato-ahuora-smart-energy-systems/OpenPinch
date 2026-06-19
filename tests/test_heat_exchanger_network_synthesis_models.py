@@ -158,14 +158,68 @@ def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> No
     assert calls == ["gekko"]
 
 
-def test_couenne_option_file_preserves_openhens_runtime_limits() -> None:
-    couenne_options = (REPO_ROOT / "couenne.opt").read_text(encoding="utf-8")
+def test_couenne_options_are_written_to_model_run_directory(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def present_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        del purpose
+        return f"/usr/local/bin/{binary_name}"
 
-    assert "node_limit 2000" in couenne_options
+    class _FakeSolverFactory:
+        def available(self, exception_flag: bool = False) -> bool:
+            del exception_flag
+            return True
+
+    def present_dependency(import_name: str, **_kwargs):
+        if import_name == "pyomo.environ":
+            return SimpleNamespace(SolverFactory=lambda _name: _FakeSolverFactory())
+        return object()
+
+    monkeypatch.setattr(backend, "require_solver_binary", present_binary)
+    monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
+    model = _FakeGekkoModel(tmp_path / "gekko-run")
+
+    run = backend.configure_gekko_solver(
+        model,
+        "couenne",
+        solver_options={
+            "node_limit": 50,
+            "time_limit": 120,
+            "delete_redundant": "no",
+        },
+    )
+
+    option_file = tmp_path / "gekko-run" / "couenne.opt"
+    couenne_options = option_file.read_text(encoding="utf-8")
+
+    assert run.option_file == str(option_file)
+    assert run.solver_options == {
+        "problem_print_level": 3,
+        "node_limit": 50,
+        "feas_tolerance": 0.01,
+        "allowable_gap": 0.01,
+        "allowable_fraction_gap": 0.1,
+        "delete_redundant": "no",
+        "time_limit": 120,
+    }
+    assert model.options.SOLVER == "couenne"
+    assert model.options.SOLVER_EXTENSION == "pyomo"
+    assert "node_limit 50" in couenne_options
+    assert "node_limit 2000" not in couenne_options
     assert "feas_tolerance 0.01" in couenne_options
     assert "allowable_gap 0.01" in couenne_options
     assert "allowable_fraction_gap 0.1" in couenne_options
-    assert "delete_redundant yes" in couenne_options
+    assert "delete_redundant no" in couenne_options
+    assert "time_limit 120" in couenne_options
+
+    original_cwd = Path.cwd()
+    solve_run = backend.solve_gekko_model(model, solver_name="couenne")
+
+    assert Path.cwd() == original_cwd
+    assert model.cwd_during_solve == option_file.parent
+    assert solve_run.option_file == str(option_file)
+    assert solve_run.failure_reason is None
 
 
 def test_internal_problem_runs_stage_reduction_before_evolution(monkeypatch) -> None:
@@ -273,12 +327,21 @@ def test_stagewise_construction_matches_source_four_stream_structural_fields(
         source.S,
         source.K,
     )
-    np.testing.assert_allclose(moved.Qtot_sh, source.Qtot_sh)
-    np.testing.assert_allclose(moved.Qtot_sc, source.Qtot_sc)
-    np.testing.assert_allclose(moved.Q_max, source.Q_max)
-    assert moved.z_feasible == source.z_feasible
-    assert moved.z_hu_feasible == source.z_hu_feasible
-    assert moved.z_cu_feasible == source.z_cu_feasible
+    hot_order = _axis_order(source.Qtot_sh, moved.Qtot_sh)
+    cold_order = _axis_order(source.Qtot_sc, moved.Qtot_sc)
+    np.testing.assert_allclose(moved.Qtot_sh, _take(source.Qtot_sh, hot_order))
+    np.testing.assert_allclose(moved.Qtot_sc, _take(source.Qtot_sc, cold_order))
+    np.testing.assert_allclose(
+        moved.Q_max,
+        _take(_take(source.Q_max, hot_order, axis=0), cold_order, axis=1),
+    )
+    assert moved.z_feasible == _take(
+        _take(source.z_feasible, hot_order, axis=0),
+        cold_order,
+        axis=1,
+    ).tolist()
+    assert moved.z_hu_feasible == _take(source.z_hu_feasible, cold_order).tolist()
+    assert moved.z_cu_feasible == _take(source.z_cu_feasible, hot_order).tolist()
     assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
     assert moved.theta_1[0][0][0].name == source.theta_1[0][0][0].name
     assert moved.z[0][0][0].name == source.z[0][0][0].name
@@ -330,12 +393,21 @@ def test_esm_stagewise_construction_matches_source_four_stream_structural_fields
     assert moved.non_isothermal_model is source.non_isothermal_model is True
     assert moved.integers is source.integers is False
     assert moved.minimisation_goal == source.minimisation_goal == "variable total cost"
-    np.testing.assert_allclose(moved.Qtot_sh, source.Qtot_sh)
-    np.testing.assert_allclose(moved.Qtot_sc, source.Qtot_sc)
-    np.testing.assert_allclose(moved.Q_max, source.Q_max)
-    assert moved.z_feasible == source.z_feasible
-    assert moved.z_hu_feasible == source.z_hu_feasible
-    assert moved.z_cu_feasible == source.z_cu_feasible
+    hot_order = _axis_order(source.Qtot_sh, moved.Qtot_sh)
+    cold_order = _axis_order(source.Qtot_sc, moved.Qtot_sc)
+    np.testing.assert_allclose(moved.Qtot_sh, _take(source.Qtot_sh, hot_order))
+    np.testing.assert_allclose(moved.Qtot_sc, _take(source.Qtot_sc, cold_order))
+    np.testing.assert_allclose(
+        moved.Q_max,
+        _take(_take(source.Q_max, hot_order, axis=0), cold_order, axis=1),
+    )
+    assert moved.z_feasible == _take(
+        _take(source.z_feasible, hot_order, axis=0),
+        cold_order,
+        axis=1,
+    ).tolist()
+    assert moved.z_hu_feasible == _take(source.z_hu_feasible, cold_order).tolist()
+    assert moved.z_cu_feasible == _take(source.z_cu_feasible, hot_order).tolist()
     assert len(moved.m._equations) == len(source.m._equations)
     assert len(moved.m._objectives) == len(source.m._objectives)
     assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
@@ -410,16 +482,33 @@ def test_pdm_construction_matches_source_four_stream_above_below_fields(
             source.S,
             source.K,
         )
-        assert moved.z_i_active == source.z_i_active
-        assert moved.z_j_active == source.z_j_active
-        np.testing.assert_allclose(moved.T_h_in, source.T_h_in)
-        np.testing.assert_allclose(moved.T_h_out, source.T_h_out)
-        np.testing.assert_allclose(moved.T_c_in, source.T_c_in)
-        np.testing.assert_allclose(moved.T_c_out, source.T_c_out)
-        np.testing.assert_allclose(moved.Q_max, source.Q_max)
-        assert moved.z_feasible == source.z_feasible
-        assert moved.z_hu_feasible == source.z_hu_feasible
-        assert moved.z_cu_feasible == source.z_cu_feasible
+        hot_order = _row_order(
+            np.column_stack([source.T_h_in, source.T_h_out]),
+            np.column_stack([moved.T_h_in, moved.T_h_out]),
+        )
+        cold_order = _row_order(
+            np.column_stack([source.T_c_in, source.T_c_out]),
+            np.column_stack([moved.T_c_in, moved.T_c_out]),
+        )
+        assert moved.z_i_active == _take(source.z_i_active, hot_order).tolist()
+        assert moved.z_j_active == _take(source.z_j_active, cold_order).tolist()
+        np.testing.assert_allclose(moved.T_h_in, _take(source.T_h_in, hot_order))
+        np.testing.assert_allclose(moved.T_h_out, _take(source.T_h_out, hot_order))
+        np.testing.assert_allclose(moved.T_c_in, _take(source.T_c_in, cold_order))
+        np.testing.assert_allclose(moved.T_c_out, _take(source.T_c_out, cold_order))
+        np.testing.assert_allclose(
+            _sorted_values(moved.Q_max),
+            _sorted_values(source.Q_max),
+        )
+        np.testing.assert_array_equal(
+            _sorted_values(moved.z_feasible),
+            _sorted_values(source.z_feasible),
+        )
+        assert moved.z_hu_feasible == _take(source.z_hu_feasible, cold_order).tolist()
+        np.testing.assert_array_equal(
+            _sorted_values(moved.z_cu_feasible),
+            _sorted_values(source.z_cu_feasible),
+        )
         assert moved.Q_r[0][0][0].name == source.Q_r[0][0][0].name
         assert moved.T_h[0][0].name == source.T_h[0][0].name
 
@@ -629,6 +718,34 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
     assert [outcome.status for outcome in pdm_outcomes] == ["success", "success"]
     assert executor.executed_tasks == list(pdm_tasks)
     assert max_active_count == 2
+
+
+def test_local_executor_passes_user_solver_options_to_internal_problem() -> None:
+    problem = _four_stream_problem(
+        options={
+            "HENS_PDM_SOLVER_OPTIONS": {
+                "node_limit": 25,
+                "feas_tolerance": 0.02,
+            },
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+    task = build_pinch_decomposition_tasks(settings)[0]
+
+    internal_problem = LocalSynthesisExecutor()._build_problem(
+        task,
+        problem=problem,
+        parent_outcomes={},
+    )
+
+    assert settings.solver_options_for("pinch_decomposition") == {
+        "node_limit": 25,
+        "feas_tolerance": 0.02,
+    }
+    assert internal_problem.solver_options == {
+        "node_limit": 25,
+        "feas_tolerance": 0.02,
+    }
 
 
 def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) -> None:
@@ -920,6 +1037,46 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     return model
 
 
+def _axis_order(source_values, target_values) -> list[int]:
+    source = np.asarray(source_values, dtype=float)
+    target = np.asarray(target_values, dtype=float)
+    remaining = list(range(len(source)))
+    order: list[int] = []
+    for target_value in target:
+        for source_index in remaining:
+            if np.isclose(source[source_index], target_value):
+                order.append(source_index)
+                remaining.remove(source_index)
+                break
+        else:
+            raise AssertionError(f"missing source value for {target_value!r}")
+    return order
+
+
+def _row_order(source_rows, target_rows) -> list[int]:
+    source = np.asarray(source_rows, dtype=float)
+    target = np.asarray(target_rows, dtype=float)
+    remaining = list(range(len(source)))
+    order: list[int] = []
+    for target_row in target:
+        for source_index in remaining:
+            if np.allclose(source[source_index], target_row):
+                order.append(source_index)
+                remaining.remove(source_index)
+                break
+        else:
+            raise AssertionError(f"missing source row for {target_row!r}")
+    return order
+
+
+def _take(values, order: list[int], *, axis: int = 0):
+    return np.take(np.asarray(values), order, axis=axis)
+
+
+def _sorted_values(values):
+    return np.asarray(sorted(np.asarray(values).ravel().tolist()))
+
+
 def _source_openhens_lmtd(
     delta_1: float,
     delta_2: float,
@@ -968,9 +1125,18 @@ class _FakeOptions:
 
 
 class _FakeGekkoModel:
-    def __init__(self) -> None:
+    def __init__(self, path: Path | None = None) -> None:
         self.options = _FakeOptions()
         self.solver_options = []
+        self.cwd_during_solve = None
+        if path is not None:
+            self._path = str(path)
+
+    def solve(self, *, disp: bool = False, debug: int = 0) -> None:
+        del disp, debug
+        self.cwd_during_solve = Path.cwd()
+        self.options.SOLVESTATUS = 1
+        self.options.objfcnval = 1.0
 
 
 class _ParentCase:

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "case_id": "Four-stream-Yee-and-Grossmann-1990-1",
-  "source_summary_artifact": "openhens_baseline_results/refactor/Four-stream-Yee-and-Grossmann-1990-1/summary.json",
+  "source_summary_artifact": "Four-stream-Yee-and-Grossmann-1990-1/summary.json",
   "task_id": "esm-b520e740f0d6",
   "method": "energy_stage_refinement",
   "expected": {

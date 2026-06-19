@@ -147,6 +147,21 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_PDM_SOLVER": ConfigurationFieldSpec(str, "couenne", "synthesis"),
     "HENS_TDM_SOLVER": ConfigurationFieldSpec(str, "couenne", "synthesis"),
     "HENS_ESM_SOLVER": ConfigurationFieldSpec(str, "ipopt-pyomo", "synthesis"),
+    "HENS_PDM_SOLVER_OPTIONS": ConfigurationFieldSpec(
+        dict[str, Any],
+        {},
+        "synthesis",
+    ),
+    "HENS_TDM_SOLVER_OPTIONS": ConfigurationFieldSpec(
+        dict[str, Any],
+        {},
+        "synthesis",
+    ),
+    "HENS_ESM_SOLVER_OPTIONS": ConfigurationFieldSpec(
+        dict[str, Any],
+        {},
+        "synthesis",
+    ),
     "HENS_SOLVE_TOLERANCE": ConfigurationFieldSpec(
         float,
         1e-3,
@@ -262,6 +277,12 @@ def validate_configuration_option_value(name: str, value: Any) -> Any:
         "HENS_LOG_LEVEL",
     }:
         return _non_empty_string(name, value)
+    if name in {
+        "HENS_PDM_SOLVER_OPTIONS",
+        "HENS_TDM_SOLVER_OPTIONS",
+        "HENS_ESM_SOLVER_OPTIONS",
+    }:
+        return _solver_options(name, value)
     if name == "HENS_OUTPUT_FOLDER":
         if not isinstance(value, str):
             raise ValueError(f"{name} must be a string.")
@@ -282,6 +303,18 @@ def _positive_float_grid(name: str, value: Any) -> list[float]:
         _positive_float(name, item)
         for item in _sequence(name, value, allow_empty=False)
     ]
+
+
+def _solver_options(name: str, value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be provided as a dict.")
+    options: dict[str, Any] = {}
+    for key, option_value in value.items():
+        option_name = str(key).strip()
+        if not option_name:
+            raise ValueError(f"{name} cannot contain empty option names.")
+        options[option_name] = option_value
+    return options
 
 
 def _positive_unique_int_grid(name: str, value: Any) -> list[int]:

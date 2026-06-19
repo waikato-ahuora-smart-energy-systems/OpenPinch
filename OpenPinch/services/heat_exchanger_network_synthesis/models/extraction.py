@@ -103,6 +103,7 @@ def extract_heat_exchanger_network(
         source_metadata={
             "solver_model_class": type(solved_model).__name__,
             "solver_model_name": getattr(solved_model, "name", None),
+            "solver_dTmin": _optional_float(getattr(solved_model, "dTmin", None)),
         },
     )
 
