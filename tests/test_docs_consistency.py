@@ -216,9 +216,9 @@ def test_docs_explain_hen_synthesis_public_workflow_and_cutover():
     assert "Source OpenHENS CSV files are migration" in guide
     assert "source material only" in guide
     assert 'python -m pip install "openpinch[synthesis]"' in guide
-    assert 'rtk uv run pytest -m "not synthesis and not solver"' in guide
-    assert "rtk uv run pytest -m synthesis" in guide
-    assert "rtk uv run pytest -m solver" in guide
+    assert 'pytest -m "not synthesis and not solver"' in guide
+    assert "pytest -m synthesis" in guide
+    assert "pytest -m solver" in guide
 
 
 def test_reference_docs_match_current_heat_pump_and_schema_surface():

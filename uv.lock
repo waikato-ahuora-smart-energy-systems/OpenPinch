@@ -1023,13 +1023,17 @@ synthesis = [
 dev = [
     { name = "black" },
     { name = "build" },
+    { name = "gekko" },
     { name = "graphviz" },
     { name = "hatchling" },
     { name = "ipykernel" },
+    { name = "kaleido" },
+    { name = "matplotlib" },
     { name = "nbformat" },
     { name = "openpyxl" },
     { name = "plotly" },
     { name = "pylint" },
+    { name = "pyomo" },
     { name = "pytest" },
     { name = "pyxlsb" },
     { name = "ruff" },
@@ -1037,6 +1041,7 @@ dev = [
     { name = "sphinx-rtd-theme" },
     { name = "streamlit" },
     { name = "tespy" },
+    { name = "wakepy" },
 ]
 
 [package.metadata]
@@ -1078,13 +1083,17 @@ provides-extras = ["dashboard", "brayton-cycle", "synthesis", "notebook", "full"
 dev = [
     { name = "black", specifier = ">=23.9" },
     { name = "build", specifier = ">=1.3.0" },
+    { name = "gekko", specifier = ">=1.3.2" },
     { name = "graphviz", specifier = ">=0.21" },
     { name = "hatchling", specifier = ">=1.26" },
     { name = "ipykernel", specifier = ">=7.2.0" },
+    { name = "kaleido", specifier = ">=1.3.0" },
+    { name = "matplotlib", specifier = ">=3.10.9" },
     { name = "nbformat", specifier = ">=5.10.4" },
-    { name = "openpyxl" },
-    { name = "plotly" },
+    { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "plotly", specifier = ">=6.8.0" },
     { name = "pylint", specifier = ">=4.0.5" },
+    { name = "pyomo", specifier = ">=6.10.0" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pyxlsb" },
     { name = "ruff", specifier = ">=0.15.8" },
@@ -1092,6 +1101,7 @@ dev = [
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
     { name = "streamlit" },
     { name = "tespy" },
+    { name = "wakepy", specifier = ">=1.0.0" },
 ]
 
 [[package]]

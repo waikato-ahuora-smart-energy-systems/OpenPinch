@@ -58,6 +58,7 @@ HEN_PUBLIC_NAME_SNAPSHOT = {
     },
     "OpenPinch.lib": {
         "HEN",
+        "HeatExchangerKind",
         "HeatExchangerNetworkLabel",
         "HeatExchangerNetworkLabelKey",
         "HeatExchangerNetworkSynthesisExportRecord",
@@ -66,6 +67,7 @@ HEN_PUBLIC_NAME_SNAPSHOT = {
         "HeatExchangerNetworkSynthesisTask",
         "HeatExchangerNetworkSynthesisTaskOutcome",
         "HeatExchangerNetworkTopologyRestriction",
+        "HeatExchangerStreamRole",
         "SynthesisMethod",
         "SynthesisOutputFormat",
         "SynthesisTaskStatus",

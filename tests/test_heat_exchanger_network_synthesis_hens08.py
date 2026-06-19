@@ -24,8 +24,8 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
 FIXTURE_PATH = FIXTURE_ROOT / f"{CASE_ID}.json"
 SNAPSHOT_PATH = (
     FIXTURE_ROOT
-    / "solver_baselines"
-    / "network_snapshots"
+    / "regression_artifacts"
+    / "network_design_snapshots"
     / CASE_ID
     / "best-esm.json"
 )

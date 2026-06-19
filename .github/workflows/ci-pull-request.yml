@@ -32,7 +32,7 @@ jobs:
   #     - name: Run Ruff
   #       run: ruff check .
   #     - name: Run tests
-  #       run: pytest -q
+  #       run: pytest -q -m "not solver"
 
   # # optional-install-smoke:
   #   if: ${{ github.event.pull_request.draft == false }}

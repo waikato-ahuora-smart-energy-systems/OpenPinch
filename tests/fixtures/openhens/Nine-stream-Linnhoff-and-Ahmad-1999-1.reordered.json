@@ -36,7 +36,7 @@
       "topology_design",
       "energy_stage_refinement"
     ],
-    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Nine-stream-Linnhoff-and-Ahmad-1999-1",
+    "HENS_OUTPUT_FOLDER": "",
     "HENS_OUTPUT_FORMATS": [
       "json",
       "csv"

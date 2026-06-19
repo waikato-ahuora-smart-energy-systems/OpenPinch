@@ -23,7 +23,10 @@ from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
-SNAPSHOT_ROOT = FIXTURE_ROOT / "solver_baselines"
+REGRESSION_ARTIFACT_ROOT = FIXTURE_ROOT / "regression_artifacts"
+ADAPTER_ARRAY_SNAPSHOT_ROOT = (
+    REGRESSION_ARTIFACT_ROOT / "adapter_array_snapshots"
+)
 CASE_DTMIN = {
     "Four-stream-Yee-and-Grossmann-1990-1": 14.0,
     "Nine-stream-Linnhoff-and-Ahmad-1999-1": 18.0,
@@ -98,7 +101,7 @@ def test_converted_openhens_json_loads_through_prepared_pinch_problem(
 def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     case_id = "Four-stream-Yee-and-Grossmann-1990-1"
     fixture_path = FIXTURE_ROOT / f"{case_id}.json"
-    snapshot_path = SNAPSHOT_ROOT / "adapter_snapshots" / case_id / "dTmin-14.json"
+    snapshot_path = ADAPTER_ARRAY_SNAPSHOT_ROOT / case_id / "dTmin-14.json"
     snapshot = json.loads(snapshot_path.read_text())
     payload = problem_to_solver_arrays(PinchProblem(source=fixture_path), 14.0)
     current = payload.to_json_dict()

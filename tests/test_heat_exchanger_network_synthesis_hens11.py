@@ -33,8 +33,11 @@ from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
-BASELINE_ROOT = FIXTURE_ROOT / "solver_baselines"
-NETWORK_SNAPSHOT_ROOT = BASELINE_ROOT / "network_snapshots"
+REGRESSION_ARTIFACT_ROOT = FIXTURE_ROOT / "regression_artifacts"
+OPENHENS_SOLVER_RUN_ROOT = REGRESSION_ARTIFACT_ROOT / "openhens_solver_runs"
+NETWORK_DESIGN_SNAPSHOT_ROOT = (
+    REGRESSION_ARTIFACT_ROOT / "network_design_snapshots"
+)
 
 TAC_ABS_TOL = 1.0
 TAC_REL_TOL = 1e-4
@@ -548,7 +551,9 @@ def _network_context(
     HeatExchangerNetwork,
 ]:
     snapshot = _network_snapshot(case_id)
-    source_summary = _load_json(BASELINE_ROOT / snapshot["source_summary_artifact"])
+    source_summary = _load_json(
+        OPENHENS_SOLVER_RUN_ROOT / snapshot["source_solver_run_summary_artifact"]
+    )
     fixture = _fixture(case_id)
     arrays = _source_artifact_solver_arrays(fixture, snapshot["expected"]["best_dTmin"])
     solution = _snapshot_solution(snapshot, arrays)
@@ -1044,7 +1049,7 @@ def _utility_price(fixture: dict[str, Any], utility_type: str) -> float:
 
 
 def _best_solution_metrics_row(case_id: str, task_id: str) -> dict[str, str]:
-    with (BASELINE_ROOT / case_id / "solution_metrics.csv").open(
+    with (OPENHENS_SOLVER_RUN_ROOT / case_id / "solution_metrics.csv").open(
         encoding="utf-8",
         newline="",
     ) as handle:
@@ -1057,11 +1062,11 @@ def _fixture(case_id: str) -> dict[str, Any]:
 
 
 def _summary(case_id: str) -> dict[str, Any]:
-    return _load_json(BASELINE_ROOT / case_id / "summary.json")
+    return _load_json(OPENHENS_SOLVER_RUN_ROOT / case_id / "summary.json")
 
 
 def _network_snapshot(case_id: str) -> dict[str, Any]:
-    return _load_json(NETWORK_SNAPSHOT_ROOT / case_id / "best-esm.json")
+    return _load_json(NETWORK_DESIGN_SNAPSHOT_ROOT / case_id / "best-esm.json")
 
 
 def _load_json(path: Path) -> dict[str, Any]:
