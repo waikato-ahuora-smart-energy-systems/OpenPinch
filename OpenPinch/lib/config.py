@@ -11,7 +11,7 @@ from copy import deepcopy
 
 from .config_metadata import (
     CONFIG_FIELD_SPECS,
-    configuration_option_status,
+    validate_configuration_options,
 )
 
 C_to_K: float = 273.15  # degrees
@@ -61,7 +61,7 @@ class Configuration:
         if not isinstance(options, dict):
             raise TypeError("Configuration options must be provided as a dict.")
 
-        for key, value in self._validate_option_keys(options).items():
+        for key, value in self._validate_options(options).items():
             spec = CONFIG_FIELD_SPECS[str(key)]
             if key in {"REFRIGERANTS", "MVR_FLUIDS"}:
                 ref_ls = (
@@ -81,19 +81,9 @@ class Configuration:
         return {key for key in cls.__annotations__ if not key.startswith("_")}
 
     @classmethod
-    def _validate_option_keys(cls, options: dict) -> dict:
-        """Fail fast on unsupported or removed configuration keys."""
-        statuses = {key: configuration_option_status(str(key)) for key in options}
-
-        dead_keys = sorted(
-            key for key, status in statuses.items() if status.runtime_status == "dead"
-        )
-        if dead_keys:
-            raise ValueError(
-                f"Unknown configuration option(s): {', '.join(dead_keys)}."
-            )
-
-        return options
+    def _validate_options(cls, options: dict) -> dict:
+        """Fail fast on unsupported keys and invalid option values."""
+        return validate_configuration_options(options)
 
     @staticmethod
     def _validate_enum_option(key: str, value, enum_cls):

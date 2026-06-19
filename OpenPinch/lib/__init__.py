@@ -6,10 +6,11 @@ API.  They are re-exported here for consumers that need to construct or inspect
 inputs programmatically.
 """
 
-from . import config, enums, problem_table_types, schemas
+from . import config, enums, heat_exchanger_network_types, problem_table_types, schemas
 from .config import ACTIVATE_TIMING, LOG_TIMING, T_CRIT, C_to_K, Configuration, tol
 from .enums import (
     GT,
+    HEN,
     PT,
     SD,
     SID,
@@ -21,6 +22,9 @@ from .enums import (
     CogenerationTarget,
     FluidPhase,
     GraphType,
+    HeatExchangerKind,
+    HeatExchangerNetworkLabel,
+    HeatExchangerStreamRole,
     HeatExchangerTypes,
     HeatFlowUnits,
     HeatPump,
@@ -39,6 +43,7 @@ from .enums import (
     TurbineModel,
     ZoneType,
 )
+from .heat_exchanger_network_types import HeatExchangerNetworkLabelKey
 from .problem_table_types import (
     ProblemTableColumnKey,
     ProblemTableColumnUpdates,
@@ -58,6 +63,12 @@ from .schemas import (
     GraphCatalogEntry,
     GraphPayloadEntry,
     GraphSet,
+    HeatExchangerNetworkSynthesisExportRecord,
+    HeatExchangerNetworkSynthesisManifest,
+    HeatExchangerNetworkSynthesisResult,
+    HeatExchangerNetworkSynthesisTask,
+    HeatExchangerNetworkSynthesisTaskOutcome,
+    HeatExchangerNetworkTopologyRestriction,
     HeatPumpTargetBase,
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
@@ -87,6 +98,9 @@ from .schemas import (
     StatefulValueWithUnit,
     StreamSchema,
     SummaryCard,
+    SynthesisMethod,
+    SynthesisOutputFormat,
+    SynthesisTaskStatus,
     TableView,
     TargetInput,
     TargetOutput,
@@ -112,6 +126,7 @@ from .schemas import (
 __all__ = [
     "config",
     "enums",
+    "heat_exchanger_network_types",
     "problem_table_types",
     "schemas",
     "ACTIVATE_TIMING",
@@ -126,6 +141,10 @@ __all__ = [
     "GraphType",
     "FluidPhase",
     "GT",
+    "HeatExchangerKind",
+    "HeatExchangerNetworkLabel",
+    "HeatExchangerStreamRole",
+    "HEN",
     "HeatExchangerTypes",
     "HeatFlowUnits",
     "HeatPump",
@@ -149,6 +168,7 @@ __all__ = [
     "TurbineModel",
     "ZoneType",
     "ZT",
+    "HeatExchangerNetworkLabelKey",
     "ProblemTableColumnKey",
     "ProblemTableColumnUpdates",
     "ProblemTableUpdateKwargs",
@@ -163,6 +183,15 @@ __all__ = [
     "Segment",
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",
+    "HeatExchangerNetworkSynthesisExportRecord",
+    "HeatExchangerNetworkSynthesisManifest",
+    "HeatExchangerNetworkSynthesisResult",
+    "HeatExchangerNetworkSynthesisTask",
+    "HeatExchangerNetworkSynthesisTaskOutcome",
+    "HeatExchangerNetworkTopologyRestriction",
+    "SynthesisMethod",
+    "SynthesisOutputFormat",
+    "SynthesisTaskStatus",
     "HPRParsedState",
     "HPRThermoArtifacts",
     "HPRBackendResult",

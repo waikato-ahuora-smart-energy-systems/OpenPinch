@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import math
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, List
@@ -27,6 +30,17 @@ class ConfigurationOptionStatus:
 
     name: str
     runtime_status: str
+
+
+HENS_METHOD_SEQUENCE_VALUES = frozenset(
+    {
+        "pinch_decomposition",
+        "topology_design",
+        "energy_stage_refinement",
+    }
+)
+HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
+_HENS_RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
 # fmt: off
@@ -106,6 +120,70 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "ETA_MECH": ConfigurationFieldSpec(float, 1, "turbine", numeric_min=0.0),
     "TURB_MODEL": ConfigurationFieldSpec(str, TurbineModel.MEDINA_FLORES.value, "turbine", enum_cls=TurbineModel),
     "IS_HIGH_P_COND_FLASH": ConfigurationFieldSpec(bool, False, "turbine"),
+    "HENS_APPROACH_TEMPERATURES": ConfigurationFieldSpec(
+        List[float],
+        [14.0],
+        "synthesis",
+    ),
+    "HENS_DERIVATIVE_THRESHOLDS": ConfigurationFieldSpec(
+        List[float],
+        [0.5],
+        "synthesis",
+    ),
+    "HENS_STAGE_SELECTION": ConfigurationFieldSpec(
+        List[int],
+        [1, 2, 3],
+        "synthesis",
+    ),
+    "HENS_METHOD_SEQUENCE": ConfigurationFieldSpec(
+        List[str],
+        [
+            "pinch_decomposition",
+            "topology_design",
+            "energy_stage_refinement",
+        ],
+        "synthesis",
+    ),
+    "HENS_PDM_SOLVER": ConfigurationFieldSpec(str, "couenne", "synthesis"),
+    "HENS_TDM_SOLVER": ConfigurationFieldSpec(str, "couenne", "synthesis"),
+    "HENS_ESM_SOLVER": ConfigurationFieldSpec(str, "ipopt-pyomo", "synthesis"),
+    "HENS_PDM_SOLVER_OPTIONS": ConfigurationFieldSpec(
+        dict[str, Any],
+        {},
+        "synthesis",
+    ),
+    "HENS_TDM_SOLVER_OPTIONS": ConfigurationFieldSpec(
+        dict[str, Any],
+        {},
+        "synthesis",
+    ),
+    "HENS_ESM_SOLVER_OPTIONS": ConfigurationFieldSpec(
+        dict[str, Any],
+        {},
+        "synthesis",
+    ),
+    "HENS_SOLVE_TOLERANCE": ConfigurationFieldSpec(
+        float,
+        1e-3,
+        "synthesis",
+        numeric_min=0.0,
+    ),
+    "HENS_MAX_PARALLEL": ConfigurationFieldSpec(
+        int,
+        1,
+        "synthesis",
+        numeric_min=1.0,
+    ),
+    "HENS_LOG_LEVEL": ConfigurationFieldSpec(str, "INFO", "synthesis"),
+    "HENS_OUTPUT_FOLDER": ConfigurationFieldSpec(str, "", "synthesis"),
+    "HENS_OUTPUT_FORMATS": ConfigurationFieldSpec(List[str], [], "synthesis"),
+    "HENS_RUN_ID": ConfigurationFieldSpec(str, "default", "synthesis"),
+    "HENS_BEST_SOLUTIONS_TO_SAVE": ConfigurationFieldSpec(
+        int,
+        1,
+        "synthesis",
+        numeric_min=1.0,
+    ),
 }
 # fmt: on
 
@@ -146,3 +224,151 @@ def configuration_field_support_level(name: str) -> str:
     """Return the frontend support level for one editable config field."""
     group = configuration_group(name)
     return "stable" if group in {"general", "targeting"} else "advanced"
+
+
+def validate_configuration_options(options: dict) -> dict:
+    """Validate user-provided configuration option keys and values."""
+    statuses = {str(key): configuration_option_status(str(key)) for key in options}
+
+    dead_keys = sorted(
+        key for key, status in statuses.items() if status.runtime_status == "dead"
+    )
+    if dead_keys:
+        raise ValueError(f"Unknown configuration option(s): {', '.join(dead_keys)}.")
+
+    return {
+        str(key): validate_configuration_option_value(str(key), value)
+        for key, value in options.items()
+    }
+
+
+def validate_configuration_option_value(name: str, value: Any) -> Any:
+    """Validate one supported configuration value."""
+    if name == "HENS_APPROACH_TEMPERATURES":
+        return _positive_float_grid(name, value)
+    if name == "HENS_DERIVATIVE_THRESHOLDS":
+        return _positive_float_grid(name, value)
+    if name == "HENS_STAGE_SELECTION":
+        return _positive_unique_int_grid(name, value)
+    if name == "HENS_METHOD_SEQUENCE":
+        return _string_choice_grid(
+            name,
+            value,
+            HENS_METHOD_SEQUENCE_VALUES,
+            allow_empty=False,
+        )
+    if name == "HENS_OUTPUT_FORMATS":
+        return _string_choice_grid(
+            name,
+            value,
+            HENS_OUTPUT_FORMAT_VALUES,
+            allow_empty=True,
+        )
+    if name == "HENS_SOLVE_TOLERANCE":
+        return _positive_float(name, value)
+    if name in {"HENS_MAX_PARALLEL", "HENS_BEST_SOLUTIONS_TO_SAVE"}:
+        return _positive_int(name, value)
+    if name == "HENS_RUN_ID":
+        return _run_id(name, value)
+    if name in {
+        "HENS_PDM_SOLVER",
+        "HENS_TDM_SOLVER",
+        "HENS_ESM_SOLVER",
+        "HENS_LOG_LEVEL",
+    }:
+        return _non_empty_string(name, value)
+    if name in {
+        "HENS_PDM_SOLVER_OPTIONS",
+        "HENS_TDM_SOLVER_OPTIONS",
+        "HENS_ESM_SOLVER_OPTIONS",
+    }:
+        return _solver_options(name, value)
+    if name == "HENS_OUTPUT_FOLDER":
+        if not isinstance(value, str):
+            raise ValueError(f"{name} must be a string.")
+        return value
+    return value
+
+
+def _sequence(name: str, value: Any, *, allow_empty: bool) -> Sequence:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError(f"{name} must be provided as a list.")
+    if not allow_empty and not value:
+        raise ValueError(f"{name} must contain at least one value.")
+    return value
+
+
+def _positive_float_grid(name: str, value: Any) -> list[float]:
+    return [
+        _positive_float(name, item)
+        for item in _sequence(name, value, allow_empty=False)
+    ]
+
+
+def _solver_options(name: str, value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be provided as a dict.")
+    options: dict[str, Any] = {}
+    for key, option_value in value.items():
+        option_name = str(key).strip()
+        if not option_name:
+            raise ValueError(f"{name} cannot contain empty option names.")
+        options[option_name] = option_value
+    return options
+
+
+def _positive_unique_int_grid(name: str, value: Any) -> list[int]:
+    stages = [
+        _positive_int(name, item) for item in _sequence(name, value, allow_empty=False)
+    ]
+    if len(set(stages)) != len(stages):
+        raise ValueError(f"{name} values must be unique.")
+    return stages
+
+
+def _string_choice_grid(
+    name: str,
+    value: Any,
+    choices: frozenset[str],
+    *,
+    allow_empty: bool,
+) -> list[str]:
+    values = list(_sequence(name, value, allow_empty=allow_empty))
+    invalid = [
+        item for item in values if not isinstance(item, str) or item not in choices
+    ]
+    if invalid:
+        choices_text = ", ".join(sorted(choices))
+        raise ValueError(f"{name} values must be one of: {choices_text}.")
+    return values
+
+
+def _positive_float(name: str, value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a finite positive number.")
+    numeric_value = float(value)
+    if not math.isfinite(numeric_value) or numeric_value <= 0.0:
+        raise ValueError(f"{name} must be a finite positive number.")
+    return numeric_value
+
+
+def _positive_int(name: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
+def _run_id(name: str, value: Any) -> str:
+    value = _non_empty_string(name, value)
+    if _HENS_RUN_ID_PATTERN.fullmatch(value) is None:
+        raise ValueError(
+            f"{name} must start with an alphanumeric character and contain only "
+            "letters, numbers, underscores, hyphens, or periods."
+        )
+    return value
+
+
+def _non_empty_string(name: str, value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty string.")
+    return value.strip()

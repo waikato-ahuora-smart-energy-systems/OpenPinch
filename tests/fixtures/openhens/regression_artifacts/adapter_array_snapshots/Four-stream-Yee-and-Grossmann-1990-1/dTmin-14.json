@@ -1,0 +1,439 @@
+{
+  "active_dTmin": 14.0,
+  "array_shapes": {
+    "A_coeff": [
+      1
+    ],
+    "A_exp": [
+      1
+    ],
+    "T_c_cont": [
+      2
+    ],
+    "T_c_in": [
+      2
+    ],
+    "T_c_out": [
+      2
+    ],
+    "T_cu_in": [
+      1
+    ],
+    "T_cu_out": [
+      1
+    ],
+    "T_h_cont": [
+      2
+    ],
+    "T_h_in": [
+      2
+    ],
+    "T_h_out": [
+      2
+    ],
+    "T_hu_in": [
+      1
+    ],
+    "T_hu_out": [
+      1
+    ],
+    "c_cost": [
+      2
+    ],
+    "cold_names": [
+      2
+    ],
+    "cu_coeff": [
+      1
+    ],
+    "cu_cost": [
+      1
+    ],
+    "cu_exp": [
+      1
+    ],
+    "cu_unit_cost": [
+      1
+    ],
+    "f_c": [
+      2
+    ],
+    "f_h": [
+      2
+    ],
+    "h_cost": [
+      2
+    ],
+    "hot_names": [
+      2
+    ],
+    "htc_c": [
+      2
+    ],
+    "htc_cu": [
+      1
+    ],
+    "htc_h": [
+      2
+    ],
+    "htc_hu": [
+      1
+    ],
+    "hu_coeff": [
+      1
+    ],
+    "hu_cost": [
+      1
+    ],
+    "hu_exp": [
+      1
+    ],
+    "hu_unit_cost": [
+      1
+    ],
+    "unit_cost": [
+      1
+    ]
+  },
+  "arrays": {
+    "A_coeff": [
+      150.0
+    ],
+    "A_exp": [
+      1.0
+    ],
+    "T_c_cont": [
+      7.0,
+      7.0
+    ],
+    "T_c_in": [
+      410.0,
+      350.0
+    ],
+    "T_c_out": [
+      650.0,
+      500.0
+    ],
+    "T_cu_in": [
+      300.0
+    ],
+    "T_cu_out": [
+      320.0
+    ],
+    "T_h_cont": [
+      7.0,
+      7.0
+    ],
+    "T_h_in": [
+      650.0,
+      590.0
+    ],
+    "T_h_out": [
+      370.0,
+      370.0
+    ],
+    "T_hu_in": [
+      680.0
+    ],
+    "T_hu_out": [
+      680.0
+    ],
+    "c_cost": [
+      0.0,
+      0.0
+    ],
+    "cold_names": [
+      "Milk Concentrate",
+      "CIP Water"
+    ],
+    "cu_coeff": [
+      150.0
+    ],
+    "cu_cost": [
+      15.0
+    ],
+    "cu_exp": [
+      1.0
+    ],
+    "cu_unit_cost": [
+      5500.0
+    ],
+    "f_c": [
+      15.0,
+      13.0
+    ],
+    "f_h": [
+      10.0,
+      20.0
+    ],
+    "h_cost": [
+      0.0,
+      0.0
+    ],
+    "hot_names": [
+      "Raw Milk",
+      "HT Flash"
+    ],
+    "htc_c": [
+      1.0,
+      1.0
+    ],
+    "htc_cu": [
+      1.0
+    ],
+    "htc_h": [
+      1.0,
+      1.0
+    ],
+    "htc_hu": [
+      5.0
+    ],
+    "hu_coeff": [
+      150.0
+    ],
+    "hu_cost": [
+      80.0
+    ],
+    "hu_exp": [
+      1.0
+    ],
+    "hu_unit_cost": [
+      5500.0
+    ],
+    "unit_cost": [
+      5500.0
+    ]
+  },
+  "axis_maps": {
+    "cold_process_streams": {
+      "Process A.CIP Water": 1,
+      "Process A.Milk Concentrate": 0
+    },
+    "cold_utilities": {
+      "Cold Utility.CW": 0
+    },
+    "hot_process_streams": {
+      "Process A.HT Flash": 1,
+      "Process A.Raw Milk": 0
+    },
+    "hot_utilities": {
+      "Hot Utility.HPS": 0
+    },
+    "stages": {
+      "1": 0,
+      "2": 1,
+      "3": 2,
+      "4": 3
+    }
+  },
+  "case_id": "Four-stream-Yee-and-Grossmann-1990-1",
+  "configuration": {
+    "HENS_APPROACH_TEMPERATURES": [
+      2.0,
+      4.0,
+      6.0,
+      8.0,
+      10.0,
+      12.0,
+      14.0,
+      16.0,
+      18.0,
+      20.0
+    ],
+    "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
+    "HENS_DERIVATIVE_THRESHOLDS": [
+      0.5,
+      0.9,
+      1.3,
+      1.7,
+      2.1,
+      2.4,
+      2.8,
+      3.2,
+      3.6,
+      4.0
+    ],
+    "HENS_ESM_SOLVER": "ipopt-pyomo",
+    "HENS_ESM_SOLVER_OPTIONS": {},
+    "HENS_LOG_LEVEL": "WARNING",
+    "HENS_MAX_PARALLEL": 10,
+    "HENS_METHOD_SEQUENCE": [
+      "pinch_decomposition",
+      "topology_design",
+      "energy_stage_refinement"
+    ],
+    "HENS_OUTPUT_FOLDER": "",
+    "HENS_OUTPUT_FORMATS": [
+      "json",
+      "csv"
+    ],
+    "HENS_PDM_SOLVER": "couenne",
+    "HENS_PDM_SOLVER_OPTIONS": {},
+    "HENS_RUN_ID": "Four-stream-Yee-and-Grossmann-1990-1",
+    "HENS_SOLVE_TOLERANCE": 0.001,
+    "HENS_STAGE_SELECTION": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "HENS_TDM_SOLVER": "couenne",
+    "HENS_TDM_SOLVER_OPTIONS": {},
+    "active_dTmin": 14.0,
+    "costing": {
+      "COST_EXP": 1.0,
+      "FIXED_COST": 5500.0,
+      "VARIABLE_COST": 150.0
+    }
+  },
+  "extraction_command": "rtk uv run python scripts/convert_openhens_fixtures.py --openhens-root /Users/ca107/Desktop/ahuora/OpenHENS --write",
+  "preparation": {
+    "pinch_problem_class": "PinchProblem",
+    "pinch_problem_load": "passed",
+    "prepare_problem": "created Zone, StreamCollection, and Stream objects",
+    "prepared_zone_class": "Zone",
+    "process_stream_collection_class": "StreamCollection",
+    "stream_class": "Stream",
+    "zone_name": "Site"
+  },
+  "schema_version": "openpinch-openhens-adapter-snapshot/v1",
+  "source_csv_path": "/Users/ca107/Desktop/ahuora/OpenHENS/examples/cases/Four-stream-Yee-and-Grossmann-1990-1.csv",
+  "source_csv_sha256": "0c0a7f9592e7d8e27d35aef523530d70c11826c407dcbe4adba7fff86f4835f2",
+  "source_fixture_path": "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json",
+  "source_fixture_sha256": "ee3def59bed9dad923e452668b216d2673a18d00a9c601163e7d9f4bad8a494a",
+  "source_openhens_arrays": {
+    "A_coeff": [
+      150.0
+    ],
+    "A_exp": [
+      1.0
+    ],
+    "T_c_cont": [
+      7.0,
+      7.0
+    ],
+    "T_c_in": [
+      410.0,
+      350.0
+    ],
+    "T_c_out": [
+      650.0,
+      500.0
+    ],
+    "T_cu_in": [
+      300.0
+    ],
+    "T_cu_out": [
+      320.0
+    ],
+    "T_h_cont": [
+      7.0,
+      7.0
+    ],
+    "T_h_in": [
+      650.0,
+      590.0
+    ],
+    "T_h_out": [
+      370.0,
+      370.0
+    ],
+    "T_hu_in": [
+      680.0
+    ],
+    "T_hu_out": [
+      680.0
+    ],
+    "c_cost": [
+      0.0,
+      0.0
+    ],
+    "cold_names": [
+      "Milk Concentrate",
+      "CIP Water"
+    ],
+    "cu_coeff": [
+      150.0
+    ],
+    "cu_cost": [
+      15.0
+    ],
+    "cu_exp": [
+      1.0
+    ],
+    "cu_unit_cost": [
+      5500.0
+    ],
+    "f_c": [
+      15.0,
+      13.0
+    ],
+    "f_h": [
+      10.0,
+      20.0
+    ],
+    "h_cost": [
+      0.0,
+      0.0
+    ],
+    "hot_names": [
+      "Raw Milk ",
+      "HT Flash"
+    ],
+    "htc_c": [
+      1.0,
+      1.0
+    ],
+    "htc_cu": [
+      1.0
+    ],
+    "htc_h": [
+      1.0,
+      1.0
+    ],
+    "htc_hu": [
+      5.0
+    ],
+    "hu_coeff": [
+      150.0
+    ],
+    "hu_cost": [
+      80.0
+    ],
+    "hu_exp": [
+      1.0
+    ],
+    "hu_unit_cost": [
+      5500.0
+    ],
+    "unit_cost": [
+      5500.0
+    ]
+  },
+  "stream_identities": {
+    "cold_process_streams": [
+      "Process A.Milk Concentrate",
+      "Process A.CIP Water"
+    ],
+    "hot_process_streams": [
+      "Process A.Raw Milk",
+      "Process A.HT Flash"
+    ]
+  },
+  "unit_conventions": {
+    "cost_coefficients": "OpenPinch Configuration FIXED_COST, VARIABLE_COST, COST_EXP",
+    "heat_capacity_flowrate": "kW/K",
+    "heat_transfer_coefficient": "kW/m^2/K",
+    "temperature": "K",
+    "temperature_contribution": "K, falling back to dTmin / 2 when prepared contribution is absent",
+    "utility_price": "numeric UtilitySchema.price passed through for OpenHENS annual cost equations"
+  },
+  "utility_identities": {
+    "cold_utilities": [
+      "Cold Utility.CW"
+    ],
+    "hot_utilities": [
+      "Hot Utility.HPS"
+    ]
+  }
+}

@@ -75,6 +75,21 @@ class HeatExchangerTypes(Enum):
     CondEvap = "Condensing or Evaporating"
 
 
+class HeatExchangerKind(str, Enum):
+    """Supported heat-transfer link families in a HEN design."""
+
+    RECOVERY = "recovery"
+    HOT_UTILITY = "hot_utility"
+    COLD_UTILITY = "cold_utility"
+
+
+class HeatExchangerStreamRole(str, Enum):
+    """Identity class for the source and sink streams on an exchanger link."""
+
+    PROCESS = "process"
+    UTILITY = "utility"
+
+
 class HeatPump(Enum):
     """Heat pump components"""
 
@@ -236,6 +251,24 @@ class ProblemTableLabel(Enum):
 PT = ProblemTableLabel
 
 
+class HeatExchangerNetworkLabel(Enum):
+    """Heat exchanger network metric labels for labelled accessors."""
+
+    RECOVERY_DUTY = "recovery_duty"
+    HOT_UTILITY_DUTY = "hot_utility_duty"
+    COLD_UTILITY_DUTY = "cold_utility_duty"
+    RECOVERY_AREA = "recovery_area"
+    HOT_UTILITY_AREA = "hot_utility_area"
+    COLD_UTILITY_AREA = "cold_utility_area"
+    HOT_RECOVERY_OUTLET_TEMPERATURE = "hot_recovery_outlet_temperature"
+    COLD_RECOVERY_OUTLET_TEMPERATURE = "cold_recovery_outlet_temperature"
+    MATCH_ACTIVE = "match_active"
+    MATCH_ALLOWED = "match_allowed"
+
+
+HEN = HeatExchangerNetworkLabel
+
+
 class StreamDataLabel(Enum):
     """Stream data column header labels"""
 
@@ -333,6 +366,10 @@ __all__ = [
     "FluidPhase",
     "GraphType",
     "GT",
+    "HeatExchangerKind",
+    "HEN",
+    "HeatExchangerNetworkLabel",
+    "HeatExchangerStreamRole",
     "HeatExchangerTypes",
     "HeatFlowUnits",
     "HeatPump",

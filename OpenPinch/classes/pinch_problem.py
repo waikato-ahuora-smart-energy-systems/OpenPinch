@@ -31,6 +31,7 @@ from ._problem import (
     JsonDict,
     PathLike,
     _ComponentAccessorDescriptor,
+    _DesignAccessorDescriptor,
     _LoadedProblemSource,
     _PlotAccessorDescriptor,
     _ProblemSourceAdapters,
@@ -70,6 +71,7 @@ class PinchProblem:
     _input_source_kind: str
     _validation_context: Optional[dict[str, list[dict[str, Any]]]]
     add_component = _ComponentAccessorDescriptor()
+    design = _DesignAccessorDescriptor()
     plot = _PlotAccessorDescriptor()
     target = _TargetAccessorDescriptor()
 

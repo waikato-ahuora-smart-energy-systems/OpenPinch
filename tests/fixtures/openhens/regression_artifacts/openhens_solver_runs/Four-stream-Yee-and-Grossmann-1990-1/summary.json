@@ -1,0 +1,18 @@
+{
+  "best_cu_units": 2,
+  "best_dTmin": 14,
+  "best_hu_units": 1,
+  "best_min_dQ": 0.5,
+  "best_recovery_units": 3,
+  "best_solution": 154853.8518602861,
+  "best_stages": 3,
+  "quartile_1": 154853.8601589499,
+  "quartile_2": 159038.71986626228,
+  "quartile_3": 163556.12518498677,
+  "solved_esm_count": 100,
+  "total_cases_attempted": 1210,
+  "total_cases_solved": 1210,
+  "within_10_percent": 100,
+  "within_2_percent": 37,
+  "within_5_percent": 64
+}

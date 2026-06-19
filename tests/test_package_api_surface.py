@@ -31,6 +31,9 @@ EXPECTED_EXPORTS = {
         "Configuration",
         "Graph",
         "GraphSet",
+        "HeatExchangerNetworkLabel",
+        "HeatExchangerNetworkSynthesisResult",
+        "HeatExchangerNetworkSynthesisTask",
         "HeatUtility",
         "HeatPumpTargetOutputs",
         "StreamSchema",
@@ -45,6 +48,8 @@ EXPECTED_EXPORTS = {
         "ZoneType",
     },
     "OpenPinch.classes": {
+        "HeatExchanger",
+        "HeatExchangerNetwork",
         "PinchProblem",
         "PinchWorkspace",
         "ProblemTable",
@@ -102,3 +107,19 @@ def test_public_namespace_exports_match_snapshot():
         assert expected <= actual
         for exported_name in expected:
             assert hasattr(module, exported_name)
+
+
+def test_openhens_compatibility_surfaces_are_not_root_exported():
+    forbidden_exports = {
+        "OpenHENS",
+        "CaseStudy",
+        "SynthesisStudy",
+        "run_synthesis_workflow",
+        "HeatExchangerNetworkDesignSpace",
+        "HeatExchangerNetworkMethodSequence",
+        "HeatExchangerNetworkSolveSetup",
+        "HeatExchangerNetworkOutputs",
+    }
+
+    for module in MODULES.values():
+        assert forbidden_exports.isdisjoint(_public_exports(module))

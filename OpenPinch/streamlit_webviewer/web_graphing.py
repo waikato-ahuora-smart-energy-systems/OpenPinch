@@ -15,22 +15,6 @@ from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tupl
 
 import pandas as pd
 
-try:
-    import plotly.graph_objects as go
-except ImportError as exc:  # pragma: no cover - optional dependency guard
-    go = None
-    _PLOTLY_IMPORT_ERROR = exc
-else:
-    _PLOTLY_IMPORT_ERROR = None
-
-try:
-    import streamlit as st
-except ImportError as exc:  # pragma: no cover - optional dependency guard
-    st = None
-    _STREAMLIT_IMPORT_ERROR = exc
-else:
-    _STREAMLIT_IMPORT_ERROR = None
-
 from ..classes.problem_table import ProblemTable
 from ..classes.zone import Zone
 from ..lib.enums import LineColour
@@ -57,24 +41,31 @@ _SEGMENT_COLOUR_MAP: Dict[int, str] = {
 
 
 def _require_plotly():
-    if _PLOTLY_IMPORT_ERROR is None:
+    try:
+        import plotly.graph_objects as go
+    except ImportError as exc:  # pragma: no cover - optional dependency guard
+        raise ImportError(
+            "Plotly is required for graph rendering. "
+            "Reinstall OpenPinch or install it directly with 'pip install plotly'."
+        ) from exc
+    else:
         return go
-    raise ImportError(
-        "Plotly is required for graph rendering. "
-        "Reinstall OpenPinch or install it directly with 'pip install plotly'."
-    ) from _PLOTLY_IMPORT_ERROR
 
 
 def _require_streamlit():
     streamlit_mod = sys.modules.get("streamlit")
     if streamlit_mod is not None:
         return streamlit_mod
-    if _STREAMLIT_IMPORT_ERROR is None:
+
+    try:
+        import streamlit as st
+    except ImportError as exc:  # pragma: no cover - optional dependency guard
+        raise ImportError(
+            "Streamlit is required for 'render_streamlit_dashboard'. "
+            "Reinstall OpenPinch or install it directly with 'pip install streamlit'."
+        ) from exc
+    else:
         return st
-    raise ImportError(
-        "Streamlit is required for 'render_streamlit_dashboard'. "
-        "Reinstall OpenPinch or install it directly with 'pip install streamlit'."
-    ) from _STREAMLIT_IMPORT_ERROR
 
 
 def _require_openpyxl():

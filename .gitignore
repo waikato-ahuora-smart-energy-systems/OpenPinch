@@ -210,3 +210,11 @@ __marimo__/
 # Other stuff
 results/*
 commands.txt
+
+# Generated solver artifacts
+*.pkl
+*.pickle
+openhens_baseline_results/main/
+openhens_baseline_results/refactor/*/manifest.json
+openhens_baseline_results/refactor/*/results/
+openhens_baseline_results/refactor/*/*/

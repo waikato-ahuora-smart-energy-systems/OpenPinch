@@ -12,6 +12,7 @@ points to the right sample case, notebook, and API surface for that workflow.
    input-formats-and-validation
    zonal-and-total-site-workflows
    heat-pump-workflows
+   heat-exchanger-network-synthesis
    cogeneration-workflows
    exergy-workflows
    graphing-and-interpretation
