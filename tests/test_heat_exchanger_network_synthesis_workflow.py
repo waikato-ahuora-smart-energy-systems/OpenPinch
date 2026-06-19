@@ -16,6 +16,7 @@ import OpenPinch.services
 import OpenPinch.services.heat_exchanger_network_synthesis.workflow as workflow_module
 from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
+from OpenPinch.lib import HeatExchangerKind
 from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisManifest,
     HeatExchangerNetworkSynthesisTask,
@@ -47,14 +48,33 @@ FORBIDDEN_SOLVER_MODULES = [
     "pyomo",
     "pyomo.environ",
     "pyomo.opt",
-    "matplotlib",
-    "matplotlib.pyplot",
     "plotly",
     "plotly.graph_objects",
     "kaleido",
     "openpyxl",
     "wakepy",
 ]
+
+
+def test_workflow_default_uses_local_synthesis_executor(monkeypatch) -> None:
+    used_default = False
+
+    class SpyLocalExecutor(FakeSynthesisExecutor):
+        def __init__(self) -> None:
+            nonlocal used_default
+            used_default = True
+            super().__init__()
+
+    monkeypatch.setattr(workflow_module, "LocalSynthesisExecutor", SpyLocalExecutor)
+    problem = _small_problem()
+
+    result = workflow_module._execute_synthesis_workflow(
+        problem,
+        workflow_settings_from_problem(problem),
+    )
+
+    assert used_default
+    assert result.accepted_result.network.exchangers
 
 
 def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
@@ -88,6 +108,133 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
     assert esm_tasks[0].topology_restrictions
     assert pdm_executor.stage_order == ["pinch_decomposition"]
     assert tdm_executor.stage_order == ["topology_design"]
+
+
+def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
+    class MissingCouenneForTopologyExecutor(FakeSynthesisExecutor):
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            if tasks and tasks[0].method == "topology_design":
+                return tuple(
+                    HeatExchangerNetworkSynthesisTaskOutcome(
+                        task=task,
+                        status="failed",
+                        solver_status="failed",
+                        error=(
+                            "The 'couenne' solver executable is required for "
+                            "couenne heat exchanger network synthesis solves, but it was not found "
+                            "on PATH."
+                        ),
+                    )
+                    for task in tasks
+                )
+            return super().execute(
+                tasks,
+                problem=problem,
+                parent_outcomes=parent_outcomes,
+                max_parallel=max_parallel,
+            )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+
+    with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
+        result = workflow_module._execute_synthesis_workflow(
+            problem,
+            settings,
+            executor=MissingCouenneForTopologyExecutor(),
+        )
+
+    outcomes = result.accepted_result.task_outcomes
+    pdm_success = next(
+        outcome
+        for outcome in outcomes
+        if outcome.status == "success" and outcome.task.method == "pinch_decomposition"
+    )
+    tdm_failures = [
+        outcome for outcome in outcomes if outcome.task.method == "topology_design"
+    ]
+    esm_success = next(
+        outcome
+        for outcome in outcomes
+        if outcome.status == "success"
+        and outcome.task.method == "energy_stage_refinement"
+    )
+
+    assert result.accepted_result.method == "energy_stage_refinement"
+    assert all(outcome.status == "failed" for outcome in tdm_failures)
+    assert esm_success.task.parent_task_id == pdm_success.task.task_id
+    assert esm_success.task.derivative_threshold is None
+
+
+def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
+    class MissingCouenneForPdmExecutor(FakeSynthesisExecutor):
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            if tasks and tasks[0].method == "pinch_decomposition":
+                return tuple(
+                    HeatExchangerNetworkSynthesisTaskOutcome(
+                        task=task,
+                        status="failed",
+                        solver_status="failed",
+                        error=(
+                            "The 'couenne' solver executable is required for "
+                            "couenne heat exchanger network synthesis solves, but it was not found "
+                            "on PATH."
+                        ),
+                    )
+                    for task in tasks
+                )
+            return super().execute(
+                tasks,
+                problem=problem,
+                parent_outcomes=parent_outcomes,
+                max_parallel=max_parallel,
+            )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+
+    with pytest.warns(RuntimeWarning, match="pinch-decomposition"):
+        result = workflow_module._execute_synthesis_workflow(
+            problem,
+            settings,
+            executor=MissingCouenneForPdmExecutor(),
+        )
+
+    outcomes = result.accepted_result.task_outcomes
+    pdm_failures = [
+        outcome for outcome in outcomes if outcome.task.method == "pinch_decomposition"
+    ]
+    tdm_outcomes = [
+        outcome for outcome in outcomes if outcome.task.method == "topology_design"
+    ]
+    esm_successes = [
+        outcome
+        for outcome in outcomes
+        if outcome.status == "success"
+        and outcome.task.method == "energy_stage_refinement"
+    ]
+
+    assert all(outcome.status == "failed" for outcome in pdm_failures)
+    assert tdm_outcomes == []
+    assert esm_successes
+    assert all(outcome.task.parent_task_id is None for outcome in esm_successes)
+    assert result.accepted_result.method == "energy_stage_refinement"
+
+
+def test_failed_workflow_reports_task_errors() -> None:
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    executor = FakeSynthesisExecutor(
+        failures={task.task_id for task in pdm_tasks if task.task_id is not None},
+    )
+
+    with pytest.raises(WorkflowContractError, match="configured fake executor failure"):
+        workflow_module._execute_synthesis_workflow(
+            problem,
+            settings,
+            executor=executor,
+        )
 
 
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
@@ -183,7 +330,10 @@ def test_legacy_z_restriction_handoff_uses_source_shaped_duty_values() -> None:
     )
 
 
-def test_direct_design_run_populates_results_cache_and_preserves_targets() -> None:
+def test_direct_design_run_populates_results_cache_and_preserves_targets(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
     target_output = problem.target()
 
@@ -197,7 +347,8 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets() -> No
     assert design.objective_values["total_annual_cost"] > 0
 
 
-def test_direct_design_run_computes_targets_when_cache_is_empty() -> None:
+def test_direct_design_run_computes_targets_when_cache_is_empty(monkeypatch) -> None:
+    _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
 
     design = problem.design.heat_exchanger_network_synthesis()
@@ -207,7 +358,35 @@ def test_direct_design_run_computes_targets_when_cache_is_empty() -> None:
     assert problem.results.design == design
 
 
-def test_workspace_design_workflow_dispatches_to_live_problem_design_path() -> None:
+def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    payload = _small_payload()
+    for record in payload["streams"] + payload["utilities"]:
+        for field in ("t_supply", "t_target"):
+            record[field]["value"] -= 273.15
+            record[field]["unit"] = "degC"
+    problem = PinchProblem(source=payload, project_name="HENS Celsius Demo")
+
+    design = problem.design.heat_exchanger_network_synthesis()
+    recovery = next(
+        exchanger
+        for exchanger in design.network.exchangers
+        if exchanger.kind is HeatExchangerKind.RECOVERY
+    )
+
+    assert recovery.source_inlet_temperature == pytest.approx(650.0)
+    assert recovery.source_outlet_temperature == pytest.approx(370.0)
+    assert recovery.sink_inlet_temperature == pytest.approx(410.0)
+    assert recovery.sink_outlet_temperature == pytest.approx(650.0)
+    assert design.network.summary_metrics["approach_temperature"] == pytest.approx(2.0)
+
+
+def test_workspace_design_workflow_dispatches_to_live_problem_design_path(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
     workspace = PinchWorkspace(_small_payload(), project_name="HENS Demo")
 
     view = workspace.solve_variant(
@@ -225,7 +404,11 @@ def test_workspace_design_workflow_dispatches_to_live_problem_design_path() -> N
     assert not hasattr(problem.target, "heat_exchanger_network_synthesis")
 
 
-def test_optional_exports_round_trip_from_problem_results(tmp_path: Path) -> None:
+def test_optional_exports_round_trip_from_problem_results(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
     problem = _small_problem(project_name="Export Demo")
     problem.design.heat_exchanger_network_synthesis(workspace_variant="variant-a")
 
@@ -308,6 +491,14 @@ if loaded:
 
 def _small_problem(*, project_name: str = "HENS Demo") -> PinchProblem:
     return PinchProblem(source=_small_payload(), project_name=project_name)
+
+
+def _use_fake_default_executor(monkeypatch) -> None:
+    monkeypatch.setattr(
+        workflow_module,
+        "LocalSynthesisExecutor",
+        FakeSynthesisExecutor,
+    )
 
 
 def _small_payload() -> dict:

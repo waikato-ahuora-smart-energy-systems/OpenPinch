@@ -1,4 +1,4 @@
-"""Problem-rooted HEN synthesis workflow orchestration.
+"""Problem-rooted heat exchanger network synthesis workflow orchestration.
 
 The workflow in this module is intentionally internal to OpenPinch. Public
 execution starts at ``PinchProblem.design`` or ``PinchWorkspace.solve_variant``;
@@ -9,6 +9,7 @@ stream, utility, or configuration state.
 from __future__ import annotations
 
 import multiprocessing
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
@@ -54,7 +55,7 @@ class WorkflowContractError(RuntimeError):
 
 @dataclass(frozen=True)
 class SynthesisWorkflowSettings:
-    """Resolved HEN controls read from a prepared OpenPinch problem."""
+    """Resolved synthesis controls read from a prepared OpenPinch problem."""
 
     run_id: str
     approach_temperatures: tuple[float, ...]
@@ -145,7 +146,8 @@ class FakeSynthesisExecutor:
                 parent = parent_outcomes.get(task.parent_task_id)
                 if parent is None or parent.status != "success":
                     raise WorkflowContractError(
-                        "downstream HEN tasks require successful parent outcomes"
+                        "downstream heat exchanger network tasks require "
+                        "successful parent outcomes"
                     )
 
             self.executed_tasks.append(task)
@@ -363,7 +365,7 @@ def _solve_built_task(
             reason = getattr(
                 internal_problem,
                 "solution_failure_reason",
-                "solver did not return a successful HEN model",
+                "solver did not return a successful heat exchanger network model",
             )
             return task, _failed_task_outcome(task, reason), None
         verify = getattr(solved, "verify", None)
@@ -398,10 +400,12 @@ def workflow_settings_from_problem(
     state_id: str | None = None,
     workspace_variant: str | None = None,
 ) -> SynthesisWorkflowSettings:
-    """Read persistent HEN controls from a prepared problem configuration."""
+    """Read persistent synthesis controls from a prepared problem configuration."""
     zone = problem.master_zone
     if zone is None:
-        raise RuntimeError("HEN synthesis requires a loaded PinchProblem.")
+        raise RuntimeError(
+            "heat exchanger network synthesis requires a loaded PinchProblem."
+        )
     config = zone.config
     return SynthesisWorkflowSettings(
         run_id=str(config.HENS_RUN_ID),
@@ -435,14 +439,15 @@ def _execute_synthesis_workflow(
     *,
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
-    """Generate, fake-execute, and collect the PDM -> TDM -> ESM task graph."""
+    """Generate, execute, and collect the PDM -> TDM -> ESM task graph."""
     if settings.method_sequence != _METHOD_SEQUENCE:
         raise WorkflowContractError(
             "HENS_METHOD_SEQUENCE must preserve pinch_decomposition -> "
             "topology_design -> energy_stage_refinement for this migration slice."
         )
 
-    executor = executor or FakeSynthesisExecutor()
+    if executor is None:
+        executor = LocalSynthesisExecutor()
     start = perf_counter()
 
     pdm_tasks = build_pinch_decomposition_tasks(settings)
@@ -454,16 +459,43 @@ def _execute_synthesis_workflow(
     )
 
     pdm_outcome_map = _outcome_map(pdm_outcomes)
-    tdm_tasks = build_topology_design_tasks(settings, pdm_outcomes)
-    tdm_outcomes = executor.execute(
-        tdm_tasks,
-        problem=problem,
-        parent_outcomes=pdm_outcome_map,
-        max_parallel=settings.max_parallel,
-    )
+    if _can_skip_preliminary_stages_for_missing_couenne(
+        settings,
+        pdm_tasks,
+        pdm_outcomes,
+    ):
+        _warn_couenne_fallback(
+            "Couenne is unavailable for the heat exchanger network "
+            "pinch-decomposition stage",
+        )
+        tdm_tasks: tuple[HeatExchangerNetworkSynthesisTask, ...] = ()
+        tdm_outcomes: tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...] = ()
+        esm_tasks = build_direct_energy_stage_refinement_tasks(settings)
+        upstream_outcomes = {}
+    else:
+        tdm_tasks = build_topology_design_tasks(settings, pdm_outcomes)
+        tdm_outcomes = executor.execute(
+            tdm_tasks,
+            problem=problem,
+            parent_outcomes=pdm_outcome_map,
+            max_parallel=settings.max_parallel,
+        )
 
-    upstream_outcomes = pdm_outcome_map | _outcome_map(tdm_outcomes)
-    esm_tasks = build_energy_stage_refinement_tasks(settings, tdm_outcomes)
+        upstream_outcomes = pdm_outcome_map | _outcome_map(tdm_outcomes)
+        esm_tasks = build_energy_stage_refinement_tasks(settings, tdm_outcomes)
+    if not esm_tasks and _can_skip_derivative_stage_for_missing_couenne(
+        settings,
+        tdm_tasks,
+        tdm_outcomes,
+    ):
+        _warn_couenne_fallback(
+            "Couenne is unavailable for the heat exchanger network "
+            "thermal-derivative topology stage",
+        )
+        esm_tasks = build_energy_stage_refinement_tasks_from_pinch_decomposition(
+            pdm_outcomes,
+        )
+        upstream_outcomes = pdm_outcome_map
     esm_outcomes = executor.execute(
         esm_tasks,
         problem=problem,
@@ -561,6 +593,56 @@ def build_energy_stage_refinement_tasks(
     return tuple(tasks)
 
 
+def build_energy_stage_refinement_tasks_from_pinch_decomposition(
+    pdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
+    """Generate ESM tasks directly from PDM when TDM is unavailable."""
+    tasks: list[HeatExchangerNetworkSynthesisTask] = []
+    for outcome in pdm_outcomes:
+        if not _successful_method(outcome, "pinch_decomposition"):
+            continue
+        restrictions = required_topology_restrictions_from_outcome(
+            outcome,
+            "energy_stage_refinement",
+        )
+        stage_count = _required_stage_count(outcome, "energy_stage_refinement")
+        tasks.append(
+            HeatExchangerNetworkSynthesisTask(
+                run_id=outcome.task.run_id,
+                method="energy_stage_refinement",
+                approach_temperature=outcome.task.approach_temperature,
+                derivative_threshold=None,
+                stage_count=stage_count,
+                problem_id=outcome.task.problem_id,
+                workspace_variant=outcome.task.workspace_variant,
+                state_id=outcome.task.state_id,
+                parent_task_id=outcome.task.task_id,
+                topology_restrictions=restrictions,
+            )
+        )
+    return tuple(tasks)
+
+
+def build_direct_energy_stage_refinement_tasks(
+    settings: SynthesisWorkflowSettings,
+) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
+    """Generate ESM tasks without Couenne-backed PDM/TDM parent tasks."""
+    return tuple(
+        HeatExchangerNetworkSynthesisTask(
+            run_id=settings.run_id,
+            method="energy_stage_refinement",
+            approach_temperature=approach_temperature,
+            derivative_threshold=None,
+            stage_count=stage_count,
+            problem_id=settings.problem_id,
+            workspace_variant=settings.workspace_variant,
+            state_id=settings.state_id,
+        )
+        for approach_temperature in settings.approach_temperatures
+        for stage_count in settings.stage_selection
+    )
+
+
 def required_topology_restrictions_from_outcome(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome,
     downstream_method: SynthesisMethod,
@@ -601,7 +683,9 @@ def build_synthesis_result(
     """Convert accepted task outcomes into the canonical design payload."""
     accepted = _accepted_outcome(outcomes)
     if accepted.network is None:
-        raise WorkflowContractError("Accepted HEN outcome must include a network.")
+        raise WorkflowContractError(
+            "Accepted heat exchanger network outcome must include a network."
+        )
 
     network = accepted.network.model_copy(
         update={
@@ -670,7 +754,78 @@ def _accepted_outcome(
                     else outcome.objective_value
                 ),
             )
-    raise WorkflowContractError("HEN synthesis produced no successful task outcomes.")
+    detail = _failed_outcome_summary(outcomes)
+    message = "heat exchanger network synthesis produced no successful task outcomes."
+    if detail:
+        message = f"{message} Failed task details: {detail}"
+    raise WorkflowContractError(message)
+
+
+def _failed_outcome_summary(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> str:
+    method_rank = {method: rank for rank, method in enumerate(_METHOD_SEQUENCE)}
+    failed = sorted(
+        (outcome for outcome in outcomes if outcome.status != "success"),
+        key=lambda outcome: method_rank.get(outcome.task.method, -1),
+        reverse=True,
+    )
+    if not failed:
+        return ""
+    summaries = []
+    for outcome in failed[:3]:
+        reason = outcome.error or outcome.solver_status or "no failure reason"
+        summaries.append(
+            f"{outcome.task.method}({outcome.task.approach_temperature:g} K): {reason}"
+        )
+    if len(failed) > len(summaries):
+        summaries.append(f"{len(failed) - len(summaries)} more failed task(s)")
+    return "; ".join(summaries)
+
+
+def _can_skip_derivative_stage_for_missing_couenne(
+    settings: SynthesisWorkflowSettings,
+    tdm_tasks: Sequence[HeatExchangerNetworkSynthesisTask],
+    tdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> bool:
+    if settings.tdm_solver != "couenne" or not tdm_tasks or not tdm_outcomes:
+        return False
+    if any(_successful_method(outcome, "topology_design") for outcome in tdm_outcomes):
+        return False
+    return all(_missing_couenne_failure(outcome) for outcome in tdm_outcomes)
+
+
+def _can_skip_preliminary_stages_for_missing_couenne(
+    settings: SynthesisWorkflowSettings,
+    pdm_tasks: Sequence[HeatExchangerNetworkSynthesisTask],
+    pdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> bool:
+    if settings.pdm_solver != "couenne" or not pdm_tasks or not pdm_outcomes:
+        return False
+    if any(
+        _successful_method(outcome, "pinch_decomposition") for outcome in pdm_outcomes
+    ):
+        return False
+    return all(_missing_couenne_failure(outcome) for outcome in pdm_outcomes)
+
+
+def _missing_couenne_failure(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
+    if outcome.status == "success" or outcome.task.method not in {
+        "pinch_decomposition",
+        "topology_design",
+    }:
+        return False
+    error = outcome.error or ""
+    return "couenne" in error and "not found on PATH" in error
+
+
+def _warn_couenne_fallback(stage: str) -> None:
+    warnings.warn(
+        f"{stage}; skipping Couenne-backed derivative/topology setup and "
+        "running energy_stage_refinement directly.",
+        RuntimeWarning,
+        stacklevel=3,
+    )
 
 
 def _successful_method(
@@ -713,7 +868,9 @@ def _fake_network(
 ) -> HeatExchangerNetwork:
     zone = problem.master_zone
     if zone is None:
-        raise RuntimeError("Fake HEN execution requires a prepared root Zone.")
+        raise RuntimeError(
+            "Fake heat exchanger network execution requires a prepared root Zone."
+        )
 
     hot_key, hot_stream = _first_stream(zone.hot_streams.items(), "hot process")
     cold_key, cold_stream = _first_stream(zone.cold_streams.items(), "cold process")
@@ -797,7 +954,7 @@ def _first_stream(items, label: str):
         return next(iter(items))
     except StopIteration as exc:
         raise ValueError(
-            f"HEN synthesis requires at least one {label} stream."
+            f"heat exchanger network synthesis requires at least one {label} stream."
         ) from exc
 
 
@@ -826,7 +983,7 @@ def _failed_task_outcome(
         task=task,
         status="failed",
         solver_status="failed",
-        error=reason or "HEN synthesis task failed",
+        error=reason or "heat exchanger network synthesis task failed",
     )
 
 

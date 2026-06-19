@@ -1,4 +1,4 @@
-"""Lazy solver backend helpers for migrated HEN equation models."""
+"""Lazy solver backend helpers for migrated heat exchanger network equation models."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
 
 @dataclass(frozen=True)
 class SolverRun:
-    """Serializable metadata for one local HEN solver attempt."""
+    """Serializable metadata for one local heat exchanger network solver attempt."""
 
     name: str
     extension: str | int | None = None
@@ -63,7 +63,7 @@ def create_gekko_model(*, remote: bool = False) -> Any:
     gekko = require_synthesis_dependency(
         "gekko",
         package="gekko",
-        purpose="GEKKO HEN equation model construction",
+        purpose="GEKKO heat exchanger network equation model construction",
     )
     return gekko.GEKKO(remote=remote)
 
@@ -75,7 +75,7 @@ def require_solver_backend(solver_name: str) -> None:
         binary_name = PYOMO_SOLVER_BINARIES[solver_name]
         require_solver_binary(
             binary_name,
-            purpose=f"{solver_name} HEN synthesis solves",
+            purpose=f"{solver_name} heat exchanger network synthesis solves",
         )
         require_synthesis_dependency(
             "pyomo.environ",
@@ -88,12 +88,13 @@ def require_solver_backend(solver_name: str) -> None:
         require_synthesis_dependency(
             "gekko",
             package="gekko",
-            purpose=f"{solver_name} HEN synthesis solves",
+            purpose=f"{solver_name} heat exchanger network synthesis solves",
         )
         return
 
     raise MissingSynthesisSolverError(
-        f"Unsupported HEN synthesis solver {solver_name!r}. Supported solvers "
+        "Unsupported heat exchanger network synthesis solver "
+        f"{solver_name!r}. Supported solvers "
         f"are: {', '.join(sorted(PYOMO_SOLVERS | GEKKO_SOLVERS))}."
     )
 
@@ -168,7 +169,7 @@ def configure_gekko_solver(
             raise MissingSynthesisSolverError(
                 f"The {model.options.SOLVER!r} Pyomo solver is not available. "
                 "Install the solver binary, confirm it is on PATH, and rerun "
-                "the HEN synthesis solver tests."
+                "the heat exchanger network synthesis solver tests."
             )
 
     return SolverRun(

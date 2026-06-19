@@ -51,7 +51,7 @@ These classes represent the solved hierarchy and its numerical results.
 Heat Exchanger Network Design Records
 -------------------------------------
 
-These classes are the OpenPinch-native public result model for HEN design
+These classes are the OpenPinch-native public result model for heat exchanger network design
 outcomes. They expose exchanger links by source and sink stream identity; raw
 solver axis positions remain internal implementation details.
 

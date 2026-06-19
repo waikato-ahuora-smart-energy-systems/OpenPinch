@@ -30,13 +30,21 @@ extra:
 python -m pip install "openpinch[brayton_cycle]"
 ```
 
+If you plan to run solver-backed heat-exchanger-network synthesis, install the
+synthesis extra and then download the IDAES solver extensions:
+
+```bash
+python -m pip install "openpinch[synthesis]"
+idaes get-extensions
+```
+
 If you want the full optional surface in one install:
 
 ```bash
 python -m pip install "openpinch[full]"
 ```
 
-OpenPinch currently requires Python `>=3.14`.
+OpenPinch currently requires Python `>=3.14.2`.
 
 
 ## Notebook Workflow
@@ -59,14 +67,14 @@ The packaged notebook series currently includes:
 - `06_energy_transfer_analysis.ipynb`
 - `07_vapour_compression_mvr_cascade_hpr.ipynb`
 - `08_direct_gas_stream_mvr.ipynb`
+- `09_hen_design_service_four_stream.ipynb`
 
 These notebooks are intended to be the main learning path for new users. The
 series now spans the single-case `PinchProblem` front door, named
 `PinchWorkspace` studies, real multistate targeting, the typed/service plus
 serialized-workspace boundaries, energy-transfer analysis, and the simulated
-heat pump targeting backend. The direct gas/vapour MVR notebook adds the
-process-component workflow, where an MVR component mutates selected hot vapour
-streams in live `PinchProblem` cases before direct and Total Site targeting.
+heat pump targeting backend, direct gas/vapour process-component MVR, and the
+heat exchanger network design service on a compact four-stream problem.
 
 
 ## Python Workflow

@@ -1,4 +1,4 @@
-"""Internal service boundary for problem-rooted HEN synthesis."""
+"""Internal service boundary for problem-rooted heat exchanger network synthesis."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def heat_exchanger_network_synthesis_service(
     workspace_variant: str | None = None,
     executor: SynthesisExecutor | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
-    """Run HEN synthesis for a live ``PinchProblem`` and update its cache.
+    """Run heat exchanger network synthesis and update the problem cache.
 
     This function is intentionally not re-exported from ``OpenPinch`` or
     ``OpenPinch.services``. The stable public semantics are the problem-owned
@@ -51,7 +51,8 @@ def heat_exchanger_network_synthesis_service(
     verification_failures = verify_synthesis_result(design)
     if verification_failures:
         raise RuntimeError(
-            "HEN synthesis verification failed: " + "; ".join(verification_failures)
+            "heat exchanger network synthesis verification failed: "
+            + "; ".join(verification_failures)
         )
 
     problem._results = TargetOutput.model_validate(
@@ -80,15 +81,16 @@ def _normalise_runtime_options(options: dict[str, Any] | None) -> dict[str, Any]
         return {}
     if not isinstance(options, dict):
         raise TypeError(
-            "HEN synthesis runtime options must be supplied as a dict. "
-            "Persistent HEN controls belong in TargetInput.options before the "
+            "heat exchanger network synthesis runtime options must be supplied "
+            "as a dict. Persistent heat exchanger network controls belong in "
+            "TargetInput.options before the "
             "PinchProblem is loaded."
         )
 
     hens_overrides = sorted(str(key) for key in options if str(key).startswith("HENS_"))
     if hens_overrides:
         raise ValueError(
-            "HEN synthesis configuration must be loaded through "
+            "heat exchanger network synthesis configuration must be loaded through "
             "TargetInput.options / prepared Configuration, not passed as "
             "separate design options: " + ", ".join(hens_overrides)
         )

@@ -17,6 +17,7 @@ import OpenPinch.lib
 import OpenPinch.lib.schemas as schemas
 import OpenPinch.services
 import OpenPinch.services.heat_exchanger_network_synthesis as synthesis_package
+import OpenPinch.services.heat_exchanger_network_synthesis.workflow as workflow_module
 from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
@@ -24,6 +25,9 @@ from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
 from OpenPinch.services.heat_exchanger_network_synthesis.service import (
     heat_exchanger_network_synthesis_service,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
+    FakeSynthesisExecutor,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -211,7 +215,10 @@ def test_openhens_field_aliases_are_rejected_by_public_schemas() -> None:
         TargetInput(streams=[], options={"min_dT_values": [2.0]})
 
 
-def test_problem_design_workflow_example_from_converted_openhens_fixture() -> None:
+def test_problem_design_workflow_example_from_converted_openhens_fixture(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
     problem = _public_example_problem()
 
     design = problem.design.heat_exchanger_network_synthesis()
@@ -228,7 +235,10 @@ def test_problem_design_workflow_example_from_converted_openhens_fixture() -> No
     assert first_link.sink_stream
 
 
-def test_native_targetinput_design_workflow_example_from_converted_fixture() -> None:
+def test_native_targetinput_design_workflow_example_from_converted_fixture(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
     target_input = TargetInput.model_validate(_public_example_payload())
     problem = PinchProblem(
         source=target_input,
@@ -242,7 +252,10 @@ def test_native_targetinput_design_workflow_example_from_converted_fixture() -> 
     assert design.network.exchangers
 
 
-def test_workspace_design_workflow_example_from_converted_openhens_fixture() -> None:
+def test_workspace_design_workflow_example_from_converted_openhens_fixture(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
     workspace = PinchWorkspace(
         _public_example_payload(),
         project_name="Four-stream converted OpenHENS example",
@@ -275,6 +288,14 @@ def _public_example_problem() -> PinchProblem:
     return PinchProblem(
         source=_public_example_payload(),
         project_name="Four-stream converted OpenHENS example",
+    )
+
+
+def _use_fake_default_executor(monkeypatch) -> None:
+    monkeypatch.setattr(
+        workflow_module,
+        "LocalSynthesisExecutor",
+        FakeSynthesisExecutor,
     )
 
 

@@ -76,7 +76,7 @@ class HeatExchangerTypes(Enum):
 
 
 class HeatExchangerKind(str, Enum):
-    """Supported heat-transfer link families in a HEN design."""
+    """Supported heat-transfer link families in a heat exchanger network design."""
 
     RECOVERY = "recovery"
     HOT_UTILITY = "hot_utility"

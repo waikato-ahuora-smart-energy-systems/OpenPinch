@@ -2,7 +2,7 @@ Heat Exchanger Network Synthesis
 ================================
 
 Heat exchanger network synthesis is exposed through the same problem and
-workspace roots as the rest of OpenPinch. A HEN run starts from an
+workspace roots as the rest of OpenPinch. A heat exchanger network run starts from an
 OpenPinch-compatible JSON payload, a native
 :class:`~OpenPinch.lib.schemas.io.TargetInput`, or an already loaded
 :class:`~OpenPinch.PinchProblem`. Source OpenHENS CSV files are migration
@@ -11,10 +11,16 @@ source material only; convert them once into OpenPinch JSON or native
 
 The implementation boundary is
 ``heat_exchanger_network_synthesis_service(problem)``. It is internal and
-problem-rooted: it requires a live ``PinchProblem`` and reads persistent HEN
+problem-rooted: it requires a live ``PinchProblem`` and reads persistent heat exchanger network
 configuration from ``TargetInput.options`` through the prepared
 ``Configuration``. User code should call the problem design accessor or the
 workspace workflow dispatch shown below, not the internal service directly.
+Those public calls invoke the local solver-backed synthesis executor by
+default.
+
+When Couenne is unavailable for the Couenne-backed derivative/topology stages,
+OpenPinch emits a warning and attempts ``energy_stage_refinement`` directly
+with the configured ESM solver and stage selection.
 
 Problem Workflow
 ----------------
@@ -87,15 +93,15 @@ map to ``StreamSchema`` records, utilities and utility prices map to
    problem = PinchProblem(source=payload, project_name="Four-stream example")
    design = problem.design.heat_exchanger_network_synthesis()
 
-Do not pass HEN design-space or solver controls as a separate object to the
+Do not pass heat exchanger network design-space or solver controls as a separate object to the
 design call. The call may receive non-design runtime state options, but
-persistent HEN controls belong in the loaded problem payload.
+persistent heat exchanger network controls belong in the loaded problem payload.
 
 Workspace Workflow
 ------------------
 
 Use :class:`~OpenPinch.PinchWorkspace` when a named study needs variants,
-comparisons, or bundle persistence. The workspace dispatches HEN synthesis to
+comparisons, or bundle persistence. The workspace dispatches heat exchanger network synthesis to
 the active variant's live ``PinchProblem.design`` path.
 
 .. code-block:: python
@@ -115,8 +121,9 @@ the active variant's live ``PinchProblem.design`` path.
    problem = workspace.case("baseline")
    design = problem.results.design
 
-``PinchWorkspace`` is the multi-case owner. HEN synthesis does not add a public
-case, study, scenario, or HEN-specific workspace root.
+``PinchWorkspace`` is the multi-case owner. Heat exchanger network synthesis
+does not add a public case, study, scenario, or heat exchanger network-specific
+workspace root.
 
 Results and Optional Exports
 ----------------------------
@@ -132,6 +139,35 @@ The network exposes source/sink stream links through
 links are hot process stream to cold process stream, hot utility links are hot
 utility to cold process stream, and cold utility links are hot process stream
 to cold utility.
+
+OpenHENS-style network grid diagrams are available directly from the design
+result. The rank is 1-based and follows the same accepted-method ordering used
+for saved best-network candidates:
+
+.. code-block:: python
+
+   diagram = problem.results.design.grid_diagram(solution_rank=1)
+   diagram.show()
+   diagram.save("network.png")
+
+The returned object exposes the Plotly ``fig`` object, a lightweight drawing
+adapter on ``ax`` for tests and introspection, the selected ``network``, and the
+normalized ``grid_model`` used to draw the process-stream topology. Saving to
+``.png`` uses Plotly static image export; saving to ``.html`` writes an
+interactive Plotly document.
+
+The default layout follows the OpenHENS stage-based grid. Two optional keyword
+arguments tune the diagram without changing the selected solution:
+
+.. code-block:: python
+
+   design.grid_diagram(stream_line_width=5.0)
+   design.grid_diagram(temperature_scaled=True)
+
+``stream_line_width`` controls the stream strokes and is also used to auto-size
+the figure height for larger networks. ``temperature_scaled=True`` positions
+stream and match x-coordinates on a high-to-low temperature axis while keeping
+the same hot and cold stream direction conventions.
 
 JSON and CSV files are optional export views generated from
 ``problem.results`` after synthesis:
@@ -194,7 +230,7 @@ aliases, OpenHENS field aliases, command parity, or an ``OpenHENS`` facade.
 Dependencies and Solver Tests
 -----------------------------
 
-Core ``import OpenPinch`` remains lightweight. Install HEN synthesis runtime
+Core ``import OpenPinch`` remains lightweight. Install heat exchanger network synthesis runtime
 dependencies explicitly when live solver-backed synthesis is needed:
 
 .. code-block:: bash
@@ -207,13 +243,16 @@ Repository development uses the same optional extra in an editable checkout:
 
    python -m pip install -e ".[synthesis]"
 
-The ``synthesis`` extra installs Python packages such as Pyomo, GEKKO,
+The ``synthesis`` extra installs Python packages such as Pyomo, GEKKO, IDAES,
 plotting/export libraries, and wake-management tooling. External solver
-binaries such as Couenne and IPOPT are installed separately and must be
-available on ``PATH`` for marked solver tests. Missing optional Python packages
-raise ``MissingSynthesisDependencyError`` with the ``openpinch[synthesis]``
-install path. Missing external executables raise ``MissingSynthesisSolverError``
-with the missing binary name and solver-test guidance.
+binaries such as Couenne and IPOPT are installed separately. OpenPinch first
+checks ``PATH`` and then the IDAES extension directory reported by
+``idaes.bin_directory``; when a solver is found there, OpenPinch prepends that
+directory to the process ``PATH`` so downstream Pyomo solver factories can
+resolve the executable. Missing optional Python packages raise
+``MissingSynthesisDependencyError`` with the ``openpinch[synthesis]`` install
+path. Missing external executables raise ``MissingSynthesisSolverError`` with
+the missing binary name and solver-test guidance.
 
 Use the documented test tiers:
 

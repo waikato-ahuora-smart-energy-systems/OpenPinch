@@ -1,4 +1,4 @@
-"""OpenPinch-native HEN synthesis schemas."""
+"""OpenPinch-native heat exchanger network synthesis schemas."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ _RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
 class HeatExchangerNetworkSynthesisTask(BaseModel):
-    """One deterministic OpenPinch HEN synthesis task record."""
+    """One deterministic OpenPinch heat exchanger network synthesis task record."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -154,7 +154,7 @@ class HeatExchangerNetworkSynthesisExportRecord(BaseModel):
 
 
 class HeatExchangerNetworkSynthesisManifest(BaseModel):
-    """Run manifest for optional HEN exports and diagnostic records."""
+    """Run manifest for exports and diagnostic records."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -225,7 +225,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
 
 
 class HeatExchangerNetworkSynthesisTaskOutcome(BaseModel):
-    """Outcome for one OpenPinch HEN synthesis task."""
+    """Outcome for one OpenPinch heat exchanger network synthesis task."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -259,7 +259,7 @@ class HeatExchangerNetworkSynthesisTaskOutcome(BaseModel):
 
 
 class HeatExchangerNetworkSynthesisResult(BaseModel):
-    """Problem-owned HEN synthesis result payload for ``TargetOutput.design``."""
+    """Problem-owned heat exchanger network synthesis result payload."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -322,6 +322,25 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
         value: tuple[str, ...],
     ) -> tuple[str, ...]:
         return tuple(_validate_optional_identity(item) for item in value)
+
+    def grid_diagram(
+        self,
+        solution_rank: int = 1,
+        *,
+        stream_line_width: float = 5.0,
+        temperature_scaled: bool = False,
+    ):
+        """Return an OpenHENS-style grid diagram for one ranked solution."""
+        from ...services.heat_exchanger_network_synthesis.grid_diagram import (
+            build_grid_diagram,
+        )
+
+        return build_grid_diagram(
+            self,
+            solution_rank=solution_rank,
+            stream_line_width=stream_line_width,
+            temperature_scaled=temperature_scaled,
+        )
 
 
 def _validate_run_id(value: str) -> str:

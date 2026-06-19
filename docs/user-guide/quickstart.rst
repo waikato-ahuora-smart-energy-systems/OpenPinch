@@ -31,6 +31,7 @@ Packaged notebooks:
 - ``06_energy_transfer_analysis.ipynb``
 - ``07_vapour_compression_mvr_cascade_hpr.ipynb``
 - ``08_direct_gas_stream_mvr.ipynb``
+- ``09_hen_design_service_four_stream.ipynb``
 
 Use these pages instead:
 

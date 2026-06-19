@@ -1,4 +1,4 @@
-"""Internal HEN problem shell behind the OpenPinch synthesis service."""
+"""Internal heat exchanger network problem shell behind the synthesis service."""
 
 from __future__ import annotations
 
@@ -360,7 +360,7 @@ class InternalHeatExchangerNetworkProblem:
             return PinchDecompModel
         if default == "StageWiseModel":
             return StageWiseModel
-        raise ValueError(f"Unknown HEN model factory {default!r}.")
+        raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
 
 
 def _assign(variable: Any, value: float) -> None:

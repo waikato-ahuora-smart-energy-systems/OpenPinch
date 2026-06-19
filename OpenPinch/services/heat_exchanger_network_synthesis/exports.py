@@ -1,4 +1,4 @@
-"""Optional HEN synthesis exports generated from ``problem.results``."""
+"""Optional heat exchanger network synthesis exports."""
 
 from __future__ import annotations
 
@@ -21,7 +21,9 @@ def export_heat_exchanger_network_synthesis_results(
 ) -> HeatExchangerNetworkSynthesisManifest:
     """Write optional JSON/CSV views from one problem-owned design result."""
     if not isinstance(problem, PinchProblem):
-        raise TypeError("HEN synthesis exports require a live PinchProblem.")
+        raise TypeError(
+            "heat exchanger network synthesis exports require a live PinchProblem."
+        )
     if problem.results is None or problem.results.design is None:
         raise RuntimeError(
             "Run problem.design.heat_exchanger_network_synthesis(...) before export."

@@ -1,4 +1,4 @@
-"""Fast validation tests for OpenPinch HEN synthesis schemas."""
+"""Fast validation tests for OpenPinch heat exchanger network synthesis schemas."""
 
 from __future__ import annotations
 
