@@ -201,11 +201,11 @@ dependencies explicitly when live solver-backed synthesis is needed:
 
    python -m pip install "openpinch[synthesis]"
 
-Repository development uses the same optional extra through uv:
+Repository development uses the same optional extra in an editable checkout:
 
 .. code-block:: bash
 
-   rtk uv sync --extra synthesis
+   python -m pip install -e ".[synthesis]"
 
 The ``synthesis`` extra installs Python packages such as Pyomo, GEKKO,
 plotting/export libraries, and wake-management tooling. External solver
@@ -219,9 +219,9 @@ Use the documented test tiers:
 
 .. code-block:: bash
 
-   rtk uv run pytest -m "not synthesis and not solver"
-   rtk uv run pytest -m synthesis
-   rtk uv run pytest -m solver
+   pytest -m "not synthesis and not solver"
+   pytest -m synthesis
+   pytest -m solver
 
 The dependency policy for maintainers is recorded in
 :doc:`../developer/synthesis-dependency-policy`.

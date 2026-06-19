@@ -75,6 +75,21 @@ class HeatExchangerTypes(Enum):
     CondEvap = "Condensing or Evaporating"
 
 
+class HeatExchangerKind(str, Enum):
+    """Supported heat-transfer link families in a HEN design."""
+
+    RECOVERY = "recovery"
+    HOT_UTILITY = "hot_utility"
+    COLD_UTILITY = "cold_utility"
+
+
+class HeatExchangerStreamRole(str, Enum):
+    """Identity class for the source and sink streams on an exchanger link."""
+
+    PROCESS = "process"
+    UTILITY = "utility"
+
+
 class HeatPump(Enum):
     """Heat pump components"""
 
@@ -351,8 +366,10 @@ __all__ = [
     "FluidPhase",
     "GraphType",
     "GT",
+    "HeatExchangerKind",
     "HEN",
     "HeatExchangerNetworkLabel",
+    "HeatExchangerStreamRole",
     "HeatExchangerTypes",
     "HeatFlowUnits",
     "HeatPump",

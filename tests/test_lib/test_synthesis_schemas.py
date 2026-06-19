@@ -328,7 +328,11 @@ def test_public_synthesis_exports_are_openpinch_native():
     assert expected_class_exports <= set(OpenPinch.classes.__all__)
     assert expected_schema_exports <= set(schemas.__all__)
     assert "HeatExchangerNetworkSynthesisResult" in OpenPinch.lib.__all__
+    assert "HeatExchangerKind" in OpenPinch.lib.__all__
     assert "HeatExchangerNetworkLabel" in OpenPinch.lib.__all__
+    assert "HeatExchangerStreamRole" in OpenPinch.lib.__all__
+    assert OpenPinch.lib.HeatExchangerKind is HeatExchangerKind
+    assert OpenPinch.lib.HeatExchangerStreamRole is HeatExchangerStreamRole
     assert isinstance(
         HeatExchangerNetworkLabel.RECOVERY_DUTY.value,
         str,

@@ -3,25 +3,11 @@
 from __future__ import annotations
 
 import math
-from enum import Enum
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
-class HeatExchangerKind(str, Enum):
-    """Supported heat-transfer link families in a HEN design."""
-
-    RECOVERY = "recovery"
-    HOT_UTILITY = "hot_utility"
-    COLD_UTILITY = "cold_utility"
-
-
-class HeatExchangerStreamRole(str, Enum):
-    """Identity class for the source and sink streams on an exchanger link."""
-
-    PROCESS = "process"
-    UTILITY = "utility"
+from ..lib.enums import HeatExchangerKind, HeatExchangerStreamRole
 
 
 class HeatExchanger(BaseModel):
