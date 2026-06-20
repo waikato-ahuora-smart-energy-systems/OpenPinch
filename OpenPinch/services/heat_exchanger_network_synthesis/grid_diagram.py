@@ -11,6 +11,7 @@ from ...classes.heat_exchanger import HeatExchanger
 from ...classes.heat_exchanger_network import HeatExchangerNetwork
 from ...lib.enums import HeatExchangerKind
 from ._dependencies import require_synthesis_dependency
+from .ranking import rank_unique_network_outcomes
 
 if TYPE_CHECKING:
     from ...lib.schemas.synthesis import (
@@ -1477,23 +1478,7 @@ def _select_ranked_network(
     if solution_rank < 1:
         raise IndexError("solution_rank is 1-based and must be at least 1")
 
-    candidates = [
-        outcome
-        for outcome in result.task_outcomes
-        if outcome.status == "success"
-        and outcome.network is not None
-        and outcome.objective_value is not None
-    ]
-    accepted_method = [
-        outcome for outcome in candidates if outcome.task.method == result.method
-    ]
-    ranked = sorted(
-        accepted_method or candidates,
-        key=lambda outcome: (
-            outcome.objective_value,
-            outcome.task.task_id or "",
-        ),
-    )
+    ranked = rank_unique_network_outcomes(result)
 
     if not ranked and result.network is not None:
         if solution_rank == 1:

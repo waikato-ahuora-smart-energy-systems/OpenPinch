@@ -55,6 +55,28 @@ Input and Output Schemas
    :members:
    :no-index:
 
+Heat Exchanger Network Design Results
+-------------------------------------
+
+``TargetOutput.design`` stores a
+:class:`~OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult`
+after ``problem.design.heat_exchanger_network_synthesis()`` runs. The selected
+network is available as ``design.network`` and the ranked unique network
+candidates are available as ``design.ranked_networks``.
+
+Use ``design.get_n_best_networks(n)`` to read the first ``n`` ranked
+candidates. Use ``design.select_network(solution_rank=...)`` to make another
+ranked candidate the selected ``design.network``. ``solution_rank`` is 1-based.
+
+Grid diagrams are returned from ``design.grid_diagram(solution_rank=...)``. The
+returned object wraps the Plotly ``fig``, a lightweight drawing adapter ``ax``,
+the selected ranked ``network``, ``solution_rank``, and the normalized
+``grid_model`` used to draw the topology.
+
+.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult
+   :members:
+   :no-index:
+
 Target Models
 -------------
 

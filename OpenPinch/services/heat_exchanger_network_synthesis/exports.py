@@ -37,7 +37,7 @@ def export_heat_exchanger_network_synthesis_results(
     metrics_dir.mkdir(parents=True, exist_ok=True)
 
     records: list[HeatExchangerNetworkSynthesisExportRecord] = []
-    for outcome in design.task_outcomes:
+    for outcome in design.ranked_networks:
         task_id = outcome.task.task_id or "unknown-task"
         outcome_path = results_dir / f"{task_id}.json"
         outcome_path.write_text(outcome.model_dump_json(indent=2), encoding="utf-8")
@@ -124,7 +124,7 @@ def _manifest_with_export_records(
             stage_selection=(design.stage_count or 1,),
             task_ids=tuple(
                 outcome.task.task_id
-                for outcome in design.task_outcomes
+                for outcome in design.ranked_networks
                 if outcome.task.task_id is not None
             ),
             problem_id=problem_id,
@@ -162,7 +162,7 @@ def _record(
 
 def _solution_metric_rows(design) -> list[dict[str, Any]]:
     rows = []
-    for outcome in design.task_outcomes:
+    for outcome in design.ranked_networks:
         rows.append(
             {
                 "run_id": design.run_id,
@@ -185,15 +185,15 @@ def _run_summary_row(
     workspace_variant: str | None,
 ) -> dict[str, Any]:
     solved = [
-        outcome for outcome in design.task_outcomes if outcome.status == "success"
+        outcome for outcome in design.ranked_networks if outcome.status == "success"
     ]
     return {
         "run_id": design.run_id,
         "problem_id": problem_id,
         "workspace_variant": workspace_variant,
         "accepted_task_id": design.task_id,
-        "task_count": len(design.task_outcomes),
-        "solved_task_count": len(solved),
+        "ranked_network_count": len(design.ranked_networks),
+        "solved_ranked_network_count": len(solved),
         "total_annual_cost": design.objective_values.get("total_annual_cost"),
         "utility_cost": design.objective_values.get("utility_cost"),
         "capital_cost": design.objective_values.get("capital_cost"),

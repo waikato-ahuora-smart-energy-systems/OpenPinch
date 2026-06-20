@@ -113,7 +113,7 @@ def test_synthesis_schema_serialization_round_trips():
             "total_annual_cost": 154853.8518602861,
             "utility_cost": 123.0,
         },
-        task_outcomes=(outcome,),
+        ranked_networks=(outcome,),
         manifest=manifest,
     )
 

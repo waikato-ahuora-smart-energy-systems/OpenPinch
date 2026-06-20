@@ -26,7 +26,7 @@ def verify_synthesis_result(
             "accepted heat exchanger network design must include total annual "
             "cost metadata"
         )
-    for outcome in result.task_outcomes:
+    for outcome in result.ranked_networks:
         if outcome.status == "success" and outcome.network is None:
             failures.append(
                 f"successful task {outcome.task.task_id} is missing network output"

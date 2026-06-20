@@ -238,7 +238,9 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     assert '"HENS_DERIVATIVE_THRESHOLDS": [0.5]' in combined_source
     assert '"HENS_STAGE_SELECTION": [3]' in combined_source
     assert '"HENS_MAX_PARALLEL": 1' in combined_source
-    assert "top_network_outcomes" in combined_source
+    assert "top_ranked_networks" in combined_source
+    assert "get_n_best_networks(3)" in combined_source
+    assert "select_network(solution_rank=2)" in combined_source
     assert "HeatExchangerKind.RECOVERY" in combined_source
     assert "grid_diagram(solution_rank=rank)" in combined_source
     assert "go.Figure()" not in combined_source

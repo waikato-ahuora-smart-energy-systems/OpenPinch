@@ -144,7 +144,7 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
             executor=MissingCouenneForTopologyExecutor(),
         )
 
-    outcomes = result.accepted_result.task_outcomes
+    outcomes = result.outcomes
     pdm_success = next(
         outcome
         for outcome in outcomes
@@ -200,7 +200,7 @@ def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
             executor=MissingCouenneForPdmExecutor(),
         )
 
-    outcomes = result.accepted_result.task_outcomes
+    outcomes = result.outcomes
     pdm_failures = [
         outcome for outcome in outcomes if outcome.task.method == "pinch_decomposition"
     ]

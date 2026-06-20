@@ -7,6 +7,7 @@ from typing import Any
 from ...classes.pinch_problem import PinchProblem
 from ...lib.schemas.io import TargetOutput
 from ...lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from .ranking import rank_unique_network_outcomes
 from .verification import verify_synthesis_result
 from .workflow import (
     SynthesisExecutor,
@@ -47,7 +48,14 @@ def heat_exchanger_network_synthesis_service(
         settings,
         executor=executor,
     )
-    design = workflow_result.accepted_result
+    design = workflow_result.accepted_result.model_copy(
+        update={
+            "ranked_networks": rank_unique_network_outcomes(
+                workflow_result.accepted_result
+            )
+        }
+    )
+    design.select_network()
     verification_failures = verify_synthesis_result(design)
     if verification_failures:
         raise RuntimeError(

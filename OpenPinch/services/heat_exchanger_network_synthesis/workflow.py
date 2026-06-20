@@ -731,7 +731,7 @@ def build_synthesis_result(
         method=accepted.task.method,
         stage_count=network.stage_count,
         objective_values=objective_values,
-        task_outcomes=tuple(outcomes),
+        ranked_networks=tuple(outcomes),
         manifest=manifest,
     )
 

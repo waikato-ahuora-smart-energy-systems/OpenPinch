@@ -131,8 +131,49 @@ Results and Optional Exports
 The canonical in-memory result is ``problem.results``. Its
 ``TargetOutput.design`` field contains a
 :class:`~OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult`
-with objective values, task metadata, an optional manifest, and a
+with objective values, ranked network candidates, an optional manifest, and a
+selected
 :class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`.
+
+The selected network is available as ``design.network``. The public design
+service ranks successful network candidates by objective value, removes
+duplicate exchanger-connection structures, stores that unique list on
+``design.ranked_networks``, and selects rank 1 by default:
+
+.. code-block:: python
+
+   design = problem.design.heat_exchanger_network_synthesis()
+
+   # Rank 1 is selected by default.
+   selected = design.network
+   ranked = design.ranked_networks
+
+   assert ranked[0].network == selected
+
+Use ``get_n_best_networks(...)`` when you only need the first few ranked
+candidates:
+
+.. code-block:: python
+
+   top_three = design.get_n_best_networks(3)
+
+   for rank, outcome in enumerate(top_three, start=1):
+       print(rank, outcome.objective_value, outcome.task.task_id)
+
+Use ``select_network(...)`` to make another ranked candidate the selected
+network. The method mutates the design result, updates ``design.network`` and
+the associated selected-task metadata, and returns the same design object:
+
+.. code-block:: python
+
+   design.select_network(solution_rank=2)
+
+   print(design.task_id)
+   print(design.objective_values)
+   print(len(design.network.exchangers))
+
+``solution_rank`` is 1-based. Requesting an unavailable rank raises
+``IndexError`` with the number of available ranked networks.
 
 The network exposes source/sink stream links through
 :class:`~OpenPinch.classes.heat_exchanger.HeatExchanger` records. Recovery
@@ -142,19 +183,31 @@ to cold utility.
 
 OpenHENS-style network grid diagrams are available directly from the design
 result. The rank is 1-based and follows the same accepted-method ordering used
-for saved best-network candidates:
+for ranked network candidates:
 
 .. code-block:: python
 
-   diagram = problem.results.design.grid_diagram(solution_rank=1)
+   design = problem.results.design
+
+   diagram = design.grid_diagram(solution_rank=1)
    diagram.show()
    diagram.save("network.png")
 
 The returned object exposes the Plotly ``fig`` object, a lightweight drawing
 adapter on ``ax`` for tests and introspection, the selected ``network``, and the
-normalized ``grid_model`` used to draw the process-stream topology. Saving to
-``.png`` uses Plotly static image export; saving to ``.html`` writes an
-interactive Plotly document.
+normalized ``grid_model`` used to draw the process-stream topology:
+
+.. code-block:: python
+
+   diagram.fig
+   diagram.ax
+   diagram.network
+   diagram.solution_rank
+   diagram.grid_model
+
+The Plotly figure includes hover information on exchanger markers, including
+duty, area when available, and match description. Saving to ``.png`` uses Plotly
+static image export; saving to ``.html`` writes an interactive Plotly document.
 
 The default layout follows the OpenHENS stage-based grid. Two optional keyword
 arguments tune the diagram without changing the selected solution:
@@ -165,9 +218,25 @@ arguments tune the diagram without changing the selected solution:
    design.grid_diagram(temperature_scaled=True)
 
 ``stream_line_width`` controls the stream strokes and is also used to auto-size
-the figure height for larger networks. ``temperature_scaled=True`` positions
-stream and match x-coordinates on a high-to-low temperature axis while keeping
-the same hot and cold stream direction conventions.
+the figure height for larger networks. The actual marker size and connector
+line widths are derived from the available lane pitch so diagrams scale with
+the number of process streams, utility matches, and stream split lanes.
+``temperature_scaled=True`` positions stream and match x-coordinates on a
+high-to-low temperature axis while keeping the same hot and cold stream
+direction conventions.
+
+The grid diagram uses ranked network candidates directly, so the following two
+calls inspect different network structures when ranks 1 and 2 are both
+available:
+
+.. code-block:: python
+
+   design.grid_diagram(solution_rank=1)
+   design.grid_diagram(solution_rank=2)
+
+Calling ``select_network(solution_rank=2)`` changes ``design.network`` for
+subsequent result inspection, but it is not required before drawing
+``grid_diagram(solution_rank=2)``.
 
 JSON and CSV files are optional export views generated from
 ``problem.results`` after synthesis:

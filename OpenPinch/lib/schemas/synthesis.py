@@ -274,7 +274,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
     method: SynthesisMethod | None = None
     stage_count: int | None = None
     objective_values: dict[str, float] = Field(default_factory=dict)
-    task_outcomes: tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...] = Field(
+    ranked_networks: tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...] = Field(
         default_factory=tuple,
     )
     manifest: HeatExchangerNetworkSynthesisManifest | None = None
@@ -341,6 +341,55 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
             stream_line_width=stream_line_width,
             temperature_scaled=temperature_scaled,
         )
+
+    def get_n_best_networks(self, n: int | None = None):
+        """Return the best ranked network outcomes with duplicates removed."""
+        from ...services.heat_exchanger_network_synthesis.ranking import (
+            rank_unique_network_outcomes,
+        )
+
+        return rank_unique_network_outcomes(self, limit=n)
+
+    def select_network(self, solution_rank: int = 1) -> Self:
+        """Select ``network`` from the ranked network list and return this result."""
+        ranked = self.get_n_best_networks()
+        if solution_rank < 1:
+            raise IndexError("solution_rank is 1-based and must be at least 1")
+        if not ranked:
+            if solution_rank == 1:
+                return self
+            raise IndexError(
+                "solution_rank 2 is unavailable; only 1 network is available"
+            )
+        if solution_rank > len(ranked):
+            raise IndexError(
+                f"solution_rank {solution_rank} is unavailable; only "
+                f"{len(ranked)} network(s) are available"
+            )
+
+        selected = ranked[solution_rank - 1]
+        if selected.network is None:
+            raise ValueError(
+                "selected ranked network outcome is missing network output"
+            )
+
+        network = selected.network
+        self.ranked_networks = ranked
+        self.network = network
+        self.task_id = selected.task.task_id
+        self.solver_status = selected.solver_status
+        self.method = selected.task.method
+        self.stage_count = network.stage_count or selected.task.stage_count
+        self.objective_values = {
+            key: value
+            for key, value in {
+                "total_annual_cost": network.total_annual_cost,
+                "utility_cost": network.utility_cost,
+                "capital_cost": network.capital_cost,
+            }.items()
+            if value is not None
+        }
+        return self
 
 
 def _validate_run_id(value: str) -> str:

@@ -26,6 +26,9 @@ from OpenPinch.services.heat_exchanger_network_synthesis.grid_diagram import (
     _RECOVERY_MATCH_COLOR,
     build_grid_model,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.ranking import (
+    network_structure_signature,
+)
 
 
 def test_grid_model_recovers_process_topology_and_branches() -> None:
@@ -53,6 +56,36 @@ def test_grid_diagram_ranks_successful_networks_by_accepted_method() -> None:
     assert diagram.network.run_id == "accepted-best"
     assert diagram.grid_model.network is diagram.network
     assert diagram.fig.__class__.__module__.startswith("plotly.")
+
+
+def test_result_ranks_only_unique_network_structures() -> None:
+    result = _result()
+
+    ranked = result.get_n_best_networks()
+
+    assert [outcome.network.run_id for outcome in ranked] == [
+        "accepted-best",
+        "accepted-second",
+    ]
+    assert network_structure_signature(
+        ranked[0].network
+    ) != network_structure_signature(ranked[1].network)
+
+
+def test_result_selects_ranked_network() -> None:
+    result = _result()
+
+    assert result.select_network() is result
+    assert result.network.run_id == "accepted-best"
+    assert result.task_id == "esm-best"
+    assert result.objective_values == {}
+
+    result.select_network(solution_rank=2)
+
+    assert result.network.run_id == "accepted-second"
+    assert result.task_id == "esm-second"
+    assert result.method == "energy_stage_refinement"
+    assert len(result.ranked_networks) == 2
 
 
 def test_grid_diagram_uses_one_based_ranking_and_reports_missing_rank() -> None:
@@ -478,7 +511,7 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
         network=_network("accepted-best"),
         run_id="result",
         method="energy_stage_refinement",
-        task_outcomes=(
+        ranked_networks=(
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=pdm_task,
                 status="success",
@@ -488,8 +521,18 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=esm_second_task,
                 status="success",
-                network=_network("accepted-second"),
+                network=_distinct_network("accepted-second"),
                 objective_value=200.0,
+            ),
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=_task(
+                    method="energy_stage_refinement",
+                    task_id="esm-duplicate",
+                    approach_temperature=16.0,
+                ),
+                status="success",
+                network=_network("accepted-duplicate"),
+                objective_value=110.0,
             ),
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=esm_best_task,
@@ -517,7 +560,7 @@ def _result_for_network(
         network=network,
         run_id="result",
         method="energy_stage_refinement",
-        task_outcomes=(),
+        ranked_networks=(),
     )
 
 
@@ -562,6 +605,22 @@ def _network(run_id: str) -> HeatExchangerNetwork:
                 "cold_process_streams": {"C1": 0, "C2": 1},
             },
         },
+    )
+
+
+def _distinct_network(run_id: str) -> HeatExchangerNetwork:
+    return HeatExchangerNetwork(
+        exchangers=(
+            _recovery("E1", "H1", "C1", 1, 1200.0),
+            _recovery("E2", "H2", "C2", 2, 900.0),
+            _recovery("E3", "H1", "C1", 3, 700.0),
+            _recovery("E4", "H2", "C2", 3, 300.0),
+            _hot_utility("Utilities.HU1", "C2", 200.0),
+            _cold_utility("H2", "Cold Utility/CU1", 250.0),
+        ),
+        run_id=run_id,
+        method="energy_stage_refinement",
+        stage_count=3,
     )
 
 

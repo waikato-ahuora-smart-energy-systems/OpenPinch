@@ -21,8 +21,12 @@ import OpenPinch.services.heat_exchanger_network_synthesis.workflow as workflow_
 from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
+from OpenPinch.lib import HeatExchangerKind
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
+from OpenPinch.services.heat_exchanger_network_synthesis.ranking import (
+    network_structure_signature,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.service import (
     heat_exchanger_network_synthesis_service,
 )
@@ -233,6 +237,84 @@ def test_problem_design_workflow_example_from_converted_openhens_fixture(
     assert isinstance(first_link, HeatExchanger)
     assert first_link.source_stream
     assert first_link.sink_stream
+
+
+def test_public_design_accessor_returns_ranked_networks(
+    monkeypatch,
+) -> None:
+    class DuplicateStructureExecutor(FakeSynthesisExecutor):
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            outcomes = super().execute(
+                tasks,
+                problem=problem,
+                parent_outcomes=parent_outcomes,
+                max_parallel=max_parallel,
+            )
+            if not tasks or tasks[0].method != "energy_stage_refinement":
+                return outcomes
+
+            adjusted = []
+            for outcome in outcomes:
+                network = outcome.network
+                if network is None or outcome.task.approach_temperature != 4.0:
+                    adjusted.append(outcome)
+                    continue
+
+                exchangers = tuple(
+                    exchanger.model_copy(update={"stage": 1})
+                    if exchanger.kind is HeatExchangerKind.RECOVERY
+                    else exchanger
+                    for exchanger in network.exchangers
+                )
+                adjusted.append(
+                    outcome.model_copy(
+                        update={
+                            "network": network.model_copy(
+                                update={"exchangers": exchangers}
+                            )
+                        }
+                    )
+                )
+            return tuple(adjusted)
+
+    monkeypatch.setattr(
+        workflow_module,
+        "LocalSynthesisExecutor",
+        DuplicateStructureExecutor,
+    )
+    payload = _public_example_payload()
+    payload["options"] = {
+        **payload["options"],
+        "HENS_APPROACH_TEMPERATURES": [2.0, 4.0],
+        "HENS_DERIVATIVE_THRESHOLDS": [0.5, 1.0],
+        "HENS_STAGE_SELECTION": [2],
+    }
+    problem = PinchProblem(
+        source=payload,
+        project_name="Ranked unique heat exchanger network outcomes",
+    )
+
+    design = problem.design.heat_exchanger_network_synthesis()
+
+    assert problem.results is not None
+    assert problem.results.design == design
+    assert len(design.ranked_networks) == 2
+    assert design.ranked_networks[0].network == design.network
+    assert design.task_id == design.ranked_networks[0].task.task_id
+    assert [outcome.objective_value for outcome in design.ranked_networks] == sorted(
+        outcome.objective_value for outcome in design.ranked_networks
+    )
+    assert all(outcome.status == "success" for outcome in design.ranked_networks)
+    assert all(
+        outcome.task.method == design.method for outcome in design.ranked_networks
+    )
+    assert len(
+        {
+            network_structure_signature(outcome.network)
+            for outcome in design.ranked_networks
+            if outcome.network is not None
+        }
+    ) == len(design.ranked_networks)
 
 
 def test_native_targetinput_design_workflow_example_from_converted_fixture(

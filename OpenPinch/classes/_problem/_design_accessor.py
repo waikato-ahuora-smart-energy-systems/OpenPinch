@@ -1,4 +1,4 @@
-"""Design-workflow accessor for problem-owned HEN synthesis operations."""
+"""Design-workflow accessor for problem-owned heat exchanger network operations."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class _DesignAccessor:
         state_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
-        """Run HEN synthesis and cache the result on ``problem.results.design``."""
+        """Run heat exchanger network synthesis and cache the design result."""
         from ...services.heat_exchanger_network_synthesis.service import (
             _normalise_runtime_options,
             heat_exchanger_network_synthesis_service,
