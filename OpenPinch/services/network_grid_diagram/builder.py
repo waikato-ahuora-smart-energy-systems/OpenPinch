@@ -134,7 +134,6 @@ def _add_or_accumulate(
     )
 
 
-
 def _is_significant_match(exchanger: HeatExchanger) -> bool:
     return (
         exchanger.active

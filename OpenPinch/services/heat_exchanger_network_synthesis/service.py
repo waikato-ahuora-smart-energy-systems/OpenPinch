@@ -197,9 +197,7 @@ def _normalise_seed_networks(
         raise ValueError("initial_networks must contain at least one network.")
     for network in networks:
         if not isinstance(network, HeatExchangerNetwork):
-            raise TypeError(
-                "initial_networks must be HeatExchangerNetwork instances."
-            )
+            raise TypeError("initial_networks must be HeatExchangerNetwork instances.")
     return networks
 
 

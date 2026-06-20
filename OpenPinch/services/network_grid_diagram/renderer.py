@@ -1279,7 +1279,6 @@ class _PlotlyGridRenderer:
         )
 
 
-
 def _stream_endpoint_temperatures(
     grid_model: HeatExchangerNetworkGridModel,
 ) -> dict[str, dict[str, float]]:

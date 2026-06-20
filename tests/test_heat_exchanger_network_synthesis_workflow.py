@@ -115,12 +115,16 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
 def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
-    seed = FakeSynthesisExecutor().execute(
-        build_pinch_decomposition_tasks(settings)[:1],
-        problem=problem,
-        parent_outcomes={},
-        max_parallel=settings.max_parallel,
-    )[0].network
+    seed = (
+        FakeSynthesisExecutor()
+        .execute(
+            build_pinch_decomposition_tasks(settings)[:1],
+            problem=problem,
+            parent_outcomes={},
+            max_parallel=settings.max_parallel,
+        )[0]
+        .network
+    )
     assert seed is not None
 
     tdm_tasks = build_seeded_topology_design_tasks(settings, (seed, seed))
