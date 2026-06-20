@@ -77,14 +77,14 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
     assert optional_deps["synthesis"] == [
         "pyomo>=6.10.0",
         "gekko>=1.3.2",
-        "matplotlib>=3.10.9",
         "plotly>=6.8.0",
         "kaleido>=1.3.0",
         "openpyxl>=3.1.5",
         "wakepy>=1.0.0",
+        "idaes-pse>=2.11.0",
     ]
 
-    synthesis_only = {"pyomo", "gekko", "matplotlib", "kaleido", "wakepy"}
+    synthesis_only = {"pyomo", "gekko", "kaleido", "wakepy", "idaes-pse"}
     core_deps = {
         _dependency_name(dep) for dep in _read_pyproject()["project"]["dependencies"]
     }
@@ -116,7 +116,7 @@ def test_full_extra_aggregates_optional_runtime_surfaces():
 def test_full_extra_does_not_include_solver_synthesis_stack():
     full_deps = {_dependency_name(dep) for dep in _optional_deps()["full"]}
 
-    assert {"pyomo", "gekko", "matplotlib", "kaleido", "wakepy"}.isdisjoint(full_deps)
+    assert {"pyomo", "gekko", "kaleido", "wakepy", "idaes-pse"}.isdisjoint(full_deps)
 
 
 def test_dev_dependency_group_retains_notebook_dependencies():
@@ -144,14 +144,14 @@ def test_requires_python_matches_python_version_files_and_ci():
 
     for workflow in WORKFLOWS:
         text = workflow.read_text(encoding="utf-8")
-        assert 'PYTHON_VERSION: "3.14"' in text
+        assert f'PYTHON_VERSION: "{minimum_version}"' in text
         assert "python-version: ${{ env.PYTHON_VERSION }}" in text
 
 
 def test_requires_python_classifier_matches_minimum_version():
     project = _read_pyproject()["project"]
 
-    assert project["requires-python"] == ">=3.14"
+    assert project["requires-python"] == ">=3.14.2"
     assert "Programming Language :: Python :: 3.14" in project["classifiers"]
 
 
@@ -159,7 +159,7 @@ def test_pytest_marker_policy_declares_synthesis_and_solver_tiers():
     pytest_ini = PYTEST_INI.read_text(encoding="utf-8")
 
     assert (
-        "synthesis: optional HEN synthesis tests that require the synthesis extra"
+        "synthesis: optional heat exchanger network synthesis tests that require the synthesis extra"
         in pytest_ini
     )
     assert (

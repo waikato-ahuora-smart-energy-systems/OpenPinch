@@ -1,4 +1,4 @@
-"""Private equation-model boundary for OpenPinch HEN synthesis.
+"""Private equation-model boundary for OpenPinch heat exchanger network synthesis.
 
 The symbols in this package are implementation details behind the
 problem-rooted synthesis service. Importing the package must stay lightweight;

@@ -1,4 +1,4 @@
-"""Base setup for migrated HEN equation kernels."""
+"""Base setup for migrated heat exchanger network equation kernels."""
 
 from __future__ import annotations
 
@@ -131,9 +131,10 @@ class BaseHeatExchangerNetworkModel(ABC):
         formula_allowed: bool,
         fallback_delta: float | None = None,
     ) -> float:
-        """Return source-compatible post-process LMTD for HEN area metrics.
+        """Return source-compatible post-process LMTD.
 
-        HEN synthesis owns the OpenHENS active-unit and dTmin/tolerance gates.
+        Heat exchanger network synthesis owns the OpenHENS active-unit and
+        dTmin/tolerance gates.
         Once those gates pass, the shared OpenPinch heat-exchanger utility owns
         the positive endpoint logarithmic-mean formula.
         """

@@ -14,12 +14,14 @@ This page has moved, but the packaged notebook workflow still depends on
 - ``06_energy_transfer_analysis.ipynb``
 - ``07_vapour_compression_mvr_cascade_hpr.ipynb``
 - ``08_direct_gas_stream_mvr.ipynb``
+- ``09_hen_design_service_four_stream.ipynb``
 
 These notebooks now span the main single-case ``PinchProblem`` workflow, named
 ``PinchWorkspace`` studies, real multistate targeting, and the typed/service
 and serialized workspace boundaries, plus energy-transfer analysis and the
 vapour-compression plus MVR cascade HPR backend. The series also includes the
-direct gas/vapour stream MVR process-component workflow.
+direct gas/vapour stream MVR process-component workflow and the problem-owned
+heat exchanger network design-service workflow on a four-stream synthesis case.
 
 Use these pages instead:
 

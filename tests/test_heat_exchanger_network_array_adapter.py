@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -134,6 +135,38 @@ def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
     )
     np.testing.assert_allclose(payload.arrays["f_c"], [100.0, 70.0, 350.0, 60.0, 200.0])
     np.testing.assert_allclose(payload.arrays["hu_cost"], [60.0])
+
+
+def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() -> None:
+    case_id = "Four-stream-Yee-and-Grossmann-1990-1"
+    fixture_path = FIXTURE_ROOT / f"{case_id}.json"
+    kelvin_arrays = problem_to_solver_arrays(PinchProblem(source=fixture_path), 14.0)
+    payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+    celsius_payload = deepcopy(payload)
+    for record in celsius_payload["streams"] + celsius_payload["utilities"]:
+        for field in ("t_supply", "t_target"):
+            record[field]["value"] -= 273.15
+            record[field]["unit"] = "degC"
+
+    celsius_arrays = problem_to_solver_arrays(
+        PinchProblem(source=celsius_payload), 14.0
+    )
+
+    assert celsius_arrays.unit_conventions["temperature"] == "K"
+    for array_name in (
+        "T_c_in",
+        "T_c_out",
+        "T_cu_in",
+        "T_cu_out",
+        "T_h_in",
+        "T_h_out",
+        "T_hu_in",
+        "T_hu_out",
+    ):
+        np.testing.assert_allclose(
+            celsius_arrays.arrays[array_name],
+            kelvin_arrays.arrays[array_name],
+        )
 
 
 @pytest.mark.parametrize("case_id", CASE_DTMIN)

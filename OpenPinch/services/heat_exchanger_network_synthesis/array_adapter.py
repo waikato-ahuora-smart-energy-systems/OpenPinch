@@ -59,8 +59,9 @@ def problem_to_solver_arrays(
     """Build the private solver-array payload from a prepared ``PinchProblem``.
 
     The adapter intentionally accepts only a live ``PinchProblem`` so raw fixture
-    rows, raw ``TargetInput`` payloads, HEN schemas, cached array dictionaries,
-    and standalone DTOs cannot bypass OpenPinch validation and preparation.
+    rows, raw ``TargetInput`` payloads, heat exchanger network schemas, cached
+    array dictionaries, and standalone DTOs cannot bypass OpenPinch validation
+    and preparation.
     """
 
     if not isinstance(problem, PinchProblem):

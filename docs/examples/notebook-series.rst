@@ -7,7 +7,9 @@ decision question rather than a generic feature tour. The series now spans the
 main single-case API, named multi-case studies, multistate targeting, the
 typed/service boundary, the energy-transfer analysis view, and the
 vapour-compression plus MVR cascade HPR backend. It also covers direct
-gas/vapour stream MVR as a process-component workflow on live workspace cases.
+gas/vapour stream MVR as a process-component workflow on live workspace cases
+and the heat exchanger network design service on a compact four-stream
+synthesis case.
 
 Included Notebooks
 ------------------
@@ -60,6 +62,13 @@ Included Notebooks
    target summaries, inspects replacement streams, and toggles the component
    active state.
 
+``09_hen_design_service_four_stream.ipynb``
+   Heat exchanger network design-service execution on a compact four-stream
+   synthesis problem,
+   including the public ``problem.design.heat_exchanger_network_synthesis()``
+   accessor, workspace workflow dispatch, concise task metadata, and grid
+   views for the top networks.
+
 How To Use Them
 ---------------
 
@@ -94,6 +103,8 @@ Recommended Learning Order
    a serial mechanical-vapour-recompression high stage.
 8. Use the direct gas/vapour MVR notebook when a process vapour stream itself
    is the recompression source and you need before/after workspace comparison.
+9. Use the heat exchanger network design-service notebook when you need network
+   synthesis on a compact four-stream case and top-network grid inspection.
 
 Why These Matter
 ----------------
@@ -101,7 +112,7 @@ Why These Matter
 The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
 hierarchical targeting, graph-based interpretation, real multistate studies,
-advanced HPR cycle targeting, process-component MVR mutation, and stable
-programmatic boundaries built on the same packaged assets. The distributed
-copies are also kept output-free so they do not ship stale plots, tracebacks,
-or machine-specific execution state.
+advanced HPR cycle targeting, process-component MVR mutation, heat exchanger
+network synthesis, and stable programmatic boundaries built on the same packaged
+assets. The distributed copies are also kept output-free so they do not ship
+stale plots, tracebacks, or machine-specific execution state.

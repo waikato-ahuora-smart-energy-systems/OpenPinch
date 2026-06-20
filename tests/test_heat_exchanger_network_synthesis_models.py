@@ -1,4 +1,4 @@
-"""Private HEN synthesis model-boundary tests."""
+"""Private heat exchanger network synthesis model-boundary tests."""
 
 from __future__ import annotations
 
@@ -60,8 +60,6 @@ SYNTHESIS_ONLY_MODULES = [
     "pyomo",
     "pyomo.environ",
     "pyomo.opt",
-    "matplotlib",
-    "matplotlib.pyplot",
     "plotly",
     "plotly.graph_objects",
     "kaleido",
@@ -101,7 +99,7 @@ if loaded:
 def test_create_gekko_model_reports_missing_optional_dependency(monkeypatch) -> None:
     def missing_dependency(*_args, **_kwargs):
         raise MissingSynthesisDependencyError(
-            "gekko is required for GEKKO HEN equation model construction. "
+            "gekko is required for GEKKO heat exchanger network equation model construction. "
             'Install "openpinch[synthesis]".'
         )
 
@@ -109,7 +107,7 @@ def test_create_gekko_model_reports_missing_optional_dependency(monkeypatch) -> 
 
     with pytest.raises(
         MissingSynthesisDependencyError,
-        match=r"gekko.*GEKKO HEN equation model construction.*openpinch\[synthesis\]",
+        match=r"gekko.*GEKKO heat exchanger network equation model construction.*openpinch\[synthesis\]",
     ):
         backend.create_gekko_model()
 
@@ -127,7 +125,7 @@ def test_pyomo_solver_configuration_reports_missing_binary_before_factory_import
 
     with pytest.raises(
         MissingSynthesisSolverError,
-        match=r"couenne.*couenne HEN synthesis solves.*PATH",
+        match=r"couenne.*couenne heat exchanger network synthesis solves.*PATH",
     ):
         backend.require_solver_backend("couenne")
 
@@ -598,6 +596,14 @@ def test_extraction_converts_solver_arrays_to_identity_labelled_network() -> Non
         "cold_utility_load": 3.0,
         "recovery_load": 30.0,
     }
+    assert network.source_metadata["hot_stage_boundary_temperatures"] == [
+        [650.0, 620.0, 390.0],
+        [610.0, 580.0, 360.0],
+    ]
+    assert network.source_metadata["cold_stage_boundary_temperatures"] == [
+        [480.0, 420.0, 300.0],
+        [510.0, 470.0, 330.0],
+    ]
 
 
 def test_internal_problem_result_serializes_without_solver_arrays() -> None:

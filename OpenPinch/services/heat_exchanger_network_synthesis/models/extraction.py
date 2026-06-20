@@ -1,4 +1,4 @@
-"""Solution extraction from private solver arrays into OpenPinch HEN records."""
+"""Extract private solver arrays into OpenPinch heat exchanger network records."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def extract_heat_exchanger_network(
     tolerance: float = tol,
     include_inactive: bool = False,
 ) -> HeatExchangerNetwork:
-    """Convert a solved HEN model into identity-labelled OpenPinch records."""
+    """Convert a solved model into identity-labelled OpenPinch records."""
 
     hot_streams = _identities_by_axis(solver_arrays, "hot_process_streams")
     cold_streams = _identities_by_axis(solver_arrays, "cold_process_streams")
@@ -104,6 +104,16 @@ def extract_heat_exchanger_network(
             "solver_model_class": type(solved_model).__name__,
             "solver_model_name": getattr(solved_model, "name", None),
             "solver_dTmin": _optional_float(getattr(solved_model, "dTmin", None)),
+            "hot_stage_boundary_temperatures": _boundary_temperature_matrix(
+                getattr(solved_model, "T_h", None),
+                rows=len(hot_streams),
+                columns=(stage_total or 0) + 1,
+            ),
+            "cold_stage_boundary_temperatures": _boundary_temperature_matrix(
+                getattr(solved_model, "T_c", None),
+                rows=len(cold_streams),
+                columns=(stage_total or 0) + 1,
+            ),
         },
     )
 
@@ -348,7 +358,9 @@ def _identities_by_axis(
 
 def _single_utility(identities: tuple[str, ...], label: str) -> str:
     if not identities:
-        raise ValueError(f"solved HEN extraction requires at least one {label}.")
+        raise ValueError(
+            f"solved heat exchanger network extraction requires at least one {label}."
+        )
     return identities[0]
 
 
@@ -368,6 +380,20 @@ def _cold_recovery_outlet(solved_model: Any, i: int, j: int, k: int) -> float | 
     if explicit is not None:
         return explicit
     return _optional_float(_index(getattr(solved_model, "T_c", None), j, k))
+
+
+def _boundary_temperature_matrix(
+    values: Any,
+    *,
+    rows: int,
+    columns: int,
+) -> list[list[float | None]]:
+    if values is None or rows <= 0 or columns <= 0:
+        return []
+    return [
+        [_optional_float(_index(values, row, column)) for column in range(columns)]
+        for row in range(rows)
+    ]
 
 
 def _approach_temperatures(

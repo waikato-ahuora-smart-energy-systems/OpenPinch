@@ -38,6 +38,8 @@ from .reporting import (
 from .synthesis import (
     HeatExchangerNetworkSynthesisExportRecord,
     HeatExchangerNetworkSynthesisManifest,
+    HeatExchangerNetworkSynthesisMethodInput,
+    HeatExchangerNetworkSynthesisMethodOutput,
     HeatExchangerNetworkSynthesisResult,
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
@@ -115,6 +117,8 @@ __all__ = [
     "PinchTemp",
     "HeatExchangerNetworkSynthesisExportRecord",
     "HeatExchangerNetworkSynthesisManifest",
+    "HeatExchangerNetworkSynthesisMethodInput",
+    "HeatExchangerNetworkSynthesisMethodOutput",
     "HeatExchangerNetworkSynthesisResult",
     "HeatExchangerNetworkSynthesisTask",
     "HeatExchangerNetworkSynthesisTaskOutcome",

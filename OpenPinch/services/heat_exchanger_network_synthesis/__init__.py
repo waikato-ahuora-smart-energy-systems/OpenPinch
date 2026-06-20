@@ -1,4 +1,4 @@
-"""Internal helpers for the future OpenPinch HEN synthesis service."""
+"""Internal helpers for heat exchanger network synthesis."""
 
 from __future__ import annotations
 

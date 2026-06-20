@@ -22,9 +22,6 @@ from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
 from OpenPinch.services.heat_exchanger_network_synthesis.models.extraction import (
     extract_heat_exchanger_network,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.service import (
-    heat_exchanger_network_synthesis_service,
-)
 from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
     LocalSynthesisExecutor,
     _execute_synthesis_workflow,
@@ -288,7 +285,7 @@ def test_four_stream_live_solver_winning_branch_matches_checked_in_summary() -> 
 
     assert [
         outcome.task.method
-        for outcome in design.task_outcomes
+        for outcome in workflow_result.outcomes
         if outcome.status == "success"
     ] == [
         "pinch_decomposition",
@@ -332,11 +329,12 @@ def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -
         max_parallel=8,
     )
 
-    design = _execute_synthesis_workflow(
+    workflow_result = _execute_synthesis_workflow(
         problem,
         settings,
         executor=LocalSynthesisExecutor(print_output=False),
-    ).accepted_result
+    )
+    design = workflow_result.accepted_result
     network = design.network
 
     _assert_close(
@@ -346,12 +344,14 @@ def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -
         rel_tol=TAC_REL_TOL,
     )
     assert (
-        _weighted_solver_job_count(design.task_outcomes)
+        _weighted_solver_job_count(workflow_result.outcomes)
         == expected["total_cases_attempted"]
     )
     assert (
         _weighted_solver_job_count(
-            outcome for outcome in design.task_outcomes if outcome.status == "success"
+            outcome
+            for outcome in workflow_result.outcomes
+            if outcome.status == "success"
         )
         >= expected["total_cases_solved_min"]
     )
@@ -359,7 +359,7 @@ def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -
         sum(
             outcome.status == "success"
             and outcome.task.method == "energy_stage_refinement"
-            for outcome in design.task_outcomes
+            for outcome in workflow_result.outcomes
         )
         >= expected["solved_esm_count_min"]
     )
@@ -384,22 +384,20 @@ def _assert_live_solver_case_matches_checked_in_summary(
     expected = BASELINE_EXPECTATIONS[case_id]
     problem = PinchProblem(source=FIXTURE_ROOT / f"{case_id}.json")
 
+    problem.target()
     if max_parallel is None:
-        design = heat_exchanger_network_synthesis_service(
-            problem,
-            executor=LocalSynthesisExecutor(print_output=False),
-        )
+        settings = workflow_settings_from_problem(problem)
     else:
-        problem.target()
         settings = replace(
             workflow_settings_from_problem(problem),
             max_parallel=max_parallel,
         )
-        design = _execute_synthesis_workflow(
-            problem,
-            settings,
-            executor=LocalSynthesisExecutor(print_output=False),
-        ).accepted_result
+    workflow_result = _execute_synthesis_workflow(
+        problem,
+        settings,
+        executor=LocalSynthesisExecutor(print_output=False),
+    )
+    design = workflow_result.accepted_result
     network = design.network
 
     _assert_close(
@@ -409,12 +407,14 @@ def _assert_live_solver_case_matches_checked_in_summary(
         rel_tol=TAC_REL_TOL,
     )
     assert (
-        _weighted_solver_job_count(design.task_outcomes)
+        _weighted_solver_job_count(workflow_result.outcomes)
         == expected["total_cases_attempted"]
     )
     assert (
         _weighted_solver_job_count(
-            outcome for outcome in design.task_outcomes if outcome.status == "success"
+            outcome
+            for outcome in workflow_result.outcomes
+            if outcome.status == "success"
         )
         == expected["total_cases_solved"]
     )
@@ -422,7 +422,7 @@ def _assert_live_solver_case_matches_checked_in_summary(
         sum(
             outcome.status == "success"
             and outcome.task.method == "energy_stage_refinement"
-            for outcome in design.task_outcomes
+            for outcome in workflow_result.outcomes
         )
         == expected["solved_esm_count"]
     )

@@ -16,6 +16,7 @@ EXPECTED_NOTEBOOKS = [
     "06_energy_transfer_analysis.ipynb",
     "07_vapour_compression_mvr_cascade_hpr.ipynb",
     "08_direct_gas_stream_mvr.ipynb",
+    "09_hen_design_service_four_stream.ipynb",
 ]
 
 
@@ -219,3 +220,33 @@ def test_notebook_8_covers_direct_gas_stream_mvr(tmp_path: Path):
     assert "summary_frame(case_name=" in combined_source
     assert "plot.grand_composite_curve(" in combined_source
     assert "return_graph_data=True" in combined_source
+
+
+def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "09_hen_design_service_four_stream.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "PinchProblem" in combined_source
+    assert "design.heat_exchanger_network_synthesis()" in combined_source
+    assert '"HENS_APPROACH_TEMPERATURES": [10.0, 14.0, 18.0]' in combined_source
+    assert '"HENS_DERIVATIVE_THRESHOLDS": [0.5]' in combined_source
+    assert '"HENS_STAGE_SELECTION": [3]' in combined_source
+    assert '"HENS_MAX_PARALLEL": 1' in combined_source
+    assert "top_ranked_networks" in combined_source
+    assert "get_n_best_networks(3)" in combined_source
+    assert "select_network(solution_rank=2)" in combined_source
+    assert "problem.design.network.total_heat_recovery" in combined_source
+    assert "problem.design.network.total_hot_utility" in combined_source
+    assert "problem.design.network.total_cold_utility" in combined_source
+    assert "problem.design.network.utility(" in combined_source
+    assert "from OpenPinch.lib import" not in combined_source
+    assert "HeatExchangerKind" not in combined_source
+    assert "HeatExchangerNetworkLabel" not in combined_source
+    assert "filterwarnings" not in combined_source
+    assert "import warnings" not in combined_source
+    assert "from OpenPinch.services.network_grid_diagram" not in combined_source
+    assert "design.network.build_grid_diagram(" in combined_source
+    assert "go.Figure()" not in combined_source

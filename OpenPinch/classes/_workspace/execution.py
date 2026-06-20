@@ -18,9 +18,17 @@ _WORKFLOW_SUPPORT_LEVELS = {
     "cogeneration": "advanced",
     "area_cost": "advanced",
     "heat_exchanger_network_synthesis": "advanced",
+    "network_evolution": "advanced",
+    "pinch_decomposition": "advanced",
+    "thermal_derivative": "advanced",
 }
 
-_DESIGN_WORKFLOWS = {"heat_exchanger_network_synthesis"}
+_DESIGN_WORKFLOWS = {
+    "heat_exchanger_network_synthesis",
+    "network_evolution",
+    "pinch_decomposition",
+    "thermal_derivative",
+}
 
 
 @dataclass

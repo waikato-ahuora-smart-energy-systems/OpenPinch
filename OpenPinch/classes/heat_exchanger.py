@@ -29,8 +29,10 @@ class HeatExchanger(BaseModel):
     approach_temperatures: tuple[float, ...] = Field(default_factory=tuple)
     source_inlet_temperature: float | None = None
     source_outlet_temperature: float | None = None
+    source_mid_temperature: float | None = None
     sink_inlet_temperature: float | None = None
     sink_outlet_temperature: float | None = None
+    sink_mid_temperature: float | None = None
     capital_cost: float | None = None
     operating_cost: float | None = None
     total_annual_cost: float | None = None
@@ -81,8 +83,10 @@ class HeatExchanger(BaseModel):
     @field_validator(
         "source_inlet_temperature",
         "source_outlet_temperature",
+        "source_mid_temperature",
         "sink_inlet_temperature",
         "sink_outlet_temperature",
+        "sink_mid_temperature",
     )
     @classmethod
     def _validate_finite_temperature(cls, value: float | None) -> float | None:
@@ -104,6 +108,28 @@ class HeatExchanger(BaseModel):
                     "approach temperatures must be finite non-negative values"
                 )
         return tuple(float(approach_temperature) for approach_temperature in value)
+
+    @model_validator(mode="after")
+    def _set_mid_temperatures(self) -> Self:
+        if "source_mid_temperature" not in self.model_fields_set:
+            object.__setattr__(
+                self,
+                "source_mid_temperature",
+                _midpoint_temperature(
+                    self.source_inlet_temperature,
+                    self.source_outlet_temperature,
+                ),
+            )
+        if "sink_mid_temperature" not in self.model_fields_set:
+            object.__setattr__(
+                self,
+                "sink_mid_temperature",
+                _midpoint_temperature(
+                    self.sink_inlet_temperature,
+                    self.sink_outlet_temperature,
+                ),
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_direction_semantics(self) -> Self:
@@ -154,6 +180,15 @@ class HeatExchanger(BaseModel):
         if self.source_stream != source_stream or self.sink_stream != sink_stream:
             return False
         return stage is None or self.stage == stage
+
+
+def _midpoint_temperature(
+    inlet_temperature: float | None,
+    outlet_temperature: float | None,
+) -> float | None:
+    if inlet_temperature is None or outlet_temperature is None:
+        return None
+    return (inlet_temperature + outlet_temperature) / 2
 
 
 __all__ = [

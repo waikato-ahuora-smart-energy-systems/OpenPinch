@@ -1,4 +1,4 @@
-"""Private pinch-decomposition contract for migrated HEN PDM fields.
+"""Private pinch-decomposition contract for migrated heat exchanger network PDM fields.
 
 This module is intentionally internal to the synthesis service package. It
 accepts a prepared :class:`PinchProblem`, uses OpenPinch targeting as the source

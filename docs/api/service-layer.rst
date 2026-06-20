@@ -51,6 +51,25 @@ level ``problem.target.*(..., state_id=...)`` wrappers.
 .. autofunction:: OpenPinch.services.input_data_processing.data_preparation.prepare_problem
    :no-index:
 
+Network Grid Diagrams
+---------------------
+
+The selected heat exchanger network can construct its own grid diagram through
+:meth:`OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork.build_grid_diagram`:
+
+.. code-block:: python
+
+   design = problem.results.design
+   diagram = design.network.build_grid_diagram()
+
+The standalone service remains available for batch rendering one or more
+:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
+objects, for example when displaying several ranked candidates.
+
+.. automodule:: OpenPinch.services.network_grid_diagram
+   :members:
+   :no-index:
+
 Typical Preparation and Solve Pattern
 -------------------------------------
 

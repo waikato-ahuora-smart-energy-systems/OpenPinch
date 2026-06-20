@@ -59,9 +59,11 @@ analysis outputs. Notebook 07 covers the vapour-compression plus MVR cascade
 HPR backend and its split-fraction source/process routing. Notebook 08 covers
 the direct gas/vapour MVR process-component workflow, where live
 ``PinchProblem`` cases are mutated with replacement hot streams and compared
-in a ``PinchWorkspace``. The distributed assets are packaged as clean sources:
-no stored Plotly payloads, no cached execution counts, and no stale traceback
-output.
+in a ``PinchWorkspace``. Notebook 09 covers the problem-owned heat exchanger
+network design service on a compact four-stream synthesis case, including grid
+configuration, live solver execution, and top-network inspection. The distributed assets are
+packaged as clean sources: no stored Plotly payloads, no cached execution
+counts, and no stale traceback output.
 
 Copy the full series with:
 
@@ -94,6 +96,7 @@ Current packaged notebooks:
 6. ``06_energy_transfer_analysis.ipynb``
 7. ``07_vapour_compression_mvr_cascade_hpr.ipynb``
 8. ``08_direct_gas_stream_mvr.ipynb``
+9. ``09_hen_design_service_four_stream.ipynb``
 
 Notebook 04 shows the named-state workflow directly through
 ``problem.target.direct_heat_integration(state_id="peak")`` and
@@ -110,7 +113,10 @@ screening and notes ``"Parallel Carnot cycles"`` as the explicit staged
 Carnot option. Notebook 08 shows ``add_component.process_mvr(...)``,
 ``stage_results_by_state``, replacement stream inspection, component
 activation/deactivation, and baseline-versus-MVR comparison through
-``workspace.compare_cases(...)``.
+``workspace.compare_cases(...)``. Notebook 09 shows
+``problem.design.heat_exchanger_network_synthesis()`` and
+``workspace.solve_variant(..., workflow="heat_exchanger_network_synthesis")``
+with a small heat exchanger network design grid and grid views for the top networks.
 
 Recommended Learning Path
 -------------------------
@@ -132,6 +138,8 @@ Recommended Learning Path
    vapour-compression plus MVR cascade HPR backend.
 8. Notebook 08 when you need direct gas/vapour MVR on selected process streams
    before re-solving direct and Total Site targets.
+9. Notebook 09 when you need heat exchanger network design-service execution and network
+   inspection on a compact four-stream synthesis case.
 
 Why These Assets Matter
 -----------------------

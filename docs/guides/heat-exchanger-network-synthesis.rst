@@ -2,7 +2,7 @@ Heat Exchanger Network Synthesis
 ================================
 
 Heat exchanger network synthesis is exposed through the same problem and
-workspace roots as the rest of OpenPinch. A HEN run starts from an
+workspace roots as the rest of OpenPinch. A heat exchanger network run starts from an
 OpenPinch-compatible JSON payload, a native
 :class:`~OpenPinch.lib.schemas.io.TargetInput`, or an already loaded
 :class:`~OpenPinch.PinchProblem`. Source OpenHENS CSV files are migration
@@ -11,10 +11,16 @@ source material only; convert them once into OpenPinch JSON or native
 
 The implementation boundary is
 ``heat_exchanger_network_synthesis_service(problem)``. It is internal and
-problem-rooted: it requires a live ``PinchProblem`` and reads persistent HEN
+problem-rooted: it requires a live ``PinchProblem`` and reads persistent heat exchanger network
 configuration from ``TargetInput.options`` through the prepared
 ``Configuration``. User code should call the problem design accessor or the
 workspace workflow dispatch shown below, not the internal service directly.
+Those public calls invoke the local solver-backed synthesis executor by
+default.
+
+When Couenne is unavailable for the Couenne-backed derivative/topology stages,
+OpenPinch emits a warning and attempts ``energy_stage_refinement`` directly
+with the configured ESM solver and stage selection.
 
 Problem Workflow
 ----------------
@@ -87,15 +93,15 @@ map to ``StreamSchema`` records, utilities and utility prices map to
    problem = PinchProblem(source=payload, project_name="Four-stream example")
    design = problem.design.heat_exchanger_network_synthesis()
 
-Do not pass HEN design-space or solver controls as a separate object to the
+Do not pass heat exchanger network design-space or solver controls as a separate object to the
 design call. The call may receive non-design runtime state options, but
-persistent HEN controls belong in the loaded problem payload.
+persistent heat exchanger network controls belong in the loaded problem payload.
 
 Workspace Workflow
 ------------------
 
 Use :class:`~OpenPinch.PinchWorkspace` when a named study needs variants,
-comparisons, or bundle persistence. The workspace dispatches HEN synthesis to
+comparisons, or bundle persistence. The workspace dispatches heat exchanger network synthesis to
 the active variant's live ``PinchProblem.design`` path.
 
 .. code-block:: python
@@ -115,8 +121,9 @@ the active variant's live ``PinchProblem.design`` path.
    problem = workspace.case("baseline")
    design = problem.results.design
 
-``PinchWorkspace`` is the multi-case owner. HEN synthesis does not add a public
-case, study, scenario, or HEN-specific workspace root.
+``PinchWorkspace`` is the multi-case owner. Heat exchanger network synthesis
+does not add a public case, study, scenario, or heat exchanger network-specific
+workspace root.
 
 Results and Optional Exports
 ----------------------------
@@ -124,14 +131,146 @@ Results and Optional Exports
 The canonical in-memory result is ``problem.results``. Its
 ``TargetOutput.design`` field contains a
 :class:`~OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult`
-with objective values, task metadata, an optional manifest, and a
+with objective values, ranked network candidates, an optional manifest, and a
+selected
 :class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`.
+
+The selected network is available as ``design.network``. The public design
+service ranks successful network candidates by objective value, removes
+duplicate exchanger-connection structures, stores that unique list on
+``design.ranked_networks``, and selects rank 1 by default:
+
+.. code-block:: python
+
+   design = problem.design.heat_exchanger_network_synthesis()
+
+   # Rank 1 is selected by default.
+   selected = design.network
+   ranked = design.ranked_networks
+
+   assert ranked[0].network == selected
+
+Use ``get_n_best_networks(...)`` when you only need the first few ranked
+candidates:
+
+.. code-block:: python
+
+   top_three = design.get_n_best_networks(3)
+
+   for rank, outcome in enumerate(top_three, start=1):
+       print(rank, outcome.objective_value, outcome.task.task_id)
+
+Use ``select_network(...)`` to make another ranked candidate the selected
+network. The method mutates the design result, updates ``design.network`` and
+the associated selected-task metadata, and returns the same design object:
+
+.. code-block:: python
+
+   design.select_network(solution_rank=2)
+
+   print(design.task_id)
+   print(design.objective_values)
+   print(len(design.network.exchangers))
+
+``solution_rank`` is 1-based. Requesting an unavailable rank raises
+``IndexError`` with the number of available ranked networks.
+
+The problem design accessor also exposes convenience totals for the currently
+selected network through ``problem.design.network``:
+
+.. code-block:: python
+
+   problem.design.network.total_heat_recovery
+   problem.design.network.total_hot_utility
+   problem.design.network.total_cold_utility
+   problem.design.network.utility("HU1")
+
+These helpers read from ``problem.results.design.network``. Run
+``problem.design.heat_exchanger_network_synthesis()`` first so a selected
+network is cached on the problem. ``utility(name)`` returns duty for hot or
+cold utility exchangers whose utility stream identity matches ``name``.
 
 The network exposes source/sink stream links through
 :class:`~OpenPinch.classes.heat_exchanger.HeatExchanger` records. Recovery
 links are hot process stream to cold process stream, hot utility links are hot
 utility to cold process stream, and cold utility links are hot process stream
 to cold utility.
+
+OpenHENS-style network grid diagrams are available directly from the selected
+:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`:
+
+.. code-block:: python
+
+   design = problem.results.design
+
+   diagram = design.network.build_grid_diagram()
+   diagram.show()
+   diagram.save("network.png")
+
+For synthesis results, ``grid_diagram(...)`` remains available as a ranked
+convenience wrapper. The rank is 1-based and follows the same accepted-method
+ordering used for ranked network candidates:
+
+.. code-block:: python
+
+   diagram = design.grid_diagram(solution_rank=1)
+
+The returned object exposes the Plotly ``fig`` object, a lightweight drawing
+adapter on ``ax`` for tests and introspection, the selected ``network``, and the
+normalized ``grid_model`` used to draw the process-stream topology:
+
+.. code-block:: python
+
+   diagram.fig
+   diagram.ax
+   diagram.network
+   diagram.grid_model
+
+The Plotly figure includes hover information on exchanger markers, including
+duty, area when available, and match description. Saving to ``.png`` uses Plotly
+static image export; saving to ``.html`` writes an interactive Plotly document.
+
+The default layout follows the OpenHENS stage-based grid. Two optional keyword
+arguments tune the diagram without changing the selected network:
+
+.. code-block:: python
+
+   design.network.build_grid_diagram(stream_line_width=5.0)
+   design.network.build_grid_diagram(temperature_scaled=True)
+
+``stream_line_width`` controls the stream strokes and is also used to auto-size
+the figure height for larger networks. The actual marker size and connector
+line widths are derived from the available lane pitch so diagrams scale with
+the number of process streams, utility matches, and stream split lanes.
+``temperature_scaled=True`` positions stream and match x-coordinates on a
+high-to-low temperature axis while keeping the same hot and cold stream
+direction conventions.
+
+The standalone service accepts multiple ranked network candidates directly. Use
+the 0-based ``index`` argument to draw one specific network, or omit ``index``
+to receive a tuple of diagrams:
+
+.. code-block:: python
+
+   from OpenPinch.services.network_grid_diagram import build_grid_diagram
+
+   networks = tuple(
+       outcome.network for outcome in design.get_n_best_networks()
+   )
+
+   build_grid_diagram(networks, index=0)
+   build_grid_diagram(networks)
+
+For the synthesis-result wrapper, ``solution_rank`` remains 1-based:
+
+.. code-block:: python
+
+   design.grid_diagram(solution_rank=1)
+   design.grid_diagram(solution_rank=2)
+
+Calling ``select_network(solution_rank=2)`` changes ``design.network`` for
+subsequent result inspection, but it is not required before using the wrapper
+with ``grid_diagram(solution_rank=2)``.
 
 JSON and CSV files are optional export views generated from
 ``problem.results`` after synthesis:
@@ -194,7 +333,7 @@ aliases, OpenHENS field aliases, command parity, or an ``OpenHENS`` facade.
 Dependencies and Solver Tests
 -----------------------------
 
-Core ``import OpenPinch`` remains lightweight. Install HEN synthesis runtime
+Core ``import OpenPinch`` remains lightweight. Install heat exchanger network synthesis runtime
 dependencies explicitly when live solver-backed synthesis is needed:
 
 .. code-block:: bash
@@ -207,13 +346,16 @@ Repository development uses the same optional extra in an editable checkout:
 
    python -m pip install -e ".[synthesis]"
 
-The ``synthesis`` extra installs Python packages such as Pyomo, GEKKO,
+The ``synthesis`` extra installs Python packages such as Pyomo, GEKKO, IDAES,
 plotting/export libraries, and wake-management tooling. External solver
-binaries such as Couenne and IPOPT are installed separately and must be
-available on ``PATH`` for marked solver tests. Missing optional Python packages
-raise ``MissingSynthesisDependencyError`` with the ``openpinch[synthesis]``
-install path. Missing external executables raise ``MissingSynthesisSolverError``
-with the missing binary name and solver-test guidance.
+binaries such as Couenne and IPOPT are installed separately. OpenPinch first
+checks ``PATH`` and then the IDAES extension directory reported by
+``idaes.bin_directory``; when a solver is found there, OpenPinch prepends that
+directory to the process ``PATH`` so downstream Pyomo solver factories can
+resolve the executable. Missing optional Python packages raise
+``MissingSynthesisDependencyError`` with the ``openpinch[synthesis]`` install
+path. Missing external executables raise ``MissingSynthesisSolverError`` with
+the missing binary name and solver-test guidance.
 
 Use the documented test tiers:
 

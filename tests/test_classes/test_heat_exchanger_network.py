@@ -72,11 +72,57 @@ def test_heat_exchanger_serialization_round_trip_excludes_solver_metadata():
 
     round_tripped = HeatExchanger.model_validate_json(exchanger.model_dump_json())
 
+    assert exchanger.source_mid_temperature == pytest.approx(150.0)
+    assert exchanger.sink_mid_temperature == pytest.approx(85.0)
     assert round_tripped == exchanger.model_copy(
         update={"solver_metadata": {}, "source_metadata": {}}
     )
     assert "solver_metadata" not in exchanger.model_dump()
     assert "source_metadata" not in exchanger.model_dump()
+
+
+def test_heat_exchanger_preserves_explicit_mid_temperatures():
+    exchanger = HeatExchanger(
+        exchanger_id="explicit-midpoints",
+        kind=HeatExchangerKind.RECOVERY,
+        source_stream="H1",
+        sink_stream="C1",
+        source_stream_role=HeatExchangerStreamRole.PROCESS,
+        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        stage=1,
+        duty=100.0,
+        source_inlet_temperature=180.0,
+        source_outlet_temperature=120.0,
+        source_mid_temperature=155.0,
+        sink_inlet_temperature=60.0,
+        sink_outlet_temperature=110.0,
+        sink_mid_temperature=82.0,
+    )
+
+    assert exchanger.source_mid_temperature == pytest.approx(155.0)
+    assert exchanger.sink_mid_temperature == pytest.approx(82.0)
+
+
+def test_heat_exchanger_does_not_infer_mid_temperature_from_one_endpoint():
+    exchanger = HeatExchanger(
+        exchanger_id="partial-midpoints",
+        kind=HeatExchangerKind.RECOVERY,
+        source_stream="H1",
+        sink_stream="C1",
+        source_stream_role=HeatExchangerStreamRole.PROCESS,
+        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        stage=1,
+        duty=100.0,
+        source_inlet_temperature=180.0,
+        sink_outlet_temperature=110.0,
+    )
+
+    assert exchanger.source_mid_temperature is None
+    assert exchanger.sink_mid_temperature is None
+
+    exchanger.source_outlet_temperature = 120.0
+
+    assert exchanger.source_mid_temperature == pytest.approx(150.0)
 
 
 def test_heat_exchanger_direction_semantics_are_enforced():
