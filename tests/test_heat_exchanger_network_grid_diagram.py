@@ -17,17 +17,20 @@ from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.grid_diagram import (
+from OpenPinch.services.heat_exchanger_network_synthesis.ranking import (
+    network_structure_signature,
+)
+from OpenPinch.services.network_grid_diagram import (
+    build_grid_diagram,
+    build_grid_model,
+)
+from OpenPinch.services.network_grid_diagram.constants import (
     _COLD_STREAM_COLOR,
     _COLD_UTILITY_COLOR,
     _HOT_STREAM_COLOR,
     _HOT_UTILITY_COLOR,
     _LABEL_BACKGROUND_COLOR,
     _RECOVERY_MATCH_COLOR,
-    build_grid_model,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.ranking import (
-    network_structure_signature,
 )
 
 
@@ -46,13 +49,62 @@ def test_grid_model_recovers_process_topology_and_branches() -> None:
     assert grid_model.branch_counts[("C1", 3)] == 2
 
 
+def test_grid_diagram_service_accepts_one_network() -> None:
+    _require_plotly()
+    network = _network("standalone")
+
+    diagram = build_grid_diagram(network)
+
+    assert diagram.network is network
+    assert diagram.grid_model.network is network
+    assert diagram.fig.__class__.__module__.startswith("plotly.")
+
+
+def test_grid_diagram_service_accepts_multiple_networks_without_index() -> None:
+    _require_plotly()
+    networks = (_network("first"), _distinct_network("second"))
+
+    diagrams = build_grid_diagram(networks)
+
+    assert isinstance(diagrams, tuple)
+    assert [diagram.network.run_id for diagram in diagrams] == ["first", "second"]
+
+
+def test_grid_diagram_service_uses_zero_based_index() -> None:
+    _require_plotly()
+    networks = [_network("first"), _distinct_network("second")]
+
+    diagram = build_grid_diagram(networks, index=1)
+
+    assert diagram.network.run_id == "second"
+
+
+def test_grid_diagram_service_reports_invalid_network_inputs() -> None:
+    _require_plotly()
+
+    with pytest.raises(ValueError, match="at least one HeatExchangerNetwork"):
+        build_grid_diagram(())
+    with pytest.raises(IndexError, match="0-based"):
+        build_grid_diagram((_network("first"),), index=-1)
+    with pytest.raises(IndexError, match="index 2 is unavailable"):
+        build_grid_diagram((_network("first"),), index=2)
+
+
+def test_grid_diagram_service_reports_wrong_input_types() -> None:
+    with pytest.raises(TypeError, match="networks must be a HeatExchangerNetwork"):
+        build_grid_diagram("not-a-network")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="item 1 is str"):
+        build_grid_diagram(  # type: ignore[list-item]
+            [_network("first"), "not-a-network"],
+        )
+
+
 def test_grid_diagram_ranks_successful_networks_by_accepted_method() -> None:
     _require_plotly()
     result = _result()
 
     diagram = result.grid_diagram(solution_rank=1)
 
-    assert diagram.solution_rank == 1
     assert diagram.network.run_id == "accepted-best"
     assert diagram.grid_model.network is diagram.network
     assert diagram.fig.__class__.__module__.startswith("plotly.")

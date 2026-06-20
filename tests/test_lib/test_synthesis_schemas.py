@@ -24,6 +24,8 @@ from OpenPinch.lib.schemas.io import TargetInput, TargetOutput
 from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisExportRecord,
     HeatExchangerNetworkSynthesisManifest,
+    HeatExchangerNetworkSynthesisMethodInput,
+    HeatExchangerNetworkSynthesisMethodOutput,
     HeatExchangerNetworkSynthesisResult,
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
@@ -70,6 +72,60 @@ def test_synthesis_task_generates_deterministic_task_id():
 
     assert first.task_id == second.task_id
     assert first.task_id.startswith("hens-task-")
+
+
+def test_method_input_is_consistent_task_contract_for_all_synthesis_methods():
+    pdm = HeatExchangerNetworkSynthesisMethodInput(
+        run_id="run-1",
+        method="pinch_decomposition",
+        approach_temperature=14.0,
+    )
+    tdm = HeatExchangerNetworkSynthesisMethodInput(
+        run_id="run-1",
+        method="topology_design",
+        approach_temperature=14.0,
+        derivative_threshold=0.5,
+        stage_count=3,
+        seed_network_index=0,
+    )
+    evolution = HeatExchangerNetworkSynthesisMethodInput(
+        run_id="run-1",
+        method="energy_stage_refinement",
+        approach_temperature=14.0,
+        stage_count=3,
+        seed_network_index=1,
+    )
+
+    assert pdm.task_id.startswith("hens-task-")
+    assert tdm.task_id != evolution.task_id
+    assert [item.method for item in (pdm, tdm, evolution)] == [
+        "pinch_decomposition",
+        "topology_design",
+        "energy_stage_refinement",
+    ]
+
+
+def test_method_output_is_consistent_outcome_contract_for_all_synthesis_methods():
+    method_input = HeatExchangerNetworkSynthesisMethodInput(
+        run_id="run-1",
+        method="energy_stage_refinement",
+        approach_temperature=14.0,
+        stage_count=3,
+    )
+    output = HeatExchangerNetworkSynthesisMethodOutput(
+        task=method_input,
+        status="success",
+        network=_network(),
+        objective_value=1000.0,
+        solver_status="optimal",
+    )
+
+    round_tripped = HeatExchangerNetworkSynthesisMethodOutput.model_validate_json(
+        output.model_dump_json(),
+    )
+
+    assert round_tripped == output
+    assert round_tripped.task.method == "energy_stage_refinement"
 
 
 def test_synthesis_schema_serialization_round_trips():
@@ -318,6 +374,8 @@ def test_public_synthesis_exports_are_openpinch_native():
     expected_schema_exports = {
         "HeatExchangerNetworkSynthesisExportRecord",
         "HeatExchangerNetworkSynthesisManifest",
+        "HeatExchangerNetworkSynthesisMethodInput",
+        "HeatExchangerNetworkSynthesisMethodOutput",
         "HeatExchangerNetworkSynthesisResult",
         "HeatExchangerNetworkSynthesisTask",
         "HeatExchangerNetworkSynthesisTaskOutcome",

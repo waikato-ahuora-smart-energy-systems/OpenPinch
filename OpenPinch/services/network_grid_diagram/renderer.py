@@ -1,68 +1,33 @@
-"""OpenHENS-style grid diagrams for OpenPinch heat exchanger network design results."""
+"""Plotly renderer for heat exchanger network grid diagrams."""
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from dataclasses import dataclass
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from ...classes.heat_exchanger import HeatExchanger
-from ...classes.heat_exchanger_network import HeatExchangerNetwork
 from ...lib.enums import HeatExchangerKind
-from ._dependencies import require_synthesis_dependency
-from .ranking import rank_unique_network_outcomes
-
-if TYPE_CHECKING:
-    from ...lib.schemas.synthesis import (
-        HeatExchangerNetworkSynthesisResult,
-        HeatExchangerNetworkSynthesisTaskOutcome,
-    )
-
-_DUTY_TOLERANCE_KW = 1.0
-_DEFAULT_STREAM_LINE_WIDTH = 5.0
-_LAYOUT_X_MIN = 0.0
-_LAYOUT_X_MAX = 1.0
-_MIN_FIGURE_WIDTH_PX = 960
-_MIN_FIGURE_HEIGHT_PX = 260
-_LANE_HEIGHT_PX = 46
-_GROUP_GAP_LANES = 0.1
-_MIN_MARKER_RADIUS = 35.0
-_MAX_MARKER_RADIUS = 70.0
-_MARKER_ROW_PITCH_RATIO = 0.8
-_STREAM_LINE_TO_MARKER_RADIUS_RATIO = 0.1
-_MATCH_LINE_TO_STREAM_LINE_WIDTH_RATIO = 0.5
-_HOT_STREAM_COLOR = "#ff8f8f"
-_COLD_STREAM_COLOR = "#9ec5fe"
-_HOT_UTILITY_COLOR = "#b00020"
-_COLD_UTILITY_COLOR = "#0b1f4d"
-_RECOVERY_MATCH_COLOR = "#3f3f46"
-_LABEL_BACKGROUND_COLOR = "rgba(255,255,255,0.82)"
-
-
-@dataclass(frozen=True)
-class GridDiagramMatch:
-    """One active exchanger match placed in the process-stream grid."""
-
-    exchanger: HeatExchanger
-    source_stream: str
-    sink_stream: str
-    stage: int | None
-    duty: float
-
-
-@dataclass(frozen=True)
-class HeatExchangerNetworkGridModel:
-    """Normalized topology for a heat exchanger network grid diagram."""
-
-    network: HeatExchangerNetwork
-    hot_streams: tuple[str, ...]
-    cold_streams: tuple[str, ...]
-    stages: tuple[int, ...]
-    recovery_matches: tuple[GridDiagramMatch, ...]
-    hot_utility_matches: tuple[GridDiagramMatch, ...]
-    cold_utility_matches: tuple[GridDiagramMatch, ...]
-    branch_counts: dict[tuple[str, int], int]
+from .constants import (
+    _COLD_STREAM_COLOR,
+    _COLD_UTILITY_COLOR,
+    _DEFAULT_STREAM_LINE_WIDTH,
+    _DUTY_TOLERANCE_KW,
+    _GROUP_GAP_LANES,
+    _HOT_STREAM_COLOR,
+    _HOT_UTILITY_COLOR,
+    _LABEL_BACKGROUND_COLOR,
+    _LANE_HEIGHT_PX,
+    _LAYOUT_X_MAX,
+    _LAYOUT_X_MIN,
+    _MARKER_ROW_PITCH_RATIO,
+    _MATCH_LINE_TO_STREAM_LINE_WIDTH_RATIO,
+    _MAX_MARKER_RADIUS,
+    _MIN_FIGURE_HEIGHT_PX,
+    _MIN_FIGURE_WIDTH_PX,
+    _MIN_MARKER_RADIUS,
+    _RECOVERY_MATCH_COLOR,
+    _STREAM_LINE_TO_MARKER_RADIUS_RATIO,
+)
+from .models import GridDiagramMatch, HeatExchangerNetworkGridModel
 
 
 @dataclass(frozen=True)
@@ -71,163 +36,6 @@ class _SplitGroup:
     end_x: float
     left_connector_x: float
     right_connector_x: float
-
-
-@dataclass
-class HeatExchangerNetworkGridDiagram:
-    """Rendered heat exchanger network grid diagram."""
-
-    fig: Any
-    ax: Any
-    network: HeatExchangerNetwork
-    solution_rank: int
-    grid_model: HeatExchangerNetworkGridModel
-
-    def show(self) -> None:
-        """Display the Plotly figure."""
-        self.fig.show()
-
-    def save(self, path: str | Path = "grid_diagram.png") -> None:
-        """Save the Plotly figure to ``path``."""
-        path = Path(path)
-        if path.suffix.lower() == ".html":
-            self.fig.write_html(path)
-            return
-        self.fig.write_image(path)
-
-
-def build_grid_diagram(
-    result: "HeatExchangerNetworkSynthesisResult",
-    *,
-    solution_rank: int = 1,
-    stream_line_width: float = _DEFAULT_STREAM_LINE_WIDTH,
-    temperature_scaled: bool = False,
-) -> HeatExchangerNetworkGridDiagram:
-    """Return an OpenHENS-style grid diagram for one ranked design solution."""
-    selected = _select_ranked_network(result, solution_rank)
-    network = selected.network if selected is not None else result.network
-    grid_model = build_grid_model(network)
-    plotly_go = require_synthesis_dependency(
-        "plotly.graph_objects",
-        package="plotly",
-        purpose="heat exchanger network grid diagrams",
-    )
-    renderer = _PlotlyGridRenderer(
-        grid_model,
-        graph_objects=plotly_go,
-        stream_line_width=stream_line_width,
-        temperature_scaled=temperature_scaled,
-    )
-    return HeatExchangerNetworkGridDiagram(
-        fig=renderer.fig,
-        ax=renderer.ax,
-        network=network,
-        solution_rank=solution_rank,
-        grid_model=grid_model,
-    )
-
-
-def build_grid_model(
-    network: HeatExchangerNetwork,
-) -> HeatExchangerNetworkGridModel:
-    """Normalize an OpenPinch network into the OpenHENS grid topology."""
-    hot_streams: list[str] = []
-    cold_streams: list[str] = []
-    recovery_by_key: OrderedDict[tuple[str, str, int], GridDiagramMatch] = OrderedDict()
-    hot_utility_by_cold_stream: OrderedDict[str, GridDiagramMatch] = OrderedDict()
-    cold_utility_by_hot_stream: OrderedDict[str, GridDiagramMatch] = OrderedDict()
-    seen_recovery_stages: set[int] = set()
-
-    for exchanger in network.exchangers:
-        if not _is_significant_match(exchanger):
-            continue
-        if exchanger.kind is HeatExchangerKind.RECOVERY:
-            _append_unique(hot_streams, exchanger.source_stream)
-            _append_unique(cold_streams, exchanger.sink_stream)
-            if exchanger.stage is None:
-                continue
-            seen_recovery_stages.add(exchanger.stage)
-            _add_or_accumulate(
-                recovery_by_key,
-                key=(exchanger.source_stream, exchanger.sink_stream, exchanger.stage),
-                exchanger=exchanger,
-            )
-        elif exchanger.kind is HeatExchangerKind.HOT_UTILITY:
-            _append_unique(cold_streams, exchanger.sink_stream)
-            _add_or_accumulate(
-                hot_utility_by_cold_stream,
-                key=exchanger.sink_stream,
-                exchanger=exchanger,
-            )
-        elif exchanger.kind is HeatExchangerKind.COLD_UTILITY:
-            _append_unique(hot_streams, exchanger.source_stream)
-            _add_or_accumulate(
-                cold_utility_by_hot_stream,
-                key=exchanger.source_stream,
-                exchanger=exchanger,
-            )
-
-    if network.stage_count is not None:
-        stages = tuple(range(1, network.stage_count + 1))
-    else:
-        stages = tuple(sorted(seen_recovery_stages)) or (1,)
-
-    hot_index = {stream: index for index, stream in enumerate(hot_streams)}
-    cold_index = {stream: index for index, stream in enumerate(cold_streams)}
-    stage_index = {stage: index for index, stage in enumerate(stages)}
-    recovery_matches = tuple(
-        sorted(
-            recovery_by_key.values(),
-            key=lambda match: (
-                stage_index.get(match.stage or 0, len(stages)),
-                hot_index[match.source_stream],
-                cold_index[match.sink_stream],
-            ),
-        )
-    )
-    hot_utility_matches = tuple(
-        sorted(
-            hot_utility_by_cold_stream.values(),
-            key=lambda match: cold_index[match.sink_stream],
-        )
-    )
-    cold_utility_matches = tuple(
-        sorted(
-            cold_utility_by_hot_stream.values(),
-            key=lambda match: hot_index[match.source_stream],
-        )
-    )
-
-    branch_counts: dict[tuple[str, int], int] = {}
-    for stream in hot_streams:
-        for stage in stages:
-            count = sum(
-                1
-                for match in recovery_matches
-                if match.source_stream == stream and match.stage == stage
-            )
-            if count > 1:
-                branch_counts[(stream, stage)] = count
-    for stream in cold_streams:
-        for stage in stages:
-            count = sum(
-                1
-                for match in recovery_matches
-                if match.sink_stream == stream and match.stage == stage
-            )
-            if count > 1:
-                branch_counts[(stream, stage)] = count
-
-    return HeatExchangerNetworkGridModel(
-        network=network,
-        hot_streams=tuple(hot_streams),
-        cold_streams=tuple(cold_streams),
-        stages=stages,
-        recovery_matches=recovery_matches,
-        hot_utility_matches=hot_utility_matches,
-        cold_utility_matches=cold_utility_matches,
-        branch_counts=branch_counts,
-    )
 
 
 class _PlotlyLine:
@@ -1471,46 +1279,6 @@ class _PlotlyGridRenderer:
         )
 
 
-def _select_ranked_network(
-    result: "HeatExchangerNetworkSynthesisResult",
-    solution_rank: int,
-) -> "HeatExchangerNetworkSynthesisTaskOutcome | None":
-    if solution_rank < 1:
-        raise IndexError("solution_rank is 1-based and must be at least 1")
-
-    ranked = rank_unique_network_outcomes(result)
-
-    if not ranked and result.network is not None:
-        if solution_rank == 1:
-            return None
-        raise IndexError("solution_rank 2 is unavailable; only 1 network is available")
-
-    if solution_rank > len(ranked):
-        raise IndexError(
-            f"solution_rank {solution_rank} is unavailable; only "
-            f"{len(ranked)} network(s) are available"
-        )
-    return ranked[solution_rank - 1]
-
-
-def _add_or_accumulate(
-    matches: OrderedDict[Any, GridDiagramMatch],
-    *,
-    key: Any,
-    exchanger: HeatExchanger,
-) -> None:
-    if key not in matches:
-        matches[key] = _match(exchanger)
-        return
-    current = matches[key]
-    matches[key] = GridDiagramMatch(
-        exchanger=current.exchanger,
-        source_stream=current.source_stream,
-        sink_stream=current.sink_stream,
-        stage=current.stage,
-        duty=current.duty + exchanger.duty,
-    )
-
 
 def _stream_endpoint_temperatures(
     grid_model: HeatExchangerNetworkGridModel,
@@ -1724,33 +1492,4 @@ def _split_adjusted_temperature_x(
     return x_value
 
 
-def _is_significant_match(exchanger: HeatExchanger) -> bool:
-    return (
-        exchanger.active
-        and exchanger.match_allowed
-        and exchanger.duty > _DUTY_TOLERANCE_KW
-    )
-
-
-def _match(exchanger: HeatExchanger) -> GridDiagramMatch:
-    return GridDiagramMatch(
-        exchanger=exchanger,
-        source_stream=exchanger.source_stream,
-        sink_stream=exchanger.sink_stream,
-        stage=exchanger.stage,
-        duty=exchanger.duty,
-    )
-
-
-def _append_unique(items: list[str], item: str) -> None:
-    if item not in items:
-        items.append(item)
-
-
-__all__ = [
-    "HeatExchangerNetworkGridDiagram",
-    "HeatExchangerNetworkGridModel",
-    "GridDiagramMatch",
-    "build_grid_diagram",
-    "build_grid_model",
-]
+__all__ = ["_PlotlyGridRenderer"]

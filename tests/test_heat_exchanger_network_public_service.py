@@ -75,6 +75,8 @@ HEN_PUBLIC_NAME_SNAPSHOT = {
         "HeatExchangerNetworkLabelKey",
         "HeatExchangerNetworkSynthesisExportRecord",
         "HeatExchangerNetworkSynthesisManifest",
+        "HeatExchangerNetworkSynthesisMethodInput",
+        "HeatExchangerNetworkSynthesisMethodOutput",
         "HeatExchangerNetworkSynthesisResult",
         "HeatExchangerNetworkSynthesisTask",
         "HeatExchangerNetworkSynthesisTaskOutcome",
@@ -87,6 +89,8 @@ HEN_PUBLIC_NAME_SNAPSHOT = {
     "OpenPinch.lib.schemas": {
         "HeatExchangerNetworkSynthesisExportRecord",
         "HeatExchangerNetworkSynthesisManifest",
+        "HeatExchangerNetworkSynthesisMethodInput",
+        "HeatExchangerNetworkSynthesisMethodOutput",
         "HeatExchangerNetworkSynthesisResult",
         "HeatExchangerNetworkSynthesisTask",
         "HeatExchangerNetworkSynthesisTaskOutcome",

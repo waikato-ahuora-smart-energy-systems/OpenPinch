@@ -68,10 +68,13 @@ Use ``design.get_n_best_networks(n)`` to read the first ``n`` ranked
 candidates. Use ``design.select_network(solution_rank=...)`` to make another
 ranked candidate the selected ``design.network``. ``solution_rank`` is 1-based.
 
-Grid diagrams are returned from ``design.grid_diagram(solution_rank=...)``. The
-returned object wraps the Plotly ``fig``, a lightweight drawing adapter ``ax``,
-the selected ranked ``network``, ``solution_rank``, and the normalized
-``grid_model`` used to draw the topology.
+Grid diagrams are created by
+:func:`OpenPinch.services.network_grid_diagram.build_grid_diagram` from one or
+more ``HeatExchangerNetwork`` objects. ``design.grid_diagram(solution_rank=...)``
+is also available as a convenience wrapper that selects a ranked network before
+delegating to the standalone service. The returned object wraps the Plotly
+``fig``, a lightweight drawing adapter ``ax``, the selected ``network``, and
+the normalized ``grid_model`` used to draw the topology.
 
 .. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult
    :members:

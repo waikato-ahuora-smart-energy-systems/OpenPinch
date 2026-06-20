@@ -242,5 +242,9 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     assert "get_n_best_networks(3)" in combined_source
     assert "select_network(solution_rank=2)" in combined_source
     assert "HeatExchangerKind.RECOVERY" in combined_source
-    assert "grid_diagram(solution_rank=rank)" in combined_source
+    assert (
+        "from OpenPinch.services.network_grid_diagram import build_grid_diagram"
+        in combined_source
+    )
+    assert "build_grid_diagram(" in combined_source
     assert "go.Figure()" not in combined_source

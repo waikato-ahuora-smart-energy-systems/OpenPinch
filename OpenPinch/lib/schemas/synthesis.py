@@ -23,8 +23,8 @@ SynthesisOutputFormat = Literal["json", "csv", "xlsx"]
 _RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
-class HeatExchangerNetworkSynthesisTask(BaseModel):
-    """One deterministic OpenPinch heat exchanger network synthesis task record."""
+class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
+    """Validated input for one PDM, TDM, or evolution method run."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -37,6 +37,7 @@ class HeatExchangerNetworkSynthesisTask(BaseModel):
     problem_id: str | None = None
     workspace_variant: str | None = None
     state_id: str | None = None
+    seed_network_index: int | None = None
     parent_task_id: str | None = None
     topology_restrictions: tuple["HeatExchangerNetworkTopologyRestriction", ...] = (
         Field(default_factory=tuple)
@@ -72,6 +73,13 @@ class HeatExchangerNetworkSynthesisTask(BaseModel):
             raise ValueError("stage_count must be a positive integer when supplied")
         return value
 
+    @field_validator("seed_network_index")
+    @classmethod
+    def _validate_seed_network_index(cls, value: int | None) -> int | None:
+        if value is not None and value < 0:
+            raise ValueError("seed_network_index must be non-negative when supplied")
+        return value
+
     @model_validator(mode="after")
     def _ensure_task_id(self) -> Self:
         if self.task_id is None:
@@ -87,6 +95,7 @@ class HeatExchangerNetworkSynthesisTask(BaseModel):
             "parent_task_id": self.parent_task_id,
             "problem_id": self.problem_id,
             "run_id": self.run_id,
+            "seed_network_index": self.seed_network_index,
             "stage_count": self.stage_count,
             "state_id": self.state_id,
             "topology_restrictions": [
@@ -98,6 +107,10 @@ class HeatExchangerNetworkSynthesisTask(BaseModel):
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         digest = hashlib.sha256(encoded).hexdigest()[:16]
         return f"hens-task-{digest}"
+
+
+class HeatExchangerNetworkSynthesisTask(HeatExchangerNetworkSynthesisMethodInput):
+    """One deterministic OpenPinch heat exchanger network synthesis task record."""
 
 
 class HeatExchangerNetworkTopologyRestriction(BaseModel):
@@ -224,12 +237,12 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
         return _validate_optional_identity(value)
 
 
-class HeatExchangerNetworkSynthesisTaskOutcome(BaseModel):
-    """Outcome for one OpenPinch heat exchanger network synthesis task."""
+class HeatExchangerNetworkSynthesisMethodOutput(BaseModel):
+    """Validated output for one PDM, TDM, or evolution method run."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    task: HeatExchangerNetworkSynthesisTask
+    task: HeatExchangerNetworkSynthesisMethodInput
     status: SynthesisTaskStatus
     network: HeatExchangerNetwork | None = None
     objective_value: float | None = None
@@ -256,6 +269,14 @@ class HeatExchangerNetworkSynthesisTaskOutcome(BaseModel):
         value: tuple[str, ...],
     ) -> tuple[str, ...]:
         return tuple(_validate_optional_identity(item) for item in value)
+
+
+class HeatExchangerNetworkSynthesisTaskOutcome(
+    HeatExchangerNetworkSynthesisMethodOutput,
+):
+    """Outcome for one OpenPinch heat exchanger network synthesis task."""
+
+    task: HeatExchangerNetworkSynthesisTask
 
 
 class HeatExchangerNetworkSynthesisResult(BaseModel):
@@ -331,13 +352,36 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
         temperature_scaled: bool = False,
     ):
         """Return an OpenHENS-style grid diagram for one ranked solution."""
-        from ...services.heat_exchanger_network_synthesis.grid_diagram import (
+        from ...services.network_grid_diagram import (
             build_grid_diagram,
         )
 
+        if solution_rank < 1:
+            raise IndexError("solution_rank is 1-based and must be at least 1")
+
+        ranked = self.get_n_best_networks()
+        if not ranked:
+            if solution_rank == 1:
+                network = self.network
+            else:
+                raise IndexError(
+                    "solution_rank 2 is unavailable; only 1 network is available"
+                )
+        elif solution_rank > len(ranked):
+            raise IndexError(
+                f"solution_rank {solution_rank} is unavailable; only "
+                f"{len(ranked)} network(s) are available"
+            )
+        else:
+            selected = ranked[solution_rank - 1]
+            if selected.network is None:
+                raise ValueError(
+                    "selected ranked network outcome is missing network output"
+                )
+            network = selected.network
+
         return build_grid_diagram(
-            self,
-            solution_rank=solution_rank,
+            network,
             stream_line_width=stream_line_width,
             temperature_scaled=temperature_scaled,
         )
@@ -431,6 +475,8 @@ def _validate_positive_grid(value: tuple[float, ...]) -> tuple[float, ...]:
 __all__ = [
     "HeatExchangerNetworkSynthesisExportRecord",
     "HeatExchangerNetworkSynthesisManifest",
+    "HeatExchangerNetworkSynthesisMethodInput",
+    "HeatExchangerNetworkSynthesisMethodOutput",
     "HeatExchangerNetworkSynthesisResult",
     "HeatExchangerNetworkSynthesisTask",
     "HeatExchangerNetworkSynthesisTaskOutcome",
@@ -442,8 +488,10 @@ __all__ = [
 
 
 HeatExchangerNetworkTopologyRestriction.model_rebuild()
+HeatExchangerNetworkSynthesisMethodInput.model_rebuild()
 HeatExchangerNetworkSynthesisTask.model_rebuild()
 HeatExchangerNetworkSynthesisExportRecord.model_rebuild()
 HeatExchangerNetworkSynthesisManifest.model_rebuild()
+HeatExchangerNetworkSynthesisMethodOutput.model_rebuild()
 HeatExchangerNetworkSynthesisTaskOutcome.model_rebuild()
 HeatExchangerNetworkSynthesisResult.model_rebuild()

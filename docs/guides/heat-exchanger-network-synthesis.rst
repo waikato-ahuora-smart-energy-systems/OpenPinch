@@ -181,13 +181,27 @@ links are hot process stream to cold process stream, hot utility links are hot
 utility to cold process stream, and cold utility links are hot process stream
 to cold utility.
 
-OpenHENS-style network grid diagrams are available directly from the design
-result. The rank is 1-based and follows the same accepted-method ordering used
-for ranked network candidates:
+OpenHENS-style network grid diagrams are available from the standalone network
+grid diagram service. Pass one or more
+:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
+instances directly:
 
 .. code-block:: python
 
+   from OpenPinch.services.network_grid_diagram import build_grid_diagram
+
    design = problem.results.design
+   networks = tuple(
+       outcome.network for outcome in design.get_n_best_networks()
+   )
+
+   diagram = build_grid_diagram(networks, index=0)
+
+For synthesis results, ``grid_diagram(...)`` remains available as a convenience
+wrapper. The rank is 1-based and follows the same accepted-method ordering used
+for ranked network candidates:
+
+.. code-block:: python
 
    diagram = design.grid_diagram(solution_rank=1)
    diagram.show()
@@ -202,7 +216,6 @@ normalized ``grid_model`` used to draw the process-stream topology:
    diagram.fig
    diagram.ax
    diagram.network
-   diagram.solution_rank
    diagram.grid_model
 
 The Plotly figure includes hover information on exchanger markers, including
@@ -210,12 +223,12 @@ duty, area when available, and match description. Saving to ``.png`` uses Plotly
 static image export; saving to ``.html`` writes an interactive Plotly document.
 
 The default layout follows the OpenHENS stage-based grid. Two optional keyword
-arguments tune the diagram without changing the selected solution:
+arguments tune the diagram without changing the selected network:
 
 .. code-block:: python
 
-   design.grid_diagram(stream_line_width=5.0)
-   design.grid_diagram(temperature_scaled=True)
+   build_grid_diagram(design.network, stream_line_width=5.0)
+   build_grid_diagram(design.network, temperature_scaled=True)
 
 ``stream_line_width`` controls the stream strokes and is also used to auto-size
 the figure height for larger networks. The actual marker size and connector
@@ -225,9 +238,16 @@ the number of process streams, utility matches, and stream split lanes.
 high-to-low temperature axis while keeping the same hot and cold stream
 direction conventions.
 
-The grid diagram uses ranked network candidates directly, so the following two
-calls inspect different network structures when ranks 1 and 2 are both
-available:
+The standalone service accepts multiple ranked network candidates directly. Use
+the 0-based ``index`` argument to draw one specific network, or omit ``index``
+to receive a tuple of diagrams:
+
+.. code-block:: python
+
+   build_grid_diagram(networks, index=0)
+   build_grid_diagram(networks)
+
+For the synthesis-result wrapper, ``solution_rank`` remains 1-based:
 
 .. code-block:: python
 
@@ -235,8 +255,8 @@ available:
    design.grid_diagram(solution_rank=2)
 
 Calling ``select_network(solution_rank=2)`` changes ``design.network`` for
-subsequent result inspection, but it is not required before drawing
-``grid_diagram(solution_rank=2)``.
+subsequent result inspection, but it is not required before using the wrapper
+with ``grid_diagram(solution_rank=2)``.
 
 JSON and CSV files are optional export views generated from
 ``problem.results`` after synthesis:

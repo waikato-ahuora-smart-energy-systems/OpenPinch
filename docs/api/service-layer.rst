@@ -51,6 +51,18 @@ level ``problem.target.*(..., state_id=...)`` wrappers.
 .. autofunction:: OpenPinch.services.input_data_processing.data_preparation.prepare_problem
    :no-index:
 
+Network Grid Diagrams
+---------------------
+
+Heat exchanger network grid diagrams are exposed as a standalone service that
+accepts one or more
+:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
+objects.
+
+.. automodule:: OpenPinch.services.network_grid_diagram
+   :members:
+   :no-index:
+
 Typical Preparation and Solve Pattern
 -------------------------------------
 
