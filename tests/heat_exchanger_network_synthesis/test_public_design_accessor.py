@@ -17,20 +17,20 @@ import OpenPinch.lib
 import OpenPinch.lib.schemas as schemas
 import OpenPinch.services
 import OpenPinch.services.heat_exchanger_network_synthesis as synthesis_package
-import OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence as workflow_module
+import OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.open_hens_method as workflow_module
 from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib import HeatExchangerKind
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.fake_executor import (
     FakeSynthesisExecutor,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.reporting.ranking import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.ranking import (
     network_structure_signature,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.service import (
+from OpenPinch.services.heat_exchanger_network_synthesis.heat_exchanger_network_synthesis_entry import (
     heat_exchanger_network_synthesis_service,
 )
 
@@ -412,11 +412,19 @@ def _public_example_problem() -> PinchProblem:
 
 
 def _use_fake_default_executor(monkeypatch) -> None:
-    monkeypatch.setattr(
-        workflow_module,
-        "LocalSynthesisExecutor",
-        FakeSynthesisExecutor,
+    from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services import (
+        network_evolution_method,
+        pinch_design_method,
+        thermal_derivative_method,
     )
+
+    for module in (
+        workflow_module,
+        network_evolution_method,
+        pinch_design_method,
+        thermal_derivative_method,
+    ):
+        monkeypatch.setattr(module, "LocalSynthesisExecutor", FakeSynthesisExecutor)
 
 
 def _public_example_payload() -> dict:

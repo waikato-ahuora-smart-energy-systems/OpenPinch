@@ -13,34 +13,48 @@ import pytest
 
 import OpenPinch
 import OpenPinch.services
-import OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence as workflow_module
+import OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.open_hens_method as workflow_module
 from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib import HeatExchangerKind
+from OpenPinch.lib.enums import HENDesignMethod
 from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisManifest,
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis import __all__ as hens_all
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import (
-    FakeSynthesisExecutor,
+from OpenPinch.services.heat_exchanger_network_synthesis.common.errors import (
     WorkflowContractError,
-    build_network_evolution_method_tasks,
-    build_pinch_design_method_tasks,
-    build_seeded_network_evolution_method_tasks,
-    build_seeded_thermal_derivative_method_tasks,
-    build_thermal_derivative_method_tasks,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.executor import (
+    _legacy_z_restriction,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.fake_executor import (
+    FakeSynthesisExecutor,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
     workflow_settings_from_problem,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.reporting.exports import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.exports import (
     export_heat_exchanger_network_synthesis_results,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.service import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
+    problem_to_solver_arrays,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.heat_exchanger_network_synthesis_entry import (
     heat_exchanger_network_synthesis_service,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
-    problem_to_solver_arrays,
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.network_evolution_method import (
+    build_network_evolution_method_tasks,
+    build_seeded_network_evolution_method_tasks,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.pinch_design_method import (
+    build_pinch_design_method_tasks,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.thermal_derivative_method import (
+    build_seeded_thermal_derivative_method_tasks,
+    build_thermal_derivative_method_tasks,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -70,7 +84,7 @@ def test_workflow_default_uses_local_synthesis_executor(monkeypatch) -> None:
     monkeypatch.setattr(workflow_module, "LocalSynthesisExecutor", SpyLocalExecutor)
     problem = _small_problem()
 
-    result = workflow_module._execute_synthesis_workflow(
+    result = workflow_module.execute_open_hens_method(
         problem,
         workflow_settings_from_problem(problem),
     )
@@ -170,7 +184,7 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
     settings = workflow_settings_from_problem(problem)
 
     with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
-        result = workflow_module._execute_synthesis_workflow(
+        result = workflow_module.execute_open_hens_method(
             problem,
             settings,
             executor=MissingCouenneForTopologyExecutor(),
@@ -228,7 +242,7 @@ def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
     settings = workflow_settings_from_problem(problem)
 
     with pytest.warns(RuntimeWarning, match="pinch-design-method"):
-        result = workflow_module._execute_synthesis_workflow(
+        result = workflow_module.execute_open_hens_method(
             problem,
             settings,
             executor=MissingCouenneForPdmExecutor(),
@@ -266,7 +280,7 @@ def test_failed_workflow_reports_task_errors() -> None:
     )
 
     with pytest.raises(WorkflowContractError, match="configured fake executor failure"):
-        workflow_module._execute_synthesis_workflow(
+        workflow_module.execute_open_hens_method(
             problem,
             settings,
             executor=executor,
@@ -344,8 +358,8 @@ def test_legacy_z_restriction_handoff_uses_source_shaped_duty_values() -> None:
     tdm_task = build_thermal_derivative_method_tasks(settings, pdm_outcomes)[0]
     arrays = problem_to_solver_arrays(problem, dTmin=0.1)
 
-    z_restriction, zhu_restriction, zcu_restriction = (
-        workflow_module._legacy_z_restriction(tdm_task, arrays)
+    z_restriction, zhu_restriction, zcu_restriction = _legacy_z_restriction(
+        tdm_task, arrays
     )
     flat_restriction_cells = [
         cell
@@ -381,6 +395,28 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets(
     assert problem.results.targets == target_output.targets
     assert design.network.exchangers
     assert design.objective_values["total_annual_cost"] > 0
+    assert design.design_method == HENDesignMethod.OpenHENS
+    assert design.manifest is not None
+    assert design.manifest.design_method == HENDesignMethod.OpenHENS
+
+
+def test_open_hens_method_accessor_matches_default_dispatch(monkeypatch) -> None:
+    _use_fake_default_executor(monkeypatch)
+    default_problem = _small_problem()
+    explicit_problem = _small_problem()
+
+    default_design = default_problem.design.heat_exchanger_network_synthesis()
+    explicit_design = explicit_problem.design.open_hens_method()
+
+    assert default_design.design_method == HENDesignMethod.OpenHENS
+    assert explicit_design.design_method == HENDesignMethod.OpenHENS
+    assert default_design.method == explicit_design.method
+    assert default_design.manifest is not None
+    assert explicit_design.manifest is not None
+    assert (
+        default_design.manifest.method_sequence
+        == explicit_design.manifest.method_sequence
+    )
 
 
 def test_direct_design_run_computes_targets_when_cache_is_empty(monkeypatch) -> None:
@@ -418,6 +454,56 @@ def test_explicit_pdm_tdm_and_evolution_design_methods_share_result_shape(
     assert {outcome.task.method for outcome in evolution.ranked_networks} == {
         "network_evolution_method",
     }
+
+
+def test_umbrella_design_accessor_dispatches_each_hen_design_method(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    pdm = problem.design.heat_exchanger_network_synthesis(
+        method=HENDesignMethod.PinchDesign,
+    )
+    tdm = problem.design.heat_exchanger_network_synthesis(
+        method=HENDesignMethod.ThermalDerivative,
+    )
+    evolution = problem.design.heat_exchanger_network_synthesis(
+        method=HENDesignMethod.NetworkEvolution,
+        initial_networks=(tdm.network,),
+    )
+
+    assert pdm.design_method == HENDesignMethod.PinchDesign
+    assert pdm.method == "pinch_design_method"
+    assert tdm.design_method == HENDesignMethod.ThermalDerivative
+    assert tdm.method == "thermal_derivative_method"
+    assert evolution.design_method == HENDesignMethod.NetworkEvolution
+    assert evolution.method == "network_evolution_method"
+
+
+def test_umbrella_design_accessor_rejects_invalid_method_and_invalid_seed(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+    seed = problem.design.pinch_design_method().network
+
+    with pytest.raises(
+        ValueError, match="Unknown heat exchanger network design method"
+    ):
+        problem.design.heat_exchanger_network_synthesis(method="not_a_method")
+
+    with pytest.raises(ValueError, match="open_hens_method does not accept"):
+        problem.design.heat_exchanger_network_synthesis(
+            method=HENDesignMethod.OpenHENS,
+            initial_networks=(seed,),
+        )
+
+    with pytest.raises(ValueError, match="pinch_design_method does not accept"):
+        problem.design.heat_exchanger_network_synthesis(
+            method=HENDesignMethod.PinchDesign,
+            initial_networks=(seed,),
+        )
 
 
 def test_seeded_design_methods_require_seed_or_cached_design(monkeypatch) -> None:
@@ -539,7 +625,7 @@ import sys
 
 import OpenPinch
 from OpenPinch.classes import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import FakeSynthesisExecutor
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.fake_executor import FakeSynthesisExecutor
 
 problem = PinchProblem()
 _ = problem.design
@@ -567,11 +653,19 @@ def _small_problem(*, project_name: str = "HENS Demo") -> PinchProblem:
 
 
 def _use_fake_default_executor(monkeypatch) -> None:
-    monkeypatch.setattr(
-        workflow_module,
-        "LocalSynthesisExecutor",
-        FakeSynthesisExecutor,
+    from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services import (
+        network_evolution_method,
+        pinch_design_method,
+        thermal_derivative_method,
     )
+
+    for module in (
+        workflow_module,
+        network_evolution_method,
+        pinch_design_method,
+        thermal_derivative_method,
+    ):
+        monkeypatch.setattr(module, "LocalSynthesisExecutor", FakeSynthesisExecutor)
 
 
 def _small_payload() -> dict:

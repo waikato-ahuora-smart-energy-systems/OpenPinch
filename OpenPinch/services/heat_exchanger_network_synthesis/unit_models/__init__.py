@@ -8,7 +8,7 @@ created or configured.
 
 from __future__ import annotations
 
-from ..solver.backend import (
+from ..common.solver.backend import (
     GEKKO_SOLVERS,
     PYOMO_SOLVER_BINARIES,
     PYOMO_SOLVERS,
@@ -18,7 +18,7 @@ from ..solver.backend import (
     require_solver_backend,
     solve_gekko_model,
 )
-from ..solver.extraction import (
+from ..common.solver.extraction import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )

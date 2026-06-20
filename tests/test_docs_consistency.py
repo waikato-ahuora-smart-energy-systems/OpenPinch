@@ -32,9 +32,12 @@ OVERVIEW_SUPPORT = REPO_ROOT / "docs" / "overview" / "support-and-stability.rst"
 API_PINCHWORKSPACE = REPO_ROOT / "docs" / "api" / "pinchworkspace.rst"
 API_PACKAGE_ROOT = REPO_ROOT / "docs" / "api" / "package-root.rst"
 API_CLI_RESOURCES = REPO_ROOT / "docs" / "api" / "cli-and-resources.rst"
+API_SERVICE_LAYER = REPO_ROOT / "docs" / "api" / "service-layer.rst"
+API_SCHEMAS_CONFIG = REPO_ROOT / "docs" / "api" / "schemas-and-config.rst"
 API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
 API_LIB = REPO_ROOT / "docs" / "reference" / "api-lib.rst"
 API_ANALYSIS = REPO_ROOT / "docs" / "reference" / "api-analysis.rst"
+API_ENTRYPOINTS = REPO_ROOT / "docs" / "reference" / "api-entrypoints.rst"
 REFERENCE_INDEX = REPO_ROOT / "docs" / "reference" / "index.rst"
 
 
@@ -199,10 +202,29 @@ def test_docs_expose_pinchworkspace_as_the_named_study_surface():
 
 def test_docs_explain_hen_synthesis_public_workflow_and_cutover():
     guide = _read(GUIDE_HEN_SYNTHESIS)
+    service_layer = _read(API_SERVICE_LAYER)
+    schemas_config = _read(API_SCHEMAS_CONFIG)
+    api_entrypoints = _read(API_ENTRYPOINTS)
 
     assert "problem.design.heat_exchanger_network_synthesis()" in guide
     assert 'workflow="heat_exchanger_network_synthesis"' in guide
-    assert "heat_exchanger_network_synthesis_service(problem)" in guide
+    assert "heat_exchanger_network_synthesis_entry.py" in guide
+    assert "problem.design.open_hens_method(...)" in guide
+    assert "problem.design.open_hens_method()" in guide
+    assert "problem.design.pinch_design_method()" in guide
+    assert "problem.design.thermal_derivative_method(initial_networks=" in guide
+    assert "problem.design.network_evolution_method(initial_networks=" in guide
+    assert "HENDesignMethod.OpenHENS" in guide
+    assert "HENDesignMethod.PinchDesign" in guide
+    assert "HENDesignMethod.ThermalDerivative" in guide
+    assert "HENDesignMethod.NetworkEvolution" in guide
+    assert "design.design_method" in guide
+    assert "design.manifest.method_sequence" in guide
+    assert "targeting_services/" in guide
+    assert "common/" in guide
+    assert "unit_models/" in guide
+    assert "Old import paths" in guide
+    assert "have been removed" in guide
     assert "internal and" in guide
     assert "TargetInput.options" in guide
     assert "``Configuration``" in guide
@@ -219,6 +241,19 @@ def test_docs_explain_hen_synthesis_public_workflow_and_cutover():
     assert 'pytest -m "not synthesis and not solver"' in guide
     assert "pytest -m synthesis" in guide
     assert "pytest -m solver" in guide
+
+    for page in (service_layer, api_entrypoints):
+        assert (
+            "OpenPinch.services.heat_exchanger_network_synthesis."
+            "heat_exchanger_network_synthesis_entry" in page
+        )
+    assert (
+        "OpenPinch.services.heat_exchanger_network_synthesis."
+        "targeting_services.open_hens_method" in api_entrypoints
+    )
+    assert "HeatExchangerNetworkDesignMethod" in schemas_config
+    assert "HeatExchangerNetworkSynthesisMethodInput" in schemas_config
+    assert "HeatExchangerNetworkSynthesisMethodOutput" in schemas_config
 
 
 def test_reference_docs_match_current_heat_pump_and_schema_surface():
@@ -268,6 +303,14 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "weights" in api_classes
     assert "OpenPinch.classes.heat_exchanger" in api_classes
     assert "OpenPinch.classes.heat_exchanger_network" in api_classes
+    assert (
+        "OpenPinch.services.heat_exchanger_network_synthesis.unit_models.pinch_design"
+        in api_classes
+    )
+    assert (
+        "OpenPinch.services.heat_exchanger_network_synthesis.unit_models.stagewise"
+        in api_classes
+    )
 
     assert "compute_direct_heat_pump_or_refrigeration_target" in api_analysis
     assert "compute_indirect_heat_pump_or_refrigeration_target" in api_analysis

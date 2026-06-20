@@ -11,8 +11,8 @@ from typing import Any, Literal
 import numpy as np
 
 from ....utils.heat_exchanger import compute_LMTD_from_dts
-from ..solver import backend
-from ..solver.arrays import PreparedSolverArrays
+from ..common.solver import backend
+from ..common.solver.arrays import PreparedSolverArrays
 
 logger = logging.getLogger(__name__)
 

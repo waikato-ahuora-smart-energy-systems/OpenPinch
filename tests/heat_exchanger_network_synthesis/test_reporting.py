@@ -17,7 +17,7 @@ from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.reporting.ranking import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.ranking import (
     network_structure_signature,
 )
 from OpenPinch.services.network_grid_diagram import (

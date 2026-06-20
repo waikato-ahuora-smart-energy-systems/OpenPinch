@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.pinch_design_method import (
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.pinch_design_method import (
     build_pinch_design_method_snapshot,
 )
 

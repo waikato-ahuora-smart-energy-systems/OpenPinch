@@ -40,6 +40,13 @@ surfaces and outputs.
        refrigeration companions
      - target models with HPR summary fields and graph effects
      - Advanced
+   * - Heat exchanger network synthesis
+     - ``problem.design.open_hens_method(...)``,
+       ``problem.design.heat_exchanger_network_synthesis(method=...)``,
+       direct ``*_method`` accessors
+     - ranked HEN candidates, selected network, task manifest, grid diagrams,
+       optional exports
+     - Advanced
    * - Direct gas/vapour process MVR
      - ``problem.add_component.process_mvr(...)`` on a prepared
        ``PinchProblem`` case

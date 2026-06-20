@@ -8,10 +8,10 @@ from OpenPinch.classes.heat_exchanger import (
     HeatExchangerStreamRole,
 )
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
-from OpenPinch.services.heat_exchanger_network_synthesis.execution.settings import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
     SynthesisWorkflowSettings,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.network_evolution_method import (
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.network_evolution_method import (
     build_seeded_network_evolution_method_tasks,
 )
 

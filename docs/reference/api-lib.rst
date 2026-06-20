@@ -25,8 +25,11 @@ Enumerations and Labels
 -----------------------
 
 The enums module centralises the canonical names used for zones, targets,
-streams, graph series, and workbook-compatible option keys. Refer to these when
-you need stable identifiers instead of free-form strings.
+streams, graph series, heat exchanger network design methods, and
+workbook-compatible option keys. Refer to these when you need stable
+identifiers instead of free-form strings. Heat exchanger network synthesis uses
+``HeatExchangerNetworkDesignMethod`` for both public dispatch and task/result
+method metadata, with ``HENDesignMethod`` as the shorter alias.
 
 .. automodule:: OpenPinch.lib.enums
    :members:
@@ -46,8 +49,9 @@ The main schema modules are:
 - :mod:`OpenPinch.lib.schemas.io` for public request and response models
 - :mod:`OpenPinch.lib.schemas.reporting` for summary and report-facing models
 - :mod:`OpenPinch.lib.schemas.hpr` for lower-level heat pump solver data models
-- :mod:`OpenPinch.lib.schemas.synthesis` for heat exchanger network synthesis task, manifest,
-  optional export, and design-result payloads
+- :mod:`OpenPinch.lib.schemas.synthesis` for heat exchanger network synthesis
+  method input/output, task, manifest, optional export, and design-result
+  payloads
 - :mod:`OpenPinch.lib.schemas.targets` for runtime target models stored on
   solved zones
 - :mod:`OpenPinch.lib.schemas.turbine` for turbine solve result models

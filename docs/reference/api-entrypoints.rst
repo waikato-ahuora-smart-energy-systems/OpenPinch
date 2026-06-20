@@ -25,6 +25,28 @@ Packaged Data Assets
 .. automodule:: OpenPinch.data.notebooks
    :no-members:
 
+Heat Exchanger Network Synthesis
+--------------------------------
+
+These modules back the public ``problem.design`` HEN synthesis accessors. The
+entry module owns dispatch and problem result caching; targeting service modules
+own method-specific orchestration.
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.heat_exchanger_network_synthesis_entry
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.open_hens_method
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.pinch_design_method
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.thermal_derivative_method
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.network_evolution_method
+   :members:
+
 Streamlit App
 -------------
 

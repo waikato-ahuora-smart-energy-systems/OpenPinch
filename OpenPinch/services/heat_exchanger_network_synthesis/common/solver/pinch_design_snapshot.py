@@ -16,14 +16,14 @@ from typing import Any, Literal
 
 import numpy as np
 
-from ....classes.pinch_problem import PinchProblem
-from ....classes.zone import Zone
-from ....lib.config import tol
-from ....lib.schemas.targets import DirectIntegrationTarget
-from ....services.direct_heat_integration.direct_integration_entry import (
+from .....classes.pinch_problem import PinchProblem
+from .....classes.zone import Zone
+from .....lib.config import tol
+from .....lib.schemas.targets import DirectIntegrationTarget
+from .....services.direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,
 )
-from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
+from .arrays import PreparedSolverArrays, problem_to_solver_arrays
 
 PinchLocation = Literal["above", "below"]
 StageSelection = Literal["automated"] | tuple[int, int]

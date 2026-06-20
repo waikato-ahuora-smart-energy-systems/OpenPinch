@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from OpenPinch.services.heat_exchanger_network_synthesis.solver import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
     dependencies as _dependencies,
 )
 

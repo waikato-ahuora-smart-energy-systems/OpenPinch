@@ -7,12 +7,12 @@ from typing import Any, Literal, Mapping, Sequence
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
 from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
-from ..methods.pinch_design_method import PinchDecompositionSnapshot
-from ..solver.arrays import PreparedSolverArrays
-from ..solver.extraction import (
+from ..common.solver.arrays import PreparedSolverArrays
+from ..common.solver.extraction import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
+from ..common.solver.pinch_design_snapshot import PinchDecompositionSnapshot
 from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]

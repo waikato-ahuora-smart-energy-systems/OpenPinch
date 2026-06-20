@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     problem_to_solver_arrays,
 )
 

@@ -18,7 +18,7 @@ from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     problem_to_solver_arrays,
 )
 

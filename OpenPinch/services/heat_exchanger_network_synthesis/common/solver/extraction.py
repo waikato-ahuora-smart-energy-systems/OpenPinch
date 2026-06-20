@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from ....classes.heat_exchanger import (
+from .....classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerStreamRole,
 )
-from ....classes.heat_exchanger_network import HeatExchangerNetwork
-from ....lib.config import tol
-from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from .....classes.heat_exchanger_network import HeatExchangerNetwork
+from .....lib.config import tol
+from .....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
 from .arrays import PreparedSolverArrays
 
 

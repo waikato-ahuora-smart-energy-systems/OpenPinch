@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from ..solver.arrays import PreparedSolverArrays
+from ..common.solver.arrays import PreparedSolverArrays
 from .base import BaseHeatExchangerNetworkModel
 
 logger = logging.getLogger(__name__)

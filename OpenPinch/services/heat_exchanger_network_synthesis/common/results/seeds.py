@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ....classes.heat_exchanger_network import HeatExchangerNetwork
-from ....classes.pinch_problem import PinchProblem
+from .....classes.heat_exchanger_network import HeatExchangerNetwork
+from .....classes.pinch_problem import PinchProblem
 
 
 def resolve_seed_networks(

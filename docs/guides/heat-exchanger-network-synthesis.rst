@@ -9,18 +9,92 @@ OpenPinch-compatible JSON payload, a native
 source material only; convert them once into OpenPinch JSON or native
 ``TargetInput`` payloads before running synthesis.
 
-The implementation boundary is
-``heat_exchanger_network_synthesis_service(problem)``. It is internal and
-problem-rooted: it requires a live ``PinchProblem`` and reads persistent heat exchanger network
-configuration from ``TargetInput.options`` through the prepared
-``Configuration``. User code should call the problem design accessor or the
-workspace workflow dispatch shown below, not the internal service directly.
-Those public calls invoke the local solver-backed synthesis executor by
-default.
+The service ingress is
+``heat_exchanger_network_synthesis_entry.py``. It is internal and
+problem-rooted: it requires a live ``PinchProblem`` and reads persistent heat
+exchanger network configuration from ``TargetInput.options`` through the
+prepared ``Configuration``. User code should call
+``problem.design.open_hens_method(...)`` or
+``problem.design.heat_exchanger_network_synthesis(method=...)`` instead of the
+internal service directly. Those public calls invoke the local solver-backed
+synthesis executor by default.
 
 When Couenne is unavailable for the Couenne-backed derivative/topology stages,
 OpenPinch emits a warning and attempts ``network_evolution_method`` directly
 with the configured ESM solver and stage selection.
+
+Design Method Accessors
+-----------------------
+
+Heat exchanger network synthesis has one umbrella accessor and four explicit
+design-method accessors:
+
+.. code-block:: python
+
+   from OpenPinch.lib import HENDesignMethod
+
+   # Published OpenHENS sequence: PDM -> TDM -> EVOL.
+   problem.design.open_hens_method()
+
+   # Same default through the umbrella dispatcher.
+   problem.design.heat_exchanger_network_synthesis()
+   problem.design.heat_exchanger_network_synthesis(
+       method=HENDesignMethod.OpenHENS,
+   )
+
+   # Individual method calls.
+   problem.design.pinch_design_method()
+   problem.design.thermal_derivative_method(initial_networks=(seed_network,))
+   problem.design.network_evolution_method(initial_networks=(existing_network,))
+
+``HENDesignMethod`` is an alias for
+:class:`~OpenPinch.lib.enums.HeatExchangerNetworkDesignMethod`. The enum values
+are the canonical method identifiers stored in tasks, manifests, and results:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Enum member
+     - Stored identifier
+     - Meaning
+   * - ``HENDesignMethod.OpenHENS``
+     - ``"open_hens_method"``
+     - published OpenHENS sequence, ``pinch_design_method -> thermal_derivative_method -> network_evolution_method``
+   * - ``HENDesignMethod.PinchDesign``
+     - ``"pinch_design_method"``
+     - pinch design method only
+   * - ``HENDesignMethod.ThermalDerivative``
+     - ``"thermal_derivative_method"``
+     - thermal derivative method only
+   * - ``HENDesignMethod.NetworkEvolution``
+     - ``"network_evolution_method"``
+     - network evolution method only
+
+The umbrella accessor dispatches to the same services as the direct accessors:
+
+.. code-block:: python
+
+   problem.design.heat_exchanger_network_synthesis(
+       method=HENDesignMethod.PinchDesign,
+   )
+   problem.design.heat_exchanger_network_synthesis(
+       method=HENDesignMethod.ThermalDerivative,
+       initial_networks=(seed_network,),
+   )
+   problem.design.heat_exchanger_network_synthesis(
+       method=HENDesignMethod.NetworkEvolution,
+       initial_networks=(existing_network,),
+   )
+
+Seed behavior is explicit. ``pinch_design_method`` does not accept an initial
+network. ``thermal_derivative_method`` requires either ``initial_networks`` or a
+cached accepted ``pinch_design_method`` result on the problem. Likewise,
+``network_evolution_method`` requires either ``initial_networks`` or a cached
+accepted ``thermal_derivative_method`` result. Passing an already existing
+:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork` to
+``network_evolution_method(initial_networks=...)`` is the retrofit path: the
+method evolves that seed network into ranked candidate networks without first
+running pinch design or thermal derivative tasks.
 
 Problem Workflow
 ----------------
@@ -38,7 +112,7 @@ solver names, tolerance, output formats, and run id.
        project_name="Four-stream converted OpenHENS example",
    )
 
-   design = problem.design.heat_exchanger_network_synthesis()
+   design = problem.design.open_hens_method()
 
    result = problem.results
    network = result.design.network
@@ -96,6 +170,74 @@ map to ``StreamSchema`` records, utilities and utility prices map to
 Do not pass heat exchanger network design-space or solver controls as a separate object to the
 design call. The call may receive non-design runtime state options, but
 persistent heat exchanger network controls belong in the loaded problem payload.
+
+Result Metadata and Contracts
+-----------------------------
+
+Each public method validates its task input and task output through the shared
+Pydantic models in :mod:`OpenPinch.lib.schemas.synthesis`. The shared method
+input includes the run identity, selected method, problem/workspace metadata,
+settings, optional seed network, optional seed-network index, and trace
+metadata. The shared method output includes the method, status, accepted
+networks, ranked networks, task manifest, diagnostics, and trace metadata.
+
+``HeatExchangerNetworkSynthesisResult`` records both the high-level design
+method and the selected task method. For a direct method call these usually
+match. For OpenHENS, ``design.design_method`` is
+``HENDesignMethod.OpenHENS``, while ``design.method`` records the method that
+produced the selected accepted network, normally
+``HENDesignMethod.NetworkEvolution``. The
+``design.manifest.method_sequence`` field keeps the task-level method sequence
+used to build the executed task graph.
+
+.. code-block:: python
+
+   from OpenPinch.lib import HENDesignMethod
+
+   design = problem.design.open_hens_method()
+
+   assert design.design_method == HENDesignMethod.OpenHENS
+   assert design.manifest.design_method == HENDesignMethod.OpenHENS
+
+   for outcome in design.ranked_networks:
+       print(outcome.method, outcome.status, outcome.objective_value)
+
+Method-Oriented Service Layout
+------------------------------
+
+The HEN synthesis implementation mirrors the public method boundary. The entry
+module owns service dispatch, the ``targeting_services`` package owns
+method-specific orchestration, ``common`` owns shared execution/results/solver
+support, and ``unit_models`` owns the equation/unit model layer.
+
+.. code-block:: text
+
+   OpenPinch/services/heat_exchanger_network_synthesis/
+     heat_exchanger_network_synthesis_entry.py
+     targeting_services/
+       open_hens_method.py
+       pinch_design_method.py
+       thermal_derivative_method.py
+       network_evolution_method.py
+     common/
+       execution/
+       reporting/
+       results/
+       solver/
+       service_context.py
+       errors.py
+     unit_models/
+       base.py
+       pinch_design.py
+       stagewise.py
+       problem.py
+
+``open_hens_method.py`` is intentionally a composition layer for the published
+OpenHENS sequence. It calls the three explicit method stages rather than
+building tasks itself. The individual method files are where method-specific
+task generation and stage execution live. Old import paths such as
+``service.py``, ``methods.full_sequence``, ``solver.*``, ``equations.*``, and
+``reporting.*`` are not compatibility shims; they have been removed.
 
 Workspace Workflow
 ------------------
@@ -277,7 +419,7 @@ JSON and CSV files are optional export views generated from
 
 .. code-block:: python
 
-   from OpenPinch.services.heat_exchanger_network_synthesis.reporting.exports import (
+   from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.exports import (
        export_heat_exchanger_network_synthesis_results,
    )
 
@@ -313,7 +455,8 @@ aliases, OpenHENS field aliases, command parity, or an ``OpenHENS`` facade.
      - ``HENS_APPROACH_TEMPERATURES`` and
        ``HENS_DERIVATIVE_THRESHOLDS`` in ``TargetInput.options``.
    * - ``MethodSequence.standard_pdm_tdm_esm()``
-     - ``HENS_METHOD_SEQUENCE`` in ``TargetInput.options``.
+     - ``HENS_METHOD_SEQUENCE`` in ``TargetInput.options`` and
+       ``HENDesignMethod.OpenHENS`` for the public method dispatcher.
    * - ``SolveSetup.local(...)``
      - ``HENS_PDM_SOLVER``, ``HENS_TDM_SOLVER``, ``HENS_ESM_SOLVER``,
        ``HENS_SOLVE_TOLERANCE``, and ``HENS_MAX_PARALLEL`` in
@@ -322,10 +465,14 @@ aliases, OpenHENS field aliases, command parity, or an ``OpenHENS`` facade.
      - ``HENS_OUTPUT_FORMATS``, ``HENS_OUTPUT_FOLDER``, and optional exports
        generated from ``problem.results``.
    * - ``OpenHENS(study).solve()``
-     - ``problem.design.heat_exchanger_network_synthesis(...)`` or
+     - ``problem.design.open_hens_method()``,
+       ``problem.design.heat_exchanger_network_synthesis()`` with the default
+       ``HENDesignMethod.OpenHENS``, or
        ``workspace.solve_variant(..., workflow="heat_exchanger_network_synthesis")``.
    * - ``NetworkSolution``
      - ``TargetOutput.design.network`` as ``HeatExchangerNetwork``.
+   * - Retrofit/evolve an existing network
+     - ``problem.design.network_evolution_method(initial_networks=(network,))``.
    * - Study artifact directory
      - Optional JSON/CSV export views generated from ``problem.results`` and
        identified by OpenPinch problem or workspace variant identity.

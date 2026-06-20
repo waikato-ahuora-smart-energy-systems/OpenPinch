@@ -19,36 +19,42 @@ import pytest
 from OpenPinch import PinchProblem
 from OpenPinch.classes.heat_exchanger import HeatExchangerKind
 from OpenPinch.lib.config import tol
-from OpenPinch.services.heat_exchanger_network_synthesis.equations.pinch_design import (
-    PinchDecompModel,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.equations.problem import (
-    InternalHeatExchangerNetworkProblem,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.equations.stagewise import (
-    StageWiseModel,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.executor import (
     LocalSynthesisExecutor,
-    build_network_evolution_method_tasks,
-    build_pinch_design_method_tasks,
-    build_thermal_derivative_method_tasks,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
     workflow_settings_from_problem,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.pinch_design_method import (
-    build_pinch_design_method_snapshot,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.solver import backend
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import backend
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     PreparedSolverArrays,
     problem_to_solver_arrays,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.dependencies import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.dependencies import (
     MissingSynthesisDependencyError,
     MissingSynthesisSolverError,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.extraction import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.extraction import (
     extract_heat_exchanger_network,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.network_evolution_method import (
+    build_network_evolution_method_tasks,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.pinch_design_method import (
+    build_pinch_design_method_snapshot,
+    build_pinch_design_method_tasks,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.thermal_derivative_method import (
+    build_thermal_derivative_method_tasks,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.unit_models.pinch_design import (
+    PinchDecompModel,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.unit_models.problem import (
+    InternalHeatExchangerNetworkProblem,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.unit_models.stagewise import (
+    StageWiseModel,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -73,7 +79,7 @@ def test_models_package_import_is_optional_and_lazy() -> None:
 import sys
 
 import OpenPinch
-from OpenPinch.services.heat_exchanger_network_synthesis.equations import (
+from OpenPinch.services.heat_exchanger_network_synthesis.unit_models import (
     InternalHeatExchangerNetworkProblem,
 )
 

@@ -19,6 +19,7 @@ _WORKFLOW_SUPPORT_LEVELS = {
     "area_cost": "advanced",
     "heat_exchanger_network_synthesis": "advanced",
     "network_evolution_method": "advanced",
+    "open_hens_method": "advanced",
     "pinch_design_method": "advanced",
     "thermal_derivative_method": "advanced",
 }
@@ -26,6 +27,7 @@ _WORKFLOW_SUPPORT_LEVELS = {
 _DESIGN_WORKFLOWS = {
     "heat_exchanger_network_synthesis",
     "network_evolution_method",
+    "open_hens_method",
     "pinch_design_method",
     "thermal_derivative_method",
 }

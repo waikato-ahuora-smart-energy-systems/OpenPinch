@@ -21,7 +21,8 @@ These notebooks now span the main single-case ``PinchProblem`` workflow, named
 and serialized workspace boundaries, plus energy-transfer analysis and the
 vapour-compression plus MVR cascade HPR backend. The series also includes the
 direct gas/vapour stream MVR process-component workflow and the problem-owned
-heat exchanger network design-service workflow on a four-stream synthesis case.
+heat exchanger network design-service workflow on a four-stream synthesis case,
+including the explicit ``problem.design.open_hens_method()`` accessor.
 
 Use these pages instead:
 

@@ -17,16 +17,20 @@ import pytest
 from OpenPinch import PinchProblem
 from OpenPinch.classes.heat_exchanger import HeatExchangerKind
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
-from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.executor import (
     LocalSynthesisExecutor,
-    _execute_synthesis_workflow,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
     workflow_settings_from_problem,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     PreparedSolverArrays,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.solver.extraction import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.extraction import (
     extract_heat_exchanger_network,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.open_hens_method import (
+    execute_open_hens_method,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -279,7 +283,7 @@ def test_four_stream_live_solver_winning_branch_matches_checked_in_summary() -> 
         max_parallel=1,
     )
 
-    workflow_result = _execute_synthesis_workflow(
+    workflow_result = execute_open_hens_method(
         problem,
         settings,
         executor=LocalSynthesisExecutor(print_output=False),
@@ -336,7 +340,7 @@ def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -
         max_parallel=8,
     )
 
-    workflow_result = _execute_synthesis_workflow(
+    workflow_result = execute_open_hens_method(
         problem,
         settings,
         executor=LocalSynthesisExecutor(print_output=False),
@@ -402,7 +406,7 @@ def _assert_live_solver_case_matches_checked_in_summary(
             workflow_settings_from_problem(problem),
             max_parallel=max_parallel,
         )
-    workflow_result = _execute_synthesis_workflow(
+    workflow_result = execute_open_hens_method(
         problem,
         settings,
         executor=LocalSynthesisExecutor(print_output=False),

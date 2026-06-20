@@ -11,12 +11,10 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
+from ...enums import HeatExchangerNetworkDesignMethod
 
-SynthesisMethod = Literal[
-    "pinch_design_method",
-    "thermal_derivative_method",
-    "network_evolution_method",
-]
+SynthesisMethod = HeatExchangerNetworkDesignMethod
+SynthesisDesignMethod = HeatExchangerNetworkDesignMethod
 SynthesisTaskStatus = Literal["pending", "success", "failed", "skipped"]
 SynthesisOutputFormat = Literal["json", "csv", "xlsx"]
 
@@ -180,9 +178,9 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
     method_sequence: tuple[SynthesisMethod, ...] = (
-        "pinch_design_method",
-        "thermal_derivative_method",
-        "network_evolution_method",
+        HeatExchangerNetworkDesignMethod.PinchDesign,
+        HeatExchangerNetworkDesignMethod.ThermalDerivative,
+        HeatExchangerNetworkDesignMethod.NetworkEvolution,
     )
     export_formats: tuple[SynthesisOutputFormat, ...] = Field(default_factory=tuple)
     solve_tolerance: float = 1e-3
@@ -191,6 +189,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     problem_id: str | None = None
     workspace_variant: str | None = None
     state_id: str | None = None
+    design_method: SynthesisDesignMethod | None = None
     export_records: tuple[HeatExchangerNetworkSynthesisExportRecord, ...] = Field(
         default_factory=tuple,
     )
@@ -308,6 +307,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
     state_id: str | None = None
     solver_name: str | None = None
     solver_status: str | None = None
+    design_method: SynthesisDesignMethod | None = None
     method: SynthesisMethod | None = None
     stage_count: int | None = None
     objective_values: dict[str, float] = Field(default_factory=dict)
@@ -399,11 +399,11 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
 
     def get_n_best_networks(self, n: int | None = None):
         """Return the best ranked network outcomes with duplicates removed."""
-        from ....services.heat_exchanger_network_synthesis.reporting.ranking import (
-            rank_unique_network_outcomes,
+        from ....services.heat_exchanger_network_synthesis.common.reporting import (
+            ranking,
         )
 
-        return rank_unique_network_outcomes(self, limit=n)
+        return ranking.rank_unique_network_outcomes(self, limit=n)
 
     def select_network(self, solution_rank: int = 1) -> Self:
         """Select ``network`` from the ranked network list and return this result."""

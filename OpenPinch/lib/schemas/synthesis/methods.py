@@ -5,6 +5,7 @@ from __future__ import annotations
 from . import (
     HeatExchangerNetworkSynthesisMethodInput,
     HeatExchangerNetworkSynthesisMethodOutput,
+    SynthesisDesignMethod,
     SynthesisMethod,
     SynthesisTaskStatus,
 )
@@ -12,6 +13,7 @@ from . import (
 __all__ = [
     "HeatExchangerNetworkSynthesisMethodInput",
     "HeatExchangerNetworkSynthesisMethodOutput",
+    "SynthesisDesignMethod",
     "SynthesisMethod",
     "SynthesisTaskStatus",
 ]

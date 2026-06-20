@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ....classes.heat_exchanger_network import HeatExchangerNetwork
+from .....classes.heat_exchanger_network import HeatExchangerNetwork
 
 if TYPE_CHECKING:
-    from ....lib.schemas.synthesis import (
+    from .....lib.schemas.synthesis import (
         HeatExchangerNetworkSynthesisResult,
         HeatExchangerNetworkSynthesisTaskOutcome,
     )

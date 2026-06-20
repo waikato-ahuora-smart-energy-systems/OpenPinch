@@ -60,9 +60,27 @@ Heat Exchanger Network Design Results
 
 ``TargetOutput.design`` stores a
 :class:`~OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult`
-after ``problem.design.heat_exchanger_network_synthesis()`` runs. The selected
-network is available as ``design.network`` and the ranked unique network
-candidates are available as ``design.ranked_networks``.
+after ``problem.design.open_hens_method()``,
+``problem.design.heat_exchanger_network_synthesis()``, or one of the direct
+method accessors runs. The selected network is available as ``design.network``
+and the ranked unique network candidates are available as
+``design.ranked_networks``.
+
+The same
+:class:`~OpenPinch.lib.enums.HeatExchangerNetworkDesignMethod` enum is used for
+public dispatch and task/result method metadata. ``HENDesignMethod`` is the
+short public alias. ``design.design_method`` records the user-facing design
+service that was requested, such as ``HENDesignMethod.OpenHENS``. ``design.method``
+records the task method that produced the selected network, such as
+``HENDesignMethod.NetworkEvolution`` for a normal OpenHENS sequence result.
+``design.manifest.method_sequence`` records the executed task-level method
+sequence.
+
+Method-level inputs and outputs are also Pydantic models. Their shared input
+contract contains run/problem metadata, settings, optional seed network,
+optional seed-network index, and trace metadata. Their shared output contract
+contains status, accepted networks, ranked networks, diagnostics, trace
+metadata, and an optional manifest.
 
 Use ``design.get_n_best_networks(n)`` to read the first ``n`` ranked
 candidates. Use ``design.select_network(solution_rank=...)`` to make another
@@ -85,6 +103,18 @@ Plotly ``fig``, a lightweight drawing adapter ``ax``, the selected ``network``,
 and the normalized ``grid_model`` used to draw the topology.
 
 .. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisMethodInput
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisMethodOutput
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.enums.HeatExchangerNetworkDesignMethod
    :members:
    :no-index:
 
