@@ -6,16 +6,16 @@ import hashlib
 import json
 import math
 import re
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from ...classes.heat_exchanger_network import HeatExchangerNetwork
+from ....classes.heat_exchanger_network import HeatExchangerNetwork
 
 SynthesisMethod = Literal[
-    "pinch_decomposition",
-    "topology_design",
-    "energy_stage_refinement",
+    "pinch_design_method",
+    "thermal_derivative_method",
+    "network_evolution_method",
 ]
 SynthesisTaskStatus = Literal["pending", "success", "failed", "skipped"]
 SynthesisOutputFormat = Literal["json", "csv", "xlsx"]
@@ -37,8 +37,11 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
     problem_id: str | None = None
     workspace_variant: str | None = None
     state_id: str | None = None
+    settings: dict[str, Any] = Field(default_factory=dict)
+    seed_network: HeatExchangerNetwork | None = None
     seed_network_index: int | None = None
     parent_task_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     topology_restrictions: tuple["HeatExchangerNetworkTopologyRestriction", ...] = (
         Field(default_factory=tuple)
     )
@@ -177,9 +180,9 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
     method_sequence: tuple[SynthesisMethod, ...] = (
-        "pinch_decomposition",
-        "topology_design",
-        "energy_stage_refinement",
+        "pinch_design_method",
+        "thermal_derivative_method",
+        "network_evolution_method",
     )
     export_formats: tuple[SynthesisOutputFormat, ...] = Field(default_factory=tuple)
     solve_tolerance: float = 1e-3
@@ -243,12 +246,18 @@ class HeatExchangerNetworkSynthesisMethodOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    task: HeatExchangerNetworkSynthesisMethodInput
+    method: SynthesisMethod | None = None
+    task: HeatExchangerNetworkSynthesisMethodInput | None = None
     status: SynthesisTaskStatus
     network: HeatExchangerNetwork | None = None
+    accepted_networks: tuple[HeatExchangerNetwork, ...] = Field(default_factory=tuple)
+    ranked_networks: tuple[HeatExchangerNetwork, ...] = Field(default_factory=tuple)
+    task_manifest: HeatExchangerNetworkSynthesisManifest | None = None
     objective_value: float | None = None
     solver_status: str | None = None
     error: str | None = None
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+    trace: dict[str, Any] = Field(default_factory=dict)
     diagnostic_references: tuple[str, ...] = Field(default_factory=tuple)
 
     @field_validator("objective_value")
@@ -270,6 +279,12 @@ class HeatExchangerNetworkSynthesisMethodOutput(BaseModel):
         value: tuple[str, ...],
     ) -> tuple[str, ...]:
         return tuple(_validate_optional_identity(item) for item in value)
+
+    @model_validator(mode="after")
+    def _fill_method_from_task(self) -> Self:
+        if self.method is None and self.task is not None:
+            self.method = self.task.method
+        return self
 
 
 class HeatExchangerNetworkSynthesisTaskOutcome(
@@ -384,7 +399,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
 
     def get_n_best_networks(self, n: int | None = None):
         """Return the best ranked network outcomes with duplicates removed."""
-        from ...services.heat_exchanger_network_synthesis.ranking import (
+        from ....services.heat_exchanger_network_synthesis.reporting.ranking import (
             rank_unique_network_outcomes,
         )
 

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .._dependencies import (
+from .dependencies import (
     MissingSynthesisSolverError,
     require_solver_binary,
     require_synthesis_dependency,

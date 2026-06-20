@@ -13,7 +13,7 @@ import pytest
 
 import OpenPinch
 import OpenPinch.services
-import OpenPinch.services.heat_exchanger_network_synthesis.workflow as workflow_module
+import OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence as workflow_module
 from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib import HeatExchangerKind
@@ -23,27 +23,27 @@ from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis import __all__ as hens_all
-from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
-    problem_to_solver_arrays,
+from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import (
+    FakeSynthesisExecutor,
+    WorkflowContractError,
+    build_network_evolution_method_tasks,
+    build_pinch_design_method_tasks,
+    build_seeded_network_evolution_method_tasks,
+    build_seeded_thermal_derivative_method_tasks,
+    build_thermal_derivative_method_tasks,
+    workflow_settings_from_problem,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.exports import (
+from OpenPinch.services.heat_exchanger_network_synthesis.reporting.exports import (
     export_heat_exchanger_network_synthesis_results,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.service import (
     heat_exchanger_network_synthesis_service,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
-    FakeSynthesisExecutor,
-    WorkflowContractError,
-    build_energy_stage_refinement_tasks,
-    build_pinch_decomposition_tasks,
-    build_seeded_energy_stage_refinement_tasks,
-    build_seeded_topology_design_tasks,
-    build_topology_design_tasks,
-    workflow_settings_from_problem,
+from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
+    problem_to_solver_arrays,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
 FORBIDDEN_SOLVER_MODULES = [
     "gekko",
@@ -82,7 +82,7 @@ def test_workflow_default_uses_local_synthesis_executor(monkeypatch) -> None:
 def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
-    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
     pdm_executor = FakeSynthesisExecutor(failures={pdm_tasks[0].task_id})
     pdm_outcomes = pdm_executor.execute(
         pdm_tasks,
@@ -91,7 +91,7 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
         max_parallel=settings.max_parallel,
     )
 
-    tdm_tasks = build_topology_design_tasks(settings, pdm_outcomes)
+    tdm_tasks = build_thermal_derivative_method_tasks(settings, pdm_outcomes)
     tdm_executor = FakeSynthesisExecutor(failures={tdm_tasks[0].task_id})
     tdm_outcomes = tdm_executor.execute(
         tdm_tasks,
@@ -99,7 +99,7 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
         parent_outcomes=_outcome_map(pdm_outcomes),
         max_parallel=settings.max_parallel,
     )
-    esm_tasks = build_energy_stage_refinement_tasks(settings, tdm_outcomes)
+    esm_tasks = build_network_evolution_method_tasks(settings, tdm_outcomes)
 
     assert len(pdm_tasks) == 2
     assert len(tdm_tasks) == 2
@@ -108,8 +108,8 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
     assert len(esm_tasks) == 1
     assert esm_tasks[0].parent_task_id == tdm_tasks[1].task_id
     assert esm_tasks[0].topology_restrictions
-    assert pdm_executor.stage_order == ["pinch_decomposition"]
-    assert tdm_executor.stage_order == ["topology_design"]
+    assert pdm_executor.stage_order == ["pinch_design_method"]
+    assert tdm_executor.stage_order == ["thermal_derivative_method"]
 
 
 def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
@@ -118,7 +118,7 @@ def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
     seed = (
         FakeSynthesisExecutor()
         .execute(
-            build_pinch_decomposition_tasks(settings)[:1],
+            build_pinch_design_method_tasks(settings)[:1],
             problem=problem,
             parent_outcomes={},
             max_parallel=settings.max_parallel,
@@ -127,17 +127,17 @@ def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
     )
     assert seed is not None
 
-    tdm_tasks = build_seeded_topology_design_tasks(settings, (seed, seed))
-    evolution_tasks = build_seeded_energy_stage_refinement_tasks(settings, (seed,))
+    tdm_tasks = build_seeded_thermal_derivative_method_tasks(settings, (seed, seed))
+    evolution_tasks = build_seeded_network_evolution_method_tasks(settings, (seed,))
 
     assert len(tdm_tasks) == 4
     assert len({task.task_id for task in tdm_tasks}) == 4
-    assert {task.method for task in tdm_tasks} == {"topology_design"}
+    assert {task.method for task in tdm_tasks} == {"thermal_derivative_method"}
     assert {task.seed_network_index for task in tdm_tasks} == {0, 1}
     assert all(task.parent_task_id is None for task in tdm_tasks)
     assert all(task.topology_restrictions for task in tdm_tasks)
     assert len(evolution_tasks) == 1
-    assert evolution_tasks[0].method == "energy_stage_refinement"
+    assert evolution_tasks[0].method == "network_evolution_method"
     assert evolution_tasks[0].seed_network_index == 0
     assert evolution_tasks[0].topology_restrictions
 
@@ -145,7 +145,7 @@ def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
 def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
     class MissingCouenneForTopologyExecutor(FakeSynthesisExecutor):
         def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
-            if tasks and tasks[0].method == "topology_design":
+            if tasks and tasks[0].method == "thermal_derivative_method":
                 return tuple(
                     HeatExchangerNetworkSynthesisTaskOutcome(
                         task=task,
@@ -180,19 +180,21 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
     pdm_success = next(
         outcome
         for outcome in outcomes
-        if outcome.status == "success" and outcome.task.method == "pinch_decomposition"
+        if outcome.status == "success" and outcome.task.method == "pinch_design_method"
     )
     tdm_failures = [
-        outcome for outcome in outcomes if outcome.task.method == "topology_design"
+        outcome
+        for outcome in outcomes
+        if outcome.task.method == "thermal_derivative_method"
     ]
     esm_success = next(
         outcome
         for outcome in outcomes
         if outcome.status == "success"
-        and outcome.task.method == "energy_stage_refinement"
+        and outcome.task.method == "network_evolution_method"
     )
 
-    assert result.accepted_result.method == "energy_stage_refinement"
+    assert result.accepted_result.method == "network_evolution_method"
     assert all(outcome.status == "failed" for outcome in tdm_failures)
     assert esm_success.task.parent_task_id == pdm_success.task.task_id
     assert esm_success.task.derivative_threshold is None
@@ -201,7 +203,7 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
 def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
     class MissingCouenneForPdmExecutor(FakeSynthesisExecutor):
         def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
-            if tasks and tasks[0].method == "pinch_decomposition":
+            if tasks and tasks[0].method == "pinch_design_method":
                 return tuple(
                     HeatExchangerNetworkSynthesisTaskOutcome(
                         task=task,
@@ -225,7 +227,7 @@ def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
 
-    with pytest.warns(RuntimeWarning, match="pinch-decomposition"):
+    with pytest.warns(RuntimeWarning, match="pinch-design-method"):
         result = workflow_module._execute_synthesis_workflow(
             problem,
             settings,
@@ -234,29 +236,31 @@ def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
 
     outcomes = result.outcomes
     pdm_failures = [
-        outcome for outcome in outcomes if outcome.task.method == "pinch_decomposition"
+        outcome for outcome in outcomes if outcome.task.method == "pinch_design_method"
     ]
     tdm_outcomes = [
-        outcome for outcome in outcomes if outcome.task.method == "topology_design"
+        outcome
+        for outcome in outcomes
+        if outcome.task.method == "thermal_derivative_method"
     ]
     esm_successes = [
         outcome
         for outcome in outcomes
         if outcome.status == "success"
-        and outcome.task.method == "energy_stage_refinement"
+        and outcome.task.method == "network_evolution_method"
     ]
 
     assert all(outcome.status == "failed" for outcome in pdm_failures)
     assert tdm_outcomes == []
     assert esm_successes
     assert all(outcome.task.parent_task_id is None for outcome in esm_successes)
-    assert result.accepted_result.method == "energy_stage_refinement"
+    assert result.accepted_result.method == "network_evolution_method"
 
 
 def test_failed_workflow_reports_task_errors() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
-    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
     executor = FakeSynthesisExecutor(
         failures={task.task_id for task in pdm_tasks if task.task_id is not None},
     )
@@ -272,8 +276,8 @@ def test_failed_workflow_reports_task_errors() -> None:
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
     settings = workflow_settings_from_problem(_small_problem())
 
-    first = build_pinch_decomposition_tasks(settings)
-    second = build_pinch_decomposition_tasks(settings)
+    first = build_pinch_design_method_tasks(settings)
+    second = build_pinch_design_method_tasks(settings)
     roundtrip = HeatExchangerNetworkSynthesisTask.model_validate_json(
         first[0].model_dump_json()
     )
@@ -285,7 +289,7 @@ def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
 def test_downstream_topology_restrictions_are_required() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
-    pdm_task = build_pinch_decomposition_tasks(settings)[0]
+    pdm_task = build_pinch_design_method_tasks(settings)[0]
     missing_network = HeatExchangerNetworkSynthesisTaskOutcome(
         task=pdm_task,
         status="success",
@@ -302,15 +306,15 @@ def test_downstream_topology_restrictions_are_required() -> None:
     )
 
     with pytest.raises(WorkflowContractError, match="without a HeatExchangerNetwork"):
-        build_topology_design_tasks(settings, [missing_network])
+        build_thermal_derivative_method_tasks(settings, [missing_network])
     with pytest.raises(WorkflowContractError, match="topology restrictions"):
-        build_topology_design_tasks(settings, [empty_network])
+        build_thermal_derivative_method_tasks(settings, [empty_network])
 
 
 def test_fake_outcomes_serialize_without_live_solver_objects() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
-    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
     outcomes = FakeSynthesisExecutor().execute(
         pdm_tasks,
         problem=problem,
@@ -330,14 +334,14 @@ def test_fake_outcomes_serialize_without_live_solver_objects() -> None:
 def test_legacy_z_restriction_handoff_uses_source_shaped_duty_values() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
-    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
     pdm_outcomes = FakeSynthesisExecutor().execute(
         pdm_tasks,
         problem=problem,
         parent_outcomes={},
         max_parallel=settings.max_parallel,
     )
-    tdm_task = build_topology_design_tasks(settings, pdm_outcomes)[0]
+    tdm_task = build_thermal_derivative_method_tasks(settings, pdm_outcomes)[0]
     arrays = problem_to_solver_arrays(problem, dTmin=0.1)
 
     z_restriction, zhu_restriction, zcu_restriction = (
@@ -396,23 +400,23 @@ def test_explicit_pdm_tdm_and_evolution_design_methods_share_result_shape(
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
 
-    pdm = problem.design.pinch_decomposition()
-    tdm = problem.design.thermal_derivative()
-    evolution = problem.design.network_evolution((tdm.network,))
+    pdm = problem.design.pinch_design_method()
+    tdm = problem.design.thermal_derivative_method()
+    evolution = problem.design.network_evolution_method((tdm.network,))
 
-    assert pdm.method == "pinch_decomposition"
-    assert tdm.method == "topology_design"
-    assert evolution.method == "energy_stage_refinement"
+    assert pdm.method == "pinch_design_method"
+    assert tdm.method == "thermal_derivative_method"
+    assert evolution.method == "network_evolution_method"
     assert problem.results is not None
     assert problem.results.design == evolution
     assert all(outcome.network is not None for outcome in pdm.ranked_networks)
     assert all(outcome.network is not None for outcome in tdm.ranked_networks)
     assert all(outcome.network is not None for outcome in evolution.ranked_networks)
     assert {outcome.task.method for outcome in tdm.ranked_networks} == {
-        "topology_design",
+        "thermal_derivative_method",
     }
     assert {outcome.task.method for outcome in evolution.ranked_networks} == {
-        "energy_stage_refinement",
+        "network_evolution_method",
     }
 
 
@@ -421,10 +425,10 @@ def test_seeded_design_methods_require_seed_or_cached_design(monkeypatch) -> Non
     problem = _small_problem()
 
     with pytest.raises(ValueError, match="initial_networks"):
-        problem.design.thermal_derivative()
+        problem.design.thermal_derivative_method()
 
     with pytest.raises(ValueError, match="initial_networks"):
-        problem.design.network_evolution()
+        problem.design.network_evolution_method()
 
 
 def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
@@ -535,7 +539,7 @@ import sys
 
 import OpenPinch
 from OpenPinch.classes import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.workflow import FakeSynthesisExecutor
+from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import FakeSynthesisExecutor
 
 problem = PinchProblem()
 _ = problem.design

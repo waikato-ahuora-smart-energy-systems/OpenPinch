@@ -17,24 +17,24 @@ import OpenPinch.lib
 import OpenPinch.lib.schemas as schemas
 import OpenPinch.services
 import OpenPinch.services.heat_exchanger_network_synthesis as synthesis_package
-import OpenPinch.services.heat_exchanger_network_synthesis.workflow as workflow_module
+import OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence as workflow_module
 from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib import HeatExchangerKind
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
-from OpenPinch.services.heat_exchanger_network_synthesis.ranking import (
+from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import (
+    FakeSynthesisExecutor,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.reporting.ranking import (
     network_structure_signature,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.service import (
     heat_exchanger_network_synthesis_service,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
-    FakeSynthesisExecutor,
-)
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FOUR_STREAM_FIXTURE = (
     REPO_ROOT
     / "tests"
@@ -261,7 +261,7 @@ def test_public_design_accessor_returns_ranked_networks(
                 parent_outcomes=parent_outcomes,
                 max_parallel=max_parallel,
             )
-            if not tasks or tasks[0].method != "energy_stage_refinement":
+            if not tasks or tasks[0].method != "network_evolution_method":
                 return outcomes
 
             adjusted = []

@@ -12,7 +12,7 @@ from ....classes.heat_exchanger import (
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
 from ....lib.config import tol
 from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
-from ..array_adapter import PreparedSolverArrays
+from .arrays import PreparedSolverArrays
 
 
 def extract_heat_exchanger_network(
@@ -456,9 +456,9 @@ def _summary_metrics(solved_model: Any) -> dict[str, float | int | str | bool | 
 
 def _result_method(method: str | None):
     return {
-        "PDM": "pinch_decomposition",
-        "TDM": "topology_design",
-        "ESM": "energy_stage_refinement",
+        "PDM": "pinch_design_method",
+        "TDM": "thermal_derivative_method",
+        "ESM": "network_evolution_method",
     }.get(method, method)
 
 

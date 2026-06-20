@@ -7,8 +7,8 @@ from typing import Any, Literal
 
 import numpy as np
 
-from ..array_adapter import PreparedSolverArrays
-from ..pinch_decomposition import PinchDecompositionSnapshot
+from ..methods.pinch_design_method import PinchDecompositionSnapshot
+from ..solver.arrays import PreparedSolverArrays
 from .base import BaseHeatExchangerNetworkModel
 from .stagewise import StageWiseModel
 

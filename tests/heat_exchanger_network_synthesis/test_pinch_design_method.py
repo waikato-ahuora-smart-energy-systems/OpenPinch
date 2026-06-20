@@ -19,39 +19,39 @@ import pytest
 from OpenPinch import PinchProblem
 from OpenPinch.classes.heat_exchanger import HeatExchangerKind
 from OpenPinch.lib.config import tol
-from OpenPinch.services.heat_exchanger_network_synthesis._dependencies import (
-    MissingSynthesisDependencyError,
-    MissingSynthesisSolverError,
+from OpenPinch.services.heat_exchanger_network_synthesis.equations.pinch_design import (
+    PinchDecompModel,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
+from OpenPinch.services.heat_exchanger_network_synthesis.equations.problem import (
+    InternalHeatExchangerNetworkProblem,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.equations.stagewise import (
+    StageWiseModel,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.methods.full_sequence import (
+    LocalSynthesisExecutor,
+    build_network_evolution_method_tasks,
+    build_pinch_design_method_tasks,
+    build_thermal_derivative_method_tasks,
+    workflow_settings_from_problem,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.methods.pinch_design_method import (
+    build_pinch_design_method_snapshot,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.solver import backend
+from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
     PreparedSolverArrays,
     problem_to_solver_arrays,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.models import backend
-from OpenPinch.services.heat_exchanger_network_synthesis.models.extraction import (
+from OpenPinch.services.heat_exchanger_network_synthesis.solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.solver.extraction import (
     extract_heat_exchanger_network,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.models.pinch_decomposition import (
-    PinchDecompModel,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.models.problem import (
-    InternalHeatExchangerNetworkProblem,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.models.stagewise import (
-    StageWiseModel,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.pinch_decomposition import (
-    build_pinch_decomposition_snapshot,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
-    LocalSynthesisExecutor,
-    build_energy_stage_refinement_tasks,
-    build_pinch_decomposition_tasks,
-    build_topology_design_tasks,
-    workflow_settings_from_problem,
-)
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FOUR_STREAM_JSON = (
     REPO_ROOT / "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json"
 )
@@ -73,7 +73,7 @@ def test_models_package_import_is_optional_and_lazy() -> None:
 import sys
 
 import OpenPinch
-from OpenPinch.services.heat_exchanger_network_synthesis.models import (
+from OpenPinch.services.heat_exchanger_network_synthesis.equations import (
     InternalHeatExchangerNetworkProblem,
 )
 
@@ -342,14 +342,14 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
         "get_solution",
         fake_get_solution,
     )
-    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
     pdm_outcomes = executor.execute(
         pdm_tasks,
         problem=problem,
         parent_outcomes={},
         max_parallel=1,
     )
-    tdm_tasks = build_topology_design_tasks(settings, pdm_outcomes)
+    tdm_tasks = build_thermal_derivative_method_tasks(settings, pdm_outcomes)
     tdm_outcomes = executor.execute(
         tdm_tasks,
         problem=problem,
@@ -365,7 +365,7 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
         for outcome in (*pdm_outcomes, *tdm_outcomes)
         if outcome.task.task_id is not None
     }
-    esm_tasks = build_energy_stage_refinement_tasks(settings, tdm_outcomes)
+    esm_tasks = build_network_evolution_method_tasks(settings, tdm_outcomes)
     esm_outcomes = executor.execute(
         esm_tasks,
         problem=problem,
@@ -426,7 +426,7 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
         "get_solution",
         fake_get_solution,
     )
-    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
     pdm_outcomes = executor.execute(
         pdm_tasks,
         problem=problem,
@@ -449,7 +449,7 @@ def test_local_executor_passes_user_solver_options_to_internal_problem() -> None
         }
     )
     settings = workflow_settings_from_problem(problem)
-    task = build_pinch_decomposition_tasks(settings)[0]
+    task = build_pinch_design_method_tasks(settings)[0]
 
     internal_problem = LocalSynthesisExecutor()._build_problem(
         task,
@@ -457,7 +457,7 @@ def test_local_executor_passes_user_solver_options_to_internal_problem() -> None
         parent_outcomes={},
     )
 
-    assert settings.solver_options_for("pinch_decomposition") == {
+    assert settings.solver_options_for("pinch_design_method") == {
         "node_limit": 25,
         "feas_tolerance": 0.02,
     }
@@ -624,8 +624,8 @@ def test_internal_problem_result_serializes_without_solver_arrays() -> None:
     assert result.network.exchangers
     assert payload["problem_id"] == "problem-1"
     assert payload["task_id"] == "task-1"
-    assert payload["method"] == "topology_design"
-    assert payload["network"]["method"] == "topology_design"
+    assert payload["method"] == "thermal_derivative_method"
+    assert payload["network"]["method"] == "thermal_derivative_method"
     assert "solver_axis_metadata" not in payload["network"]
     assert "source_metadata" not in payload["network"]
     assert "Q_r" not in encoded
@@ -647,13 +647,13 @@ def _pdm_snapshots(
     stage_selection="automated",
 ):
     return {
-        "above": build_pinch_decomposition_snapshot(
+        "above": build_pinch_design_method_snapshot(
             problem,
             dTmin,
             pinch_location="above",
             stage_selection=stage_selection,
         ),
-        "below": build_pinch_decomposition_snapshot(
+        "below": build_pinch_design_method_snapshot(
             problem,
             dTmin,
             pinch_location="below",

@@ -7,9 +7,12 @@ from typing import Any, Literal, Mapping, Sequence
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
 from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
-from ..array_adapter import PreparedSolverArrays
-from ..pinch_decomposition import PinchDecompositionSnapshot
-from .extraction import extract_heat_exchanger_network, extract_network_synthesis_result
+from ..methods.pinch_design_method import PinchDecompositionSnapshot
+from ..solver.arrays import PreparedSolverArrays
+from ..solver.extraction import (
+    extract_heat_exchanger_network,
+    extract_network_synthesis_result,
+)
 from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
@@ -149,7 +152,7 @@ class InternalHeatExchangerNetworkProblem:
             )
         factory = self._model_factory(
             model_factories,
-            "pinch_decomposition",
+            "pinch_design_method",
             default="PinchDecompModel",
         )
         base_args = dict(self.args)
@@ -355,7 +358,7 @@ class InternalHeatExchangerNetworkProblem:
         if model_factories and factory_name in model_factories:
             return model_factories[factory_name]
         if default == "PinchDecompModel":
-            from .pinch_decomposition import PinchDecompModel
+            from .pinch_design import PinchDecompModel
 
             return PinchDecompModel
         if default == "StageWiseModel":

@@ -10,11 +10,11 @@ import pytest
 
 from OpenPinch import PinchProblem
 from OpenPinch.classes.heat_exchanger import HeatExchangerKind
-from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
+from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
     PreparedSolverArrays,
     problem_to_solver_arrays,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.models.extraction import (
+from OpenPinch.services.heat_exchanger_network_synthesis.solver.extraction import (
     extract_heat_exchanger_network,
 )
 

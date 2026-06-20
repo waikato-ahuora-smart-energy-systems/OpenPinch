@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.pinch_decomposition import (
-    build_pinch_decomposition_snapshot,
+from OpenPinch.services.heat_exchanger_network_synthesis.methods.pinch_design_method import (
+    build_pinch_design_method_snapshot,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +26,7 @@ def test_required_case_matrix_has_no_hu_or_cu_threshold_rows_to_cover() -> None:
     for case_id in CASE_IDS:
         problem = _load_problem(case_id)
         for dTmin in REQUIRED_DTMIN_GRID:
-            snapshot = build_pinch_decomposition_snapshot(
+            snapshot = build_pinch_design_method_snapshot(
                 problem,
                 dTmin,
                 pinch_location="above",

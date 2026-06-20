@@ -8,17 +8,18 @@ from ...classes.heat_exchanger_network import HeatExchangerNetwork
 from ...classes.pinch_problem import PinchProblem
 from ...lib.schemas.io import TargetOutput
 from ...lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
-from .ranking import rank_unique_network_outcomes
-from .verification import verify_synthesis_result
-from .workflow import (
+from .methods.full_sequence import (
     SynthesisExecutor,
     SynthesisWorkflowResult,
-    _execute_network_evolution_workflow,
-    _execute_pinch_decomposition_workflow,
+    _execute_network_evolution_method_workflow,
+    _execute_pinch_design_method_workflow,
     _execute_synthesis_workflow,
-    _execute_thermal_derivative_workflow,
+    _execute_thermal_derivative_method_workflow,
     workflow_settings_from_problem,
 )
+from .methods.seeds import resolve_seed_networks
+from .reporting.ranking import rank_unique_network_outcomes
+from .reporting.verification import verify_synthesis_result
 
 
 def heat_exchanger_network_synthesis_service(
@@ -56,7 +57,7 @@ def heat_exchanger_network_synthesis_service(
     return _finalise_design_result(problem, target_output, workflow_result)
 
 
-def heat_exchanger_network_pinch_decomposition_service(
+def heat_exchanger_network_pinch_design_method_service(
     problem: PinchProblem,
     *,
     options: dict[str, Any] | None = None,
@@ -69,7 +70,7 @@ def heat_exchanger_network_pinch_decomposition_service(
         options=options,
         workspace_variant=workspace_variant,
     )
-    workflow_result = _execute_pinch_decomposition_workflow(
+    workflow_result = _execute_pinch_design_method_workflow(
         problem,
         settings,
         executor=executor,
@@ -77,7 +78,7 @@ def heat_exchanger_network_pinch_decomposition_service(
     return _finalise_design_result(problem, target_output, workflow_result)
 
 
-def heat_exchanger_network_thermal_derivative_service(
+def heat_exchanger_network_thermal_derivative_method_service(
     problem: PinchProblem,
     *,
     initial_networks: HeatExchangerNetwork
@@ -88,13 +89,18 @@ def heat_exchanger_network_thermal_derivative_service(
     executor: SynthesisExecutor | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
     """Run only seeded TDM and update the problem cache."""
-    seed_networks = _normalise_seed_networks(problem, initial_networks)
+    seed_networks = resolve_seed_networks(
+        problem,
+        initial_networks,
+        method_name="thermal_derivative_method",
+        cached_source_method="pinch_design_method",
+    )
     target_output, settings = _prepare_service_context(
         problem,
         options=options,
         workspace_variant=workspace_variant,
     )
-    workflow_result = _execute_thermal_derivative_workflow(
+    workflow_result = _execute_thermal_derivative_method_workflow(
         problem,
         settings,
         seed_networks,
@@ -103,7 +109,7 @@ def heat_exchanger_network_thermal_derivative_service(
     return _finalise_design_result(problem, target_output, workflow_result)
 
 
-def heat_exchanger_network_evolution_service(
+def heat_exchanger_network_evolution_method_service(
     problem: PinchProblem,
     *,
     initial_networks: HeatExchangerNetwork
@@ -114,13 +120,18 @@ def heat_exchanger_network_evolution_service(
     executor: SynthesisExecutor | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
     """Run only seeded network evolution and update the problem cache."""
-    seed_networks = _normalise_seed_networks(problem, initial_networks)
+    seed_networks = resolve_seed_networks(
+        problem,
+        initial_networks,
+        method_name="network_evolution_method",
+        cached_source_method="thermal_derivative_method",
+    )
     target_output, settings = _prepare_service_context(
         problem,
         options=options,
         workspace_variant=workspace_variant,
     )
-    workflow_result = _execute_network_evolution_workflow(
+    workflow_result = _execute_network_evolution_method_workflow(
         problem,
         settings,
         seed_networks,
@@ -175,30 +186,6 @@ def _finalise_design_result(
         target_output.model_copy(update={"design": design})
     )
     return design
-
-
-def _normalise_seed_networks(
-    problem: PinchProblem,
-    initial_networks: HeatExchangerNetwork | Sequence[HeatExchangerNetwork] | None,
-) -> tuple[HeatExchangerNetwork, ...]:
-    if initial_networks is None:
-        cached = problem.results
-        if cached is not None and cached.design is not None:
-            return (cached.design.network,)
-        raise ValueError(
-            "seeded heat exchanger network methods require initial_networks or "
-            "an existing cached design network."
-        )
-    if isinstance(initial_networks, HeatExchangerNetwork):
-        networks = (initial_networks,)
-    else:
-        networks = tuple(initial_networks)
-    if not networks:
-        raise ValueError("initial_networks must contain at least one network.")
-    for network in networks:
-        if not isinstance(network, HeatExchangerNetwork):
-            raise TypeError("initial_networks must be HeatExchangerNetwork instances.")
-    return networks
 
 
 def _ensure_target_results(

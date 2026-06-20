@@ -15,13 +15,13 @@ from dataclasses import dataclass, replace
 from time import perf_counter
 from typing import Any, Callable, Protocol, Sequence
 
-from ...classes.heat_exchanger import (
+from ....classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerStreamRole,
 )
-from ...classes.heat_exchanger_network import HeatExchangerNetwork
-from ...lib.schemas.synthesis import (
+from ....classes.heat_exchanger_network import HeatExchangerNetwork
+from ....lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisManifest,
     HeatExchangerNetworkSynthesisResult,
     HeatExchangerNetworkSynthesisTask,
@@ -29,14 +29,14 @@ from ...lib.schemas.synthesis import (
     HeatExchangerNetworkTopologyRestriction,
     SynthesisMethod,
 )
-from .array_adapter import PreparedSolverArrays, problem_to_solver_arrays
-from .models.problem import InternalHeatExchangerNetworkProblem
-from .pinch_decomposition import build_pinch_decomposition_snapshot
+from ..equations.problem import InternalHeatExchangerNetworkProblem
+from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
+from .pinch_design_method import build_pinch_design_method_snapshot
 
 _METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
-    "pinch_decomposition",
-    "topology_design",
-    "energy_stage_refinement",
+    "pinch_design_method",
+    "thermal_derivative_method",
+    "network_evolution_method",
 )
 
 
@@ -78,21 +78,21 @@ class SynthesisWorkflowSettings:
 
     def solver_for(self, method: SynthesisMethod | None) -> str | None:
         """Return the configured solver name for one workflow method."""
-        if method == "pinch_decomposition":
+        if method == "pinch_design_method":
             return self.pdm_solver
-        if method == "topology_design":
+        if method == "thermal_derivative_method":
             return self.tdm_solver
-        if method == "energy_stage_refinement":
+        if method == "network_evolution_method":
             return self.esm_solver
         return None
 
     def solver_options_for(self, method: SynthesisMethod | None) -> dict[str, Any]:
         """Return user-provided solver options for one workflow method."""
-        if method == "pinch_decomposition":
+        if method == "pinch_design_method":
             return dict(self.pdm_solver_options)
-        if method == "topology_design":
+        if method == "thermal_derivative_method":
             return dict(self.tdm_solver_options)
-        if method == "energy_stage_refinement":
+        if method == "network_evolution_method":
             return dict(self.esm_solver_options)
         return {}
 
@@ -280,15 +280,15 @@ class LocalSynthesisExecutor:
         arrays = problem_to_solver_arrays(problem, dTmin)
         stage_selection = _legacy_pdm_stage_selection(problem)
         snapshots = None
-        if task.method == "pinch_decomposition":
+        if task.method == "pinch_design_method":
             snapshots = {
-                "above": build_pinch_decomposition_snapshot(
+                "above": build_pinch_design_method_snapshot(
                     problem,
                     task.approach_temperature,
                     pinch_location="above",
                     stage_selection=stage_selection,
                 ),
-                "below": build_pinch_decomposition_snapshot(
+                "below": build_pinch_design_method_snapshot(
                     problem,
                     task.approach_temperature,
                     pinch_location="below",
@@ -307,8 +307,8 @@ class LocalSynthesisExecutor:
             else float(task.derivative_threshold),
             z_restriction=_legacy_z_restriction(task, arrays),
             minimisation_goal=_legacy_objective(task.method),
-            non_isothermal_model=task.method == "energy_stage_refinement",
-            integers=task.method != "energy_stage_refinement",
+            non_isothermal_model=task.method == "network_evolution_method",
+            integers=task.method != "network_evolution_method",
             parent=parent_problem,
             tol=_solve_tolerance(problem),
             solver_options=_solver_options_for_task(problem, task.method),
@@ -359,7 +359,7 @@ def _solve_built_task(
     try:
         solved = internal_problem.get_solution(
             print_output=print_output,
-            evolution=task.method == "energy_stage_refinement",
+            evolution=task.method == "network_evolution_method",
         )
         if solved is None or getattr(solved, "mSuccess", 0) != 1:
             reason = getattr(
@@ -442,15 +442,16 @@ def _execute_synthesis_workflow(
     """Generate, execute, and collect the PDM -> TDM -> ESM task graph."""
     if settings.method_sequence != _METHOD_SEQUENCE:
         raise WorkflowContractError(
-            "HENS_METHOD_SEQUENCE must preserve pinch_decomposition -> "
-            "topology_design -> energy_stage_refinement for this migration slice."
+            "HENS_METHOD_SEQUENCE must preserve pinch_design_method -> "
+            "thermal_derivative_method -> network_evolution_method for "
+            "this migration slice."
         )
 
     if executor is None:
         executor = LocalSynthesisExecutor()
     start = perf_counter()
 
-    pdm_tasks = build_pinch_decomposition_tasks(settings)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
     pdm_outcomes = executor.execute(
         pdm_tasks,
         problem=problem,
@@ -466,14 +467,14 @@ def _execute_synthesis_workflow(
     ):
         _warn_couenne_fallback(
             "Couenne is unavailable for the heat exchanger network "
-            "pinch-decomposition stage",
+            "pinch-design-method stage",
         )
         tdm_tasks: tuple[HeatExchangerNetworkSynthesisTask, ...] = ()
         tdm_outcomes: tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...] = ()
-        esm_tasks = build_direct_energy_stage_refinement_tasks(settings)
+        esm_tasks = build_direct_network_evolution_method_tasks(settings)
         upstream_outcomes = {}
     else:
-        tdm_tasks = build_topology_design_tasks(settings, pdm_outcomes)
+        tdm_tasks = build_thermal_derivative_method_tasks(settings, pdm_outcomes)
         tdm_outcomes = executor.execute(
             tdm_tasks,
             problem=problem,
@@ -482,7 +483,7 @@ def _execute_synthesis_workflow(
         )
 
         upstream_outcomes = pdm_outcome_map | _outcome_map(tdm_outcomes)
-        esm_tasks = build_energy_stage_refinement_tasks(settings, tdm_outcomes)
+        esm_tasks = build_network_evolution_method_tasks(settings, tdm_outcomes)
     if not esm_tasks and _can_skip_derivative_stage_for_missing_couenne(
         settings,
         tdm_tasks,
@@ -490,9 +491,9 @@ def _execute_synthesis_workflow(
     ):
         _warn_couenne_fallback(
             "Couenne is unavailable for the heat exchanger network "
-            "thermal-derivative topology stage",
+            "thermal-derivative-method topology stage",
         )
-        esm_tasks = build_energy_stage_refinement_tasks_from_pinch_decomposition(
+        esm_tasks = build_network_evolution_method_tasks_from_pinch_design_method(
             pdm_outcomes,
         )
         upstream_outcomes = pdm_outcome_map
@@ -513,19 +514,19 @@ def _execute_synthesis_workflow(
     )
 
 
-def _execute_pinch_decomposition_workflow(
+def _execute_pinch_design_method_workflow(
     problem,
     settings: SynthesisWorkflowSettings,
     *,
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
     """Execute only the PDM method and collect validated method outputs."""
-    method_settings = replace(settings, method_sequence=("pinch_decomposition",))
+    method_settings = replace(settings, method_sequence=("pinch_design_method",))
     if executor is None:
         executor = LocalSynthesisExecutor()
     start = perf_counter()
 
-    tasks = build_pinch_decomposition_tasks(method_settings)
+    tasks = build_pinch_design_method_tasks(method_settings)
     outcomes = executor.execute(
         tasks,
         problem=problem,
@@ -540,7 +541,7 @@ def _execute_pinch_decomposition_workflow(
     )
 
 
-def _execute_thermal_derivative_workflow(
+def _execute_thermal_derivative_method_workflow(
     problem,
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
@@ -548,12 +549,12 @@ def _execute_thermal_derivative_workflow(
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
     """Execute only the seeded TDM method and collect validated method outputs."""
-    method_settings = replace(settings, method_sequence=("topology_design",))
+    method_settings = replace(settings, method_sequence=("thermal_derivative_method",))
     if executor is None:
         executor = LocalSynthesisExecutor()
     start = perf_counter()
 
-    tasks = build_seeded_topology_design_tasks(method_settings, seed_networks)
+    tasks = build_seeded_thermal_derivative_method_tasks(method_settings, seed_networks)
     outcomes = executor.execute(
         tasks,
         problem=problem,
@@ -568,7 +569,7 @@ def _execute_thermal_derivative_workflow(
     )
 
 
-def _execute_network_evolution_workflow(
+def _execute_network_evolution_method_workflow(
     problem,
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
@@ -576,12 +577,12 @@ def _execute_network_evolution_workflow(
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
     """Execute only the seeded evolution method and collect validated outputs."""
-    method_settings = replace(settings, method_sequence=("energy_stage_refinement",))
+    method_settings = replace(settings, method_sequence=("network_evolution_method",))
     if executor is None:
         executor = LocalSynthesisExecutor()
     start = perf_counter()
 
-    tasks = build_seeded_energy_stage_refinement_tasks(method_settings, seed_networks)
+    tasks = build_seeded_network_evolution_method_tasks(method_settings, seed_networks)
     outcomes = executor.execute(
         tasks,
         problem=problem,
@@ -596,14 +597,14 @@ def _execute_network_evolution_workflow(
     )
 
 
-def build_pinch_decomposition_tasks(
+def build_pinch_design_method_tasks(
     settings: SynthesisWorkflowSettings,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
     """Generate root PDM tasks by sweeping configured approach temperatures."""
     return tuple(
         HeatExchangerNetworkSynthesisTask(
             run_id=settings.run_id,
-            method="pinch_decomposition",
+            method="pinch_design_method",
             approach_temperature=approach_temperature,
             problem_id=settings.problem_id,
             workspace_variant=settings.workspace_variant,
@@ -613,25 +614,25 @@ def build_pinch_decomposition_tasks(
     )
 
 
-def build_topology_design_tasks(
+def build_thermal_derivative_method_tasks(
     settings: SynthesisWorkflowSettings,
     pdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
     """Fan successful PDM topologies out over derivative thresholds."""
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
     for outcome in pdm_outcomes:
-        if not _successful_method(outcome, "pinch_decomposition"):
+        if not _successful_method(outcome, "pinch_design_method"):
             continue
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
-            "topology_design",
+            "thermal_derivative_method",
         )
-        stage_count = _required_stage_count(outcome, "topology_design")
+        stage_count = _required_stage_count(outcome, "thermal_derivative_method")
         for derivative_threshold in settings.derivative_thresholds:
             tasks.append(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
-                    method="topology_design",
+                    method="thermal_derivative_method",
                     approach_temperature=outcome.task.approach_temperature,
                     derivative_threshold=derivative_threshold,
                     stage_count=stage_count,
@@ -645,7 +646,7 @@ def build_topology_design_tasks(
     return tuple(tasks)
 
 
-def build_seeded_topology_design_tasks(
+def build_seeded_thermal_derivative_method_tasks(
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
@@ -654,18 +655,18 @@ def build_seeded_topology_design_tasks(
     for seed_index, network in enumerate(seed_networks):
         restrictions = topology_restrictions_from_network(
             network,
-            downstream_method="topology_design",
+            downstream_method="thermal_derivative_method",
         )
         stage_count = stage_count_from_network(
             network,
-            downstream_method="topology_design",
+            downstream_method="thermal_derivative_method",
         )
         approach_temperature = approach_temperature_from_network(network, settings)
         for derivative_threshold in settings.derivative_thresholds:
             tasks.append(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
-                    method="topology_design",
+                    method="thermal_derivative_method",
                     approach_temperature=approach_temperature,
                     derivative_threshold=derivative_threshold,
                     stage_count=stage_count,
@@ -679,24 +680,24 @@ def build_seeded_topology_design_tasks(
     return tuple(tasks)
 
 
-def build_energy_stage_refinement_tasks(
+def build_network_evolution_method_tasks(
     settings: SynthesisWorkflowSettings,
     tdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
     """Generate one ESM refinement task for each successful TDM topology."""
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
     for outcome in tdm_outcomes:
-        if not _successful_method(outcome, "topology_design"):
+        if not _successful_method(outcome, "thermal_derivative_method"):
             continue
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
-            "energy_stage_refinement",
+            "network_evolution_method",
         )
-        stage_count = _required_stage_count(outcome, "energy_stage_refinement")
+        stage_count = _required_stage_count(outcome, "network_evolution_method")
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
-                method="energy_stage_refinement",
+                method="network_evolution_method",
                 approach_temperature=outcome.task.approach_temperature,
                 derivative_threshold=outcome.task.derivative_threshold,
                 stage_count=stage_count,
@@ -710,7 +711,7 @@ def build_energy_stage_refinement_tasks(
     return tuple(tasks)
 
 
-def build_seeded_energy_stage_refinement_tasks(
+def build_seeded_network_evolution_method_tasks(
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
@@ -719,16 +720,16 @@ def build_seeded_energy_stage_refinement_tasks(
     for seed_index, network in enumerate(seed_networks):
         restrictions = topology_restrictions_from_network(
             network,
-            downstream_method="energy_stage_refinement",
+            downstream_method="network_evolution_method",
         )
         stage_count = stage_count_from_network(
             network,
-            downstream_method="energy_stage_refinement",
+            downstream_method="network_evolution_method",
         )
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
-                method="energy_stage_refinement",
+                method="network_evolution_method",
                 approach_temperature=approach_temperature_from_network(
                     network,
                     settings,
@@ -745,23 +746,23 @@ def build_seeded_energy_stage_refinement_tasks(
     return tuple(tasks)
 
 
-def build_energy_stage_refinement_tasks_from_pinch_decomposition(
+def build_network_evolution_method_tasks_from_pinch_design_method(
     pdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
     """Generate ESM tasks directly from PDM when TDM is unavailable."""
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
     for outcome in pdm_outcomes:
-        if not _successful_method(outcome, "pinch_decomposition"):
+        if not _successful_method(outcome, "pinch_design_method"):
             continue
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
-            "energy_stage_refinement",
+            "network_evolution_method",
         )
-        stage_count = _required_stage_count(outcome, "energy_stage_refinement")
+        stage_count = _required_stage_count(outcome, "network_evolution_method")
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=outcome.task.run_id,
-                method="energy_stage_refinement",
+                method="network_evolution_method",
                 approach_temperature=outcome.task.approach_temperature,
                 derivative_threshold=None,
                 stage_count=stage_count,
@@ -775,14 +776,14 @@ def build_energy_stage_refinement_tasks_from_pinch_decomposition(
     return tuple(tasks)
 
 
-def build_direct_energy_stage_refinement_tasks(
+def build_direct_network_evolution_method_tasks(
     settings: SynthesisWorkflowSettings,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
     """Generate ESM tasks without Couenne-backed PDM/TDM parent tasks."""
     return tuple(
         HeatExchangerNetworkSynthesisTask(
             run_id=settings.run_id,
-            method="energy_stage_refinement",
+            method="network_evolution_method",
             approach_temperature=approach_temperature,
             derivative_threshold=None,
             stage_count=stage_count,
@@ -1010,7 +1011,10 @@ def _can_skip_derivative_stage_for_missing_couenne(
 ) -> bool:
     if settings.tdm_solver != "couenne" or not tdm_tasks or not tdm_outcomes:
         return False
-    if any(_successful_method(outcome, "topology_design") for outcome in tdm_outcomes):
+    if any(
+        _successful_method(outcome, "thermal_derivative_method")
+        for outcome in tdm_outcomes
+    ):
         return False
     return all(_missing_couenne_failure(outcome) for outcome in tdm_outcomes)
 
@@ -1023,7 +1027,7 @@ def _can_skip_preliminary_stages_for_missing_couenne(
     if settings.pdm_solver != "couenne" or not pdm_tasks or not pdm_outcomes:
         return False
     if any(
-        _successful_method(outcome, "pinch_decomposition") for outcome in pdm_outcomes
+        _successful_method(outcome, "pinch_design_method") for outcome in pdm_outcomes
     ):
         return False
     return all(_missing_couenne_failure(outcome) for outcome in pdm_outcomes)
@@ -1031,8 +1035,8 @@ def _can_skip_preliminary_stages_for_missing_couenne(
 
 def _missing_couenne_failure(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
     if outcome.status == "success" or outcome.task.method not in {
-        "pinch_decomposition",
-        "topology_design",
+        "pinch_design_method",
+        "thermal_derivative_method",
     }:
         return False
     error = outcome.error or ""
@@ -1042,7 +1046,7 @@ def _missing_couenne_failure(outcome: HeatExchangerNetworkSynthesisTaskOutcome) 
 def _warn_couenne_fallback(stage: str) -> None:
     warnings.warn(
         f"{stage}; skipping Couenne-backed derivative/topology setup and "
-        "running energy_stage_refinement directly.",
+        "running network_evolution_method directly.",
         RuntimeWarning,
         stacklevel=3,
     )
@@ -1209,28 +1213,28 @@ def _failed_task_outcome(
 
 def _legacy_framework(method: SynthesisMethod) -> str:
     return {
-        "pinch_decomposition": "PDM",
-        "topology_design": "TDM",
-        "energy_stage_refinement": "ESM",
+        "pinch_design_method": "PDM",
+        "thermal_derivative_method": "TDM",
+        "network_evolution_method": "ESM",
     }[method]
 
 
 def _legacy_objective(method: SynthesisMethod) -> str:
-    if method == "energy_stage_refinement":
+    if method == "network_evolution_method":
         return "variable total cost"
     return "hot utility"
 
 
 def _legacy_task_dTmin(task: HeatExchangerNetworkSynthesisTask) -> float:
-    if task.method == "pinch_decomposition":
+    if task.method == "pinch_design_method":
         return float(task.approach_temperature)
     return 0.1
 
 
 def _legacy_task_name(task: HeatExchangerNetworkSynthesisTask) -> str:
-    if task.method == "pinch_decomposition":
+    if task.method == "pinch_design_method":
         return f"P-+--PDM-{task.approach_temperature}"
-    if task.method == "topology_design":
+    if task.method == "thermal_derivative_method":
         stages = task.stage_count if task.stage_count is not None else "unknown"
         return f"P-S{stages}--TDM-{task.derivative_threshold}"
     stages = task.stage_count if task.stage_count is not None else "unknown"
@@ -1239,18 +1243,18 @@ def _legacy_task_name(task: HeatExchangerNetworkSynthesisTask) -> str:
 
 def _solver_for_task(problem, method: SynthesisMethod) -> str:
     config = problem.master_zone.config
-    if method == "pinch_decomposition":
+    if method == "pinch_design_method":
         return str(config.HENS_PDM_SOLVER)
-    if method == "topology_design":
+    if method == "thermal_derivative_method":
         return str(config.HENS_TDM_SOLVER)
     return str(config.HENS_ESM_SOLVER)
 
 
 def _solver_options_for_task(problem, method: SynthesisMethod) -> dict[str, Any]:
     config = problem.master_zone.config
-    if method == "pinch_decomposition":
+    if method == "pinch_design_method":
         return dict(config.HENS_PDM_SOLVER_OPTIONS)
-    if method == "topology_design":
+    if method == "thermal_derivative_method":
         return dict(config.HENS_TDM_SOLVER_OPTIONS)
     return dict(config.HENS_ESM_SOLVER_OPTIONS)
 

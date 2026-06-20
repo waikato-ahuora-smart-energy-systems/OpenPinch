@@ -55,7 +55,7 @@ def _network() -> HeatExchangerNetwork:
 def test_synthesis_task_generates_deterministic_task_id():
     first = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
-        method="pinch_decomposition",
+        method="pinch_design_method",
         approach_temperature=14.0,
         derivative_threshold=0.5,
         stage_count=3,
@@ -63,7 +63,7 @@ def test_synthesis_task_generates_deterministic_task_id():
     )
     second = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
-        method="pinch_decomposition",
+        method="pinch_design_method",
         approach_temperature=14.0,
         derivative_threshold=0.5,
         stage_count=3,
@@ -77,12 +77,12 @@ def test_synthesis_task_generates_deterministic_task_id():
 def test_method_input_is_consistent_task_contract_for_all_synthesis_methods():
     pdm = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
-        method="pinch_decomposition",
+        method="pinch_design_method",
         approach_temperature=14.0,
     )
     tdm = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
-        method="topology_design",
+        method="thermal_derivative_method",
         approach_temperature=14.0,
         derivative_threshold=0.5,
         stage_count=3,
@@ -90,7 +90,7 @@ def test_method_input_is_consistent_task_contract_for_all_synthesis_methods():
     )
     evolution = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         approach_temperature=14.0,
         stage_count=3,
         seed_network_index=1,
@@ -99,16 +99,16 @@ def test_method_input_is_consistent_task_contract_for_all_synthesis_methods():
     assert pdm.task_id.startswith("hens-task-")
     assert tdm.task_id != evolution.task_id
     assert [item.method for item in (pdm, tdm, evolution)] == [
-        "pinch_decomposition",
-        "topology_design",
-        "energy_stage_refinement",
+        "pinch_design_method",
+        "thermal_derivative_method",
+        "network_evolution_method",
     ]
 
 
 def test_method_output_is_consistent_outcome_contract_for_all_synthesis_methods():
     method_input = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         approach_temperature=14.0,
         stage_count=3,
     )
@@ -125,13 +125,13 @@ def test_method_output_is_consistent_outcome_contract_for_all_synthesis_methods(
     )
 
     assert round_tripped == output
-    assert round_tripped.task.method == "energy_stage_refinement"
+    assert round_tripped.task.method == "network_evolution_method"
 
 
 def test_synthesis_schema_serialization_round_trips():
     task = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
-        method="topology_design",
+        method="thermal_derivative_method",
         approach_temperature=14.0,
         derivative_threshold=0.5,
         stage_count=3,
@@ -163,7 +163,7 @@ def test_synthesis_schema_serialization_round_trips():
         task_id=task.task_id,
         solver_name="pyomo",
         solver_status="optimal",
-        method="topology_design",
+        method="thermal_derivative_method",
         stage_count=3,
         objective_values={
             "total_annual_cost": 154853.8518602861,
@@ -200,7 +200,7 @@ def test_target_output_accepts_design_result_payload():
         (
             {
                 "run_id": "run-1",
-                "method": "pinch_decomposition",
+                "method": "pinch_design_method",
                 "approach_temperature": 0.0,
             },
             "finite and positive",
@@ -208,7 +208,7 @@ def test_target_output_accepts_design_result_payload():
         (
             {
                 "run_id": "bad run id",
-                "method": "pinch_decomposition",
+                "method": "pinch_design_method",
                 "approach_temperature": 14.0,
             },
             "run_id",
@@ -216,7 +216,7 @@ def test_target_output_accepts_design_result_payload():
         (
             {
                 "run_id": "run-1",
-                "method": "pinch_decomposition",
+                "method": "pinch_design_method",
                 "approach_temperature": 14.0,
                 "stage_count": 0,
             },
@@ -317,9 +317,9 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 0.9],
         "HENS_STAGE_SELECTION": [2, 3],
         "HENS_METHOD_SEQUENCE": [
-            "pinch_decomposition",
-            "topology_design",
-            "energy_stage_refinement",
+            "pinch_design_method",
+            "thermal_derivative_method",
+            "network_evolution_method",
         ],
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_SOLVE_TOLERANCE": 1e-3,

@@ -130,12 +130,10 @@ def _check_brayton_cycle_surface() -> None:
 
 
 def _check_synthesis_surface() -> None:
-    from OpenPinch.services.heat_exchanger_network_synthesis._dependencies import (
-        require_declared_synthesis_dependencies,
-    )
+    from OpenPinch.services.heat_exchanger_network_synthesis.solver import dependencies
 
     _exercise_cli_help()
-    assert require_declared_synthesis_dependencies()
+    assert dependencies.require_declared_synthesis_dependencies()
 
 
 def build_parser() -> argparse.ArgumentParser:

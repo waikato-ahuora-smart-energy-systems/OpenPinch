@@ -19,7 +19,7 @@ Those public calls invoke the local solver-backed synthesis executor by
 default.
 
 When Couenne is unavailable for the Couenne-backed derivative/topology stages,
-OpenPinch emits a warning and attempts ``energy_stage_refinement`` directly
+OpenPinch emits a warning and attempts ``network_evolution_method`` directly
 with the configured ESM solver and stage selection.
 
 Problem Workflow
@@ -75,9 +75,9 @@ map to ``StreamSchema`` records, utilities and utility prices map to
                    4.0,
                ],
                "HENS_METHOD_SEQUENCE": [
-                   "pinch_decomposition",
-                   "topology_design",
-                   "energy_stage_refinement",
+                   "pinch_design_method",
+                   "thermal_derivative_method",
+                   "network_evolution_method",
                ],
                "HENS_PDM_SOLVER": "couenne",
                "HENS_TDM_SOLVER": "couenne",
@@ -277,7 +277,7 @@ JSON and CSV files are optional export views generated from
 
 .. code-block:: python
 
-   from OpenPinch.services.heat_exchanger_network_synthesis.exports import (
+   from OpenPinch.services.heat_exchanger_network_synthesis.reporting.exports import (
        export_heat_exchanger_network_synthesis_results,
    )
 

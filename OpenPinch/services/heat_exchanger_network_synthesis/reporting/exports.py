@@ -6,8 +6,8 @@ import csv
 from pathlib import Path
 from typing import Any
 
-from ...classes.pinch_problem import PinchProblem
-from ...lib.schemas.synthesis import (
+from ....classes.pinch_problem import PinchProblem
+from ....lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisExportRecord,
     HeatExchangerNetworkSynthesisManifest,
 )

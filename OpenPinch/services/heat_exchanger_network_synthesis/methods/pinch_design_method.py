@@ -1,9 +1,9 @@
-"""Private pinch-decomposition contract for migrated heat exchanger network PDM fields.
+"""Private pinch-design-method contract for migrated heat exchanger network PDM fields.
 
 This module is intentionally internal to the synthesis service package. It
 accepts a prepared :class:`PinchProblem`, uses OpenPinch targeting as the source
 of target semantics, and returns the structural fields that the migrated
-pinch-decomposition model needs before solver construction. Later migration
+pinch-design-method model needs before solver construction. Later migration
 slices may route PDM setup through this contract only after HENS-04 parity
 remains green for the required source examples and grids.
 """
@@ -16,14 +16,14 @@ from typing import Any, Literal
 
 import numpy as np
 
-from ...classes.pinch_problem import PinchProblem
-from ...classes.zone import Zone
-from ...lib.config import tol
-from ...lib.schemas.targets import DirectIntegrationTarget
-from ...services.direct_heat_integration.direct_integration_entry import (
+from ....classes.pinch_problem import PinchProblem
+from ....classes.zone import Zone
+from ....lib.config import tol
+from ....lib.schemas.targets import DirectIntegrationTarget
+from ....services.direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,
 )
-from .array_adapter import PreparedSolverArrays, problem_to_solver_arrays
+from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
 
 PinchLocation = Literal["above", "below"]
 StageSelection = Literal["automated"] | tuple[int, int]
@@ -63,7 +63,7 @@ class PinchDecompositionSnapshot:
     dt_cont_convention: str
 
 
-def build_pinch_decomposition_snapshot(
+def build_pinch_design_method_snapshot(
     problem: PinchProblem,
     dTmin: float,
     *,
@@ -304,5 +304,5 @@ def _copy_float_array(values: Any) -> np.ndarray:
 __all__ = [
     "PinchDecompositionSnapshot",
     "PinchTargetSnapshot",
-    "build_pinch_decomposition_snapshot",
+    "build_pinch_design_method_snapshot",
 ]

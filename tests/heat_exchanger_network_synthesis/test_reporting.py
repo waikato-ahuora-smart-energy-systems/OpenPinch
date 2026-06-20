@@ -17,7 +17,7 @@ from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.ranking import (
+from OpenPinch.services.heat_exchanger_network_synthesis.reporting.ranking import (
     network_structure_signature,
 )
 from OpenPinch.services.network_grid_diagram import (
@@ -147,7 +147,7 @@ def test_result_selects_ranked_network() -> None:
 
     assert result.network.run_id == "accepted-second"
     assert result.task_id == "esm-second"
-    assert result.method == "energy_stage_refinement"
+    assert result.method == "network_evolution_method"
     assert len(result.ranked_networks) == 2
 
 
@@ -556,24 +556,24 @@ def test_grid_diagram_uses_normalized_stream_geometry() -> None:
 
 def _result() -> HeatExchangerNetworkSynthesisResult:
     pdm_task = _task(
-        method="pinch_decomposition",
+        method="pinch_design_method",
         task_id="pdm",
         approach_temperature=10.0,
     )
     esm_best_task = _task(
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         task_id="esm-best",
         approach_temperature=14.0,
     )
     esm_second_task = _task(
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         task_id="esm-second",
         approach_temperature=18.0,
     )
     return HeatExchangerNetworkSynthesisResult(
         network=_network("accepted-best"),
         run_id="result",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         ranked_networks=(
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=pdm_task,
@@ -589,7 +589,7 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
             ),
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=_task(
-                    method="energy_stage_refinement",
+                    method="network_evolution_method",
                     task_id="esm-duplicate",
                     approach_temperature=16.0,
                 ),
@@ -605,7 +605,7 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
             ),
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=_task(
-                    method="energy_stage_refinement",
+                    method="network_evolution_method",
                     task_id="failed",
                     approach_temperature=20.0,
                 ),
@@ -622,7 +622,7 @@ def _result_for_network(
     return HeatExchangerNetworkSynthesisResult(
         network=network,
         run_id="result",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         ranked_networks=(),
     )
 
@@ -660,7 +660,7 @@ def _network(run_id: str) -> HeatExchangerNetwork:
             _recovery("tiny", "H2", "C1", 2, 0.5),
         ),
         run_id=run_id,
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=3,
         solver_axis_metadata={
             "axis_maps": {
@@ -682,7 +682,7 @@ def _distinct_network(run_id: str) -> HeatExchangerNetwork:
             _cold_utility("H2", "Cold Utility/CU1", 250.0),
         ),
         run_id=run_id,
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=3,
     )
 
@@ -694,7 +694,7 @@ def _plain_four_stream_network() -> HeatExchangerNetwork:
             _recovery("E2", "H2", "C2", 2, 900.0),
         ),
         run_id="plain-four-stream",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=2,
     )
 
@@ -703,7 +703,7 @@ def _two_stream_network() -> HeatExchangerNetwork:
     return HeatExchangerNetwork(
         exchangers=(_recovery("E1", "H1", "C1", 1, 1200.0),),
         run_id="two-stream",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=1,
     )
 
@@ -724,7 +724,7 @@ def _right_side_split_network() -> HeatExchangerNetwork:
             _recovery("E4", "H1", "C4", 3, 300.0),
         ),
         run_id="right-side-split",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=3,
     )
 
@@ -759,7 +759,7 @@ def _supply_side_hot_utility_network() -> HeatExchangerNetwork:
             ),
         ),
         run_id="supply-side-hot-utility",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=1,
     )
 
@@ -817,7 +817,7 @@ def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
             ),
         ),
         run_id="out-of-order-midpoints",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=1,
     )
 
@@ -863,7 +863,7 @@ def _temperature_scaled_network() -> HeatExchangerNetwork:
             ),
         ),
         run_id="temperature-scaled",
-        method="energy_stage_refinement",
+        method="network_evolution_method",
         stage_count=1,
     )
 

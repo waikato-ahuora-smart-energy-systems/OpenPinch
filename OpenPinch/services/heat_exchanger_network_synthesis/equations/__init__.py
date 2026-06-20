@@ -8,7 +8,7 @@ created or configured.
 
 from __future__ import annotations
 
-from .backend import (
+from ..solver.backend import (
     GEKKO_SOLVERS,
     PYOMO_SOLVER_BINARIES,
     PYOMO_SOLVERS,
@@ -18,12 +18,12 @@ from .backend import (
     require_solver_backend,
     solve_gekko_model,
 )
-from .base import BaseHeatExchangerNetworkModel
-from .extraction import (
+from ..solver.extraction import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
-from .pinch_decomposition import PinchDecompModel
+from .base import BaseHeatExchangerNetworkModel
+from .pinch_design import PinchDecompModel
 from .problem import (
     InternalHeatExchangerNetworkProblem,
     ModelSliceUnavailableError,

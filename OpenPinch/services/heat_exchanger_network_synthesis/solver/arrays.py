@@ -8,10 +8,10 @@ from typing import Any
 
 import numpy as np
 
-from ...classes.pinch_problem import PinchProblem
-from ...classes.stream import Stream
-from ...classes.zone import Zone
-from ...lib.config import tol
+from ....classes.pinch_problem import PinchProblem
+from ....classes.stream import Stream
+from ....classes.zone import Zone
+from ....lib.config import tol
 
 
 @dataclass(frozen=True)

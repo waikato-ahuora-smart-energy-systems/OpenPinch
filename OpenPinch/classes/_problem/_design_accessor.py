@@ -92,7 +92,7 @@ class _DesignAccessor:
             workspace_variant=workspace_variant,
         )
 
-    def pinch_decomposition(
+    def pinch_design_method(
         self,
         *,
         options: Optional[dict[str, Any]] = None,
@@ -101,16 +101,16 @@ class _DesignAccessor:
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only the PDM method and cache the design result."""
         from ...services.heat_exchanger_network_synthesis.service import (
-            heat_exchanger_network_pinch_decomposition_service,
+            heat_exchanger_network_pinch_design_method_service,
         )
 
-        return heat_exchanger_network_pinch_decomposition_service(
+        return heat_exchanger_network_pinch_design_method_service(
             self._problem,
             options=self._runtime_options(options, state_id),
             workspace_variant=workspace_variant,
         )
 
-    def thermal_derivative(
+    def thermal_derivative_method(
         self,
         initial_networks: HeatExchangerNetwork
         | Sequence[HeatExchangerNetwork]
@@ -122,17 +122,17 @@ class _DesignAccessor:
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only seeded TDM and cache the design result."""
         from ...services.heat_exchanger_network_synthesis.service import (
-            heat_exchanger_network_thermal_derivative_service,
+            heat_exchanger_network_thermal_derivative_method_service,
         )
 
-        return heat_exchanger_network_thermal_derivative_service(
+        return heat_exchanger_network_thermal_derivative_method_service(
             self._problem,
             initial_networks=initial_networks,
             options=self._runtime_options(options, state_id),
             workspace_variant=workspace_variant,
         )
 
-    def network_evolution(
+    def network_evolution_method(
         self,
         initial_networks: HeatExchangerNetwork
         | Sequence[HeatExchangerNetwork]
@@ -144,10 +144,10 @@ class _DesignAccessor:
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only seeded network evolution and cache the design result."""
         from ...services.heat_exchanger_network_synthesis.service import (
-            heat_exchanger_network_evolution_service,
+            heat_exchanger_network_evolution_method_service,
         )
 
-        return heat_exchanger_network_evolution_service(
+        return heat_exchanger_network_evolution_method_service(
             self._problem,
             initial_networks=initial_networks,
             options=self._runtime_options(options, state_id),

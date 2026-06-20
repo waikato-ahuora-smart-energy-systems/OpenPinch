@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
+from OpenPinch.services.heat_exchanger_network_synthesis.solver.arrays import (
     problem_to_solver_arrays,
 )
 
@@ -238,9 +238,9 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
             "HENS_LOG_LEVEL": "WARNING",
             "HENS_MAX_PARALLEL": 10,
             "HENS_METHOD_SEQUENCE": [
-                "pinch_decomposition",
-                "topology_design",
-                "energy_stage_refinement",
+                "pinch_design_method",
+                "thermal_derivative_method",
+                "network_evolution_method",
             ],
             "HENS_OUTPUT_FOLDER": (
                 f"tests/fixtures/openhens/solver_baselines/{parsed.case_id}"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
 
 
 def verify_synthesis_result(

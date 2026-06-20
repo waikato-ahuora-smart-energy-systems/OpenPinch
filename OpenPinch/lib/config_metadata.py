@@ -34,9 +34,9 @@ class ConfigurationOptionStatus:
 
 HENS_METHOD_SEQUENCE_VALUES = frozenset(
     {
-        "pinch_decomposition",
-        "topology_design",
-        "energy_stage_refinement",
+        "pinch_design_method",
+        "thermal_derivative_method",
+        "network_evolution_method",
     }
 )
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
@@ -138,9 +138,9 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_METHOD_SEQUENCE": ConfigurationFieldSpec(
         List[str],
         [
-            "pinch_decomposition",
-            "topology_design",
-            "energy_stage_refinement",
+            "pinch_design_method",
+            "thermal_derivative_method",
+            "network_evolution_method",
         ],
         "synthesis",
     ),
