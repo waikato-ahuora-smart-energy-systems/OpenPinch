@@ -29,6 +29,11 @@ Core Objects
    layer to replace selected hot gas/vapour streams with compressed
    replacement streams.
 
+``HeatExchangerNetwork``
+   Selected heat exchanger network design result with ordered exchanger
+   records, total-duty helpers, and
+   ``build_grid_diagram(...)`` for Plotly grid inspection.
+
 These are the objects you inspect when you need to understand how a case was
 prepared or why a target changed after mutating the in-memory model.
 
@@ -48,6 +53,10 @@ Key Classes
    :no-index:
 
 .. autoclass:: OpenPinch.classes.problem_table.ProblemTable
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork
    :members:
    :no-index:
 

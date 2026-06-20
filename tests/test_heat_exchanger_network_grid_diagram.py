@@ -60,6 +60,17 @@ def test_grid_diagram_service_accepts_one_network() -> None:
     assert diagram.fig.__class__.__module__.startswith("plotly.")
 
 
+def test_network_build_grid_diagram_uses_selected_network() -> None:
+    _require_plotly()
+    network = _network("selected")
+
+    diagram = network.build_grid_diagram(stream_line_width=6.0)
+
+    assert diagram.network is network
+    assert diagram.grid_model.network is network
+    assert diagram.fig.__class__.__module__.startswith("plotly.")
+
+
 def test_grid_diagram_service_accepts_multiple_networks_without_index() -> None:
     _require_plotly()
     networks = (_network("first"), _distinct_network("second"))

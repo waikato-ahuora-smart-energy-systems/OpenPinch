@@ -175,37 +175,45 @@ the associated selected-task metadata, and returns the same design object:
 ``solution_rank`` is 1-based. Requesting an unavailable rank raises
 ``IndexError`` with the number of available ranked networks.
 
+The problem design accessor also exposes convenience totals for the currently
+selected network through ``problem.design.network``:
+
+.. code-block:: python
+
+   problem.design.network.total_heat_recovery
+   problem.design.network.total_hot_utility
+   problem.design.network.total_cold_utility
+   problem.design.network.utility("HU1")
+
+These helpers read from ``problem.results.design.network``. Run
+``problem.design.heat_exchanger_network_synthesis()`` first so a selected
+network is cached on the problem. ``utility(name)`` returns duty for hot or
+cold utility exchangers whose utility stream identity matches ``name``.
+
 The network exposes source/sink stream links through
 :class:`~OpenPinch.classes.heat_exchanger.HeatExchanger` records. Recovery
 links are hot process stream to cold process stream, hot utility links are hot
 utility to cold process stream, and cold utility links are hot process stream
 to cold utility.
 
-OpenHENS-style network grid diagrams are available from the standalone network
-grid diagram service. Pass one or more
-:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
-instances directly:
+OpenHENS-style network grid diagrams are available directly from the selected
+:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`:
 
 .. code-block:: python
 
-   from OpenPinch.services.network_grid_diagram import build_grid_diagram
-
    design = problem.results.design
-   networks = tuple(
-       outcome.network for outcome in design.get_n_best_networks()
-   )
 
-   diagram = build_grid_diagram(networks, index=0)
+   diagram = design.network.build_grid_diagram()
+   diagram.show()
+   diagram.save("network.png")
 
-For synthesis results, ``grid_diagram(...)`` remains available as a convenience
-wrapper. The rank is 1-based and follows the same accepted-method ordering used
-for ranked network candidates:
+For synthesis results, ``grid_diagram(...)`` remains available as a ranked
+convenience wrapper. The rank is 1-based and follows the same accepted-method
+ordering used for ranked network candidates:
 
 .. code-block:: python
 
    diagram = design.grid_diagram(solution_rank=1)
-   diagram.show()
-   diagram.save("network.png")
 
 The returned object exposes the Plotly ``fig`` object, a lightweight drawing
 adapter on ``ax`` for tests and introspection, the selected ``network``, and the
@@ -227,8 +235,8 @@ arguments tune the diagram without changing the selected network:
 
 .. code-block:: python
 
-   build_grid_diagram(design.network, stream_line_width=5.0)
-   build_grid_diagram(design.network, temperature_scaled=True)
+   design.network.build_grid_diagram(stream_line_width=5.0)
+   design.network.build_grid_diagram(temperature_scaled=True)
 
 ``stream_line_width`` controls the stream strokes and is also used to auto-size
 the figure height for larger networks. The actual marker size and connector
@@ -243,6 +251,12 @@ the 0-based ``index`` argument to draw one specific network, or omit ``index``
 to receive a tuple of diagrams:
 
 .. code-block:: python
+
+   from OpenPinch.services.network_grid_diagram import build_grid_diagram
+
+   networks = tuple(
+       outcome.network for outcome in design.get_n_best_networks()
+   )
 
    build_grid_diagram(networks, index=0)
    build_grid_diagram(networks)

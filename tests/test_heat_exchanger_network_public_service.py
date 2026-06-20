@@ -243,6 +243,13 @@ def test_problem_design_workflow_example_from_converted_openhens_fixture(
     assert first_link.sink_stream
 
 
+def test_problem_design_network_helpers_require_cached_design() -> None:
+    problem = _public_example_problem()
+
+    with pytest.raises(RuntimeError, match="heat_exchanger_network_synthesis"):
+        _ = problem.design.network.total_heat_recovery
+
+
 def test_public_design_accessor_returns_ranked_networks(
     monkeypatch,
 ) -> None:
@@ -319,6 +326,33 @@ def test_public_design_accessor_returns_ranked_networks(
             if outcome.network is not None
         }
     ) == len(design.ranked_networks)
+
+    selected_network = design.network
+    helper = problem.design.network
+    hot_utility = next(
+        exchanger
+        for exchanger in selected_network.exchangers
+        if exchanger.kind is HeatExchangerKind.HOT_UTILITY
+    )
+    cold_utility = next(
+        exchanger
+        for exchanger in selected_network.exchangers
+        if exchanger.kind is HeatExchangerKind.COLD_UTILITY
+    )
+    assert helper.total_heat_recovery == selected_network.total_duty(
+        kind=HeatExchangerKind.RECOVERY
+    )
+    assert helper.total_hot_utility == selected_network.total_duty(
+        kind=HeatExchangerKind.HOT_UTILITY
+    )
+    assert helper.total_cold_utility == selected_network.total_duty(
+        kind=HeatExchangerKind.COLD_UTILITY
+    )
+    assert helper.utility(hot_utility.source_stream) == hot_utility.duty
+    assert helper.utility(cold_utility.sink_stream) == cold_utility.duty
+    assert helper.utility(hot_utility.sink_stream) == 0.0
+    with pytest.raises(ValueError, match="utility name"):
+        helper.utility("")
 
 
 def test_native_targetinput_design_workflow_example_from_converted_fixture(

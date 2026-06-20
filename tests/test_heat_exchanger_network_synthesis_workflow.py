@@ -37,6 +37,8 @@ from OpenPinch.services.heat_exchanger_network_synthesis.workflow import (
     WorkflowContractError,
     build_energy_stage_refinement_tasks,
     build_pinch_decomposition_tasks,
+    build_seeded_energy_stage_refinement_tasks,
+    build_seeded_topology_design_tasks,
     build_topology_design_tasks,
     workflow_settings_from_problem,
 )
@@ -108,6 +110,32 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
     assert esm_tasks[0].topology_restrictions
     assert pdm_executor.stage_order == ["pinch_decomposition"]
     assert tdm_executor.stage_order == ["topology_design"]
+
+
+def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    seed = FakeSynthesisExecutor().execute(
+        build_pinch_decomposition_tasks(settings)[:1],
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=settings.max_parallel,
+    )[0].network
+    assert seed is not None
+
+    tdm_tasks = build_seeded_topology_design_tasks(settings, (seed, seed))
+    evolution_tasks = build_seeded_energy_stage_refinement_tasks(settings, (seed,))
+
+    assert len(tdm_tasks) == 4
+    assert len({task.task_id for task in tdm_tasks}) == 4
+    assert {task.method for task in tdm_tasks} == {"topology_design"}
+    assert {task.seed_network_index for task in tdm_tasks} == {0, 1}
+    assert all(task.parent_task_id is None for task in tdm_tasks)
+    assert all(task.topology_restrictions for task in tdm_tasks)
+    assert len(evolution_tasks) == 1
+    assert evolution_tasks[0].method == "energy_stage_refinement"
+    assert evolution_tasks[0].seed_network_index == 0
+    assert evolution_tasks[0].topology_restrictions
 
 
 def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
@@ -356,6 +384,43 @@ def test_direct_design_run_computes_targets_when_cache_is_empty(monkeypatch) -> 
     assert problem.results is not None
     assert problem.results.targets
     assert problem.results.design == design
+
+
+def test_explicit_pdm_tdm_and_evolution_design_methods_share_result_shape(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    pdm = problem.design.pinch_decomposition()
+    tdm = problem.design.thermal_derivative()
+    evolution = problem.design.network_evolution((tdm.network,))
+
+    assert pdm.method == "pinch_decomposition"
+    assert tdm.method == "topology_design"
+    assert evolution.method == "energy_stage_refinement"
+    assert problem.results is not None
+    assert problem.results.design == evolution
+    assert all(outcome.network is not None for outcome in pdm.ranked_networks)
+    assert all(outcome.network is not None for outcome in tdm.ranked_networks)
+    assert all(outcome.network is not None for outcome in evolution.ranked_networks)
+    assert {outcome.task.method for outcome in tdm.ranked_networks} == {
+        "topology_design",
+    }
+    assert {outcome.task.method for outcome in evolution.ranked_networks} == {
+        "energy_stage_refinement",
+    }
+
+
+def test_seeded_design_methods_require_seed_or_cached_design(monkeypatch) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    with pytest.raises(ValueError, match="initial_networks"):
+        problem.design.thermal_derivative()
+
+    with pytest.raises(ValueError, match="initial_networks"):
+        problem.design.network_evolution()
 
 
 def test_direct_design_run_reports_absolute_temperatures_in_kelvin(

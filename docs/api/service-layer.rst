@@ -54,10 +54,17 @@ level ``problem.target.*(..., state_id=...)`` wrappers.
 Network Grid Diagrams
 ---------------------
 
-Heat exchanger network grid diagrams are exposed as a standalone service that
-accepts one or more
+The selected heat exchanger network can construct its own grid diagram through
+:meth:`OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork.build_grid_diagram`:
+
+.. code-block:: python
+
+   design = problem.results.design
+   diagram = design.network.build_grid_diagram()
+
+The standalone service remains available for batch rendering one or more
 :class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
-objects.
+objects, for example when displaying several ranked candidates.
 
 .. automodule:: OpenPinch.services.network_grid_diagram
    :members:

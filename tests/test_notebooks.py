@@ -229,11 +229,8 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     )
     combined_source = _combined_source(notebook)
 
-    assert "TargetInput" in combined_source
     assert "PinchProblem" in combined_source
-    assert "PinchWorkspace" in combined_source
     assert "design.heat_exchanger_network_synthesis()" in combined_source
-    assert 'workflow="heat_exchanger_network_synthesis"' in combined_source
     assert '"HENS_APPROACH_TEMPERATURES": [10.0, 14.0, 18.0]' in combined_source
     assert '"HENS_DERIVATIVE_THRESHOLDS": [0.5]' in combined_source
     assert '"HENS_STAGE_SELECTION": [3]' in combined_source
@@ -241,10 +238,15 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     assert "top_ranked_networks" in combined_source
     assert "get_n_best_networks(3)" in combined_source
     assert "select_network(solution_rank=2)" in combined_source
-    assert "HeatExchangerKind.RECOVERY" in combined_source
-    assert (
-        "from OpenPinch.services.network_grid_diagram import build_grid_diagram"
-        in combined_source
-    )
-    assert "build_grid_diagram(" in combined_source
+    assert "problem.design.network.total_heat_recovery" in combined_source
+    assert "problem.design.network.total_hot_utility" in combined_source
+    assert "problem.design.network.total_cold_utility" in combined_source
+    assert "problem.design.network.utility(" in combined_source
+    assert "from OpenPinch.lib import" not in combined_source
+    assert "HeatExchangerKind" not in combined_source
+    assert "HeatExchangerNetworkLabel" not in combined_source
+    assert "filterwarnings" not in combined_source
+    assert "import warnings" not in combined_source
+    assert "from OpenPinch.services.network_grid_diagram" not in combined_source
+    assert "design.network.build_grid_diagram(" in combined_source
     assert "go.Figure()" not in combined_source

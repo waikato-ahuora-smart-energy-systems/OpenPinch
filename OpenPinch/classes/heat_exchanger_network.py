@@ -24,7 +24,7 @@ _AREA_LABEL_KINDS = {
 
 
 class HeatExchangerNetwork(BaseModel):
-    """Ordered HEN result collection with stable identity-based access."""
+    """Ordered heat exchanger network result collection."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -97,6 +97,21 @@ class HeatExchangerNetwork(BaseModel):
             if isinstance(metric_value, float) and not math.isfinite(metric_value):
                 raise ValueError("summary metric values must be finite")
         return value
+
+    def build_grid_diagram(
+        self,
+        *,
+        stream_line_width: float = 5.0,
+        temperature_scaled: bool = False,
+    ) -> Any:
+        """Return a grid diagram for this heat exchanger network."""
+        from ..services.network_grid_diagram import build_grid_diagram
+
+        return build_grid_diagram(
+            self,
+            stream_line_width=stream_line_width,
+            temperature_scaled=temperature_scaled,
+        )
 
     def exchangers_involving_stream(
         self,
@@ -181,7 +196,7 @@ class HeatExchangerNetwork(BaseModel):
         stage: int | None = None,
         active_only: bool = True,
     ) -> float:
-        """Return a numeric total for a supported HEN label."""
+        """Return a numeric total for a supported heat exchanger network label."""
         normalised_label = HeatExchangerNetworkLabel(label)
         if normalised_label in _DUTY_LABEL_KINDS:
             label_kind = _DUTY_LABEL_KINDS[normalised_label]

@@ -353,10 +353,6 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
         temperature_scaled: bool = False,
     ):
         """Return an OpenHENS-style grid diagram for one ranked solution."""
-        from ...services.network_grid_diagram import (
-            build_grid_diagram,
-        )
-
         if solution_rank < 1:
             raise IndexError("solution_rank is 1-based and must be at least 1")
 
@@ -381,8 +377,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
                 )
             network = selected.network
 
-        return build_grid_diagram(
-            network,
+        return network.build_grid_diagram(
             stream_line_width=stream_line_width,
             temperature_scaled=temperature_scaled,
         )

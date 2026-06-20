@@ -68,13 +68,21 @@ Use ``design.get_n_best_networks(n)`` to read the first ``n`` ranked
 candidates. Use ``design.select_network(solution_rank=...)`` to make another
 ranked candidate the selected ``design.network``. ``solution_rank`` is 1-based.
 
-Grid diagrams are created by
-:func:`OpenPinch.services.network_grid_diagram.build_grid_diagram` from one or
-more ``HeatExchangerNetwork`` objects. ``design.grid_diagram(solution_rank=...)``
-is also available as a convenience wrapper that selects a ranked network before
-delegating to the standalone service. The returned object wraps the Plotly
-``fig``, a lightweight drawing adapter ``ax``, the selected ``network``, and
-the normalized ``grid_model`` used to draw the topology.
+The problem-level design accessor exposes convenience totals for the selected
+network at ``problem.design.network``:
+``total_heat_recovery``, ``total_hot_utility``, ``total_cold_utility``, and
+``utility(name)``.
+
+Grid diagrams for the selected network are created with
+``design.network.build_grid_diagram(...)``. The standalone
+:func:`OpenPinch.services.network_grid_diagram.build_grid_diagram` service still
+accepts one or more
+:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
+objects, and
+``design.grid_diagram(solution_rank=...)`` remains available as a convenience
+wrapper that selects a ranked network first. The returned object wraps the
+Plotly ``fig``, a lightweight drawing adapter ``ax``, the selected ``network``,
+and the normalized ``grid_model`` used to draw the topology.
 
 .. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult
    :members:

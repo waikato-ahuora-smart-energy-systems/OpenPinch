@@ -87,3 +87,14 @@ def test_stateful_value_slice_preserves_magnitudes():
 
     subset = value[1:]
     np.testing.assert_allclose(subset.state_values, np.array([4.0, 2.0]))
+
+
+def test_value_array_protocol_accepts_copy_keyword():
+    scalar = Value(12.5, "kW")
+    stateful = Value([10.0, 4.0], unit="kW")
+
+    scalar_array = np.array(scalar, copy=True)
+    stateful_array = np.array(stateful, copy=True)
+
+    assert scalar_array == pytest.approx(12.5)
+    np.testing.assert_allclose(stateful_array, np.array([10.0, 4.0]))

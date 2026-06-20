@@ -227,10 +227,14 @@ class Value:
             raise TypeError("Cannot round stateful Value.")
         return round(self._quantity.magnitude[0], ndigits)
 
-    def __array__(self, dtype=None):
+    def __array__(self, dtype=None, copy=None):
         if self._is_stateful():
-            return np.asarray(self.state_values, dtype=dtype)
-        return np.asarray(float(self), dtype=dtype)
+            array = np.asarray(self.state_values, dtype=dtype)
+        else:
+            array = np.asarray(float(self), dtype=dtype)
+        if copy is True:
+            return array.copy()
+        return array
 
     def __format__(self, format_spec):
         return format(float(self), format_spec)
