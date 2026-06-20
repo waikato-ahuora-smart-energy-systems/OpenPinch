@@ -95,7 +95,6 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
             "parent_task_id": self.parent_task_id,
             "problem_id": self.problem_id,
             "run_id": self.run_id,
-            "seed_network_index": self.seed_network_index,
             "stage_count": self.stage_count,
             "state_id": self.state_id,
             "topology_restrictions": [
@@ -104,6 +103,8 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
             ],
             "workspace_variant": self.workspace_variant,
         }
+        if self.seed_network_index is not None:
+            payload["seed_network_index"] = self.seed_network_index
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         digest = hashlib.sha256(encoded).hexdigest()[:16]
         return f"hens-task-{digest}"
