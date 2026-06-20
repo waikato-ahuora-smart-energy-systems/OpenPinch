@@ -29,6 +29,14 @@ _GROUP_GAP_LANES = 0.1
 _MIN_MARKER_RADIUS = 35.0
 _MAX_MARKER_RADIUS = 70.0
 _MARKER_ROW_PITCH_RATIO = 0.8
+_STREAM_LINE_TO_MARKER_RADIUS_RATIO = 0.1
+_MATCH_LINE_TO_STREAM_LINE_WIDTH_RATIO = 0.5
+_HOT_STREAM_COLOR = "#ff8f8f"
+_COLD_STREAM_COLOR = "#9ec5fe"
+_HOT_UTILITY_COLOR = "#b00020"
+_COLD_UTILITY_COLOR = "#0b1f4d"
+_RECOVERY_MATCH_COLOR = "#3f3f46"
+_LABEL_BACKGROUND_COLOR = "rgba(255,255,255,0.82)"
 
 
 @dataclass(frozen=True)
@@ -360,17 +368,22 @@ class _PlotlyAxes:
         font = {"color": kwargs.get("color", "black")}
         if kwargs.get("fontsize") is not None:
             font["size"] = kwargs["fontsize"]
-        self.fig.add_annotation(
-            x=xy[0],
-            y=xy[1],
-            text=text.replace("$^\\circ$", "°"),
-            showarrow=False,
-            xshift=xytext[0],
-            yshift=xytext[1],
-            xanchor=_plotly_xanchor(ha),
-            yanchor=_plotly_yanchor(va),
-            font=font,
-        )
+        annotation = {
+            "x": xy[0],
+            "y": xy[1],
+            "text": text.replace("$^\\circ$", "°"),
+            "showarrow": False,
+            "xshift": xytext[0],
+            "yshift": xytext[1],
+            "xanchor": _plotly_xanchor(ha),
+            "yanchor": _plotly_yanchor(va),
+            "font": font,
+        }
+        if kwargs.get("bgcolor") is not None:
+            annotation["bgcolor"] = kwargs["bgcolor"]
+        if kwargs.get("borderpad") is not None:
+            annotation["borderpad"] = kwargs["borderpad"]
+        self.fig.add_annotation(**annotation)
         return label
 
     def set_yticks(self, ticks, labels) -> None:
@@ -422,7 +435,10 @@ class _PlotlyGridRenderer:
         self.I = len(grid_model.hot_streams)
         self.J = len(grid_model.cold_streams)
         self.S = len(grid_model.stages)
-        self.stream_line_width = _validate_stream_line_width(stream_line_width)
+        _validate_stream_line_width(stream_line_width)
+        # Keep the public argument for compatibility; the rendered width is derived
+        # from marker radius so the diagram scales consistently with lane geometry.
+        self.stream_line_width = _DEFAULT_STREAM_LINE_WIDTH
         self.temperature_scaled = bool(temperature_scaled)
 
         self.hot_index = {
@@ -471,11 +487,16 @@ class _PlotlyGridRenderer:
         self.exchanger_tooltips: dict[Any, str] = {}
         self._label_slot_counts: dict[tuple[float, float, float, float], int] = {}
         self._split_groups_by_stream: dict[str, list[_SplitGroup]] = {}
+        self.stage_recovery_positions: dict[int, list[tuple[int, int]]] = {}
 
         self._process_match_existence()
+        self.stage_recovery_positions = self._build_stage_recovery_positions()
         self._calculate_spacing()
         self.temperature_scale = _temperature_scale(self.grid_model)
         self.figure_width, self.figure_height = self._figure_size()
+        self.match_radius = self._marker_radius()
+        self.stream_line_width = self._stream_line_width()
+        self.match_line_width = self._match_line_width()
         self.fig = self.go.Figure()
         self.ax = _PlotlyAxes(self.fig, self.go)
         self.draw_streams()
@@ -557,10 +578,9 @@ class _PlotlyGridRenderer:
             _MIN_FIGURE_WIDTH_PX,
             int(520 + 80 * max(1, self.S) + 52 * max(1, recovery_count)),
         )
-        lane_height = max(_LANE_HEIGHT_PX, int(self.stream_line_width * 7.0))
         height = max(
             _MIN_FIGURE_HEIGHT_PX,
-            int(180 + lane_height * self.lane_count),
+            int(180 + _LANE_HEIGHT_PX * self.lane_count),
         )
         return width, height
 
@@ -569,6 +589,18 @@ class _PlotlyGridRenderer:
         return max(
             _MIN_MARKER_RADIUS,
             min(row_pitch * _MARKER_ROW_PITCH_RATIO, _MAX_MARKER_RADIUS),
+        )
+
+    def _stream_line_width(self) -> float:
+        return max(
+            1.0,
+            self.match_radius * _STREAM_LINE_TO_MARKER_RADIUS_RATIO,
+        )
+
+    def _match_line_width(self) -> float:
+        return max(
+            1.0,
+            self.stream_line_width * _MATCH_LINE_TO_STREAM_LINE_WIDTH_RATIO,
         )
 
     def draw_streams(self) -> None:
@@ -591,7 +623,7 @@ class _PlotlyGridRenderer:
                 head_length=self.recovery_length * 0.02,
                 lw=self.stream_line_width,
                 length_includes_head=True,
-                color="blue",
+                color=_COLD_STREAM_COLOR,
             )
             self.cold_y_coords.append(y_cursor)
 
@@ -620,7 +652,7 @@ class _PlotlyGridRenderer:
                 head_length=self.recovery_length * 0.02,
                 lw=self.stream_line_width,
                 length_includes_head=True,
-                color="red",
+                color=_HOT_STREAM_COLOR,
             )
             self.hot_y_coords.append(y_cursor)
 
@@ -642,7 +674,7 @@ class _PlotlyGridRenderer:
                 (top_y, bottom_y),
                 lw=5.0,
                 linestyle="dashed",
-                color="black",
+                color=_RECOVERY_MATCH_COLOR,
             )
             if self.draw_stages:
                 self.ax.add_line(boundary_line)
@@ -667,7 +699,7 @@ class _PlotlyGridRenderer:
                         ],
                         stream_unit_x=self._cold_stream_unit_x_positions(j),
                         y0=self.cold_y_coords[-1 - j],
-                        color="blue",
+                        color=_COLD_STREAM_COLOR,
                     )
 
         for i in range(self.I):
@@ -682,7 +714,7 @@ class _PlotlyGridRenderer:
                         ],
                         stream_unit_x=self._hot_stream_unit_x_positions(i),
                         y0=self.hot_y_coords[-1 - i],
-                        color="red",
+                        color=_HOT_STREAM_COLOR,
                     )
 
     def _draw_split_branches(
@@ -773,17 +805,56 @@ class _PlotlyGridRenderer:
         cold_index: int,
         stage_index: int,
     ) -> float:
-        match_number = sum(
-            1
-            for i in range(self.I)
-            for j in range(self.J)
-            if self.recovery_match[i][j][stage_index] > 0
-            and (i, j) < (hot_index, cold_index)
+        match_number = self.stage_recovery_positions[stage_index].index(
+            (hot_index, cold_index)
         )
         return (
             self.stage_boundaries[stage_index]
             + self.match_start / 2
             + match_number * self.match_spacing
+        )
+
+    def _build_stage_recovery_positions(self) -> dict[int, list[tuple[int, int]]]:
+        return {
+            stage_index: self._sorted_stage_recovery_positions(stage_index)
+            for stage_index in range(self.S)
+        }
+
+    def _sorted_stage_recovery_positions(
+        self,
+        stage_index: int,
+    ) -> list[tuple[int, int]]:
+        positions = [
+            (i, j)
+            for i in range(self.I)
+            for j in range(self.J)
+            if self.recovery_match[i][j][stage_index] > 0
+        ]
+        return sorted(
+            positions,
+            key=lambda position: self._stage_recovery_position_sort_key(
+                position[0],
+                position[1],
+                stage_index,
+            ),
+        )
+
+    def _stage_recovery_position_sort_key(
+        self,
+        hot_index: int,
+        cold_index: int,
+        stage_index: int,
+    ) -> tuple[bool, float, bool, float, int, int]:
+        match = self.recovery_match_by_position[(hot_index, cold_index, stage_index)]
+        source_mid_temperature = match.exchanger.source_mid_temperature
+        sink_mid_temperature = match.exchanger.sink_mid_temperature
+        return (
+            source_mid_temperature is None,
+            0.0 if source_mid_temperature is None else -source_mid_temperature,
+            sink_mid_temperature is None,
+            0.0 if sink_mid_temperature is None else sink_mid_temperature,
+            hot_index,
+            cold_index,
         )
 
     def _cold_stream_unit_x_positions(self, cold_index: int) -> list[float]:
@@ -794,7 +865,9 @@ class _PlotlyGridRenderer:
             if self.recovery_match[i][cold_index][k] > 0
         ]
         if cold_index in self.hot_utility_by_cold_index:
-            positions.append(self.x_start + (self.stage_start - self.x_start) / 2)
+            positions.append(
+                self._hot_utility_x(self.hot_utility_by_cold_index[cold_index])
+            )
         return sorted(set(positions))
 
     def _hot_stream_unit_x_positions(self, hot_index: int) -> list[float]:
@@ -806,13 +879,11 @@ class _PlotlyGridRenderer:
         ]
         if hot_index in self.cold_utility_by_hot_index:
             positions.append(
-                self.stage_boundaries[-1]
-                + (self.x_finish - self.stage_boundaries[-1]) / 2
+                self._cold_utility_x(self.cold_utility_by_hot_index[hot_index])
             )
         return sorted(set(positions))
 
     def draw_recovery_matches(self) -> None:
-        self.match_radius = self._marker_radius()
         self.match_coords = {
             (i, j, k): [0.0, 1.0]
             for i in range(self.I)
@@ -848,45 +919,49 @@ class _PlotlyGridRenderer:
                         else:
                             self.match_coords[(i, j, k)][0] = self.hot_y_coords[-1 - i]
 
-        match_x = self.stage_boundaries[0] + self.match_start / 2
         for k in range(self.S):
             for i in range(self.I):
                 for j in range(self.J):
                     if self.recovery_match[i][j][k] > 0:
                         match = self.recovery_match_by_position[(i, j, k)]
                         if self.temperature_scaled:
-                            match_x = self._recovery_match_x(match)
+                            hot_match_x, cold_match_x = self._recovery_match_x_pair(
+                                match
+                            )
+                        else:
+                            hot_match_x = self._staged_match_x(i, j, k)
+                            cold_match_x = hot_match_x
                         recovery_hx = _PlotlyLine(
-                            (match_x, match_x),
+                            (hot_match_x, cold_match_x),
                             (
                                 self.match_coords[(i, j, k)][0],
                                 self.match_coords[(i, j, k)][1],
                             ),
-                            lw=self.stream_line_width,
-                            color="black",
+                            lw=self.match_line_width,
+                            color=_RECOVERY_MATCH_COLOR,
                             marker=".",
                             markersize=self.match_radius,
-                            markerfacecolor="black",
-                            markeredgecolor="black",
+                            markerfacecolor=_RECOVERY_MATCH_COLOR,
+                            markeredgecolor=_RECOVERY_MATCH_COLOR,
                             markeredgewidth=1.0,
                         )
                         self.ax.add_line(recovery_hx)
                         self._register_exchanger_artist(recovery_hx, match)
                         self._register_stream_match_position(
                             match.source_stream,
-                            match_x,
+                            hot_match_x,
                             self.match_coords[(i, j, k)][0],
                             match,
                         )
                         self._register_stream_match_position(
                             match.sink_stream,
-                            match_x,
+                            cold_match_x,
                             self.match_coords[(i, j, k)][1],
                             match,
                         )
-                        self.match_x_by_position[(i, j, k)] = match_x
-                        match_x += self.match_spacing
-            match_x = self.stage_boundaries[k + 1] + self.match_start / 2
+                        self.match_x_by_position[(i, j, k)] = (
+                            hot_match_x + cold_match_x
+                        ) / 2.0
 
     def draw_utility_match(self) -> None:
         self.match_HU_x = self.x_start + (self.stage_start - self.x_start) / 2
@@ -898,11 +973,11 @@ class _PlotlyGridRenderer:
                     (match_hu_x, match_hu_x),
                     (self.cold_y_coords[-1 - j], self.cold_y_coords[-1 - j]),
                     lw=self.stream_line_width,
-                    color="red",
+                    color=_HOT_UTILITY_COLOR,
                     marker=".",
                     markersize=self.match_radius,
-                    markerfacecolor="red",
-                    markeredgecolor="red",
+                    markerfacecolor=_HOT_UTILITY_COLOR,
+                    markeredgecolor=_HOT_UTILITY_COLOR,
                     markeredgewidth=1.0,
                 )
                 self.ax.add_line(utility_hx)
@@ -917,11 +992,13 @@ class _PlotlyGridRenderer:
                     match_hu_x,
                     self.cold_y_coords[-1 - j],
                     _short_stream_name(match.source_stream),
-                    color="red",
+                    color=_HOT_UTILITY_COLOR,
                     fontsize=self.duty_font_size,
                     ha="center",
                     va="bottom",
                     xytext=(0, self._font_points(self.duty_font_size, 0.95)),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
 
         self.match_CU_x = (
@@ -935,11 +1012,11 @@ class _PlotlyGridRenderer:
                     (match_cu_x, match_cu_x),
                     (self.hot_y_coords[-1 - i], self.hot_y_coords[-1 - i]),
                     lw=self.stream_line_width,
-                    color="blue",
+                    color=_COLD_UTILITY_COLOR,
                     marker=".",
                     markersize=self.match_radius,
-                    markerfacecolor="blue",
-                    markeredgecolor="blue",
+                    markerfacecolor=_COLD_UTILITY_COLOR,
+                    markeredgecolor=_COLD_UTILITY_COLOR,
                     markeredgewidth=1.0,
                 )
                 self.ax.add_line(utility_hx)
@@ -954,26 +1031,28 @@ class _PlotlyGridRenderer:
                     match_cu_x,
                     self.hot_y_coords[-1 - i],
                     _short_stream_name(match.sink_stream),
-                    color="blue",
+                    color=_COLD_UTILITY_COLOR,
                     fontsize=self.duty_font_size,
                     ha="center",
                     va="bottom",
                     xytext=(0, self._font_points(self.duty_font_size, 0.95)),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
 
     def add_duties(self) -> None:
         duty_y_offset = -self._duty_label_offset()
-        match_x = self.stage_boundaries[0] + self.match_start / 2
-
         for k in range(self.S):
             for i in range(self.I):
                 for j in range(self.J):
                     if self.recovery_match[i][j][k] == 1:
                         match = self.recovery_match_by_position[(i, j, k)]
                         if self.temperature_scaled:
-                            match_x = self._recovery_match_x(match)
+                            _, duty_x = self._recovery_match_x_pair(match)
+                        else:
+                            duty_x = self._staged_match_x(i, j, k)
                         self._add_label(
-                            match_x,
+                            duty_x,
                             self.match_coords[(i, j, k)][1],
                             f"{match.duty / 1000:.2f} MW",
                             fontsize=self.duty_font_size,
@@ -981,10 +1060,9 @@ class _PlotlyGridRenderer:
                             ha="center",
                             va="top",
                             xytext=(0, duty_y_offset),
+                            bgcolor=_LABEL_BACKGROUND_COLOR,
+                            borderpad=1,
                         )
-                        match_x += self.match_spacing
-            match_x = self.stage_boundaries[k + 1] + self.match_start / 2
-
         for j in range(self.J):
             match = self.hot_utility_by_cold_index.get(j)
             if match is not None:
@@ -998,6 +1076,8 @@ class _PlotlyGridRenderer:
                     ha="center",
                     va="top",
                     xytext=(0, duty_y_offset),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
 
         for i in range(self.I):
@@ -1013,6 +1093,8 @@ class _PlotlyGridRenderer:
                     ha="center",
                     va="top",
                     xytext=(0, duty_y_offset),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
 
     def add_temps(self) -> None:
@@ -1034,6 +1116,8 @@ class _PlotlyGridRenderer:
                     ha="left",
                     va="center_baseline",
                     xytext=(endpoint_x_offset, 0),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
             cold_out = temperatures["cold_out"].get(stream)
             if cold_out is not None:
@@ -1045,6 +1129,8 @@ class _PlotlyGridRenderer:
                     ha="right",
                     va="center_baseline",
                     xytext=(-endpoint_x_offset, 0),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
             self._add_intermediate_temperature_labels(
                 stream,
@@ -1067,6 +1153,8 @@ class _PlotlyGridRenderer:
                     ha="right",
                     va="center_baseline",
                     xytext=(-endpoint_x_offset, 0),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
             hot_out = temperatures["hot_out"].get(stream)
             if hot_out is not None:
@@ -1078,6 +1166,8 @@ class _PlotlyGridRenderer:
                     ha="left",
                     va="center_baseline",
                     xytext=(endpoint_x_offset, 0),
+                    bgcolor=_LABEL_BACKGROUND_COLOR,
+                    borderpad=1,
                 )
             self._add_intermediate_temperature_labels(
                 stream,
@@ -1200,16 +1290,13 @@ class _PlotlyGridRenderer:
                     x,
                     node_y,
                     match,
-                    match.exchanger.source_outlet_temperature,
+                    match.exchanger.source_inlet_temperature,
                 )
                 for x, node_y, match in positions
                 if match.source_stream == stream
                 and match.exchanger.kind
                 in (HeatExchangerKind.RECOVERY, HeatExchangerKind.COLD_UTILITY)
-                and (
-                    match.exchanger.source_inlet_temperature is not None
-                    or match.exchanger.source_outlet_temperature is not None
-                )
+                and match.exchanger.source_inlet_temperature is not None
             ]
             candidates.sort(key=lambda item: item[0])
         else:
@@ -1218,36 +1305,21 @@ class _PlotlyGridRenderer:
                     x,
                     node_y,
                     match,
-                    match.exchanger.sink_outlet_temperature,
+                    match.exchanger.sink_inlet_temperature,
                 )
                 for x, node_y, match in positions
                 if match.sink_stream == stream
                 and match.exchanger.kind
                 in (HeatExchangerKind.RECOVERY, HeatExchangerKind.HOT_UTILITY)
-                and (
-                    match.exchanger.sink_inlet_temperature is not None
-                    or match.exchanger.sink_outlet_temperature is not None
-                )
+                and match.exchanger.sink_inlet_temperature is not None
             ]
             candidates.sort(key=lambda item: item[0], reverse=True)
 
         segments: list[tuple[float, float, float, str]] = []
         for current, next_match in zip(candidates, candidates[1:], strict=False):
-            current_match = current[2]
-            next_stage = next_match[2].stage
-            if current_match.stage == next_stage:
+            if self._same_split_group(stream, current[0], next_match[0]):
                 continue
-            temperature = self._downstream_utility_inlet_temperature(
-                next_match[2],
-                role=role,
-            )
-            if temperature is None:
-                temperature = self._stream_temperature_after_stage(
-                    stream,
-                    role=role,
-                    stage=current_match.stage,
-                    fallback=current[3],
-                )
+            temperature = next_match[3]
             if temperature is None:
                 continue
             node_y = current[1] if current[1] == next_match[1] else y
@@ -1277,6 +1349,16 @@ class _PlotlyGridRenderer:
                 ha="center",
                 va="bottom",
                 xytext=xytext,
+                bgcolor=_LABEL_BACKGROUND_COLOR,
+                borderpad=1,
+            )
+
+    def _same_split_group(self, stream: str, x_start: float, x_end: float) -> bool:
+        tolerance = 1e-9
+        return any(
+            group.start_x - tolerance <= x_start <= group.end_x + tolerance
+            and group.start_x - tolerance <= x_end <= group.end_x + tolerance
+            for group in self._split_groups_by_stream.get(stream, [])
         )
 
     def _split_adjusted_temperature_segment(
@@ -1292,29 +1374,9 @@ class _PlotlyGridRenderer:
             adjusted_end = _split_adjusted_temperature_x(adjusted_end, x_start, group)
         return adjusted_start, adjusted_end
 
-    def _downstream_utility_inlet_temperature(
-        self,
-        match: GridDiagramMatch,
-        *,
-        role: str,
-    ) -> float | None:
-        if (
-            role == "hot"
-            and match.exchanger.kind is HeatExchangerKind.COLD_UTILITY
-            and match.exchanger.source_inlet_temperature is not None
-        ):
-            return match.exchanger.source_inlet_temperature
-        if (
-            role == "cold"
-            and match.exchanger.kind is HeatExchangerKind.HOT_UTILITY
-            and match.exchanger.sink_inlet_temperature is not None
-        ):
-            return match.exchanger.sink_inlet_temperature
-        return None
-
     def _duty_label_offset(self) -> float:
         font_offset = self._font_points(self.duty_font_size, 0.5)
-        marker_clearance = _plotly_marker_size(self.match_radius) * 0.25
+        marker_clearance = _plotly_marker_size(self.match_radius) * 0.5
         return max(font_offset, marker_clearance)
 
     def _temperature_label_offset(self) -> float:
@@ -1324,30 +1386,6 @@ class _PlotlyGridRenderer:
 
     def _font_points(self, fontsize: float, multiplier: float = 1.0) -> float:
         return max(float(fontsize), self.stream_line_width) * multiplier
-
-    def _stream_temperature_after_stage(
-        self,
-        stream: str,
-        *,
-        role: str,
-        stage: int | None,
-        fallback: float | None,
-    ) -> float | None:
-        if stage is None:
-            return fallback
-        boundaries = _stage_boundary_temperatures(
-            self.grid_model,
-            stream,
-            role=role,
-        )
-        if boundaries:
-            if role == "hot":
-                index = stage
-            else:
-                index = stage - 1
-            if 0 <= index < len(boundaries) and boundaries[index] is not None:
-                return boundaries[index]
-        return fallback
 
     def _register_stream_match_position(
         self,
@@ -1381,34 +1419,44 @@ class _PlotlyGridRenderer:
         cold_out = temperatures["cold_out"].get(stream)
         return self._x_from_temperature(cold_in), self._x_from_temperature(cold_out)
 
-    def _recovery_match_x(self, match: GridDiagramMatch) -> float:
+    def _recovery_match_x_pair(self, match: GridDiagramMatch) -> tuple[float, float]:
         if not self.temperature_scaled:
-            return 0.0
-        temperatures = (
-            match.exchanger.source_outlet_temperature,
-            match.exchanger.sink_outlet_temperature,
+            return 0.0, 0.0
+        return (
+            self._x_from_temperature(
+                _midpoint_temperature(
+                    match.exchanger.source_inlet_temperature,
+                    match.exchanger.source_outlet_temperature,
+                )
+            ),
+            self._x_from_temperature(
+                _midpoint_temperature(
+                    match.exchanger.sink_inlet_temperature,
+                    match.exchanger.sink_outlet_temperature,
+                )
+            ),
         )
-        x_values = [
-            self._x_from_temperature(temperature)
-            for temperature in temperatures
-            if temperature is not None
-        ]
-        if not x_values:
-            return self.stage_start
-        return sum(x_values) / len(x_values)
 
     def _hot_utility_x(self, match: GridDiagramMatch) -> float:
-        if not self.temperature_scaled:
-            return self.match_HU_x
-        temperatures = _stream_endpoint_temperatures(self.grid_model)
-        return self._x_from_temperature(temperatures["cold_out"].get(match.sink_stream))
+        if self.temperature_scaled:
+            return self._x_from_temperature(
+                _midpoint_temperature(
+                    match.exchanger.sink_inlet_temperature,
+                    match.exchanger.sink_outlet_temperature,
+                )
+            )
+        return self.x_start + (self.stage_start - self.x_start) / 2
 
     def _cold_utility_x(self, match: GridDiagramMatch) -> float:
-        if not self.temperature_scaled:
-            return self.match_CU_x
-        temperatures = _stream_endpoint_temperatures(self.grid_model)
-        return self._x_from_temperature(
-            temperatures["hot_out"].get(match.source_stream)
+        if self.temperature_scaled:
+            return self._x_from_temperature(
+                _midpoint_temperature(
+                    match.exchanger.source_inlet_temperature,
+                    match.exchanger.source_outlet_temperature,
+                )
+            )
+        return (
+            self.stage_boundaries[-1] + (self.x_finish - self.stage_boundaries[-1]) / 2
         )
 
     def _x_from_temperature(self, temperature: float | None) -> float:
@@ -1509,6 +1557,30 @@ def _stream_endpoint_temperatures(
                 cold_out.get(match.sink_stream, exchanger.sink_outlet_temperature),
                 exchanger.sink_outlet_temperature,
             )
+    for match in grid_model.hot_utility_matches:
+        exchanger = match.exchanger
+        if exchanger.sink_inlet_temperature is not None:
+            cold_in[match.sink_stream] = min(
+                cold_in.get(match.sink_stream, exchanger.sink_inlet_temperature),
+                exchanger.sink_inlet_temperature,
+            )
+        if exchanger.sink_outlet_temperature is not None:
+            cold_out[match.sink_stream] = max(
+                cold_out.get(match.sink_stream, exchanger.sink_outlet_temperature),
+                exchanger.sink_outlet_temperature,
+            )
+    for match in grid_model.cold_utility_matches:
+        exchanger = match.exchanger
+        if exchanger.source_inlet_temperature is not None:
+            hot_in[match.source_stream] = max(
+                hot_in.get(match.source_stream, exchanger.source_inlet_temperature),
+                exchanger.source_inlet_temperature,
+            )
+        if exchanger.source_outlet_temperature is not None:
+            hot_out[match.source_stream] = min(
+                hot_out.get(match.source_stream, exchanger.source_outlet_temperature),
+                exchanger.source_outlet_temperature,
+            )
 
     return {
         "hot_in": hot_in,
@@ -1516,35 +1588,6 @@ def _stream_endpoint_temperatures(
         "cold_in": cold_in,
         "cold_out": cold_out,
     }
-
-
-def _stage_boundary_temperatures(
-    grid_model: HeatExchangerNetworkGridModel,
-    stream: str,
-    *,
-    role: str,
-) -> tuple[float | None, ...]:
-    network = grid_model.network
-    axis_maps = network.solver_axis_metadata.get("axis_maps", {})
-    if role == "hot":
-        stream_axis = "hot_process_streams"
-        temperature_key = "hot_stage_boundary_temperatures"
-    else:
-        stream_axis = "cold_process_streams"
-        temperature_key = "cold_stage_boundary_temperatures"
-
-    stream_index = axis_maps.get(stream_axis, {}).get(stream)
-    if stream_index is None:
-        return ()
-    temperature_rows = network.source_metadata.get(temperature_key) or ()
-    if not temperature_rows or stream_index >= len(temperature_rows):
-        return ()
-    row = temperature_rows[stream_index]
-    if not isinstance(row, (list, tuple)):
-        return ()
-    return tuple(
-        float(temperature) if temperature is not None else None for temperature in row
-    )
 
 
 def _temperature_scale(
@@ -1563,9 +1606,43 @@ def _temperature_scale(
             )
             if temperature is not None
         )
+    for match in grid_model.hot_utility_matches:
+        exchanger = match.exchanger
+        temperatures.extend(
+            temperature
+            for temperature in (
+                exchanger.sink_inlet_temperature,
+                exchanger.sink_outlet_temperature,
+            )
+            if temperature is not None
+        )
+    for match in grid_model.cold_utility_matches:
+        exchanger = match.exchanger
+        temperatures.extend(
+            temperature
+            for temperature in (
+                exchanger.source_inlet_temperature,
+                exchanger.source_outlet_temperature,
+            )
+            if temperature is not None
+        )
     if not temperatures:
         return 0.0, 1.0
     return min(temperatures), max(temperatures)
+
+
+def _midpoint_temperature(
+    inlet_temperature: float | None,
+    outlet_temperature: float | None,
+) -> float | None:
+    temperatures = [
+        temperature
+        for temperature in (inlet_temperature, outlet_temperature)
+        if temperature is not None
+    ]
+    if not temperatures:
+        return None
+    return sum(temperatures) / len(temperatures)
 
 
 def _validate_stream_line_width(value: float) -> float:

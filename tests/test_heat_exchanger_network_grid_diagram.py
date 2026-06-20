@@ -18,6 +18,12 @@ from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.grid_diagram import (
+    _COLD_STREAM_COLOR,
+    _COLD_UTILITY_COLOR,
+    _HOT_STREAM_COLOR,
+    _HOT_UTILITY_COLOR,
+    _LABEL_BACKGROUND_COLOR,
+    _RECOVERY_MATCH_COLOR,
     build_grid_model,
 )
 
@@ -123,21 +129,19 @@ def test_grid_diagram_places_intermediate_temperatures_between_exchanger_nodes()
 
     diagram = result.grid_diagram(solution_rank=1)
 
-    intermediate_hot = _intermediate_labels(diagram.ax, "347 $^\\circ$C")
-    intermediate_cold = _intermediate_labels(diagram.ax, "57 $^\\circ$C")
-    intermediate_hot_h2 = _intermediate_labels(diagram.ax, "307 $^\\circ$C")
+    intermediate_hot = _intermediate_labels(diagram.ax, "377 $^\\circ$C")
+    intermediate_cold = _intermediate_labels(diagram.ax, "27 $^\\circ$C")
     intermediate_hot_utility = _intermediate_labels(diagram.ax, "287 $^\\circ$C")
-    intermediate_cold_c2 = _intermediate_labels(diagram.ax, "67 $^\\circ$C")
-    intermediate_cold_utility = _intermediate_labels(diagram.ax, "92 $^\\circ$C")
     hot_midpoints = {round(label.xy[0], 2) for label in intermediate_hot}
     cold_midpoints = {round(label.xy[0], 2) for label in intermediate_cold}
 
-    assert hot_midpoints == {0.28}
-    assert {round(label.xy[0], 2) for label in intermediate_hot_h2} == {0.58}
+    assert hot_midpoints == {0.28, 0.58}
     assert {round(label.xy[0], 2) for label in intermediate_hot_utility} == {0.87}
-    assert cold_midpoints == {0.28}
-    assert {round(label.xy[0], 2) for label in intermediate_cold_c2} == {0.5}
-    assert {round(label.xy[0], 2) for label in intermediate_cold_utility} == {0.21}
+    assert cold_midpoints == {0.28, 0.5}
+    assert {
+        round(label.xy[0], 2)
+        for label in _intermediate_labels(diagram.ax, "92 $^\\circ$C")
+    } == {0.21}
     assert len({(label.get_text(), label.xy[1]) for label in intermediate_hot}) == len(
         intermediate_hot
     )
@@ -146,11 +150,10 @@ def test_grid_diagram_places_intermediate_temperatures_between_exchanger_nodes()
     )
     assert all(label.get_position()[1] > 0 for label in intermediate_hot)
     assert all(label.get_position()[1] == 2.625 for label in intermediate_hot)
-    assert all(label.get_position()[1] > 0 for label in intermediate_hot_h2)
     assert all(label.get_position()[1] > 0 for label in intermediate_hot_utility)
     assert all(label.get_position()[1] > 0 for label in intermediate_cold)
-    assert all(label.get_position()[1] > 0 for label in intermediate_cold_c2)
-    assert all(label.get_position()[1] > 0 for label in intermediate_cold_utility)
+    assert not _intermediate_labels(diagram.ax, "347 $^\\circ$C")
+    assert not _intermediate_labels(diagram.ax, "307 $^\\circ$C")
 
 
 def test_grid_diagram_split_connections_align_with_unit_gap_midpoints() -> None:
@@ -165,10 +168,10 @@ def test_grid_diagram_split_connections_align_with_unit_gap_midpoints() -> None:
             for line in diagram.ax.lines
             if line.kwargs.get("color") == color and len(set(line.get_ydata())) > 1
         }
-        for color in ("blue", "red")
+        for color in (_COLD_STREAM_COLOR, _HOT_STREAM_COLOR)
     }
-    assert connector_centers_by_color["blue"] == {0.35, 0.95}
-    assert connector_centers_by_color["red"] == {0.35, 0.8}
+    assert connector_centers_by_color[_COLD_STREAM_COLOR] == {0.35, 0.95}
+    assert connector_centers_by_color[_HOT_STREAM_COLOR] == {0.35, 0.8}
 
 
 def test_grid_diagram_right_side_split_temperature_labels_move_right() -> None:
@@ -178,8 +181,47 @@ def test_grid_diagram_right_side_split_temperature_labels_move_right() -> None:
         solution_rank=1
     )
 
-    right_label = _intermediate_labels(diagram.ax, "237 $^\\circ$C")
-    assert {round(label.xy[0], 2) for label in right_label} == {0.73}
+    split_label = _intermediate_labels(diagram.ax, "377 $^\\circ$C")
+    assert {round(label.xy[0], 2) for label in split_label} == {0.5}
+    assert len(split_label) == 1
+
+
+def test_grid_diagram_hot_utility_intermediate_temperature_uses_utility_inlet() -> None:
+    _require_plotly()
+
+    diagram = _result_for_network(_supply_side_hot_utility_network()).grid_diagram(
+        solution_rank=1
+    )
+
+    hot_utility = next(text for text in diagram.ax.texts if text.get_text() == "HU1")
+    recovery = next(
+        line
+        for line in diagram.ax.lines
+        if line.kwargs.get("marker")
+        and line.kwargs.get("color") == _RECOVERY_MATCH_COLOR
+    )
+
+    assert hot_utility.xy[0] < min(recovery.get_xdata())
+    assert _intermediate_labels(diagram.ax, "-3 $^\\circ$C")
+    assert not _intermediate_labels(diagram.ax, "27 $^\\circ$C")
+
+
+def test_grid_diagram_orders_stage_matches_by_mid_temperature_attributes() -> None:
+    _require_plotly()
+
+    diagram = _result_for_network(_out_of_order_midpoint_network()).grid_diagram(
+        solution_rank=1
+    )
+    recovery_lines = {
+        line.openpinch_tooltip.split(" | ", maxsplit=1)[0]: line
+        for line in diagram.ax.lines
+        if line.kwargs.get("marker")
+        and line.kwargs.get("color") == _RECOVERY_MATCH_COLOR
+    }
+
+    x_positions = {match: line.get_xdata()[0] for match, line in recovery_lines.items()}
+    assert x_positions["H2 -> C2"] < x_positions["H3 -> C3"]
+    assert x_positions["H3 -> C3"] < x_positions["H1 -> C1"]
 
 
 def test_grid_diagram_centres_duty_labels_below_heat_exchanger_dots() -> None:
@@ -228,14 +270,16 @@ def test_grid_diagram_exchanger_artists_include_hover_tooltips() -> None:
     assert any("Area: 123.40 m^2" in tooltip for tooltip in tooltips)
 
 
-def test_grid_diagram_auto_sizes_height_from_stream_line_width() -> None:
+def test_grid_diagram_ignores_requested_stream_line_width_for_scaled_geometry() -> None:
     _require_plotly()
     result = _result()
 
     default = result.grid_diagram(solution_rank=1)
     thick = result.grid_diagram(solution_rank=1, stream_line_width=20)
 
-    assert thick.fig.layout.height > default.fig.layout.height
+    assert thick.fig.layout.height == default.fig.layout.height
+    assert max(_marker_sizes(thick)) == pytest.approx(max(_marker_sizes(default)))
+    assert max(_line_widths(thick)) == pytest.approx(max(_line_widths(default)))
 
 
 def test_grid_diagram_height_is_proportional_to_lane_count() -> None:
@@ -253,20 +297,20 @@ def test_grid_diagram_height_is_proportional_to_lane_count() -> None:
     assert split_four_stream.fig.layout.height > two_stream.fig.layout.height
 
 
-def test_grid_diagram_marker_radius_scales_with_row_pitch() -> None:
+def test_grid_diagram_marker_radius_is_bounded_by_row_pitch() -> None:
     _require_plotly()
 
-    default = _result().grid_diagram(solution_rank=1)
-    thick = _result().grid_diagram(solution_rank=1, stream_line_width=20)
+    diagrams = (
+        _result().grid_diagram(solution_rank=1),
+        _result_for_network(_plain_four_stream_network()).grid_diagram(solution_rank=1),
+        _result_for_network(_two_stream_network()).grid_diagram(solution_rank=1),
+    )
 
-    default_markers = _marker_sizes(default)
-    thick_markers = _marker_sizes(thick)
-
-    assert default_markers
-    assert min(default_markers) >= 35
-    assert max(default_markers) <= 70
-    assert max(thick_markers) > max(default_markers)
-    assert max(thick_markers) <= 70
+    for diagram in diagrams:
+        markers = _marker_sizes(diagram)
+        assert markers
+        assert min(markers) >= 35
+        assert max(markers) <= 70
 
 
 def test_grid_diagram_label_offsets_use_geometry_clearance() -> None:
@@ -274,18 +318,62 @@ def test_grid_diagram_label_offsets_use_geometry_clearance() -> None:
 
     diagram = _result().grid_diagram(solution_rank=1, stream_line_width=20)
 
-    temperature_label = next(
-        text for text in diagram.ax.texts if text.get_text() == "347 $^\\circ$C"
-    )
+    temperature_label = _intermediate_labels(diagram.ax, "377 $^\\circ$C")[0]
     duty_label = next(text for text in diagram.ax.texts if text.get_text() == "1.20 MW")
     marker_size = max(_marker_sizes(diagram))
     displayed_marker_size = max(12.0, min(marker_size * 0.42, 30.0))
+    line_width = max(_line_widths(diagram))
 
-    assert temperature_label.get_position()[1] >= 10
-    assert abs(duty_label.get_position()[1]) >= displayed_marker_size * 0.25
+    assert temperature_label.get_position()[1] >= line_width * 0.5
+    assert abs(duty_label.get_position()[1]) >= displayed_marker_size * 0.5
 
 
-def test_grid_diagram_terminal_utility_zones_are_half_stage_width() -> None:
+def test_grid_diagram_line_width_is_marker_radius_ratio() -> None:
+    _require_plotly()
+
+    diagram = _result().grid_diagram(solution_rank=1, stream_line_width=20)
+
+    assert max(_line_widths(diagram)) == pytest.approx(
+        max(_marker_sizes(diagram)) * 0.1
+    )
+    assert max(_recovery_line_widths(diagram)) == pytest.approx(
+        max(_line_widths(diagram)) * 0.5
+    )
+
+
+def test_grid_diagram_uses_stream_and_utility_colours() -> None:
+    _require_plotly()
+
+    diagram = _result().grid_diagram(solution_rank=1)
+    figure_line_colours = {
+        trace.line.color for trace in diagram.fig.data if getattr(trace, "line", None)
+    }
+    utility_colours = {
+        line.kwargs.get("color")
+        for line in diagram.ax.lines
+        if line.kwargs.get("marker")
+        and line.kwargs.get("color") in {_HOT_UTILITY_COLOR, _COLD_UTILITY_COLOR}
+    }
+
+    assert _HOT_STREAM_COLOR in figure_line_colours
+    assert _COLD_STREAM_COLOR in figure_line_colours
+    assert _RECOVERY_MATCH_COLOR in figure_line_colours
+    assert utility_colours == {_HOT_UTILITY_COLOR, _COLD_UTILITY_COLOR}
+
+
+def test_grid_diagram_labels_have_background_to_read_over_connectors() -> None:
+    _require_plotly()
+
+    diagram = _result().grid_diagram(solution_rank=1)
+    annotations_by_text = {
+        annotation.text: annotation for annotation in diagram.fig.layout.annotations
+    }
+
+    assert annotations_by_text["1.20 MW"].bgcolor == _LABEL_BACKGROUND_COLOR
+    assert annotations_by_text["377 °C"].bgcolor == _LABEL_BACKGROUND_COLOR
+
+
+def test_grid_diagram_terminal_utility_positions_use_utility_sections() -> None:
     _require_plotly()
 
     diagram = _result().grid_diagram(solution_rank=1)
@@ -311,6 +399,51 @@ def test_grid_diagram_can_temperature_scale_stream_x_positions() -> None:
     assert len({tuple(round(value, 6) for value in pair) for pair in staged_x}) == 1
     assert len({tuple(round(value, 6) for value in pair) for pair in scaled_x}) >= 2
     assert scaled_x != staged_x
+
+
+def test_grid_diagram_temperature_scaled_recovery_matches_are_diagonal() -> None:
+    _require_plotly()
+    result = _result()
+
+    scaled = result.grid_diagram(solution_rank=1, temperature_scaled=True)
+
+    recovery_lines = [
+        line
+        for line in scaled.ax.lines
+        if line.kwargs.get("marker")
+        and line.kwargs.get("color") == _RECOVERY_MATCH_COLOR
+    ]
+    assert any(line.get_xdata()[0] != line.get_xdata()[1] for line in recovery_lines)
+
+
+def test_grid_diagram_temperature_scaled_uses_process_midpoints_for_recovery() -> None:
+    _require_plotly()
+
+    scaled = _result_for_network(_temperature_scaled_network()).grid_diagram(
+        solution_rank=1,
+        temperature_scaled=True,
+    )
+
+    recovery_line = next(
+        line
+        for line in scaled.ax.lines
+        if line.kwargs.get("marker")
+        and line.kwargs.get("color") == _RECOVERY_MATCH_COLOR
+    )
+    hot_utility_line = next(
+        line
+        for line in scaled.ax.lines
+        if line.kwargs.get("marker") and line.kwargs.get("color") == _HOT_UTILITY_COLOR
+    )
+    cold_utility_line = next(
+        line
+        for line in scaled.ax.lines
+        if line.kwargs.get("marker") and line.kwargs.get("color") == _COLD_UTILITY_COLOR
+    )
+
+    assert recovery_line.get_xdata() == pytest.approx((0.1, 0.7))
+    assert hot_utility_line.get_xdata() == pytest.approx((0.9, 0.9))
+    assert cold_utility_line.get_xdata() == pytest.approx((0.3, 0.3))
 
 
 def test_grid_diagram_uses_normalized_stream_geometry() -> None:
@@ -429,16 +562,6 @@ def _network(run_id: str) -> HeatExchangerNetwork:
                 "cold_process_streams": {"C1": 0, "C2": 1},
             },
         },
-        source_metadata={
-            "hot_stage_boundary_temperatures": (
-                (650.0, 620.0, 590.0, 550.0),
-                (650.0, 610.0, 580.0, 550.0),
-            ),
-            "cold_stage_boundary_temperatures": (
-                (400.0, 360.0, 330.0, 300.0),
-                (400.0, 370.0, 340.0, 300.0),
-            ),
-        },
     )
 
 
@@ -481,6 +604,145 @@ def _right_side_split_network() -> HeatExchangerNetwork:
         run_id="right-side-split",
         method="energy_stage_refinement",
         stage_count=3,
+    )
+
+
+def _supply_side_hot_utility_network() -> HeatExchangerNetwork:
+    return HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                exchanger_id="E1",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                duty=1200.0,
+                source_inlet_temperature=650.0,
+                source_outlet_temperature=570.0,
+                sink_inlet_temperature=300.0,
+                sink_outlet_temperature=390.0,
+            ),
+            HeatExchanger(
+                exchanger_id="HU1-C1",
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream="HU1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.UTILITY,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                duty=350.0,
+                sink_inlet_temperature=270.0,
+                sink_outlet_temperature=300.0,
+            ),
+        ),
+        run_id="supply-side-hot-utility",
+        method="energy_stage_refinement",
+        stage_count=1,
+    )
+
+
+def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
+    return HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                exchanger_id="low-temp",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                duty=800.0,
+                source_inlet_temperature=520.0,
+                source_outlet_temperature=500.0,
+                source_mid_temperature=500.0,
+                sink_inlet_temperature=290.0,
+                sink_outlet_temperature=330.0,
+                sink_mid_temperature=310.0,
+            ),
+            HeatExchanger(
+                exchanger_id="high-source-low-sink",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H2",
+                sink_stream="C2",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                duty=900.0,
+                source_inlet_temperature=720.0,
+                source_outlet_temperature=680.0,
+                source_mid_temperature=700.0,
+                sink_inlet_temperature=500.0,
+                sink_outlet_temperature=560.0,
+                sink_mid_temperature=250.0,
+            ),
+            HeatExchanger(
+                exchanger_id="high-source-high-sink",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H3",
+                sink_stream="C3",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                duty=850.0,
+                source_inlet_temperature=690.0,
+                source_outlet_temperature=650.0,
+                source_mid_temperature=700.0,
+                sink_inlet_temperature=430.0,
+                sink_outlet_temperature=470.0,
+                sink_mid_temperature=450.0,
+            ),
+        ),
+        run_id="out-of-order-midpoints",
+        method="energy_stage_refinement",
+        stage_count=1,
+    )
+
+
+def _temperature_scaled_network() -> HeatExchangerNetwork:
+    return HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                exchanger_id="E1",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                duty=1200.0,
+                source_inlet_temperature=700.0,
+                source_outlet_temperature=600.0,
+                sink_inlet_temperature=300.0,
+                sink_outlet_temperature=400.0,
+            ),
+            HeatExchanger(
+                exchanger_id="HU1-C1",
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream="HU1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.UTILITY,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                duty=200.0,
+                sink_inlet_temperature=200.0,
+                sink_outlet_temperature=300.0,
+            ),
+            HeatExchanger(
+                exchanger_id="H1-CU1",
+                kind=HeatExchangerKind.COLD_UTILITY,
+                source_stream="H1",
+                sink_stream="CU1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.UTILITY,
+                duty=250.0,
+                source_inlet_temperature=600.0,
+                source_outlet_temperature=500.0,
+            ),
+        ),
+        run_id="temperature-scaled",
+        method="energy_stage_refinement",
+        stage_count=1,
     )
 
 
@@ -556,6 +818,21 @@ def _marker_sizes(diagram) -> list[float]:
         float(line.kwargs["markersize"])
         for line in diagram.ax.lines
         if line.kwargs.get("marker")
+    ]
+
+
+def _line_widths(diagram) -> list[float]:
+    return [
+        float(line.kwargs["lw"]) for line in diagram.ax.lines if "lw" in line.kwargs
+    ]
+
+
+def _recovery_line_widths(diagram) -> list[float]:
+    return [
+        float(line.kwargs["lw"])
+        for line in diagram.ax.lines
+        if line.kwargs.get("marker")
+        and line.kwargs.get("color") == _RECOVERY_MATCH_COLOR
     ]
 
 
