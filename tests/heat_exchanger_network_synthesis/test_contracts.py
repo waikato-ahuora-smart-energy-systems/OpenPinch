@@ -11,6 +11,7 @@ import OpenPinch
 import OpenPinch.classes
 import OpenPinch.lib
 import OpenPinch.lib.schemas as schemas
+import OpenPinch.lib.schemas.synthesis as synthesis_schemas
 from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
@@ -19,7 +20,10 @@ from OpenPinch.classes import (
 )
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.config_metadata import CONFIG_FIELD_SPECS
-from OpenPinch.lib.enums import HeatExchangerNetworkLabel
+from OpenPinch.lib.enums import (
+    HeatExchangerNetworkDesignMethod,
+    HeatExchangerNetworkLabel,
+)
 from OpenPinch.lib.schemas.io import TargetInput, TargetOutput
 from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisExportRecord,
@@ -72,6 +76,16 @@ def test_synthesis_task_generates_deterministic_task_id():
 
     assert first.task_id == second.task_id
     assert first.task_id.startswith("hens-task-")
+
+
+def test_hen_design_method_stringifies_to_canonical_method_identifier():
+    assert str(HeatExchangerNetworkDesignMethod.NetworkEvolution) == (
+        "network_evolution_method"
+    )
+    assert (
+        f"{HeatExchangerNetworkDesignMethod.ThermalDerivative}"
+        == "thermal_derivative_method"
+    )
 
 
 def test_method_input_is_consistent_task_contract_for_all_synthesis_methods():
@@ -379,10 +393,12 @@ def test_public_synthesis_exports_are_openpinch_native():
         "HeatExchangerNetworkSynthesisResult",
         "HeatExchangerNetworkSynthesisTask",
         "HeatExchangerNetworkSynthesisTaskOutcome",
+        "SynthesisDesignMethod",
     }
 
     assert expected_class_exports <= set(OpenPinch.classes.__all__)
     assert expected_schema_exports <= set(schemas.__all__)
+    assert expected_schema_exports <= set(synthesis_schemas.__all__)
     assert "HeatExchangerNetworkSynthesisResult" in OpenPinch.lib.__all__
     assert "HeatExchangerKind" in OpenPinch.lib.__all__
     assert "HeatExchangerNetworkLabel" in OpenPinch.lib.__all__

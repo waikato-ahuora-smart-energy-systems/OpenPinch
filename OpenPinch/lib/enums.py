@@ -98,6 +98,9 @@ class HeatExchangerNetworkDesignMethod(str, Enum):
     ThermalDerivative = "thermal_derivative_method"
     NetworkEvolution = "network_evolution_method"
 
+    def __str__(self):
+        return self.value
+
 
 HENDesignMethod = HeatExchangerNetworkDesignMethod
 

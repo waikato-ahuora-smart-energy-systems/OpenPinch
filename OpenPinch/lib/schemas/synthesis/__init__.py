@@ -492,6 +492,7 @@ __all__ = [
     "HeatExchangerNetworkSynthesisTask",
     "HeatExchangerNetworkSynthesisTaskOutcome",
     "HeatExchangerNetworkTopologyRestriction",
+    "SynthesisDesignMethod",
     "SynthesisMethod",
     "SynthesisOutputFormat",
     "SynthesisTaskStatus",

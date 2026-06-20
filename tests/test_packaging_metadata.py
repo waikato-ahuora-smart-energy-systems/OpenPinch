@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import runpy
 import tomllib
 from pathlib import Path
 
@@ -146,6 +147,14 @@ def test_requires_python_matches_python_version_files_and_ci():
         text = workflow.read_text(encoding="utf-8")
         assert f'PYTHON_VERSION: "{minimum_version}"' in text
         assert "python-version: ${{ env.PYTHON_VERSION }}" in text
+
+
+def test_update_toolchain_uses_minor_selector_for_python_install():
+    namespace = runpy.run_path(str(UPDATE_TOOLCHAIN))
+
+    assert namespace["_read_python_version"](REPO_ROOT) == "3.14.2"
+    assert namespace["_read_python_minor"](REPO_ROOT) == "3.14"
+    assert namespace["_python_minor_from_version"]("3.14.2") == "3.14"
 
 
 def test_requires_python_classifier_matches_minimum_version():
