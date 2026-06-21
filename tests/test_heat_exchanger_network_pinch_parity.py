@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
@@ -26,9 +27,27 @@ CASE_IDS = (
     "Four-stream-Yee-and-Grossmann-1990-1",
     "Nine-stream-Linnhoff-and-Ahmad-1999-1",
 )
+COMPARISON_CASE_IDS = (
+    "Four-stream-Escobar-and-Trierweiler-2013-1",
+    "Four-stream-Yee-and-Grossmann-1990-1",
+    "Five-stream-Bogataj-and-Kravanja-2012-1",
+    "Five-stream-Kim-et-al-2017-1",
+    "Six-stream-Spray-Dryer-2025-1",
+    "Six-stream-Yee-and-Grossmann-1990-1",
+)
 REQUIRED_DTMIN_GRID = (2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0)
 AUTO_STAGE_SELECTION = "automated"
 ABS_TOL = 1e-6
+
+
+@pytest.mark.parametrize("case_id", COMPARISON_CASE_IDS)
+def test_requested_openhens_comparison_fixture_loads(case_id: str) -> None:
+    problem = _load_problem(case_id)
+
+    assert len(problem.hot_streams) > 0
+    assert len(problem.cold_streams) > 0
+    assert len(problem.hot_utilities) > 0
+    assert len(problem.cold_utilities) > 0
 
 
 def test_required_case_matrix_has_no_hu_or_cu_threshold_rows_to_cover() -> None:

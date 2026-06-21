@@ -36,7 +36,7 @@
       "thermal_derivative_method",
       "network_evolution_method"
     ],
-    "HENS_OUTPUT_FOLDER": "",
+    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Four-stream-Yee-and-Grossmann-1990-1",
     "HENS_OUTPUT_FORMATS": [
       "json",
       "csv"
@@ -57,6 +57,10 @@
   },
   "streams": [
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 13.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 1950.0
@@ -77,6 +81,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 15.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 3600.0
@@ -97,6 +105,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 20.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 4400.0
@@ -117,6 +129,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 10.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 2800.0
@@ -125,7 +141,7 @@
         "unit": "kW/m^2/K",
         "value": 1.0
       },
-      "name": "Raw Milk ",
+      "name": "Raw Milk",
       "t_supply": {
         "unit": "K",
         "value": 650.0

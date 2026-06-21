@@ -1,7 +1,7 @@
 {
   "options": {
-    "COST_EXP": 1.0,
-    "FIXED_COST": 5500.0,
+    "COST_EXP": 0.8,
+    "FIXED_COST": 1000.0,
     "HENS_APPROACH_TEMPERATURES": [
       2.0,
       4.0,
@@ -36,14 +36,14 @@
       "thermal_derivative_method",
       "network_evolution_method"
     ],
-    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Four-stream-Yee-and-Grossmann-1990-1",
+    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Six-stream-Spray-Dryer-2025-1",
     "HENS_OUTPUT_FORMATS": [
       "json",
       "csv"
     ],
     "HENS_PDM_SOLVER": "couenne",
     "HENS_PDM_SOLVER_OPTIONS": {},
-    "HENS_RUN_ID": "Four-stream-Yee-and-Grossmann-1990-1",
+    "HENS_RUN_ID": "Six-stream-Spray-Dryer-2025-1",
     "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_STAGE_SELECTION": [
       1,
@@ -53,102 +53,150 @@
     ],
     "HENS_TDM_SOLVER": "couenne",
     "HENS_TDM_SOLVER_OPTIONS": {},
-    "VARIABLE_COST": 150.0
+    "VARIABLE_COST": 40000.0
   },
   "streams": [
     {
       "heat_capacity_flowrate": {
         "unit": "kW/delta_degC",
-        "value": 10.0
+        "value": 307.0
       },
       "heat_flow": {
         "unit": "kW",
-        "value": 2800.0
+        "value": 1535.0
       },
       "htc": {
         "unit": "kW/m^2/K",
         "value": 1.0
       },
-      "name": "Raw Milk",
+      "name": "Condenser",
       "t_supply": {
         "unit": "K",
-        "value": 650.0
+        "value": 328.15
       },
       "t_target": {
         "unit": "K",
-        "value": 370.0
+        "value": 323.15
       },
       "zone": "Site/Process A"
     },
     {
       "heat_capacity_flowrate": {
         "unit": "kW/delta_degC",
-        "value": 20.0
+        "value": 108.0
       },
       "heat_flow": {
         "unit": "kW",
-        "value": 4400.0
+        "value": 2592.0
       },
       "htc": {
         "unit": "kW/m^2/K",
         "value": 1.0
       },
-      "name": "HT Flash",
+      "name": "Exhaust air",
       "t_supply": {
         "unit": "K",
-        "value": 590.0
+        "value": 357.15
       },
       "t_target": {
         "unit": "K",
-        "value": 370.0
+        "value": 333.15
       },
       "zone": "Site/Process A"
     },
     {
       "heat_capacity_flowrate": {
         "unit": "kW/delta_degC",
-        "value": 15.0
+        "value": 57.0
       },
       "heat_flow": {
         "unit": "kW",
-        "value": 3600.0
+        "value": 10830.0
       },
       "htc": {
         "unit": "kW/m^2/K",
         "value": 1.0
       },
-      "name": "Milk Concentrate",
+      "name": "Dryer inlet air",
       "t_supply": {
         "unit": "K",
-        "value": 410.0
+        "value": 288.15
       },
       "t_target": {
         "unit": "K",
-        "value": 650.0
+        "value": 478.15
       },
       "zone": "Site/Process A"
     },
     {
       "heat_capacity_flowrate": {
         "unit": "kW/delta_degC",
-        "value": 13.0
+        "value": 18.0
       },
       "heat_flow": {
         "unit": "kW",
-        "value": 1950.0
+        "value": 1170.0
       },
       "htc": {
         "unit": "kW/m^2/K",
         "value": 1.0
       },
-      "name": "CIP Water",
+      "name": "FB inlet air",
       "t_supply": {
         "unit": "K",
-        "value": 350.0
+        "value": 303.15
       },
       "t_target": {
         "unit": "K",
-        "value": 500.0
+        "value": 368.15
+      },
+      "zone": "Site/Process A"
+    },
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 21.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 525.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 1.0
+      },
+      "name": "Milk concentrate",
+      "t_supply": {
+        "unit": "K",
+        "value": 323.15
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 348.15
+      },
+      "zone": "Site/Process A"
+    },
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 1.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 70.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 1.0
+      },
+      "name": "CIP",
+      "t_supply": {
+        "unit": "K",
+        "value": 288.15
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 358.15
       },
       "zone": "Site/Process A"
     }
@@ -158,20 +206,20 @@
       "heat_flow": null,
       "htc": {
         "unit": "kW/m^2/K",
-        "value": 5.0
+        "value": 3.4
       },
       "name": "HPS",
       "price": {
         "unit": "$/MWh",
-        "value": 80.0
+        "value": 200.0
       },
       "t_supply": {
         "unit": "K",
-        "value": 680.0
+        "value": 513.15
       },
       "t_target": {
         "unit": "K",
-        "value": 680.0
+        "value": 513.15
       },
       "type": "Hot"
     },
@@ -179,20 +227,20 @@
       "heat_flow": null,
       "htc": {
         "unit": "kW/m^2/K",
-        "value": 1.0
+        "value": 1.7
       },
       "name": "CW",
       "price": {
         "unit": "$/MWh",
-        "value": 15.0
+        "value": 10.0
       },
       "t_supply": {
         "unit": "K",
-        "value": 300.0
+        "value": 298.15
       },
       "t_target": {
         "unit": "K",
-        "value": 320.0
+        "value": 313.15
       },
       "type": "Cold"
     }
