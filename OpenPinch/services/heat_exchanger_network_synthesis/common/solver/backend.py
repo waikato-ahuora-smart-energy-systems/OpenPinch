@@ -24,14 +24,7 @@ PYOMO_SOLVER_BINARIES = {
 }
 COUENNE_OPTION_FILE = "couenne.opt"
 IPOPT_OPTION_FILE = "ipopt.opt"
-DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {
-    "problem_print_level": 3,
-    "node_limit": 2000,
-    "feas_tolerance": 0.01,
-    "allowable_gap": 0.01,
-    "allowable_fraction_gap": 0.1,
-    "delete_redundant": "yes",
-}
+DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {}
 DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
     "tol": "1e-3",
     "acceptable_tol": "1e-2",
@@ -138,15 +131,13 @@ def configure_gekko_solver(
 
     if model.options.SOLVER_EXTENSION == "pyomo":
         if solver_name == "couenne":
-            effective_options = _merge_solver_options(
-                DEFAULT_COUENNE_OPTIONS,
-                solver_options,
-            )
-            option_file = _write_solver_option_file(
-                model,
-                COUENNE_OPTION_FILE,
-                effective_options,
-            )
+            effective_options = _normalise_solver_options(solver_options)
+            if effective_options:
+                option_file = _write_solver_option_file(
+                    model,
+                    COUENNE_OPTION_FILE,
+                    effective_options,
+                )
         else:
             effective_options = _normalise_solver_options(solver_options)
             if effective_options:

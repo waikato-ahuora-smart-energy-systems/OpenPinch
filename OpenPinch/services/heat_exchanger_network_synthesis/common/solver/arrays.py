@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,8 +9,11 @@ import numpy as np
 
 from .....classes.pinch_problem import PinchProblem
 from .....classes.stream import Stream
+from .....classes.value import Value
 from .....classes.zone import Zone
 from .....lib.config import tol
+
+_PreparedItem = tuple[str, Stream, Any | None]
 
 
 @dataclass(frozen=True)
@@ -78,10 +80,10 @@ def problem_to_solver_arrays(
         raise ValueError("dTmin must be finite and positive.")
 
     zone = problem.master_zone
-    hot_items = _ordered_stream_items(zone.hot_streams.items())
-    cold_items = _ordered_stream_items(zone.cold_streams.items())
-    hot_utility_items = _ordered_utility_items(zone.hot_utilities.items())
-    cold_utility_items = _ordered_utility_items(zone.cold_utilities.items())
+    hot_items = _ordered_stream_items(problem, zone.hot_streams.items())
+    cold_items = _ordered_stream_items(problem, zone.cold_streams.items())
+    hot_utility_items = _ordered_utility_items(problem, zone.hot_utilities.items())
+    cold_utility_items = _ordered_utility_items(problem, zone.cold_utilities.items())
 
     if not hot_items or not cold_items:
         raise ValueError("prepared PinchProblem must contain hot and cold streams.")
@@ -93,68 +95,74 @@ def problem_to_solver_arrays(
         "A_coeff": _float_array([config.VARIABLE_COST]),
         "A_exp": _float_array([config.COST_EXP]),
         "T_c_cont": _float_array(
-            _temperature_contribution(stream, dTmin) for _, stream in cold_items
+            _temperature_contribution(stream, dTmin) for _, stream, _ in cold_items
         ),
         "T_c_in": _float_array(
-            _value(stream.t_supply, "K") for _, stream in cold_items
+            _value(stream.t_supply, "K") for _, stream, _ in cold_items
         ),
         "T_c_out": _float_array(
-            _value(stream.t_target, "K") for _, stream in cold_items
+            _value(stream.t_target, "K") for _, stream, _ in cold_items
         ),
         "T_cu_in": _float_array(
-            _value(stream.t_supply, "K") for _, stream in cold_utility_items
+            _value(stream.t_supply, "K") for _, stream, _ in cold_utility_items
         ),
         "T_cu_out": _float_array(
-            _utility_solver_target(stream, zone) for _, stream in cold_utility_items
+            _utility_solver_target(stream, zone) for _, stream, _ in cold_utility_items
         ),
         "T_h_cont": _float_array(
-            _temperature_contribution(stream, dTmin) for _, stream in hot_items
+            _temperature_contribution(stream, dTmin) for _, stream, _ in hot_items
         ),
-        "T_h_in": _float_array(_value(stream.t_supply, "K") for _, stream in hot_items),
+        "T_h_in": _float_array(
+            _value(stream.t_supply, "K") for _, stream, _ in hot_items
+        ),
         "T_h_out": _float_array(
-            _value(stream.t_target, "K") for _, stream in hot_items
+            _value(stream.t_target, "K") for _, stream, _ in hot_items
         ),
         "T_hu_in": _float_array(
-            _value(stream.t_supply, "K") for _, stream in hot_utility_items
+            _value(stream.t_supply, "K") for _, stream, _ in hot_utility_items
         ),
         "T_hu_out": _float_array(
-            _utility_solver_target(stream, zone) for _, stream in hot_utility_items
+            _utility_solver_target(stream, zone) for _, stream, _ in hot_utility_items
         ),
         "c_cost": _float_array(
-            _value(stream.price, "$/MW/h") for _, stream in cold_items
+            _value(stream.price, "$/MW/h") for _, stream, _ in cold_items
         ),
-        "cold_names": _str_array(stream.name for _, stream in cold_items),
+        "cold_names": _str_array(stream.name for _, stream, _ in cold_items),
         "cu_coeff": _float_array([config.VARIABLE_COST]),
         "cu_cost": _float_array(
-            _value(stream.price, "$/MW/h") for _, stream in cold_utility_items
+            _value(stream.price, "$/MW/h") for _, stream, _ in cold_utility_items
         ),
         "cu_exp": _float_array([config.COST_EXP]),
         "cu_unit_cost": _float_array([config.FIXED_COST]),
         "f_c": _float_array(
-            _value(stream.CP, "kW/delta_degC") for _, stream in cold_items
+            _stream_heat_capacity_flowrate(stream, record)
+            for _, stream, record in cold_items
         ),
         "f_h": _float_array(
-            _value(stream.CP, "kW/delta_degC") for _, stream in hot_items
+            _stream_heat_capacity_flowrate(stream, record)
+            for _, stream, record in hot_items
         ),
         "h_cost": _float_array(
-            _value(stream.price, "$/MW/h") for _, stream in hot_items
+            _value(stream.price, "$/MW/h") for _, stream, _ in hot_items
         ),
-        "hot_names": _str_array(stream.name for _, stream in hot_items),
+        "hot_names": _str_array(stream.name for _, stream, _ in hot_items),
         "htc_c": _float_array(
-            _value(stream.htc, "kW/m^2/delta_degC") for _, stream in cold_items
+            _value(stream.htc, "kW/m^2/delta_degC") for _, stream, _ in cold_items
         ),
         "htc_cu": _float_array(
-            _value(stream.htc, "kW/m^2/delta_degC") for _, stream in cold_utility_items
+            _value(stream.htc, "kW/m^2/delta_degC")
+            for _, stream, _ in cold_utility_items
         ),
         "htc_h": _float_array(
-            _value(stream.htc, "kW/m^2/delta_degC") for _, stream in hot_items
+            _value(stream.htc, "kW/m^2/delta_degC") for _, stream, _ in hot_items
         ),
         "htc_hu": _float_array(
-            _value(stream.htc, "kW/m^2/delta_degC") for _, stream in hot_utility_items
+            _value(stream.htc, "kW/m^2/delta_degC")
+            for _, stream, _ in hot_utility_items
         ),
         "hu_coeff": _float_array([config.VARIABLE_COST]),
         "hu_cost": _float_array(
-            _value(stream.price, "$/MW/h") for _, stream in hot_utility_items
+            _value(stream.price, "$/MW/h") for _, stream, _ in hot_utility_items
         ),
         "hu_exp": _float_array([config.COST_EXP]),
         "hu_unit_cost": _float_array([config.FIXED_COST]),
@@ -163,14 +171,16 @@ def problem_to_solver_arrays(
 
     axis_maps = {
         "cold_process_streams": {
-            key: index for index, (key, _) in enumerate(cold_items)
+            key: index for index, (key, _, _) in enumerate(cold_items)
         },
         "cold_utilities": {
-            key: index for index, (key, _) in enumerate(cold_utility_items)
+            key: index for index, (key, _, _) in enumerate(cold_utility_items)
         },
-        "hot_process_streams": {key: index for index, (key, _) in enumerate(hot_items)},
+        "hot_process_streams": {
+            key: index for index, (key, _, _) in enumerate(hot_items)
+        },
         "hot_utilities": {
-            key: index for index, (key, _) in enumerate(hot_utility_items)
+            key: index for index, (key, _, _) in enumerate(hot_utility_items)
         },
         "stages": {
             str(stage): index
@@ -214,8 +224,8 @@ def problem_to_solver_arrays(
             "zone_name": zone.name,
         },
         stream_identities={
-            "cold_process_streams": [key for key, _ in cold_items],
-            "hot_process_streams": [key for key, _ in hot_items],
+            "cold_process_streams": [key for key, _, _ in cold_items],
+            "hot_process_streams": [key for key, _, _ in hot_items],
         },
         unit_conventions={
             "cost_coefficients": (
@@ -233,8 +243,8 @@ def problem_to_solver_arrays(
             ),
         },
         utility_identities={
-            "cold_utilities": [key for key, _ in cold_utility_items],
-            "hot_utilities": [key for key, _ in hot_utility_items],
+            "cold_utilities": [key for key, _, _ in cold_utility_items],
+            "hot_utilities": [key for key, _, _ in hot_utility_items],
         },
     )
 
@@ -254,12 +264,27 @@ def _utility_solver_target(stream: Stream, zone: Zone) -> float:
     return target
 
 
-def _ordered_stream_items(items) -> list[tuple[str, Stream]]:
-    return sorted(items, key=lambda item: _natural_stream_key(item[1].name, item[0]))
+def _stream_heat_capacity_flowrate(stream: Stream, record) -> float:
+    raw_flowrate = getattr(record, "heat_capacity_flowrate", None)
+    if raw_flowrate is not None:
+        parsed = _optional_value(raw_flowrate, "kW/delta_degC")
+        if parsed is not None:
+            return parsed
+    return _value(stream.CP, "kW/delta_degC")
 
 
-def _ordered_utility_items(items) -> list[tuple[str, Stream]]:
-    ordered = _ordered_stream_items(items)
+def _ordered_stream_items(problem: PinchProblem, items) -> list[_PreparedItem]:
+    item_list = list(items)
+    input_streams = getattr(getattr(problem, "_validated_data", None), "streams", ())
+    return _items_in_input_order(item_list, input_streams)
+
+
+def _ordered_utility_items(problem: PinchProblem, items) -> list[_PreparedItem]:
+    item_list = list(items)
+    input_utilities = getattr(
+        getattr(problem, "_validated_data", None), "utilities", ()
+    )
+    ordered = _items_in_input_order(item_list, input_utilities)
     if len(ordered) <= 1:
         return ordered
     real_utilities = [
@@ -270,19 +295,63 @@ def _ordered_utility_items(items) -> list[tuple[str, Stream]]:
     return real_utilities or ordered
 
 
-def _natural_stream_key(name: str, fallback: str) -> tuple[str, int, str]:
-    text = name or fallback
-    match = re.search(r"(\d+)", text)
-    prefix = text[: match.start()].strip() if match else text
-    number = int(match.group(1)) if match else 0
-    return (prefix, number, text)
+def _items_in_input_order(
+    items: list[tuple[str, Stream]],
+    input_records,
+) -> list[_PreparedItem]:
+    if not input_records:
+        return [(key, stream, None) for key, stream in items]
+
+    remaining = list(items)
+    ordered: list[_PreparedItem] = []
+    for record in input_records:
+        match_index = _matching_item_index(remaining, record)
+        if match_index is None:
+            continue
+        key, stream = remaining.pop(match_index)
+        ordered.append((key, stream, record))
+    ordered.extend((key, stream, None) for key, stream in remaining)
+    return ordered
+
+
+def _matching_item_index(
+    items: list[tuple[str, Stream]],
+    record,
+) -> int | None:
+    record_name = str(getattr(record, "name", "") or "").strip()
+    record_zone = str(getattr(record, "zone", "") or "").strip()
+    zone_leaf = record_zone.split("/")[-1] if record_zone else ""
+    for index, (key, stream) in enumerate(items):
+        if stream.name != record_name:
+            continue
+        if not zone_leaf or key.startswith(f"{zone_leaf}."):
+            return index
+    for index, (_key, stream) in enumerate(items):
+        if stream.name == record_name:
+            return index
+    return None
 
 
 def _value(value: Any, unit: str) -> float:
-    if value is None:
+    parsed = _optional_value(value, unit)
+    if parsed is None:
         return 0.0
+    return parsed
+
+
+def _optional_value(value: Any, unit: str) -> float | None:
+    if value is None:
+        return None
     if hasattr(value, "to"):
         return float(value.to(unit).value)
+    if hasattr(value, "value"):
+        raw_value = getattr(value, "value")
+        if raw_value is None:
+            return None
+        raw_unit = getattr(value, "unit", None)
+        if raw_unit:
+            return float(Value(raw_value, raw_unit).to(unit).value)
+        return float(raw_value)
     return float(value)
 
 

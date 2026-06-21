@@ -500,14 +500,18 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(sum(self.X[i][j][k] for j in range(self.J)) == 1.0)
+                self.m.Equation(
+                    self.m.sum([self.X[i][j][k] for j in range(self.J)]) == 1.0
+                )
                 if sum(self.z_allowed[i][j][k] for j in range(self.J)) > 0
                 else None
                 for k in range(self.S)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(sum(self.Y[j][i][k] for i in range(self.I)) == 1.0)
+                self.m.Equation(
+                    self.m.sum([self.Y[j][i][k] for i in range(self.I)]) == 1.0
+                )
                 if sum(self.z_allowed[i][j][k] for i in range(self.I)) > 0
                 else None
                 for k in range(self.S)
@@ -998,11 +1002,11 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
 
     def _set_total_cost_objective(self) -> None:
         self.hu_cost_total = self.m.Intermediate(
-            self.hu_cost[0] * sum(self.Q_h[j] for j in range(self.J)),
+            self.hu_cost[0] * self.m.sum([self.Q_h[j] for j in range(self.J)]),
             name="Hot utility cost",
         )
         self.cu_cost_total = self.m.Intermediate(
-            self.cu_cost[0] * sum(self.Q_c[i] for i in range(self.I)),
+            self.cu_cost[0] * self.m.sum([self.Q_c[i] for i in range(self.I)]),
             name="Cold utility cost",
         )
         self.recovery_area_cost_filtered = [

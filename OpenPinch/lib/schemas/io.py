@@ -30,6 +30,15 @@ class StreamSchema(BaseModel):
     h_supply: Optional[ScalarOrVU] = None
     h_target: Optional[ScalarOrVU] = None
     heat_flow: ScalarOrVU
+    heat_capacity_flowrate: Optional[ScalarOrVU] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "heat_capacity_flowrate",
+            "heat_capacity_flow_rate",
+            "flow_heat_capacity",
+        ),
+        serialization_alias="heat_capacity_flowrate",
+    )
     dt_cont: Optional[ScalarOrVU] = 0.0
     htc: Optional[ScalarOrVU] = 1.0
     fluid_name: Optional[str] = None

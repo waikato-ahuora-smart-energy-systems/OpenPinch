@@ -355,6 +355,10 @@ def _stream_payload(
             "value": row.heat_capacity_flowrate * delta_t,
             "unit": "kW",
         },
+        "heat_capacity_flowrate": {
+            "value": row.heat_capacity_flowrate,
+            "unit": "kW/delta_degC",
+        },
         "htc": {
             "value": row.heat_transfer_coefficient,
             "unit": "kW/m^2/K",

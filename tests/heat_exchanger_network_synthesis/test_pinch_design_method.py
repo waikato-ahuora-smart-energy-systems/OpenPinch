@@ -158,7 +158,7 @@ def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> No
     assert calls == ["gekko"]
 
 
-def test_couenne_options_are_written_to_model_run_directory(
+def test_user_couenne_options_are_written_to_model_run_directory(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -195,11 +195,7 @@ def test_couenne_options_are_written_to_model_run_directory(
 
     assert run.option_file == str(option_file)
     assert run.solver_options == {
-        "problem_print_level": 3,
         "node_limit": 50,
-        "feas_tolerance": 0.01,
-        "allowable_gap": 0.01,
-        "allowable_fraction_gap": 0.1,
         "delete_redundant": "no",
         "time_limit": 120,
     }
@@ -207,9 +203,9 @@ def test_couenne_options_are_written_to_model_run_directory(
     assert model.options.SOLVER_EXTENSION == "pyomo"
     assert "node_limit 50" in couenne_options
     assert "node_limit 2000" not in couenne_options
-    assert "feas_tolerance 0.01" in couenne_options
-    assert "allowable_gap 0.01" in couenne_options
-    assert "allowable_fraction_gap 0.1" in couenne_options
+    assert "feas_tolerance" not in couenne_options
+    assert "allowable_gap" not in couenne_options
+    assert "allowable_fraction_gap" not in couenne_options
     assert "delete_redundant no" in couenne_options
     assert "time_limit 120" in couenne_options
 
@@ -220,6 +216,43 @@ def test_couenne_options_are_written_to_model_run_directory(
     assert model.cwd_during_solve == option_file.parent
     assert solve_run.option_file == str(option_file)
     assert solve_run.failure_reason is None
+
+
+def test_couenne_without_user_options_matches_source_no_option_file(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def present_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        del purpose
+        return f"/usr/local/bin/{binary_name}"
+
+    class _FakeSolverFactory:
+        def available(self, exception_flag: bool = False) -> bool:
+            del exception_flag
+            return True
+
+    def present_dependency(import_name: str, **_kwargs):
+        if import_name == "pyomo.environ":
+            return SimpleNamespace(SolverFactory=lambda _name: _FakeSolverFactory())
+        return object()
+
+    monkeypatch.setattr(backend, "require_solver_binary", present_binary)
+    monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
+    model = _FakeGekkoModel(tmp_path / "gekko-run")
+
+    run = backend.configure_gekko_solver(model, "couenne")
+
+    assert run.option_file is None
+    assert run.solver_options is None
+    assert not (tmp_path / "gekko-run" / "couenne.opt").exists()
+
+    original_cwd = Path.cwd()
+    solve_run = backend.solve_gekko_model(model, solver_name="couenne")
+
+    assert Path.cwd() == original_cwd
+    assert model.cwd_during_solve == original_cwd
+    assert solve_run.option_file is None
+    assert solve_run.solver_options is None
 
 
 def test_internal_problem_runs_stage_reduction_before_evolution(monkeypatch) -> None:
