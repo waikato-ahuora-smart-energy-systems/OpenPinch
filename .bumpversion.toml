@@ -17,3 +17,12 @@ commit_args = ""
 filename = "./pyproject.toml"
 search = "version = \"{current_version}\""
 replace = "version = \"{new_version}\""
+
+[[tool.bumpversion.files]]
+filename = "./uv.lock"
+search = """name = "openpinch"
+version = "{current_version}"
+source = """
+replace = """name = "openpinch"
+version = "{new_version}"
+source = """

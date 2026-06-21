@@ -7,6 +7,7 @@ import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+BUMPVERSION = REPO_ROOT / ".bumpversion.toml"
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 UV_LOCK = REPO_ROOT / "uv.lock"
 PYTHON_VERSION = REPO_ROOT / ".python-version"
@@ -26,6 +27,11 @@ def _read_pyproject() -> dict:
 
 def _read_uv_lock() -> dict:
     with UV_LOCK.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def _read_bumpversion() -> dict:
+    with BUMPVERSION.open("rb") as handle:
         return tomllib.load(handle)
 
 
@@ -187,6 +193,41 @@ def test_lockfile_project_version_matches_pyproject():
     )
 
     assert package["version"] == project_version
+
+
+def test_bumpversion_updates_lockfile_project_version():
+    config = _read_bumpversion()["tool"]["bumpversion"]
+    uv_lock_entries = [
+        entry
+        for entry in config["files"]
+        if entry["filename"] in {"uv.lock", "./uv.lock"}
+    ]
+
+    assert len(uv_lock_entries) == 1
+
+    entry = uv_lock_entries[0]
+    current_search = entry["search"].replace(
+        "{current_version}", config["current_version"]
+    )
+
+    assert 'name = "openpinch"' in entry["search"]
+    assert "source = " in entry["search"]
+    assert "{ editable" not in entry["search"]
+    assert 'version = "{new_version}"' in entry["replace"]
+    assert current_search in UV_LOCK.read_text(encoding="utf-8")
+
+
+def test_ci_workflows_check_lockfile_project_version():
+    command = "python scripts/check_lockfile_version.py"
+
+    for workflow in WORKFLOWS:
+        text = workflow.read_text(encoding="utf-8")
+        assert command in text
+
+    pull_request_workflow = (
+        REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml"
+    ).read_text(encoding="utf-8")
+    assert pull_request_workflow.count(command) >= 2
 
 
 def test_testpypi_publish_skips_existing_files_but_pypi_publish_does_not():
