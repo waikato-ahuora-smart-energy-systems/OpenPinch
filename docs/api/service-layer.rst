@@ -51,6 +51,43 @@ level ``problem.target.*(..., state_id=...)`` wrappers.
 .. autofunction:: OpenPinch.services.input_data_processing.data_preparation.prepare_problem
    :no-index:
 
+Heat Exchanger Network Synthesis Entry
+--------------------------------------
+
+Heat exchanger network synthesis is problem-rooted. User code should normally
+enter through ``PinchProblem.design``:
+
+.. code-block:: python
+
+   from OpenPinch.lib import HENDesignMethod
+
+   problem.design.open_hens_method()
+   problem.design.heat_exchanger_network_synthesis(
+       method=HENDesignMethod.NetworkEvolution,
+       initial_networks=(existing_network,),
+   )
+
+The internal service entry point owns method dispatch and final result caching.
+It dispatches to the same direct services exposed by the design accessor:
+``open_hens_method``, ``pinch_design_method``,
+``thermal_derivative_method``, and ``network_evolution_method``.
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.heat_exchanger_network_synthesis_entry
+   :members:
+   :no-index:
+
+The HEN synthesis package is intentionally method-oriented:
+
+- ``targeting_services`` contains method-specific orchestration.
+- ``common.execution`` contains settings, task builders, executor contracts,
+  and fallback policy.
+- ``common.results`` contains result assembly and seed lookup.
+- ``common.reporting`` contains ranking, verification, and export helpers.
+- ``common.solver`` contains optional-dependency checks, array adapters,
+  backend calls, and network extraction.
+- ``unit_models`` contains the equation/unit model layer for pinch design and
+  stagewise models.
+
 Network Grid Diagrams
 ---------------------
 

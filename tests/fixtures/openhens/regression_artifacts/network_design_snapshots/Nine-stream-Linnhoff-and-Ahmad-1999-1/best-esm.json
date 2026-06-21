@@ -3,7 +3,7 @@
   "case_id": "Nine-stream-Linnhoff-and-Ahmad-1999-1",
   "source_solver_run_summary_artifact": "Nine-stream-Linnhoff-and-Ahmad-1999-1/summary.json",
   "task_id": "esm-187ea46995ce",
-  "method": "energy_stage_refinement",
+  "method": "network_evolution_method",
   "expected": {
     "total_annual_cost": 2905807.275299348,
     "best_dTmin": 18,

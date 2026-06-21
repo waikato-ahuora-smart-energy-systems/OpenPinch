@@ -24,6 +24,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+      - name: Check uv.lock project version
+        run: python scripts/check_lockfile_version.py
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
@@ -210,6 +212,10 @@ jobs:
             git add -A
             git commit -m "chore: bump version: ${prev} → ${curr} [ci bump]"
           fi
+
+      - name: Check bumped uv.lock project version
+        if: steps.bump.outputs.bumped == 'true'
+        run: python scripts/check_lockfile_version.py
 
       # 3) Push to the PR head branch explicitly (never to refs/pull/*/merge)
       - name: Push bump commit to PR head

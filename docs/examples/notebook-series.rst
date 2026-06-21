@@ -65,9 +65,10 @@ Included Notebooks
 ``09_hen_design_service_four_stream.ipynb``
    Heat exchanger network design-service execution on a compact four-stream
    synthesis problem,
-   including the public ``problem.design.heat_exchanger_network_synthesis()``
-   accessor, workspace workflow dispatch, concise task metadata, and grid
-   views for the top networks.
+   including the public ``problem.design.open_hens_method()`` accessor, the
+   ``problem.design.heat_exchanger_network_synthesis(method=...)`` dispatcher,
+   workspace workflow dispatch, concise task metadata, and grid views for the
+   top networks.
 
 How To Use Them
 ---------------

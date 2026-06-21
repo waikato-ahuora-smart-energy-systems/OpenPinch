@@ -3,7 +3,7 @@
   "case_id": "Four-stream-Yee-and-Grossmann-1990-1",
   "source_solver_run_summary_artifact": "Four-stream-Yee-and-Grossmann-1990-1/summary.json",
   "task_id": "esm-b520e740f0d6",
-  "method": "energy_stage_refinement",
+  "method": "network_evolution_method",
   "expected": {
     "total_annual_cost": 154853.8518602861,
     "best_dTmin": 14.0,

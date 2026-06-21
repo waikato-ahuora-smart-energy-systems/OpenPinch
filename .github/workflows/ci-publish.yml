@@ -71,6 +71,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+      - name: Check uv.lock project version
+        run: python scripts/check_lockfile_version.py
       - name: Build sdist/wheel
         run: |
           python -m pip install --upgrade pip

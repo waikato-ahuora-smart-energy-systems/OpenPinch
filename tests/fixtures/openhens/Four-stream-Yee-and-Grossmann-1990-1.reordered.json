@@ -32,9 +32,9 @@
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
     "HENS_METHOD_SEQUENCE": [
-      "pinch_decomposition",
-      "topology_design",
-      "energy_stage_refinement"
+      "pinch_design_method",
+      "thermal_derivative_method",
+      "network_evolution_method"
     ],
     "HENS_OUTPUT_FOLDER": "",
     "HENS_OUTPUT_FORMATS": [

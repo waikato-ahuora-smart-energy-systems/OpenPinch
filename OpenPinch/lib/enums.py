@@ -90,6 +90,21 @@ class HeatExchangerStreamRole(str, Enum):
     UTILITY = "utility"
 
 
+class HeatExchangerNetworkDesignMethod(str, Enum):
+    """User-selectable heat exchanger network design service methods."""
+
+    OpenHENS = "open_hens_method"
+    PinchDesign = "pinch_design_method"
+    ThermalDerivative = "thermal_derivative_method"
+    NetworkEvolution = "network_evolution_method"
+
+    def __str__(self):
+        return self.value
+
+
+HENDesignMethod = HeatExchangerNetworkDesignMethod
+
+
 class HeatPump(Enum):
     """Heat pump components"""
 

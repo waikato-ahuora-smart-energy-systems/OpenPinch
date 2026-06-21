@@ -61,6 +61,29 @@ solver axis positions remain internal implementation details.
 .. automodule:: OpenPinch.classes.heat_exchanger_network
    :members:
 
+Heat Exchanger Network Unit Models
+----------------------------------
+
+The HEN synthesis unit-model modules sit below the public design accessors.
+They are useful when inspecting how the pinch-design and stagewise equations
+are assembled, but users normally call the methods through
+``problem.design``.
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models
+   :no-members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.base
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.pinch_design
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.stagewise
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.problem
+   :members:
+
 Units and Scalar Helpers
 ------------------------
 

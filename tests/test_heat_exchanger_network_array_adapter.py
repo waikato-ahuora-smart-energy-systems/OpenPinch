@@ -18,7 +18,7 @@ from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
-from OpenPinch.services.heat_exchanger_network_synthesis.array_adapter import (
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     problem_to_solver_arrays,
 )
 
@@ -137,6 +137,68 @@ def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
     np.testing.assert_allclose(payload.arrays["hu_cost"], [60.0])
 
 
+def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
+    problem = PinchProblem(
+        source={
+            "streams": [
+                {
+                    "zone": "Site/Process A",
+                    "name": "H1",
+                    "t_supply": {"value": 500.0, "unit": "K"},
+                    "t_target": {"value": 370.0, "unit": "K"},
+                    "heat_flow": {"value": 999.0, "unit": "kW"},
+                    "heat_capacity_flowrate": {
+                        "value": 14.8,
+                        "unit": "kW/delta_degC",
+                    },
+                },
+                {
+                    "zone": "Site/Process A",
+                    "name": "C1",
+                    "t_supply": {"value": 310.0, "unit": "K"},
+                    "t_target": {"value": 470.0, "unit": "K"},
+                    "heat_flow": {"value": 888.0, "unit": "kW"},
+                    "flow_heat_capacity": 6.1,
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "HPS",
+                    "type": "Hot",
+                    "t_supply": {"value": 520.0, "unit": "K"},
+                    "t_target": {"value": 520.0, "unit": "K"},
+                    "heat_flow": None,
+                    "htc": {"value": 5.0, "unit": "kW/m^2/K"},
+                    "price": {"value": 60.0, "unit": "$/MWh"},
+                },
+                {
+                    "name": "CW",
+                    "type": "Cold",
+                    "t_supply": {"value": 290.0, "unit": "K"},
+                    "t_target": {"value": 310.0, "unit": "K"},
+                    "heat_flow": None,
+                    "htc": {"value": 1.0, "unit": "kW/m^2/K"},
+                    "price": {"value": 10.0, "unit": "$/MWh"},
+                },
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [
+                    {"name": "Process A", "type": "Process Zone", "children": None}
+                ],
+            },
+        }
+    )
+
+    payload = problem_to_solver_arrays(problem, 10.0)
+
+    assert float(problem.hot_streams[0].CP) != pytest.approx(14.8)
+    assert float(problem.cold_streams[0].CP) != pytest.approx(6.1)
+    assert payload.arrays["f_h"].tolist() == [14.8]
+    assert payload.arrays["f_c"].tolist() == [6.1]
+
+
 def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() -> None:
     case_id = "Four-stream-Yee-and-Grossmann-1990-1"
     fixture_path = FIXTURE_ROOT / f"{case_id}.json"
@@ -170,7 +232,7 @@ def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() ->
 
 
 @pytest.mark.parametrize("case_id", CASE_DTMIN)
-def test_reordered_fixtures_keep_same_prepared_adapter_semantics(case_id: str) -> None:
+def test_reordered_fixtures_change_private_solver_axis_order(case_id: str) -> None:
     base = problem_to_solver_arrays(
         PinchProblem(source=FIXTURE_ROOT / f"{case_id}.json"),
         CASE_DTMIN[case_id],
@@ -180,15 +242,21 @@ def test_reordered_fixtures_keep_same_prepared_adapter_semantics(case_id: str) -
         CASE_DTMIN[case_id],
     )
 
-    assert reordered.axis_maps == base.axis_maps
-    assert reordered.stream_identities == base.stream_identities
+    assert set(reordered.axis_maps) == set(base.axis_maps)
     assert reordered.utility_identities == base.utility_identities
-    for name, expected in base.arrays.items():
-        actual = reordered.arrays[name]
-        if expected.dtype.kind in {"U", "S", "O"}:
-            assert actual.tolist() == expected.tolist()
-        else:
-            np.testing.assert_allclose(actual, expected)
+    assert set(reordered.stream_identities) == set(base.stream_identities)
+    assert reordered.stream_identities["hot_process_streams"] == list(
+        reversed(base.stream_identities["hot_process_streams"])
+    )
+    assert reordered.stream_identities["cold_process_streams"] == list(
+        reversed(base.stream_identities["cold_process_streams"])
+    )
+    assert reordered.arrays["hot_names"].tolist() == list(
+        reversed(base.arrays["hot_names"].tolist())
+    )
+    assert reordered.arrays["cold_names"].tolist() == list(
+        reversed(base.arrays["cold_names"].tolist())
+    )
 
 
 def test_adapter_requires_prepared_pinch_problem_and_rejects_bypass_payloads() -> None:
@@ -279,16 +347,12 @@ def _load_converter_module():
 def _assert_axis_identities_match(current: dict, snapshot: dict) -> None:
     assert set(current["axis_maps"]) == set(snapshot["axis_maps"])
     for axis_name, current_axis in current["axis_maps"].items():
-        snapshot_axis = snapshot["axis_maps"][axis_name]
-        if axis_name == "stages":
-            assert current_axis == snapshot_axis
-        else:
-            assert set(current_axis) == set(snapshot_axis)
+        assert current_axis == snapshot["axis_maps"][axis_name]
 
     for identity_group in ("stream_identities", "utility_identities"):
         assert set(current[identity_group]) == set(snapshot[identity_group])
         for axis_name, identities in current[identity_group].items():
-            assert set(identities) == set(snapshot[identity_group][axis_name])
+            assert identities == snapshot[identity_group][axis_name]
 
 
 def _assert_array_matches_by_identity(

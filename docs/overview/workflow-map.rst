@@ -61,6 +61,9 @@ Use ``PinchProblem`` when:
 - you want access to ``problem.plot.*``, ``problem.target.*``,
   ``problem.add_component.*``, ``problem.state_ids``, or
   ``problem.target_all_states()``
+- you want heat exchanger network design through
+  ``problem.design.open_hens_method(...)`` or the explicit HEN ``*_method``
+  accessors
 
 Use ``PinchWorkspace`` when:
 
@@ -103,6 +106,7 @@ Workflow Layering
                  |
                  v
    direct / indirect / HPR / exergy / cogeneration services
+   heat exchanger network synthesis design services
                  |
                  v
       TargetOutput + summaries + graphs + exports
@@ -129,6 +133,14 @@ Stateful study
 Advanced HPR study
    ``base case -> problem.target.direct_heat_pump(...) -> compare summary rows
    and GCC / HPR graph surfaces``
+
+Heat exchanger network synthesis study
+   ``PinchProblem("four_stream.json") -> problem.design.open_hens_method() ->
+   inspect ranked networks -> build grid diagrams``
+
+Retrofit network evolution study
+   ``existing HeatExchangerNetwork -> problem.design.network_evolution_method(
+   initial_networks=(network,)) -> compare ranked retrofit candidates``
 
 Direct process MVR study
    ``workspace.copy_case -> problem.add_component.process_mvr(...) -> re-solve

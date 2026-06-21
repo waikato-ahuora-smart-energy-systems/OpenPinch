@@ -9,7 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from OpenPinch.services.heat_exchanger_network_synthesis import _dependencies
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
+    dependencies as _dependencies,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SYNTHESIS_ONLY_MODULES = [
