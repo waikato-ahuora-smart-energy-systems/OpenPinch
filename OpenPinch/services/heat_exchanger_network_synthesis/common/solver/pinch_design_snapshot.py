@@ -317,10 +317,7 @@ def _source_interval_cp_sum(
 ) -> np.float64:
     total = np.float64(0.0)
     for index in range(len(cp)):
-        if (
-            stream_max[index] > lower + tol
-            and stream_min[index] < upper - tol
-        ):
+        if stream_max[index] > lower + tol and stream_min[index] < upper - tol:
             total = total + cp[index]
     return total
 

@@ -7,11 +7,11 @@ from pathlib import Path
 import numpy as np
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
-    PreparedSolverArrays,
-)
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
     pinch_design_snapshot as snapshot_module,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
+    PreparedSolverArrays,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.pinch_design_snapshot import (
     _source_style_target_snapshot,
