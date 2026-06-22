@@ -309,7 +309,7 @@ def test_public_design_accessor_returns_ranked_networks(
 
     assert problem.results is not None
     assert problem.results.design == design
-    assert len(design.ranked_networks) == 2
+    assert len(design.ranked_networks) == 1
     assert design.ranked_networks[0].network == design.network
     assert design.task_id == design.ranked_networks[0].task.task_id
     assert [outcome.objective_value for outcome in design.ranked_networks] == sorted(

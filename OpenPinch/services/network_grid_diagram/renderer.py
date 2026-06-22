@@ -10,7 +10,6 @@ from .constants import (
     _COLD_STREAM_COLOR,
     _COLD_UTILITY_COLOR,
     _DEFAULT_STREAM_LINE_WIDTH,
-    _DUTY_TOLERANCE_KW,
     _GROUP_GAP_LANES,
     _HOT_STREAM_COLOR,
     _HOT_UTILITY_COLOR,
@@ -278,7 +277,6 @@ class _PlotlyGridRenderer:
         }
 
         self.x_start = _LAYOUT_X_MIN
-        self.tol = _DUTY_TOLERANCE_KW
         self.size_of_font = 18
         self.duty_font_size = 14
         self.temp_font_size = 14

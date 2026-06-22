@@ -27,6 +27,7 @@ OpenPinch currently ships with sample cases such as:
 - ``pulp_mill.json``
 - ``heat_pump_targeting.json``
 - ``chocolate_factory.json``
+- ``Four-stream-Yee-and-Grossmann-1990-1.json``
 
 Use the resource helpers when you want to inspect or copy them explicitly:
 
@@ -140,8 +141,9 @@ Recommended Learning Path
    vapour-compression plus MVR cascade HPR backend.
 8. Notebook 08 when you need direct gas/vapour MVR on selected process streams
    before re-solving direct and Total Site targets.
-9. Notebook 09 when you need heat exchanger network design-service execution and network
-   inspection on a compact four-stream synthesis case.
+9. Notebook 09 when you need heat exchanger network design-service execution
+   and network inspection on the converted OpenHENS Ye and Grossman four-stream
+   synthesis case.
 
 Why These Assets Matter
 -----------------------

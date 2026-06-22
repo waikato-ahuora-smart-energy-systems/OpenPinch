@@ -40,6 +40,10 @@ Included Cases
    Advanced direct-versus-indirect Carnot HPR and refrigeration example used in
    the packaged notebook workflow.
 
+``Four-stream-Yee-and-Grossmann-1990-1.json``
+   Converted OpenHENS Ye and Grossman four-stream heat exchanger network
+   synthesis example used by notebook 09.
+
 How To Copy Them
 ----------------
 
@@ -81,3 +85,5 @@ Choosing The Right Case
   screening input data set.
 - Use ``chocolate_factory.json`` when you want to study the advanced
   direct-versus-indirect HPR and refrigeration surface used by notebook 03.
+- Use ``Four-stream-Yee-and-Grossmann-1990-1.json`` when you want the converted
+  OpenHENS four-stream synthesis case used by notebook 09.

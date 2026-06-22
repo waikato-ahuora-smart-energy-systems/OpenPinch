@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from OpenPinch.resources import list_notebooks
+from OpenPinch.resources import list_notebooks, list_sample_cases
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 README = REPO_ROOT / "README.md"
@@ -152,14 +152,8 @@ def test_docs_reference_current_packaged_sample_cases():
         ]
     )
 
-    assert "basic_pinch.json" in combined
-    assert "crude_preheat_train.json" in combined
-    assert "crude_preheat_train_multistate.json" in combined
-    assert "zonal_site.json" in combined
-    assert "zonal_site_multistate.json" in combined
-    assert "pulp_mill.json" in combined
-    assert "heat_pump_targeting.json" in combined
-    assert "chocolate_factory.json" in combined
+    for sample_case_name in list_sample_cases():
+        assert sample_case_name in combined
 
 
 def test_docs_explain_base_and_notebook_installs():

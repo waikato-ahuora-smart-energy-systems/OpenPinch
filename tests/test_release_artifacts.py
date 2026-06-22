@@ -80,6 +80,12 @@ def _assert_common_release_boundary(names: list[str], *, root_prefix: str = "") 
     )
     assert any(
         name.endswith(
+            "OpenPinch/data/sample_cases/Four-stream-Yee-and-Grossmann-1990-1.json"
+        )
+        for name in names
+    )
+    assert any(
+        name.endswith(
             "OpenPinch/data/notebooks/01_basic_pinch_and_dtcont_sensitivity.ipynb"
         )
         for name in names

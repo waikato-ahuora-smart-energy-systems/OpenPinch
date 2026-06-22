@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
+from ....network_grid_diagram.builder import build_grid_model
 
 if TYPE_CHECKING:
     from .....lib.schemas.synthesis import (
@@ -12,14 +13,10 @@ if TYPE_CHECKING:
         HeatExchangerNetworkSynthesisTaskOutcome,
     )
 
-_STRUCTURE_DUTY_TOLERANCE_KW = 1.0
-
-
 def rank_unique_network_outcomes(
     result: "HeatExchangerNetworkSynthesisResult",
     *,
     limit: int | None = None,
-    duty_tolerance: float = _STRUCTURE_DUTY_TOLERANCE_KW,
 ) -> tuple["HeatExchangerNetworkSynthesisTaskOutcome", ...]:
     """Return ranked successful outcomes with duplicate structures removed."""
     if limit is not None and limit < 1:
@@ -28,10 +25,7 @@ def rank_unique_network_outcomes(
     unique_outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome] = []
     seen_structures: set[tuple[tuple[Any, ...], ...]] = set()
     for outcome in _ranked_candidate_outcomes(result):
-        structure = network_structure_signature(
-            outcome.network,
-            duty_tolerance=duty_tolerance,
-        )
+        structure = network_structure_signature(outcome.network)
         if structure in seen_structures:
             continue
         seen_structures.add(structure)
@@ -44,22 +38,37 @@ def rank_unique_network_outcomes(
 
 def network_structure_signature(
     network: HeatExchangerNetwork,
-    *,
-    duty_tolerance: float = _STRUCTURE_DUTY_TOLERANCE_KW,
 ) -> tuple[tuple[Any, ...], ...]:
-    """Return a stable topology signature for active exchanger connections."""
-    links = {
-        (
-            exchanger.kind.value,
-            exchanger.source_stream,
-            exchanger.sink_stream,
-            exchanger.stage,
+    """Return the stable topology signature used by grid-diagram plotting."""
+    grid_model = build_grid_model(network)
+    recovery_stage_index = {
+        stage: index
+        for index, stage in enumerate(
+            dict.fromkeys(
+                match.stage
+                for match in grid_model.recovery_matches
+                if match.stage is not None
+            )
         )
-        for exchanger in network.exchangers
-        if exchanger.active
-        and exchanger.match_allowed
-        and exchanger.duty > duty_tolerance
     }
+    links = [
+        (
+            "recovery",
+            match.source_stream,
+            match.sink_stream,
+            recovery_stage_index[match.stage],
+        )
+        for match in grid_model.recovery_matches
+        if match.stage is not None
+    ]
+    links.extend(
+        ("hot_utility", match.source_stream, match.sink_stream, None)
+        for match in grid_model.hot_utility_matches
+    )
+    links.extend(
+        ("cold_utility", match.source_stream, match.sink_stream, None)
+        for match in grid_model.cold_utility_matches
+    )
     return tuple(sorted(links))
 
 

@@ -4,6 +4,7 @@ import csv
 from uuid import uuid4
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from OpenPinch.classes import *
@@ -467,6 +468,95 @@ def test_get_utility_streams_returns_hot_and_cold_utility_streams():
     }
     assert [s.name for s in utility_streams] == ["H_UT", "C_UT"]
     assert utility_streams._sort_reverse is True
+
+
+def test_to_dict_exports_streams_in_standard_reporting_order():
+    sc = StreamCollection()
+    streams = [
+        Stream(
+            name="CU1",
+            t_supply=50,
+            t_target=100,
+            heat_flow=1,
+            is_process_stream=False,
+        ),
+        Stream(name="C2", t_supply=80, t_target=180, heat_flow=1),
+        Stream(name="H1", t_supply=200, t_target=100, heat_flow=1),
+        Stream(
+            name="HU1",
+            t_supply=240,
+            t_target=230,
+            heat_flow=1,
+            is_process_stream=False,
+        ),
+        Stream(name="H2", t_supply=220, t_target=90, heat_flow=1),
+        Stream(
+            name="CU2",
+            t_supply=90,
+            t_target=140,
+            heat_flow=1,
+            is_process_stream=False,
+        ),
+        Stream(name="C1", t_supply=120, t_target=150, heat_flow=1),
+        Stream(
+            name="HU2",
+            t_supply=260,
+            t_target=200,
+            heat_flow=1,
+            is_process_stream=False,
+        ),
+        Stream(name="H3", t_supply=200, t_target=150, heat_flow=1),
+    ]
+    for stream in streams:
+        sc.add(stream)
+    sc.set_sort_key("name", reverse=False)
+
+    payload = sc.to_dict()
+    frame = pd.DataFrame(payload)
+
+    assert frame["name"].tolist() == [
+        "H2",
+        "H3",
+        "H1",
+        "C1",
+        "C2",
+        "HU2",
+        "HU1",
+        "CU2",
+        "CU1",
+    ]
+    assert frame["category"].tolist() == [
+        "hot_stream",
+        "hot_stream",
+        "hot_stream",
+        "cold_stream",
+        "cold_stream",
+        "hot_utility",
+        "hot_utility",
+        "cold_utility",
+        "cold_utility",
+    ]
+    assert frame.loc[0, "t_supply"] == pytest.approx(220.0)
+    assert frame.loc[0, "t_target"] == pytest.approx(90.0)
+
+
+def test_to_dict_uses_requested_state_index_for_stateful_stream_values():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="H1",
+            t_supply={"values": [200.0, 180.0], "unit": "degC"},
+            t_target={"values": [120.0, 100.0], "unit": "degC"},
+            heat_flow={"values": [100.0, 80.0], "unit": "kW"},
+        )
+    )
+
+    payload = sc.to_dict(idx=1)
+    frame = pd.DataFrame(payload)
+
+    assert frame.loc[0, "t_supply"] == pytest.approx(180.0)
+    assert frame.loc[0, "t_target"] == pytest.approx(100.0)
+    assert frame.loc[0, "heat_flow"] == pytest.approx(80.0)
 
 
 def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
