@@ -55,26 +55,26 @@ def prepare_problem(
         zone_tree,
         project_name,
     )
-    zone_config = _build_zone_config(
+    config = _build_zone_config(
         options=options,
         top_zone_name=top_zone_name,
         top_zone_identifier=top_zone_identifier,
     )
-    zone_tree, streams, utilities, zone_config = _validate_input_data(
+    zone_tree, streams, utilities, config = _validate_input_data(
         zone_tree=zone_tree,
         streams=streams,
         utilities=utilities,
-        zone_config=zone_config,
+        config=config,
     )
     master_zone = Zone(
-        name=zone_config.TOP_ZONE_NAME,
-        type=zone_config.TOP_ZONE_IDENTIFIER,
-        zone_config=zone_config,
+        name=config.problem.top_zone_name,
+        type=config.problem.top_zone_identifier,
+        config=config,
     )
     master_zone = _create_nested_zones(
         parent_zone=master_zone,
         zone_tree=zone_tree,
-        zone_config=master_zone.config,
+        config=master_zone.config,
     )
     prepared_streams, process_zone_paths = _build_prepared_stream_collection(
         master_zone=master_zone,
@@ -143,7 +143,7 @@ def _build_prepared_stream_collection(
         utilities=utilities,
         hu_t_min=hu_t_min,
         cu_t_max=cu_t_max,
-        zone_config=master_zone.config,
+        config=master_zone.config,
         dt_cont_multiplier=master_zone.dt_cont_multiplier,
     )
     prepared_streams = process_streams + utility_streams

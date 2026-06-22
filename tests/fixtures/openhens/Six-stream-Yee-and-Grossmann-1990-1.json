@@ -1,0 +1,259 @@
+{
+  "options": {
+    "COSTING_HX_AREA_EXP": 0.6,
+    "COSTING_HX_UNIT_COST": 0.0,
+    "HENS_APPROACH_TEMPERATURES": [
+      2.0,
+      4.0,
+      6.0,
+      8.0,
+      10.0,
+      12.0,
+      14.0,
+      16.0,
+      18.0,
+      20.0
+    ],
+    "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
+    "HENS_DERIVATIVE_THRESHOLDS": [
+      0.5,
+      0.9,
+      1.3,
+      1.7,
+      2.1,
+      2.4,
+      2.8,
+      3.2,
+      3.6,
+      4.0
+    ],
+    "HENS_SOLVER_EVM": "ipopt-pyomo",
+    "HENS_SOLVER_OPTIONS_EVM": {},
+    "HENS_LOG_LEVEL": "WARNING",
+    "HENS_MAX_PARALLEL": 10,
+    "HENS_METHOD_SEQUENCE": [
+      "pinch_design_method",
+      "thermal_derivative_method",
+      "network_evolution_method"
+    ],
+    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Six-stream-Yee-and-Grossmann-1990-1",
+    "HENS_OUTPUT_FORMATS": [
+      "json",
+      "csv"
+    ],
+    "HENS_SOLVER_PDM": "couenne",
+    "HENS_SOLVER_OPTIONS_PDM": {},
+    "HENS_RUN_ID": "Six-stream-Yee-and-Grossmann-1990-1",
+    "HENS_SOLVE_TOLERANCE": 0.001,
+    "HENS_STAGE_SELECTION": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "HENS_SOLVER_TDM": "couenne",
+    "HENS_SOLVER_OPTIONS_TDM": {},
+    "COSTING_HX_AREA_COEFF": 1200.0
+  },
+  "streams": [
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 6.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 1080.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "Raw Milk",
+      "t_supply": {
+        "unit": "K",
+        "value": 500.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 320.0
+      },
+      "zone": "Site/Process A"
+    },
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 4.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 400.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "HT Flash",
+      "t_supply": {
+        "unit": "K",
+        "value": 480.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 380.0
+      },
+      "zone": "Site/Process A"
+    },
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 6.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 600.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "Hot 3",
+      "t_supply": {
+        "unit": "K",
+        "value": 460.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 360.0
+      },
+      "zone": "Site/Process A"
+    },
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 20.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 400.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "Hot 4",
+      "t_supply": {
+        "unit": "K",
+        "value": 380.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 360.0
+      },
+      "zone": "Site/Process A"
+    },
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 12.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 720.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "Hot 5",
+      "t_supply": {
+        "unit": "K",
+        "value": 380.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 320.0
+      },
+      "zone": "Site/Process A"
+    },
+    {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 18.0
+      },
+      "heat_flow": {
+        "unit": "kW",
+        "value": 6660.0
+      },
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "Milk Concentrate",
+      "t_supply": {
+        "unit": "K",
+        "value": 290.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 660.0
+      },
+      "zone": "Site/Process A"
+    }
+  ],
+  "utilities": [
+    {
+      "heat_flow": null,
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "HPS",
+      "price": {
+        "unit": "$/MWh",
+        "value": 140.0
+      },
+      "t_supply": {
+        "unit": "K",
+        "value": 700.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 700.0
+      },
+      "type": "Hot"
+    },
+    {
+      "heat_flow": null,
+      "htc": {
+        "unit": "kW/m^2/K",
+        "value": 2.0
+      },
+      "name": "CW",
+      "price": {
+        "unit": "$/MWh",
+        "value": 10.0
+      },
+      "t_supply": {
+        "unit": "K",
+        "value": 300.0
+      },
+      "t_target": {
+        "unit": "K",
+        "value": 320.0
+      },
+      "type": "Cold"
+    }
+  ],
+  "zone_tree": {
+    "children": [
+      {
+        "children": null,
+        "name": "Process A",
+        "type": "Process Zone"
+      }
+    ],
+    "name": "Site",
+    "type": "Site"
+  }
+}

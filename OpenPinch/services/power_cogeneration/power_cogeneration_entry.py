@@ -76,13 +76,15 @@ def get_power_cogeneration_below_pinch(
     temperatures: np.ndarray,
     heat_flows: np.ndarray,
     *,
-    zone_config: Configuration | None = None,
+    config: Configuration | None = None,
     T_sink: float | None = None,
 ) -> tuple[float, dict]:
     """Solve a below Pinch turbine target against an environmental sink."""
-    zone_config = zone_config or Configuration()
-    turbine_params = _prepare_turbine_parameters(zone_config)
-    sink_temperature = zone_config.T_ENV if T_sink is None else float(T_sink)
+    config = config or Configuration()
+    turbine_params = _prepare_turbine_parameters(config)
+    sink_temperature = (
+        config.environment.temperature if T_sink is None else float(T_sink)
+    )
 
     turbine = MultiStageSteamTurbine()
     return turbine.solve(
@@ -204,16 +206,17 @@ def _ensure_cogeneration_target(
     return None
 
 
-def _prepare_turbine_parameters(zone_config: Configuration) -> dict:
-    """Load and sanitize turbine parameters from ``zone_config``."""
+def _prepare_turbine_parameters(config: Configuration) -> dict:
+    """Load and sanitize turbine parameters from ``config``."""
+    power = config.power
     return {
-        "P_in": float(zone_config.TURB_P_IN),
-        "T_in": float(zone_config.TURB_T_IN),
-        "min_eff": float(zone_config.MIN_EFF),
-        "model": zone_config.TURB_MODEL,
-        "load_frac": min(max(float(zone_config.LOAD_FRACTION), 0.0), 1.0),
-        "mech_eff": min(max(float(zone_config.ETA_MECH), 0.0), 1.0),
-        "is_high_p_cond_flash": bool(zone_config.IS_HIGH_P_COND_FLASH),
+        "P_in": float(power.turb_p_in),
+        "T_in": float(power.turb_t_in),
+        "min_eff": float(power.min_eff),
+        "model": power.turb_model,
+        "load_frac": min(max(float(power.load_fraction), 0.0), 1.0),
+        "mech_eff": min(max(float(power.eta_mech), 0.0), 1.0),
+        "is_high_p_cond_flash": bool(power.high_p_cond_flash_enabled),
     }
 
 

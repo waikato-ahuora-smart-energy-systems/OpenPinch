@@ -61,7 +61,7 @@ def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
         calls.append(z.name)
 
     valid = Zone(name="UO", type=ZT.O.value)
-    valid.config.DO_DIRECT_OPERATION_TARGETING = True
+    valid.config.targeting.direct_operation_enabled = True
     child = Zone(name="child", type=ZT.O.value)
     valid.add_zone(child)
     out = td._get_unit_operation_targets(valid, direct_service_func=direct)
@@ -69,7 +69,7 @@ def test_unit_operation_targets_covers_direct_and_invalid_nesting(monkeypatch):
     assert calls.count("UO") == 1
 
     invalid = Zone(name="UO_bad", type=ZT.O.value)
-    invalid.config.DO_DIRECT_OPERATION_TARGETING = True
+    invalid.config.targeting.direct_operation_enabled = True
     invalid.add_zone(Zone(name="bad", type="X"))
     with pytest.raises(ValueError, match="Unit operation zones can only contain"):
         td._get_unit_operation_targets(invalid)
@@ -105,7 +105,7 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
     proc = Zone(name="P", type=ZT.P.value)
     proc.add_zone(Zone(name="op", type=ZT.O.value))
     proc.add_zone(Zone(name="sub_proc", type=ZT.P.value))
-    proc.config.DO_INDIRECT_PROCESS_TARGETING = True
+    proc.config.targeting.indirect_process_enabled = True
     out = td._get_process_targets(
         proc,
         direct_service_func=direct,
@@ -115,6 +115,21 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
     assert out is proc
     assert any("direct:P" == c for c in calls)
     assert any("indirect:P" == c for c in calls)
+
+
+def test_process_targets_keep_plain_indirect_service_behind_process_selector():
+    calls = []
+
+    def indirect(z, args=None):
+        calls.append(f"indirect:{z.name}")
+
+    proc = Zone(name="P", type=ZT.P.value)
+    proc.add_zone(Zone(name="op", type=ZT.O.value))
+
+    out = td._get_process_targets(proc, indirect_service_func=indirect)
+
+    assert out is proc
+    assert calls == []
 
 
 def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):

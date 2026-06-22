@@ -77,7 +77,7 @@ def dummy_config():
 @pytest.fixture
 def dummy_site(dummy_config):
     """Return dummy site data used by this test module."""
-    return Zone(name="test_site", zone_config=dummy_config)
+    return Zone(name="test_site", config=dummy_config)
 
 
 @pytest.fixture
@@ -432,11 +432,9 @@ def test_prepare_problem_applies_configured_input_unit_defaults():
         streams=streams,
         utilities=utilities,
         options={
-            "INPUT_UNITS": {
-                "temperature": "K",
-                "dt_cont": "K",
-                "htc": "W/m^2/K",
-            }
+            "INPUT_UNIT_TEMPERATURE": "K",
+            "INPUT_UNIT_DELTA_T": "K",
+            "INPUT_UNIT_HTC": "W/m^2/K",
         },
     )
     z1 = site.subzones["Z1"]
@@ -1173,10 +1171,11 @@ def test_default_utilities_use_zone_effective_dt_cont_multiplier():
     hu = next(utility for utility in area.hot_utilities if utility.name == "HU")
     cu = next(utility for utility in area.cold_utilities if utility.name == "CU")
 
-    assert float(hu.dt_cont[0]) == pytest.approx(area.config.DT_CONT)
-    assert float(hu.dt_cont_act[0]) == pytest.approx(area.config.DT_CONT * 3.0)
-    assert float(cu.dt_cont[0]) == pytest.approx(area.config.DT_CONT)
-    assert float(cu.dt_cont_act[0]) == pytest.approx(area.config.DT_CONT * 3.0)
+    dt_cont = area.config.thermal.dt_cont
+    assert float(hu.dt_cont[0]) == pytest.approx(dt_cont)
+    assert float(hu.dt_cont_act[0]) == pytest.approx(dt_cont * 3.0)
+    assert float(cu.dt_cont[0]) == pytest.approx(dt_cont)
+    assert float(cu.dt_cont_act[0]) == pytest.approx(dt_cont * 3.0)
 
 
 def test_phase_change_utility_with_null_target_is_completed_near_supply_temperature():
@@ -1275,8 +1274,8 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
         ),
     ]
     options = {
-        "STATE_IDS": ["one", "two"],
-        "WEIGHTS": [1, 1],
+        "PROBLEM_STATE_IDS": ["one", "two"],
+        "PROBLEM_STATE_WEIGHTS": [1, 1],
     }
 
     site = prepare_problem(streams=streams, options=options)
@@ -1423,11 +1422,11 @@ def test_stateful_hot_utility_sorting_uses_selected_state(dummy_streams):
 
 
 def test_build_prepared_stream_collection_rejects_neutral_process_stream():
-    master_zone = Zone(name="Site", type=ZT.S.value, zone_config=Configuration())
+    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
     area = Zone(
         name="AreaA",
         type=ZT.P.value,
-        zone_config=master_zone.config,
+        config=master_zone.config,
         parent_zone=master_zone,
     )
     master_zone.add_zone(area)
@@ -1839,37 +1838,63 @@ def test_nested_path_with_whitespace_trimming():
 
 
 def test_invalid_config_missing_op_time(dummy_config):
-    dummy_config.ANNUAL_OP_TIME = 0
+    dummy_config.costing.annual_op_time = 0
     out_config = _validate_config_data_completed(dummy_config)
-    assert out_config.ANNUAL_OP_TIME > 0
+    assert out_config.costing.annual_op_time > 0
+    assert not hasattr(out_config, "COSTING_ANNUAL_OP_TIME")
+    assert not hasattr(out_config, "ANNUAL_OP_TIME")
 
 
 def test_turbine_pressure_is_clamped_using_canonical_config_fields(dummy_config):
-    dummy_config.DO_TURBINE_WORK = True
-    dummy_config.TURB_P_IN = 250.0
+    dummy_config.power.turbine_work_enabled = True
+    dummy_config.power.turb_p_in = 250.0
 
     out_config = _validate_config_data_completed(dummy_config)
 
-    assert out_config.TURB_P_IN == 200
+    assert out_config.power.turb_p_in == 200
+    assert not hasattr(out_config, "POWER_TURB_P_IN")
+    assert not hasattr(out_config, "TURB_P_IN")
+
+
+def test_thermal_repairs_use_current_config_fields_without_legacy_attrs(dummy_config):
+    dummy_config.thermal.dt_phase_change = 0
+    dummy_config.thermal.dt_cont = -5.0
+
+    out_config = _validate_config_data_completed(dummy_config)
+
+    assert out_config.thermal.dt_phase_change == 0.01
+    assert not hasattr(out_config, "THERMAL_DT_PHASE_CHANGE")
+    assert out_config.thermal.dt_cont == 0.0
+    assert not hasattr(out_config, "THERMAL_DT_CONT")
+    assert not hasattr(out_config, "DT_PHASE_CHANGE")
+    assert not hasattr(out_config, "DT_CONT")
 
 
 def test_prepare_problem_preserves_passed_configuration_object(dummy_streams):
     cfg = Configuration(
         options={
-            "DO_TURBINE_WORK": True,
-            "TURB_P_IN": 12.0,
-            "TURB_T_IN": 375.0,
-            "IS_HIGH_P_COND_FLASH": True,
+            "PROBLEM_TOP_ZONE_NAME": "Original Site",
+            "POWER_TURBINE_WORK_ENABLED": True,
+            "POWER_TURB_P_IN": 12.0,
+            "POWER_TURB_T_IN": 375.0,
+            "POWER_HIGH_P_COND_FLASH_ENABLED": True,
         }
     )
 
-    site = prepare_problem(streams=dummy_streams, options=cfg)
+    site = prepare_problem(
+        streams=dummy_streams,
+        options=cfg,
+        project_name="Runtime Site",
+    )
 
     assert site.config is not cfg
-    assert site.config.DO_TURBINE_WORK is True
-    assert site.config.TURB_P_IN == 12.0
-    assert site.config.TURB_T_IN == 375.0
-    assert site.config.IS_HIGH_P_COND_FLASH is True
+    assert site.config.problem.top_zone_name == "Runtime Site"
+    assert not hasattr(site.config, "PROBLEM_TOP_ZONE_NAME")
+    assert not hasattr(site.config, "PROBLEM_TOP_ZONE_IDENTIFIER")
+    assert site.config.power.turbine_work_enabled is True
+    assert site.config.power.turb_p_in == 12.0
+    assert site.config.power.turb_t_in == 375.0
+    assert site.config.power.high_p_cond_flash_enabled is True
 
 
 def test_prepare_problem_rejects_removed_legacy_turbine_gateway(dummy_streams):
@@ -1933,8 +1958,14 @@ def config():
     """Test helper for config."""
 
     class Config:
-        TOP_ZONE_NAME = "MySite"
-        TOP_ZONE_IDENTIFIER = ZT.S.value
+        problem = type(
+            "ProblemConfig",
+            (),
+            {
+                "top_zone_name": "MySite",
+                "top_zone_identifier": ZT.S.value,
+            },
+        )()
 
     return Config()
 
@@ -1956,15 +1987,15 @@ def make_zone_tree_schema():
 
 
 def test_creates_nested_zones_correctly():
-    zone_config = Configuration()
+    config = Configuration()
     zone_tree = make_zone_tree_schema()
     master_zone = Zone(
-        name=zone_config.TOP_ZONE_NAME,
-        type=zone_config.TOP_ZONE_IDENTIFIER,
-        zone_config=zone_config,
+        name=config.problem.top_zone_name,
+        type=config.problem.top_zone_identifier,
+        config=config,
     )
 
-    result = _create_nested_zones(master_zone, zone_tree, zone_config)
+    result = _create_nested_zones(master_zone, zone_tree, config)
 
     assert result.name == "Site"
     assert len(result.subzones) == 1
@@ -1981,18 +2012,18 @@ def test_creates_nested_zones_correctly():
 
 
 def test_empty_zone_tree_returns_parent():
-    zone_config = Configuration()
+    config = Configuration()
     zone_tree = ZoneTreeSchema(name="MySite", type=ZT.S.value, children=None)
-    parent_zone = Zone(name="MySite", type=ZT.S.value, zone_config=zone_config)
+    parent_zone = Zone(name="MySite", type=ZT.S.value, config=config)
 
-    result = _create_nested_zones(parent_zone, zone_tree, zone_config)
+    result = _create_nested_zones(parent_zone, zone_tree, config)
 
     assert result == parent_zone
     assert result.subzones == {}
 
 
 def test_assign_process_streams_to_subzones_requires_zone_mapping():
-    master_zone = Zone(name="Site", type=ZT.S.value, zone_config=Configuration())
+    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
     process_streams = StreamCollection()
     process_streams.add(
         Stream(

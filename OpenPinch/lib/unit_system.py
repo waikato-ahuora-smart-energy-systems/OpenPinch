@@ -252,7 +252,7 @@ def standardise_input_value(
     if rule is None:
         return Value(value)
 
-    overrides = _config_units(config, attr_name="INPUT_UNITS")
+    overrides = _config_units(config, attr_name="input_unit_overrides")
     source_value = value
     source_unit_text = _unit_from_value_like(value)
     if field_name == "dt_cont" and source_unit_text in {"degC", "K"}:
@@ -285,7 +285,7 @@ def coerce_output_value(
     if rule is None:
         return Value(value)
 
-    overrides = _config_units(config, attr_name="OUTPUT_UNITS")
+    overrides = _config_units(config, attr_name="output_unit_overrides")
     display_unit = _resolve_override(
         key=metric_name,
         aliases=rule.aliases,

@@ -170,9 +170,11 @@ class LocalSynthesisExecutor:
             framework=_legacy_framework(task.method),
             solver=_solver_for_task(problem, task.method),
             dTmin=dTmin,
-            min_dqda=0.0
-            if task.derivative_threshold is None
-            else float(task.derivative_threshold),
+            min_dqda=(
+                0.0
+                if task.derivative_threshold is None
+                else float(task.derivative_threshold)
+            ),
             z_restriction=_legacy_z_restriction(task, arrays),
             minimisation_goal=_legacy_objective(task.method),
             non_isothermal_model=task.method == "network_evolution_method",
@@ -305,30 +307,30 @@ def _legacy_task_name(task: HeatExchangerNetworkSynthesisTask) -> str:
 
 
 def _solver_for_task(problem, method: SynthesisMethod) -> str:
-    config = problem.master_zone.config
+    hens = problem.master_zone.config.hens
     if method == "pinch_design_method":
-        return str(config.HENS_PDM_SOLVER)
+        return str(hens.solver_pdm)
     if method == "thermal_derivative_method":
-        return str(config.HENS_TDM_SOLVER)
-    return str(config.HENS_ESM_SOLVER)
+        return str(hens.solver_tdm)
+    return str(hens.solver_evm)
 
 
 def _solver_options_for_task(problem, method: SynthesisMethod) -> dict[str, Any]:
-    config = problem.master_zone.config
+    hens = problem.master_zone.config.hens
     if method == "pinch_design_method":
-        return dict(config.HENS_PDM_SOLVER_OPTIONS)
+        return dict(hens.solver_options_pdm)
     if method == "thermal_derivative_method":
-        return dict(config.HENS_TDM_SOLVER_OPTIONS)
-    return dict(config.HENS_ESM_SOLVER_OPTIONS)
+        return dict(hens.solver_options_tdm)
+    return dict(hens.solver_options_evm)
 
 
 def _solve_tolerance(problem) -> float:
-    return float(problem.master_zone.config.HENS_SOLVE_TOLERANCE)
+    return float(problem.master_zone.config.hens.solve_tolerance)
 
 
 def _legacy_pdm_stage_selection(problem) -> str | list[int]:
     selection = [
-        int(value) for value in problem.master_zone.config.HENS_STAGE_SELECTION
+        int(value) for value in problem.master_zone.config.hens.stage_selection
     ]
     if len(selection) == 2:
         return selection

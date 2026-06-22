@@ -31,14 +31,14 @@ class Zone:
         self,
         name: str = "Zone",
         type: str = ZT.P.value,
-        zone_config: Optional[Configuration] = None,
+        config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
     ):
         """Initialise an empty zone with stream, target, and graph containers."""
         # === Metadata ===
         self._name = name
         self._type = type
-        self._config = zone_config or Configuration()
+        self._config = config or Configuration()
         self._parent_zone = parent_zone
         self._dt_cont_multiplier = (
             parent_zone.dt_cont_multiplier
@@ -56,14 +56,17 @@ class Zone:
             self._weights = parent_zone._weights
         else:
             self._state_ids = (
-                {state_id: idx for idx, state_id in enumerate(self._config.STATE_IDS)}
-                if isinstance(self._config.STATE_IDS, list | tuple)
+                {
+                    state_id: idx
+                    for idx, state_id in enumerate(self._config.problem.state_ids)
+                }
+                if isinstance(self._config.problem.state_ids, list | tuple)
                 else {"0": 0}
             )
             self._num_states = len(self._state_ids)
-            if isinstance(self._config.WEIGHTS, np.ndarray | list):
-                if len(self._config.WEIGHTS) == self._num_states:
-                    self._weights = self._config.WEIGHTS
+            if isinstance(self._config.problem.state_weights, np.ndarray | list):
+                if len(self._config.problem.state_weights) == self._num_states:
+                    self._weights = self._config.problem.state_weights
                 else:
                     self._weights = np.ones(len(self._state_ids), dtype=float)
 

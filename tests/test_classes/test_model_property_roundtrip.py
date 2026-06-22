@@ -189,9 +189,9 @@ def test_target_model_and_zone_property_branches():
     payload_hot = t.serialize_json(isTotal=False)
     assert payload_hot["pinch_temp"]["hot_temp"] == {"value": 135.0, "unit": "degC"}
 
-    t.config.DO_TURBINE_WORK = True
-    t.config.DO_AREA_TARGETING = True
-    t.config.DO_EXERGY_TARGETING = True
+    t.config.power.turbine_work_enabled = True
+    t.config.targeting.area_cost_enabled = True
+    t.config.targeting.exergy_enabled = True
     payload_all = t.serialize_json()
     assert payload_all["work_target"] == {"value": 5.0, "unit": "kW"}
     assert payload_all["area"] == {"value": 1.0, "unit": "m^2"}

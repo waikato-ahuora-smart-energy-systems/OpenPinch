@@ -1,7 +1,7 @@
 {
   "options": {
-    "COST_EXP": 1.0,
-    "FIXED_COST": 5500.0,
+    "COSTING_HX_AREA_EXP": 1.0,
+    "COSTING_HX_UNIT_COST": 5500.0,
     "HENS_APPROACH_TEMPERATURES": [
       2.0,
       4.0,
@@ -27,8 +27,8 @@
       3.6,
       4.0
     ],
-    "HENS_ESM_SOLVER": "ipopt-pyomo",
-    "HENS_ESM_SOLVER_OPTIONS": {},
+    "HENS_SOLVER_EVM": "ipopt-pyomo",
+    "HENS_SOLVER_OPTIONS_EVM": {},
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
     "HENS_METHOD_SEQUENCE": [
@@ -36,13 +36,13 @@
       "thermal_derivative_method",
       "network_evolution_method"
     ],
-    "HENS_OUTPUT_FOLDER": "",
+    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Four-stream-Yee-and-Grossmann-1990-1",
     "HENS_OUTPUT_FORMATS": [
       "json",
       "csv"
     ],
-    "HENS_PDM_SOLVER": "couenne",
-    "HENS_PDM_SOLVER_OPTIONS": {},
+    "HENS_SOLVER_PDM": "couenne",
+    "HENS_SOLVER_OPTIONS_PDM": {},
     "HENS_RUN_ID": "Four-stream-Yee-and-Grossmann-1990-1",
     "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_STAGE_SELECTION": [
@@ -51,12 +51,16 @@
       3,
       4
     ],
-    "HENS_TDM_SOLVER": "couenne",
-    "HENS_TDM_SOLVER_OPTIONS": {},
-    "VARIABLE_COST": 150.0
+    "HENS_SOLVER_TDM": "couenne",
+    "HENS_SOLVER_OPTIONS_TDM": {},
+    "COSTING_HX_AREA_COEFF": 150.0
   },
   "streams": [
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 13.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 1950.0
@@ -77,6 +81,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 15.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 3600.0
@@ -97,6 +105,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 20.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 4400.0
@@ -117,6 +129,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 10.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 2800.0
@@ -125,7 +141,7 @@
         "unit": "kW/m^2/K",
         "value": 1.0
       },
-      "name": "Raw Milk ",
+      "name": "Raw Milk",
       "t_supply": {
         "unit": "K",
         "value": 650.0

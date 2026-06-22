@@ -90,7 +90,8 @@ def test_property_setters_getters(dummy_zone: Zone):
     dummy_zone.ETE = 0.75
     assert dummy_zone.ETE == 0.75
 
-    dummy_zone.dt_cont_multiplier = 1.5
+    with pytest.warns(UserWarning, match="empty stream collection"):
+        dummy_zone.dt_cont_multiplier = 1.5
     assert dummy_zone.dt_cont_multiplier == 1.5
 
 
@@ -241,8 +242,8 @@ def test_serialize_json_basic(dummy_tar):
 
 
 def test_serialize_json_with_area_and_exergy(dummy_tar):
-    dummy_tar.config.DO_AREA_TARGETING = True
-    dummy_tar.config.DO_EXERGY_TARGETING = True
+    dummy_tar.config.targeting.area_cost_enabled = True
+    dummy_tar.config.targeting.exergy_enabled = True
 
     dummy_tar.area = 120
     dummy_tar.num_units = 3

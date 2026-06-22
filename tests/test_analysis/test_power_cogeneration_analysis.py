@@ -28,14 +28,14 @@ def _make_zone_config(
 ):
     return Configuration(
         options={
-            "TURB_P_IN": 20.0,
-            "TURB_T_IN": 300.0,
-            "MIN_EFF": 0.5,
-            "TURB_MODEL": model,
-            "LOAD_FRACTION": load,
-            "ETA_MECH": mech_eff,
-            "IS_HIGH_P_COND_FLASH": is_high_p_cond_flash,
-            "T_ENV": 15.0,
+            "POWER_TURB_P_IN": 20.0,
+            "POWER_TURB_T_IN": 300.0,
+            "POWER_MIN_EFF": 0.5,
+            "POWER_TURB_MODEL": model,
+            "POWER_LOAD_FRACTION": load,
+            "POWER_ETA_MECH": mech_eff,
+            "POWER_HIGH_P_COND_FLASH_ENABLED": is_high_p_cond_flash,
+            "ENV_TEMPERATURE": 15.0,
         }
     )
 
@@ -81,13 +81,13 @@ def _patch_steam_properties(monkeypatch):
 
 
 def test_prepare_turbine_parameters_clamps_inputs():
-    cfg = _make_zone_config(load=2.0, mech_eff=-0.3)
+    cfg = _make_zone_config(load=2.0, mech_eff=1.3)
     params = pca._prepare_turbine_parameters(cfg)
 
     assert params["P_in"] == 20.0
     assert params["T_in"] == 300.0
     assert params["load_frac"] == 1.0
-    assert params["mech_eff"] == 0.0
+    assert params["mech_eff"] == 1.0
     assert params["model"] == "Fixed Isentropic Turbine"
 
 
@@ -98,8 +98,8 @@ def test_prepare_turbine_parameters_reads_canonical_config_fields():
         mech_eff=0.85,
         is_high_p_cond_flash=True,
     )
-    cfg.TURB_P_IN = 42.0
-    cfg.TURB_T_IN = 365.0
+    cfg.power.turb_p_in = 42.0
+    cfg.power.turb_t_in = 365.0
     params = pca._prepare_turbine_parameters(cfg)
 
     assert params == {
@@ -155,7 +155,7 @@ def test_get_power_cogeneration_above_pinch_updates_zone_targets(monkeypatch):
 
     assert out is zone
     assert out.work_target > 0.0
-    assert out.turbine_efficiency_target >= cfg.MIN_EFF
+    assert out.turbine_efficiency_target >= cfg.power.min_eff
 
 
 def test_get_power_cogeneration_above_pinch_accepts_heat_pump_targets(monkeypatch):
@@ -193,7 +193,7 @@ def test_get_power_cogeneration_above_pinch_accepts_heat_pump_targets(monkeypatc
 
     assert out is target
     assert out.work_target > 0.0
-    assert out.turbine_efficiency_target >= cfg.MIN_EFF
+    assert out.turbine_efficiency_target >= cfg.power.min_eff
 
 
 def test_get_power_cogeneration_above_pinch_returns_zone_when_no_viable_stage(
@@ -217,11 +217,11 @@ def test_get_power_cogeneration_below_pinch_uses_environment_default(monkeypatch
     total_work, details = pca.get_power_cogeneration_below_pinch(
         np.array([180.0, 140.0]),
         np.array([200.0, 80.0]),
-        zone_config=cfg,
+        config=cfg,
     )
 
     assert total_work == pytest.approx(details["total_work"])
-    assert details["sink_temperature"] == pytest.approx(cfg.T_ENV)
+    assert details["sink_temperature"] == pytest.approx(cfg.environment.temperature)
     assert len(details["stages"]) == 2
 
 

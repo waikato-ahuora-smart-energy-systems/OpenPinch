@@ -827,9 +827,9 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
     config = Configuration(
         {
             "HPR_TYPE": HPRcycle.VapourCompMVR.value,
-            "N_MVR": 2,
-            "MVR_FLUIDS": "Water;R134A",
-            "ETA_MVR_COMP": 0.65,
+            "HPR_MVR_COUNT": 2,
+            "HPR_MVR_FLUIDS": ["Water", "R134A"],
+            "HPR_MVR_ETA_COMP": 0.65,
         }
     )
     args = construct_HPRTargetInputs(
@@ -837,7 +837,7 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_hot=np.array([0.0, -5.0, -10.0]),
         H_cold=np.array([10.0, 5.0, 0.0]),
-        zone_config=config,
+        config=config,
     )
 
     assert args.n_mvr == 2
@@ -870,7 +870,7 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
         T_vals=np.array([120.0, 80.0]),
         H_hot=np.array([0.0, -10.0]),
         H_cold=np.array([10.0, 0.0]),
-        zone_config=SimpleNamespace(HPR_TYPE=HPRcycle.VapourCompMVR.value),
+        config=Configuration({"HPR_TYPE": HPRcycle.VapourCompMVR.value}),
         is_heat_pumping=True,
     )
 

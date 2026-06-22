@@ -16,8 +16,11 @@ from typing import Any, Literal
 import numpy as np
 
 from .....classes.pinch_problem import PinchProblem
-from .....lib.config import Configuration, tol
+from .....lib.config import tol
+from .....lib.config_metadata import CONFIG_FIELD_SPECS
 from .arrays import PreparedSolverArrays, problem_to_solver_arrays
+
+_DEFAULT_REFERENCE_TEMPERATURE = float(CONFIG_FIELD_SPECS["ENV_TEMPERATURE"].default)
 
 PinchLocation = Literal["above", "below"]
 StageSelection = Literal["automated"] | tuple[int, int]
@@ -118,8 +121,8 @@ def _calculate_openpinch_targets(
 def _problem_reference_temperature(problem: PinchProblem) -> float:
     master_zone = problem.master_zone
     if master_zone is None:
-        return float(Configuration.T_ENV)
-    return float(getattr(master_zone.config, "T_ENV", Configuration.T_ENV))
+        return _DEFAULT_REFERENCE_TEMPERATURE
+    return float(master_zone.config.environment.temperature)
 
 
 def _source_style_target_snapshot(
@@ -128,7 +131,7 @@ def _source_style_target_snapshot(
     reference_temperature: float | None = None,
 ) -> dict[str, float]:
     if reference_temperature is None:
-        reference_temperature = float(Configuration.T_ENV)
+        reference_temperature = _DEFAULT_REFERENCE_TEMPERATURE
 
     values = arrays.arrays
     T_h_in = np.array(values["T_h_in"], dtype=np.float64)

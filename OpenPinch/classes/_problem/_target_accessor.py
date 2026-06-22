@@ -14,6 +14,7 @@ from ...services import (
     indirect_refrigeration_service,
     power_cogeneration_service,
 )
+from ._target_plan import build_targeting_plan
 
 if TYPE_CHECKING:
     from ..pinch_problem import PinchProblem
@@ -34,10 +35,12 @@ class _TargetAccessor:
         runtime_options = dict(options or {})
         if state_id is not None:
             runtime_options["state_id"] = state_id
+        execution_master_zone = self._problem._build_execution_master_zone()
+        plan = build_targeting_plan(execution_master_zone.config)
         return self._problem._run_targeting_for_zone_and_subzones(
-            zone=None,
-            direct_service_func=direct_heat_integration_service,
-            indirect_service_func=indirect_heat_integration_service,
+            zone=execution_master_zone,
+            direct_service_func=plan.composite_direct_service(),
+            indirect_service_func=plan.composite_indirect_service(),
             options=runtime_options,
         )
 
@@ -213,7 +216,6 @@ class _TargetAccessor:
     ) -> BaseTargetModel:
         """Run exergy targeting on the first compatible base target family."""
         runtime_options = dict(options or {})
-        runtime_options["DO_EXERGY_TARGETING"] = True
         if state_id is not None:
             runtime_options["state_id"] = state_id
         return self._problem._execute_exergy_targeting(

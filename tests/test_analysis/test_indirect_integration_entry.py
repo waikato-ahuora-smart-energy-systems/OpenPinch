@@ -21,7 +21,7 @@ from OpenPinch.services.indirect_heat_integration import (
 def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     monkeypatch,
 ):
-    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
     zone.targets[TT.TZ.value] = SimpleNamespace(
         hot_utilities=StreamCollection(),
         cold_utilities=StreamCollection(),

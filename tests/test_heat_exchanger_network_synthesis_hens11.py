@@ -949,9 +949,9 @@ def _assert_cost_recomputation(
     expected_total: float,
 ) -> None:
     options = fixture["options"]
-    fixed_cost = float(options["FIXED_COST"])
-    variable_cost = float(options["VARIABLE_COST"])
-    cost_exp = float(options["COST_EXP"])
+    fixed_cost = float(options["COSTING_HX_UNIT_COST"])
+    variable_cost = float(options["COSTING_HX_AREA_COEFF"])
+    cost_exp = float(options["COSTING_HX_AREA_EXP"])
     hot_utility_price = _utility_price(fixture, "Hot")
     cold_utility_price = _utility_price(fixture, "Cold")
 
@@ -1005,9 +1005,9 @@ def _assert_network_cost_recomputes(
     expected_total: float,
 ) -> None:
     options = fixture["options"]
-    fixed_cost = float(options["FIXED_COST"])
-    variable_cost = float(options["VARIABLE_COST"])
-    cost_exp = float(options["COST_EXP"])
+    fixed_cost = float(options["COSTING_HX_UNIT_COST"])
+    variable_cost = float(options["COSTING_HX_AREA_COEFF"])
+    cost_exp = float(options["COSTING_HX_AREA_EXP"])
     hot_utility_price = _utility_price(fixture, "Hot")
     cold_utility_price = _utility_price(fixture, "Cold")
     total_annual_cost = network.total_annual_cost

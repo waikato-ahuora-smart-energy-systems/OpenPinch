@@ -22,12 +22,20 @@ from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays im
 )
 
 CASE_IDS = (
+    "Four-stream-Escobar-and-Trierweiler-2013-1",
     "Four-stream-Yee-and-Grossmann-1990-1",
-    "Nine-stream-Linnhoff-and-Ahmad-1999-1",
+    "Five-stream-Bogataj-and-Kravanja-2012-1",
+    "Five-stream-Kim-et-al-2017-1",
+    "Six-stream-Spray-Dryer-2025-1",
+    "Six-stream-Yee-and-Grossmann-1990-1",
 )
 DTMIN_BY_CASE = {
+    "Four-stream-Escobar-and-Trierweiler-2013-1": 10.0,
     "Four-stream-Yee-and-Grossmann-1990-1": 14.0,
-    "Nine-stream-Linnhoff-and-Ahmad-1999-1": 18.0,
+    "Five-stream-Bogataj-and-Kravanja-2012-1": 10.0,
+    "Five-stream-Kim-et-al-2017-1": 10.0,
+    "Six-stream-Spray-Dryer-2025-1": 10.0,
+    "Six-stream-Yee-and-Grossmann-1990-1": 10.0,
 }
 OPENHENS_DT_GRID = [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0]
 OPENHENS_DQDA_GRID = [0.5, 0.9, 1.3, 1.7, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0]
@@ -372,7 +380,7 @@ def _stream_payload(
 def _utility_payload(row: UtilityRow) -> dict[str, Any]:
     utility_type = "Hot" if row.designation == "Hot Utility" else "Cold"
     return {
-        "name": row.name,
+        "name": row.name.strip(),
         "type": utility_type,
         "t_supply": {"value": row.supply_temperature, "unit": "K"},
         "t_target": {"value": row.target_temperature, "unit": "K"},
@@ -386,15 +394,16 @@ def _unique_process_stream_name(
     row: ProcessStreamRow,
     parsed: ParsedOpenHENSCase,
 ) -> str:
+    row_name = row.name.strip()
     matching_names = [
-        item.name
+        item.name.strip()
         for item in [*parsed.hot_streams, *parsed.cold_streams]
-        if item.name == row.name
+        if item.name.strip() == row_name
     ]
     if len(matching_names) == 1:
-        return row.name
+        return row_name
     prefix = "Hot" if row.designation == "Hot" else "Cold"
-    return f"{prefix} {row.number} {row.name}".strip()
+    return f"{prefix} {row.number} {row_name}".strip()
 
 
 def _validate_costing_can_use_openpinch_configuration(

@@ -1804,15 +1804,19 @@
         }
     ],
     "options": {
-        "DO_PROCESS_HP_TARGETING": true,
-        "DO_UTILITY_HP_TARGETING": true,
+        "TARGETING_PROCESS_HP_ENABLED": true,
+        "TARGETING_UTILITY_HP_ENABLED": true,
         "HPR_TYPE": "Parallel vapour compression cycles",
-        "HPR_LOAD_VALUE": "{\"multiply\": 1} ",
-        "REFRIGERANTS": "R601,R600",
-        "N_COND": 2,
-        "N_EVAP": true,
-        "ETA_COMP": 0.7,
-        "DT_CONT_HP": 4,
-        "DT_HPR_IHX": 20
+        "HPR_LOAD_MODE": "fraction",
+        "HPR_LOAD_FRACTION": 1.0,
+        "HPR_REFRIGERANTS": [
+            "R601",
+            "R600"
+        ],
+        "HPR_N_COND": 2,
+        "HPR_N_EVAP": 1,
+        "HPR_ETA_COMP": 0.7,
+        "HPR_DT_CONT": 4,
+        "HPR_DT_IHX": 20
     }
 }

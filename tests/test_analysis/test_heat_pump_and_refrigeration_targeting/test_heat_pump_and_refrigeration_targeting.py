@@ -300,7 +300,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
         T_vals=np.array([120.0, 80.0]),
         H_hot=np.array([0.0, -10.0]),
         H_cold=np.array([10.0, 0.0]),
-        zone_config=SimpleNamespace(HPR_TYPE=HPRcycle.CascadeCarnot.value),
+        config=SimpleNamespace(HPR_TYPE=HPRcycle.CascadeCarnot.value),
         is_heat_pumping=True,
         idx=2,
     )
@@ -310,7 +310,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
 
 
 def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypatch):
-    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
     zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
     zone.targets[TT.TS.value] = SimpleNamespace(pt=ProblemTable({PT.T: [120.0, 60.0]}))
     calls = {}
@@ -392,7 +392,7 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
 def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans(
     monkeypatch,
 ):
-    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
     zone.targets[TT.TS.value] = SimpleNamespace(
         pt=ProblemTable(
             {
@@ -483,13 +483,15 @@ def test_validate_hpr_required_ignores_nan_load_entries():
             PT.H_NET_COLD: [np.nan, 100.0, 0.0],
         }
     )
-    config = Configuration(options={"HPR_LOAD_VALUE": 0.25})
+    config = Configuration(
+        options={"HPR_LOAD_MODE": "fraction", "HPR_LOAD_FRACTION": 0.25}
+    )
 
     assert hp._validate_hpr_required(
         H_net_cold=pt[PT.H_NET_COLD],
         H_net_hot=pt[PT.H_NET_HOT],
         is_heat_pumping=True,
-        zone_config=config,
+        config=config,
     ) == pytest.approx(25.0)
 
 
@@ -507,7 +509,7 @@ def test_validate_hpr_required_returns_zero_for_all_nan_load_entries():
             H_net_cold=pt[PT.H_NET_COLD],
             H_net_hot=pt[PT.H_NET_HOT],
             is_heat_pumping=True,
-            zone_config=Configuration(),
+            config=Configuration(),
         )
         == 0.0
     )
@@ -749,7 +751,7 @@ def test_get_hpr_targets_validates_supported_non_brayton_backend_results(
         T_vals=np.array([120.0, 80.0]),
         H_hot=np.array([0.0, -10.0]),
         H_cold=np.array([10.0, 0.0]),
-        zone_config=SimpleNamespace(HPR_TYPE=hpr_type),
+        config=SimpleNamespace(HPR_TYPE=hpr_type),
         is_heat_pumping=True,
     )
 

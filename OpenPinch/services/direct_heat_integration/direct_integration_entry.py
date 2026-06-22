@@ -63,11 +63,13 @@ def compute_direct_integration_targets(
         idx=idx,
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
+    direct = zone.config.direct
+    targeting = zone.config.targeting
     pt = get_additional_GCCs(
         pt,
-        do_vert_cc_calc=zone.config.DO_VERTICAL_GCC,
-        do_assisted_ht_calc=zone.config.DO_ASSITED_HT,
-        assisted_ht_dt_cut=zone.config.DT_ASSISTED_HT,
+        do_vert_cc_calc=direct.vertical_gcc_enabled,
+        do_assisted_ht_calc=direct.assisted_ht_enabled,
+        assisted_ht_dt_cut=direct.assisted_ht_dt,
     )
 
     get_utility_targets(
@@ -87,7 +89,7 @@ def compute_direct_integration_targets(
             idx=idx,
         )
     )
-    if zone.config.DO_BALANCED_CC or zone.config.DO_AREA_TARGETING:
+    if direct.balanced_cc_enabled or targeting.area_cost_enabled:
         pt.update(
             **get_balanced_CC(
                 T_col=pt[PT.T],
@@ -112,7 +114,7 @@ def compute_direct_integration_targets(
             )
         )
         # Target capital cost, area, and exchanger count from the balanced CC.
-        if zone.config.DO_AREA_TARGETING:
+        if targeting.area_cost_enabled:
             num_units = get_min_number_hx(
                 T_vals=pt[PT.T],
                 H_hot_bal=pt[PT.H_HOT_BAL],
@@ -133,7 +135,7 @@ def compute_direct_integration_targets(
             capital_cost, annual_capital_cost = get_capital_cost_targets(
                 area=area,
                 num_units=num_units,
-                zone_config=zone.config,
+                config=zone.config,
             )
             area_payload = {
                 "area": area,

@@ -28,21 +28,25 @@ def construct_HPRTargetInputs(
     H_cold: np.ndarray,
     *,
     is_heat_pumping: bool = True,
-    zone_config: Configuration,
+    config: Configuration,
     idx: int = 0,
     debug: bool = False,
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
+    hpr = config.hpr
+    costing = config.costing
+    environment = config.environment
+    thermal = config.thermal
     T_hot, T_cold = _apply_temperature_shift_for_hpr_stream_dtmin_cont(
-        T_vals, zone_config.DT_CONT_HP
+        T_vals, hpr.dt_cont
     )
 
     T_hot, H_hot, z_amb_hot, s_hot = _prepare_hpr_background_profile(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_hot,
         H_vals=H_hot,
-        zone_config=zone_config,
+        config=config,
         is_heat_pumping=is_heat_pumping,
         is_cold=False,
     )
@@ -50,7 +54,7 @@ def construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_cold,
         H_vals=H_cold,
-        zone_config=zone_config,
+        config=config,
         is_heat_pumping=is_heat_pumping,
         is_cold=True,
     )
@@ -72,44 +76,44 @@ def construct_HPRTargetInputs(
         is_heat_pumping=bool(is_heat_pumping),
         debug=debug,
         idx=idx,
-        # Direct zone_config pass-through.
-        hpr_type=zone_config.HPR_TYPE,
-        hpr_comp_fixed_cost=zone_config.HPR_COMP_FIXED_COST,
-        hpr_comp_variable_cost=zone_config.HPR_COMP_VARIABLE_COST,
-        hpr_comp_cost_exp=zone_config.HPR_COMP_COST_EXP,
-        hpr_hx_fixed_cost=zone_config.HPR_HX_FIXED_COST,
-        hpr_hx_variable_cost=zone_config.HPR_HX_VARIABLE_COST,
-        hpr_hx_cost_exp=zone_config.HPR_HX_COST_EXP,
-        n_cond=zone_config.N_COND,
-        n_evap=zone_config.N_EVAP,
-        n_mvr=zone_config.N_MVR,
-        refrigerant_ls=zone_config.hpr_refrigerants,
-        mvr_fluid_ls=zone_config.hpr_mvr_fluids,
-        do_refrigerant_sort=zone_config.DO_REFRIGERANT_SORT,
-        eta_comp=zone_config.ETA_COMP,
-        eta_mvr_comp=zone_config.ETA_MVR_COMP,
-        eta_motor=zone_config.ETA_MOTOR,
-        eta_exp=zone_config.ETA_EXP,
-        eta_ii_hpr_carnot=zone_config.ETA_II_HPR_CARNOT,
-        eta_ii_he_carnot=zone_config.effective_eta_ii_he_carnot,
-        dtcont_hp=zone_config.DT_CONT_HP,
-        dt_hp_ihx=zone_config.DT_HPR_IHX,
-        dt_cascade_hx=zone_config.DT_HPR_CASCADE_HX,
-        T_env=zone_config.T_ENV,
-        dt_env_cont=zone_config.DT_ENV_CONT,
-        dt_phase_change=zone_config.DT_PHASE_CHANGE,
-        eta_penalty=zone_config.ETA_PENALTY,
-        rho_penalty=zone_config.RHO_PENALTY,
-        max_multi_start=zone_config.MAX_HP_MULTISTART,
-        bb_minimiser=zone_config.BB_MINIMISER,
-        allow_integrated_expander=zone_config.ALLOW_INTEGRATED_EXPANDER,
-        initialise_simulated_cycle=zone_config.INITIALISE_SIMULATED_CYCLE,
-        heat_to_power_ratio=zone_config.PRICE_RATIO_HEAT_TO_ELE,
-        cold_to_power_ratio=zone_config.PRICE_RATIO_COLD_TO_ELE,
-        ele_price=zone_config.ELE_PRICE,
-        annual_op_time=zone_config.ANNUAL_OP_TIME,
-        discount_rate=zone_config.DISCOUNT_RATE,
-        serv_life=zone_config.SERV_LIFE,
+        # Direct config pass-through.
+        hpr_type=hpr.type,
+        hpr_comp_fixed_cost=costing.hpr_comp_fixed_cost,
+        hpr_comp_variable_cost=costing.hpr_comp_variable_cost,
+        hpr_comp_cost_exp=costing.hpr_comp_cost_exp,
+        hpr_hx_fixed_cost=costing.hpr_hx_duty_fixed_cost,
+        hpr_hx_variable_cost=costing.hpr_hx_duty_variable_cost,
+        hpr_hx_cost_exp=costing.hpr_hx_duty_cost_exp,
+        n_cond=hpr.n_cond,
+        n_evap=hpr.n_evap,
+        n_mvr=hpr.mvr_count,
+        refrigerant_ls=hpr.normalised_refrigerants,
+        mvr_fluid_ls=hpr.normalised_mvr_fluids,
+        do_refrigerant_sort=hpr.refrigerant_sort_enabled,
+        eta_comp=hpr.eta_comp,
+        eta_mvr_comp=hpr.mvr_eta_comp,
+        eta_motor=hpr.mvr_eta_motor,
+        eta_exp=hpr.eta_exp,
+        eta_ii_hpr_carnot=hpr.eta_ii_carnot,
+        eta_ii_he_carnot=hpr.effective_eta_ii_he_carnot,
+        dtcont_hp=hpr.dt_cont,
+        dt_hp_ihx=hpr.dt_ihx,
+        dt_cascade_hx=hpr.dt_cascade_hx,
+        T_env=environment.temperature,
+        dt_env_cont=hpr.dt_env_cont,
+        dt_phase_change=thermal.dt_phase_change,
+        eta_penalty=hpr.eta_penalty,
+        rho_penalty=hpr.rho_penalty,
+        max_multi_start=hpr.max_multistart,
+        bb_minimiser=hpr.bb_minimiser,
+        allow_integrated_expander=hpr.integrated_expander_enabled,
+        initialise_simulated_cycle=hpr.initialise_simulated_cycle,
+        heat_to_power_ratio=costing.hpr_price_ratio_heat_to_ele,
+        cold_to_power_ratio=costing.hpr_price_ratio_cold_to_ele,
+        ele_price=costing.hpr_ele_price,
+        annual_op_time=costing.annual_op_time,
+        discount_rate=costing.discount_rate,
+        serv_life=costing.service_life,
     )
 
 
@@ -123,7 +127,7 @@ def _prepare_hpr_background_profile(
     Q_hpr_target: float,
     T_vals: np.ndarray,
     H_vals: np.ndarray,
-    zone_config: Configuration,
+    config: Configuration,
     is_heat_pumping: bool,
     is_cold: bool,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, object]:
@@ -138,7 +142,7 @@ def _prepare_hpr_background_profile(
     T_vals, H_vals, z_amb = _get_simplified_bckgrd_cascade_and_z_amb(
         T_vals=T_vals,
         H_vals=H_vals,
-        zone_config=zone_config,
+        config=config,
         is_cold=is_cold,
     )
     return (
@@ -237,16 +241,17 @@ def _get_z_ambient(
 def _get_simplified_bckgrd_cascade_and_z_amb(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
-    zone_config: Configuration,
+    config: Configuration,
     *,
     is_cold: bool,
 ) -> Tuple[np.ndarray, float]:
     sign = 1 if is_cold else -1
     T_amb_star = (
-        zone_config.T_ENV + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign
+        config.environment.temperature
+        + (config.hpr.dt_env_cont + config.hpr.dt_cont) * sign
     )
     T_vals, H_vals = _add_T_amb_interval(
-        T_vals, H_vals, T_amb_star, zone_config.DT_PHASE_CHANGE, is_cold
+        T_vals, H_vals, T_amb_star, config.thermal.dt_phase_change, is_cold
     )
     z_amb = _get_z_ambient(T_vals=T_vals, T_amb_star=T_amb_star, is_cold=is_cold)
     H_vals += z_amb
@@ -255,8 +260,8 @@ def _get_simplified_bckgrd_cascade_and_z_amb(
 
     z_amb = _get_z_ambient(
         T_vals=T_vals,
-        T_amb_star=zone_config.T_ENV
-        + (zone_config.DT_ENV_CONT + zone_config.DT_CONT_HP) * sign,
+        T_amb_star=config.environment.temperature
+        + (config.hpr.dt_env_cont + config.hpr.dt_cont) * sign,
         is_cold=is_cold,
     )
     H_vals -= z_amb

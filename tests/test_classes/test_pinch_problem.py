@@ -18,7 +18,7 @@ from OpenPinch.resources import copy_sample_case
 def sample_problem():
     """Return sample problem data used by this test module."""
     return {
-        "options": {"DT_CONT": 10},
+        "options": {"THERMAL_DT_CONT": 10},
         "streams": [
             {
                 "zone": "Z1",
@@ -315,7 +315,7 @@ def test_problem_data_and_master_zone_properties():
 
 def test_root_stream_views_are_exposed_on_problem():
     payload = {
-        "options": {"DT_CONT": 10},
+        "options": {"THERMAL_DT_CONT": 10},
         "streams": [
             {
                 "zone": "Area1",
@@ -357,7 +357,7 @@ def test_root_stream_views_require_loaded_problem():
 
 def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
     payload = {
-        "options": {"DT_CONT": 10},
+        "options": {"THERMAL_DT_CONT": 10},
         "streams": [
             {
                 "zone": "Area1",
@@ -593,7 +593,6 @@ def test_target_accessor_exergy_uses_dedicated_execution_path(monkeypatch):
     assert called["application_zone"] == "Plant"
     assert called["options"] == {
         "base_target_type": "Direct Integration",
-        "DO_EXERGY_TARGETING": True,
         "state_id": "peak",
     }
     assert called["include_subzones"] is False
@@ -649,7 +648,7 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
         TotalSiteTarget,
     )
 
-    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
     ts_target = TotalSiteTarget(
         zone_name=zone.name,
         type=TT.TS.value,
@@ -701,7 +700,7 @@ def test_execute_exergy_targeting_returns_selected_target_family():
         TotalSiteTarget,
     )
 
-    zone = Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
     ts_target = TotalSiteTarget(
         zone_name=zone.name,
         type=TT.TS.value,
@@ -750,7 +749,7 @@ def test_execute_exergy_targeting_does_not_walk_children_without_include_subzone
     from OpenPinch.lib.enums import ProblemTableLabel as PT
     from OpenPinch.lib.schemas.targets import TotalSiteTarget
 
-    root = Zone(name="Root", type=ZT.S.value, zone_config=Configuration())
+    root = Zone(name="Root", type=ZT.S.value, config=Configuration())
     child = Zone(name="Child", parent_zone=root)
     root._subzones = {"Child": child}
     ts_target = TotalSiteTarget(
@@ -813,13 +812,13 @@ def test_run_exergy_targeting_for_zone_and_subzones_drops_base_target_type_for_c
         service_func=lambda zone, args=None: calls.append(
             (zone.name, dict(args or {}))
         ),
-        options={"base_target_type": "Total Site Target", "DO_EXERGY_TARGETING": True},
+        options={"base_target_type": "Total Site Target", "state_id": "peak"},
     )
 
-    assert calls[0] == ("Child", {"DO_EXERGY_TARGETING": True})
+    assert calls[0] == ("Child", {"state_id": "peak"})
     assert calls[1] == (
         "Root",
-        {"base_target_type": "Total Site Target", "DO_EXERGY_TARGETING": True},
+        {"base_target_type": "Total Site Target", "state_id": "peak"},
     )
 
 
@@ -1673,7 +1672,7 @@ def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Pa
         ],
         "utilities": [],
         "options": {
-            "STATE_IDS": ["0", "peak"],
+            "PROBLEM_STATE_IDS": ["0", "peak"],
         },
     }
     path = tmp_path / "stateful_equal_t.json"
@@ -1803,8 +1802,9 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     cold_utility = next(
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
-    assert float(cold_utility.dt_cont) == pytest.approx(area.config.DT_CONT)
-    assert float(cold_utility.dt_cont_act) == pytest.approx(area.config.DT_CONT)
+    dt_cont = area.config.thermal.dt_cont
+    assert float(cold_utility.dt_cont) == pytest.approx(dt_cont)
+    assert float(cold_utility.dt_cont_act) == pytest.approx(dt_cont)
     assert len(area.net_hot_streams) > 0
 
     problem.set_dt_cont_multiplier(3.0, zone_name="AreaA")
@@ -1814,8 +1814,9 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     cold_utility = next(
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
-    assert float(cold_utility.dt_cont) == pytest.approx(area.config.DT_CONT)
-    assert float(cold_utility.dt_cont_act) == pytest.approx(area.config.DT_CONT * 3.0)
+    dt_cont = area.config.thermal.dt_cont
+    assert float(cold_utility.dt_cont) == pytest.approx(dt_cont)
+    assert float(cold_utility.dt_cont_act) == pytest.approx(dt_cont * 3.0)
     assert len(area.net_hot_streams) > 0
 
     net_stream = area.net_hot_streams[0]
@@ -1858,8 +1859,9 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
 
-    assert float(cold_utility.dt_cont) == pytest.approx(area.config.DT_CONT)
-    assert float(cold_utility.dt_cont_act) == pytest.approx(area.config.DT_CONT * 0.5)
+    dt_cont = area.config.thermal.dt_cont
+    assert float(cold_utility.dt_cont) == pytest.approx(dt_cont)
+    assert float(cold_utility.dt_cont_act) == pytest.approx(dt_cont * 0.5)
     assert len(area.net_hot_streams) > 0
 
     net_stream = area.net_hot_streams[0]
@@ -1915,7 +1917,7 @@ def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_res
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "STATE_IDS": ["0", "peak"],
+            "PROBLEM_STATE_IDS": ["0", "peak"],
         },
     }
 
@@ -1968,7 +1970,7 @@ def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
     }
 
     def fake_direct_hpr(target_zone, is_heat_pumping, args=None):
@@ -2048,7 +2050,7 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
     }
 
     def fake_indirect_hpr(target_zone, is_heat_pumping, args=None):
@@ -2144,7 +2146,7 @@ def test_direct_heat_integration_rejects_unknown_state_id():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "STATE_IDS": ["0", "peak"],
+            "PROBLEM_STATE_IDS": ["0", "peak"],
         },
     }
 
@@ -2185,7 +2187,7 @@ def test_problem_exposes_canonical_state_ids():
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
@@ -2240,7 +2242,7 @@ def test_target_all_states_runs_each_state_and_preserves_call_order():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "STATE_IDS": ["0", "peak"],
+            "PROBLEM_STATE_IDS": ["0", "peak"],
         },
     }
 
@@ -2277,7 +2279,7 @@ def test_target_all_states_uses_validated_output_state_id_for_serial_keys(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
     }
 
     monkeypatch.setattr(
@@ -2343,7 +2345,7 @@ def test_target_all_states_supports_thread_parallel_execution():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "STATE_IDS": ["0", "peak"],
+            "PROBLEM_STATE_IDS": ["0", "peak"],
         },
     }
 
@@ -2378,7 +2380,7 @@ def test_target_all_states_uses_validated_output_state_id_for_parallel_keys(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
     }
 
     monkeypatch.setattr(

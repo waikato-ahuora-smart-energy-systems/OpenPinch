@@ -24,7 +24,7 @@ from OpenPinch.services import services_entry as svc
 
 
 def _make_zone() -> Zone:
-    return Zone(name="Plant", type=ZT.S.value, zone_config=Configuration())
+    return Zone(name="Plant", type=ZT.S.value, config=Configuration())
 
 
 def _dummy_problem_table() -> ProblemTable:
@@ -513,7 +513,7 @@ def test_energy_transfer_total_site_bootstrap_solves_parent_and_child_di(
     monkeypatch,
 ):
     zone = _make_zone()
-    subzone = Zone(name="Bleaching", type=ZT.P.value, zone_config=zone.config)
+    subzone = Zone(name="Bleaching", type=ZT.P.value, config=zone.config)
     zone.add_zone(subzone)
     calls: list[tuple[str, str]] = []
 
@@ -562,8 +562,8 @@ def test_energy_transfer_total_site_bootstrap_solves_parent_and_child_di(
 
 def test_energy_transfer_total_site_uses_one_subzone_layer_of_gccs(monkeypatch):
     zone = _make_zone()
-    area = Zone(name="Area", type=ZT.S.value, zone_config=zone.config)
-    unit = Zone(name="Unit", type=ZT.P.value, zone_config=zone.config)
+    area = Zone(name="Area", type=ZT.S.value, config=zone.config)
+    unit = Zone(name="Unit", type=ZT.P.value, config=zone.config)
     zone.add_zone(area)
     area.add_zone(unit)
     calls: list[tuple[str, str]] = []

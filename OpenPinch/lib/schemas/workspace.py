@@ -121,6 +121,7 @@ class ConfigurationFieldMetadata(BaseModel):
     label: str
     field_type: str
     group: str
+    config_path: List[str] = Field(default_factory=list)
     support_level: str
     runtime_status: str = "supported"
     enum_choices: List[str] = Field(default_factory=list)
