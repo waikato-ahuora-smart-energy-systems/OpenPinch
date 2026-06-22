@@ -576,26 +576,16 @@ class PinchProblem:
         ]
         unit_columns = {col: f"{col} (unit)" for col in columns}
 
-        comparison = pd.DataFrame(
-            [
-                pd.Series(
-                    {
-                        col: base_row.get(col)
-                        for col in [*columns, *unit_columns.values()]
-                    },
-                    name=base_label,
-                ),
-                pd.Series(
-                    {
-                        col: other_row.get(col)
-                        for col in [*columns, *unit_columns.values()]
-                    },
-                    name=other_label,
-                ),
-            ]
-        )
-
-        change_row: dict[str, object] = {}
+        row_columns = [*columns, *unit_columns.values()]
+        base_payload = {
+            "Target": str(base_row["Target"]),
+            **{col: base_row.get(col) for col in row_columns},
+        }
+        other_payload = {
+            "Target": str(other_row["Target"]),
+            **{col: other_row.get(col) for col in row_columns},
+        }
+        change_row: dict[str, object] = {"Target": str(base_row["Target"])}
         for col in columns:
             unit_col = unit_columns[col]
             base_unit = base_row.get(unit_col)
@@ -608,14 +598,19 @@ class PinchProblem:
                 other_unit = base_unit
                 change_row[col] = float(other_value) - float(base_value)
                 change_row[unit_col] = base_unit
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 change_row[col] = None
                 change_row[unit_col] = None
 
-        comparison.loc["Change"] = pd.Series(change_row)
-        comparison.insert(0, "Target", str(base_row["Target"]))
-        comparison.loc["Change", "Target"] = str(base_row["Target"])
-        return comparison
+        return pd.DataFrame.from_dict(
+            {
+                base_label: base_payload,
+                other_label: other_payload,
+                "Change": change_row,
+            },
+            orient="index",
+            columns=["Target", *row_columns],
+        )
 
     def _data_preprocessing(self) -> "Zone":
         if isinstance(self._validated_data, TargetInput) and isinstance(

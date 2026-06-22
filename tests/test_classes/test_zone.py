@@ -90,7 +90,8 @@ def test_property_setters_getters(dummy_zone: Zone):
     dummy_zone.ETE = 0.75
     assert dummy_zone.ETE == 0.75
 
-    dummy_zone.dt_cont_multiplier = 1.5
+    with pytest.warns(UserWarning, match="empty stream collection"):
+        dummy_zone.dt_cont_multiplier = 1.5
     assert dummy_zone.dt_cont_multiplier == 1.5
 
 
