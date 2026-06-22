@@ -54,10 +54,14 @@ class TargetingPlan:
         )
 
     def composite_direct_service(self) -> Callable | None:
-        return _compose_services(self.direct_services)
+        return _compose_services(
+            spec for spec in self.specs if spec.slot == "direct"
+        )
 
     def composite_indirect_service(self) -> Callable | None:
-        return _compose_services(self.indirect_services)
+        return _compose_services(
+            spec for spec in self.specs if spec.slot == "indirect"
+        )
 
 
 TARGETING_METHOD_SPECS: tuple[TargetingMethodSpec, ...] = (
@@ -183,13 +187,25 @@ def _unique_services(services) -> tuple[Callable, ...]:
     return tuple(unique)
 
 
-def _compose_services(services: tuple[Callable, ...]) -> Callable | None:
-    if not services:
+def _compose_services(specs) -> Callable | None:
+    selected = tuple(specs)
+    if not selected:
         return None
 
     def _composite(zone, args=None):
-        for service in services:
-            service(zone, args)
+        zone_type = getattr(zone, "type", None)
+        invoked_services: set[int] = set()
+        for spec in selected:
+            if zone_type not in spec.zone_applicability:
+                continue
+            marker = id(spec.service)
+            if marker in invoked_services:
+                continue
+            invoked_services.add(marker)
+            spec.service(zone, args)
         return zone
 
+    _composite._openpinch_zone_applicability = frozenset(
+        zone_type for spec in selected for zone_type in spec.zone_applicability
+    )
     return _composite

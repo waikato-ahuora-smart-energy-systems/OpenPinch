@@ -35,6 +35,12 @@ def _invoke_service(service_func: Callable, zone: Zone, args: dict | None = None
     return service_func(zone, args)
 
 
+def _service_declares_zone_applicability(service_func: Callable, zone: Zone) -> bool:
+    """Return whether a plan-built callback explicitly applies to ``zone``."""
+    zone_applicability = getattr(service_func, "_openpinch_zone_applicability", ())
+    return zone.type in zone_applicability
+
+
 def _invoke_target_handler(
     handler: Callable,
     zone: Zone,
@@ -109,9 +115,14 @@ def _get_process_targets(
                     "other process zones and operation zones."
                 )
 
-        if zone.config.targeting.indirect_process_enabled:
-            if callable(indirect_service_func):
-                _invoke_service(indirect_service_func, zone, args)
+        if (
+            callable(indirect_service_func)
+            and (
+                zone.config.targeting.indirect_process_enabled
+                or _service_declares_zone_applicability(indirect_service_func, zone)
+            )
+        ):
+            _invoke_service(indirect_service_func, zone, args)
 
     if callable(direct_service_func):
         _invoke_service(direct_service_func, zone, args)

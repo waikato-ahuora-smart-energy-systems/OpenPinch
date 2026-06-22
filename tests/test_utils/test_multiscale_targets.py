@@ -117,6 +117,21 @@ def test_process_targets_covers_invalid_and_indirect_paths(monkeypatch):
     assert any("indirect:P" == c for c in calls)
 
 
+def test_process_targets_keep_plain_indirect_service_behind_process_selector():
+    calls = []
+
+    def indirect(z, args=None):
+        calls.append(f"indirect:{z.name}")
+
+    proc = Zone(name="P", type=ZT.P.value)
+    proc.add_zone(Zone(name="op", type=ZT.O.value))
+
+    out = td._get_process_targets(proc, indirect_service_func=indirect)
+
+    assert out is proc
+    assert calls == []
+
+
 def test_site_targets_covers_branching_and_invalid_nesting(monkeypatch):
     invalid = Zone(name="S_bad", type=ZT.S.value)
     invalid.add_zone(Zone(name="bad", type="X"))
