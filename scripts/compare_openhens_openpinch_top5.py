@@ -13,21 +13,22 @@ import queue as queue_module
 import sys
 import tempfile
 import time
-from dataclasses import dataclass
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
 from OpenPinch import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.executor import (
-    LocalSynthesisExecutor,
+
+_HENS_PACKAGE = "OpenPinch.services.heat_exchanger_network_synthesis"
+_executor_module = import_module(f"{_HENS_PACKAGE}.common.execution.executor")
+_settings_module = import_module(f"{_HENS_PACKAGE}.common.execution.settings")
+_open_hens_module = import_module(
+    f"{_HENS_PACKAGE}.targeting_services.open_hens_method"
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
-    workflow_settings_from_problem,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.open_hens_method import (
-    execute_open_hens_method,
-)
+LocalSynthesisExecutor = _executor_module.LocalSynthesisExecutor
+workflow_settings_from_problem = _settings_module.workflow_settings_from_problem
+execute_open_hens_method = _open_hens_module.execute_open_hens_method
 
 CASE_IDS = (
     "Four-stream-Escobar-and-Trierweiler-2013-1",
@@ -126,9 +127,7 @@ def main() -> None:
         rows_by_timeout = _read_timeout_rows(
             args.output_dir / "source_task_timeouts.csv"
         )
-        run_summaries = _read_run_summaries(
-            args.output_dir / "case_run_summary.csv"
-        )
+        run_summaries = _read_run_summaries(args.output_dir / "case_run_summary.csv")
         rerun_cases = set(args.case_ids)
         if not (args.source_diagnostics_only or args.openpinch_diagnostics_only):
             rows_by_engine = [
@@ -138,9 +137,7 @@ def main() -> None:
                 row for row in rows_by_rank if row.get("case_id") not in rerun_cases
             ]
             rows_by_timeout = [
-                row
-                for row in rows_by_timeout
-                if row.get("case_id") not in rerun_cases
+                row for row in rows_by_timeout if row.get("case_id") not in rerun_cases
             ]
             run_summaries = [
                 row for row in run_summaries if row.case_id not in rerun_cases
@@ -154,9 +151,7 @@ def main() -> None:
             rows_by_engine = _read_network_rows(
                 args.output_dir / "top5_unique_networks.csv"
             )
-            rows_by_rank = _read_rank_rows(
-                args.output_dir / "top5_rank_comparison.csv"
-            )
+            rows_by_rank = _read_rank_rows(args.output_dir / "top5_rank_comparison.csv")
         if not rows_by_timeout:
             rows_by_timeout = _read_timeout_rows(
                 args.output_dir / "source_task_timeouts.csv"
@@ -314,9 +309,7 @@ def main() -> None:
                     existing_summary.source_esm_solution_count,
                     source_stats["source_esm_solution_count"],
                 )
-            run_summaries = [
-                row for row in run_summaries if row.case_id != case_id
-            ]
+            run_summaries = [row for row in run_summaries if row.case_id != case_id]
             run_summaries.append(
                 CaseRunSummary(
                     case_id=case_id,
@@ -472,9 +465,7 @@ def _parse_args() -> argparse.Namespace:
         "--openpinch-task-timeout",
         type=float,
         default=0.0,
-        help=(
-            "Per OpenPinch grid wall-clock timeout. Disabled when 0 or lower."
-        ),
+        help=("Per OpenPinch grid wall-clock timeout. Disabled when 0 or lower."),
     )
     parser.add_argument(
         "--append-existing",
@@ -892,9 +883,7 @@ def _run_openpinch_bounded(
     task_timeout: float,
 ) -> list[RankedNetwork]:
     pending = [
-        (float(d_tmin), float(dqda))
-        for d_tmin in d_tmin_grid
-        for dqda in dqda_grid
+        (float(d_tmin), float(dqda)) for d_tmin in d_tmin_grid for dqda in dqda_grid
     ]
     active: list[dict[str, Any]] = []
     rows: list[RankedNetwork] = []
@@ -1078,10 +1067,7 @@ def _merge_ranked_networks(
         by_signature.values(),
         key=lambda row: (row.tac, row.signature_text),
     )[:top_n]
-    return [
-        replace(row, rank=rank)
-        for rank, row in enumerate(ranked, start=1)
-    ]
+    return [replace(row, rank=rank) for rank, row in enumerate(ranked, start=1)]
 
 
 def _summary_with_openpinch_count(
@@ -1310,9 +1296,7 @@ def _read_network_rows(path: Path) -> list[RankedNetwork]:
                     stages=_optional_int_or_none(row["stages"]),
                     recovery_units=_optional_int_or_none(row["recovery_units"]),
                     hot_utility_units=_optional_int_or_none(row["hot_utility_units"]),
-                    cold_utility_units=_optional_int_or_none(
-                        row["cold_utility_units"]
-                    ),
+                    cold_utility_units=_optional_int_or_none(row["cold_utility_units"]),
                     signature=tuple(
                         item for item in row["signature"].split(";") if item
                     ),
@@ -1384,9 +1368,7 @@ def _enrich_rank_rows_with_networks(
     rows_by_rank: list[dict[str, Any]],
     network_rows: list[RankedNetwork],
 ) -> list[dict[str, Any]]:
-    by_engine_rank = {
-        (row.case_id, row.engine, row.rank): row for row in network_rows
-    }
+    by_engine_rank = {(row.case_id, row.engine, row.rank): row for row in network_rows}
     enriched_rows: list[dict[str, Any]] = []
     for row in rows_by_rank:
         enriched = dict(row)
@@ -1468,9 +1450,7 @@ def _read_run_summaries(path: Path) -> list[CaseRunSummary]:
                     case_id=row["case_id"],
                     d_tmin_grid=_parse_grid(row.get("d_tmin_grid", "")),
                     dqda_grid=_parse_grid(row.get("dqda_grid", "")),
-                    is_full_openhens_grid=(
-                        row.get("is_full_openhens_grid") == "True"
-                    ),
+                    is_full_openhens_grid=(row.get("is_full_openhens_grid") == "True"),
                     top_n=int(row["top_n"]),
                     source_solution_count=_optional_int_or_none(
                         row.get("source_solution_count")
@@ -1538,7 +1518,10 @@ def _write_markdown_report(
         "",
         "## Coverage Summary",
         "",
-        "| Case | Grid | Source ESM | OpenHENS Unique | OpenPinch Unique | Exact Paired Ranks | Source Timeouts | Coverage |",
+        (
+            "| Case | Grid | Source ESM | OpenHENS Unique | OpenPinch Unique | "
+            "Exact Paired Ranks | Source Timeouts | Coverage |"
+        ),
         "|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for row in _coverage_rows(
@@ -1589,7 +1572,11 @@ def _write_markdown_report(
             "",
             "## Rank Comparison",
             "",
-            "| Case | Rank | OpenHENS TAC | OpenPinch TAC | OpenHENS dTmin/min dQ | OpenPinch dTmin/min dQ | Delta | Delta % | Same Signature |",
+            (
+                "| Case | Rank | OpenHENS TAC | OpenPinch TAC | "
+                "OpenHENS dTmin/min dQ | OpenPinch dTmin/min dQ | "
+                "Delta | Delta % | Same Signature |"
+            ),
             "|---|---:|---:|---:|---|---|---:|---:|---|",
         ]
     )
@@ -1624,15 +1611,16 @@ def _write_markdown_report(
             "",
             "## Structural Signatures",
             "",
-            "| Case | Engine | Rank | TAC | dTmin | min dQ/dA | Stages | R/HU/CU Units | Signature Hash | Signature |",
+            (
+                "| Case | Engine | Rank | TAC | dTmin | min dQ/dA | Stages | "
+                "R/HU/CU Units | Signature Hash | Signature |"
+            ),
             "|---|---|---:|---:|---:|---:|---:|---|---|---|",
         ]
     )
     for row in network_rows:
         unit_text = (
-            f"{row.recovery_units}/"
-            f"{row.hot_utility_units}/"
-            f"{row.cold_utility_units}"
+            f"{row.recovery_units}/{row.hot_utility_units}/{row.cold_utility_units}"
         )
         lines.append(
             f"| {row.case_id} | {row.engine} | {row.rank} | "

@@ -52,9 +52,7 @@ class _HprConfig(SimpleNamespace):
     @property
     def effective_eta_ii_he_carnot(self) -> float:
         """Return the usable Carnot heat-engine efficiency for HPR targeting."""
-        return (
-            float(self.he_eta_ii_carnot) if self.integrated_expander_enabled else 0.0
-        )
+        return float(self.he_eta_ii_carnot) if self.integrated_expander_enabled else 0.0
 
 
 class Configuration:

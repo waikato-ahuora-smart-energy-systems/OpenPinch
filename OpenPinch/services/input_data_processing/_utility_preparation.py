@@ -213,9 +213,7 @@ def _complete_utility_data(
             config=config,
         )
         if _value_is_missing(price_value):
-            utility.price = (
-                config.costing.utility_price * config.costing.annual_op_time
-            )
+            utility.price = config.costing.utility_price * config.costing.annual_op_time
 
         htc_value = standardise_input_value(
             utility.htc,
