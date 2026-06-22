@@ -212,12 +212,11 @@ def test_target_results_apply_configured_output_unit_overrides():
         type=TT.DI.value,
         config=Configuration(
             options={
-                "OUTPUT_UNITS": {
-                    "heat_flow": "MW",
-                    "temperature": "K",
-                    "percent": "-",
-                    "area": "ft^2",
-                }
+                "OUTPUT_UNIT_HEAT_FLOW": "MW",
+                "OUTPUT_UNIT_WORK": "MW",
+                "OUTPUT_UNIT_TEMPERATURE": "K",
+                "OUTPUT_UNIT_PERCENT": "-",
+                "OUTPUT_UNIT_AREA": "ft^2",
             }
         ),
         pt=_problem_table(),

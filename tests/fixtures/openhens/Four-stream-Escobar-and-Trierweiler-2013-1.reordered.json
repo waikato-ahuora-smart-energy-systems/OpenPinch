@@ -1,7 +1,7 @@
 {
   "options": {
-    "COST_EXP": 0.83,
-    "FIXED_COST": 4000.0,
+    "COSTING_HX_AREA_EXP": 0.83,
+    "COSTING_HX_UNIT_COST": 4000.0,
     "HENS_APPROACH_TEMPERATURES": [
       2.0,
       4.0,
@@ -27,8 +27,8 @@
       3.6,
       4.0
     ],
-    "HENS_ESM_SOLVER": "ipopt-pyomo",
-    "HENS_ESM_SOLVER_OPTIONS": {},
+    "HENS_SOLVER_EVM": "ipopt-pyomo",
+    "HENS_SOLVER_OPTIONS_EVM": {},
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
     "HENS_METHOD_SEQUENCE": [
@@ -41,8 +41,8 @@
       "json",
       "csv"
     ],
-    "HENS_PDM_SOLVER": "couenne",
-    "HENS_PDM_SOLVER_OPTIONS": {},
+    "HENS_SOLVER_PDM": "couenne",
+    "HENS_SOLVER_OPTIONS_PDM": {},
     "HENS_RUN_ID": "Four-stream-Escobar-and-Trierweiler-2013-1",
     "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_STAGE_SELECTION": [
@@ -51,9 +51,9 @@
       3,
       4
     ],
-    "HENS_TDM_SOLVER": "couenne",
-    "HENS_TDM_SOLVER_OPTIONS": {},
-    "VARIABLE_COST": 500.0
+    "HENS_SOLVER_TDM": "couenne",
+    "HENS_SOLVER_OPTIONS_TDM": {},
+    "COSTING_HX_AREA_COEFF": 500.0
   },
   "streams": [
     {

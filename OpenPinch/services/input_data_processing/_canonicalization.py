@@ -52,10 +52,10 @@ def _build_zone_config(
         )
 
     if isinstance(options, Configuration):
-        zone_config = copy.deepcopy(options)
-        zone_config.TOP_ZONE_NAME = top_zone_name
-        zone_config.TOP_ZONE_IDENTIFIER = top_zone_identifier
-        return zone_config
+        config = copy.deepcopy(options)
+        config.problem.top_zone_name = top_zone_name
+        config.problem.top_zone_identifier = top_zone_identifier
+        return config
 
     if isinstance(options, dict):
         return Configuration(
@@ -112,24 +112,24 @@ def _validate_input_data(
     zone_tree: ZoneTreeSchema = None,
     streams: Optional[List[StreamSchema]] = None,
     utilities: Optional[List[UtilitySchema]] = None,
-    zone_config: Optional[Configuration] = None,
+    config: Optional[Configuration] = None,
 ):
     """Check and complete input data where safe defaults are available."""
     streams_list = [] if streams is None else list(streams)
     utilities_list = [] if utilities is None else list(utilities)
-    cfg = zone_config or Configuration()
+    cfg = config or Configuration()
 
     streams_list = _validate_streams_passed_in(streams_list)
     utilities_list = _validate_utilities_passed_in(utilities_list)
     cfg = _validate_config_data_completed(cfg)
     zone_tree = _validate_zone_tree_structure(
-        zone_tree, streams_list, cfg.TOP_ZONE_NAME
+        zone_tree, streams_list, cfg.problem.top_zone_name
     )
     return zone_tree, streams_list, utilities_list, cfg
 
 
 def _create_nested_zones(
-    parent_zone: Zone, zone_tree: ZoneTreeSchema, zone_config: Configuration
+    parent_zone: Zone, zone_tree: ZoneTreeSchema, config: Configuration
 ) -> Zone:
     """Recursively construct a Zone hierarchy from a ZoneTreeSchema."""
     if not zone_tree.children:
@@ -139,11 +139,11 @@ def _create_nested_zones(
         child_zone = Zone(
             name=child_schema.name,
             type=child_schema.type,
-            zone_config=zone_config,
+            config=config,
             parent_zone=parent_zone,
         )
         parent_zone.add_zone(child_zone, sub=True)
-        _create_nested_zones(child_zone, child_schema, zone_config)
+        _create_nested_zones(child_zone, child_schema, config)
 
     return parent_zone
 
@@ -361,17 +361,17 @@ def _validate_utilities_passed_in(utilities: List[UtilitySchema]) -> list:
     return [] if utilities is None else utilities
 
 
-def _validate_config_data_completed(zone_config: Configuration) -> Configuration:
+def _validate_config_data_completed(config: Configuration) -> Configuration:
     """Validates that the configuration settings make logical sense."""
     if (
-        not isinstance(zone_config.ANNUAL_OP_TIME, (int, float))
-        or zone_config.ANNUAL_OP_TIME == 0
+        not isinstance(config.costing.annual_op_time, (int, float))
+        or config.costing.annual_op_time == 0
     ):
-        zone_config.ANNUAL_OP_TIME = 365 * 24
-    if zone_config.DO_TURBINE_WORK and zone_config.TURB_P_IN > 220:
-        zone_config.TURB_P_IN = 200
-    if zone_config.DT_PHASE_CHANGE <= 0:
-        zone_config.DT_PHASE_CHANGE = 0.01
-    if zone_config.DT_CONT < 0:
-        zone_config.DT_CONT = 0.0
-    return zone_config
+        config.costing.annual_op_time = 365 * 24
+    if config.power.turbine_work_enabled and config.power.turb_p_in > 220:
+        config.power.turb_p_in = 200
+    if config.thermal.dt_phase_change <= 0:
+        config.thermal.dt_phase_change = 0.01
+    if config.thermal.dt_cont < 0:
+        config.thermal.dt_cont = 0.0
+    return config

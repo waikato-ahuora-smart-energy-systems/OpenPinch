@@ -39,18 +39,26 @@ def target_matches_requested_state(
 
 
 def apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
-    """Apply supported runtime option overrides onto the selected zone config."""
+    """Reject broad runtime config overrides at service boundaries."""
     if not isinstance(args, dict):
         return
 
+    allowed_runtime_keys = {"idx", "state_id", "base_target_type"}
+    invalid_keys = sorted(
+        str(key) for key in args if str(key) not in allowed_runtime_keys
+    )
+    if invalid_keys:
+        raise ValueError(
+            "Runtime options may only contain execution context keys: "
+            + ", ".join(sorted(allowed_runtime_keys))
+            + ". Invalid key(s): "
+            + ", ".join(invalid_keys)
+            + "."
+        )
+
     for key, value in args.items():
-        if key == "base_target_type":
+        if str(key) in allowed_runtime_keys:
             continue
-        if not hasattr(zone.config, key):
-            continue
-        if key == "REFRIGERANTS" and isinstance(value, str):
-            value = value.replace(";", ",").split(",")
-        setattr(zone.config, key, value)
 
 
 def format_selected_state_suffix(args: dict | None) -> str:

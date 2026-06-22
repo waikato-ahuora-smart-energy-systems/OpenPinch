@@ -72,7 +72,7 @@ def _problem_payload(
         "streams": streams,
         "utilities": [],
         "zone_tree": {"name": "Site", "type": "Site", "children": children},
-        "options": {"STATE_IDS": ["0", "peak"]} if multistate else {},
+        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]} if multistate else {},
     }
 
 

@@ -274,7 +274,7 @@ def apply_exergy_if_enabled(
     apply_func=apply_exergy_targeting,
 ) -> Any:
     """Attach exergy outputs to one target when the feature is enabled."""
-    if target is None or not bool(getattr(zone.config, "DO_EXERGY_TARGETING", False)):
+    if target is None or not bool(zone.config.targeting.exergy_enabled):
         return target
     return apply_func(target)
 
@@ -287,9 +287,8 @@ def run_exergy_targeting_service(
 ):
     """Enrich the first compatible existing target family with exergy outputs."""
     apply_zone_config_overrides(zone, args)
-    zone.config.DO_EXERGY_TARGETING = True
+    zone.config.targeting.exergy_enabled = True
     runtime_args = dict(args or {})
-    runtime_args["DO_EXERGY_TARGETING"] = True
     explicit_target_type = _normalize_exergy_base_target_type(
         runtime_args.get("base_target_type")
     )
@@ -361,10 +360,11 @@ def _get_exergy_candidate_order(
 
 def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
     target_type = getattr(target, "type", None)
-    t_env = float(getattr(getattr(target, "config", None), "T_ENV", 15.0))
-    dt_cont_half = (
-        abs(float(getattr(getattr(target, "config", None), "DT_CONT", 0.0))) / 2
-    )
+    config = getattr(target, "config", None)
+    environment = getattr(config, "environment", None)
+    thermal = getattr(config, "thermal", None)
+    t_env = float(getattr(environment, "temperature", 15.0))
+    dt_cont_half = abs(float(getattr(thermal, "dt_cont", 0.0))) / 2
 
     if target_type == TT.DI.value:
         pt = getattr(target, "pt", None)

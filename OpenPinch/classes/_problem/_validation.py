@@ -9,6 +9,7 @@ from typing import Any, Optional
 import numpy as np
 from pydantic import ValidationError
 
+from ...lib.config_metadata import CONFIG_FIELD_SPECS, input_unit_options_to_map
 from ...lib.enums import ST
 from ...lib.schemas.io import TargetInput
 from ...lib.schemas.workspace import ValidationIssue, ValidationReport
@@ -160,7 +161,9 @@ def semantic_issues(
     """Return semantic validation issues for one validated problem definition."""
     issues: list[ValidationIssue] = []
     options = problem_inputs.options if isinstance(problem_inputs.options, dict) else {}
-    input_unit_config = {"INPUT_UNITS": options.get("INPUT_UNITS", {})}
+    input_unit_config = input_unit_options_to_map(
+        {name: spec.default for name, spec in CONFIG_FIELD_SPECS.items()} | options
+    )
 
     if len(problem_inputs.streams) == 0:
         issues.append(

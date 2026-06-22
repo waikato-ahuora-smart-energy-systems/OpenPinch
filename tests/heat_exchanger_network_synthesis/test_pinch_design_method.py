@@ -481,7 +481,7 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
 def test_local_executor_passes_user_solver_options_to_internal_problem() -> None:
     problem = _four_stream_problem(
         options={
-            "HENS_PDM_SOLVER_OPTIONS": {
+            "HENS_SOLVER_OPTIONS_PDM": {
                 "node_limit": 25,
                 "feas_tolerance": 0.02,
             },

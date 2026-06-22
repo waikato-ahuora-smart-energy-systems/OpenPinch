@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from OpenPinch.classes.problem_table import ProblemTable
@@ -15,6 +17,7 @@ from OpenPinch.lib.schemas.targets import (
     TotalSiteTarget,
 )
 from OpenPinch.services.exergy_analysis import (
+    apply_exergy_if_enabled,
     apply_exergy_targeting,
     build_exergy_gcc_curve,
     compute_exergetic_temperature,
@@ -27,8 +30,8 @@ def _make_problem_table(columns: dict) -> ProblemTable:
 
 def _base_config() -> Configuration:
     config = Configuration()
-    config.T_ENV = 15.0
-    config.DT_CONT = 10.0
+    config.environment.temperature = 15.0
+    config.thermal.dt_cont = 10.0
     return config
 
 
@@ -207,6 +210,26 @@ def test_apply_exergy_targeting_populates_graphs_and_scalar_targets(factory):
     assert target.ETE is not None
     assert target.exergy_req_min is not None
     assert target.exergy_des_min is not None
+
+
+def test_apply_exergy_if_enabled_uses_grouped_targeting_config_only():
+    config = Configuration()
+    zone = SimpleNamespace(config=config)
+    target = object()
+    calls = []
+
+    def apply_func(value):
+        calls.append(value)
+        return "applied"
+
+    assert apply_exergy_if_enabled(target, zone, apply_func=apply_func) is target
+    assert calls == []
+
+    config.targeting.exergy_enabled = True
+
+    assert apply_exergy_if_enabled(target, zone, apply_func=apply_func) == "applied"
+    assert calls == [target]
+    assert not hasattr(config, "TARGETING_EXERGY_ENABLED")
 
 
 def test_total_site_serialization_includes_exergy_fields_after_enrichment():

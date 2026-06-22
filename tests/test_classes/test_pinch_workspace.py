@@ -57,15 +57,15 @@ def test_pinch_workspace_returns_real_cases_and_delegates_to_pinchproblem():
 def test_pinch_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: Path):
     workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
     workspace.copy_case(source_name="baseline", new_name="wide_dt", activate=False)
-    workspace.update_options({"DT_CONT": 15}, case_name="wide_dt")
+    workspace.update_options({"THERMAL_DT_CONT": 15}, case_name="wide_dt")
 
     bundle_path = workspace.save_bundle(tmp_path / "pinch_workspace_bundle.json")
     reloaded = PinchWorkspace.load_bundle(bundle_path)
 
-    assert workspace.get_case_payload("wide_dt")["options"]["DT_CONT"] == 15
+    assert workspace.get_case_payload("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
     assert bundle_path.exists()
     assert reloaded.list_cases() == ["baseline", "wide_dt"]
-    assert reloaded.get_case_payload("wide_dt")["options"]["DT_CONT"] == 15
+    assert reloaded.get_case_payload("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
 
 
 def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
@@ -78,7 +78,7 @@ def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
 
     workspace.set_variant_payload(
         "wide_dt",
-        {"options": {"DT_CONT": 15}},
+        {"options": {"THERMAL_DT_CONT": 15}},
         base="baseline",
     )
     baseline_view = workspace.solve_variant("baseline")
@@ -157,9 +157,10 @@ def test_pinch_workspace_validation_and_configuration_metadata():
     assert any(issue.path == "streams[0].t_target" for issue in report.issues)
     assert invalid_view.status == "invalid"
     assert by_name["HPR_TYPE"].field_type == "enum"
-    assert by_name["DT_ASSISTED_HT"].group == "general"
-    assert by_name["ELE_PRICE"].group == "costing"
-    assert by_name["DO_EXERGY_TARGETING"].runtime_status == "experimental"
+    assert by_name["DIRECT_ASSISTED_HT_DT"].group == "direct"
+    assert by_name["COSTING_HPR_ELE_PRICE"].group == "costing"
+    assert by_name["TARGETING_EXERGY_ENABLED"].runtime_status == "experimental"
+    assert by_name["HENS_SOLVER_EVM"].config_path == ["hens", "solver_evm"]
 
 
 def test_pinch_workspace_reports_error_category_for_unsupported_workflow():
@@ -179,11 +180,12 @@ def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
     case.update_options(
         {
             "HPR_TYPE": HPRcycle.CascadeCarnot.value,
-            "HPR_LOAD_VALUE": 1.0,
-            "MAX_HP_MULTISTART": 10,
-            "N_COND": 3,
-            "N_EVAP": 3,
-            "REFRIGERANTS": "water;ammonia",
+            "HPR_LOAD_MODE": "fraction",
+            "HPR_LOAD_FRACTION": 1.0,
+            "HPR_MAX_MULTISTART": 10,
+            "HPR_N_COND": 3,
+            "HPR_N_EVAP": 3,
+            "HPR_REFRIGERANTS": ["water", "ammonia"],
         }
     )
 
@@ -191,7 +193,9 @@ def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
 
     assert target.name.endswith("Direct Heat Pump")
     assert (
-        workspace.get_case_payload("direct_hp_full_load")["options"]["HPR_LOAD_VALUE"]
+        workspace.get_case_payload("direct_hp_full_load")["options"][
+            "HPR_LOAD_FRACTION"
+        ]
         == 1.0
     )
     assert not case.plot.catalog().empty

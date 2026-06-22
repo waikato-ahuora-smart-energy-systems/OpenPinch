@@ -8,46 +8,50 @@ from OpenPinch.lib.enums import TT, ZT, HPRcycle
 
 
 def test_configuration_parses_refrigerant_list_option():
-    cfg = Configuration(options={"REFRIGERANTS": "water;ammonia,co2"})
-    assert cfg.REFRIGERANTS == ["water", "ammonia", "co2"]
+    cfg = Configuration(options={"HPR_REFRIGERANTS": ["water", "ammonia", "co2"]})
+    assert cfg.hpr.refrigerants == ["water", "ammonia", "co2"]
+    assert not hasattr(cfg, "HPR_REFRIGERANTS")
 
 
 def test_configuration_exposes_normalised_hpr_backend_options():
     cfg = Configuration(
         options={
-            "REFRIGERANTS": " water ; ammonia, co2 ",
-            "MVR_FLUIDS": " Water ; R134A, ",
-            "ETA_II_HE_CARNOT": 0.4,
-            "ALLOW_INTEGRATED_EXPANDER": True,
+            "HPR_REFRIGERANTS": ["water", "ammonia", "co2"],
+            "HPR_MVR_FLUIDS": ["Water", "R134A"],
+            "HPR_HE_ETA_II_CARNOT": 0.4,
+            "HPR_INTEGRATED_EXPANDER_ENABLED": True,
         }
     )
 
-    assert cfg.hpr_refrigerants == ["WATER", "AMMONIA", "CO2"]
-    assert cfg.hpr_mvr_fluids == ["Water", "R134A"]
-    assert cfg.effective_eta_ii_he_carnot == pytest.approx(0.4)
+    assert cfg.hpr.normalised_refrigerants == ["WATER", "AMMONIA", "CO2"]
+    assert cfg.hpr.normalised_mvr_fluids == ["Water", "R134A"]
+    assert cfg.hpr.effective_eta_ii_he_carnot == pytest.approx(0.4)
+    assert not hasattr(cfg, "hpr_refrigerants")
+    assert not hasattr(cfg, "hpr_mvr_fluids")
+    assert not hasattr(cfg, "effective_eta_ii_he_carnot")
 
 
 def test_configuration_disables_effective_hpr_heat_engine_efficiency_by_default():
     cfg = Configuration(
         options={
-            "ETA_II_HE_CARNOT": 0.4,
-            "ALLOW_INTEGRATED_EXPANDER": False,
+            "HPR_HE_ETA_II_CARNOT": 0.4,
+            "HPR_INTEGRATED_EXPANDER_ENABLED": False,
         }
     )
 
-    assert cfg.effective_eta_ii_he_carnot == pytest.approx(0.0)
+    assert cfg.hpr.effective_eta_ii_he_carnot == pytest.approx(0.0)
 
 
 def test_configuration_accepts_input_and_output_unit_maps():
     cfg = Configuration(
         options={
-            "INPUT_UNITS": {"temperature": "K"},
-            "OUTPUT_UNITS": {"heat_flow": "MW"},
+            "INPUT_UNIT_TEMPERATURE": "K",
+            "OUTPUT_UNIT_HEAT_FLOW": "MW",
         }
     )
 
-    assert cfg.INPUT_UNITS == {"temperature": "K"}
-    assert cfg.OUTPUT_UNITS == {"heat_flow": "MW"}
+    assert cfg.input_unit_overrides["temperature"] == "K"
+    assert cfg.output_unit_overrides["heat_flow"] == "MW"
 
 
 def test_configuration_rejects_unknown_option_keys():
@@ -66,9 +70,9 @@ def test_configuration_rejects_removed_condensate_alias():
 
 
 def test_configuration_option_status_classifies_runtime_roles():
-    assert configuration_option_status("DT_CONT").runtime_status == "supported"
+    assert configuration_option_status("THERMAL_DT_CONT").runtime_status == "supported"
     assert (
-        configuration_option_status("DO_EXERGY_TARGETING").runtime_status
+        configuration_option_status("TARGETING_EXERGY_ENABLED").runtime_status
         == "experimental"
     )
     assert configuration_option_status("HP_CONDESATE").runtime_status == "dead"
@@ -99,17 +103,69 @@ def test_configuration_accepts_current_hpr_names_and_rejects_invalid_names():
         "Vapour compression with MVR cascade",
     ]
     assert (
-        Configuration(options={"HPR_TYPE": HPRcycle.CascadeCarnot.value}).HPR_TYPE
+        Configuration(options={"HPR_TYPE": HPRcycle.CascadeCarnot.value}).hpr.type
         == HPRcycle.CascadeCarnot.value
     )
     assert (
-        Configuration(options={"HPR_TYPE": HPRcycle.ParallelCarnot.value}).HPR_TYPE
+        Configuration(options={"HPR_TYPE": HPRcycle.ParallelCarnot.value}).hpr.type
         == HPRcycle.ParallelCarnot.value
     )
     assert (
-        Configuration(options={"HPR_TYPE": HPRcycle.ParallelVapourComp.value}).HPR_TYPE
+        Configuration(options={"HPR_TYPE": HPRcycle.ParallelVapourComp.value}).hpr.type
         == HPRcycle.ParallelVapourComp.value
     )
 
     with pytest.raises(ValueError, match="Invalid value"):
         Configuration(options={"HPR_TYPE": "Not a real HPR cycle"})
+
+
+@pytest.mark.parametrize(
+    "legacy_key",
+    [
+        "REFRIGERANTS",
+        "MVR_FLUIDS",
+        "ETA_II_HE_CARNOT",
+        "ALLOW_INTEGRATED_EXPANDER",
+        "INPUT_UNITS",
+        "OUTPUT_UNITS",
+        "DT_CONT",
+        "DO_EXERGY_TARGETING",
+    ],
+)
+def test_configuration_rejects_retired_flat_option_names(legacy_key):
+    with pytest.raises(ValueError, match="Unknown configuration option"):
+        Configuration(options={legacy_key: None})
+
+
+def test_configuration_builds_two_layer_runtime_config_from_flat_options():
+    cfg = Configuration(
+        options={
+            "PROBLEM_TOP_ZONE_NAME": "Plant",
+            "PROBLEM_TOP_ZONE_IDENTIFIER": ZT.S.value,
+            "COSTING_ANNUAL_OP_TIME": 7000.0,
+            "ENV_TEMPERATURE": 20.0,
+            "POWER_TURB_P_IN": 110.0,
+            "COSTING_HX_UNIT_COST": 5000.0,
+            "HENS_SOLVER_EVM": "ipopt-pyomo",
+            "TARGETING_AREA_COST_ENABLED": True,
+            "THERMAL_DT_CONT": 8.0,
+            "THERMAL_DT_PHASE_CHANGE": 0.02,
+        }
+    )
+
+    assert cfg.problem.top_zone_name == "Plant"
+    assert cfg.problem.top_zone_identifier == ZT.S.value
+    assert cfg.costing.annual_op_time == pytest.approx(7000.0)
+    assert cfg.environment.temperature == pytest.approx(20.0)
+    assert cfg.power.turb_p_in == pytest.approx(110.0)
+    assert cfg.costing.hx_unit_cost == pytest.approx(5000.0)
+    assert cfg.hens.solver_evm == "ipopt-pyomo"
+    assert cfg.targeting.area_cost_enabled is True
+    assert cfg.thermal.dt_cont == pytest.approx(8.0)
+    assert cfg.thermal.dt_phase_change == pytest.approx(0.02)
+    assert not hasattr(cfg, "COSTING_ANNUAL_OP_TIME")
+    assert not hasattr(cfg, "POWER_TURB_P_IN")
+    assert not hasattr(cfg, "PROBLEM_TOP_ZONE_NAME")
+    assert not hasattr(cfg, "PROBLEM_TOP_ZONE_IDENTIFIER")
+    assert not hasattr(cfg, "THERMAL_DT_CONT")
+    assert not hasattr(cfg, "THERMAL_DT_PHASE_CHANGE")

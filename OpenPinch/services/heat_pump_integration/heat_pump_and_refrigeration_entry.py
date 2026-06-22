@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from ast import literal_eval
 from copy import deepcopy
 
 import numpy as np
@@ -75,7 +74,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
-        zone_config=zone.config,
+        config=zone.config,
         idx=idx,
     )
     if target_load < tol:
@@ -86,7 +85,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         T_vals=pt[PT.T],
         H_hot=pt[PT.H_NET_HOT],
         H_cold=pt[PT.H_NET_COLD],
-        zone_config=zone.config,
+        config=zone.config,
         is_heat_pumping=is_heat_pumping,
         idx=idx,
     )
@@ -148,7 +147,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
-        zone_config=zone.config,
+        config=zone.config,
         idx=idx,
     )
     if target_load < tol:
@@ -159,7 +158,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         T_vals=pt_ut_gen[PT.T],
         H_hot=pt_ut_gen[PT.H_NET_HOT],
         H_cold=pt_ut_gen[PT.H_NET_COLD],
-        zone_config=zone.config,
+        config=zone.config,
         is_heat_pumping=is_heat_pumping,
         idx=idx,
     )
@@ -209,12 +208,12 @@ def _validate_hpr_required(
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
     zone_name: str = None,
-    zone_config: Configuration | None = None,
+    config: Configuration | None = None,
     r: dict | float | int = None,
     idx: int | None = None,
 ) -> float:
-    if zone_config is None:
-        raise ValueError("zone_config must be provided for HPR targeting.")
+    if config is None:
+        raise ValueError("config must be provided for HPR targeting.")
 
     if is_heat_pumping:
         load_values = H_net_cold
@@ -224,12 +223,44 @@ def _validate_hpr_required(
         return 0
     Q_max = float(np.nanmax(np.abs(load_values), initial=0.0))
 
-    Q = Q_max
-    hpr_load = zone_config.HPR_LOAD_VALUE if r is None else r
+    if r is not None:
+        return _resolve_legacy_hpr_load_override(
+            r,
+            Q_max=Q_max,
+            zone_name=zone_name,
+            idx=idx,
+        )
+
+    hpr = config.hpr
+    if hpr.load_mode == "fraction":
+        return Q_max * float(hpr.load_fraction)
+    if hpr.load_mode == "duty":
+        return min(float(hpr.load_duty), Q_max)
+    if hpr.load_mode == "state_values":
+        return min(
+            evaluate_value_spec(
+                hpr.load_state_values,
+                default_value=Q_max,
+                zone_name=zone_name,
+                idx=idx,
+            ),
+            Q_max,
+        )
+    raise ValueError(f"Unsupported HPR_LOAD_MODE {hpr.load_mode!r}.")
+
+
+def _resolve_legacy_hpr_load_override(
+    hpr_load: dict | float | int,
+    *,
+    Q_max: float,
+    zone_name: str | None,
+    idx: int | None,
+) -> float:
+    """Resolve direct test/helper load overrides without accepting flat config keys."""
     if isinstance(hpr_load, float | int):
-        Q = Q_max * hpr_load
-    elif isinstance(hpr_load, dict):
-        Q = min(
+        return Q_max * float(hpr_load)
+    if isinstance(hpr_load, dict):
+        return min(
             evaluate_value_spec(
                 hpr_load,
                 default_value=Q_max,
@@ -238,20 +269,7 @@ def _validate_hpr_required(
             ),
             Q_max,
         )
-    elif isinstance(hpr_load, str):
-        hpr_load = literal_eval(hpr_load.strip())
-        if isinstance(hpr_load, float | int | dict):
-            Q = _validate_hpr_required(
-                H_net_cold=H_net_cold,
-                H_net_hot=H_net_hot,
-                is_heat_pumping=is_heat_pumping,
-                is_refrigeration=is_refrigeration,
-                zone_name=zone_name,
-                zone_config=zone_config,
-                r=hpr_load,
-                idx=idx,
-            )
-    return Q
+    raise ValueError("HPR load override must be a number or state-value mapping.")
 
 
 def _get_hpr_targets(
@@ -259,7 +277,7 @@ def _get_hpr_targets(
     T_vals: np.ndarray,
     H_hot: np.ndarray,
     H_cold: np.ndarray,
-    zone_config: Configuration,
+    config: Configuration,
     is_heat_pumping: bool,
     idx: int = 0,
 ) -> HeatPumpTargetOutputs:
@@ -269,11 +287,11 @@ def _get_hpr_targets(
         H_hot=np.abs(H_hot) * -1,
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
-        zone_config=zone_config,
+        config=config,
         idx=idx,
         debug=False,
     )
-    handler = _HP_PLACEMENT_HANDLERS.get(zone_config.HPR_TYPE)
+    handler = _HP_PLACEMENT_HANDLERS.get(args.hpr_type)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
     result = handler(args)
@@ -285,7 +303,7 @@ def _get_hpr_target_summary(
     zone: Zone,
 ) -> dict:
     return {
-        "hpr_cycle": str(zone.config.HPR_TYPE),
+        "hpr_cycle": str(zone.config.hpr.type),
         "hpr_utility_total": res.utility_tot,
         "hpr_work": res.w_net,
         "hpr_external_utility": res.Q_ext,

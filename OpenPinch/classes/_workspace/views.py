@@ -141,10 +141,12 @@ def configuration_field_metadata() -> list[ConfigurationFieldMetadata]:
                 label=name.replace("_", " ").title(),
                 field_type=field_type,
                 group=spec.group,
+                config_path=list(spec.config_path),
                 support_level=configuration_field_support_level(name),
                 runtime_status=spec.runtime_status,
                 enum_choices=[str(item.value) for item in enum_cls] if enum_cls else [],
                 numeric_min=spec.numeric_min,
+                numeric_max=spec.numeric_max,
                 multiple=multiple,
             )
         )
@@ -298,9 +300,11 @@ def summary_metric_deltas(
                     base_value=base_value,
                     variant_value=variant_value,
                     unit=unit,
-                    delta=numeric_delta(base_value, variant_value)
-                    if units_match
-                    else None,
+                    delta=(
+                        numeric_delta(base_value, variant_value)
+                        if units_match
+                        else None
+                    ),
                 )
             )
     return deltas

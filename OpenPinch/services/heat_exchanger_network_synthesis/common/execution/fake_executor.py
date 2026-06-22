@@ -92,7 +92,7 @@ def _fake_network(
         zone.cold_utilities.items(),
         "cold utility",
     )
-    stage_count = task.stage_count or int(zone.config.HENS_STAGE_SELECTION[0])
+    stage_count = task.stage_count or int(zone.config.hens.stage_selection[0])
     duty = _fake_duty(task)
     utility_cost = round(duty * 0.35, 6)
     capital_cost = round(duty * 1.15, 6)

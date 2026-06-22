@@ -81,22 +81,20 @@ def test_temperature_shift_and_h_column_edge_branches():
 
 
 def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
-    zone_config = type(
-        "Cfg",
-        (),
-        {
-            "T_ENV": 20.0,
-            "DT_ENV_CONT": 5.0,
-            "DT_CONT_HP": 5.0,
-            "DT_PHASE_CHANGE": 1.0,
-        },
-    )()
+    config = Configuration(
+        options={
+            "ENV_TEMPERATURE": 20.0,
+            "HPR_DT_ENV_CONT": 5.0,
+            "HPR_DT_CONT": 5.0,
+            "THERMAL_DT_PHASE_CHANGE": 1.0,
+        }
+    )
 
     T_out, H_out, z_amb, streams = hp_pre._prepare_hpr_background_profile(
         Q_hpr_target=150.0,
         T_vals=np.array([120.0, 100.0, 80.0]),
         H_vals=np.array([200.0, 150.0, 0.0]),
-        zone_config=zone_config,
+        config=config,
         is_heat_pumping=True,
         is_cold=True,
     )
@@ -107,14 +105,14 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
 
 
 def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
-    zone_config = Configuration(
+    config = Configuration(
         options={
-            "ETA_PENALTY": 0.123,
-            "RHO_PENALTY": 4.5,
-            "REFRIGERANTS": " water ; r134a ",
-            "MVR_FLUIDS": " Water ; R245FA ",
-            "ETA_II_HE_CARNOT": 0.42,
-            "ALLOW_INTEGRATED_EXPANDER": True,
+            "HPR_ETA_PENALTY": 0.123,
+            "HPR_RHO_PENALTY": 4.5,
+            "HPR_REFRIGERANTS": ["water", "r134a"],
+            "HPR_MVR_FLUIDS": ["Water", "R245FA"],
+            "HPR_HE_ETA_II_CARNOT": 0.42,
+            "HPR_INTEGRATED_EXPANDER_ENABLED": True,
         }
     )
 
@@ -123,7 +121,7 @@ def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_hot=np.array([0.0, -50.0, -100.0]),
         H_cold=np.array([100.0, 50.0, 0.0]),
-        zone_config=zone_config,
+        config=config,
     )
 
     assert args.eta_penalty == pytest.approx(0.123)

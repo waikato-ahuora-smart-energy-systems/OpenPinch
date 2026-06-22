@@ -28,20 +28,20 @@ def _get_hot_and_cold_utilities(
     utilities: List[UtilitySchema],
     hu_t_min: float,
     cu_t_max: float,
-    zone_config: Configuration,
+    config: Configuration,
     dt_cont_multiplier: float = 1.0,
 ) -> StreamCollection:
     """Extract all utility data into class instances."""
     utilities_filled, add_default_hu, add_default_cu = _complete_utility_data(
         deepcopy(list(utilities)),
-        zone_config=zone_config,
+        config=config,
         hu_t_min=hu_t_min,
         cu_t_max=cu_t_max,
         dt_cont_multiplier=dt_cont_multiplier,
     )
     utilities_with_defaults = _add_default_utilities(
         utilities=utilities_filled,
-        zone_config=zone_config,
+        config=config,
         add_default_hu=add_default_hu,
         add_default_cu=add_default_cu,
         hu_t_min=hu_t_min,
@@ -52,13 +52,13 @@ def _get_hot_and_cold_utilities(
         utilities=utilities_with_defaults,
         utility_type=ST.Hot.value,
         dt_cont_multiplier=dt_cont_multiplier,
-        zone_config=zone_config,
+        config=config,
     )
     cold_utilities, _ = _create_utilities_list(
         utilities=utilities_left,
         utility_type=ST.Cold.value,
         dt_cont_multiplier=dt_cont_multiplier,
-        zone_config=zone_config,
+        config=config,
     )
     return hot_utilities + cold_utilities
 
@@ -92,17 +92,17 @@ def _shift_temperature_value(value: Value, delta: float) -> Value:
 
 def _utility_temperature_arrays(
     utility: UtilitySchema,
-    zone_config: Configuration,
+    config: Configuration,
 ) -> tuple[Value, Value]:
     t_supply = standardise_input_value(
         utility.t_supply,
         field_name="t_supply",
-        config=zone_config,
+        config=config,
     )
     t_target = standardise_input_value(
         utility.t_target,
         field_name="t_target",
-        config=zone_config,
+        config=config,
     )
     if t_supply is None or t_target is None:
         raise ValueError(
@@ -114,9 +114,9 @@ def _utility_temperature_arrays(
 def _orient_utility_temperatures(
     utility: UtilitySchema,
     utility_type: str,
-    zone_config: Configuration,
+    config: Configuration,
 ) -> tuple[Value, Value, bool]:
-    t_supply, t_target = _utility_temperature_arrays(utility, zone_config)
+    t_supply, t_target = _utility_temperature_arrays(utility, config)
     t_supply_arr = t_supply.state_values
     t_target_arr = t_target.state_values
 
@@ -139,7 +139,7 @@ def _orient_utility_temperatures(
 
 def _complete_utility_data(
     utilities: List[UtilitySchema],
-    zone_config: Configuration,
+    config: Configuration,
     hu_t_min: float,
     cu_t_max: float,
     dt_cont_multiplier: float = 1.0,
@@ -147,29 +147,30 @@ def _complete_utility_data(
     """Complete utility data and add default utilities where needed."""
     add_default_hu = True
     add_default_cu = True
+    thermal = config.thermal
 
     for utility in utilities:
         t_supply = standardise_input_value(
             utility.t_supply,
             field_name="t_supply",
-            config=zone_config,
+            config=config,
         )
         t_target = standardise_input_value(
             utility.t_target,
             field_name="t_target",
-            config=zone_config,
+            config=config,
         )
         if _value_is_missing(t_target):
             delta = (
-                -zone_config.DT_PHASE_CHANGE
+                -thermal.dt_phase_change
                 if utility.type in [ST.Hot.value, ST.Both.value]
-                else zone_config.DT_PHASE_CHANGE
+                else thermal.dt_phase_change
             )
             utility.t_target = _shift_temperature_value(t_supply, delta).to_dict()
             t_target = standardise_input_value(
                 utility.t_target,
                 field_name="t_target",
-                config=zone_config,
+                config=config,
             )
         else:
             if np.allclose(
@@ -179,9 +180,9 @@ def _complete_utility_data(
                 rtol=0.0,
             ):
                 delta = (
-                    -zone_config.DT_PHASE_CHANGE
+                    -thermal.dt_phase_change
                     if utility.type in [ST.Hot.value, ST.Both.value]
-                    else zone_config.DT_PHASE_CHANGE
+                    else thermal.dt_phase_change
                 )
                 utility.t_target = _shift_temperature_value(
                     t_supply,
@@ -190,37 +191,39 @@ def _complete_utility_data(
                 t_target = standardise_input_value(
                     utility.t_target,
                     field_name="t_target",
-                    config=zone_config,
+                    config=config,
                 )
 
         dt_cont = standardise_input_value(
             utility.dt_cont,
             field_name="dt_cont",
-            config=zone_config,
+            config=config,
         )
         if _value_is_missing(dt_cont):
-            utility.dt_cont = zone_config.DT_CONT
+            utility.dt_cont = thermal.dt_cont
             dt_cont = standardise_input_value(
                 utility.dt_cont,
                 field_name="dt_cont",
-                config=zone_config,
+                config=config,
             )
 
         price_value = standardise_input_value(
             utility.price,
             field_name="price",
-            config=zone_config,
+            config=config,
         )
         if _value_is_missing(price_value):
-            utility.price = zone_config.UTILITY_PRICE * zone_config.ANNUAL_OP_TIME
+            utility.price = (
+                config.costing.utility_price * config.costing.annual_op_time
+            )
 
         htc_value = standardise_input_value(
             utility.htc,
             field_name="htc",
-            config=zone_config,
+            config=config,
         )
         if _value_is_missing(htc_value):
-            utility.htc = zone_config.HTC
+            utility.htc = thermal.htc
 
         t_supply_arr = t_supply.state_values
         t_target_arr = t_target.state_values
@@ -233,7 +236,7 @@ def _complete_utility_data(
             and utility.active
             and (
                 np.min(np.minimum(t_supply_arr, t_target_arr) - effective_dt_cont_arr)
-                >= hu_t_min - zone_config.DT_PHASE_CHANGE
+                >= hu_t_min - thermal.dt_phase_change
             )
         ):
             add_default_hu = False
@@ -242,7 +245,7 @@ def _complete_utility_data(
             and utility.active
             and (
                 np.max(np.maximum(t_supply_arr, t_target_arr) + effective_dt_cont_arr)
-                <= cu_t_max + zone_config.DT_PHASE_CHANGE
+                <= cu_t_max + thermal.dt_phase_change
             )
         ):
             add_default_cu = False
@@ -251,7 +254,7 @@ def _complete_utility_data(
 
 def _add_default_utilities(
     utilities: List[UtilitySchema],
-    zone_config: Configuration,
+    config: Configuration,
     add_default_hu: bool,
     add_default_cu: bool,
     hu_t_min: float,
@@ -265,7 +268,7 @@ def _add_default_utilities(
                 "HU",
                 ST.Hot.value,
                 hu_t_min,
-                zone_config,
+                config,
                 dt_cont_multiplier=dt_cont_multiplier,
             )
         )
@@ -275,7 +278,7 @@ def _add_default_utilities(
                 "CU",
                 ST.Cold.value,
                 cu_t_max,
-                zone_config,
+                config,
                 dt_cont_multiplier=dt_cont_multiplier,
             )
         )
@@ -286,12 +289,12 @@ def _create_default_utility(
     name: str,
     utility_type: str,
     temperature: float,
-    zone_config: Configuration,
+    config: Configuration,
     dt_cont_multiplier: float = 1.0,
 ) -> UtilitySchema:
     """Construct a default utility entry anchored to the process temperature."""
     direction = 1 if utility_type == ST.Hot.value else -1
-    dt_cont = zone_config.DT_CONT
+    dt_cont = config.thermal.dt_cont
     dt_cont_act = dt_cont * dt_cont_multiplier
     return UtilitySchema.model_validate(
         {
@@ -299,11 +302,11 @@ def _create_default_utility(
             "type": utility_type,
             "t_supply": temperature + dt_cont_act * direction,
             "t_target": temperature
-            + (dt_cont_act - zone_config.DT_PHASE_CHANGE) * direction,
+            + (dt_cont_act - config.thermal.dt_phase_change) * direction,
             "heat_flow": 0,
             "dt_cont": dt_cont,
-            "price": zone_config.UTILITY_PRICE,
-            "htc": zone_config.HTC,
+            "price": config.costing.utility_price,
+            "htc": config.thermal.htc,
         }
     )
 
@@ -312,7 +315,7 @@ def _create_utilities_list(
     utilities: List[UtilitySchema],
     utility_type: str,
     dt_cont_multiplier: float = 1.0,
-    zone_config: Configuration = Configuration(),
+    config: Configuration = Configuration(),
 ) -> Tuple[StreamCollection, List[UtilitySchema]]:
     """Create a sorted list of hot or cold Stream objects based on type."""
     created_utilities = StreamCollection()
@@ -326,7 +329,7 @@ def _create_utilities_list(
         supply_value, target_value, endpoints_swapped = _orient_utility_temperatures(
             selected,
             utility_type,
-            zone_config,
+            config,
         )
         candidates.append((selected, supply_value, target_value, endpoints_swapped))
 
@@ -352,37 +355,37 @@ def _create_utilities_list(
                 p_supply=standardise_input_value(
                     p_supply,
                     field_name="p_supply",
-                    config=zone_config,
+                    config=config,
                 ),
                 p_target=standardise_input_value(
                     p_target,
                     field_name="p_target",
-                    config=zone_config,
+                    config=config,
                 ),
                 h_supply=standardise_input_value(
                     h_supply,
                     field_name="h_supply",
-                    config=zone_config,
+                    config=config,
                 ),
                 h_target=standardise_input_value(
                     h_target,
                     field_name="h_target",
-                    config=zone_config,
+                    config=config,
                 ),
                 dt_cont=standardise_input_value(
                     selected.dt_cont,
                     field_name="dt_cont",
-                    config=zone_config,
+                    config=config,
                 ),
                 htc=standardise_input_value(
                     selected.htc,
                     field_name="htc",
-                    config=zone_config,
+                    config=config,
                 ),
                 price=standardise_input_value(
                     selected.price,
                     field_name="price",
-                    config=zone_config,
+                    config=config,
                 ),
                 is_process_stream=False,
                 fluid_name=selected.fluid_name,

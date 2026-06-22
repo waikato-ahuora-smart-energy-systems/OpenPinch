@@ -58,11 +58,11 @@ def _get_unit_operation_targets(
     args: dict | None = None,
 ):
     """Populate a ``Zone`` with detailed unit operation-level pinch targets."""
-    if zone.config.DO_DIRECT_OPERATION_TARGETING:
+    if zone.config.targeting.direct_operation_enabled:
         if len(zone.subzones) > 0:
             for subzone in zone.subzones.values():
                 if subzone.type == ZT.O.value:
-                    if subzone.config.DO_DIRECT_OPERATION_TARGETING:
+                    if subzone.config.targeting.direct_operation_enabled:
                         if callable(direct_service_func):
                             _invoke_service(direct_service_func, subzone, args)
                 else:
@@ -109,7 +109,7 @@ def _get_process_targets(
                     "other process zones and operation zones."
                 )
 
-        if zone.config.DO_INDIRECT_PROCESS_TARGETING:
+        if zone.config.targeting.indirect_process_enabled:
             if callable(indirect_service_func):
                 _invoke_service(indirect_service_func, zone, args)
 

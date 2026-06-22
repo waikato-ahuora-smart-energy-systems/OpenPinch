@@ -91,9 +91,11 @@ def problem_to_solver_arrays(
         raise ValueError("prepared PinchProblem must contain hot and cold utilities.")
 
     config = zone.config
+    costing = config.costing
+    hens = config.hens
     arrays = {
-        "A_coeff": _float_array([config.VARIABLE_COST]),
-        "A_exp": _float_array([config.COST_EXP]),
+        "A_coeff": _float_array([costing.hx_area_coeff]),
+        "A_exp": _float_array([costing.hx_area_exp]),
         "T_c_cont": _float_array(
             _temperature_contribution(stream, dTmin) for _, stream, _ in cold_items
         ),
@@ -128,12 +130,12 @@ def problem_to_solver_arrays(
             _value(stream.price, "$/MW/h") for _, stream, _ in cold_items
         ),
         "cold_names": _str_array(stream.name for _, stream, _ in cold_items),
-        "cu_coeff": _float_array([config.VARIABLE_COST]),
+        "cu_coeff": _float_array([costing.hx_area_coeff]),
         "cu_cost": _float_array(
             _value(stream.price, "$/MW/h") for _, stream, _ in cold_utility_items
         ),
-        "cu_exp": _float_array([config.COST_EXP]),
-        "cu_unit_cost": _float_array([config.FIXED_COST]),
+        "cu_exp": _float_array([costing.hx_area_exp]),
+        "cu_unit_cost": _float_array([costing.hx_unit_cost]),
         "f_c": _float_array(
             _stream_heat_capacity_flowrate(stream, record)
             for _, stream, record in cold_items
@@ -160,13 +162,13 @@ def problem_to_solver_arrays(
             _value(stream.htc, "kW/m^2/delta_degC")
             for _, stream, _ in hot_utility_items
         ),
-        "hu_coeff": _float_array([config.VARIABLE_COST]),
+        "hu_coeff": _float_array([costing.hx_area_coeff]),
         "hu_cost": _float_array(
             _value(stream.price, "$/MW/h") for _, stream, _ in hot_utility_items
         ),
-        "hu_exp": _float_array([config.COST_EXP]),
-        "hu_unit_cost": _float_array([config.FIXED_COST]),
-        "unit_cost": _float_array([config.FIXED_COST]),
+        "hu_exp": _float_array([costing.hx_area_exp]),
+        "hu_unit_cost": _float_array([costing.hx_unit_cost]),
+        "unit_cost": _float_array([costing.hx_unit_cost]),
     }
 
     axis_maps = {
@@ -183,8 +185,7 @@ def problem_to_solver_arrays(
             key: index for index, (key, _, _) in enumerate(hot_utility_items)
         },
         "stages": {
-            str(stage): index
-            for index, stage in enumerate(getattr(config, "HENS_STAGE_SELECTION", ()))
+            str(stage): index for index, stage in enumerate(hens.stage_selection)
         },
     }
 
@@ -192,28 +193,28 @@ def problem_to_solver_arrays(
         arrays=arrays,
         axis_maps=axis_maps,
         configuration={
-            "HENS_APPROACH_TEMPERATURES": list(config.HENS_APPROACH_TEMPERATURES),
-            "HENS_BEST_SOLUTIONS_TO_SAVE": config.HENS_BEST_SOLUTIONS_TO_SAVE,
-            "HENS_DERIVATIVE_THRESHOLDS": list(config.HENS_DERIVATIVE_THRESHOLDS),
-            "HENS_ESM_SOLVER": config.HENS_ESM_SOLVER,
-            "HENS_ESM_SOLVER_OPTIONS": dict(config.HENS_ESM_SOLVER_OPTIONS),
-            "HENS_LOG_LEVEL": config.HENS_LOG_LEVEL,
-            "HENS_MAX_PARALLEL": config.HENS_MAX_PARALLEL,
-            "HENS_METHOD_SEQUENCE": list(config.HENS_METHOD_SEQUENCE),
-            "HENS_OUTPUT_FOLDER": config.HENS_OUTPUT_FOLDER,
-            "HENS_OUTPUT_FORMATS": list(config.HENS_OUTPUT_FORMATS),
-            "HENS_PDM_SOLVER": config.HENS_PDM_SOLVER,
-            "HENS_PDM_SOLVER_OPTIONS": dict(config.HENS_PDM_SOLVER_OPTIONS),
-            "HENS_RUN_ID": config.HENS_RUN_ID,
-            "HENS_SOLVE_TOLERANCE": config.HENS_SOLVE_TOLERANCE,
-            "HENS_STAGE_SELECTION": list(config.HENS_STAGE_SELECTION),
-            "HENS_TDM_SOLVER": config.HENS_TDM_SOLVER,
-            "HENS_TDM_SOLVER_OPTIONS": dict(config.HENS_TDM_SOLVER_OPTIONS),
+            "HENS_APPROACH_TEMPERATURES": list(hens.approach_temperatures),
+            "HENS_BEST_SOLUTIONS_TO_SAVE": hens.best_solutions_to_save,
+            "HENS_DERIVATIVE_THRESHOLDS": list(hens.derivative_thresholds),
+            "HENS_LOG_LEVEL": hens.log_level,
+            "HENS_MAX_PARALLEL": hens.max_parallel,
+            "HENS_METHOD_SEQUENCE": list(hens.method_sequence),
+            "HENS_OUTPUT_FOLDER": hens.output_folder,
+            "HENS_OUTPUT_FORMATS": list(hens.output_formats),
+            "HENS_RUN_ID": hens.run_id,
+            "HENS_SOLVE_TOLERANCE": hens.solve_tolerance,
+            "HENS_SOLVER_EVM": hens.solver_evm,
+            "HENS_SOLVER_OPTIONS_EVM": dict(hens.solver_options_evm),
+            "HENS_SOLVER_OPTIONS_PDM": dict(hens.solver_options_pdm),
+            "HENS_SOLVER_OPTIONS_TDM": dict(hens.solver_options_tdm),
+            "HENS_SOLVER_PDM": hens.solver_pdm,
+            "HENS_SOLVER_TDM": hens.solver_tdm,
+            "HENS_STAGE_SELECTION": list(hens.stage_selection),
             "active_dTmin": float(dTmin),
             "costing": {
-                "COST_EXP": config.COST_EXP,
-                "FIXED_COST": config.FIXED_COST,
-                "VARIABLE_COST": config.VARIABLE_COST,
+                "COSTING_HX_AREA_COEFF": costing.hx_area_coeff,
+                "COSTING_HX_AREA_EXP": costing.hx_area_exp,
+                "COSTING_HX_UNIT_COST": costing.hx_unit_cost,
             },
         },
         preparation={
@@ -229,7 +230,8 @@ def problem_to_solver_arrays(
         },
         unit_conventions={
             "cost_coefficients": (
-                "OpenPinch Configuration FIXED_COST, VARIABLE_COST, COST_EXP"
+                "OpenPinch costing config: COSTING_HX_UNIT_COST, "
+                "COSTING_HX_AREA_COEFF, COSTING_HX_AREA_EXP"
             ),
             "heat_capacity_flowrate": "kW/K",
             "heat_transfer_coefficient": "kW/m^2/K",
@@ -259,7 +261,7 @@ def _temperature_contribution(stream: Stream, dTmin: float) -> float:
 def _utility_solver_target(stream: Stream, zone: Zone) -> float:
     supply = _value(stream.t_supply, "K")
     target = _value(stream.t_target, "K")
-    if abs(supply - target) <= zone.config.DT_PHASE_CHANGE + tol:
+    if abs(supply - target) <= zone.config.thermal.dt_phase_change + tol:
         return supply
     return target
 

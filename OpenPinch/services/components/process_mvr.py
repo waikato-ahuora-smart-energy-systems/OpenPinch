@@ -165,9 +165,11 @@ def create_process_mvr_component(
         mvr_stage_pressure_ratio=mvr_stage_pressure_ratio,
         liquid_injection=bool(liquid_injection),
         eta_mvr_comp=float(
-            root.config.ETA_MVR_COMP if eta_mvr_comp is None else eta_mvr_comp
+            root.config.process_mvr.eta_comp if eta_mvr_comp is None else eta_mvr_comp
         ),
-        eta_motor=float(root.config.ETA_MOTOR if eta_motor is None else eta_motor),
+        eta_motor=float(
+            root.config.process_mvr.eta_motor if eta_motor is None else eta_motor
+        ),
         dt_diff_max=float(getattr(root.config, "DT_DIFF_MAX", 0.1)),
     )
     component_id = _resolve_component_id(problem, mvr_id)

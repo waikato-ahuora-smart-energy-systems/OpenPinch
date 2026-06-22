@@ -98,7 +98,7 @@ def test_source_style_pdm_targets_preserve_openhens_float_literals() -> None:
 
 def test_source_style_targets_use_problem_environment_temperature(monkeypatch) -> None:
     problem = _load_problem(CASE_IDS[0])
-    problem.master_zone.config.T_ENV = 23.5
+    problem.master_zone.config.environment.temperature = 23.5
     captured: dict[str, float] = {}
 
     def fake_source_style_target_snapshot(
