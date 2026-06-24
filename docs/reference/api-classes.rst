@@ -81,6 +81,15 @@ are assembled, but users normally call the methods through
 .. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.stagewise
    :members:
 
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.packed_pinch_design
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.packed_stagewise
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.stage_packing
+   :members:
+
 .. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.unit_models.problem
    :members:
 

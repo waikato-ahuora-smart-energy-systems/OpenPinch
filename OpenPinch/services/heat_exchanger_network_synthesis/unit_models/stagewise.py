@@ -11,6 +11,8 @@ import copy
 import logging
 import math
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
@@ -19,6 +21,25 @@ from ..common.solver.arrays import PreparedSolverArrays
 from .base import BaseHeatExchangerNetworkModel
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _EvolutionCandidateSpec:
+    kind: Literal["minus", "plus"]
+    unit: int
+    branch_index: int
+    rank: int
+    prev_case: Any
+    position: tuple[int, int, int]
+    z_allowed: list
+    signature: tuple[tuple[int, int, int], ...]
+
+
+@dataclass
+class _EvolutionBranchState:
+    model: Any
+    best_tac: float
+    stale_depths: int = 0
 
 
 class StageWiseModel(BaseHeatExchangerNetworkModel):
@@ -106,7 +127,12 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.Q_max = np.array(
             [
                 [
-                    max(self.T_h_in[i] - self.T_c_in[j] - self.dTmin, 0.0)
+                    max(
+                        self.T_h_in[i]
+                        - self.T_c_in[j]
+                        - self._recovery_approach_temperature(i, j),
+                        0.0,
+                    )
                     * min(self.f_h[i], self.f_c[j])
                     for j in range(self.J)
                 ]
@@ -121,7 +147,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                     abs(self.T_h_out[i] - self.T_c_in[j]),
                     abs(self.T_h_out[i] - self.T_c_out[j]),
                 )
-                + self.dTmin
+                + self._recovery_approach_temperature(i, j)
                 for j in range(self.J)
             ]
             for i in range(self.I)
@@ -143,14 +169,16 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.Q_r = [
             [
                 [
-                    self.m.Var(
-                        value=self.Q_max[i][j] / 3,
-                        ub=self.Q_max[i][j],
-                        lb=0.0,
-                        name=f"Q_H{i}_to_C{j}_at_S{k}",
+                    (
+                        self.m.Var(
+                            value=self.Q_max[i][j] / 3,
+                            ub=self.Q_max[i][j],
+                            lb=0.0,
+                            name=f"Q_H{i}_to_C{j}_at_S{k}",
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else self.m.Param(value=0.0, name=f"Q_H{i}_to_C{j}_at_S{k}")
                     )
-                    if self.z_allowed[i][j][k] > 0
-                    else self.m.Param(value=0.0, name=f"Q_H{i}_to_C{j}_at_S{k}")
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
@@ -158,51 +186,59 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             for i in range(self.I)
         ]
         self.Q_c = [
-            self.m.Var(
-                value=0,
-                ub=self.Qtot_sh[i],
-                lb=0.0,
-                name=f"Q_H{i}_to_CU",
+            (
+                self.m.Var(
+                    value=0,
+                    ub=self.Qtot_sh[i],
+                    lb=0.0,
+                    name=f"Q_H{i}_to_CU",
+                )
+                if self.z_cu_allowed[i] > 0
+                else self.m.Param(value=0, name=f"Q_H{i}_to_CU")
             )
-            if self.z_cu_allowed[i] > 0
-            else self.m.Param(value=0, name=f"Q_H{i}_to_CU")
             for i in range(self.I)
         ]
         self.Q_h = [
-            self.m.Var(
-                value=0,
-                ub=self.Qtot_sc[j],
-                lb=0.0,
-                name=f"Q_HU_to_C{j}",
+            (
+                self.m.Var(
+                    value=0,
+                    ub=self.Qtot_sc[j],
+                    lb=0.0,
+                    name=f"Q_HU_to_C{j}",
+                )
+                if self.z_hu_allowed[j] > 0
+                else self.m.Param(value=0, name=f"Q_HU_to_C{j}")
             )
-            if self.z_hu_allowed[j] > 0
-            else self.m.Param(value=0, name=f"Q_HU_to_C{j}")
             for j in range(self.J)
         ]
         self.T_h = [
             [
-                self.m.Var(
-                    value=self.T_h_in[i],
-                    ub=self.T_h_in[i],
-                    lb=self.T_h_out[i],
-                    name=f"T_H{i}_at_B{k}",
+                (
+                    self.m.Var(
+                        value=self.T_h_in[i],
+                        ub=self.T_h_in[i],
+                        lb=self.T_h_out[i],
+                        name=f"T_H{i}_at_B{k}",
+                    )
+                    if k > 0
+                    else self.m.Param(value=self.T_h_in[i], name=f"T_H{i}_at_B{k}")
                 )
-                if k > 0
-                else self.m.Param(value=self.T_h_in[i], name=f"T_H{i}_at_B{k}")
                 for k in range(self.K)
             ]
             for i in range(self.I)
         ]
         self.T_c = [
             [
-                self.m.Var(
-                    value=self.T_c_in[j],
-                    ub=self.T_c_out[j],
-                    lb=self.T_c_in[j],
-                    name=f"T_C{j}_at_B{k}",
+                (
+                    self.m.Var(
+                        value=self.T_c_in[j],
+                        ub=self.T_c_out[j],
+                        lb=self.T_c_in[j],
+                        name=f"T_C{j}_at_B{k}",
+                    )
+                    if k < self.S
+                    else self.m.Param(value=self.T_c_in[j], name=f"T_C{j}_at_B{k}")
                 )
-                if k < self.S
-                else self.m.Param(value=self.T_c_in[j], name=f"T_C{j}_at_B{k}")
                 for k in range(self.K)
             ]
             for j in range(self.J)
@@ -210,16 +246,18 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.theta_1 = [
             [
                 [
-                    self.m.Var(
-                        value=self.dTmin,
-                        ub=abs(self.T_h_in[i] - self.T_c_in[j]),
-                        lb=self.dTmin,
-                        name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else self.m.Param(
-                        value=self.dTmin,
-                        name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
+                    (
+                        self.m.Var(
+                            value=self._recovery_approach_temperature(i, j),
+                            ub=abs(self.T_h_in[i] - self.T_c_in[j]),
+                            lb=self._recovery_approach_temperature(i, j),
+                            name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else self.m.Param(
+                            value=self._recovery_approach_temperature(i, j),
+                            name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
+                        )
                     )
                     for k in range(self.S)
                 ]
@@ -230,16 +268,18 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.theta_2 = [
             [
                 [
-                    self.m.Var(
-                        value=self.dTmin,
-                        ub=abs(self.T_h_in[i] - self.T_c_in[j]),
-                        lb=self.dTmin,
-                        name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else self.m.Param(
-                        value=self.dTmin,
-                        name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
+                    (
+                        self.m.Var(
+                            value=self._recovery_approach_temperature(i, j),
+                            ub=abs(self.T_h_in[i] - self.T_c_in[j]),
+                            lb=self._recovery_approach_temperature(i, j),
+                            name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else self.m.Param(
+                            value=self._recovery_approach_temperature(i, j),
+                            name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
+                        )
                     )
                     for k in range(self.S)
                 ]
@@ -293,15 +333,17 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.z = [
                 [
                     [
-                        self.m.Var(
-                            value=1,
-                            ub=1,
-                            lb=0,
-                            integer=True,
-                            name=f"z_H{i}_to_C{j}_at_S{k}",
+                        (
+                            self.m.Var(
+                                value=1,
+                                ub=1,
+                                lb=0,
+                                integer=True,
+                                name=f"z_H{i}_to_C{j}_at_S{k}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -309,56 +351,70 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
             self.z_cu = [
-                self.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_H{i}_to_CU",
+                (
+                    self.m.Var(
+                        value=1,
+                        ub=1,
+                        lb=0,
+                        integer=True,
+                        name=f"z_H{i}_to_CU",
+                    )
+                    if self.z_cu_allowed[i] > 0
+                    else self.m.Param(value=0, name=f"z_H{i}_to_CU")
                 )
-                if self.z_cu_allowed[i] > 0
-                else self.m.Param(value=0, name=f"z_H{i}_to_CU")
                 for i in range(self.I)
             ]
             self.z_hu = [
-                self.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_HU_to_C{j}",
+                (
+                    self.m.Var(
+                        value=1,
+                        ub=1,
+                        lb=0,
+                        integer=True,
+                        name=f"z_HU_to_C{j}",
+                    )
+                    if self.z_hu_allowed[j] > 0
+                    else self.m.Param(value=0, name=f"z_HU_to_C{j}")
                 )
-                if self.z_hu_allowed[j] > 0
-                else self.m.Param(value=0, name=f"z_HU_to_C{j}")
                 for j in range(self.J)
             ]
             _ = [
-                self.m.Equation(self.Q_r[i][j][k] <= self.Q_max[i][j] * self.z[i][j][k])
-                if self.z_allowed[i][j][k] > 0
-                else None
+                (
+                    self.m.Equation(
+                        self.Q_r[i][j][k] <= self.Q_max[i][j] * self.z[i][j][k]
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(self.Q_c[i] <= self.Qtot_sh[i] * self.z_cu[i])
-                if self.z_cu_allowed[i] > 0
-                else None
+                (
+                    self.m.Equation(self.Q_c[i] <= self.Qtot_sh[i] * self.z_cu[i])
+                    if self.z_cu_allowed[i] > 0
+                    else None
+                )
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(self.Q_h[j] <= self.Qtot_sc[j] * self.z_hu[j])
-                if self.z_hu_allowed[j] > 0
-                else None
+                (
+                    self.m.Equation(self.Q_h[j] <= self.Qtot_sc[j] * self.z_hu[j])
+                    if self.z_hu_allowed[j] > 0
+                    else None
+                )
                 for j in range(self.J)
             ]
         else:
             self.z = [
                 [
                     [
-                        self.m.Param(value=1, name=f"z_H{i}_to_C{j}_at_S{k}")
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
+                        (
+                            self.m.Param(value=1, name=f"z_H{i}_to_C{j}_at_S{k}")
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
+                        )
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -366,15 +422,19 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
             self.z_hu = [
-                self.m.Param(value=1, name=f"z_HU_to_C{j}")
-                if self.z_hu_allowed[j] > 0
-                else self.m.Param(value=0, name=f"z_HU_to_C{j}")
+                (
+                    self.m.Param(value=1, name=f"z_HU_to_C{j}")
+                    if self.z_hu_allowed[j] > 0
+                    else self.m.Param(value=0, name=f"z_HU_to_C{j}")
+                )
                 for j in range(self.J)
             ]
             self.z_cu = [
-                self.m.Param(value=1, name=f"z_H{i}_to_CU")
-                if self.z_cu_allowed[i] > 0
-                else self.m.Param(value=0, name=f"z_H{i}_to_CU")
+                (
+                    self.m.Param(value=1, name=f"z_H{i}_to_CU")
+                    if self.z_cu_allowed[i] > 0
+                    else self.m.Param(value=0, name=f"z_H{i}_to_CU")
+                )
                 for i in range(self.I)
             ]
 
@@ -382,14 +442,16 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.X = [
                 [
                     [
-                        self.m.Var(
-                            value=0.5,
-                            ub=1.0,
-                            lb=0.0,
-                            name=f"X_H{i}_to_C{j}_at_S{k}",
+                        (
+                            self.m.Var(
+                                value=0.5,
+                                ub=1.0,
+                                lb=0.0,
+                                name=f"X_H{i}_to_C{j}_at_S{k}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0.0, name=f"X_H{i}_to_C{j}_at_S{k}")
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0.0, name=f"X_H{i}_to_C{j}_at_S{k}")
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -399,14 +461,16 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.Y = [
                 [
                     [
-                        self.m.Var(
-                            value=0.5,
-                            ub=1.0,
-                            lb=0.0,
-                            name=f"Y_C{j}_to_H{i}_at_S{k}",
+                        (
+                            self.m.Var(
+                                value=0.5,
+                                ub=1.0,
+                                lb=0.0,
+                                name=f"Y_C{j}_to_H{i}_at_S{k}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0.0, name=f"Y_C{j}_to_H{i}_at_S{k}")
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0.0, name=f"Y_C{j}_to_H{i}_at_S{k}")
                         for k in range(self.S)
                     ]
                     for i in range(self.I)
@@ -416,14 +480,16 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.T_h_out_x = [
                 [
                     [
-                        self.m.Var(
-                            value=self.T_h_in[i],
-                            ub=self.T_h_in[i],
-                            lb=self.T_h_out[i],
-                            name=f"Thout_x_H{i}_to_C{j}_at_S{k}",
+                        (
+                            self.m.Var(
+                                value=self.T_h_in[i],
+                                ub=self.T_h_in[i],
+                                lb=self.T_h_out[i],
+                                name=f"Thout_x_H{i}_to_C{j}_at_S{k}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0, name=f"Tx_H{i}_to_C{j}_at_S{k}")
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0, name=f"Tx_H{i}_to_C{j}_at_S{k}")
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -433,14 +499,16 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.T_c_out_y = [
                 [
                     [
-                        self.m.Var(
-                            value=self.T_c_in[j],
-                            ub=self.T_c_out[j],
-                            lb=self.T_c_in[j],
-                            name=f"Tcout_y_C{j}_to_H{i}_at_S{k}",
+                        (
+                            self.m.Var(
+                                value=self.T_c_in[j],
+                                ub=self.T_c_out[j],
+                                lb=self.T_c_in[j],
+                                name=f"Tcout_y_C{j}_to_H{i}_at_S{k}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0, name=f"Ty_C{j}_to_H{i}_at_S{k}")
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0, name=f"Ty_C{j}_to_H{i}_at_S{k}")
                         for k in range(self.S)
                     ]
                     for i in range(self.I)
@@ -448,120 +516,140 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for j in range(self.J)
             ]
             _ = [
-                self.m.Equation(
-                    self.theta_1[i][j][k]
-                    <= (self.T_h[i][k] - self.T_c_out_y[j][i][k])
-                    + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                (
+                    self.m.Equation(
+                        self.theta_1[i][j][k]
+                        <= (self.T_h[i][k] - self.T_c_out_y[j][i][k])
+                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.theta_2[i][j][k]
-                    <= (self.T_h_out_x[i][j][k] - self.T_c[j][k + 1])
-                    + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                (
+                    self.m.Equation(
+                        self.theta_2[i][j][k]
+                        <= (self.T_h_out_x[i][j][k] - self.T_c[j][k + 1])
+                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.Q_r[i][j][k]
-                    - self.X[i][j][k]
-                    * self.f_h[i]
-                    * (self.T_h[i][k] - self.T_h_out_x[i][j][k])
-                    == 0.0
+                (
+                    self.m.Equation(
+                        self.Q_r[i][j][k]
+                        - self.X[i][j][k]
+                        * self.f_h[i]
+                        * (self.T_h[i][k] - self.T_h_out_x[i][j][k])
+                        == 0.0
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.Q_r[i][j][k]
-                    - self.Y[j][i][k]
-                    * self.f_c[j]
-                    * (self.T_c_out_y[j][i][k] - self.T_c[j][k + 1])
-                    == 0.0
+                (
+                    self.m.Equation(
+                        self.Q_r[i][j][k]
+                        - self.Y[j][i][k]
+                        * self.f_c[j]
+                        * (self.T_c_out_y[j][i][k] - self.T_c[j][k + 1])
+                        == 0.0
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.m.sum([self.X[i][j][k] for j in range(self.J)]) == 1.0
+                (
+                    self.m.Equation(
+                        self.m.sum([self.X[i][j][k] for j in range(self.J)]) == 1.0
+                    )
+                    if sum(self.z_allowed[i][j][k] for j in range(self.J)) > 0
+                    else None
                 )
-                if sum(self.z_allowed[i][j][k] for j in range(self.J)) > 0
-                else None
                 for k in range(self.S)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.m.sum([self.Y[j][i][k] for i in range(self.I)]) == 1.0
+                (
+                    self.m.Equation(
+                        self.m.sum([self.Y[j][i][k] for i in range(self.I)]) == 1.0
+                    )
+                    if sum(self.z_allowed[i][j][k] for i in range(self.I)) > 0
+                    else None
                 )
-                if sum(self.z_allowed[i][j][k] for i in range(self.I)) > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
             ]
         else:
             _ = [
-                self.m.Equation(
-                    self.theta_1[i][j][k]
-                    <= (self.T_h[i][k] - self.T_c[j][k])
-                    + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                (
+                    self.m.Equation(
+                        self.theta_1[i][j][k]
+                        <= (self.T_h[i][k] - self.T_c[j][k])
+                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.theta_1[i][j][k]
-                    >= (self.T_h[i][k] - self.T_c[j][k])
-                    - self.M_ij[i][j] * (1 - self.z[i][j][k])
+                (
+                    self.m.Equation(
+                        self.theta_1[i][j][k]
+                        >= (self.T_h[i][k] - self.T_c[j][k])
+                        - self.M_ij[i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.theta_2[i][j][k]
-                    <= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                    + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                (
+                    self.m.Equation(
+                        self.theta_2[i][j][k]
+                        <= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
+                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(
-                    self.theta_2[i][j][k]
-                    >= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                    - self.M_ij[i][j] * (1 - self.z[i][j][k])
+                (
+                    self.m.Equation(
+                        self.theta_2[i][j][k]
+                        >= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
+                        - self.M_ij[i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
@@ -576,15 +664,17 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.min_dqda_int = [
             [
                 [
-                    self.m.Intermediate(
-                        self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
-                        - self.theta_1[i][j][k]
-                        * self.theta_2[i][j][k]
-                        * self.U_r[i][j],
-                        name=f"dqda_calc_H{i}_to_C{j}_at_S{k}",
+                    (
+                        self.m.Intermediate(
+                            self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
+                            - self.theta_1[i][j][k]
+                            * self.theta_2[i][j][k]
+                            * self.U_r[i][j],
+                            name=f"dqda_calc_H{i}_to_C{j}_at_S{k}",
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else None
                     )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
@@ -592,12 +682,14 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             for i in range(self.I)
         ]
         self.min_dQ_dA_eqn = [
-            self.m.Equation(
-                self.min_dqda_int[i][j][k]
-                <= self.min_dqda * self.M_ij[i][j] * (1 - self.z[i][j][k])
+            (
+                self.m.Equation(
+                    self.min_dqda_int[i][j][k]
+                    <= self.min_dqda * self.M_ij[i][j] * (1 - self.z[i][j][k])
+                )
+                if self.z_allowed[i][j][k] > 0
+                else None
             )
-            if self.z_allowed[i][j][k] > 0
-            else None
             for k in range(self.S)
             for j in range(self.J)
             for i in range(self.I)
@@ -640,12 +732,12 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         self._set_value(self.z[i][j][k], 0, brackets=brackets)
                         self._set_value(
                             self.theta_1[i][j][k],
-                            self.dTmin,
+                            self._recovery_approach_temperature(i, j),
                             brackets=brackets,
                         )
                         self._set_value(
                             self.theta_2[i][j][k],
-                            self.dTmin,
+                            self._recovery_approach_temperature(i, j),
                             brackets=brackets,
                         )
 
@@ -737,96 +829,168 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 )
             else:
                 for k in range(self.S):
-                    for j in range(self.J):
-                        sum_Q_r_j = sum(
-                            init_solution.Q_r[i][j][k].VALUE[0] for i in range(self.I)
-                        )
                     for i in range(self.I):
                         sum_Q_r_i = sum(
                             init_solution.Q_r[i][j][k].VALUE[0] for j in range(self.J)
                         )
-                        if self.z_allowed[i][j][k] > 0:
+                        allowed_js = [
+                            j for j in range(self.J) if self.z_allowed[i][j][k] > 0
+                        ]
+                        for j in range(self.J):
+                            if self.z_allowed[i][j][k] <= 0:
+                                self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
+                                continue
                             q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                            if q_val > 0.0:
+                            if sum_Q_r_i > self.tol:
+                                value = q_val / sum_Q_r_i
+                            else:
+                                value = 1.0 / len(allowed_js) if allowed_js else 0.0
+                            self._set_value(
+                                self.X[i][j][k],
+                                value,
+                                brackets=brackets,
+                            )
+                    for j in range(self.J):
+                        sum_Q_r_j = sum(
+                            init_solution.Q_r[i][j][k].VALUE[0] for i in range(self.I)
+                        )
+                        allowed_is = [
+                            i for i in range(self.I) if self.z_allowed[i][j][k] > 0
+                        ]
+                        for i in range(self.I):
+                            if self.z_allowed[i][j][k] <= 0:
+                                self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
+                                continue
+                            q_val = init_solution.Q_r[i][j][k].VALUE[0]
+                            if sum_Q_r_j > self.tol:
+                                value = q_val / sum_Q_r_j
+                            else:
+                                value = 1.0 / len(allowed_is) if allowed_is else 0.0
+                            self._set_value(
+                                self.Y[j][i][k],
+                                value,
+                                brackets=brackets,
+                            )
+                    for i in range(self.I):
+                        for j in range(self.J):
+                            if self.z_allowed[i][j][k] > 0:
+                                q_val = init_solution.Q_r[i][j][k].VALUE[0]
                                 self._set_value(
-                                    self.X[i][j][k],
-                                    q_val / sum_Q_r_j if sum_Q_r_j else 0.0,
+                                    self.T_h_out_x[i][j][k],
+                                    (
+                                        init_solution.T_h[i][k + 1].VALUE[0]
+                                        if q_val > self.tol
+                                        else init_solution.T_h[i][k].VALUE[0]
+                                    ),
                                     brackets=brackets,
                                 )
                                 self._set_value(
-                                    self.Y[j][i][k],
-                                    q_val / sum_Q_r_i if sum_Q_r_i else 0.0,
+                                    self.T_c_out_y[j][i][k],
+                                    (
+                                        init_solution.T_c[j][k].VALUE[0]
+                                        if q_val > self.tol
+                                        else init_solution.T_c[j][k + 1].VALUE[0]
+                                    ),
                                     brackets=brackets,
                                 )
                             else:
-                                self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
-                                self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
-                            self._set_value(
-                                self.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
-                                brackets=brackets,
-                            )
-                            self._set_value(
-                                self.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
-                            )
-                        else:
-                            self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
-                            self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
-                            self._set_value(
-                                self.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
-                                brackets=brackets,
-                            )
-                            self._set_value(
-                                self.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
-                            )
+                                self._set_value(
+                                    self.T_h_out_x[i][j][k],
+                                    init_solution.T_h[i][k + 1].VALUE[0],
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.T_c_out_y[j][i][k],
+                                    init_solution.T_c[j][k].VALUE[0],
+                                    brackets=brackets,
+                                )
 
     def get_net_benefit_evolution(
         self,
         print_output: bool,
         max_depth: int = 5,
+        n_ad_branches: int = 1,
+        n_rm_branches: int = 1,
+        max_parallel: int = 1,
+        no_improvement_patience: int | None = None,
     ):
-        """Evolve topology using the source add/remove net-benefit heuristic."""
+        """Evolve topology using branched add/remove net-benefit heuristics."""
 
         if self.mSuccess != 1:
             logger.warning("Initial model was not successful; skipping evolution.")
             return self
 
-        model = self
+        n_ad_branches = max(1, int(n_ad_branches))
+        n_rm_branches = max(1, int(n_rm_branches))
+        max_parallel = max(1, int(max_parallel))
+        if no_improvement_patience is not None:
+            no_improvement_patience = max(1, int(no_improvement_patience))
+        frontier = [_EvolutionBranchState(model=self, best_tac=float(self.TAC))]
         best_model = self
 
         for unit in range(max_depth):
             logger.debug(
-                "Evolution step %s/%s: current TAC %s",
+                "Evolution step %s/%s: active branches %s, best TAC %s",
                 unit + 1,
                 max_depth,
-                getattr(model, "TAC", None),
+                len(frontier),
+                getattr(best_model, "TAC", None),
             )
-            model_minus_one = self.get_n_minus_one_evolution(
-                print_output=print_output,
+            specs = self._evolution_candidate_specs(
+                frontier,
                 unit=unit,
-                prev_case=model,
+                n_ad_branches=n_ad_branches,
+                n_rm_branches=n_rm_branches,
             )
-            model_plus_one = self.get_n_plus_one_evolution(
-                print_output=print_output,
-                unit=unit,
-                prev_case=model,
-            )
+            if not specs:
+                logger.debug("No evolution candidate topologies found.")
+                break
 
-            model = self._select_best_candidate(model, model_minus_one, model_plus_one)
-            if model is None:
+            solved_candidates = self._solve_evolution_candidates(
+                specs,
+                print_output=print_output,
+                max_parallel=max_parallel,
+            )
+            next_frontier: list[_EvolutionBranchState] = []
+            for spec, candidate in solved_candidates:
+                if not _is_usable_evolution_candidate(candidate):
+                    continue
+                parent_state = frontier[spec.branch_index]
+                candidate_tac = float(candidate.TAC)
+                if candidate_tac < parent_state.best_tac:
+                    branch_state = _EvolutionBranchState(
+                        model=candidate,
+                        best_tac=candidate_tac,
+                        stale_depths=0,
+                    )
+                else:
+                    branch_state = _EvolutionBranchState(
+                        model=candidate,
+                        best_tac=parent_state.best_tac,
+                        stale_depths=parent_state.stale_depths + 1,
+                    )
+                if (
+                    no_improvement_patience is not None
+                    and branch_state.stale_depths >= no_improvement_patience
+                ):
+                    logger.debug(
+                        "Pruning EVM branch %s after %s non-improving steps.",
+                        spec.branch_index,
+                        branch_state.stale_depths,
+                    )
+                    continue
+                next_frontier.append(branch_state)
+                if candidate.TAC < best_model.TAC:
+                    best_model = candidate
+            frontier = next_frontier
+            if not frontier:
                 logger.debug("No viable evolution model found.")
                 break
 
-            if model.TAC < best_model.TAC:
-                best_model = model
+            if best_model is not self:
                 logger.debug(
                     "New best evolution model %s with TAC %.6f",
-                    model.name,
+                    best_model.name,
                     best_model.TAC,
                 )
 
@@ -837,6 +1001,166 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.m.cleanup()
         return self
 
+    def _evolution_candidate_specs(
+        self,
+        frontier: Sequence[_EvolutionBranchState],
+        *,
+        unit: int,
+        n_ad_branches: int,
+        n_rm_branches: int,
+    ) -> list[_EvolutionCandidateSpec]:
+        specs: list[_EvolutionCandidateSpec] = []
+        seen_signatures: set[tuple[tuple[int, int, int], ...]] = set()
+        for branch_index, branch_state in enumerate(frontier):
+            prev_case = branch_state.model
+            for rank, position in enumerate(
+                prev_case.get_lowest_benefit_HX_candidates(n_rm_branches),
+                start=1,
+            ):
+                spec = self._evolution_candidate_spec(
+                    kind="minus",
+                    unit=unit,
+                    branch_index=branch_index,
+                    rank=rank,
+                    prev_case=prev_case,
+                    position=position,
+                    z_value=0,
+                    seen_signatures=seen_signatures,
+                )
+                if spec is not None:
+                    specs.append(spec)
+            for rank, position in enumerate(
+                prev_case.get_max_benefit_HX_candidates(n_ad_branches),
+                start=1,
+            ):
+                spec = self._evolution_candidate_spec(
+                    kind="plus",
+                    unit=unit,
+                    branch_index=branch_index,
+                    rank=rank,
+                    prev_case=prev_case,
+                    position=position,
+                    z_value=1,
+                    seen_signatures=seen_signatures,
+                )
+                if spec is not None:
+                    specs.append(spec)
+        return specs
+
+    def _evolution_candidate_spec(
+        self,
+        *,
+        kind: Literal["minus", "plus"],
+        unit: int,
+        branch_index: int,
+        rank: int,
+        prev_case,
+        position: Sequence[int],
+        z_value: int,
+        seen_signatures: set[tuple[tuple[int, int, int], ...]],
+    ) -> _EvolutionCandidateSpec | None:
+        if len(position) != 3:
+            return None
+        candidate_position = tuple(int(index) for index in position)
+        z_allowed = self._z_allowed_with_candidate(
+            prev_case,
+            position=candidate_position,
+            value=z_value,
+        )
+        signature = self._topology_signature_from_z(z_allowed)
+        if signature in seen_signatures:
+            logger.debug(
+                "Skipping duplicate EVM topology at depth %s from branch %s",
+                unit,
+                branch_index,
+            )
+            return None
+        seen_signatures.add(signature)
+        return _EvolutionCandidateSpec(
+            kind=kind,
+            unit=unit,
+            branch_index=branch_index,
+            rank=rank,
+            prev_case=prev_case,
+            position=candidate_position,
+            z_allowed=z_allowed,
+            signature=signature,
+        )
+
+    def _solve_evolution_candidates(
+        self,
+        specs: Sequence[_EvolutionCandidateSpec],
+        *,
+        print_output: bool,
+        max_parallel: int,
+    ) -> list[tuple[_EvolutionCandidateSpec, Any]]:
+        if max_parallel <= 1 or len(specs) <= 1:
+            return [
+                (spec, candidate)
+                for spec in specs
+                if (candidate := self._solve_evolution_candidate(spec, print_output))
+                is not None
+            ]
+
+        candidates: list[tuple[_EvolutionCandidateSpec, Any]] = []
+        with ThreadPoolExecutor(max_workers=min(max_parallel, len(specs))) as pool:
+            futures = {
+                pool.submit(self._solve_evolution_candidate, spec, print_output): spec
+                for spec in specs
+            }
+            for future in as_completed(futures):
+                spec = futures[future]
+                try:
+                    candidate = future.result()
+                except Exception as exc:
+                    logger.debug(
+                        "Discarding failed EVM %s branch %s rank %s: %s",
+                        spec.kind,
+                        spec.branch_index,
+                        spec.rank,
+                        exc,
+                    )
+                    continue
+                if candidate is not None:
+                    candidates.append((spec, candidate))
+        return candidates
+
+    def _solve_evolution_candidate(
+        self,
+        spec: _EvolutionCandidateSpec,
+        print_output: bool,
+    ):
+        try:
+            if spec.kind == "minus":
+                return self._build_and_solve_n_minus_one_evolution(
+                    print_output=print_output,
+                    unit=spec.unit,
+                    prev_case=spec.prev_case,
+                    position=spec.position,
+                    z_allowed_removed=spec.z_allowed,
+                    branch_label=self._evolution_branch_label(spec),
+                )
+            return self._build_and_solve_n_plus_one_evolution(
+                print_output=print_output,
+                unit=spec.unit,
+                prev_case=spec.prev_case,
+                position=spec.position,
+                z_allowed_added=spec.z_allowed,
+                branch_label=self._evolution_branch_label(spec),
+            )
+        except Exception as exc:
+            logger.debug(
+                "EVM %s branch %s rank %s failed: %s",
+                spec.kind,
+                spec.branch_index,
+                spec.rank,
+                exc,
+            )
+            return None
+
+    def _evolution_branch_label(self, spec: _EvolutionCandidateSpec) -> str:
+        return f"{spec.unit}-b{spec.branch_index}-{spec.kind}{spec.rank}"
+
     def _select_best_candidate(
         self,
         current_model,
@@ -846,11 +1170,13 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Select the source plus/minus evolution candidate for the next step."""
 
         del current_model
-        if not model_minus_one.mSuccess and not model_plus_one.mSuccess:
+        minus_usable = _is_usable_evolution_candidate(model_minus_one)
+        plus_usable = _is_usable_evolution_candidate(model_plus_one)
+        if not minus_usable and not plus_usable:
             return None
-        if model_minus_one.mSuccess and not model_plus_one.mSuccess:
+        if minus_usable and not plus_usable:
             return model_minus_one
-        if not model_minus_one.mSuccess and model_plus_one.mSuccess:
+        if not minus_usable and plus_usable:
             return model_plus_one
         logger.debug(
             "TAC comparison -1: %.6f, +1: %.6f",
@@ -891,21 +1217,46 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     def get_n_minus_one_evolution(self, print_output: bool, unit: int, prev_case):
         """Build and solve the source minus-one topology evolution candidate."""
 
-        low_pos = prev_case.get_lowest_benefit_HX()
-        z_allowed_removed = copy.deepcopy(prev_case.z)
-        for i, j, k in low_pos:
-            logger.debug("worst selected position i,j,k %s", [i, j, k])
-            if isinstance(z_allowed_removed[0][0][0], int):
-                z_allowed_removed[i][j][k] = 0
-            else:
-                z_allowed_removed[i][j][k][0] = 0
+        candidates = prev_case.get_lowest_benefit_HX_candidates(1)
+        if not candidates:
+            return None
+        position = tuple(candidates[0])
+        z_allowed_removed = self._z_allowed_with_candidate(
+            prev_case,
+            position=position,
+            value=0,
+        )
+        return self._build_and_solve_n_minus_one_evolution(
+            print_output=print_output,
+            unit=unit,
+            prev_case=prev_case,
+            position=position,
+            z_allowed_removed=z_allowed_removed,
+        )
 
+    def _build_and_solve_n_minus_one_evolution(
+        self,
+        *,
+        print_output: bool,
+        unit: int,
+        prev_case,
+        position: Sequence[int],
+        z_allowed_removed: list,
+        branch_label: str | None = None,
+    ):
+        """Build and solve one minus-one topology evolution candidate."""
+
+        i, j, k = (int(index) for index in position)
+        logger.debug("worst selected position i,j,k %s", [i, j, k])
         logger.debug(
             "number in z_allowed_removed %s",
             _count_allowed_matches(z_allowed_removed),
         )
         model_minus_one = StageWiseModel(
-            name=f"{self.name}-n_minus 1 evolution model {unit}",
+            name=(
+                f"{self.name}-n_minus 1 evolution model "
+                f"{branch_label if branch_label is not None else unit}"
+            ),
             framework=prev_case.framework,
             solver="ipopt-pyomo",
             solver_arrays=prev_case.solver_arrays,
@@ -920,11 +1271,11 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             solver_options=self.solver_options,
         )
 
-        for i, j, k in low_pos:
-            model_minus_one.Q_r[i][j][k].VALUE.value = 0.0
-            model_minus_one.z[i][j][k].VALUE.value = 0
-            model_minus_one.theta_1[i][j][k].VALUE.value = self.dTmin
-            model_minus_one.theta_2[i][j][k].VALUE.value = self.dTmin
+        model_minus_one.Q_r[i][j][k].VALUE.value = 0.0
+        model_minus_one.z[i][j][k].VALUE.value = 0
+        approach = self._recovery_approach_temperature(i, j)
+        model_minus_one.theta_1[i][j][k].VALUE.value = approach
+        model_minus_one.theta_2[i][j][k].VALUE.value = approach
 
         model_minus_one.optimise(print_output=print_output)
         return model_minus_one
@@ -932,21 +1283,46 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     def get_n_plus_one_evolution(self, print_output: bool, unit: int, prev_case):
         """Build and solve the source plus-one topology evolution candidate."""
 
-        high_pos = prev_case.get_max_benefit_HX()
-        z_allowed_added = copy.deepcopy(prev_case.z)
-        for i, j, k in high_pos:
-            logger.debug("best non-selected position i,j,k %s", [i, j, k])
-            if isinstance(z_allowed_added[0][0][0], int):
-                z_allowed_added[i][j][k] = 1
-            else:
-                z_allowed_added[i][j][k][0] = 1
+        candidates = prev_case.get_max_benefit_HX_candidates(1)
+        if not candidates:
+            return None
+        position = tuple(candidates[0])
+        z_allowed_added = self._z_allowed_with_candidate(
+            prev_case,
+            position=position,
+            value=1,
+        )
+        return self._build_and_solve_n_plus_one_evolution(
+            print_output=print_output,
+            unit=unit,
+            prev_case=prev_case,
+            position=position,
+            z_allowed_added=z_allowed_added,
+        )
 
+    def _build_and_solve_n_plus_one_evolution(
+        self,
+        *,
+        print_output: bool,
+        unit: int,
+        prev_case,
+        position: Sequence[int],
+        z_allowed_added: list,
+        branch_label: str | None = None,
+    ):
+        """Build and solve one plus-one topology evolution candidate."""
+
+        i, j, k = (int(index) for index in position)
+        logger.debug("best non-selected position i,j,k %s", [i, j, k])
         logger.debug(
             "number in z_allowed_added %s",
             _count_allowed_matches(z_allowed_added),
         )
         model_plus_one = StageWiseModel(
-            name=f"{self.name}-n_plus 1 evolution model {unit}",
+            name=(
+                f"{self.name}-n_plus 1 evolution model "
+                f"{branch_label if branch_label is not None else unit}"
+            ),
             framework=prev_case.framework,
             solver="ipopt-pyomo",
             solver_arrays=prev_case.solver_arrays,
@@ -961,11 +1337,66 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             solver_options=self.solver_options,
         )
 
-        for i, j, k in high_pos:
-            model_plus_one.z[i][j][k].VALUE.value = 1
+        model_plus_one.z[i][j][k].VALUE.value = 1
 
         model_plus_one.optimise(print_output=print_output)
         return model_plus_one
+
+    def _z_allowed_with_candidate(
+        self,
+        prev_case,
+        *,
+        position: Sequence[int],
+        value: int,
+    ) -> list:
+        z_allowed = copy.deepcopy(prev_case.z)
+        i, j, k = (int(index) for index in position)
+        self._set_recovery_binary_value(z_allowed, (i, j, k), value)
+        return z_allowed
+
+    def _set_recovery_binary_value(
+        self,
+        z_values: list,
+        position: tuple[int, int, int],
+        value: int,
+    ) -> None:
+        i, j, k = position
+        element = z_values[i][j][k]
+        if isinstance(element, (int, float)):
+            z_values[i][j][k] = int(value)
+            return
+        try:
+            element[0] = int(value)
+            return
+        except TypeError:
+            pass
+        except IndexError:
+            pass
+        if hasattr(element, "VALUE"):
+            element.VALUE.value = int(value)
+            return
+        z_values[i][j][k] = int(value)
+
+    def _topology_signature_from_z(
+        self,
+        z_values: Sequence[Sequence[Sequence[Any]]],
+    ) -> tuple[tuple[int, int, int], ...]:
+        return tuple(
+            (i, j, k)
+            for k in range(self.S)
+            for j in range(self.J)
+            for i in range(self.I)
+            if self._active_binary_value(z_values[i][j][k]) > self.tol
+        )
+
+    def _active_binary_value(self, value) -> float:
+        try:
+            return float(value[0])
+        except TypeError, IndexError:
+            pass
+        if hasattr(value, "VALUE"):
+            return float(value.VALUE[0])
+        return float(value)
 
     def set_obj(self) -> None:
         """Attach source StageWise objective expressions unchanged."""
@@ -1180,8 +1611,16 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         formula_allowed=(
                             abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
                             > self.tol
-                            and abs(self.theta_1[i][j][k][0] - self.dTmin) >= self.tol
-                            and abs(self.theta_2[i][j][k][0] - self.dTmin) >= self.tol
+                            and abs(
+                                self.theta_1[i][j][k][0]
+                                - self._recovery_approach_temperature(i, j)
+                            )
+                            >= self.tol
+                            and abs(
+                                self.theta_2[i][j][k][0]
+                                - self._recovery_approach_temperature(i, j)
+                            )
+                            >= self.tol
                         ),
                     )
                     for k in range(self.S)
@@ -1193,10 +1632,12 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.area_r = [
             [
                 [
-                    self.Q_r[i][j][k][0] / self.U_r[i][j] / self.LMTD_r[i][j][k]
-                    if self.LMTD_r[i][j][k] > self.tol
-                    and self.Q_r[i][j][k][0] > self.tol
-                    else 0.0
+                    (
+                        self.Q_r[i][j][k][0] / self.U_r[i][j] / self.LMTD_r[i][j][k]
+                        if self.LMTD_r[i][j][k] > self.tol
+                        and self.Q_r[i][j][k][0] > self.tol
+                        else 0.0
+                    )
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
@@ -1214,16 +1655,28 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         - (self.T_hu_out[0] - self.T_c[j][0][0])
                     )
                     > self.tol
-                    and (self.T_hu_in[0] - self.T_c_out[j] - self.dTmin) >= self.tol
-                    and (self.T_hu_out[0] - self.T_c[j][0][0] - self.dTmin) >= self.tol
+                    and (
+                        self.T_hu_in[0]
+                        - self.T_c_out[j]
+                        - self._hot_utility_approach_temperature(j)
+                    )
+                    >= self.tol
+                    and (
+                        self.T_hu_out[0]
+                        - self.T_c[j][0][0]
+                        - self._hot_utility_approach_temperature(j)
+                    )
+                    >= self.tol
                 ),
             )
             for j in range(self.J)
         ]
         self.area_hu = [
-            self.Q_h[j][0] / self.U_hu[j] / self.LMTD_hu[j]
-            if self.LMTD_hu[j] > self.tol and self.Q_h[j][0] > self.tol
-            else 0.0
+            (
+                self.Q_h[j][0] / self.U_hu[j] / self.LMTD_hu[j]
+                if self.LMTD_hu[j] > self.tol and self.Q_h[j][0] > self.tol
+                else 0.0
+            )
             for j in range(self.J)
         ]
         self.LMTD_cu = [
@@ -1237,18 +1690,29 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         - (self.T_h_out[i] - self.T_cu_in[0])
                     )
                     > self.tol
-                    and (self.T_h[i][self.S][0] - self.T_cu_out[0] - self.dTmin)
+                    and (
+                        self.T_h[i][self.S][0]
+                        - self.T_cu_out[0]
+                        - self._cold_utility_approach_temperature(i)
+                    )
                     >= self.tol
-                    and (self.T_h_out[i] - self.T_cu_in[0] - self.dTmin) >= self.tol
+                    and (
+                        self.T_h_out[i]
+                        - self.T_cu_in[0]
+                        - self._cold_utility_approach_temperature(i)
+                    )
+                    >= self.tol
                 ),
                 fallback_delta=self.T_h_out[i] - self.T_cu_in[0],
             )
             for i in range(self.I)
         ]
         self.area_cu = [
-            self.Q_c[i][0] / self.U_cu[i] / self.LMTD_cu[i]
-            if self.LMTD_cu[i] > self.tol and self.Q_c[i][0] > self.tol
-            else 0.0
+            (
+                self.Q_c[i][0] / self.U_cu[i] / self.LMTD_cu[i]
+                if self.LMTD_cu[i] > self.tol and self.Q_c[i][0] > self.tol
+                else 0.0
+            )
             for i in range(self.I)
         ]
         self.Q_cu_total = sum(self.Q_c[i][0] for i in range(self.I))
@@ -1328,31 +1792,43 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     def get_lowest_benefit_HX(self) -> list[list[int]]:
         """Return the active exchanger with the lowest source net benefit."""
 
+        return self.get_lowest_benefit_HX_candidates(1)
+
+    def get_lowest_benefit_HX_candidates(self, limit: int) -> list[list[int]]:
+        """Return active exchangers sorted by ascending source net benefit."""
+
         self.net_benefit = np.array(
             [
                 [[0.0 for _k in range(self.S)] for _j in range(self.J)]
                 for _i in range(self.I)
             ]
         )
-        smallest_net_benefit = float("inf")
-        low_pos: list[list[int]] = []
+        candidates: list[tuple[float, int, list[int]]] = []
+        order = 0
         for k in range(self.S):
             for j in range(self.J):
                 for i in range(self.I):
-                    if self.z[i][j][k][0] == 1:
+                    if self._active_binary_value(self.z[i][j][k]) > self.tol:
                         self.net_benefit[i][j][k] = self.Q_r[i][j][k][0] * self.alpha[
                             i
                         ][j][k][0] * (self.hu_cost[0] + self.cu_cost[0]) - (
                             self.unit_cost[0]
                             + self.A_coeff[0] * (self.area_r[i][j][k] ** self.A_exp[0])
                         )
-                        if self.net_benefit[i][j][k] < smallest_net_benefit:
-                            smallest_net_benefit = self.net_benefit[i][j][k]
-                            low_pos = [[i, j, k]]
-        return low_pos
+                        candidates.append(
+                            (float(self.net_benefit[i][j][k]), order, [i, j, k])
+                        )
+                    order += 1
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return [position for _benefit, _order, position in candidates[: int(limit)]]
 
     def get_max_benefit_HX(self) -> list[list[int]]:
         """Return the inactive feasible exchanger with the highest alpha-dQ/dA."""
+
+        return self.get_max_benefit_HX_candidates(1)
+
+    def get_max_benefit_HX_candidates(self, limit: int) -> list[list[int]]:
+        """Return inactive feasible exchangers sorted by descending alpha-dQ/dA."""
 
         self.net_benefit = np.array(
             [
@@ -1360,18 +1836,22 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for _i in range(self.I)
             ]
         )
-        highest_net_benefit = 0.0
-        high_pos: list[list[int]] = []
+        candidates: list[tuple[float, int, list[int]]] = []
+        order = 0
         for k in range(self.S):
             for j in range(self.J):
                 for i in range(self.I):
                     if (
-                        self.alpha_dqda[i][j][k] > highest_net_benefit
+                        self._active_binary_value(self.z[i][j][k]) <= self.tol
+                        and self.alpha_dqda[i][j][k] > 0.0
                         and self.z_feasible[i][j][k]
                     ):
-                        highest_net_benefit = self.alpha_dqda[i][j][k]
-                        high_pos = [[i, j, k]]
-        return high_pos
+                        candidates.append(
+                            (-float(self.alpha_dqda[i][j][k]), order, [i, j, k])
+                        )
+                    order += 1
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return [position for _benefit, _order, position in candidates[: int(limit)]]
 
     def verify(self) -> tuple[bool, list[str]]:
         """Run the source solution checks used by topology evolution."""
@@ -1400,6 +1880,24 @@ def _count_allowed_matches(values) -> int:
                 else:
                     count += 1 if element[0] == 1 else 0
     return count
+
+
+def _is_usable_evolution_candidate(candidate) -> bool:
+    if candidate is None:
+        return False
+    if not candidate.mSuccess:
+        return False
+    verify = getattr(candidate, "verify", None)
+    if not callable(verify):
+        return True
+    is_valid, reasons = verify()
+    if not is_valid:
+        logger.debug(
+            "Discarding invalid evolution candidate %s: %s",
+            getattr(candidate, "name", None),
+            ", ".join(reasons),
+        )
+    return is_valid
 
 
 def _check_temperatures(

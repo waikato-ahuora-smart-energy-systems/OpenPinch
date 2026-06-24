@@ -56,6 +56,7 @@ AXIS_ARRAY_NAMES = {
         "htc_c",
     },
     "cold_utilities": {
+        "T_cu_cont",
         "T_cu_in",
         "T_cu_out",
         "cu_cost",
@@ -71,6 +72,7 @@ AXIS_ARRAY_NAMES = {
         "htc_h",
     },
     "hot_utilities": {
+        "T_hu_cont",
         "T_hu_in",
         "T_hu_out",
         "htc_hu",
@@ -173,7 +175,9 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     payload = problem_to_solver_arrays(PinchProblem(source=fixture_path), 14.0)
     current = payload.to_json_dict()
 
-    assert current["array_shapes"] == snapshot["array_shapes"]
+    assert {
+        name: current["array_shapes"][name] for name in snapshot["array_shapes"]
+    } == snapshot["array_shapes"]
     _assert_axis_identities_match(current, snapshot)
 
     for name, expected in snapshot["arrays"].items():
@@ -181,6 +185,9 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
 
     for name, expected in snapshot["source_openhens_arrays"].items():
         _assert_array_matches_by_identity(name, current, expected, snapshot)
+
+    np.testing.assert_allclose(current["arrays"]["T_hu_cont"], [7.0])
+    np.testing.assert_allclose(current["arrays"]["T_cu_cont"], [7.0])
 
 
 def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
@@ -265,6 +272,65 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
     assert float(problem.cold_streams[0].CP) != pytest.approx(6.1)
     assert payload.arrays["f_h"].tolist() == [14.8]
     assert payload.arrays["f_c"].tolist() == [6.1]
+
+
+def test_adapter_scales_explicit_dt_cont_by_active_multiplier() -> None:
+    problem = PinchProblem(
+        source={
+            "streams": [
+                {
+                    "zone": "Site/Process A",
+                    "name": "H1",
+                    "t_supply": {"value": 500.0, "unit": "K"},
+                    "t_target": {"value": 370.0, "unit": "K"},
+                    "heat_flow": {"value": 999.0, "unit": "kW"},
+                    "dt_cont": {"value": 3.0, "unit": "K"},
+                },
+                {
+                    "zone": "Site/Process A",
+                    "name": "C1",
+                    "t_supply": {"value": 310.0, "unit": "K"},
+                    "t_target": {"value": 470.0, "unit": "K"},
+                    "heat_flow": {"value": 888.0, "unit": "kW"},
+                    "dt_cont": {"value": 4.0, "unit": "K"},
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "HPS",
+                    "type": "Hot",
+                    "t_supply": {"value": 520.0, "unit": "K"},
+                    "t_target": {"value": 520.0, "unit": "K"},
+                    "dt_cont": {"value": 1.0, "unit": "K"},
+                    "heat_flow": None,
+                    "price": {"value": 60.0, "unit": "$/MWh"},
+                },
+                {
+                    "name": "CW",
+                    "type": "Cold",
+                    "t_supply": {"value": 290.0, "unit": "K"},
+                    "t_target": {"value": 310.0, "unit": "K"},
+                    "dt_cont": {"value": 2.0, "unit": "K"},
+                    "heat_flow": None,
+                    "price": {"value": 10.0, "unit": "$/MWh"},
+                },
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [
+                    {"name": "Process A", "type": "Process Zone", "children": None}
+                ],
+            },
+        }
+    )
+
+    payload = problem_to_solver_arrays(problem, 2.0)
+
+    np.testing.assert_allclose(payload.arrays["T_h_cont"], [6.0])
+    np.testing.assert_allclose(payload.arrays["T_c_cont"], [8.0])
+    np.testing.assert_allclose(payload.arrays["T_hu_cont"], [2.0])
+    np.testing.assert_allclose(payload.arrays["T_cu_cont"], [4.0])
 
 
 def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() -> None:

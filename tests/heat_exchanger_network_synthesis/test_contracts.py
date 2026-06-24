@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -18,6 +19,7 @@ from OpenPinch.classes import (
     HeatExchangerNetwork,
     HeatExchangerStreamRole,
 )
+from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.config_metadata import CONFIG_FIELD_SPECS
 from OpenPinch.lib.enums import (
@@ -34,6 +36,12 @@ from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
+    workflow_settings_from_problem,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
 
 
 def _network() -> HeatExchangerNetwork:
@@ -79,6 +87,7 @@ def test_synthesis_task_generates_deterministic_task_id():
 
 
 def test_hen_design_method_stringifies_to_canonical_method_identifier():
+    assert str(HeatExchangerNetworkDesignMethod.OpenHENS) == ("open_hens_method")
     assert str(HeatExchangerNetworkDesignMethod.NetworkEvolution) == (
         "network_evolution_method"
     )
@@ -272,6 +281,20 @@ def test_synthesis_task_rejects_invalid_values(payload, message):
             "stage_selection": [1],
             "solve_tolerance": -1.0,
         },
+        {
+            "run_id": "run-1",
+            "approach_temperatures": [14.0],
+            "derivative_thresholds": [0.5],
+            "stage_selection": [1],
+            "evm_n_ad_branches": 0,
+        },
+        {
+            "run_id": "run-1",
+            "approach_temperatures": [14.0],
+            "derivative_thresholds": [0.5],
+            "stage_selection": [1],
+            "evm_n_rm_branches": 0,
+        },
     ],
 )
 def test_manifest_rejects_invalid_grids_formats_stages_and_tolerances(payload):
@@ -313,6 +336,12 @@ def test_hen_config_field_specs_use_openpinch_names():
         "HENS_SOLVER_OPTIONS_EVM",
         "HENS_SOLVE_TOLERANCE",
         "HENS_MAX_PARALLEL",
+        "HENS_SYNTHESIS_QUALITY_TIER",
+        "HENS_PDM_STAGE_PAIR_LIMIT",
+        "HENS_TDM_PARENT_LIMIT",
+        "HENS_STAGE_PACKING",
+        "HENS_EVM_N_AD_BRANCHES",
+        "HENS_EVM_N_RM_BRANCHES",
         "HENS_LOG_LEVEL",
         "HENS_OUTPUT_FOLDER",
         "HENS_OUTPUT_FORMATS",
@@ -326,7 +355,12 @@ def test_hen_config_field_specs_use_openpinch_names():
         "hens",
         "solver_evm",
     )
+    assert CONFIG_FIELD_SPECS["HENS_SYNTHESIS_QUALITY_TIER"].default == 1
+    assert CONFIG_FIELD_SPECS["HENS_EVM_N_AD_BRANCHES"].default is None
+    assert CONFIG_FIELD_SPECS["HENS_EVM_N_RM_BRANCHES"].default is None
     assert not any(key.startswith("OPENHENS_") for key in CONFIG_FIELD_SPECS)
+    assert not any("OPTIMIZED" in key for key in CONFIG_FIELD_SPECS)
+    assert not any("ENHANCED" in key for key in CONFIG_FIELD_SPECS)
 
 
 @pytest.mark.parametrize(
@@ -348,6 +382,7 @@ def test_hen_config_rejects_retired_solver_option_names(legacy_key):
 def test_hen_config_options_accept_valid_values_on_canonical_paths():
     options = {
         "HENS_APPROACH_TEMPERATURES": [10, 14.0],
+        "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 0.9],
         "HENS_STAGE_SELECTION": [2, 3],
         "HENS_METHOD_SEQUENCE": [
@@ -358,6 +393,12 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_SOLVE_TOLERANCE": 1e-3,
         "HENS_MAX_PARALLEL": 2,
+        "HENS_SYNTHESIS_QUALITY_TIER": 3,
+        "HENS_PDM_STAGE_PAIR_LIMIT": 6,
+        "HENS_TDM_PARENT_LIMIT": 4,
+        "HENS_STAGE_PACKING": "pdm",
+        "HENS_EVM_N_AD_BRANCHES": 2,
+        "HENS_EVM_N_RM_BRANCHES": 3,
         "HENS_RUN_ID": "run-1",
         "HENS_BEST_SOLUTIONS_TO_SAVE": 3,
         "HENS_SOLVER_OPTIONS_PDM": {"node_limit": 50},
@@ -369,22 +410,112 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
     target_input = TargetInput(streams=[], options=options)
 
     assert cfg.hens.approach_temperatures == [10.0, 14.0]
+    assert cfg.hens.dt_cont_multipliers == [1.0, 1.5]
     assert cfg.hens.output_formats == ["json", "csv"]
+    assert target_input.options["HENS_DT_CONT_MULTIPLIERS"] == [1.0, 1.5]
     assert target_input.options["HENS_DERIVATIVE_THRESHOLDS"] == [0.5, 0.9]
     assert target_input.options["HENS_STAGE_SELECTION"] == [2, 3]
+    assert cfg.hens.synthesis_quality_tier == 3
+    assert cfg.hens.pdm_stage_pair_limit == 6
+    assert cfg.hens.tdm_parent_limit == 4
+    assert cfg.hens.stage_packing == "pdm"
+    assert target_input.options["HENS_SYNTHESIS_QUALITY_TIER"] == 3
+    assert target_input.options["HENS_STAGE_PACKING"] == "pdm"
+    assert cfg.hens.evm_n_ad_branches == 2
+    assert cfg.hens.evm_n_rm_branches == 3
+    assert target_input.options["HENS_EVM_N_AD_BRANCHES"] == 2
+    assert target_input.options["HENS_EVM_N_RM_BRANCHES"] == 3
     assert cfg.hens.solver_options_pdm == {"node_limit": 50}
     assert target_input.options["HENS_SOLVER_OPTIONS_EVM"] == {"max_iter": 500}
+
+
+def test_hen_dt_cont_multipliers_feed_quality_pdm_multiplier_grid():
+    problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    problem.master_zone.config = Configuration(
+        options={
+            "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
+        }
+    )
+
+    settings = workflow_settings_from_problem(problem)
+
+    assert settings.approach_temperatures == (10.0, 20.0)
+    assert settings.dt_cont_multipliers == (1.0, 1.5)
+    assert settings.user_dt_cont_multipliers is True
+    assert settings.quality_dt_cont_multipliers == ()
+
+    tier_problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    tier_problem.master_zone.config = Configuration(
+        options={
+            "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
+            "HENS_SYNTHESIS_QUALITY_TIER": 3,
+        }
+    )
+    tier_settings = workflow_settings_from_problem(tier_problem)
+
+    assert tier_settings.quality_dt_cont_multipliers == (1.0, 1.5)
+    assert tier_settings.quality_pdm_approach_temperatures == (10.0, 15.0)
+
+
+def test_evm_branch_options_round_trip_to_workflow_settings():
+    problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    problem.master_zone.config = Configuration(
+        options={
+            "HENS_EVM_N_AD_BRANCHES": 2,
+            "HENS_EVM_N_RM_BRANCHES": 3,
+        }
+    )
+
+    settings = workflow_settings_from_problem(problem)
+
+    assert settings.evm_n_ad_branches == 2
+    assert settings.evm_n_rm_branches == 3
+    assert settings.effective_evm_n_ad_branches == 2
+    assert settings.effective_evm_n_rm_branches == 3
+
+
+def test_synthesis_quality_tier_derives_evm_branch_widths() -> None:
+    problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    problem.master_zone.config = Configuration(
+        options={"HENS_SYNTHESIS_QUALITY_TIER": 5}
+    )
+
+    settings = workflow_settings_from_problem(problem)
+
+    assert settings.evm_n_ad_branches is None
+    assert settings.evm_n_rm_branches is None
+    assert settings.effective_evm_n_ad_branches == 2
+    assert settings.effective_evm_n_rm_branches == 2
 
 
 @pytest.mark.parametrize(
     "options",
     [
         {"HENS_APPROACH_TEMPERATURES": [0.0]},
+        {"HENS_DT_CONT_MULTIPLIERS": [0.0]},
         {"HENS_DERIVATIVE_THRESHOLDS": [float("inf")]},
         {"HENS_STAGE_SELECTION": [0]},
         {"HENS_STAGE_SELECTION": [1, 1]},
         {"HENS_OUTPUT_FORMATS": ["xml"]},
         {"HENS_SOLVE_TOLERANCE": 0.0},
+        {"HENS_SYNTHESIS_QUALITY_TIER": -1},
+        {"HENS_SYNTHESIS_QUALITY_TIER": 6},
+        {"HENS_PDM_STAGE_PAIR_LIMIT": -1},
+        {"HENS_PDM_STAGE_PAIR_LIMIT": 13},
+        {"HENS_TDM_PARENT_LIMIT": 0},
+        {"HENS_STAGE_PACKING": "everywhere"},
+        {"HENS_EVM_N_AD_BRANCHES": 0},
+        {"HENS_EVM_N_RM_BRANCHES": -1},
         {"HENS_RUN_ID": "bad run id"},
         {"HENS_SOLVER_OPTIONS_PDM": ["node_limit 50"]},
         {"HENS_SOLVER_OPTIONS_TDM": {"": 50}},
@@ -396,6 +527,23 @@ def test_hen_config_options_reject_invalid_values_on_canonical_paths(options):
 
     with pytest.raises(ValidationError):
         TargetInput(streams=[], options=options)
+
+
+@pytest.mark.parametrize(
+    "removed_key",
+    [
+        "HENS_OPTIMIZED_ENABLE_STAGE_PACKING",
+        "HENS_OPTIMIZED_STAGE_PACKING",
+        "HENS_OPTIMIZED_PDM_QUALITY",
+        "HENS_ENHANCED_QUALITY",
+    ],
+)
+def test_removed_prototype_hen_options_are_not_accepted(removed_key):
+    with pytest.raises(ValueError, match="Unknown configuration option"):
+        Configuration(options={removed_key: True})
+
+    with pytest.raises(ValidationError):
+        TargetInput(streams=[], options={removed_key: True})
 
 
 def test_public_synthesis_exports_are_openpinch_native():

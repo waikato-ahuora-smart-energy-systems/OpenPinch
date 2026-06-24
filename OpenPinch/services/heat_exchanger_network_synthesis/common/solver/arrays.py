@@ -111,6 +111,10 @@ def problem_to_solver_arrays(
         "T_cu_out": _float_array(
             _utility_solver_target(stream, zone) for _, stream, _ in cold_utility_items
         ),
+        "T_cu_cont": _float_array(
+            _temperature_contribution(stream, dTmin)
+            for _, stream, _ in cold_utility_items
+        ),
         "T_h_cont": _float_array(
             _temperature_contribution(stream, dTmin) for _, stream, _ in hot_items
         ),
@@ -125,6 +129,10 @@ def problem_to_solver_arrays(
         ),
         "T_hu_out": _float_array(
             _utility_solver_target(stream, zone) for _, stream, _ in hot_utility_items
+        ),
+        "T_hu_cont": _float_array(
+            _temperature_contribution(stream, dTmin)
+            for _, stream, _ in hot_utility_items
         ),
         "c_cost": _float_array(
             _value(stream.price, "$/MW/h") for _, stream, _ in cold_items
@@ -196,8 +204,19 @@ def problem_to_solver_arrays(
             "HENS_APPROACH_TEMPERATURES": list(hens.approach_temperatures),
             "HENS_BEST_SOLUTIONS_TO_SAVE": hens.best_solutions_to_save,
             "HENS_DERIVATIVE_THRESHOLDS": list(hens.derivative_thresholds),
+            "HENS_DT_CONT_MULTIPLIERS": getattr(
+                hens,
+                "dt_cont_multipliers",
+                None,
+            ),
+            "HENS_SYNTHESIS_QUALITY_TIER": hens.synthesis_quality_tier,
+            "HENS_PDM_STAGE_PAIR_LIMIT": hens.pdm_stage_pair_limit,
+            "HENS_TDM_PARENT_LIMIT": hens.tdm_parent_limit,
+            "HENS_STAGE_PACKING": hens.stage_packing,
             "HENS_LOG_LEVEL": hens.log_level,
             "HENS_MAX_PARALLEL": hens.max_parallel,
+            "HENS_EVM_N_AD_BRANCHES": hens.evm_n_ad_branches,
+            "HENS_EVM_N_RM_BRANCHES": hens.evm_n_rm_branches,
             "HENS_METHOD_SEQUENCE": list(hens.method_sequence),
             "HENS_OUTPUT_FOLDER": hens.output_folder,
             "HENS_OUTPUT_FORMATS": list(hens.output_formats),
@@ -211,6 +230,7 @@ def problem_to_solver_arrays(
             "HENS_SOLVER_TDM": hens.solver_tdm,
             "HENS_STAGE_SELECTION": list(hens.stage_selection),
             "active_dTmin": float(dTmin),
+            "active_dt_cont_multiplier": float(dTmin),
             "costing": {
                 "COSTING_HX_AREA_COEFF": costing.hx_area_coeff,
                 "COSTING_HX_AREA_EXP": costing.hx_area_exp,
@@ -237,7 +257,9 @@ def problem_to_solver_arrays(
             "heat_transfer_coefficient": "kW/m^2/K",
             "temperature": "K",
             "temperature_contribution": (
-                "K, falling back to dTmin / 2 when prepared contribution is absent"
+                "K, using prepared stream dt_cont multiplied by the active HEN "
+                "sweep value and falling back to dTmin / 2 when prepared "
+                "contribution is absent"
             ),
             "utility_price": (
                 "numeric UtilitySchema.price passed through for OpenHENS "
@@ -254,7 +276,7 @@ def problem_to_solver_arrays(
 def _temperature_contribution(stream: Stream, dTmin: float) -> float:
     contribution = _value(stream.dt_cont, "delta_degC")
     if contribution > tol:
-        return contribution
+        return contribution * float(dTmin)
     return float(dTmin) / 2.0
 
 

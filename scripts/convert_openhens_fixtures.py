@@ -113,9 +113,11 @@ class ParsedOpenHENSCase:
             "A_coeff": [exchange.area_coefficient],
             "A_exp": [exchange.area_exponent],
             "T_c_cont": [
-                row.temperature_contribution
-                if row.temperature_contribution is not None
-                else default_temperature_contribution
+                (
+                    row.temperature_contribution
+                    if row.temperature_contribution is not None
+                    else default_temperature_contribution
+                )
                 for row in self.cold_streams
             ],
             "T_c_in": [row.supply_temperature for row in self.cold_streams],
@@ -123,9 +125,11 @@ class ParsedOpenHENSCase:
             "T_cu_in": [row.supply_temperature for row in self.cold_utilities],
             "T_cu_out": [row.target_temperature for row in self.cold_utilities],
             "T_h_cont": [
-                row.temperature_contribution
-                if row.temperature_contribution is not None
-                else default_temperature_contribution
+                (
+                    row.temperature_contribution
+                    if row.temperature_contribution is not None
+                    else default_temperature_contribution
+                )
                 for row in self.hot_streams
             ],
             "T_h_in": [row.supply_temperature for row in self.hot_streams],

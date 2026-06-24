@@ -234,12 +234,12 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     assert '"Four-stream-Yee-and-Grossmann-1990-1.json"' in combined_source
     assert "four_stream_case = {" not in combined_source
     assert "source=case_name" in combined_source
-    assert "problem.update_options(teaching_grid)" in combined_source
+    assert "problem.update_options(options_dict)" in combined_source
     assert "design.heat_exchanger_network_synthesis()" in combined_source
-    assert '"HENS_APPROACH_TEMPERATURES": [10.0, 14.0, 18.0]' in combined_source
+    assert '"HENS_APPROACH_TEMPERATURES": [6.0, 10.0, 14.0, 18.0]' in combined_source
     assert '"HENS_DERIVATIVE_THRESHOLDS": [0.5]' in combined_source
-    assert '"HENS_STAGE_SELECTION": [3]' in combined_source
-    assert '"HENS_MAX_PARALLEL": 1' in combined_source
+    assert '"HENS_STAGE_SELECTION": [5]' in combined_source
+    assert '"HENS_MAX_PARALLEL": 10' in combined_source
     assert "top_ranked_networks" in combined_source
     assert "get_n_best_networks(3)" in combined_source
     assert "select_network(solution_rank=2)" in combined_source

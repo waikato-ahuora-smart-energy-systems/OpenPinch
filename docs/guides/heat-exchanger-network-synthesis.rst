@@ -14,30 +14,34 @@ The service ingress is
 problem-rooted: it requires a live ``PinchProblem`` and reads persistent heat
 exchanger network configuration from ``TargetInput.options`` through the
 prepared ``Configuration``. User code should call
-``problem.design.open_hens_method(...)`` or
+``problem.design.enhanced_synthesis_method(quality_tier=...)``,
+``problem.design.open_hens_method(...)``, or
 ``problem.design.heat_exchanger_network_synthesis(method=...)`` instead of the
 internal service directly. Those public calls invoke the local solver-backed
 synthesis executor by default.
 
 When Couenne is unavailable for the Couenne-backed derivative/topology stages,
 OpenPinch emits a warning and attempts ``network_evolution_method`` directly
-with the configured ESM solver and stage selection.
+with the configured EVM solver and stage selection.
 
 Design Method Accessors
 -----------------------
 
-Heat exchanger network synthesis has one umbrella accessor and four explicit
-design-method accessors:
+Heat exchanger network synthesis has one umbrella accessor, one enhanced
+quality-tier accessor, and four explicit design-method accessors:
 
 .. code-block:: python
 
    from OpenPinch.lib import HENDesignMethod
 
-   # Published OpenHENS sequence: PDM -> TDM -> EVOL.
-   problem.design.open_hens_method()
-
-   # Same default through the umbrella dispatcher.
+   # Fast generic default: tier 0 compact PDM -> EVM.
    problem.design.heat_exchanger_network_synthesis()
+
+   # Primary quality-tier entrypoint. Tier 2 is the enhanced baseline.
+   problem.design.enhanced_synthesis_method(quality_tier=2)
+
+   # Original OpenHENS sequence: tier 1 PDM -> TDM -> EVM.
+   problem.design.open_hens_method()
    problem.design.heat_exchanger_network_synthesis(
        method=HENDesignMethod.OpenHENS,
    )
@@ -59,7 +63,7 @@ are the canonical method identifiers stored in tasks, manifests, and results:
      - Meaning
    * - ``HENDesignMethod.OpenHENS``
      - ``"open_hens_method"``
-     - published OpenHENS sequence, ``pinch_design_method -> thermal_derivative_method -> network_evolution_method``
+     - original tier-1 OpenHENS sequence, ``pinch_design_method -> thermal_derivative_method -> network_evolution_method``
    * - ``HENDesignMethod.PinchDesign``
      - ``"pinch_design_method"``
      - pinch design method only
@@ -70,7 +74,9 @@ are the canonical method identifiers stored in tasks, manifests, and results:
      - ``"network_evolution_method"``
      - network evolution method only
 
-The umbrella accessor dispatches to the same services as the direct accessors:
+The umbrella accessor dispatches to the same services as the direct accessors
+when a method is supplied. With no method it uses the fast tier 0 OpenHENS
+route:
 
 .. code-block:: python
 
@@ -153,9 +159,10 @@ map to ``StreamSchema`` records, utilities and utility prices map to
                    "thermal_derivative_method",
                    "network_evolution_method",
                ],
-               "HENS_PDM_SOLVER": "couenne",
-               "HENS_TDM_SOLVER": "couenne",
-               "HENS_ESM_SOLVER": "ipopt-pyomo",
+               "HENS_SYNTHESIS_QUALITY_TIER": 1,
+               "HENS_SOLVER_PDM": "couenne",
+               "HENS_SOLVER_TDM": "couenne",
+               "HENS_SOLVER_EVM": "ipopt-pyomo",
                "HENS_SOLVE_TOLERANCE": 1e-3,
                "HENS_MAX_PARALLEL": 10,
                "HENS_OUTPUT_FORMATS": ["json", "csv"],
@@ -165,11 +172,110 @@ map to ``StreamSchema`` records, utilities and utility prices map to
    )
 
    problem = PinchProblem(source=payload, project_name="Four-stream example")
-   design = problem.design.heat_exchanger_network_synthesis()
+   design = problem.design.open_hens_method()
 
 Do not pass heat exchanger network design-space or solver controls as a separate object to the
 design call. The call may receive non-design runtime state options, but
 persistent heat exchanger network controls belong in the loaded problem payload.
+
+Quality Tiers
+-------------
+
+``problem.design.enhanced_synthesis_method(quality_tier=...)`` is the primary
+public way to run OpenHENS quality tiers. ``quality_tier`` accepts values
+``0`` through ``5`` and defaults to tier 2. ``open_hens_method()`` always runs
+the original tier 1 sequence. ``heat_exchanger_network_synthesis()`` with no
+method runs the fast tier 0 route.
+
+``HENS_SYNTHESIS_QUALITY_TIER`` remains a persistent configuration field for
+advanced prepared-problem workflows. Its configuration default is tier 1, but
+the public method-level entrypoints above supply call-local tier choices.
+Higher tiers add protected fallback routes and quality-search routes; they do
+not replace tier 1 unless a candidate gives a better valid network.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Tier
+     - Meaning
+     - Default generated routes
+   * - ``0``
+     - Fast compact screening
+     - compact PDM -> EVM at multiplier ``1.0``
+   * - ``1``
+     - Original OpenHENS
+     - standard PDM -> TDM -> EVM
+   * - ``2``
+     - Base quality search
+     - protected tiers 0 and 1 plus compact/direct and raw/TDM routes at
+       multiplier ``1.0``
+   * - ``3``
+     - dTmin sweep
+     - tier 2 plus compact/direct and raw/TDM routes at multipliers
+       ``1.0`` and ``2.0``
+   * - ``4``
+     - Balanced quality search
+     - tier 3 routes with EVM add/remove branch breadth ``2/2``
+   * - ``5``
+     - Experimental broad dTmin search
+     - tier 4 breadth with multipliers ``0.5``, ``1.0``, and ``2.0``
+
+The generated multiplier is applied to the first configured
+``HENS_APPROACH_TEMPERATURES`` value. ``HENS_DT_CONT_MULTIPLIERS`` is an expert
+override for non-standard tier routes and is always interpreted as a
+multiplier, not an absolute approach temperature. ``HENS_EVM_N_AD_BRANCHES``
+and ``HENS_EVM_N_RM_BRANCHES`` override tier-derived EVM branch breadth when
+supplied.
+
+Compact PDM routes go directly to network evolution. Raw and standard routes
+are the routes that use TDM. Tiers 2 and above preserve protected tier 0 and
+tier 1 candidates so a broader search can fall back to the fast or original
+OpenHENS result when the additional routes do not improve the objective.
+
+Robustness and Topology Normalization
+-------------------------------------
+
+The enhanced tiers keep the original OpenHENS route available while adding
+routes that are deliberately smaller or more redundant:
+
+- Compact PDM routes build a reduced task surface and pass successful
+  topologies directly to EVM. They avoid TDM when the derivative stage is not
+  needed for that pathway.
+- Raw PDM routes and the original standard route are the only generated routes
+  that use TDM.
+- Tier 4 and tier 5 increase EVM add/remove branch breadth to ``2/2`` and use
+  no-improvement pruning so branch search can recover from one poor topology
+  edit without continuing indefinitely.
+
+Topology restrictions are canonicalized before downstream quality-route tasks
+are built. Empty recovery-stage gaps are removed, independent matches that were
+packed into one original stage are split into consecutive canonical stages, and
+matches that share a hot or cold process stream remain in the same stage. This
+makes equivalent grid layouts compare as the same topology and reduces
+duplicate seeded EVM tasks.
+
+Compact PDM routes use recovery-stage packing, and advanced workflows can
+enable the same packing for standard PDM and/or TDM with ``HENS_STAGE_PACKING``.
+Those constraints force active recovery stages to be contiguous and bind active
+matches to a small positive duty threshold. The practical goal is to reduce
+stage-index symmetry in the stage-wise superstructure, which makes equivalent
+solutions less likely to appear as different solver choices and gives
+downstream topology evolution a cleaner starting point.
+
+Benchmarking Quality Tiers
+--------------------------
+
+``scripts/benchmark_performance.py`` is the non-gating benchmark harness used
+to compare small OpenHENS fixture cases. Its default case set covers unique
+fixtures up to nine process streams, excludes reordered duplicates, and runs
+production-supported tiers ``0`` through ``4``. Tier ``5`` is intentionally
+documented as experimental because its broader dTmin sweep adds runtime cost
+and is better suited to research or benchmarking runs.
+
+The benchmark output is incremental JSON. It records total runtime, task and
+stage counts, selected pathway metadata, failure categories, and partial
+diagnostics for timed-out or interrupted runs. Use it for local performance
+comparison rather than as a replacement for the unit and contract tests.
 
 Result Metadata and Contracts
 -----------------------------
@@ -188,13 +294,16 @@ match. For OpenHENS, ``design.design_method`` is
 produced the selected accepted network, normally
 ``HENDesignMethod.NetworkEvolution``. The
 ``design.manifest.method_sequence`` field keeps the task-level method sequence
-used to build the executed task graph.
+used to build the executed task graph. ``design.manifest.selected_pathway_id``
+records which quality-tier pathway produced the accepted network, and
+``selected_protected_pathway`` indicates whether that winner was one of the
+protected fallback routes.
 
 .. code-block:: python
 
    from OpenPinch.lib import HENDesignMethod
 
-   design = problem.design.open_hens_method()
+   design = problem.design.enhanced_synthesis_method(quality_tier=2)
 
    assert design.design_method == HENDesignMethod.OpenHENS
    assert design.manifest.design_method == HENDesignMethod.OpenHENS
@@ -219,8 +328,10 @@ support, and ``unit_models`` owns the equation/unit model layer.
        pinch_design_method.py
        thermal_derivative_method.py
        network_evolution_method.py
+       topology.py
      common/
        execution/
+         pathways.py
        reporting/
        results/
        solver/
@@ -230,10 +341,13 @@ support, and ``unit_models`` owns the equation/unit model layer.
        base.py
        pinch_design.py
        stagewise.py
+       packed_pinch_design.py
+       packed_stagewise.py
+       stage_packing.py
        problem.py
 
-``open_hens_method.py`` is intentionally a composition layer for the published
-OpenHENS sequence. It calls the three explicit method stages rather than
+``open_hens_method.py`` is intentionally a composition layer for the OpenHENS
+workflow. It calls the explicit method stages rather than
 building tasks itself. The individual method files are where method-specific
 task generation and stage execution live. Old import paths such as
 ``service.py``, ``methods.full_sequence``, ``solver.*``, ``equations.*``, and
@@ -284,7 +398,7 @@ duplicate exchanger-connection structures, stores that unique list on
 
 .. code-block:: python
 
-   design = problem.design.heat_exchanger_network_synthesis()
+   design = problem.design.enhanced_synthesis_method(quality_tier=2)
 
    # Rank 1 is selected by default.
    selected = design.network
@@ -327,10 +441,10 @@ selected network through ``problem.design.network``:
    problem.design.network.total_cold_utility
    problem.design.network.utility("HU1")
 
-These helpers read from ``problem.results.design.network``. Run
-``problem.design.heat_exchanger_network_synthesis()`` first so a selected
-network is cached on the problem. ``utility(name)`` returns duty for hot or
-cold utility exchangers whose utility stream identity matches ``name``.
+These helpers read from ``problem.results.design.network``. Run a design method
+such as ``problem.design.enhanced_synthesis_method(quality_tier=2)`` first so a
+selected network is cached on the problem. ``utility(name)`` returns duty for
+hot or cold utility exchangers whose utility stream identity matches ``name``.
 
 The network exposes source/sink stream links through
 :class:`~OpenPinch.classes.heat_exchanger.HeatExchanger` records. Recovery
@@ -457,8 +571,14 @@ aliases, OpenHENS field aliases, command parity, or an ``OpenHENS`` facade.
    * - ``MethodSequence.standard_pdm_tdm_esm()``
      - ``HENS_METHOD_SEQUENCE`` in ``TargetInput.options`` and
        ``HENDesignMethod.OpenHENS`` for the public method dispatcher.
+   * - Search quality/breadth controls
+     - ``problem.design.enhanced_synthesis_method(quality_tier=...)`` for the
+       public tier selector, with persistent ``HENS_SYNTHESIS_QUALITY_TIER``,
+       optional ``HENS_DT_CONT_MULTIPLIERS``, optional ``HENS_STAGE_PACKING``,
+       and optional EVM branch overrides in ``TargetInput.options`` for
+       prepared-problem defaults.
    * - ``SolveSetup.local(...)``
-     - ``HENS_PDM_SOLVER``, ``HENS_TDM_SOLVER``, ``HENS_ESM_SOLVER``,
+     - ``HENS_SOLVER_PDM``, ``HENS_SOLVER_TDM``, ``HENS_SOLVER_EVM``,
        ``HENS_SOLVE_TOLERANCE``, and ``HENS_MAX_PARALLEL`` in
        ``TargetInput.options``.
    * - ``StudyOutputs``
@@ -466,8 +586,7 @@ aliases, OpenHENS field aliases, command parity, or an ``OpenHENS`` facade.
        generated from ``problem.results``.
    * - ``OpenHENS(study).solve()``
      - ``problem.design.open_hens_method()``,
-       ``problem.design.heat_exchanger_network_synthesis()`` with the default
-       ``HENDesignMethod.OpenHENS``, or
+       ``problem.design.enhanced_synthesis_method(quality_tier=...)``, or
        ``workspace.solve_variant(..., workflow="heat_exchanger_network_synthesis")``.
    * - ``NetworkSolution``
      - ``TargetOutput.design.network`` as ``HeatExchangerNetwork``.

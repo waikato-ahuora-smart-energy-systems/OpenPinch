@@ -64,11 +64,12 @@ Included Notebooks
 
 ``09_hen_design_service_four_stream.ipynb``
    Heat exchanger network design-service execution on a compact four-stream
-   synthesis problem,
-   including the public ``problem.design.open_hens_method()`` accessor, the
-   ``problem.design.heat_exchanger_network_synthesis(method=...)`` dispatcher,
-   workspace workflow dispatch, concise task metadata, and grid views for the
-   top networks.
+   synthesis problem, including
+   ``problem.design.enhanced_synthesis_method(quality_tier=...)`` for tiered
+   OpenHENS search, ``problem.design.open_hens_method()`` for the original
+   tier-1 route, the ``problem.design.heat_exchanger_network_synthesis(...)``
+   dispatcher, workspace workflow dispatch, concise task metadata, and grid
+   views for the top networks.
 
 How To Use Them
 ---------------

@@ -22,7 +22,9 @@ and serialized workspace boundaries, plus energy-transfer analysis and the
 vapour-compression plus MVR cascade HPR backend. The series also includes the
 direct gas/vapour stream MVR process-component workflow and the problem-owned
 heat exchanger network design-service workflow on a four-stream synthesis case,
-including the explicit ``problem.design.open_hens_method()`` accessor.
+including ``problem.design.enhanced_synthesis_method(quality_tier=...)`` for
+tiered search and ``problem.design.open_hens_method()`` for the original
+tier-1 route.
 
 Use these pages instead:
 

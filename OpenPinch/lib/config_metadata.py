@@ -43,6 +43,7 @@ HENS_METHOD_SEQUENCE_VALUES = frozenset(
     }
 )
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
+HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "state_values"})
 _HENS_RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
@@ -166,7 +167,12 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
 
     # HEN synthesis.
     "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures"),
+    "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers"),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds"),
+    "HENS_SYNTHESIS_QUALITY_TIER": _spec(int, 1, "hens", "synthesis_quality_tier", numeric_min=0.0, numeric_max=5.0),
+    "HENS_PDM_STAGE_PAIR_LIMIT": _spec(int | None, None, "hens", "pdm_stage_pair_limit", numeric_min=0.0, numeric_max=12.0),
+    "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
+    "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing"),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection"),
     "HENS_METHOD_SEQUENCE": _spec(List[str], ["pinch_design_method", "thermal_derivative_method", "network_evolution_method"], "hens", "method_sequence"),
     "HENS_SOLVER_PDM": _spec(str, "couenne", "hens", "solver_pdm"),
@@ -177,12 +183,13 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_SOLVER_OPTIONS_EVM": _spec(dict[str, Any], {}, "hens", "solver_options_evm"),
     "HENS_SOLVE_TOLERANCE": _spec(float, 1e-3, "hens", "solve_tolerance", numeric_min=0.0),
     "HENS_MAX_PARALLEL": _spec(int, 1, "hens", "max_parallel", numeric_min=1.0),
+    "HENS_EVM_N_AD_BRANCHES": _spec(int | None, None, "hens", "evm_n_ad_branches", numeric_min=1.0),
+    "HENS_EVM_N_RM_BRANCHES": _spec(int | None, None, "hens", "evm_n_rm_branches", numeric_min=1.0),
     "HENS_LOG_LEVEL": _spec(str, "INFO", "hens", "log_level"),
     "HENS_OUTPUT_FOLDER": _spec(str, "", "hens", "output_folder"),
     "HENS_OUTPUT_FORMATS": _spec(List[str], [], "hens", "output_formats"),
     "HENS_RUN_ID": _spec(str, "default", "hens", "run_id"),
     "HENS_BEST_SOLUTIONS_TO_SAVE": _spec(int, 1, "hens", "best_solutions_to_save", numeric_min=1.0),
-
     # Heat pump and refrigeration.
     "HPR_TYPE": _spec(str, HPRcycle.CascadeCarnot.value, "hpr", "type", enum_cls=HPRcycle),
     "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode"),
@@ -305,7 +312,9 @@ def validate_configuration_option_value(name: str, value: Any) -> Any:
     spec = CONFIG_FIELD_SPECS[name]
     if name in _UNIT_TARGETS:
         return _unit_string(name, value, _UNIT_TARGETS[name])
-    if name == "HENS_APPROACH_TEMPERATURES":
+    if name in {"HENS_APPROACH_TEMPERATURES", "HENS_DT_CONT_MULTIPLIERS"}:
+        if value is None and name == "HENS_DT_CONT_MULTIPLIERS":
+            return None
         return _positive_float_grid(name, value)
     if name == "HENS_DERIVATIVE_THRESHOLDS":
         return _positive_float_grid(name, value)
@@ -325,10 +334,20 @@ def validate_configuration_option_value(name: str, value: Any) -> Any:
             HENS_OUTPUT_FORMAT_VALUES,
             allow_empty=True,
         )
+    if name == "HENS_STAGE_PACKING":
+        return _string_choice(name, value, HENS_STAGE_PACKING_VALUES)
     if name == "HENS_SOLVE_TOLERANCE":
         return _positive_float(name, value)
-    if name in {"HENS_MAX_PARALLEL", "HENS_BEST_SOLUTIONS_TO_SAVE"}:
+    if name in {
+        "HENS_MAX_PARALLEL",
+        "HENS_BEST_SOLUTIONS_TO_SAVE",
+    }:
         return _positive_int(name, value)
+    if name in {
+        "HENS_EVM_N_AD_BRANCHES",
+        "HENS_EVM_N_RM_BRANCHES",
+    }:
+        return _positive_int_or_none(name, value)
     if name == "HENS_RUN_ID":
         return _run_id(name, value)
     if name in {
@@ -614,6 +633,12 @@ def _positive_int(name: str, value: Any) -> int:
     if numeric_value <= 0:
         raise ValueError(f"{name} must be a positive integer.")
     return numeric_value
+
+
+def _positive_int_or_none(name: str, value: Any) -> int | None:
+    if value is None:
+        return None
+    return _positive_int(name, value)
 
 
 def _float(name: str, value: Any) -> float:
