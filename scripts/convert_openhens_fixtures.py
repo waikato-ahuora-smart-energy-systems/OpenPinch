@@ -113,9 +113,11 @@ class ParsedOpenHENSCase:
             "A_coeff": [exchange.area_coefficient],
             "A_exp": [exchange.area_exponent],
             "T_c_cont": [
-                row.temperature_contribution
-                if row.temperature_contribution is not None
-                else default_temperature_contribution
+                (
+                    row.temperature_contribution
+                    if row.temperature_contribution is not None
+                    else default_temperature_contribution
+                )
                 for row in self.cold_streams
             ],
             "T_c_in": [row.supply_temperature for row in self.cold_streams],
@@ -123,9 +125,11 @@ class ParsedOpenHENSCase:
             "T_cu_in": [row.supply_temperature for row in self.cold_utilities],
             "T_cu_out": [row.target_temperature for row in self.cold_utilities],
             "T_h_cont": [
-                row.temperature_contribution
-                if row.temperature_contribution is not None
-                else default_temperature_contribution
+                (
+                    row.temperature_contribution
+                    if row.temperature_contribution is not None
+                    else default_temperature_contribution
+                )
                 for row in self.hot_streams
             ],
             "T_h_in": [row.supply_temperature for row in self.hot_streams],
@@ -241,8 +245,8 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
             "HENS_APPROACH_TEMPERATURES": OPENHENS_DT_GRID,
             "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
             "HENS_DERIVATIVE_THRESHOLDS": OPENHENS_DQDA_GRID,
-            "HENS_ESM_SOLVER": "ipopt-pyomo",
-            "HENS_ESM_SOLVER_OPTIONS": {},
+            "HENS_SOLVER_EVM": "ipopt-pyomo",
+            "HENS_SOLVER_OPTIONS_EVM": {},
             "HENS_LOG_LEVEL": "WARNING",
             "HENS_MAX_PARALLEL": 10,
             "HENS_METHOD_SEQUENCE": [
@@ -254,13 +258,13 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
                 f"tests/fixtures/openhens/solver_baselines/{parsed.case_id}"
             ),
             "HENS_OUTPUT_FORMATS": ["json", "csv"],
-            "HENS_PDM_SOLVER": "couenne",
-            "HENS_PDM_SOLVER_OPTIONS": {},
+            "HENS_SOLVER_PDM": "couenne",
+            "HENS_SOLVER_OPTIONS_PDM": {},
             "HENS_RUN_ID": parsed.case_id,
             "HENS_SOLVE_TOLERANCE": 1e-3,
             "HENS_STAGE_SELECTION": [1, 2, 3, 4],
-            "HENS_TDM_SOLVER": "couenne",
-            "HENS_TDM_SOLVER_OPTIONS": {},
+            "HENS_SOLVER_TDM": "couenne",
+            "HENS_SOLVER_OPTIONS_TDM": {},
             "VARIABLE_COST": exchange.area_coefficient,
         },
         "zone_tree": {

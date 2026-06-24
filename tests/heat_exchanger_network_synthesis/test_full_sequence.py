@@ -126,6 +126,228 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
     assert tdm_executor.stage_order == ["thermal_derivative_method"]
 
 
+def test_quality_tier_zero_skips_thermal_derivative_stage() -> None:
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 0})
+    settings = workflow_settings_from_problem(problem)
+    executor = FakeSynthesisExecutor()
+
+    result = workflow_module.execute_open_hens_method(
+        problem,
+        settings,
+        executor=executor,
+    )
+
+    assert executor.stage_order == [
+        "pinch_design_method",
+        "network_evolution_method",
+    ]
+    assert not any(task.method == "thermal_derivative_method" for task in result.tasks)
+    assert all(
+        outcome.task.method != "thermal_derivative_method"
+        for outcome in result.outcomes
+    )
+
+
+def test_quality_tier_one_keeps_standard_pdm_task_grid() -> None:
+    settings = workflow_settings_from_problem(_small_problem())
+
+    tasks = build_pinch_design_method_tasks(settings)
+
+    assert settings.synthesis_quality_tier == 1
+    assert len(tasks) == 2
+    assert all(
+        task.metadata.get("pathway_ids") == ["tier1-open-hens"] for task in tasks
+    )
+    assert all(not task.settings for task in tasks)
+
+
+def test_quality_tier_three_expands_pdm_candidates() -> None:
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 3})
+    settings = workflow_settings_from_problem(problem)
+
+    tasks = build_pinch_design_method_tasks(settings)
+
+    assert settings.quality_dt_cont_multipliers == (1.0, 2.0)
+    assert settings.quality_pdm_stage_pair_count == 0
+    assert settings.effective_evm_n_ad_branches == 1
+    assert settings.effective_evm_n_rm_branches == 1
+    assert len(tasks) == 6
+    assert {task.settings.get("pdm_mode") for task in tasks if task.settings} == {
+        "compact",
+        "raw",
+    }
+    assert any(
+        "tier1-open-hens" in task.metadata.get("pathway_ids", ()) for task in tasks
+    )
+    assert any(
+        "tier3-compact-1" in task.metadata.get("pathway_ids", ()) for task in tasks
+    )
+    assert any(
+        task.approach_temperature == 4.0
+        and "tier3-compact-2" in task.metadata.get("pathway_ids", ())
+        for task in tasks
+    )
+    assert any(
+        task.approach_temperature == 4.0
+        and "tier3-raw-2" in task.metadata.get("pathway_ids", ())
+        for task in tasks
+    )
+
+
+def test_quality_tier_four_adds_evm_branch_breadth_to_dtmin_sweep() -> None:
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    settings = workflow_settings_from_problem(problem)
+
+    tasks = build_pinch_design_method_tasks(settings)
+
+    assert settings.quality_dt_cont_multipliers == (1.0, 2.0)
+    assert settings.effective_evm_n_ad_branches == 2
+    assert settings.effective_evm_n_rm_branches == 2
+    assert len(tasks) == 6
+    assert any(
+        task.approach_temperature == 2.0
+        and "tier4-compact-1" in task.metadata.get("pathway_ids", ())
+        for task in tasks
+    )
+    assert any(
+        task.approach_temperature == 4.0
+        and "tier4-raw-2" in task.metadata.get("pathway_ids", ())
+        for task in tasks
+    )
+
+
+def test_quality_tier_five_adds_experimental_reduced_dtmin_without_4x() -> None:
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
+    settings = workflow_settings_from_problem(problem)
+
+    tasks = build_pinch_design_method_tasks(problem=problem, settings=settings)
+
+    assert settings.quality_dt_cont_multipliers == (0.5, 1.0, 2.0)
+    assert settings.quality_pdm_stage_pair_count == 0
+    assert settings.quality_derivative_thresholds == (0.5, 1.0)
+    assert settings.effective_evm_n_ad_branches == 2
+    assert settings.effective_evm_n_rm_branches == 2
+    assert any(
+        task.approach_temperature == 1.0
+        and "tier5-compact-0p5" in task.metadata.get("pathway_ids", ())
+        for task in tasks
+    )
+    assert not any(
+        "tier5-compact-4" in task.metadata.get("pathway_ids", ())
+        or "tier5-raw-4" in task.metadata.get("pathway_ids", ())
+        for task in tasks
+    )
+
+
+def test_synthesis_quality_tier_five_retains_experimental_limits() -> None:
+    settings = workflow_settings_from_problem(
+        _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
+    )
+
+    assert settings.quality_dt_cont_multipliers == (0.5, 1.0, 2.0)
+    assert settings.quality_pdm_stage_pair_count == 0
+    assert settings.quality_derivative_thresholds == (0.5, 1.0)
+    assert settings.effective_evm_n_ad_branches == 2
+    assert settings.effective_evm_n_rm_branches == 2
+
+
+def test_user_dt_cont_multipliers_are_applied_as_multipliers() -> None:
+    problem = _small_problem_with_options(
+        {
+            "HENS_SYNTHESIS_QUALITY_TIER": 3,
+            "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+
+    tasks = build_pinch_design_method_tasks(settings)
+
+    assert settings.quality_pdm_approach_temperatures == (10.0, 15.0)
+    assert any(
+        task.approach_temperature == 15.0
+        and "tier3-compact-1p5" in task.metadata.get("pathway_ids", ())
+        for task in tasks
+    )
+    assert not any(task.approach_temperature in {100.0, 200.0} for task in tasks)
+
+
+def test_quality_tier_two_contains_tier_zero_and_tier_one_paths() -> None:
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 2})
+    settings = workflow_settings_from_problem(problem)
+    executor = FakeSynthesisExecutor()
+
+    result = workflow_module.execute_open_hens_method(
+        problem,
+        settings,
+        executor=executor,
+    )
+
+    pdm_tasks = [task for task in result.tasks if task.method == "pinch_design_method"]
+    tdm_tasks = [
+        task for task in result.tasks if task.method == "thermal_derivative_method"
+    ]
+    evm_tasks = [
+        task for task in result.tasks if task.method == "network_evolution_method"
+    ]
+
+    assert any(task.settings.get("pdm_mode") == "compact" for task in pdm_tasks)
+    assert any(
+        not task.settings and task.metadata.get("pathway_ids") == ["tier1-open-hens"]
+        for task in pdm_tasks
+    )
+    assert any(
+        "tier0-compact-1" in task.metadata.get("pathway_ids", ()) for task in evm_tasks
+    )
+    assert any(
+        task.metadata.get("pathway_ids") == ["tier1-open-hens"] for task in evm_tasks
+    )
+    assert not any(
+        "tier2-compact-1" in task.metadata.get("pathway_ids", ()) for task in tdm_tasks
+    )
+    assert any(
+        "tier2-compact-1" in task.metadata.get("pathway_ids", ()) for task in evm_tasks
+    )
+    assert result.accepted_result.manifest is not None
+    assert result.accepted_result.manifest.task_count_by_method[
+        "network_evolution_method"
+    ] == len(evm_tasks)
+
+
+def test_higher_tier_can_select_protected_lower_tier_evm_result() -> None:
+    class ProtectedTierWinsExecutor(FakeSynthesisExecutor):
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            outcomes = super().execute(
+                tasks,
+                problem=problem,
+                parent_outcomes=parent_outcomes,
+                max_parallel=max_parallel,
+            )
+            return tuple(
+                _with_pathway_tac(
+                    outcome,
+                    tier1_tac=100.0,
+                    other_tac=500.0,
+                )
+                for outcome in outcomes
+            )
+
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 2})
+    settings = workflow_settings_from_problem(problem)
+
+    result = workflow_module.execute_open_hens_method(
+        problem,
+        settings,
+        executor=ProtectedTierWinsExecutor(),
+    )
+
+    manifest = result.accepted_result.manifest
+    assert manifest is not None
+    assert result.accepted_result.objective_values["total_annual_cost"] == 100.0
+    assert manifest.selected_pathway_id == "tier1-open-hens"
+    assert manifest.selected_protected_pathway is True
+
+
 def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
@@ -398,25 +620,93 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets(
     assert design.design_method == HENDesignMethod.OpenHENS
     assert design.manifest is not None
     assert design.manifest.design_method == HENDesignMethod.OpenHENS
+    assert design.manifest.synthesis_quality_tier == 0
 
 
-def test_open_hens_method_accessor_matches_default_dispatch(monkeypatch) -> None:
+def test_open_hens_method_accessor_runs_original_tier_one(monkeypatch) -> None:
     _use_fake_default_executor(monkeypatch)
-    default_problem = _small_problem()
+    configured_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    original_config_tier = (
+        configured_problem.master_zone.config.hens.synthesis_quality_tier
+    )
+
+    design = configured_problem.design.open_hens_method()
+
+    assert design.design_method == HENDesignMethod.OpenHENS
+    assert design.manifest is not None
+    assert design.manifest.synthesis_quality_tier == 1
+    assert configured_problem.master_zone.config.hens.synthesis_quality_tier == (
+        original_config_tier
+    )
+
+
+def test_default_dispatch_is_fast_tier_zero_and_explicit_openhens_is_tier_one(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    default_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
     explicit_problem = _small_problem()
 
     default_design = default_problem.design.heat_exchanger_network_synthesis()
-    explicit_design = explicit_problem.design.open_hens_method()
+    explicit_design = explicit_problem.design.heat_exchanger_network_synthesis(
+        method=HENDesignMethod.OpenHENS,
+    )
 
     assert default_design.design_method == HENDesignMethod.OpenHENS
     assert explicit_design.design_method == HENDesignMethod.OpenHENS
-    assert default_design.method == explicit_design.method
     assert default_design.manifest is not None
     assert explicit_design.manifest is not None
-    assert (
-        default_design.manifest.method_sequence
-        == explicit_design.manifest.method_sequence
+    assert default_design.manifest.synthesis_quality_tier == 0
+    assert explicit_design.manifest.synthesis_quality_tier == 1
+    assert default_problem.master_zone.config.hens.synthesis_quality_tier == 4
+
+
+def test_enhanced_synthesis_method_runs_requested_quality_tier(monkeypatch) -> None:
+    _use_fake_default_executor(monkeypatch)
+    default_problem = _small_problem()
+    explicit_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
+    original_config_tier = (
+        explicit_problem.master_zone.config.hens.synthesis_quality_tier
     )
+
+    default_design = default_problem.design.enhanced_synthesis_method()
+    explicit_design = explicit_problem.design.enhanced_synthesis_method(
+        quality_tier=3,
+    )
+
+    assert default_design.design_method == HENDesignMethod.OpenHENS
+    assert explicit_design.design_method == HENDesignMethod.OpenHENS
+    assert default_design.manifest is not None
+    assert explicit_design.manifest is not None
+    assert default_design.manifest.synthesis_quality_tier == 2
+    assert explicit_design.manifest.synthesis_quality_tier == 3
+    assert explicit_problem.master_zone.config.hens.synthesis_quality_tier == (
+        original_config_tier
+    )
+
+
+@pytest.mark.parametrize("quality_tier", [-1, 6])
+def test_enhanced_synthesis_method_rejects_out_of_range_quality_tier(
+    monkeypatch,
+    quality_tier: int,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    with pytest.raises(ValueError, match="quality_tier"):
+        problem.design.enhanced_synthesis_method(quality_tier=quality_tier)
+
+
+@pytest.mark.parametrize("quality_tier", [1.5, "2", True])
+def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
+    monkeypatch,
+    quality_tier: object,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    with pytest.raises(TypeError, match="quality_tier"):
+        problem.design.enhanced_synthesis_method(quality_tier=quality_tier)  # type: ignore[arg-type]
 
 
 def test_direct_design_run_computes_targets_when_cache_is_empty(monkeypatch) -> None:
@@ -652,6 +942,16 @@ def _small_problem(*, project_name: str = "HENS Demo") -> PinchProblem:
     return PinchProblem(source=_small_payload(), project_name=project_name)
 
 
+def _small_problem_with_options(
+    options: dict,
+    *,
+    project_name: str = "HENS Demo",
+) -> PinchProblem:
+    payload = _small_payload()
+    payload["options"] = {**payload["options"], **options}
+    return PinchProblem(source=payload, project_name=project_name)
+
+
 def _use_fake_default_executor(monkeypatch) -> None:
     from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services import (
         network_evolution_method,
@@ -694,3 +994,29 @@ def _outcome_map(outcomes):
         for outcome in outcomes
         if outcome.task.task_id is not None
     }
+
+
+def _with_pathway_tac(
+    outcome: HeatExchangerNetworkSynthesisTaskOutcome,
+    *,
+    tier1_tac: float,
+    other_tac: float,
+) -> HeatExchangerNetworkSynthesisTaskOutcome:
+    if outcome.task.method != "network_evolution_method" or outcome.network is None:
+        return outcome
+    pathway_ids = outcome.task.metadata.get("pathway_ids", ())
+    tac = tier1_tac if pathway_ids == ["tier1-open-hens"] else other_tac
+    network = outcome.network.model_copy(
+        update={
+            "objective_value": tac,
+            "total_annual_cost": tac,
+            "utility_cost": tac / 2.0,
+            "capital_cost": tac / 2.0,
+        }
+    )
+    return outcome.model_copy(
+        update={
+            "network": network,
+            "objective_value": tac,
+        }
+    )

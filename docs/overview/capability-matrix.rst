@@ -41,7 +41,8 @@ surfaces and outputs.
      - target models with HPR summary fields and graph effects
      - Advanced
    * - Heat exchanger network synthesis
-     - ``problem.design.open_hens_method(...)``,
+     - ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
+       ``problem.design.open_hens_method(...)``,
        ``problem.design.heat_exchanger_network_synthesis(method=...)``,
        direct ``*_method`` accessors
      - ranked HEN candidates, selected network, task manifest, grid diagrams,

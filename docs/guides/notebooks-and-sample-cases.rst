@@ -115,7 +115,8 @@ Carnot option. Notebook 08 shows ``add_component.process_mvr(...)``,
 ``stage_results_by_state``, replacement stream inspection, component
 activation/deactivation, and baseline-versus-MVR comparison through
 ``workspace.compare_cases(...)``. Notebook 09 shows
-``problem.design.open_hens_method()``,
+``problem.design.enhanced_synthesis_method(quality_tier=...)``,
+``problem.design.open_hens_method()`` for original tier 1,
 ``problem.design.heat_exchanger_network_synthesis(method=...)``, and
 ``workspace.solve_variant(..., workflow="heat_exchanger_network_synthesis")``
 with a small heat exchanger network design grid and grid views for the top

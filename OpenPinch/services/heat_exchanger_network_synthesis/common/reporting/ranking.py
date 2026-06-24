@@ -5,13 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
+from .....lib.schemas.synthesis import HeatExchangerNetworkTopologyRestriction
 from ....network_grid_diagram.builder import build_grid_model
+from ...targeting_services.topology import (
+    canonical_topology_restrictions,
+    topology_restriction_signature,
+)
 
 if TYPE_CHECKING:
     from .....lib.schemas.synthesis import (
         HeatExchangerNetworkSynthesisResult,
         HeatExchangerNetworkSynthesisTaskOutcome,
     )
+
 
 def rank_unique_network_outcomes(
     result: "HeatExchangerNetworkSynthesisResult",
@@ -41,25 +47,30 @@ def network_structure_signature(
 ) -> tuple[tuple[Any, ...], ...]:
     """Return the stable topology signature used by grid-diagram plotting."""
     grid_model = build_grid_model(network)
-    recovery_stage_index = {
-        stage: index
-        for index, stage in enumerate(
-            dict.fromkeys(
-                match.stage
-                for match in grid_model.recovery_matches
-                if match.stage is not None
+    recovery_restrictions = canonical_topology_restrictions(
+        (
+            HeatExchangerNetworkTopologyRestriction(
+                source_stream=match.source_stream,
+                sink_stream=match.sink_stream,
+                stage=int(match.stage),
+                duty=float(match.duty),
             )
-        )
-    }
+            for match in grid_model.recovery_matches
+            if match.stage is not None
+        ),
+        hot_stream_order=grid_model.hot_streams,
+        cold_stream_order=grid_model.cold_streams,
+    )
     links = [
         (
             "recovery",
-            match.source_stream,
-            match.sink_stream,
-            recovery_stage_index[match.stage],
+            source_stream,
+            sink_stream,
+            stage,
         )
-        for match in grid_model.recovery_matches
-        if match.stage is not None
+        for source_stream, sink_stream, stage in topology_restriction_signature(
+            recovery_restrictions
+        )
     ]
     links.extend(
         ("hot_utility", match.source_stream, match.sink_stream, None)

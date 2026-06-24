@@ -133,7 +133,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.Q_max = np.array(
             [
                 [
-                    max(self.T_h_in[i] - self.T_c_in[j] - self.dTmin, 0.0)
+                    max(
+                        self.T_h_in[i]
+                        - self.T_c_in[j]
+                        - self._recovery_approach_temperature(i, j),
+                        0.0,
+                    )
                     * min(
                         self.f_h[i] * self.z_i_active[i],
                         self.f_c[j] * self.z_j_active[j],
@@ -165,14 +170,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.Q_r = [
             [
                 [
-                    self.m.Var(
-                        value=self.Q_max[i][j] / 3,
-                        ub=self.Q_max[i][j],
-                        lb=0.0,
-                        name=f"Q_H{i}_to_C{j}_at_S{k}",
+                    (
+                        self.m.Var(
+                            value=self.Q_max[i][j] / 3,
+                            ub=self.Q_max[i][j],
+                            lb=0.0,
+                            name=f"Q_H{i}_to_C{j}_at_S{k}",
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else self.m.Param(value=0.0, name=f"Q_H{i}_to_C{j}_at_S{k}")
                     )
-                    if self.z_allowed[i][j][k] > 0
-                    else self.m.Param(value=0.0, name=f"Q_H{i}_to_C{j}_at_S{k}")
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
@@ -180,97 +187,117 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             for i in range(self.I)
         ]
         self.Q_c = [
-            self.m.Var(
-                value=0,
-                ub=self.Qtot_sh[i],
-                lb=0.0,
-                name=f"Q_H{i}_to_CU",
+            (
+                self.m.Var(
+                    value=0,
+                    ub=self.Qtot_sh[i],
+                    lb=0.0,
+                    name=f"Q_H{i}_to_CU",
+                )
+                if self.z_cu_allowed[i] > 0
+                else self.m.Param(value=0, name=f"Q_H{i}_to_CU")
             )
-            if self.z_cu_allowed[i] > 0
-            else self.m.Param(value=0, name=f"Q_H{i}_to_CU")
             for i in range(self.I)
         ]
         self.Q_h = [
-            self.m.Var(
-                value=0,
-                ub=self.Qtot_sc[j],
-                lb=0.0,
-                name=f"Q_HU_to_C{j}",
+            (
+                self.m.Var(
+                    value=0,
+                    ub=self.Qtot_sc[j],
+                    lb=0.0,
+                    name=f"Q_HU_to_C{j}",
+                )
+                if self.z_hu_allowed[j] > 0
+                else self.m.Param(value=0, name=f"Q_HU_to_C{j}")
             )
-            if self.z_hu_allowed[j] > 0
-            else self.m.Param(value=0, name=f"Q_HU_to_C{j}")
             for j in range(self.J)
         ]
         self.T_h = [
             [
-                self.m.Var(
-                    value=self.T_h_in[i],
-                    ub=self.T_h_in[i],
-                    lb=self.T_h_out[i],
-                    name=f"T_H{i}_at_B{k}",
+                (
+                    self.m.Var(
+                        value=self.T_h_in[i],
+                        ub=self.T_h_in[i],
+                        lb=self.T_h_out[i],
+                        name=f"T_H{i}_at_B{k}",
+                    )
+                    if k > 0 and self.z_i_active[i] > 0
+                    else self.m.Param(value=self.T_h_in[i], name=f"T_H{i}_at_B{k}")
                 )
-                if k > 0 and self.z_i_active[i] > 0
-                else self.m.Param(value=self.T_h_in[i], name=f"T_H{i}_at_B{k}")
                 for k in range(self.K)
             ]
             for i in range(self.I)
         ]
         self.T_c = [
             [
-                self.m.Var(
-                    value=self.T_c_in[j],
-                    ub=self.T_c_out[j],
-                    lb=self.T_c_in[j],
-                    name=f"T_C{j}_at_B{k}",
+                (
+                    self.m.Var(
+                        value=self.T_c_in[j],
+                        ub=self.T_c_out[j],
+                        lb=self.T_c_in[j],
+                        name=f"T_C{j}_at_B{k}",
+                    )
+                    if k < self.S and self.z_j_active[j] > 0
+                    else self.m.Param(value=self.T_c_in[j], name=f"T_C{j}_at_B{k}")
                 )
-                if k < self.S and self.z_j_active[j] > 0
-                else self.m.Param(value=self.T_c_in[j], name=f"T_C{j}_at_B{k}")
                 for k in range(self.K)
             ]
             for j in range(self.J)
         ]
 
         _ = [
-            self.m.Equation(
-                self.Qtot_sh[i]
-                - sum(self.Q_r[i][j][k] for k in range(self.S) for j in range(self.J))
-                - self.Q_c[i]
-                == 0.0
+            (
+                self.m.Equation(
+                    self.Qtot_sh[i]
+                    - sum(
+                        self.Q_r[i][j][k] for k in range(self.S) for j in range(self.J)
+                    )
+                    - self.Q_c[i]
+                    == 0.0
+                )
+                if self.z_i_active[i] > 0
+                else None
             )
-            if self.z_i_active[i] > 0
-            else None
             for i in range(self.I)
         ]
         _ = [
-            self.m.Equation(
-                self.Qtot_sc[j]
-                - sum(self.Q_r[i][j][k] for k in range(self.S) for i in range(self.I))
-                - self.Q_h[j]
-                == 0.0
+            (
+                self.m.Equation(
+                    self.Qtot_sc[j]
+                    - sum(
+                        self.Q_r[i][j][k] for k in range(self.S) for i in range(self.I)
+                    )
+                    - self.Q_h[j]
+                    == 0.0
+                )
+                if self.z_j_active[j] > 0
+                else None
             )
-            if self.z_j_active[j] > 0
-            else None
             for j in range(self.J)
         ]
         _ = [
-            self.m.Equation(
-                (self.T_h[i][k + 1] - self.T_h[i][k]) * self.f_h[i]
-                + sum(self.Q_r[i][j][k] for j in range(self.J))
-                == 0
+            (
+                self.m.Equation(
+                    (self.T_h[i][k + 1] - self.T_h[i][k]) * self.f_h[i]
+                    + sum(self.Q_r[i][j][k] for j in range(self.J))
+                    == 0
+                )
+                if self.z_i_active[i] > 0
+                else None
             )
-            if self.z_i_active[i] > 0
-            else None
             for k in range(self.S)
             for i in range(self.I)
         ]
         _ = [
-            self.m.Equation(
-                (self.T_c[j][k + 1] - self.T_c[j][k]) * self.f_c[j]
-                + sum(self.Q_r[i][j][k] for i in range(self.I))
-                == 0
+            (
+                self.m.Equation(
+                    (self.T_c[j][k + 1] - self.T_c[j][k]) * self.f_c[j]
+                    + sum(self.Q_r[i][j][k] for i in range(self.I))
+                    == 0
+                )
+                if self.z_j_active[j] > 0
+                else None
             )
-            if self.z_j_active[j] > 0
-            else None
             for k in range(self.S)
             for j in range(self.J)
         ]
@@ -279,15 +306,17 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             self.z = [
                 [
                     [
-                        self.m.Var(
-                            value=1,
-                            ub=1,
-                            lb=0,
-                            integer=True,
-                            name=f"z_H{i}_to_C{j}_at_S{k}",
+                        (
+                            self.m.Var(
+                                value=1,
+                                ub=1,
+                                lb=0,
+                                integer=True,
+                                name=f"z_H{i}_to_C{j}_at_S{k}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -295,56 +324,68 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
             self.z_cu = [
-                self.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_H{i}_to_CU",
+                (
+                    self.m.Var(
+                        value=1,
+                        ub=1,
+                        lb=0,
+                        integer=True,
+                        name=f"z_H{i}_to_CU",
+                    )
+                    if self.z_cu_allowed[i] > 0
+                    else self.m.Param(value=0, name=f"z_H{i}_to_CU")
                 )
-                if self.z_cu_allowed[i] > 0
-                else self.m.Param(value=0, name=f"z_H{i}_to_CU")
                 for i in range(self.I)
             ]
             self.z_hu = [
-                self.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_HU_to_C{j}",
+                (
+                    self.m.Var(
+                        value=1,
+                        ub=1,
+                        lb=0,
+                        integer=True,
+                        name=f"z_HU_to_C{j}",
+                    )
+                    if self.z_hu_allowed[j] > 0
+                    else self.m.Param(value=0, name=f"z_HU_to_C{j}")
                 )
-                if self.z_hu_allowed[j] > 0
-                else self.m.Param(value=0, name=f"z_HU_to_C{j}")
                 for j in range(self.J)
             ]
             _ = [
-                self.m.Equation(self.Q_r[i][j][k] * (1 - self.z[i][j][k]) == 0.0)
-                if self.z_allowed[i][j][k] > 0
-                else None
+                (
+                    self.m.Equation(self.Q_r[i][j][k] * (1 - self.z[i][j][k]) == 0.0)
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(self.Q_c[i] * (1 - self.z_cu[i]) == 0.0)
-                if self.z_cu_allowed[i] > 0
-                else None
+                (
+                    self.m.Equation(self.Q_c[i] * (1 - self.z_cu[i]) == 0.0)
+                    if self.z_cu_allowed[i] > 0
+                    else None
+                )
                 for i in range(self.I)
             ]
             _ = [
-                self.m.Equation(self.Q_h[j] * (1 - self.z_hu[j]) == 0.0)
-                if self.z_hu_allowed[j] > 0
-                else None
+                (
+                    self.m.Equation(self.Q_h[j] * (1 - self.z_hu[j]) == 0.0)
+                    if self.z_hu_allowed[j] > 0
+                    else None
+                )
                 for j in range(self.J)
             ]
         else:
             self.z = [
                 [
                     [
-                        self.m.Param(value=1, name=f"z_H{i}_to_C{j}_at_S{k}")
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
+                        (
+                            self.m.Param(value=1, name=f"z_H{i}_to_C{j}_at_S{k}")
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
+                        )
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -352,15 +393,19 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
             self.z_hu = [
-                self.m.Param(value=1, name=f"z_HU_to_C{j}")
-                if self.z_hu_allowed[j] > 0
-                else self.m.Param(value=0, name=f"z_HU_to_C{j}")
+                (
+                    self.m.Param(value=1, name=f"z_HU_to_C{j}")
+                    if self.z_hu_allowed[j] > 0
+                    else self.m.Param(value=0, name=f"z_HU_to_C{j}")
+                )
                 for j in range(self.J)
             ]
             self.z_cu = [
-                self.m.Param(value=1, name=f"z_H{i}_to_CU")
-                if self.z_cu_allowed[i] > 0
-                else self.m.Param(value=0, name=f"z_H{i}_to_CU")
+                (
+                    self.m.Param(value=1, name=f"z_H{i}_to_CU")
+                    if self.z_cu_allowed[i] > 0
+                    else self.m.Param(value=0, name=f"z_H{i}_to_CU")
+                )
                 for i in range(self.I)
             ]
 
@@ -372,29 +417,35 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                     abs(self.T_h_out[i] - self.T_c_in[j]),
                     abs(self.T_h_out[i] - self.T_c_out[j]),
                 )
-                + self.dTmin
+                + self._recovery_approach_temperature(i, j)
                 for j in range(self.J)
             ]
             for i in range(self.I)
         ]
         _ = [
-            self.m.Equation(
-                (self.T_h[i][k] - self.T_c[j][k])
-                >= self.dTmin - M_ij[i][j] * (1 - self.z[i][j][k])
+            (
+                self.m.Equation(
+                    (self.T_h[i][k] - self.T_c[j][k])
+                    >= self._recovery_approach_temperature(i, j)
+                    - M_ij[i][j] * (1 - self.z[i][j][k])
+                )
+                if self.z_allowed[i][j][k] > 0
+                else None
             )
-            if self.z_allowed[i][j][k] > 0
-            else None
             for k in range(self.S)
             for j in range(self.J)
             for i in range(self.I)
         ]
         _ = [
-            self.m.Equation(
-                (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                >= self.dTmin - M_ij[i][j] * (1 - self.z[i][j][k])
+            (
+                self.m.Equation(
+                    (self.T_h[i][k + 1] - self.T_c[j][k + 1])
+                    >= self._recovery_approach_temperature(i, j)
+                    - M_ij[i][j] * (1 - self.z[i][j][k])
+                )
+                if self.z_allowed[i][j][k] > 0
+                else None
             )
-            if self.z_allowed[i][j][k] > 0
-            else None
             for k in range(self.S)
             for j in range(self.J)
             for i in range(self.I)
@@ -476,9 +527,11 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             self.theta_1 = [
                 [
                     [
-                        [self.T_h[i][k][0] - self.T_c[j][k][0]]
-                        if self.z[i][j][k][0] > 0
-                        else [self.dTmin]
+                        (
+                            [self.T_h[i][k][0] - self.T_c[j][k][0]]
+                            if self.z[i][j][k][0] > 0
+                            else [self._recovery_approach_temperature(i, j)]
+                        )
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -488,9 +541,11 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             self.theta_2 = [
                 [
                     [
-                        [self.T_h[i][k + 1][0] - self.T_c[j][k + 1][0]]
-                        if self.z[i][j][k][0] > 0
-                        else [self.dTmin]
+                        (
+                            [self.T_h[i][k + 1][0] - self.T_c[j][k + 1][0]]
+                            if self.z[i][j][k][0] > 0
+                            else [self._recovery_approach_temperature(i, j)]
+                        )
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -508,8 +563,10 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         formula_allowed=(
                             abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
                             > self.tol
-                            and self.theta_1[i][j][k][0] >= self.dTmin
-                            and self.theta_2[i][j][k][0] >= self.dTmin
+                            and self.theta_1[i][j][k][0]
+                            >= self._recovery_approach_temperature(i, j)
+                            and self.theta_2[i][j][k][0]
+                            >= self._recovery_approach_temperature(i, j)
                         ),
                     )
                     for k in range(self.S)
@@ -521,10 +578,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.area_r = [
             [
                 [
-                    self.Q_r[i][j][k][0] / self.U_r[i][j] / self.LMTD_r[i][j][k]
-                    if self.LMTD_r[i][j][k] > self.tol
-                    and self.Q_r[i][j][k][0] > self.tol
-                    else 0.0
+                    (
+                        self.Q_r[i][j][k][0] / self.U_r[i][j] / self.LMTD_r[i][j][k]
+                        if self.LMTD_r[i][j][k] > self.tol
+                        and self.Q_r[i][j][k][0] > self.tol
+                        else 0.0
+                    )
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
@@ -542,16 +601,20 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         - (self.T_hu_out[0] - self.T_c[j][0][0])
                     )
                     > self.tol
-                    and self.T_hu_in[0] - self.T_c_out[j] >= self.dTmin
-                    and self.T_hu_out[0] - self.T_c[j][0][0] >= self.dTmin
+                    and self.T_hu_in[0] - self.T_c_out[j]
+                    >= self._hot_utility_approach_temperature(j)
+                    and self.T_hu_out[0] - self.T_c[j][0][0]
+                    >= self._hot_utility_approach_temperature(j)
                 ),
             )
             for j in range(self.J)
         ]
         self.area_hu = [
-            self.Q_h[j][0] / self.U_hu[j] / self.LMTD_hu[j]
-            if self.LMTD_hu[j] > self.tol and self.Q_h[j][0] > self.tol
-            else 0.0
+            (
+                self.Q_h[j][0] / self.U_hu[j] / self.LMTD_hu[j]
+                if self.LMTD_hu[j] > self.tol and self.Q_h[j][0] > self.tol
+                else 0.0
+            )
             for j in range(self.J)
         ]
         self.LMTD_cu = [
@@ -565,17 +628,21 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         - (self.T_h_out[i] - self.T_cu_in[0])
                     )
                     > self.tol
-                    and self.T_h[i][self.S][0] - self.T_cu_out[0] >= self.dTmin
-                    and self.T_h_out[i] - self.T_cu_in[0] >= self.dTmin
+                    and self.T_h[i][self.S][0] - self.T_cu_out[0]
+                    >= self._cold_utility_approach_temperature(i)
+                    and self.T_h_out[i] - self.T_cu_in[0]
+                    >= self._cold_utility_approach_temperature(i)
                 ),
                 fallback_delta=self.T_h_out[i] - self.T_cu_in[0],
             )
             for i in range(self.I)
         ]
         self.area_cu = [
-            self.Q_c[i][0] / self.U_cu[i] / self.LMTD_cu[i]
-            if self.LMTD_cu[i] > self.tol and self.Q_c[i][0] > self.tol
-            else 0.0
+            (
+                self.Q_c[i][0] / self.U_cu[i] / self.LMTD_cu[i]
+                if self.LMTD_cu[i] > self.tol and self.Q_c[i][0] > self.tol
+                else 0.0
+            )
             for i in range(self.I)
         ]
         self.Q_cu_total = sum(self.Q_c[i][0] for i in range(self.I))
@@ -590,14 +657,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             [
                 [
                     (
-                        self.theta_1[i][j][k][0]
-                        * self.theta_2[i][j][k][0]
-                        * self.U_r[i][j]
+                        (
+                            self.theta_1[i][j][k][0]
+                            * self.theta_2[i][j][k][0]
+                            * self.U_r[i][j]
+                        )
+                        / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                        * self.z[i][j][k][0]
+                        if (self.T_h[i][k][0] - self.T_c[j][k + 1][0]) > 0.0
+                        else 0.0
                     )
-                    / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                    * self.z[i][j][k][0]
-                    if (self.T_h[i][k][0] - self.T_c[j][k + 1][0]) > 0.0
-                    else 0.0
                     for k in range(self.S)
                 ]
                 for j in range(self.J)

@@ -312,9 +312,153 @@ def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
     ranking_model.area_r = [[[5.0, 0.0], [15.0, 0.0]]]
     ranking_model.alpha_dqda = [[[0.0, 3.0], [0.0, 9.0]]]
     ranking_model.z_feasible = [[[1, 1], [1, 1]]]
+    ranking_model.tol = 1e-3
 
     assert ranking_model.get_lowest_benefit_HX() == [[0, 0, 0]]
+    assert ranking_model.get_lowest_benefit_HX_candidates(2) == [
+        [0, 0, 0],
+        [0, 1, 0],
+    ]
     assert ranking_model.get_max_benefit_HX() == [[0, 1, 1]]
+    assert ranking_model.get_max_benefit_HX_candidates(2) == [
+        [0, 1, 1],
+        [0, 0, 1],
+    ]
+
+
+def test_stagewise_evolution_defaults_solve_one_add_and_one_remove_branch() -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+    solved: list[str] = []
+
+    def solve_minus(**kwargs):
+        solved.append(kwargs["branch_label"])
+        return _BranchEvolutionCase(
+            name="minus",
+            tac=90.0,
+            z=kwargs["z_allowed_removed"],
+        )
+
+    def solve_plus(**kwargs):
+        solved.append(kwargs["branch_label"])
+        return _BranchEvolutionCase(
+            name="plus",
+            tac=95.0,
+            z=kwargs["z_allowed_added"],
+        )
+
+    model._build_and_solve_n_minus_one_evolution = solve_minus
+    model._build_and_solve_n_plus_one_evolution = solve_plus
+
+    model.get_net_benefit_evolution(print_output=False, max_depth=1)
+
+    assert solved == ["0-b0-minus1", "0-b0-plus1"]
+    assert model.updated_with == "minus"
+
+
+def test_stagewise_evolution_branch_frontier_selects_best_global_tac() -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+    solved: list[str] = []
+
+    def solve_minus(**kwargs):
+        solved.append(kwargs["branch_label"])
+        return _BranchEvolutionCase(
+            name=kwargs["branch_label"],
+            tac={
+                "0-b0-minus1": 120.0,
+                "0-b0-minus2": 80.0,
+            }[kwargs["branch_label"]],
+            z=kwargs["z_allowed_removed"],
+        )
+
+    def solve_plus(**kwargs):
+        solved.append(kwargs["branch_label"])
+        label = kwargs["branch_label"]
+        if label == "0-b0-plus1":
+            return _BranchEvolutionCase(
+                name=label,
+                tac=90.0,
+                z=kwargs["z_allowed_added"],
+                add_candidates=((0, 0, 3),),
+            )
+        if label == "0-b0-plus2":
+            return _BranchEvolutionCase(
+                name=label,
+                tac=110.0,
+                z=kwargs["z_allowed_added"],
+            )
+        return _BranchEvolutionCase(
+            name="plus-branch-best",
+            tac=70.0,
+            z=kwargs["z_allowed_added"],
+        )
+
+    model._build_and_solve_n_minus_one_evolution = solve_minus
+    model._build_and_solve_n_plus_one_evolution = solve_plus
+
+    model.get_net_benefit_evolution(
+        print_output=False,
+        max_depth=2,
+        n_ad_branches=2,
+        n_rm_branches=2,
+    )
+
+    assert solved == [
+        "0-b0-minus1",
+        "0-b0-minus2",
+        "0-b0-plus1",
+        "0-b0-plus2",
+        "1-b2-plus1",
+    ]
+    assert model.updated_with == "plus-branch-best"
+
+
+def test_stagewise_evolution_failed_child_does_not_stop_siblings() -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0),),
+        add_candidates=((0, 0, 2),),
+    )
+    solved: list[str] = []
+
+    def solve_minus(**kwargs):
+        solved.append(kwargs["branch_label"])
+        raise RuntimeError("forced branch failure")
+
+    def solve_plus(**kwargs):
+        solved.append(kwargs["branch_label"])
+        return _BranchEvolutionCase(
+            name="usable-plus",
+            tac=90.0,
+            z=kwargs["z_allowed_added"],
+        )
+
+    model._build_and_solve_n_minus_one_evolution = solve_minus
+    model._build_and_solve_n_plus_one_evolution = solve_plus
+
+    model.get_net_benefit_evolution(print_output=False, max_depth=1)
+
+    assert solved == ["0-b0-minus1", "0-b0-plus1"]
+    assert model.updated_with == "usable-plus"
+
+
+def test_solver_arrays_include_evm_branch_options() -> None:
+    arrays = problem_to_solver_arrays(
+        _four_stream_problem(
+            options={
+                "HENS_EVM_N_AD_BRANCHES": 2,
+                "HENS_EVM_N_RM_BRANCHES": 3,
+            }
+        ),
+        14.0,
+    )
+
+    assert arrays.configuration["HENS_EVM_N_AD_BRANCHES"] == 2
+    assert arrays.configuration["HENS_EVM_N_RM_BRANCHES"] == 3
 
 
 def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
@@ -503,6 +647,31 @@ def test_local_executor_passes_user_solver_options_to_internal_problem() -> None
     assert internal_problem.solver_options == {
         "node_limit": 25,
         "feas_tolerance": 0.02,
+    }
+
+
+def test_local_executor_merges_task_solver_options_into_internal_problem() -> None:
+    problem = _four_stream_problem(
+        options={
+            "HENS_SOLVER_OPTIONS_PDM": {
+                "node_limit": 25,
+            },
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+    task = build_pinch_design_method_tasks(settings)[0].model_copy(
+        update={"settings": {"solver_options": {"time_limit": 60}}},
+    )
+
+    internal_problem = LocalSynthesisExecutor()._build_problem(
+        task,
+        problem=problem,
+        parent_outcomes={},
+    )
+
+    assert internal_problem.solver_options == {
+        "node_limit": 25,
+        "time_limit": 60,
     }
 
 
@@ -871,8 +1040,10 @@ class _EvolutionCase:
         assert print_output is False
         self.calls.append("optimise")
 
-    def get_net_benefit_evolution(self, print_output: bool):
+    def get_net_benefit_evolution(self, print_output: bool, **kwargs):
         assert print_output is False
+        assert kwargs["n_ad_branches"] == 1
+        assert kwargs["n_rm_branches"] == 1
         self.calls.append("evolution")
         return self
 
@@ -889,6 +1060,67 @@ class _CandidateModel:
     def __init__(self, *, mSuccess: int, TAC: float) -> None:
         self.mSuccess = mSuccess
         self.TAC = TAC
+
+
+class _BranchEvolutionCase:
+    def __init__(
+        self,
+        *,
+        name: str,
+        tac: float,
+        z: list,
+        rm_candidates: tuple[tuple[int, int, int], ...] = (),
+        add_candidates: tuple[tuple[int, int, int], ...] = (),
+        success: int = 1,
+        valid: bool = True,
+    ) -> None:
+        self.name = name
+        self.TAC = tac
+        self.z = z
+        self.mSuccess = success
+        self._rm_candidates = rm_candidates
+        self._add_candidates = add_candidates
+        self._valid = valid
+
+    def get_lowest_benefit_HX_candidates(self, limit: int) -> list[list[int]]:
+        return [list(position) for position in self._rm_candidates[:limit]]
+
+    def get_max_benefit_HX_candidates(self, limit: int) -> list[list[int]]:
+        return [list(position) for position in self._add_candidates[:limit]]
+
+    def verify(self) -> tuple[bool, list[str]]:
+        return self._valid, [] if self._valid else ["forced"]
+
+
+def _branching_root_model(
+    *,
+    rm_candidates: tuple[tuple[int, int, int], ...],
+    add_candidates: tuple[tuple[int, int, int], ...],
+):
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.name = "root"
+    model.I = 1
+    model.J = 1
+    model.S = 4
+    model.tol = 1e-3
+    model.mSuccess = 1
+    model.TAC = 100.0
+    model.z = [[[[1], [1], [0], [0]]]]
+    model.m = SimpleNamespace(cleanup=lambda: setattr(model, "cleaned", True))
+    model.cleaned = False
+    model.updated_with = None
+    model.get_lowest_benefit_HX_candidates = lambda limit: [
+        list(position) for position in rm_candidates[:limit]
+    ]
+    model.get_max_benefit_HX_candidates = lambda limit: [
+        list(position) for position in add_candidates[:limit]
+    ]
+    model._update_with_best_model = lambda best: setattr(
+        model,
+        "updated_with",
+        best.name,
+    )
+    return model
 
 
 class _RecordingStageWise:
