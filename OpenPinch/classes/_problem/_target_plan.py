@@ -54,14 +54,10 @@ class TargetingPlan:
         )
 
     def composite_direct_service(self) -> Callable | None:
-        return _compose_services(
-            spec for spec in self.specs if spec.slot == "direct"
-        )
+        return _compose_services(spec for spec in self.specs if spec.slot == "direct")
 
     def composite_indirect_service(self) -> Callable | None:
-        return _compose_services(
-            spec for spec in self.specs if spec.slot == "indirect"
-        )
+        return _compose_services(spec for spec in self.specs if spec.slot == "indirect")
 
 
 TARGETING_METHOD_SPECS: tuple[TargetingMethodSpec, ...] = (

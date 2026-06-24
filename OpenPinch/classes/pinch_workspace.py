@@ -182,6 +182,10 @@ class PinchWorkspace:
         """Return a structured validation report for one payload."""
         return build_validation_report(self._get_variant_payload(name))
 
+    def validation_report(self, case_name: Optional[str] = None):
+        """Return a structured validation report for one case payload."""
+        return self.validate_variant(self._resolve_case_name(case_name))
+
     def set_variant_payload(
         self,
         name: str,
@@ -355,6 +359,39 @@ class PinchWorkspace:
         data_source = self.get_case_payload(source_name, canonical=True)
         return self.load(data_source, case_name=new_name, activate=activate)
 
+    def scenario(
+        self,
+        name: str,
+        *,
+        base: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        replace_options: bool = False,
+        dt_cont_multiplier: float | None = None,
+        activate: bool = False,
+        solve: bool = False,
+        workflow: str = "target",
+        workflow_options: Optional[dict[str, Any]] = None,
+    ) -> PinchProblem:
+        """Create a named scenario from a base case and optional edits."""
+        source_name = base or self.baseline_name
+        case = self.copy_case(
+            source_name=source_name,
+            new_name=name,
+            activate=activate,
+        )
+        if options:
+            case.update_options(options, replace=replace_options)
+        if dt_cont_multiplier is not None:
+            case.set_dt_cont_multiplier(dt_cont_multiplier)
+        self._sync_case_payload(name)
+        if solve:
+            self.solve_variant(
+                name,
+                workflow=workflow,
+                workflow_options=workflow_options,
+            )
+        return self.case(name)
+
     def get_case_payload(
         self,
         name: Optional[str] = None,
@@ -420,9 +457,18 @@ class PinchWorkspace:
         *,
         case_name: Optional[str] = None,
         detailed: bool = False,
+        format: str | None = None,
     ) -> pd.DataFrame:
         """Return the solved summary for one case."""
-        return self.case(case_name).summary_frame(detailed=detailed)
+        return self.case(case_name).summary_frame(detailed=detailed, format=format)
+
+    def metrics(self, *, case_name: Optional[str] = None, solve: bool = True):
+        """Return typed metrics for one case."""
+        return self.case(case_name).metrics(solve=solve)
+
+    def report(self, *, case_name: Optional[str] = None, solve: bool = True):
+        """Return a typed report for one case."""
+        return self.case(case_name).report(solve=solve)
 
     def export_excel(
         self,

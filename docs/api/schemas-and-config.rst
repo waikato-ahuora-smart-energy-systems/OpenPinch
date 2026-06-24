@@ -25,6 +25,25 @@ What Each Layer Does
    assumptions, costing inputs, and turbine settings. Each prepared
    :class:`~OpenPinch.classes.zone.Zone` owns one config object.
 
+Discovering Options
+-------------------
+
+Use ``config_options()`` or ``Configuration.options_catalog()`` to inspect the
+supported flat ``TargetInput.options`` keys, their groups, runtime status,
+enum choices, numeric bounds, and config paths:
+
+.. code-block:: python
+
+   from OpenPinch import config_options
+
+   options = config_options()
+   hpr_options = [field for field in options if field.group == "hpr"]
+
+Common options include ``THERMAL_DT_CONT`` for minimum contribution
+temperature, ``TARGETING_*`` flags for default target selection,
+``OUTPUT_UNIT_*`` fields for report units, and ``HPR_*`` fields for heat-pump
+and refrigeration workflows.
+
 Configuration
 -------------
 

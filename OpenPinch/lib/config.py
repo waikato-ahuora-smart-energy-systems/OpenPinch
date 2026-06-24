@@ -105,6 +105,13 @@ class Configuration:
         return set(CONFIG_FIELD_SPECS)
 
     @classmethod
+    def options_catalog(cls):
+        """Return declarative metadata for all supported flat option keys."""
+        from ..classes._workspace.views import configuration_field_metadata
+
+        return configuration_field_metadata()
+
+    @classmethod
     def _validate_options(cls, options: dict) -> dict:
         """Fail fast on unsupported keys and invalid option values."""
         return validate_configuration_options(options)

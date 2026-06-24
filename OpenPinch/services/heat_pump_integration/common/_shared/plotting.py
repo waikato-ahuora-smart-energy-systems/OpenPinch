@@ -16,6 +16,7 @@ else:
 
 from .....classes.stream_collection import StreamCollection
 from .....lib.enums import PT
+from .....utils.optional_dependencies import optional_dependency_error
 from ....common.graph_data import clean_composite_curve_ends
 from ....common.problem_table_analysis import (
     create_problem_table_with_t_int,
@@ -103,9 +104,12 @@ def plot_multi_hp_profiles_from_results(
 def _require_plotly():
     if _PLOTLY_IMPORT_ERROR is not None:
         raise ImportError(
-            "Plotly is required for HPR profile plotting. "
-            "Install it directly or reinstall OpenPinch with "
-            "'pip install openpinch[notebook]' or 'pip install openpinch[dashboard]'."
+            optional_dependency_error(
+                package="Plotly",
+                purpose="HPR profile plotting",
+                extras=("notebook", "dashboard"),
+                docs="the heat-pump workflows guide",
+            )
         ) from _PLOTLY_IMPORT_ERROR
     return go
 

@@ -3,10 +3,11 @@ Notebooks and Sample Cases
 
 The packaged notebooks and sample cases are part of the supported OpenPinch
 learning surface. They are the fastest way to move from a blank environment to
-an end-to-end workflow, but they are exposed through two different mechanisms:
+an end-to-end workflow, and the primary discovery surface is Python:
 
-- the ``openpinch notebook`` CLI and ``copy_notebook(...)`` for notebooks
-- Python resource helpers and wrapper-object name resolution for sample cases
+- Python resource helpers expose names, metadata, readers, and copy helpers
+- wrapper objects resolve packaged sample-case names directly
+- a shell copy shortcut remains documented later for notebook assets
 
 Install the notebook runtime first:
 
@@ -37,9 +38,11 @@ Use the resource helpers when you want to inspect or copy them explicitly:
        copy_sample_case,
        list_sample_cases,
        read_sample_case,
+       sample_case_metadata,
    )
 
    print(list_sample_cases())
+   print(sample_case_metadata("basic_pinch.json").description)
    print(read_sample_case("basic_pinch.json")[:120])
    copy_sample_case("basic_pinch.json", "basic_pinch.json")
 
@@ -66,26 +69,22 @@ configuration, live solver execution, and top-network inspection. The distribute
 packaged as clean sources: no stored Plotly payloads, no cached execution
 counts, and no stale traceback output.
 
-Copy the full series with:
+Access notebook assets directly from Python:
+
+.. code-block:: python
+
+   from OpenPinch.resources import copy_notebook, list_notebooks, notebook_metadata
+
+   print(list_notebooks())
+   print(notebook_metadata("02_total_site_targets_and_sugcc.ipynb").description)
+   copy_notebook("01_basic_pinch_and_dtcont_sensitivity.ipynb", "notebooks")
+
+The notebook-copy CLI remains available when you only need to copy source
+assets from a shell:
 
 .. code-block:: bash
 
    openpinch notebook -o notebooks
-
-Or copy one notebook:
-
-.. code-block:: bash
-
-   openpinch notebook --name 02_total_site_targets_and_sugcc.ipynb -o notebooks
-
-From Python you can also access the same notebook asset helpers directly:
-
-.. code-block:: python
-
-   from OpenPinch.resources import copy_notebook, list_notebooks
-
-   print(list_notebooks())
-   copy_notebook("01_basic_pinch_and_dtcont_sensitivity.ipynb", "notebooks")
 
 Current packaged notebooks:
 

@@ -11,19 +11,37 @@ import OpenPinch.utils
 EXPECTED_EXPORTS = {
     "OpenPinch": {
         "Configuration",
+        "GraphAvailability",
+        "GraphType",
+        "HPRcycle",
+        "NotebookMetadata",
         "PinchProblem",
         "PinchWorkspace",
+        "ProblemReport",
+        "ReportMetric",
+        "SampleCaseMetadata",
         "StreamSchema",
         "StreamType",
         "TargetInput",
         "TargetOutput",
+        "TargetType",
         "UtilitySchema",
+        "ValidationIssue",
+        "ValidationReport",
         "VisualiseInput",
         "VisualiseOutput",
         "ZoneTreeSchema",
         "ZoneType",
+        "config_options",
+        "copy_notebook",
+        "copy_sample_case",
         "get_piecewise_linearisation_for_streams",
+        "list_notebooks",
+        "list_sample_cases",
+        "notebook_metadata",
         "pinch_analysis_service",
+        "read_sample_case",
+        "sample_case_metadata",
     },
     "OpenPinch.lib": {
         "BaseTargetModel",
@@ -104,7 +122,10 @@ def test_public_namespace_exports_match_snapshot():
     for name, module in MODULES.items():
         actual = _public_exports(module)
         expected = EXPECTED_EXPORTS[name]
-        assert expected <= actual
+        if name == "OpenPinch":
+            assert actual == expected
+        else:
+            assert expected <= actual
         for exported_name in expected:
             assert hasattr(module, exported_name)
 

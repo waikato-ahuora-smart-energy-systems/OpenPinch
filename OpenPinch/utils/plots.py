@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from .optional_dependencies import optional_dependency_error
+
 __all__ = [
     "graph_simple_cc_plot",
     "plot_t_h_curve",
@@ -14,9 +16,12 @@ def _require_plotly():
         import plotly.graph_objects as go
     except ImportError as exc:  # pragma: no cover - optional dependency guard
         raise ImportError(
-            "Plotly is required for graph_simple_cc_plot. "
-            "Install it directly or reinstall OpenPinch with "
-            "'pip install openpinch[notebook]' or 'pip install openpinch[dashboard]'."
+            optional_dependency_error(
+                package="Plotly",
+                purpose="graph_simple_cc_plot",
+                extras=("notebook", "dashboard"),
+                docs="the graphing and exporting results guides",
+            )
         ) from exc
     return go
 

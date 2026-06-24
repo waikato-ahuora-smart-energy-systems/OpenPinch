@@ -132,7 +132,9 @@ def test_controllability_service_can_exclude_utility_actuators() -> None:
     assert len(without_utilities.actuators) == 3
     assert len(with_utilities.actuators) == 5
     assert without_utilities.matrix_rank < with_utilities.matrix_rank
-    assert without_utilities.components.redundancy < with_utilities.components.redundancy
+    assert (
+        without_utilities.components.redundancy < with_utilities.components.redundancy
+    )
     assert without_utilities.score < with_utilities.score
     assert "utility flow actuators were excluded from the analysis" in (
         without_utilities.diagnostics
@@ -222,8 +224,7 @@ def test_partial_controllability_case_distinguishes_projected_outputs() -> None:
     assert single_projection.matrix_rank == 1
     assert single_projection.components.rank == pytest.approx(1.0)
     assert not any(
-        "rank deficient" in diagnostic
-        for diagnostic in single_projection.diagnostics
+        "rank deficient" in diagnostic for diagnostic in single_projection.diagnostics
     )
 
     assert [output.output_id for output in coupled_projection.outputs] == [
@@ -263,12 +264,12 @@ def test_multistage_utility_streams_create_independent_actuators() -> None:
         "hot_utility_flow",
         "hot_utility_flow",
     ]
-    assert with_utilities.interaction_matrix[1] == pytest.approx(
-        (0.5, 0.25, 0.25)
-    )
+    assert with_utilities.interaction_matrix[1] == pytest.approx((0.5, 0.25, 0.25))
     assert with_utilities.matrix_rank == 2
     assert without_utilities.matrix_rank == 1
-    assert with_utilities.components.redundancy > without_utilities.components.redundancy
+    assert (
+        with_utilities.components.redundancy > without_utilities.components.redundancy
+    )
 
 
 def test_output_feedback_case_does_not_require_temperature_measurements() -> None:

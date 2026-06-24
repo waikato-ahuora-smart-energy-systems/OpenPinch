@@ -146,9 +146,7 @@ def _validate_options(
         not math.isfinite(minimum_approach_temperature)
         or minimum_approach_temperature < 0.0
     ):
-        raise ValueError(
-            "minimum_approach_temperature must be finite and non-negative"
-        )
+        raise ValueError("minimum_approach_temperature must be finite and non-negative")
     if desired_redundancy < 1:
         raise ValueError("desired_redundancy must be at least 1")
     if rank_tolerance is not None and (
@@ -177,9 +175,9 @@ def _build_outputs(
                     "total_duty": 0.0,
                     "exchanger_count": 0,
                 }
-            totals[output_id]["total_duty"] = (
-                float(totals[output_id]["total_duty"]) + float(exchanger.duty)
-            )
+            totals[output_id]["total_duty"] = float(
+                totals[output_id]["total_duty"]
+            ) + float(exchanger.duty)
             totals[output_id]["exchanger_count"] = (
                 int(totals[output_id]["exchanger_count"]) + 1
             )
@@ -300,9 +298,7 @@ def _matrix_diagnostics(
     tolerance = rank_tolerance
     if tolerance is None:
         tolerance = (
-            max(matrix.shape)
-            * np.finfo(float).eps
-            * float(singular_values_array[0])
+            max(matrix.shape) * np.finfo(float).eps * float(singular_values_array[0])
         )
     positive = singular_values_array[singular_values_array > tolerance]
     if positive.size == 0:

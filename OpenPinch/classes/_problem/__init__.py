@@ -12,7 +12,9 @@ from ._loading import (
 )
 from ._output import (
     build_graph_payload,
+    build_problem_report,
     build_problem_summary_frame,
+    build_report_metrics,
     locate_summary_row,
 )
 from ._plot_accessor import _PlotAccessorDescriptor
@@ -21,6 +23,7 @@ from ._target_accessor import _TargetAccessorDescriptor
 from ._target_dispatch import run_targeting_for_zone_and_subzones
 from ._validation import (
     _validate_problem_semantics,
+    build_validation_report,
     format_schema_validation_error,
 )
 
@@ -34,8 +37,11 @@ __all__ = [
     "_PlotAccessorDescriptor",
     "_TargetAccessorDescriptor",
     "_validate_problem_semantics",
+    "build_validation_report",
     "build_graph_payload",
+    "build_problem_report",
     "build_problem_summary_frame",
+    "build_report_metrics",
     "extract_results",
     "format_schema_validation_error",
     "load_problem_source",

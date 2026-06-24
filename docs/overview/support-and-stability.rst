@@ -30,8 +30,9 @@ Stable Public Surfaces
 - :func:`OpenPinch.main.pinch_analysis_service`
 - root package imports from :mod:`OpenPinch`
 - `TargetInput`, `TargetOutput`, and the main I/O schema models
-- the ``openpinch notebook`` CLI command
 - packaged sample-case and notebook resource helpers
+- ``validation_report()``, ``report()``, ``metrics()``, and
+  ``Configuration.options_catalog()`` helper surfaces
 
 Advanced Public Surfaces
 ------------------------
@@ -45,6 +46,7 @@ Advanced Public Surfaces
 - domain classes such as `Zone`, `Stream`, `StreamCollection`, and
   `ProblemTable`
 - stream linearisation and some other utility helpers
+- the narrow ``openpinch notebook`` command for copying packaged notebooks
 
 Experimental or Partial Surfaces
 --------------------------------

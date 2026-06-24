@@ -115,12 +115,9 @@ def _get_process_targets(
                     "other process zones and operation zones."
                 )
 
-        if (
-            callable(indirect_service_func)
-            and (
-                zone.config.targeting.indirect_process_enabled
-                or _service_declares_zone_applicability(indirect_service_func, zone)
-            )
+        if callable(indirect_service_func) and (
+            zone.config.targeting.indirect_process_enabled
+            or _service_declares_zone_applicability(indirect_service_func, zone)
         ):
             _invoke_service(indirect_service_func, zone, args)
 

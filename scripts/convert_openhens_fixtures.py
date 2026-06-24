@@ -312,20 +312,13 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
                 output_formats=[],
             )
             _write_json(
-                repo_root
-                / "OpenPinch"
-                / "data"
-                / "sample_cases"
-                / f"{case_id}.json",
+                repo_root / "OpenPinch" / "data" / "sample_cases" / f"{case_id}.json",
                 sample_case,
             )
 
     _write_adapter_snapshot(
         parse_openhens_csv(
-            openhens_root
-            / "examples"
-            / "cases"
-            / f"{PACKAGE_SAMPLE_CASE_ID}.csv",
+            openhens_root / "examples" / "cases" / f"{PACKAGE_SAMPLE_CASE_ID}.csv",
             case_id=PACKAGE_SAMPLE_CASE_ID,
         ),
         repo_root,

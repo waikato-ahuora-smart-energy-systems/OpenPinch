@@ -20,6 +20,7 @@ from ..classes.zone import Zone
 from ..lib.enums import LineColour
 from ..lib.schemas.targets import BaseTargetModel
 from ..services.common.graph_data import get_output_graph_data
+from ..utils.optional_dependencies import optional_dependency_error
 
 __all__ = [
     "StreamlitGraphSet",
@@ -45,8 +46,12 @@ def _require_plotly():
         import plotly.graph_objects as go
     except ImportError as exc:  # pragma: no cover - optional dependency guard
         raise ImportError(
-            "Plotly is required for graph rendering. "
-            "Reinstall OpenPinch or install it directly with 'pip install plotly'."
+            optional_dependency_error(
+                package="Plotly",
+                purpose="graph rendering",
+                extras=("notebook", "dashboard"),
+                docs="the graphing and exporting results guides",
+            )
         ) from exc
     else:
         return go
@@ -61,8 +66,12 @@ def _require_streamlit():
         import streamlit as st
     except ImportError as exc:  # pragma: no cover - optional dependency guard
         raise ImportError(
-            "Streamlit is required for 'render_streamlit_dashboard'. "
-            "Reinstall OpenPinch or install it directly with 'pip install streamlit'."
+            optional_dependency_error(
+                package="Streamlit",
+                purpose="render_streamlit_dashboard",
+                extras="dashboard",
+                docs="the first-solve Python guide",
+            )
         ) from exc
     else:
         return st
@@ -73,9 +82,12 @@ def _require_openpyxl():
         import openpyxl
     except ImportError as exc:  # pragma: no cover - optional dependency guard
         raise ImportError(
-            "OpenPyXL is required for dashboard Excel downloads. "
-            "Install it directly or reinstall OpenPinch with "
-            "'pip install openpinch[dashboard]' or 'pip install openpinch[notebook]'."
+            optional_dependency_error(
+                package="OpenPyXL",
+                purpose="dashboard Excel downloads",
+                extras=("dashboard", "notebook"),
+                docs="the exporting results guide",
+            )
         ) from exc
     return openpyxl
 

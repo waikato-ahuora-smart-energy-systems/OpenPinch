@@ -31,8 +31,11 @@ from .io import (
     ZoneTreeSchema,
 )
 from .reporting import (
+    GraphAvailability,
     HeatUtility,
     PinchTemp,
+    ProblemReport,
+    ReportMetric,
     TargetResults,
 )
 from .synthesis import (
@@ -95,6 +98,7 @@ __all__ = [
     "Graph",
     "GraphSet",
     "Segment",
+    "GraphAvailability",
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",
     "HPRParsedState",
@@ -114,6 +118,8 @@ __all__ = [
     "VisualiseOutput",
     "ZoneTreeSchema",
     "HeatUtility",
+    "ProblemReport",
+    "ReportMetric",
     "TargetResults",
     "PinchTemp",
     "HeatExchangerNetworkSynthesisExportRecord",

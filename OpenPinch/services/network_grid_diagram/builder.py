@@ -139,9 +139,7 @@ def _is_significant_match(
     duty_threshold: float,
 ) -> bool:
     return (
-        exchanger.active
-        and exchanger.match_allowed
-        and exchanger.duty > duty_threshold
+        exchanger.active and exchanger.match_allowed and exchanger.duty > duty_threshold
     )
 
 

@@ -57,11 +57,16 @@ def test_docs_highlight_current_pinchproblem_methods():
         ]
     )
     assert "target()" in combined
+    assert "validation_report()" in combined
     assert "summary_frame()" in combined
+    assert "report()" in combined
+    assert "metrics()" in combined
     assert "export_excel" in combined
     assert "show_dashboard()" in combined
+    assert "plot.export_gallery" in combined
     assert "plot.grand_composite_curve" in combined
     assert "problem.target.direct_heat_pump" in combined
+    assert "workspace.scenario" in combined
     assert 'state_id="peak"' in combined or 'state_id="winter"' in combined
 
 
@@ -87,7 +92,20 @@ def test_docs_do_not_reference_stale_workflow_names():
     assert "openpinch validate" not in combined
     assert "openpinch sample" not in combined
     assert "Python 3.11 or newer" not in combined
-    assert "openpinch notebook -o notebooks" in combined
+
+
+def test_docs_present_python_resources_before_cli_shortcuts():
+    readme = _read(README)
+    resource_guide = _read(GUIDE_NOTEBOOKS_AND_CASES)
+
+    assert "sample_case_metadata" in readme
+    assert "notebook_metadata" in readme
+    assert "sample_case_metadata" in resource_guide
+    assert "notebook_metadata" in resource_guide
+    assert readme.index("list_sample_cases") < readme.index("openpinch notebook")
+    assert resource_guide.index("sample_case_metadata") < resource_guide.index(
+        "openpinch notebook"
+    )
 
 
 def test_support_and_cli_docs_match_the_current_command_surface():
@@ -191,6 +209,7 @@ def test_docs_expose_pinchworkspace_as_the_named_study_surface():
     assert "PinchWorkspace" in combined
     assert 'source="crude_preheat_train.json"' in combined
     assert 'project_name="crude_preheat_train"' in combined
+    assert "scenario" in combined
     assert "compare_cases" in combined
 
 

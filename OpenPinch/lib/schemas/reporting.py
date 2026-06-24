@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ...classes.stream_collection import StreamCollection
 from ...classes.value import Value
 from ..unit_system import coerce_output_value
+from .workspace import ValidationReport
 
 _REPORT_MODEL_CONFIG = ConfigDict(
     arbitrary_types_allowed=True,
@@ -148,8 +149,48 @@ class TargetResults(BaseModel):
         return _report_value_payload(value, metric_name=info.field_name)
 
 
+class ReportMetric(BaseModel):
+    """One numeric report metric resolved for a target and optional state."""
+
+    target_name: str
+    metric: str
+    label: str
+    value: Any = None
+    unit: Optional[str] = None
+    state_id: Optional[str] = None
+
+
+class GraphAvailability(BaseModel):
+    """One graph available from a solved report payload."""
+
+    graph_id: str
+    graph_set_id: str
+    target_name: str
+    zone_name: Optional[str] = None
+    zone_address: Optional[str] = None
+    target_type: Optional[str] = None
+    graph_type: Optional[str] = None
+    graph_name: str
+    index: int
+
+
+class ProblemReport(BaseModel):
+    """Typed report payload for script, notebook, and export workflows."""
+
+    project_name: str
+    solved: bool
+    validation: ValidationReport
+    targets: List[TargetResults] = Field(default_factory=list)
+    metrics: List[ReportMetric] = Field(default_factory=list)
+    graph_catalog: List[GraphAvailability] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
 __all__ = [
+    "GraphAvailability",
     "HeatUtility",
+    "ProblemReport",
+    "ReportMetric",
     "TargetResults",
     "PinchTemp",
 ]
