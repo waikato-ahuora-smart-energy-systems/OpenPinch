@@ -107,6 +107,31 @@ objects, for example when displaying several ranked candidates.
    :members:
    :no-index:
 
+Network Controllability
+-----------------------
+
+Solved heat exchanger networks can also be screened for steady-state
+controllability. The service treats process-stream outlet temperatures as
+controlled outputs and practical bypass or utility-flow adjustments as
+manipulated variables, then scores the resulting duty-normalised interaction
+matrix:
+
+.. code-block:: python
+
+   design = problem.results.design
+   assessment = design.network.quantify_controllability()
+   assessment.score
+   assessment.components.rank
+
+The score is a screening metric rather than a dynamic closed-loop simulation.
+It is intended for comparing candidate HEN topologies and identifying networks
+with weak actuator coverage, poor pairing, low thermal margin, or insufficient
+control redundancy.
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_controllability
+   :members:
+   :no-index:
+
 Typical Preparation and Solve Pattern
 -------------------------------------
 
