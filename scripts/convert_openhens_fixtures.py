@@ -1,4 +1,4 @@
-"""Convert selected OpenHENS CSV examples into OpenPinch-owned test fixtures.
+"""Convert selected OpenHENS CSV problems into OpenPinch-owned JSON assets.
 
 This is a development helper for the OpenHENS migration task set. It is not a
 runtime synthesis API and is intentionally kept outside the ``OpenPinch``
@@ -28,15 +28,15 @@ CASE_IDS = (
     "Five-stream-Kim-et-al-2017-1",
     "Six-stream-Spray-Dryer-2025-1",
     "Six-stream-Yee-and-Grossmann-1990-1",
+    "Nine-stream-Linnhoff-and-Ahmad-1999-1",
+    "Ten-stream-Ahmad-1985-1",
+    "Ten-stream-Chakraborty-and-Ghoshb-1999-1",
+    "Ten-stream-Escobar-and-Grossmann-2010-1",
+    "Eleven-stream-Castillo-et-al-1998-1",
+    "Pinch-Problem",
+    "Thirteen-stream-Kim-et-al-2017-1",
 )
-DTMIN_BY_CASE = {
-    "Four-stream-Escobar-and-Trierweiler-2013-1": 10.0,
-    "Four-stream-Yee-and-Grossmann-1990-1": 14.0,
-    "Five-stream-Bogataj-and-Kravanja-2012-1": 10.0,
-    "Five-stream-Kim-et-al-2017-1": 10.0,
-    "Six-stream-Spray-Dryer-2025-1": 10.0,
-    "Six-stream-Yee-and-Grossmann-1990-1": 10.0,
-}
+PACKAGE_SAMPLE_CASE_ID = "Four-stream-Yee-and-Grossmann-1990-1"
 OPENHENS_DT_GRID = [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0]
 OPENHENS_DQDA_GRID = [0.5, 0.9, 1.3, 1.7, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0]
 
@@ -226,7 +226,12 @@ def parse_openhens_csv(
     return parsed
 
 
-def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
+def convert_case_to_target_input(
+    parsed: ParsedOpenHENSCase,
+    *,
+    output_folder: str | None = None,
+    output_formats: list[str] | None = None,
+) -> dict[str, Any]:
     """Return standard OpenPinch ``TargetInput`` JSON data."""
     exchange = parsed.economics("exchange")
     streams = [
@@ -240,8 +245,8 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
         "streams": streams,
         "utilities": utilities,
         "options": {
-            "COST_EXP": exchange.area_exponent,
-            "FIXED_COST": exchange.unit_cost,
+            "COSTING_HX_AREA_EXP": exchange.area_exponent,
+            "COSTING_HX_UNIT_COST": exchange.unit_cost,
             "HENS_APPROACH_TEMPERATURES": OPENHENS_DT_GRID,
             "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
             "HENS_DERIVATIVE_THRESHOLDS": OPENHENS_DQDA_GRID,
@@ -255,9 +260,13 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
                 "network_evolution_method",
             ],
             "HENS_OUTPUT_FOLDER": (
-                f"tests/fixtures/openhens/solver_baselines/{parsed.case_id}"
+                output_folder
+                if output_folder is not None
+                else f"tests/fixtures/openhens/solver_baselines/{parsed.case_id}"
             ),
-            "HENS_OUTPUT_FORMATS": ["json", "csv"],
+            "HENS_OUTPUT_FORMATS": (
+                output_formats if output_formats is not None else ["json", "csv"]
+            ),
             "HENS_SOLVER_PDM": "couenne",
             "HENS_SOLVER_OPTIONS_PDM": {},
             "HENS_RUN_ID": parsed.case_id,
@@ -265,7 +274,7 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
             "HENS_STAGE_SELECTION": [1, 2, 3, 4],
             "HENS_SOLVER_TDM": "couenne",
             "HENS_SOLVER_OPTIONS_TDM": {},
-            "VARIABLE_COST": exchange.area_coefficient,
+            "COSTING_HX_AREA_COEFF": exchange.area_coefficient,
         },
         "zone_tree": {
             "name": "Site",
@@ -282,7 +291,7 @@ def convert_case_to_target_input(parsed: ParsedOpenHENSCase) -> dict[str, Any]:
 
 
 def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
-    """Generate converted JSON fixtures and HENS-03 structural snapshots."""
+    """Generate converted JSON fixtures, package samples, and adapter snapshots."""
     for case_id in CASE_IDS:
         parsed = parse_openhens_csv(
             openhens_root / "examples" / "cases" / f"{case_id}.csv",
@@ -296,15 +305,31 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
         reordered["streams"] = list(reversed(target_input["streams"]))
         _write_json(reordered_path, reordered)
 
+        if case_id == PACKAGE_SAMPLE_CASE_ID:
+            sample_case = convert_case_to_target_input(
+                parsed,
+                output_folder="",
+                output_formats=[],
+            )
+            _write_json(
+                repo_root
+                / "OpenPinch"
+                / "data"
+                / "sample_cases"
+                / f"{case_id}.json",
+                sample_case,
+            )
+
     _write_adapter_snapshot(
         parse_openhens_csv(
             openhens_root
             / "examples"
             / "cases"
-            / "Four-stream-Yee-and-Grossmann-1990-1.csv",
-            case_id="Four-stream-Yee-and-Grossmann-1990-1",
+            / f"{PACKAGE_SAMPLE_CASE_ID}.csv",
+            case_id=PACKAGE_SAMPLE_CASE_ID,
         ),
         repo_root,
+        openhens_root=openhens_root,
         dTmin=14.0,
     )
 
@@ -313,6 +338,7 @@ def _write_adapter_snapshot(
     parsed: ParsedOpenHENSCase,
     repo_root: Path,
     *,
+    openhens_root: Path,
     dTmin: float,
 ) -> None:
     fixture_path = (
@@ -325,14 +351,14 @@ def _write_adapter_snapshot(
         "schema_version": "openpinch-openhens-adapter-snapshot/v1",
         "case_id": parsed.case_id,
         "active_dTmin": dTmin,
-        "source_csv_path": _display_path(parsed.source_csv, repo_root),
+        "source_csv_path": _display_path(parsed.source_csv, openhens_root),
         "source_csv_sha256": _sha256(parsed.source_csv),
         "source_fixture_path": _display_path(fixture_path, repo_root),
         "source_fixture_sha256": _sha256(fixture_path),
         "source_openhens_arrays": parsed.to_legacy_arrays(dTmin),
         "extraction_command": (
-            "rtk uv run python scripts/convert_openhens_fixtures.py "
-            "--openhens-root /Users/ca107/Desktop/ahuora/OpenHENS --write"
+            "uv run python scripts/convert_openhens_fixtures.py "
+            "--openhens-root ../OpenHENS --write"
         ),
         "preparation": adapter.preparation
         | {
@@ -345,8 +371,8 @@ def _write_adapter_snapshot(
         / "tests"
         / "fixtures"
         / "openhens"
-        / "solver_baselines"
-        / "adapter_snapshots"
+        / "regression_artifacts"
+        / "adapter_array_snapshots"
         / parsed.case_id
         / "dTmin-14.json",
         snapshot,

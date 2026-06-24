@@ -30,6 +30,7 @@ __all__ = [
     "power_cogeneration_service",
     "area_cost_targeting_service",
     "energy_transfer_analysis_service",
+    "heat_exchanger_network_controllability_service",
     "get_area_targets",
     "get_capital_cost_targets",
     "get_output_graph_data",
@@ -102,3 +103,12 @@ def area_cost_targeting_service(zone: "Zone", args: dict = None) -> "Zone":
 def energy_transfer_analysis_service(zone: "Zone", args: dict = None) -> "Zone":
     """Create energy-transfer diagram and surplus/deficit table outputs."""
     return _load_services_entry_module().energy_transfer_analysis_service(zone, args)
+
+
+def heat_exchanger_network_controllability_service(network: Any, **kwargs: Any) -> Any:
+    """Quantify steady-state controllability for a heat exchanger network."""
+    from .heat_exchanger_network_controllability import (
+        quantify_heat_exchanger_network_controllability,
+    )
+
+    return quantify_heat_exchanger_network_controllability(network, **kwargs)
