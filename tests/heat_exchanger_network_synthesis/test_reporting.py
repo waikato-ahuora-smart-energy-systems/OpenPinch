@@ -135,6 +135,62 @@ def test_result_ranks_only_unique_network_structures() -> None:
     ) != network_structure_signature(ranked[1].network)
 
 
+def test_result_ranks_stage_shifted_networks_as_duplicate_structures() -> None:
+    best_task = _task(
+        method="network_evolution_method",
+        task_id="esm-stage-best",
+        approach_temperature=14.0,
+    )
+    shifted_task = _task(
+        method="network_evolution_method",
+        task_id="esm-stage-shifted",
+        approach_temperature=16.0,
+    )
+    distinct_task = _task(
+        method="network_evolution_method",
+        task_id="esm-distinct",
+        approach_temperature=18.0,
+    )
+    best_network = _stage_gap_network("stage-best")
+    shifted_network = _stage_compressed_network("stage-shifted")
+    distinct_network = _distinct_network("stage-distinct")
+    result = HeatExchangerNetworkSynthesisResult(
+        network=best_network,
+        run_id="result",
+        method="network_evolution_method",
+        ranked_networks=(
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=shifted_task,
+                status="success",
+                network=shifted_network,
+                objective_value=100.05,
+            ),
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=distinct_task,
+                status="success",
+                network=distinct_network,
+                objective_value=200.0,
+            ),
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=best_task,
+                status="success",
+                network=best_network,
+                objective_value=100.0,
+            ),
+        ),
+    )
+
+    ranked = result.get_n_best_networks()
+
+    assert network_structure_signature(best_network) == network_structure_signature(
+        shifted_network
+    )
+    assert [outcome.network.run_id for outcome in ranked] == [
+        "stage-best",
+        "stage-distinct",
+    ]
+
+
 def test_result_selects_ranked_network() -> None:
     result = _result()
 
@@ -657,7 +713,7 @@ def _network(run_id: str) -> HeatExchangerNetwork:
             _recovery("E5", "H2", "C1", 3, 250.0),
             _hot_utility("Utilities.HU1", "C2", 200.0),
             _cold_utility("H2", "Cold Utility/CU1", 250.0),
-            _recovery("tiny", "H2", "C1", 2, 0.5),
+            _recovery("tiny", "H2", "C1", 2, 0.001),
         ),
         run_id=run_id,
         method="network_evolution_method",
@@ -678,6 +734,34 @@ def _distinct_network(run_id: str) -> HeatExchangerNetwork:
             _recovery("E2", "H2", "C2", 2, 900.0),
             _recovery("E3", "H1", "C1", 3, 700.0),
             _recovery("E4", "H2", "C2", 3, 300.0),
+            _hot_utility("Utilities.HU1", "C2", 200.0),
+            _cold_utility("H2", "Cold Utility/CU1", 250.0),
+        ),
+        run_id=run_id,
+        method="network_evolution_method",
+        stage_count=3,
+    )
+
+
+def _stage_gap_network(run_id: str) -> HeatExchangerNetwork:
+    return HeatExchangerNetwork(
+        exchangers=(
+            _recovery("E1", "H1", "C1", 1, 1200.0),
+            _recovery("E2", "H2", "C2", 3, 900.0),
+            _hot_utility("Utilities.HU1", "C2", 200.0),
+            _cold_utility("H2", "Cold Utility/CU1", 250.0),
+        ),
+        run_id=run_id,
+        method="network_evolution_method",
+        stage_count=3,
+    )
+
+
+def _stage_compressed_network(run_id: str) -> HeatExchangerNetwork:
+    return HeatExchangerNetwork(
+        exchangers=(
+            _recovery("E1", "H1", "C1", 1, 1200.0),
+            _recovery("E2", "H2", "C2", 2, 900.0),
             _hot_utility("Utilities.HU1", "C2", 200.0),
             _cold_utility("H2", "Cold Utility/CU1", 250.0),
         ),

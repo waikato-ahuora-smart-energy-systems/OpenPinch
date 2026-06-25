@@ -5,7 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from OpenPinch.resources import copy_notebook, list_notebooks
+from OpenPinch.resources import (
+    copy_notebook,
+    list_notebooks,
+    list_sample_cases,
+    notebook_metadata,
+    read_sample_case,
+    sample_case_metadata,
+)
 
 EXPECTED_NOTEBOOKS = [
     "01_basic_pinch_and_dtcont_sensitivity.ipynb",
@@ -37,6 +44,27 @@ def _copied_notebook(tmp_path: Path, notebook_name: str) -> dict:
 def test_packaged_notebook_series_is_present():
     """Keep the packaged notebook inventory synchronized with the docs."""
     assert list_notebooks() == EXPECTED_NOTEBOOKS
+
+
+def test_packaged_resource_metadata_and_friendly_errors():
+    sample_meta = sample_case_metadata("basic_pinch.json")
+    notebook_meta = notebook_metadata("01_basic_pinch_and_dtcont_sensitivity.ipynb")
+
+    assert sample_meta.title == "Basic Pinch"
+    assert "quickstart" in sample_meta.topics
+    assert notebook_meta.title == "Basic Pinch and DT Cont Sensitivity"
+    assert len(sample_case_metadata()) == len(list_sample_cases())
+    assert len(notebook_metadata()) == len(list_notebooks())
+
+    try:
+        read_sample_case("not-a-case.json")
+    except FileNotFoundError as exc:
+        message = str(exc)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("invalid sample case unexpectedly succeeded")
+
+    assert "Unknown OpenPinch sample case" in message
+    assert "basic_pinch.json" in message
 
 
 def test_packaged_notebooks_are_output_free_and_use_library_surfaces(tmp_path: Path):
@@ -230,6 +258,11 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     combined_source = _combined_source(notebook)
 
     assert "PinchProblem" in combined_source
+    assert "Four-stream-Yee-and-Grossmann-1990-1.json" in list_sample_cases()
+    assert '"Four-stream-Yee-and-Grossmann-1990-1.json"' in combined_source
+    assert "four_stream_case = {" not in combined_source
+    assert "source=case_name" in combined_source
+    assert "problem.update_options(teaching_grid)" in combined_source
     assert "design.heat_exchanger_network_synthesis()" in combined_source
     assert '"HENS_APPROACH_TEMPERATURES": [10.0, 14.0, 18.0]' in combined_source
     assert '"HENS_DERIVATIVE_THRESHOLDS": [0.5]' in combined_source

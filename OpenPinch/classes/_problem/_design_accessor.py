@@ -62,8 +62,8 @@ class _DesignNetworkAccessor:
         design = None if results is None else results.design
         if design is None:
             raise RuntimeError(
-                "Run problem.design.heat_exchanger_network_synthesis(...) before "
-                "accessing problem.design.network helpers."
+                "Run a heat exchanger network design method before accessing "
+                "problem.design.network helpers."
             )
         return design.network
 
@@ -87,15 +87,34 @@ class _DesignAccessor:
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run a selected HEN design method and cache the design result."""
-        from ...lib.enums import HENDesignMethod
         from ...services.heat_exchanger_network_synthesis import (
             heat_exchanger_network_synthesis_entry as hens_entry,
         )
 
         return hens_entry.heat_exchanger_network_synthesis_service(
             self._problem,
-            method=HENDesignMethod.OpenHENS if method is None else method,
+            method=method,
             initial_networks=initial_networks,
+            options=self._runtime_options(options, state_id),
+            workspace_variant=workspace_variant,
+        )
+
+    def enhanced_synthesis_method(
+        self,
+        *,
+        quality_tier: int = 2,
+        options: Optional[dict[str, Any]] = None,
+        state_id: Optional[str] = None,
+        workspace_variant: Optional[str] = None,
+    ) -> "HeatExchangerNetworkSynthesisResult":
+        """Run OpenHENS synthesis with an explicit quality tier."""
+        from ...services.heat_exchanger_network_synthesis import (
+            heat_exchanger_network_synthesis_entry as hens_entry,
+        )
+
+        return hens_entry._heat_exchanger_network_enhanced_synthesis_method_service(
+            self._problem,
+            quality_tier=quality_tier,
             options=self._runtime_options(options, state_id),
             workspace_variant=workspace_variant,
         )
@@ -107,7 +126,7 @@ class _DesignAccessor:
         state_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
-        """Run the published OpenHENS PDM -> TDM -> EVOL method."""
+        """Run the original tier-1 OpenHENS PDM -> TDM -> EVM method."""
         from ...services.heat_exchanger_network_synthesis import (
             heat_exchanger_network_synthesis_entry as hens_entry,
         )
@@ -138,9 +157,9 @@ class _DesignAccessor:
 
     def thermal_derivative_method(
         self,
-        initial_networks: HeatExchangerNetwork
-        | Sequence[HeatExchangerNetwork]
-        | None = None,
+        initial_networks: (
+            HeatExchangerNetwork | Sequence[HeatExchangerNetwork] | None
+        ) = None,
         *,
         options: Optional[dict[str, Any]] = None,
         state_id: Optional[str] = None,
@@ -160,9 +179,9 @@ class _DesignAccessor:
 
     def network_evolution_method(
         self,
-        initial_networks: HeatExchangerNetwork
-        | Sequence[HeatExchangerNetwork]
-        | None = None,
+        initial_networks: (
+            HeatExchangerNetwork | Sequence[HeatExchangerNetwork] | None
+        ) = None,
         *,
         options: Optional[dict[str, Any]] = None,
         state_id: Optional[str] = None,

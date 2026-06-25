@@ -243,10 +243,27 @@ def test_problem_design_workflow_example_from_converted_openhens_fixture(
     assert first_link.sink_stream
 
 
+def test_enhanced_synthesis_method_is_public_quality_tier_entrypoint(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _public_example_problem()
+    problem.update_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
+    configured_tier = problem.master_zone.config.hens.synthesis_quality_tier
+
+    design = problem.design.enhanced_synthesis_method(quality_tier=3)
+
+    assert problem.results is not None
+    assert problem.results.design == design
+    assert design.manifest is not None
+    assert design.manifest.synthesis_quality_tier == 3
+    assert problem.master_zone.config.hens.synthesis_quality_tier == configured_tier
+
+
 def test_problem_design_network_helpers_require_cached_design() -> None:
     problem = _public_example_problem()
 
-    with pytest.raises(RuntimeError, match="heat_exchanger_network_synthesis"):
+    with pytest.raises(RuntimeError, match="heat exchanger network design method"):
         _ = problem.design.network.total_heat_recovery
 
 
@@ -272,9 +289,11 @@ def test_public_design_accessor_returns_ranked_networks(
                     continue
 
                 exchangers = tuple(
-                    exchanger.model_copy(update={"stage": 1})
-                    if exchanger.kind is HeatExchangerKind.RECOVERY
-                    else exchanger
+                    (
+                        exchanger.model_copy(update={"stage": 1})
+                        if exchanger.kind is HeatExchangerKind.RECOVERY
+                        else exchanger
+                    )
                     for exchanger in network.exchangers
                 )
                 adjusted.append(
@@ -309,7 +328,7 @@ def test_public_design_accessor_returns_ranked_networks(
 
     assert problem.results is not None
     assert problem.results.design == design
-    assert len(design.ranked_networks) == 2
+    assert len(design.ranked_networks) == 1
     assert design.ranked_networks[0].network == design.network
     assert design.task_id == design.ranked_networks[0].task.task_id
     assert [outcome.objective_value for outcome in design.ranked_networks] == sorted(

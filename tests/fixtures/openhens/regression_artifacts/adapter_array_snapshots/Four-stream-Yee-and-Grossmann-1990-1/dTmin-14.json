@@ -260,19 +260,19 @@
       "thermal_derivative_method",
       "network_evolution_method"
     ],
-    "HENS_OUTPUT_FOLDER": "",
+    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Four-stream-Yee-and-Grossmann-1990-1",
     "HENS_OUTPUT_FORMATS": [
       "json",
       "csv"
     ],
     "HENS_RUN_ID": "Four-stream-Yee-and-Grossmann-1990-1",
-    "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_SOLVER_EVM": "ipopt-pyomo",
     "HENS_SOLVER_OPTIONS_EVM": {},
     "HENS_SOLVER_OPTIONS_PDM": {},
     "HENS_SOLVER_OPTIONS_TDM": {},
     "HENS_SOLVER_PDM": "couenne",
     "HENS_SOLVER_TDM": "couenne",
+    "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_STAGE_SELECTION": [
       1,
       2,
@@ -286,7 +286,7 @@
       "COSTING_HX_UNIT_COST": 5500.0
     }
   },
-  "extraction_command": "rtk uv run python scripts/convert_openhens_fixtures.py --openhens-root /Users/ca107/Desktop/ahuora/OpenHENS --write",
+  "extraction_command": "uv run python scripts/convert_openhens_fixtures.py --openhens-root ../OpenHENS --write",
   "preparation": {
     "pinch_problem_class": "PinchProblem",
     "pinch_problem_load": "passed",
@@ -297,10 +297,10 @@
     "zone_name": "Site"
   },
   "schema_version": "openpinch-openhens-adapter-snapshot/v1",
-  "source_csv_path": "/Users/ca107/Desktop/ahuora/OpenHENS/examples/cases/Four-stream-Yee-and-Grossmann-1990-1.csv",
+  "source_csv_path": "examples/cases/Four-stream-Yee-and-Grossmann-1990-1.csv",
   "source_csv_sha256": "0c0a7f9592e7d8e27d35aef523530d70c11826c407dcbe4adba7fff86f4835f2",
   "source_fixture_path": "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json",
-  "source_fixture_sha256": "ee3def59bed9dad923e452668b216d2673a18d00a9c601163e7d9f4bad8a494a",
+  "source_fixture_sha256": "6b4a853e0f7aed0fa0f7a8d47b821e83cb565c679d23204ffbb3cf619af3aecb",
   "source_openhens_arrays": {
     "A_coeff": [
       150.0

@@ -81,6 +81,10 @@ class InternalHeatExchangerNetworkProblem:
         *,
         print_output: bool = True,
         evolution: bool | None = None,
+        evolution_n_ad_branches: int = 1,
+        evolution_n_rm_branches: int = 1,
+        evolution_max_parallel: int = 1,
+        evolution_no_improvement_patience: int | None = None,
         model_factories: Mapping[str, Any] | None = None,
     ) -> Any:
         """Load, solve, and return the private solved model for this task."""
@@ -94,7 +98,13 @@ class InternalHeatExchangerNetworkProblem:
             if self.framework in {"PDM", "TDM"}:
                 self.case = self.remove_unused_stages(self.case)
             if evolution:
-                evolved = self.case.get_net_benefit_evolution(print_output=print_output)
+                evolved = self.case.get_net_benefit_evolution(
+                    print_output=print_output,
+                    n_ad_branches=evolution_n_ad_branches,
+                    n_rm_branches=evolution_n_rm_branches,
+                    max_parallel=evolution_max_parallel,
+                    no_improvement_patience=evolution_no_improvement_patience,
+                )
                 if evolved is not None:
                     self.case = evolved
             return self.case

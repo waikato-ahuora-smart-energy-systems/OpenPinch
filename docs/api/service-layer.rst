@@ -61,16 +61,20 @@ enter through ``PinchProblem.design``:
 
    from OpenPinch.lib import HENDesignMethod
 
+   problem.design.enhanced_synthesis_method(quality_tier=2)
    problem.design.open_hens_method()
+   problem.design.heat_exchanger_network_synthesis()
    problem.design.heat_exchanger_network_synthesis(
        method=HENDesignMethod.NetworkEvolution,
        initial_networks=(existing_network,),
    )
 
 The internal service entry point owns method dispatch and final result caching.
-It dispatches to the same direct services exposed by the design accessor:
-``open_hens_method``, ``pinch_design_method``,
-``thermal_derivative_method``, and ``network_evolution_method``.
+It dispatches to the same direct services exposed by the design accessor.
+Use ``enhanced_synthesis_method(quality_tier=...)`` as the public quality-tier
+selector, ``open_hens_method()`` for original tier 1 OpenHENS, and
+``heat_exchanger_network_synthesis()`` for the generic fast tier 0 default or
+explicit enum dispatch.
 
 .. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.heat_exchanger_network_synthesis_entry
    :members:
@@ -104,6 +108,31 @@ The standalone service remains available for batch rendering one or more
 objects, for example when displaying several ranked candidates.
 
 .. automodule:: OpenPinch.services.network_grid_diagram
+   :members:
+   :no-index:
+
+Network Controllability
+-----------------------
+
+Solved heat exchanger networks can also be screened for steady-state
+controllability. The service treats process-stream outlet temperatures as
+controlled outputs and practical bypass or utility-flow adjustments as
+manipulated variables, then scores the resulting duty-normalised interaction
+matrix:
+
+.. code-block:: python
+
+   design = problem.results.design
+   assessment = design.network.quantify_controllability()
+   assessment.score
+   assessment.components.rank
+
+The score is a screening metric rather than a dynamic closed-loop simulation.
+It is intended for comparing candidate HEN topologies and identifying networks
+with weak actuator coverage, poor pairing, low thermal margin, or insufficient
+control redundancy.
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_controllability
    :members:
    :no-index:
 

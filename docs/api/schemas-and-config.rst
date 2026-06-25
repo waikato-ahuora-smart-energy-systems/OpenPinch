@@ -25,6 +25,25 @@ What Each Layer Does
    assumptions, costing inputs, and turbine settings. Each prepared
    :class:`~OpenPinch.classes.zone.Zone` owns one config object.
 
+Discovering Options
+-------------------
+
+Use ``config_options()`` or ``Configuration.options_catalog()`` to inspect the
+supported flat ``TargetInput.options`` keys, their groups, runtime status,
+enum choices, numeric bounds, and config paths:
+
+.. code-block:: python
+
+   from OpenPinch import config_options
+
+   options = config_options()
+   hpr_options = [field for field in options if field.group == "hpr"]
+
+Common options include ``THERMAL_DT_CONT`` for minimum contribution
+temperature, ``TARGETING_*`` flags for default target selection,
+``OUTPUT_UNIT_*`` fields for report units, and ``HPR_*`` fields for heat-pump
+and refrigeration workflows.
+
 Configuration
 -------------
 
@@ -60,7 +79,8 @@ Heat Exchanger Network Design Results
 
 ``TargetOutput.design`` stores a
 :class:`~OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult`
-after ``problem.design.open_hens_method()``,
+after ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
+``problem.design.open_hens_method()``,
 ``problem.design.heat_exchanger_network_synthesis()``, or one of the direct
 method accessors runs. The selected network is available as ``design.network``
 and the ranked unique network candidates are available as
@@ -74,7 +94,17 @@ service that was requested, such as ``HENDesignMethod.OpenHENS``. ``design.metho
 records the task method that produced the selected network, such as
 ``HENDesignMethod.NetworkEvolution`` for a normal OpenHENS sequence result.
 ``design.manifest.method_sequence`` records the executed task-level method
-sequence.
+sequence. For OpenHENS tiered runs, ``design.manifest.synthesis_quality_tier``
+records the call-local or configured tier, ``selected_pathway_id`` records the
+winning pathway, and ``selected_protected_pathway`` indicates whether the
+selected network came from a protected fallback route.
+
+``HENS_SYNTHESIS_QUALITY_TIER`` remains a persistent configuration field with a
+default of tier 1 for prepared-problem workflows. User code should prefer
+``problem.design.enhanced_synthesis_method(quality_tier=...)`` for method-level
+tier selection because it applies a call-local override without mutating the
+loaded problem configuration. Runtime ``options`` passed to design accessors are
+reserved for runtime state and do not accept persistent ``HENS_*`` overrides.
 
 Method-level inputs and outputs are also Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,

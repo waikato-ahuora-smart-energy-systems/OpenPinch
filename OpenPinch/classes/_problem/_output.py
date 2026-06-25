@@ -7,17 +7,32 @@ from typing import Any, Optional
 import pandas as pd
 
 from ...lib.schemas.report_units import split_report_value
+from ...lib.schemas.reporting import GraphAvailability, ProblemReport, ReportMetric
+from ...lib.schemas.workspace import ValidationReport
 from ...utils.export import build_summary_dataframe
+
+_SUMMARY_METRICS = {
+    "Hot Utility Target": "Qh",
+    "Cold Utility Target": "Qc",
+    "Heat Recovery": "Qr",
+    "Hot Pinch": "pinch_temp.hot_temp",
+    "Cold Pinch": "pinch_temp.cold_temp",
+}
 
 
 def build_problem_summary_frame(
     results: Any,
     *,
     detailed: bool = False,
+    format: str = "compact",
 ) -> pd.DataFrame:
     """Build either the compact or detailed problem summary table."""
-    if detailed:
+    if detailed or format == "detailed":
         return build_summary_dataframe(results.targets)
+    if format == "plain":
+        return build_plain_summary_frame(results)
+    if format != "compact":
+        raise ValueError("summary format must be 'compact', 'plain', or 'detailed'.")
 
     rows = []
     for target in results.targets:
@@ -76,6 +91,112 @@ def build_problem_summary_frame(
             }
         )
     return pd.DataFrame(rows)
+
+
+def build_plain_summary_frame(results: Any) -> pd.DataFrame:
+    """Build a user-readable summary with numeric value and unit columns."""
+    rows = []
+    for target in results.targets:
+        row = {
+            "Target": target.name,
+            "State ID": getattr(target, "state_id", None),
+        }
+        for label, attr_path in _SUMMARY_METRICS.items():
+            value, unit = split_report_value(
+                _target_attr(target, attr_path),
+                idx=getattr(target, "idx", None),
+            )
+            row[label] = value
+            row[f"{label} (unit)"] = unit
+        row["Hot Utilities"] = ", ".join(
+            format_res(
+                name=utility.name,
+                value=utility.heat_flow,
+                idx=getattr(target, "idx", None),
+            )
+            for utility in target.hot_utilities
+        )
+        row["Cold Utilities"] = ", ".join(
+            format_res(
+                name=utility.name,
+                value=utility.heat_flow,
+                idx=getattr(target, "idx", None),
+            )
+            for utility in target.cold_utilities
+        )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def build_report_metrics(results: Any) -> list[ReportMetric]:
+    """Return stable typed metrics for all summary target rows."""
+    metrics = []
+    for target in results.targets:
+        state_id = getattr(target, "state_id", None)
+        for label, attr_path in _SUMMARY_METRICS.items():
+            value, unit = split_report_value(
+                _target_attr(target, attr_path),
+                idx=getattr(target, "idx", None),
+            )
+            metrics.append(
+                ReportMetric(
+                    target_name=target.name,
+                    metric=label,
+                    label=label,
+                    value=value,
+                    unit=unit,
+                    state_id=state_id,
+                )
+            )
+    return metrics
+
+
+def build_graph_availability(
+    graph_payload: dict[str, Any] | None,
+) -> list[GraphAvailability]:
+    """Flatten graph payloads into typed graph availability records."""
+    if not graph_payload:
+        return []
+    entries = []
+    for graph_set_id, graph_set in graph_payload.items():
+        target_name = str(graph_set.get("name", graph_set_id))
+        for index, graph in enumerate(graph_set.get("graphs", [])):
+            graph_type = graph.get("type")
+            graph_name = graph.get("name", f"Graph {index + 1}")
+            entries.append(
+                GraphAvailability(
+                    graph_id=f"{graph_set_id}::{graph_type or 'graph'}::{index}",
+                    graph_set_id=str(graph_set_id),
+                    target_name=target_name,
+                    zone_name=graph_set.get("zone_name"),
+                    zone_address=graph_set.get("zone_address"),
+                    target_type=graph_set.get("target_type"),
+                    graph_type=graph_type,
+                    graph_name=str(graph_name),
+                    index=index,
+                )
+            )
+    return entries
+
+
+def build_problem_report(
+    *,
+    project_name: str,
+    validation: ValidationReport,
+    results: Any | None,
+    graph_payload: dict[str, Any] | None = None,
+    warnings: list[str] | None = None,
+) -> ProblemReport:
+    """Build a typed report from current validation and optional solved results."""
+    return ProblemReport(
+        project_name=project_name,
+        solved=results is not None,
+        validation=validation,
+        targets=list(getattr(results, "targets", []) or []),
+        metrics=build_report_metrics(results) if results is not None else [],
+        graph_catalog=build_graph_availability(graph_payload),
+        warnings=list(warnings or []),
+    )
 
 
 def locate_summary_row(
@@ -145,3 +266,12 @@ def format_res(
         return f"{name}: {float(val):.2f} {unt}"
     else:
         return f"{float(val):.2f} {unt}"
+
+
+def _target_attr(target: Any, attr_path: str) -> Any:
+    value = target
+    for part in attr_path.split("."):
+        value = getattr(value, part, None)
+        if value is None:
+            return None
+    return value

@@ -1,5 +1,6 @@
 {
   "options": {
+    "COSTING_HX_AREA_COEFF": 70.0,
     "COSTING_HX_AREA_EXP": 1.0,
     "COSTING_HX_UNIT_COST": 2000.0,
     "HENS_APPROACH_TEMPERATURES": [
@@ -27,8 +28,6 @@
       3.6,
       4.0
     ],
-    "HENS_SOLVER_EVM": "ipopt-pyomo",
-    "HENS_SOLVER_OPTIONS_EVM": {},
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
     "HENS_METHOD_SEQUENCE": [
@@ -36,27 +35,32 @@
       "thermal_derivative_method",
       "network_evolution_method"
     ],
-    "HENS_OUTPUT_FOLDER": "",
+    "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Nine-stream-Linnhoff-and-Ahmad-1999-1",
     "HENS_OUTPUT_FORMATS": [
       "json",
       "csv"
     ],
-    "HENS_SOLVER_PDM": "couenne",
-    "HENS_SOLVER_OPTIONS_PDM": {},
     "HENS_RUN_ID": "Nine-stream-Linnhoff-and-Ahmad-1999-1",
+    "HENS_SOLVER_EVM": "ipopt-pyomo",
+    "HENS_SOLVER_OPTIONS_EVM": {},
+    "HENS_SOLVER_OPTIONS_PDM": {},
+    "HENS_SOLVER_OPTIONS_TDM": {},
+    "HENS_SOLVER_PDM": "couenne",
+    "HENS_SOLVER_TDM": "couenne",
     "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_STAGE_SELECTION": [
       1,
       2,
       3,
       4
-    ],
-    "HENS_SOLVER_TDM": "couenne",
-    "HENS_SOLVER_OPTIONS_TDM": {},
-    "COSTING_HX_AREA_COEFF": 70.0
+    ]
   },
   "streams": [
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 200.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 32000.0
@@ -77,6 +81,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 60.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 6600.0
@@ -97,6 +105,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 350.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 18550.0
@@ -117,6 +129,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 70.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 9030.0
@@ -137,6 +153,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 100.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 20000.0
@@ -157,6 +177,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 400.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 46000.0
@@ -177,6 +201,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 60.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 9600.0
@@ -197,6 +225,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 160.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 9600.0
@@ -217,6 +249,10 @@
       "zone": "Site/Process A"
     },
     {
+      "heat_capacity_flowrate": {
+        "unit": "kW/delta_degC",
+        "value": 100.0
+      },
       "heat_flow": {
         "unit": "kW",
         "value": 28700.0

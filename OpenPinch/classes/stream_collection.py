@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import warnings
 from copy import copy, deepcopy
 from functools import partial
@@ -426,6 +427,77 @@ class StreamCollection:
                 )
 
         return output_path
+
+    def to_dict(self, idx: int | None = None) -> dict[str, list[Any]]:
+        """Return stream data as serializable rows in standard reporting order."""
+        ordered_streams = sorted(
+            self._streams.values(),
+            key=lambda stream: self._dict_sort_key(stream, idx),
+        )
+        columns = [
+            "name",
+            "category",
+            "type",
+            "is_process_stream",
+            "t_supply",
+            "t_target",
+            "heat_flow",
+            "dt_cont",
+            "dt_cont_multiplier",
+            "htc",
+            "active",
+        ]
+        rows = [
+            {
+                "name": stream.name,
+                "category": self._dict_category(stream),
+                "type": stream.type,
+                "is_process_stream": stream.is_process_stream,
+                "t_supply": self._value_at_idx(stream._t_supply, idx),
+                "t_target": self._value_at_idx(stream._t_target, idx),
+                "heat_flow": self._value_at_idx(stream._heat_flow, idx),
+                "dt_cont": self._value_at_idx(stream._dt_cont, idx),
+                "dt_cont_multiplier": stream.dt_cont_multiplier,
+                "htc": self._value_at_idx(stream._htc, idx),
+                "active": stream.active,
+            }
+            for stream in ordered_streams
+        ]
+        return {column: [row[column] for row in rows] for column in columns}
+
+    @staticmethod
+    def _descending_sort_value(value: float) -> float:
+        if math.isnan(value):
+            return math.inf
+        return -value
+
+    @classmethod
+    def _dict_category(cls, stream: "Stream") -> str:
+        if stream.is_process_stream and stream.type == ST.Hot.value:
+            return "hot_stream"
+        if stream.is_process_stream and stream.type == ST.Cold.value:
+            return "cold_stream"
+        if not stream.is_process_stream and stream.type == ST.Hot.value:
+            return "hot_utility"
+        if not stream.is_process_stream and stream.type == ST.Cold.value:
+            return "cold_utility"
+        return "other"
+
+    @classmethod
+    def _dict_sort_key(cls, stream: "Stream", idx: int | None = None) -> tuple:
+        category_order = {
+            "hot_stream": 0,
+            "cold_stream": 1,
+            "hot_utility": 2,
+            "cold_utility": 3,
+            "other": 4,
+        }
+        category = cls._dict_category(stream)
+        supply = cls._descending_sort_value(value_at_idx(stream._t_supply, idx))
+        target = cls._descending_sort_value(value_at_idx(stream._t_target, idx))
+        if category == "hot_stream":
+            return (category_order[category], supply, target, stream.name)
+        return (category_order[category], supply, stream.name)
 
     # === Filtered StreamCollection subset builders ===
     def _build_stream_subset(

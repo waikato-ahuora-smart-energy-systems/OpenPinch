@@ -14,6 +14,7 @@ from .....lib.schemas.synthesis import (
 from ...unit_models.problem import InternalHeatExchangerNetworkProblem
 from ..errors import WorkflowContractError
 from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
+from .pathways import pathways_from_metadata, tier_evm_branch_breadth
 
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
@@ -47,10 +48,12 @@ class LocalSynthesisExecutor:
         *,
         print_output: bool = False,
         evolution: bool = False,
+        model_factories: dict[str, Any] | None = None,
         worker_pool_factory: Callable[[int], object] | None = None,
     ) -> None:
         self.print_output = print_output
         self.evolution = evolution
+        self.model_factories = model_factories
         self.worker_pool_factory = worker_pool_factory or _process_pool
         self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
         self.stage_order: list[SynthesisMethod] = []
@@ -67,15 +70,35 @@ class LocalSynthesisExecutor:
         if tasks:
             self.stage_order.append(tasks[0].method)
 
+        worker_count = max(1, min(int(max_parallel), len(tasks)))
+        if worker_count > 1 and _can_build_tasks_in_workers(tasks, parent_outcomes):
+            solve_inputs = (
+                (
+                    task,
+                    problem,
+                    self.print_output,
+                    self.model_factories,
+                    _evolution_options(problem, task, max_parallel=1),
+                )
+                for task in tasks
+            )
+            with self.worker_pool_factory(worker_count) as pool:
+                solved_results = tuple(
+                    pool.map(_build_and_solve_root_task, solve_inputs)
+                )
+            return self._collect_outcomes(tasks, solved_results, {})
+
         built: list[
             tuple[
                 HeatExchangerNetworkSynthesisTask,
                 InternalHeatExchangerNetworkProblem,
+                dict[str, Any] | None,
             ]
         ] = []
         failed: dict[str, HeatExchangerNetworkSynthesisTaskOutcome] = {}
         for task in tasks:
             try:
+                task_model_factories = self._model_factories_for_task(task, problem)
                 built.append(
                     (
                         task,
@@ -84,6 +107,7 @@ class LocalSynthesisExecutor:
                             problem=problem,
                             parent_outcomes=parent_outcomes,
                         ),
+                        task_model_factories,
                     )
                 )
             except Exception as exc:
@@ -91,9 +115,16 @@ class LocalSynthesisExecutor:
                     failed[task.task_id] = _failed_task_outcome(task, str(exc))
 
         worker_count = max(1, min(int(max_parallel), len(built)))
+        branch_parallel = max(1, int(max_parallel)) if worker_count == 1 else 1
         solve_inputs = (
-            (task, internal_problem, self.print_output)
-            for task, internal_problem in built
+            (
+                task,
+                internal_problem,
+                self.print_output,
+                task_model_factories,
+                _evolution_options(problem, task, max_parallel=branch_parallel),
+            )
+            for task, internal_problem, task_model_factories in built
         )
         if worker_count == 1:
             solved_results = tuple(
@@ -103,6 +134,20 @@ class LocalSynthesisExecutor:
             with self.worker_pool_factory(worker_count) as pool:
                 solved_results = tuple(pool.map(_solve_built_task, solve_inputs))
 
+        return self._collect_outcomes(tasks, solved_results, failed)
+
+    def _collect_outcomes(
+        self,
+        tasks: Sequence[HeatExchangerNetworkSynthesisTask],
+        solved_results: Sequence[
+            tuple[
+                HeatExchangerNetworkSynthesisTask,
+                HeatExchangerNetworkSynthesisTaskOutcome,
+                InternalHeatExchangerNetworkProblem | None,
+            ]
+        ],
+        failed: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
+    ) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
         results_by_task_id = {
             task.task_id: (task, outcome, internal_problem)
             for task, outcome, internal_problem in solved_results
@@ -142,7 +187,7 @@ class LocalSynthesisExecutor:
         parent_problem = self._parent_problem(task, parent_outcomes)
         dTmin = _legacy_task_dTmin(task)
         arrays = problem_to_solver_arrays(problem, dTmin)
-        stage_selection = _legacy_pdm_stage_selection(problem)
+        stage_selection = _legacy_pdm_stage_selection(problem, task)
         snapshots = None
         if task.method == "pinch_design_method":
             from ..solver.pinch_design_snapshot import (
@@ -181,7 +226,7 @@ class LocalSynthesisExecutor:
             integers=task.method != "network_evolution_method",
             parent=parent_problem,
             tol=_solve_tolerance(problem),
-            solver_options=_solver_options_for_task(problem, task.method),
+            solver_options=_solver_options_for_task(problem, task),
             stage_selection=stage_selection,
             stages=task.stage_count,
             synthesis_task_id=task.task_id,
@@ -213,24 +258,68 @@ class LocalSynthesisExecutor:
             )
         return parent_problem
 
+    def _model_factories_for_task(
+        self,
+        task: HeatExchangerNetworkSynthesisTask,
+        problem,
+    ) -> dict[str, Any] | None:
+        factories = dict(self.model_factories or {})
+        scope = _stage_packing_scope(problem)
+        pdm_mode = str(task.settings.get("pdm_mode", ""))
+        if task.method == "pinch_design_method" and (
+            pdm_mode == "compact" or (not pdm_mode and scope in {"pdm", "all"})
+        ):
+            factories.setdefault(
+                "pinch_design_method",
+                _stage_packed_pdm_factory(),
+            )
+        if task.method == "thermal_derivative_method" and scope in {"tdm", "all"}:
+            factories.setdefault("stagewise", _stage_packed_stagewise_factory())
+        return factories or None
+
 
 def _solve_built_task(
-    payload: tuple[
-        HeatExchangerNetworkSynthesisTask,
-        InternalHeatExchangerNetworkProblem,
-        bool,
-    ],
+    payload: tuple[Any, ...],
 ) -> tuple[
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
     InternalHeatExchangerNetworkProblem | None,
 ]:
-    task, internal_problem, print_output = payload
-    try:
-        solved = internal_problem.get_solution(
-            print_output=print_output,
-            evolution=task.method == "network_evolution_method",
+    if len(payload) == 4:
+        task, internal_problem, print_output, model_factories = payload
+        evolution_options = {
+            "n_ad_branches": 1,
+            "n_rm_branches": 1,
+            "max_parallel": 1,
+            "no_improvement_patience": None,
+        }
+    else:
+        task, internal_problem, print_output, model_factories, evolution_options = (
+            payload
         )
+    try:
+        solve_kwargs: dict[str, Any] = {
+            "print_output": print_output,
+            "evolution": task.method == "network_evolution_method",
+            "model_factories": model_factories,
+        }
+        if task.method == "network_evolution_method" and evolution_options != {
+            "n_ad_branches": 1,
+            "n_rm_branches": 1,
+            "max_parallel": 1,
+            "no_improvement_patience": None,
+        }:
+            solve_kwargs.update(
+                {
+                    "evolution_n_ad_branches": evolution_options["n_ad_branches"],
+                    "evolution_n_rm_branches": evolution_options["n_rm_branches"],
+                    "evolution_max_parallel": evolution_options["max_parallel"],
+                    "evolution_no_improvement_patience": evolution_options[
+                        "no_improvement_patience"
+                    ],
+                }
+            )
+        solved = internal_problem.get_solution(**solve_kwargs)
         if solved is None or getattr(solved, "mSuccess", 0) != 1:
             reason = getattr(
                 internal_problem,
@@ -264,6 +353,51 @@ def _solve_built_task(
         return task, _failed_task_outcome(task, str(exc)), None
 
 
+def _build_and_solve_root_task(
+    payload: tuple[
+        HeatExchangerNetworkSynthesisTask,
+        Any,
+        bool,
+        dict[str, Any] | None,
+        dict[str, int | None],
+    ],
+) -> tuple[
+    HeatExchangerNetworkSynthesisTask,
+    HeatExchangerNetworkSynthesisTaskOutcome,
+    InternalHeatExchangerNetworkProblem | None,
+]:
+    task, problem, print_output, model_factories, evolution_options = payload
+    executor = LocalSynthesisExecutor(
+        print_output=print_output,
+        model_factories=model_factories,
+    )
+    task_model_factories = executor._model_factories_for_task(task, problem)
+    try:
+        internal_problem = executor._build_problem(
+            task,
+            problem=problem,
+            parent_outcomes={},
+        )
+    except Exception as exc:
+        return task, _failed_task_outcome(task, str(exc)), None
+    return _solve_built_task(
+        (
+            task,
+            internal_problem,
+            print_output,
+            task_model_factories,
+            evolution_options,
+        )
+    )
+
+
+def _can_build_tasks_in_workers(
+    tasks: Sequence[HeatExchangerNetworkSynthesisTask],
+    parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
+) -> bool:
+    return not parent_outcomes and all(task.parent_task_id is None for task in tasks)
+
+
 def _failed_task_outcome(
     task: HeatExchangerNetworkSynthesisTask,
     reason: str,
@@ -291,9 +425,7 @@ def _legacy_objective(method: SynthesisMethod) -> str:
 
 
 def _legacy_task_dTmin(task: HeatExchangerNetworkSynthesisTask) -> float:
-    if task.method == "pinch_design_method":
-        return float(task.approach_temperature)
-    return 0.1
+    return float(task.approach_temperature)
 
 
 def _legacy_task_name(task: HeatExchangerNetworkSynthesisTask) -> str:
@@ -315,20 +447,131 @@ def _solver_for_task(problem, method: SynthesisMethod) -> str:
     return str(hens.solver_evm)
 
 
-def _solver_options_for_task(problem, method: SynthesisMethod) -> dict[str, Any]:
+def _solver_options_for_task(
+    problem,
+    task: HeatExchangerNetworkSynthesisTask,
+) -> dict[str, Any]:
+    method = task.method
     hens = problem.master_zone.config.hens
     if method == "pinch_design_method":
-        return dict(hens.solver_options_pdm)
-    if method == "thermal_derivative_method":
-        return dict(hens.solver_options_tdm)
-    return dict(hens.solver_options_evm)
+        base_options = dict(hens.solver_options_pdm)
+    elif method == "thermal_derivative_method":
+        base_options = dict(hens.solver_options_tdm)
+    else:
+        base_options = dict(hens.solver_options_evm)
+
+    task_options = task.settings.get("solver_options")
+    if task_options is None:
+        return base_options
+    if not isinstance(task_options, dict):
+        raise WorkflowContractError("task solver_options setting must be a dict.")
+    return {**base_options, **task_options}
+
+
+def _evolution_options(
+    problem,
+    task: HeatExchangerNetworkSynthesisTask,
+    *,
+    max_parallel: int,
+) -> dict[str, int | None]:
+    hens = problem.master_zone.config.hens
+    tier = int(getattr(hens, "synthesis_quality_tier", 1))
+    task_settings = task.settings or {}
+    pathway_options = _pathway_evolution_options(task)
+    return {
+        "n_ad_branches": int(
+            task_settings.get(
+                "evolution_n_ad_branches",
+                pathway_options.get(
+                    "n_ad_branches",
+                    _branch_breadth(
+                        getattr(hens, "evm_n_ad_branches", None),
+                        tier=tier,
+                    ),
+                ),
+            )
+        ),
+        "n_rm_branches": int(
+            task_settings.get(
+                "evolution_n_rm_branches",
+                pathway_options.get(
+                    "n_rm_branches",
+                    _branch_breadth(
+                        getattr(hens, "evm_n_rm_branches", None),
+                        tier=tier,
+                    ),
+                ),
+            )
+        ),
+        "max_parallel": max(1, int(max_parallel)),
+        "no_improvement_patience": _optional_int(
+            task_settings.get(
+                "evolution_no_improvement_patience",
+                pathway_options.get("no_improvement_patience"),
+            )
+        ),
+    }
+
+
+def _branch_breadth(value: int | None, *, tier: int) -> int:
+    if value is not None:
+        return max(1, int(value))
+    return tier_evm_branch_breadth(tier)
+
+
+def _pathway_evolution_options(
+    task: HeatExchangerNetworkSynthesisTask,
+) -> dict[str, int | None]:
+    pathways = pathways_from_metadata(task.metadata)
+    if not pathways:
+        return {}
+    first = pathways[0]
+    return {
+        "n_ad_branches": first.evm_n_ad_branches,
+        "n_rm_branches": first.evm_n_rm_branches,
+        "no_improvement_patience": first.evm_no_improvement_patience,
+    }
+
+
+def _optional_int(value) -> int | None:
+    if value is None:
+        return None
+    return int(value)
+
+
+def _stage_packing_scope(problem) -> str:
+    scope = str(getattr(problem.master_zone.config.hens, "stage_packing", "auto"))
+    if scope == "auto":
+        return "none"
+    return scope
+
+
+def _stage_packed_pdm_factory():
+    from ...unit_models.packed_pinch_design import StagePackedPinchDecompModel
+
+    return StagePackedPinchDecompModel
+
+
+def _stage_packed_stagewise_factory():
+    from ...unit_models.packed_stagewise import StagePackedStageWiseModel
+
+    return StagePackedStageWiseModel
 
 
 def _solve_tolerance(problem) -> float:
     return float(problem.master_zone.config.hens.solve_tolerance)
 
 
-def _legacy_pdm_stage_selection(problem) -> str | list[int]:
+def _legacy_pdm_stage_selection(
+    problem,
+    task: HeatExchangerNetworkSynthesisTask | None = None,
+) -> str | list[int]:
+    if task is not None:
+        task_stage_selection = task.settings.get("stage_selection")
+        if task_stage_selection is not None:
+            selection = [int(value) for value in task_stage_selection]
+            if len(selection) == 2:
+                return selection
     selection = [
         int(value) for value in problem.master_zone.config.hens.stage_selection
     ]

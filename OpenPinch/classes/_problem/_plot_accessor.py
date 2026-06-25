@@ -1,5 +1,6 @@
 """Graph-accessor helpers for selecting, rendering, and exporting solved plots."""
 
+from html import escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
@@ -232,6 +233,32 @@ class _PlotAccessor:
             figure.write_html(destination)
             written_paths.append(destination)
         return written_paths
+
+    def export_gallery(
+        self,
+        output_dir: PathLike,
+        *,
+        zone_name: Optional[str] = None,
+        graph_type: Optional[str] = None,
+        index_name: str = "index.html",
+    ) -> Path:
+        """Write selected graphs and a browsable HTML index to ``output_dir``."""
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        selected = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
+        links = []
+        for idx, (graph_zone_name, graph) in enumerate(selected, start=1):
+            figure = self._build_graph_figure(graph)
+            graph_title = str(graph.get("name") or graph.get("type") or f"Graph {idx}")
+            stem = _slugify(f"{graph_zone_name}_{graph.get('type', 'graph')}_{idx}")
+            destination = output_path / f"{stem}.html"
+            figure.write_html(destination)
+            links.append((destination.name, graph_zone_name, graph_title))
+
+        index_path = output_path / index_name
+        index_path.write_text(_gallery_index_html(links), encoding="utf-8")
+        return index_path
 
     def composite_curve(
         self,
@@ -506,3 +533,33 @@ def _slugify(value: str) -> str:
     while "__" in cleaned:
         cleaned = cleaned.replace("__", "_")
     return cleaned.strip("_") or "graph"
+
+
+def _gallery_index_html(links: list[tuple[str, str, str]]) -> str:
+    """Return a small static graph-gallery index page."""
+    items = "\n".join(
+        "<li>"
+        f'<a href="{escape(filename)}">{escape(title)}</a>'
+        f" <span>{escape(zone)}</span>"
+        "</li>"
+        for filename, zone, title in links
+    )
+    if not items:
+        items = "<li>No graphs matched the requested selection.</li>"
+    return (
+        "<!doctype html>\n"
+        '<html lang="en">\n'
+        "<head>\n"
+        '  <meta charset="utf-8">\n'
+        "  <title>OpenPinch Graph Gallery</title>\n"
+        "  <style>"
+        "body{font-family:system-ui,sans-serif;margin:2rem;line-height:1.5}"
+        "span{color:#666;margin-left:.5rem}"
+        "</style>\n"
+        "</head>\n"
+        "<body>\n"
+        "  <h1>OpenPinch Graph Gallery</h1>\n"
+        f"  <ul>{items}</ul>\n"
+        "</body>\n"
+        "</html>\n"
+    )

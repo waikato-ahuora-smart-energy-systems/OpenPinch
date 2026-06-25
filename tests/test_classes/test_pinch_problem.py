@@ -918,6 +918,7 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
 
     obj = PinchProblem()
     compact = obj.summary_frame()
+    plain = obj.summary_frame(format="plain")
     detailed = obj.summary_frame(detailed=True)
 
     assert list(compact.columns[:7]) == [
@@ -930,7 +931,45 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
         "Cold Pinch",
     ]
     assert compact.iloc[0]["Hot Utilities"] == "Steam: 10.00 kW"
+    assert plain.iloc[0]["Hot Utility Target"] == 10.0
+    assert plain.iloc[0]["Hot Utility Target (unit)"] == "kW"
     assert detailed.iloc[0]["Target"] == "Plant/DI"
+
+
+def test_validation_report_returns_structured_errors_without_raising():
+    obj = PinchProblem()
+    obj._problem_data = {
+        "streams": [
+            {
+                "zone": "Zone A",
+                "name": "Hot Feed",
+                "t_supply": 150.0,
+                "heat_flow": 100.0,
+            }
+        ],
+        "utilities": [],
+        "options": {},
+    }
+
+    report = obj.validation_report()
+
+    assert report.valid is False
+    assert any(issue.path == "streams[0].t_target" for issue in report.issues)
+
+
+def test_report_and_metrics_are_typed_and_do_not_require_exports(sample_problem):
+    problem = PinchProblem(source=sample_problem)
+
+    dry_report = problem.report(solve=False)
+    solved_report = problem.report()
+    metrics = problem.metrics()
+
+    assert dry_report.solved is False
+    assert dry_report.validation.valid is True
+    assert solved_report.solved is True
+    assert solved_report.targets
+    assert any(metric.metric == "Hot Utility Target" for metric in metrics)
+    assert any(metric.unit == "kW" for metric in metrics)
 
 
 def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
@@ -1397,9 +1436,12 @@ def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
 
     obj = PinchProblem()
     written = obj.plot.export(tmp_path)
+    index_path = obj.plot.export_gallery(tmp_path / "gallery")
 
     assert len(written) == 1
     assert written[0].exists()
+    assert index_path.name == "index.html"
+    assert "GCC" in index_path.read_text(encoding="utf-8")
 
 
 def test_compare_to_builds_delta_table(monkeypatch):
@@ -1440,13 +1482,11 @@ def test_compare_to_builds_delta_table(monkeypatch):
     base_problem = PinchProblem()
     other_problem = PinchProblem()
 
-    monkeypatch.setattr(
-        base_problem, "summary_frame", lambda detailed=False: base_frame
-    )
+    monkeypatch.setattr(base_problem, "summary_frame", lambda **_kwargs: base_frame)
     monkeypatch.setattr(
         other_problem,
         "summary_frame",
-        lambda detailed=False: other_frame,
+        lambda **_kwargs: other_frame,
     )
 
     comparison = base_problem.compare_to(other_problem)
@@ -1496,13 +1536,11 @@ def test_compare_to_suppresses_delta_when_units_do_not_match(monkeypatch):
     base_problem = PinchProblem()
     other_problem = PinchProblem()
 
-    monkeypatch.setattr(
-        base_problem, "summary_frame", lambda detailed=False: base_frame
-    )
+    monkeypatch.setattr(base_problem, "summary_frame", lambda **_kwargs: base_frame)
     monkeypatch.setattr(
         other_problem,
         "summary_frame",
-        lambda detailed=False: other_frame,
+        lambda **_kwargs: other_frame,
     )
 
     comparison = base_problem.compare_to(other_problem)

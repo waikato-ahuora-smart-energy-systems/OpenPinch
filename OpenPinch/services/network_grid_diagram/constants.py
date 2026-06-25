@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-_DUTY_TOLERANCE_KW = 1.0
+_DUTY_RELATIVE_TOLERANCE = 1e-5
 _DEFAULT_STREAM_LINE_WIDTH = 5.0
 _LAYOUT_X_MIN = 0.0
 _LAYOUT_X_MAX = 1.0

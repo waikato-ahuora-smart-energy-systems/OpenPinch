@@ -8,13 +8,11 @@ from typing import Any
 from ...classes.heat_exchanger import HeatExchanger
 from ...classes.heat_exchanger_network import HeatExchangerNetwork
 from ...lib.enums import HeatExchangerKind
-from .constants import _DUTY_TOLERANCE_KW
+from .constants import _DUTY_RELATIVE_TOLERANCE
 from .models import GridDiagramMatch, HeatExchangerNetworkGridModel
 
 
-def build_grid_model(
-    network: HeatExchangerNetwork,
-) -> HeatExchangerNetworkGridModel:
+def build_grid_model(network: HeatExchangerNetwork) -> HeatExchangerNetworkGridModel:
     """Normalize an OpenPinch network into the OpenHENS grid topology."""
     hot_streams: list[str] = []
     cold_streams: list[str] = []
@@ -22,9 +20,10 @@ def build_grid_model(
     hot_utility_by_cold_stream: OrderedDict[str, GridDiagramMatch] = OrderedDict()
     cold_utility_by_hot_stream: OrderedDict[str, GridDiagramMatch] = OrderedDict()
     seen_recovery_stages: set[int] = set()
+    duty_threshold = _relative_duty_threshold(network)
 
     for exchanger in network.exchangers:
-        if not _is_significant_match(exchanger):
+        if not _is_significant_match(exchanger, duty_threshold=duty_threshold):
             continue
         if exchanger.kind is HeatExchangerKind.RECOVERY:
             _append_unique(hot_streams, exchanger.source_stream)
@@ -134,12 +133,26 @@ def _add_or_accumulate(
     )
 
 
-def _is_significant_match(exchanger: HeatExchanger) -> bool:
+def _is_significant_match(
+    exchanger: HeatExchanger,
+    *,
+    duty_threshold: float,
+) -> bool:
     return (
-        exchanger.active
-        and exchanger.match_allowed
-        and exchanger.duty > _DUTY_TOLERANCE_KW
+        exchanger.active and exchanger.match_allowed and exchanger.duty > duty_threshold
     )
+
+
+def _relative_duty_threshold(network: HeatExchangerNetwork) -> float:
+    duty_scale = max(
+        (
+            exchanger.duty
+            for exchanger in network.exchangers
+            if exchanger.active and exchanger.match_allowed
+        ),
+        default=0.0,
+    )
+    return duty_scale * _DUTY_RELATIVE_TOLERANCE
 
 
 def _match(exchanger: HeatExchanger) -> GridDiagramMatch:

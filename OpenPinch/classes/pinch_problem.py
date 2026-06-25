@@ -10,10 +10,13 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
+from pint.errors import DimensionalityError
 from pydantic import ValidationError
 
 from ..lib.schemas.io import TargetInput, TargetOutput
+from ..lib.schemas.reporting import ProblemReport, ReportMetric
 from ..lib.schemas.targets import BaseTargetModel
+from ..lib.schemas.workspace import ValidationReport
 from ..resources import list_sample_cases, read_sample_case
 from ..services import data_preprocessing_service
 from ..services.common.miscellaneous import get_state_index
@@ -38,7 +41,10 @@ from ._problem import (
     _TargetAccessorDescriptor,
     _validate_problem_semantics,
     build_graph_payload,
+    build_problem_report,
     build_problem_summary_frame,
+    build_report_metrics,
+    build_validation_report,
     extract_results,
     load_problem_source,
     prepare_in_memory_problem_source,
@@ -526,12 +532,53 @@ class PinchProblem:
         )
         return input_data
 
-    def summary_frame(self, *, detailed: bool = False) -> pd.DataFrame:
+    def validation_report(self) -> ValidationReport:
+        """Return structured validation results without raising for bad inputs."""
+        if self._problem_data is None:
+            raise RuntimeError("No input loaded. Call load(...) first.")
+        return build_validation_report(
+            self._problem_data,
+            context=self._validation_context or {},
+            source_kind=self._input_source_kind or "target_input",
+        )
+
+    def summary_frame(
+        self,
+        *,
+        detailed: bool = False,
+        format: str | None = None,
+    ) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
         results = self._results if self._results is not None else self.target()
+        if format is None:
+            format = "detailed" if detailed else "compact"
+        elif detailed and format != "detailed":
+            raise ValueError("Use either detailed=True or format=..., not both.")
         if detailed:
             return build_summary_dataframe(results.targets)
-        return build_problem_summary_frame(results, detailed=False)
+        return build_problem_summary_frame(results, format=format)
+
+    def metrics(self, *, solve: bool = True) -> list[ReportMetric]:
+        """Return typed summary metrics for the current solved result."""
+        results = self._results
+        if results is None and solve:
+            results = self.target()
+        if results is None:
+            return []
+        return build_report_metrics(results)
+
+    def report(self, *, solve: bool = True) -> ProblemReport:
+        """Return a typed report without writing any files."""
+        results = self._results
+        if results is None and solve:
+            results = self.target()
+        graph_payload = build_graph_payload(results) if results is not None else None
+        return build_problem_report(
+            project_name=self.project_name,
+            validation=self.validation_report(),
+            results=results,
+            graph_payload=graph_payload,
+        )
 
     def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
         """Export the solved target summary and problem tables to an Excel file."""
@@ -557,9 +604,9 @@ class PinchProblem:
         base_label: str = "Base case",
         other_label: str = "Scenario",
     ) -> pd.DataFrame:
-        """Compare the compact summaries of two solved problems."""
-        base_frame = self.summary_frame()
-        other_frame = other_problem.summary_frame()
+        """Compare numeric summary metrics of two solved problems."""
+        base_frame = self.summary_frame(format="plain")
+        other_frame = other_problem.summary_frame(format="plain")
 
         base_row = _locate_summary_row(base_frame, target_name=target_name)
         other_row = _locate_summary_row(
@@ -598,7 +645,7 @@ class PinchProblem:
                 other_unit = base_unit
                 change_row[col] = float(other_value) - float(base_value)
                 change_row[unit_col] = base_unit
-            except TypeError, ValueError:
+            except DimensionalityError, TypeError, ValueError:
                 change_row[col] = None
                 change_row[unit_col] = None
 

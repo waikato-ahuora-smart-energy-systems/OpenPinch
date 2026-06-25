@@ -113,6 +113,14 @@ class HeatExchangerNetwork(BaseModel):
             temperature_scaled=temperature_scaled,
         )
 
+    def quantify_controllability(self, **kwargs: Any) -> Any:
+        """Return steady-state controllability metrics for this network."""
+        from ..services.heat_exchanger_network_controllability import (
+            quantify_heat_exchanger_network_controllability,
+        )
+
+        return quantify_heat_exchanger_network_controllability(self, **kwargs)
+
     def exchangers_involving_stream(
         self,
         stream_id: str,

@@ -1,5 +1,6 @@
 {
   "options": {
+    "COSTING_HX_AREA_COEFF": 1200.0,
     "COSTING_HX_AREA_EXP": 0.6,
     "COSTING_HX_UNIT_COST": 0.0,
     "HENS_APPROACH_TEMPERATURES": [
@@ -27,8 +28,6 @@
       3.6,
       4.0
     ],
-    "HENS_SOLVER_EVM": "ipopt-pyomo",
-    "HENS_SOLVER_OPTIONS_EVM": {},
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
     "HENS_METHOD_SEQUENCE": [
@@ -41,19 +40,20 @@
       "json",
       "csv"
     ],
-    "HENS_SOLVER_PDM": "couenne",
-    "HENS_SOLVER_OPTIONS_PDM": {},
     "HENS_RUN_ID": "Six-stream-Yee-and-Grossmann-1990-1",
+    "HENS_SOLVER_EVM": "ipopt-pyomo",
+    "HENS_SOLVER_OPTIONS_EVM": {},
+    "HENS_SOLVER_OPTIONS_PDM": {},
+    "HENS_SOLVER_OPTIONS_TDM": {},
+    "HENS_SOLVER_PDM": "couenne",
+    "HENS_SOLVER_TDM": "couenne",
     "HENS_SOLVE_TOLERANCE": 0.001,
     "HENS_STAGE_SELECTION": [
       1,
       2,
       3,
       4
-    ],
-    "HENS_SOLVER_TDM": "couenne",
-    "HENS_SOLVER_OPTIONS_TDM": {},
-    "COSTING_HX_AREA_COEFF": 1200.0
+    ]
   },
   "streams": [
     {

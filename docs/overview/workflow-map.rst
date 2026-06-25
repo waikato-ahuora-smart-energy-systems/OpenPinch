@@ -62,7 +62,8 @@ Use ``PinchProblem`` when:
   ``problem.add_component.*``, ``problem.state_ids``, or
   ``problem.target_all_states()``
 - you want heat exchanger network design through
-  ``problem.design.open_hens_method(...)`` or the explicit HEN ``*_method``
+  ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
+  ``problem.design.open_hens_method(...)``, or the explicit HEN ``*_method``
   accessors
 
 Use ``PinchWorkspace`` when:
@@ -135,8 +136,9 @@ Advanced HPR study
    and GCC / HPR graph surfaces``
 
 Heat exchanger network synthesis study
-   ``PinchProblem("four_stream.json") -> problem.design.open_hens_method() ->
-   inspect ranked networks -> build grid diagrams``
+   ``PinchProblem("four_stream.json") ->
+   problem.design.enhanced_synthesis_method(quality_tier=2) -> inspect ranked
+   networks -> build grid diagrams``
 
 Retrofit network evolution study
    ``existing HeatExchangerNetwork -> problem.design.network_evolution_method(

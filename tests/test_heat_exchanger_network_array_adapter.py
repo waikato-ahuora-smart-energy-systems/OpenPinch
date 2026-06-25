@@ -30,6 +30,21 @@ CASE_DTMIN = {
     "Four-stream-Yee-and-Grossmann-1990-1": 14.0,
     "Nine-stream-Linnhoff-and-Ahmad-1999-1": 18.0,
 }
+CONVERTED_OPENHENS_CASE_IDS = (
+    "Four-stream-Escobar-and-Trierweiler-2013-1",
+    "Four-stream-Yee-and-Grossmann-1990-1",
+    "Five-stream-Bogataj-and-Kravanja-2012-1",
+    "Five-stream-Kim-et-al-2017-1",
+    "Six-stream-Spray-Dryer-2025-1",
+    "Six-stream-Yee-and-Grossmann-1990-1",
+    "Nine-stream-Linnhoff-and-Ahmad-1999-1",
+    "Ten-stream-Ahmad-1985-1",
+    "Ten-stream-Chakraborty-and-Ghoshb-1999-1",
+    "Ten-stream-Escobar-and-Grossmann-2010-1",
+    "Eleven-stream-Castillo-et-al-1998-1",
+    "Pinch-Problem",
+    "Thirteen-stream-Kim-et-al-2017-1",
+)
 AXIS_ARRAY_NAMES = {
     "cold_process_streams": {
         "T_c_cont",
@@ -41,6 +56,7 @@ AXIS_ARRAY_NAMES = {
         "htc_c",
     },
     "cold_utilities": {
+        "T_cu_cont",
         "T_cu_in",
         "T_cu_out",
         "cu_cost",
@@ -56,12 +72,66 @@ AXIS_ARRAY_NAMES = {
         "htc_h",
     },
     "hot_utilities": {
+        "T_hu_cont",
         "T_hu_in",
         "T_hu_out",
         "htc_hu",
         "hu_cost",
     },
 }
+
+
+def test_openhens_fixture_inventory_matches_converter_case_ids() -> None:
+    converter = _load_converter_module()
+    base_fixture_ids = sorted(
+        path.stem
+        for path in FIXTURE_ROOT.glob("*.json")
+        if not path.name.endswith(".reordered.json")
+    )
+    reordered_fixture_ids = sorted(
+        path.name.removesuffix(".reordered.json")
+        for path in FIXTURE_ROOT.glob("*.reordered.json")
+    )
+
+    assert converter.CASE_IDS == CONVERTED_OPENHENS_CASE_IDS
+    assert base_fixture_ids == sorted(CONVERTED_OPENHENS_CASE_IDS)
+    assert reordered_fixture_ids == sorted(CONVERTED_OPENHENS_CASE_IDS)
+
+
+@pytest.mark.parametrize("case_id", CONVERTED_OPENHENS_CASE_IDS)
+def test_converted_openhens_problem_fixtures_validate(case_id: str) -> None:
+    payload = json.loads((FIXTURE_ROOT / f"{case_id}.json").read_text())
+    target_input = TargetInput.model_validate(payload)
+    problem = PinchProblem(source=payload)
+
+    assert target_input.options is not None
+    assert target_input.options["HENS_RUN_ID"] == case_id
+    assert target_input.options["HENS_SOLVER_PDM"] == "couenne"
+    assert target_input.options["HENS_SOLVER_TDM"] == "couenne"
+    assert target_input.options["HENS_SOLVER_EVM"] == "ipopt-pyomo"
+    assert "HENS_PDM_SOLVER" not in target_input.options
+    assert "FIXED_COST" not in target_input.options
+    assert problem.hot_streams
+    assert problem.cold_streams
+    assert problem.hot_utilities
+    assert problem.cold_utilities
+
+
+def test_packaged_four_stream_sample_matches_converted_fixture_without_outputs() -> (
+    None
+):
+    converter = _load_converter_module()
+    case_id = converter.PACKAGE_SAMPLE_CASE_ID
+    sample_path = REPO_ROOT / "OpenPinch" / "data" / "sample_cases" / f"{case_id}.json"
+    fixture = json.loads((FIXTURE_ROOT / f"{case_id}.json").read_text())
+    expected_sample = deepcopy(fixture)
+    expected_sample["options"] = {
+        **expected_sample["options"],
+        "HENS_OUTPUT_FOLDER": "",
+        "HENS_OUTPUT_FORMATS": [],
+    }
+
+    assert json.loads(sample_path.read_text()) == expected_sample
 
 
 @pytest.mark.parametrize(
@@ -105,7 +175,9 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     payload = problem_to_solver_arrays(PinchProblem(source=fixture_path), 14.0)
     current = payload.to_json_dict()
 
-    assert current["array_shapes"] == snapshot["array_shapes"]
+    assert {
+        name: current["array_shapes"][name] for name in snapshot["array_shapes"]
+    } == snapshot["array_shapes"]
     _assert_axis_identities_match(current, snapshot)
 
     for name, expected in snapshot["arrays"].items():
@@ -113,6 +185,9 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
 
     for name, expected in snapshot["source_openhens_arrays"].items():
         _assert_array_matches_by_identity(name, current, expected, snapshot)
+
+    np.testing.assert_allclose(current["arrays"]["T_hu_cont"], [7.0])
+    np.testing.assert_allclose(current["arrays"]["T_cu_cont"], [7.0])
 
 
 def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
@@ -197,6 +272,65 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
     assert float(problem.cold_streams[0].CP) != pytest.approx(6.1)
     assert payload.arrays["f_h"].tolist() == [14.8]
     assert payload.arrays["f_c"].tolist() == [6.1]
+
+
+def test_adapter_scales_explicit_dt_cont_by_active_multiplier() -> None:
+    problem = PinchProblem(
+        source={
+            "streams": [
+                {
+                    "zone": "Site/Process A",
+                    "name": "H1",
+                    "t_supply": {"value": 500.0, "unit": "K"},
+                    "t_target": {"value": 370.0, "unit": "K"},
+                    "heat_flow": {"value": 999.0, "unit": "kW"},
+                    "dt_cont": {"value": 3.0, "unit": "K"},
+                },
+                {
+                    "zone": "Site/Process A",
+                    "name": "C1",
+                    "t_supply": {"value": 310.0, "unit": "K"},
+                    "t_target": {"value": 470.0, "unit": "K"},
+                    "heat_flow": {"value": 888.0, "unit": "kW"},
+                    "dt_cont": {"value": 4.0, "unit": "K"},
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "HPS",
+                    "type": "Hot",
+                    "t_supply": {"value": 520.0, "unit": "K"},
+                    "t_target": {"value": 520.0, "unit": "K"},
+                    "dt_cont": {"value": 1.0, "unit": "K"},
+                    "heat_flow": None,
+                    "price": {"value": 60.0, "unit": "$/MWh"},
+                },
+                {
+                    "name": "CW",
+                    "type": "Cold",
+                    "t_supply": {"value": 290.0, "unit": "K"},
+                    "t_target": {"value": 310.0, "unit": "K"},
+                    "dt_cont": {"value": 2.0, "unit": "K"},
+                    "heat_flow": None,
+                    "price": {"value": 10.0, "unit": "$/MWh"},
+                },
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [
+                    {"name": "Process A", "type": "Process Zone", "children": None}
+                ],
+            },
+        }
+    )
+
+    payload = problem_to_solver_arrays(problem, 2.0)
+
+    np.testing.assert_allclose(payload.arrays["T_h_cont"], [6.0])
+    np.testing.assert_allclose(payload.arrays["T_c_cont"], [8.0])
+    np.testing.assert_allclose(payload.arrays["T_hu_cont"], [2.0])
+    np.testing.assert_allclose(payload.arrays["T_cu_cont"], [4.0])
 
 
 def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() -> None:

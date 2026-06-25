@@ -25,14 +25,19 @@ else:
 # Local stream API used by the simple heat pump
 from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
+from ....utils.optional_dependencies import optional_dependency_error
 
 
 def _require_tespy() -> None:
     if _TESPY_IMPORT_ERROR is None:
         return
     raise ImportError(
-        "TESPy is required for Brayton-cycle tooling. "
-        "Install it with 'pip install openpinch[brayton_cycle]'."
+        optional_dependency_error(
+            package="TESPy",
+            purpose="Brayton-cycle tooling",
+            extras="brayton_cycle",
+            docs="the heat-pump workflows guide",
+        )
     ) from _TESPY_IMPORT_ERROR
 
 

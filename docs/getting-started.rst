@@ -20,15 +20,16 @@ Install the TESPy-backed Brayton-cycle workflow with
 
 The main Python wrappers are ``PinchProblem`` for single cases and
 ``PinchWorkspace`` for named multi-case studies. The current workflow names
-include ``target()``, ``summary_frame()``, ``export_excel()``,
-``plot.grand_composite_curve()``, ``plot.export(...)``,
-``show_dashboard()``, ``problem.target.direct_heat_pump(...)``, and
-``workspace.compare_cases(...)``. When a case definition carries stateful values,
-named ``problem.target.*`` workflows also accept ``state_id=...``.
+include ``validation_report()``, ``target()``, ``summary_frame()``, ``report()``,
+``metrics()``, ``export_excel()``, ``plot.grand_composite_curve()``,
+``plot.export_gallery(...)``, ``show_dashboard()``,
+``problem.target.direct_heat_pump(...)``, ``workspace.scenario(...)``, and
+``workspace.compare_cases(...)``. When a case definition carries stateful
+values, named ``problem.target.*`` workflows also accept ``state_id=...``.
 
 Use these pages instead:
 
-- :doc:`guides/first-solve-cli`
 - :doc:`guides/first-solve-python`
 - :doc:`guides/notebooks-and-sample-cases`
+- :doc:`api/cli-and-resources`
 - :doc:`overview/workflow-map`

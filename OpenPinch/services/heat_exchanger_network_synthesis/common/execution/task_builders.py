@@ -100,6 +100,9 @@ def approach_temperature_from_network(
     value = network.summary_metrics.get("approach_temperature")
     if isinstance(value, int | float) and value > 0.0:
         return float(value)
+    value = network.source_metadata.get("solver_dTmin")
+    if isinstance(value, int | float) and value > 0.0:
+        return float(value)
     for exchanger in network.exchangers:
         for approach_temperature in exchanger.approach_temperatures:
             if approach_temperature > 0.0:

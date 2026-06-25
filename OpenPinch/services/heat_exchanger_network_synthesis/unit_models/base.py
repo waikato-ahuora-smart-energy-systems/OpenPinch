@@ -174,10 +174,12 @@ class BaseHeatExchangerNetworkModel(ABC):
                 self.P_h = [
                     [
                         [
-                            (self.T_h[i][k][0] - self.T_h_out_x[i][j][k][0])
-                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                            else 0.0
+                            (
+                                (self.T_h[i][k][0] - self.T_h_out_x[i][j][k][0])
+                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                                else 0.0
+                            )
                             for k in range(self.S)
                         ]
                         for j in range(self.J)
@@ -187,10 +189,12 @@ class BaseHeatExchangerNetworkModel(ABC):
                 self.P_c = [
                     [
                         [
-                            (self.T_c_out_y[j][i][k][0] - self.T_c[j][k + 1][0])
-                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                            else 0.0
+                            (
+                                (self.T_c_out_y[j][i][k][0] - self.T_c[j][k + 1][0])
+                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                                else 0.0
+                            )
                             for k in range(self.S)
                         ]
                         for j in range(self.J)
@@ -201,10 +205,12 @@ class BaseHeatExchangerNetworkModel(ABC):
                 self.P_h = [
                     [
                         [
-                            (self.T_h[i][k][0] - self.T_h[i][k + 1][0])
-                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                            else 0.0
+                            (
+                                (self.T_h[i][k][0] - self.T_h[i][k + 1][0])
+                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                                else 0.0
+                            )
                             for k in range(self.S)
                         ]
                         for j in range(self.J)
@@ -214,10 +220,12 @@ class BaseHeatExchangerNetworkModel(ABC):
                 self.P_c = [
                     [
                         [
-                            (self.T_c[j][k][0] - self.T_c[j][k + 1][0])
-                            / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                            if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                            else 0.0
+                            (
+                                (self.T_c[j][k][0] - self.T_c[j][k + 1][0])
+                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
+                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                                else 0.0
+                            )
                             for k in range(self.S)
                         ]
                         for j in range(self.J)
@@ -242,9 +250,11 @@ class BaseHeatExchangerNetworkModel(ABC):
             self.beta_h = [
                 [
                     [
-                        self.Q_r[i][j][k][0] / self.Sum_Qr_is[i][k][0]
-                        if self.Sum_Qr_is[i][k][0] > 0.0
-                        else 0.0
+                        (
+                            self.Q_r[i][j][k][0] / self.Sum_Qr_is[i][k][0]
+                            if self.Sum_Qr_is[i][k][0] > 0.0
+                            else 0.0
+                        )
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -254,9 +264,11 @@ class BaseHeatExchangerNetworkModel(ABC):
             self.beta_c = [
                 [
                     [
-                        self.Q_r[i][j][k][0] / self.Sum_Qr_js[j][k][0]
-                        if self.Sum_Qr_js[j][k][0] > 0.0
-                        else 0.0
+                        (
+                            self.Q_r[i][j][k][0] / self.Sum_Qr_js[j][k][0]
+                            if self.Sum_Qr_js[j][k][0] > 0.0
+                            else 0.0
+                        )
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
@@ -550,19 +562,21 @@ class BaseHeatExchangerNetworkModel(ABC):
         ]
         if not postoptimisation:
             self.alpha_dQ_dA_eqn = [
-                m.Equation(
-                    (
-                        self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
-                        - self.alpha[i][j][k]
-                        * self.theta_1[i][j][k]
-                        * self.theta_2[i][j][k]
-                        * self.U_r[i][j]
+                (
+                    m.Equation(
+                        (
+                            self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
+                            - self.alpha[i][j][k]
+                            * self.theta_1[i][j][k]
+                            * self.theta_2[i][j][k]
+                            * self.U_r[i][j]
+                        )
+                        * self.z[i][j][k]
+                        <= 0.0
                     )
-                    * self.z[i][j][k]
-                    <= 0.0
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
@@ -592,6 +606,7 @@ class BaseHeatExchangerNetworkModel(ABC):
         self.hu_coeff = np.array([], dtype=float)
         self.T_hu_in = np.array([], dtype=float)
         self.T_hu_out = np.array([], dtype=float)
+        self.T_hu_cont = np.array([], dtype=float)
         self.htc_hu = np.array([], dtype=float)
         self.hu_exp = np.array([], dtype=float)
 
@@ -600,6 +615,7 @@ class BaseHeatExchangerNetworkModel(ABC):
         self.cu_coeff = np.array([], dtype=float)
         self.T_cu_in = np.array([], dtype=float)
         self.T_cu_out = np.array([], dtype=float)
+        self.T_cu_cont = np.array([], dtype=float)
         self.htc_cu = np.array([], dtype=float)
         self.cu_exp = np.array([], dtype=float)
 
@@ -612,6 +628,49 @@ class BaseHeatExchangerNetworkModel(ABC):
 
         for name, values in self.solver_arrays.arrays.items():
             setattr(self, name, np.array(values, copy=True))
+        self._set_minimum_approach_temperatures()
+
+    def _set_minimum_approach_temperatures(self) -> None:
+        """Derive pair-specific approach limits from stream contributions."""
+
+        self.dT_r = np.array(
+            [
+                [self.T_h_cont[i] + self.T_c_cont[j] for j in range(len(self.T_c_cont))]
+                for i in range(len(self.T_h_cont))
+            ],
+            dtype=float,
+        )
+        self.dT_hu = np.array(
+            [
+                (self.T_hu_cont[0] if len(self.T_hu_cont) else self.dTmin / 2.0)
+                + self.T_c_cont[j]
+                for j in range(len(self.T_c_cont))
+            ],
+            dtype=float,
+        )
+        self.dT_cu = np.array(
+            [
+                self.T_h_cont[i]
+                + (self.T_cu_cont[0] if len(self.T_cu_cont) else self.dTmin / 2.0)
+                for i in range(len(self.T_h_cont))
+            ],
+            dtype=float,
+        )
+
+    def _recovery_approach_temperature(self, i: int, j: int) -> float:
+        if not hasattr(self, "dT_r"):
+            return float(self.dTmin)
+        return float(self.dT_r[i][j])
+
+    def _hot_utility_approach_temperature(self, j: int) -> float:
+        if not hasattr(self, "dT_hu"):
+            return float(self.dTmin)
+        return float(self.dT_hu[j])
+
+    def _cold_utility_approach_temperature(self, i: int) -> float:
+        if not hasattr(self, "dT_cu"):
+            return float(self.dTmin)
+        return float(self.dT_cu[i])
 
     def set_match_restrictions(self, restrictions) -> None:
         """Apply inherited topology restrictions in the source array shape."""

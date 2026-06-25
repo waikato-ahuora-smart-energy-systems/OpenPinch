@@ -1,4 +1,4 @@
-"""Published OpenHENS sequence orchestration for HEN synthesis."""
+"""OpenHENS workflow orchestration for HEN synthesis."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def execute_open_hens_method(
     *,
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
-    """Generate, execute, and collect the PDM -> TDM -> ESM task graph."""
+    """Generate, execute, and collect the PDM -> TDM -> EVM task graph."""
     settings = replace(settings, design_method=HENDesignMethod.OpenHENS)
     if settings.method_sequence != _METHOD_SEQUENCE:
         raise WorkflowContractError(
@@ -73,7 +73,32 @@ def execute_open_hens_method(
             settings=settings,
             executor=executor,
         )
+    elif settings.skips_thermal_derivative_method:
+        tdm_tasks = ()
+        tdm_outcomes = ()
+        esm_tasks, esm_outcomes = (
+            execute_network_evolution_method_from_pinch_design_stage(
+                problem=problem,
+                settings=settings,
+                pdm_outcomes=pdm_outcomes,
+                parent_outcomes=pdm_outcome_map,
+                executor=executor,
+            )
+        )
     else:
+        direct_esm_tasks = ()
+        direct_esm_outcomes = ()
+        if settings.synthesis_quality_tier > 1:
+            direct_esm_tasks, direct_esm_outcomes = (
+                execute_network_evolution_method_from_pinch_design_stage(
+                    problem=problem,
+                    settings=settings,
+                    pdm_outcomes=pdm_outcomes,
+                    parent_outcomes=pdm_outcome_map,
+                    executor=executor,
+                )
+            )
+
         tdm_tasks, tdm_outcomes = execute_thermal_derivative_method_stage(
             problem=problem,
             settings=settings,
@@ -90,6 +115,8 @@ def execute_open_hens_method(
             parent_outcomes=upstream_outcomes,
             executor=executor,
         )
+        esm_tasks = tuple(direct_esm_tasks + esm_tasks)
+        esm_outcomes = tuple(direct_esm_outcomes + esm_outcomes)
     if not esm_tasks and _can_skip_derivative_stage_for_missing_couenne(
         settings,
         tdm_tasks,

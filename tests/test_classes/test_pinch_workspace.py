@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from OpenPinch import PinchProblem, PinchWorkspace
+from OpenPinch import PinchProblem, PinchWorkspace, config_options
 from OpenPinch.classes._workspace.views import summary_metric_deltas
 from OpenPinch.lib.enums import HPRcycle
 from OpenPinch.lib.schemas.workspace import (
@@ -66,6 +66,28 @@ def test_pinch_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: P
     assert bundle_path.exists()
     assert reloaded.list_cases() == ["baseline", "wide_dt"]
     assert reloaded.get_case_payload("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
+
+
+def test_pinch_workspace_scenario_helper_and_report_delegates():
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+
+    scenario = workspace.scenario(
+        "wide_dt",
+        options={"THERMAL_DT_CONT": 15},
+        dt_cont_multiplier=2.0,
+        activate=True,
+        solve=True,
+    )
+    report = workspace.report(case_name="wide_dt", solve=False)
+    metrics = workspace.metrics(case_name="wide_dt")
+    validation = workspace.validation_report("wide_dt")
+
+    assert isinstance(scenario, PinchProblem)
+    assert workspace.active_case_name == "wide_dt"
+    assert workspace.get_case_payload("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
+    assert validation.valid is True
+    assert report.solved is True
+    assert any(metric.metric == "Hot Utility Target" for metric in metrics)
 
 
 def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
@@ -151,8 +173,10 @@ def test_pinch_workspace_validation_and_configuration_metadata():
     report = workspace.validate_variant("baseline")
     invalid_view = workspace.solve_variant("baseline")
     fields = PinchWorkspace.configuration_field_metadata()
+    root_fields = config_options()
     by_name = {field.name: field for field in fields}
 
+    assert root_fields[0].name == fields[0].name
     assert report.valid is False
     assert any(issue.path == "streams[0].t_target" for issue in report.issues)
     assert invalid_view.status == "invalid"

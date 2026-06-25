@@ -4,7 +4,7 @@ OpenPinch is an open-source toolkit for advanced Pinch Analysis and Total Site I
 
 ## Install
 
-Install the published package from PyPI for core CLI and Python usage:
+Install the published package from PyPI for core Python usage:
 
 ```bash
 python -m pip install openpinch
@@ -47,15 +47,29 @@ python -m pip install "openpinch[full]"
 OpenPinch currently requires Python `>=3.14.2`.
 
 
-## Notebook Workflow
+## Packaged Resources
 
-OpenPinch ships with a notebook series for distinct outputs and workflows. Copy them into your working directory with:
+OpenPinch ships with sample cases and a notebook series for distinct outputs
+and workflows. Discover them from Python:
 
-```bash
-openpinch notebook -o notebooks
+```python
+from OpenPinch import (
+    list_notebooks,
+    list_sample_cases,
+    notebook_metadata,
+    sample_case_metadata,
+)
+
+print(list_sample_cases())
+print(sample_case_metadata("basic_pinch.json").description)
+print(list_notebooks())
+print(notebook_metadata("01_basic_pinch_and_dtcont_sensitivity.ipynb").title)
 ```
 
-To run the packaged notebooks in Jupyter, install the notebook extra first with `python -m pip install "openpinch[notebook]"`.
+Copy notebooks into your working directory with `copy_notebook(...)` or the
+reference notebook-copy command `openpinch notebook -o notebooks`. To run the
+packaged notebooks in Jupyter, install the notebook extra first with
+`python -m pip install "openpinch[notebook]"`.
 
 The packaged notebook series currently includes:
 
@@ -86,13 +100,17 @@ For script and notebook usage, the main single-case front door is
 from OpenPinch import PinchProblem
 
 problem = PinchProblem("basic_pinch.json", project_name="basic_pinch")
-problem.target()
 
+validation = problem.validation_report()
+result = problem.target()
 summary = problem.summary_frame()
+plain_summary = problem.summary_frame(format="plain")
+report = problem.report()
 print(summary)
 
 problem.export_excel("results")
 problem.plot.export("graphs", graph_type="gcc")
+problem.plot.export_gallery("graph_gallery")
 ```
 
 When the PinchProblem data contains stateful values, the named
@@ -119,8 +137,7 @@ workspace = PinchWorkspace(
     source="crude_preheat_train.json",
     project_name="crude_preheat_train",
 )
-workspace.copy_case("baseline", "wide_dt", activate=False)
-workspace.set_dt_cont_multiplier(0.5, case_name="wide_dt")
+workspace.scenario("wide_dt", dt_cont_multiplier=0.5)
 comparison = workspace.compare_cases("baseline", "wide_dt")
 ```
 

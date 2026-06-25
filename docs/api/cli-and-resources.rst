@@ -1,11 +1,10 @@
 CLI and Resources
 =================
 
-OpenPinch ships with a real command-line interface and packaged learning assets
-in addition to the Python API. Those surfaces matter because much of the
-package's practical power is meant to be discoverable without writing code from
-scratch, but the codebase treats them differently: the CLI copies notebooks,
-while the resource helpers expose both notebooks and sample cases to Python.
+OpenPinch ships packaged learning assets in addition to the Python API. The
+resource helpers are the primary programmatic surface for discovering,
+inspecting, and copying those assets. The command-line surface is intentionally
+narrow and only copies notebooks.
 
 Command-Line Interface
 ----------------------
@@ -30,10 +29,11 @@ throughout the guides and examples.
 
 The main helpers are:
 
-- ``list_sample_cases()`` and ``read_sample_case()`` for discovery and
-  inspection
+- ``list_sample_cases()``, ``sample_case_metadata()``, and
+  ``read_sample_case()`` for discovery and inspection
 - ``copy_sample_case()`` for local editable copies
-- ``list_notebooks()`` and ``copy_notebook()`` for the packaged notebook series
+- ``list_notebooks()``, ``notebook_metadata()``, and ``copy_notebook()`` for
+  the packaged notebook series
 
 ``PinchProblem`` and ``PinchWorkspace`` also resolve packaged sample-case names
 such as ``basic_pinch.json`` directly when no local file with the same name
@@ -91,6 +91,6 @@ or :func:`OpenPinch.streamlit_webviewer.web_graphing.render_streamlit_dashboard`
 Where This Fits
 ---------------
 
-Use the CLI and packaged resources when you want reproducible examples,
-shareable learning assets, or a fast onboarding path. Use the Python API pages
-when you need integration into scripts, notebooks, or larger applications.
+Use packaged resources when you want reproducible examples, shareable learning
+assets, or a fast onboarding path. Use the Python API pages when you need
+integration into scripts, notebooks, or larger applications.

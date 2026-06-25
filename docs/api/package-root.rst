@@ -16,8 +16,10 @@ Use the package root when you want the supported front door:
 - :func:`OpenPinch.pinch_analysis_service` for typed programmatic execution
 - :func:`OpenPinch.get_piecewise_linearisation_for_streams` for nonlinear
   stream segmentation utilities
-- :mod:`OpenPinch.lib` re-exports when you are constructing typed inputs with
-  enums, schemas, or configuration objects
+- resource helpers such as ``list_sample_cases()``, ``sample_case_metadata()``,
+  ``list_notebooks()``, and ``copy_notebook()``
+- report helpers such as ``problem.validation_report()``, ``problem.report()``,
+  and ``problem.metrics()``
 
 Typical Pattern
 ---------------
@@ -34,8 +36,7 @@ Typical Pattern
        source="crude_preheat_train.json",
        project_name="crude_preheat_train",
    )
-   workspace.copy_case("baseline", "wide_dt", activate=False)
-   workspace.set_dt_cont_multiplier(0.5, case_name="wide_dt")
+   workspace.scenario("wide_dt", dt_cont_multiplier=0.5)
    comparison = workspace.compare_cases("baseline", "wide_dt")
 
 The package root is intentionally small. If your workflow starts depending on
@@ -60,12 +61,13 @@ High-Level Service Function
 .. autofunction:: OpenPinch.main.pinch_analysis_service
    :no-index:
 
-Package-Level Re-Export Notes
------------------------------
+Package-Level Import Notes
+--------------------------
 
-The root package also re-exports the contents of :mod:`OpenPinch.lib`. That is
-useful for interactive work, but for larger codebases it is usually clearer to
-import schemas, enums, and configuration types from their explicit modules.
+The root package keeps a curated set of commonly used classes, schemas, enums,
+resource helpers, and report types. The broader :mod:`OpenPinch.lib` package is
+still importable for advanced schema and enum work, but it is not part of the
+root wildcard export surface.
 
 Use :doc:`schemas-and-config` when you need the typed input/config layer,
 and :doc:`generated-index` when you need exhaustive module-level details.

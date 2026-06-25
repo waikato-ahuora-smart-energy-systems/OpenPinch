@@ -47,6 +47,12 @@ own method-specific orchestration.
 .. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.network_evolution_method
    :members:
 
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.topology
+   :members:
+
+.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.common.execution.pathways
+   :members:
+
 Streamlit App
 -------------
 
