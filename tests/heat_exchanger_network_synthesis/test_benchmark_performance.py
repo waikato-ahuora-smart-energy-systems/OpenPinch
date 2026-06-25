@@ -89,7 +89,11 @@ def test_benchmark_defaults_cover_small_unique_cases_and_tiers_zero_to_four() ->
     benchmark = _load_benchmark_module()
 
     assert benchmark.HENS_QUALITY_TIERS == (0, 1, 2, 3, 4)
-    assert benchmark.HENS_BENCHMARK_OPTIONS["HENS_MAX_PARALLEL"] == 4
+    assert benchmark.HENS_MAX_PARALLEL == 10
+    assert benchmark.HENS_BENCHMARK_OPTIONS["HENS_MAX_PARALLEL"] == 10
+    assert benchmark.DEFAULT_HENS_BENCHMARK_JSON == REPO_ROOT / (
+        "results/hens_t0_t4_upto9_fixture_defaults.json"
+    )
     assert "Nine-stream-Linnhoff-and-Ahmad-1999-1.json" in (
         benchmark.HENS_BENCHMARK_CASES
     )
@@ -97,6 +101,65 @@ def test_benchmark_defaults_cover_small_unique_cases_and_tiers_zero_to_four() ->
     assert set(benchmark.HENS_BENCHMARK_CASES) == set(
         benchmark.small_hens_benchmark_cases(max_streams=9)
     )
+
+
+def test_benchmark_fixture_default_mode_preserves_fixture_hens_settings() -> None:
+    benchmark = _load_benchmark_module()
+    payload = json.loads(
+        (FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    fixture_options = deepcopy(payload["options"])
+
+    options = benchmark._hens_case_options(
+        payload,
+        options={
+            "HENS_MAX_PARALLEL": 6,
+            "HENS_APPROACH_TEMPERATURES": [999.0],
+        },
+        tier=3,
+        run_id="fixture-default-test",
+        use_fixture_defaults=True,
+    )
+
+    assert (
+        options["HENS_APPROACH_TEMPERATURES"]
+        == fixture_options["HENS_APPROACH_TEMPERATURES"]
+    )
+    assert (
+        options["HENS_DERIVATIVE_THRESHOLDS"]
+        == fixture_options["HENS_DERIVATIVE_THRESHOLDS"]
+    )
+    assert options["HENS_STAGE_SELECTION"] == fixture_options["HENS_STAGE_SELECTION"]
+    assert options["HENS_MAX_PARALLEL"] == 6
+    assert options["HENS_SYNTHESIS_QUALITY_TIER"] == 3
+    assert options["HENS_RUN_ID"] == "fixture-default-test"
+    assert options["HENS_OUTPUT_FORMATS"] == []
+
+
+def test_benchmark_standard_mode_applies_benchmark_hens_overrides() -> None:
+    benchmark = _load_benchmark_module()
+    payload = json.loads(
+        (FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    options = benchmark._hens_case_options(
+        payload,
+        options=benchmark.HENS_BENCHMARK_OPTIONS,
+        tier=4,
+        run_id="standard-mode-test",
+        use_fixture_defaults=False,
+    )
+
+    assert options["HENS_APPROACH_TEMPERATURES"] == [10.0]
+    assert options["HENS_DERIVATIVE_THRESHOLDS"] == [0.5]
+    assert options["HENS_STAGE_SELECTION"] == [3]
+    assert options["HENS_MAX_PARALLEL"] == 10
+    assert options["HENS_SYNTHESIS_QUALITY_TIER"] == 4
+    assert options["HENS_RUN_ID"] == "standard-mode-test"
 
 
 def test_benchmark_trace_executor_forwards_max_parallel_to_delegate() -> None:
@@ -130,6 +193,83 @@ def test_benchmark_trace_executor_forwards_max_parallel_to_delegate() -> None:
     assert trace_executor.task_records[0]["max_parallel"] == 4
 
 
+def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> None:
+    benchmark = _load_benchmark_module()
+
+    class FakeModel:
+        _path = "/tmp/openhens/fake-model"
+
+    def fake_solve(model, *, solver_name, disp=False, debug=0):
+        return benchmark.solver_backend.SolverRun(
+            name=solver_name,
+            status=1,
+            objective_value=123.4,
+            solve_time=0.25,
+        )
+
+    monkeypatch.setattr(benchmark.solver_backend, "solve_gekko_model", fake_solve)
+    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=2)
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="run-1",
+        method="pinch_design_method",
+        approach_temperature=10.0,
+        stage_count=2,
+        task_id="task-1",
+    )
+    start_record = benchmark._task_start_record(
+        task,
+        {},
+        stage_label="pdm",
+        stage_index=0,
+        max_parallel=1,
+    )
+
+    with tracer.patched_backend():
+        with tracer.task_context(start_record):
+            run = benchmark.solver_backend.solve_gekko_model(
+                FakeModel(),
+                solver_name="apopt",
+            )
+
+    assert run.status == 1
+    assert len(tracer.records) == 1
+    record = tracer.records[0]
+    assert record["case"] == "case.json"
+    assert record["tier"] == 2
+    assert record["task_id"] == "task-1"
+    assert record["stage_label"] == "pdm"
+    assert record["solver_name"] == "apopt"
+    assert record["solver_status"] == 1
+    assert record["objective_value"] == 123.4
+    assert record["solver_call_role"] == "pdm_above"
+
+
+def test_benchmark_solver_call_summaries_aggregate_by_layer() -> None:
+    benchmark = _load_benchmark_module()
+
+    diagnostics = benchmark._diagnostics_from_records(
+        tier=4,
+        task_records=[],
+        stage_records=[],
+        solver_call_records=[
+            {"stage_label": "pdm", "duration_seconds": 1.5},
+            {"stage_label": "tdm", "duration_seconds": 2.0},
+            {"stage_label": "evm_from_tdm", "duration_seconds": 3.5},
+        ],
+        selected_task_id=None,
+        in_progress_tasks=[],
+    )
+
+    assert diagnostics["solver_call_runtime_seconds"]["pdm"] == 1.5
+    assert diagnostics["solver_call_runtime_seconds"]["tdm"] == 2.0
+    assert diagnostics["solver_call_runtime_seconds"]["evm_from_tdm"] == 3.5
+    assert diagnostics["solver_call_counts"]["by_stage"] == {
+        "evm_from_tdm": 1,
+        "pdm": 1,
+        "tdm": 1,
+    }
+
+
 def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> None:
     benchmark = _load_benchmark_module()
     output_path = tmp_path / "benchmark.json"
@@ -141,6 +281,14 @@ def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> No
         "pathway_ids": ["tier2-compact-1"],
         "status": "running",
     }
+    partial_trace["solver_call_records"].append(
+        {
+            "stage_label": "pdm",
+            "solver_call_role": "pdm_above",
+            "solver_name": "apopt",
+            "duration_seconds": 0.5,
+        }
+    )
     results = [
         benchmark._failed_hens_result(
             "case.json",
@@ -164,6 +312,8 @@ def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> No
     }
     assert payload[0]["diagnostics"]["robustness"]["funnel"]["in_progress"] == 1
     assert payload[0]["diagnostics"]["in_progress_tasks"][0]["task_id"] == "task-1"
+    assert payload[0]["diagnostics"]["solver_call_runtime_seconds"]["pdm"] == 0.5
+    assert len(payload[0]["diagnostics"]["solver_calls"]) == 1
     assert payload[1]["benchmark"] == "hens_quality_tier_comparison"
     assert payload[1]["status"] == "missing_baseline"
 
