@@ -3,15 +3,8 @@
 Heat Pump Targeting
 ===================
 
-This page has moved. The current heat pump integration entrypoints are:
-
-- advanced targeting via ``problem.target.direct_heat_pump(...)`` and related
-  indirect/refrigeration routes
-- the packaged ``03_carnot_hpr_comparison.ipynb`` notebook
-- the compact HPR sample input file ``heat_pump_targeting.json`` for smaller
-  direct screening studies
-- the public cycle strings listed in
-  :doc:`../fundamentals/heat-pump-and-refrigeration-methods`
+This legacy page has moved. Heat Pump, refrigeration, and direct gas/vapour
+MVR workflows are now documented as advanced task guides.
 
 Use these pages instead:
 

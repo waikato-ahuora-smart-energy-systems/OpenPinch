@@ -1,36 +1,40 @@
 Notebooks and Sample Cases
 ==========================
 
-The packaged notebooks and sample cases are part of the supported OpenPinch
-learning surface. They are the fastest way to move from a blank environment to
-an end-to-end workflow, and the primary discovery surface is Python:
+Purpose
+-------
 
-- Python resource helpers expose names, metadata, readers, and copy helpers
-- wrapper objects resolve packaged sample-case names directly
-- a shell copy shortcut remains documented later for notebook assets
+Use packaged notebooks and sample cases when you want maintained, reproducible
+learning assets that exercise the public OpenPinch API.
 
-Install the notebook runtime first:
+Prerequisites
+-------------
+
+Install the notebook extra before running copied notebooks:
 
 .. code-block:: bash
 
    python -m pip install "openpinch[notebook]"
 
-Packaged Sample Cases
----------------------
+Sample Cases
+------------
 
-OpenPinch currently ships with sample cases such as:
+OpenPinch currently ships:
 
+- ``Four-stream-Yee-and-Grossmann-1990-1.json``
 - ``basic_pinch.json``
+- ``chocolate_factory.json``
 - ``crude_preheat_train.json``
 - ``crude_preheat_train_multiperiod.json``
+- ``heat_pump_targeting.json``
+- ``pulp_mill.json``
 - ``zonal_site.json``
 - ``zonal_site_multiperiod.json``
-- ``pulp_mill.json``
-- ``heat_pump_targeting.json``
-- ``chocolate_factory.json``
-- ``Four-stream-Yee-and-Grossmann-1990-1.json``
 
-Use the resource helpers when you want to inspect or copy them explicitly:
+Runnable Workflow
+-----------------
+
+Discover sample cases from Python:
 
 .. code-block:: python
 
@@ -46,30 +50,16 @@ Use the resource helpers when you want to inspect or copy them explicitly:
    print(read_sample_case("basic_pinch.json")[:120])
    copy_sample_case("basic_pinch.json", "basic_pinch.json")
 
-You can also load a packaged sample case directly through
-``PinchProblem("basic_pinch.json")`` or
-``PinchWorkspace(source="basic_pinch.json")`` when no local file with that
-name exists. That rule is intentional so local files always win.
+Load a packaged sample case directly when no local file with that name exists:
 
-Packaged Notebook Series
-------------------------
+.. code-block:: python
 
-The current packaged notebooks stay on the stable public surfaces while using
-real packaged cases or real derivatives of those cases. Notebook 01 starts from
-``PinchProblem``, notebooks 01 to 03 use ``PinchWorkspace`` where named study
-cases matter, notebook 04 covers named-period targeting, and notebook 05 covers
-the typed and serialized boundaries. Notebook 06 covers energy-transfer
-analysis outputs. Notebook 07 covers the vapour-compression plus MVR cascade
-HPR backend and its split-fraction source/process routing. Notebook 08 covers
-the direct gas/vapour MVR process-component workflow, where live
-``PinchProblem`` cases are mutated with replacement hot streams and compared
-in a ``PinchWorkspace``. Notebook 09 covers the problem-owned heat exchanger
-network design service on a compact four-stream synthesis case, including grid
-configuration, live solver execution, and top-network inspection. The distributed assets are
-packaged as clean sources: no stored Plotly data, no cached execution
-counts, and no stale traceback output.
+   from OpenPinch import PinchProblem, PinchWorkspace
 
-Access notebook assets directly from Python:
+   problem = PinchProblem("basic_pinch.json")
+   workspace = PinchWorkspace(source="crude_preheat_train.json")
+
+Copy notebooks from Python:
 
 .. code-block:: python
 
@@ -79,14 +69,19 @@ Access notebook assets directly from Python:
    print(notebook_metadata("02_total_site_targets_and_sugcc.ipynb").description)
    copy_notebook("01_basic_pinch_and_dtcont_sensitivity.ipynb", "notebooks")
 
-The notebook-copy CLI remains available when you only need to copy source
-assets from a shell:
+Copy notebooks from the shell:
 
 .. code-block:: bash
 
    openpinch notebook -o notebooks
 
-Current packaged notebooks:
+Expected Output
+---------------
+
+Packaged notebooks are copied as clean sources: no stored Plotly data, no
+cached execution counts, and no stale traceback output.
+
+The current notebook series is:
 
 1. ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
 2. ``02_total_site_targets_and_sugcc.ipynb``
@@ -98,64 +93,24 @@ Current packaged notebooks:
 8. ``08_direct_gas_stream_mvr.ipynb``
 9. ``09_hen_design_service_four_stream.ipynb``
 
-Notebook 04 shows the named-period workflow directly through
-``problem.target.direct_heat_integration(period_id="peak")`` and
-``problem.target.indirect_heat_integration(period_id="winter")``. Notebook 05
-shows the typed ``TargetInput`` boundary and the serialized
-``PinchWorkspace`` view layer. Notebook 06 shows
-``target.energy_transfer(...)`` with the heat-surplus/deficit table and
-``plot.energy_transfer_diagram(...)``. Notebook 07 shows
-``target.direct_heat_pump(...)`` with
-``HPR_TYPE = "Vapour compression with MVR cascade"`` and the VC+MVR
-configuration fields. Notebook 03 uses
-``HPR_TYPE = "Cascade Carnot cycles"`` for broad direct/indirect
-screening and notes ``"Parallel Carnot cycles"`` as the explicit staged
-Carnot option. Notebook 08 shows ``add_component.process_mvr(...)``,
-``stage_results_by_period``, replacement stream inspection, component
-activation/deactivation, and baseline-versus-MVR comparison through
-``workspace.compare_cases(...)``. Notebook 09 shows
-``problem.design.enhanced_synthesis_method(quality_tier=...)``,
-``problem.design.open_hens_method()`` for original tier 1,
-``problem.design.heat_exchanger_network_synthesis(method=...)``, and
-``workspace.solve_variant(..., workflow="heat_exchanger_network_synthesis")``
-with a small heat exchanger network design grid and grid views for the top
-networks.
+Interpretation
+--------------
 
-Recommended Learning Path
--------------------------
+Recommended learning path:
 
-1. ``basic_pinch.json`` and notebook 01 for the single-case workflow and
-   ``dt_cont`` interpretation.
-2. ``zonal_site.json`` or ``pulp_mill.json`` and notebook 02 for Total Site
-   and SUGCC workflows.
-3. ``chocolate_factory.json`` and notebook 03 for
-   direct-versus-indirect HPR and refrigeration comparison.
-4. ``crude_preheat_train_multiperiod.json`` and
-   ``zonal_site_multiperiod.json`` with notebook 04 for real named-period
-   comparison.
-5. ``basic_pinch.json`` and notebook 05 when you need typed validation,
-   exports, or serialized workspace views.
-6. ``pulp_mill.json`` and notebook 06 when you need energy-transfer diagrams
-   or interval surplus/deficit accounting.
-7. ``heat_pump_targeting.json`` and notebook 07 when you need the
-   vapour-compression plus MVR cascade HPR backend.
-8. Notebook 08 when you need direct gas/vapour MVR on selected process streams
-   before re-solving direct and Total Site targets.
-9. Notebook 09 when you need heat exchanger network design-service execution
-   and network inspection on the converted OpenHENS Ye and Grossman four-stream
-   synthesis case.
-
-Why These Assets Matter
------------------------
-
-These assets are useful because they:
-
-- exercise the supported public API directly
-- provide named examples that align with the docs
-- give users a realistic plant-style context instead of toy inputs
+1. ``basic_pinch.json`` and notebook 01 for first solves and ``dt_cont`` sensitivity.
+2. ``zonal_site.json`` or ``pulp_mill.json`` and notebook 02 for Total Site and SUGCC.
+3. ``chocolate_factory.json`` and notebook 03 for direct-versus-indirect HPR.
+4. multiperiod sample cases and notebook 04 for named-period targeting.
+5. notebook 05 for typed ``TargetInput`` and serialized workspace views.
+6. notebook 06 for energy-transfer diagrams and interval surplus/deficit tables.
+7. notebook 07 for vapour-compression plus MVR cascade HPR.
+8. notebook 08 for direct gas/vapour MVR process components.
+9. notebook 09 for heat exchanger network synthesis and top-network inspection.
 
 Next Steps
 ----------
 
-- For notebook details, see :doc:`../examples/notebook-series`.
-- For sample-case details, see :doc:`../examples/sample-cases`.
+- :doc:`../examples/notebook-series` for notebook-by-notebook details.
+- :doc:`../examples/sample-cases` for sample-case descriptions.
+- :doc:`../api/cli-and-resources` for the exact resource helper API.

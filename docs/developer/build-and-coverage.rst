@@ -64,5 +64,12 @@ Current Quality Gates
 Recommended Next Gates
 ----------------------
 
-- add link checking
 - keep packaged asset indexes synchronized with the resources module
+- use link checking as an optional local audit, not a required CI or RTD gate,
+  because external links can fail independently of documentation quality
+
+Optional link audit:
+
+.. code-block:: bash
+
+   uv run python -m sphinx -b linkcheck docs docs/_build/linkcheck

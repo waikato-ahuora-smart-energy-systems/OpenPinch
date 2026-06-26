@@ -44,8 +44,9 @@ The core OpenPinch solve path can be read as one analysis-dataflow diagram:
        -> TargetOutput summaries and graph data
        -> tables, plots, Excel export, and dashboard views
 
-This matters because the same prepared model feeds the CLI, the
-``PinchProblem`` wrapper, the service layer, and the packaged notebooks.
+This matters because the same prepared model feeds the ``PinchProblem``
+wrapper, the service layer, and the packaged notebooks. The CLI only copies
+notebook sources; it does not run this solve path.
 
 Minimum Approach Temperature
 ----------------------------

@@ -1,9 +1,9 @@
 Fundamentals
 ============
 
-This section explains the thermodynamic and workflow concepts that OpenPinch
-implements, using the same terms that appear in the API, outputs, and example
-workflows.
+This section explains the thermodynamic concepts behind OpenPinch. These pages
+are method references, not API tutorials: they explain what the calculation or
+graph means before the guides show how to run it.
 
 .. toctree::
    :maxdepth: 1

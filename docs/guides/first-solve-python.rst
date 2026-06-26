@@ -1,18 +1,37 @@
 First Solve with Python
 =======================
 
-The main Python single-case front door is :class:`OpenPinch.PinchProblem`.
-It is the supported object when you want one place for loading, validation,
-solving, summaries, graphs, exports, and advanced target reruns.
+Purpose
+-------
 
-Question This Guide Answers
----------------------------
+Use :class:`OpenPinch.PinchProblem` when you want one object to load, validate,
+solve, summarize, graph, export, and rerun one OpenPinch case. This is the
+canonical beginner workflow and the default path for scripts and notebooks.
 
-How do I run a supported end-to-end OpenPinch workflow from a script or
-notebook and inspect the results directly in Python?
+Prerequisites
+-------------
 
-Step 1. Load a Known-Good Sample
---------------------------------
+Install the base package:
+
+.. code-block:: bash
+
+   python -m pip install openpinch
+
+Install the notebook extra when you want Plotly graphs, Jupyter notebooks, or
+Excel import/export:
+
+.. code-block:: bash
+
+   python -m pip install "openpinch[notebook]"
+
+Sample Case
+-----------
+
+Use ``basic_pinch.json`` first. If no local file with that name exists,
+``PinchProblem`` loads the packaged sample case from the installed wheel.
+
+Runnable Workflow
+-----------------
 
 .. code-block:: python
 
@@ -20,112 +39,64 @@ Step 1. Load a Known-Good Sample
 
    problem = PinchProblem("basic_pinch.json", project_name="basic_pinch")
 
-If no local file named ``basic_pinch.json`` exists, this resolves the packaged
-sample case that ships with the wheel. The same wrapper also accepts:
-
-- JSON files
-- Excel workbooks such as ``.xlsx`` or ``.xlsb``
-- a directory containing ``streams.csv`` and ``utilities.csv``
-- a ``(streams_csv, utilities_csv)`` tuple
-- an in-memory ``TargetInput`` or plain mapping
-
-Step 2. Validate and Run
-------------------------
-
-.. code-block:: python
-
-   problem.validate()
+   validation = problem.validation_report()
    result = problem.target()
-
-The `target()` call performs the high-level targeting workflow and caches the
-structured result on the same object.
-
-Step 3. Read the Summary
-------------------------
-
-.. code-block:: python
-
    summary = problem.summary_frame()
-   print(summary)
 
-Read the main process or plant row in this order:
+   print(validation.valid)
+   print(summary[["Target", "Hot Utility Target", "Cold Utility Target"]])
 
-1. `Hot Utility Target`
-2. `Cold Utility Target`
-3. `Heat Recovery`
-4. `Hot Pinch` and `Cold Pinch`
+Expected Output
+---------------
 
-Step 4. Inspect Graphs
-----------------------
+The solve caches a structured result on ``problem`` and returns a summary table
+with target rows. For the first pass, inspect:
+
+1. ``Hot Utility Target``
+2. ``Cold Utility Target``
+3. ``Heat Recovery``
+4. ``Hot Pinch`` and ``Cold Pinch``
+
+Graph and Export Workflow
+-------------------------
+
+With ``openpinch[notebook]`` or ``openpinch[dashboard]`` installed:
 
 .. code-block:: python
 
    gcc = problem.plot.grand_composite_curve()
-   cc = problem.plot.composite_curve()
    catalog = problem.plot.catalog()
-
-Use the GCC first when utility placement or Heat Pump opportunity is the main
-question. These rendered Plotly figures require the ``openpinch[notebook]`` or
-``openpinch[dashboard]`` extra.
-
-Step 5. Work With Selected Periods
-----------------------------------
-
-When a case carries multiperiod values, the wrapper exposes both the canonical
-period lookup and period-specific reruns:
-
-.. code-block:: python
-
-   print(problem.period_ids)
-
-   peak_target = problem.target.direct_heat_integration(period_id="peak")
-   peak_summary = problem.summary_frame()
-   print(peak_summary[["Target", "Period ID", "Hot Utility Target"]])
-
-   all_period_results = problem.target_all_periods(parallel="thread")
-   print(all_period_results.keys())
-
-The named ``problem.target.*`` entry points accept ``period_id=...``. The
-returned summary, export, and graph surfaces then reflect that selected period.
-
-Step 6. Export Artifacts
-------------------------
-
-.. code-block:: python
-
    workbook_path = problem.export_excel("results")
    graph_paths = problem.plot.export("graphs", graph_type="gcc")
 
-These Excel and Plotly export hooks require the ``openpinch[notebook]`` or
-``openpinch[dashboard]`` extra.
+The Grand Composite Curve is the best first graph for utility placement and
+Heat Pump opportunity screening.
 
-Step 7. Use the Richer Workflow Hooks
--------------------------------------
+Period-Valued Cases
+-------------------
 
-`PinchProblem` also exposes:
+Named targeting accessors accept ``period_id=...`` when the case input carries
+multiperiod values:
 
-- `problem.target.direct_heat_integration(...)`
-- `problem.target.indirect_heat_integration(...)`
-- `problem.target.direct_heat_pump(...)`
-- `problem.target.indirect_heat_pump(...)`
-- `problem.target.direct_refrigeration(...)`
-- `problem.target.indirect_refrigeration(...)`
-- `problem.target.exergy(...)`
-- `problem.target.cogeneration(...)`
+.. code-block:: python
 
-These are best treated as explicit advanced workflows after you understand the
-base case.
+   multiperiod_problem = PinchProblem(
+       "crude_preheat_train_multiperiod.json",
+       project_name="crude_multiperiod",
+   )
 
-`problem.target.exergy(...)` is a post-processing step on an existing target
-result. Run the compatible thermal target first, then inspect
-`problem.plot.exergetic_grand_composite_curve()` or
-`problem.plot.exergetic_net_load_profiles()` if you need the exergy view.
+   print(multiperiod_problem.period_ids)
+   peak_target = multiperiod_problem.target.direct_heat_integration(period_id="peak")
+   all_period_results = multiperiod_problem.target_all_periods(parallel="thread")
 
-Named Multi-Case Alternative
-----------------------------
+The summary, export, and graph surfaces then reflect the selected period.
 
-When you want one notebook or script to keep named study cases together, use
-``PinchWorkspace``:
+Interpretation
+--------------
+
+Stay on ``PinchProblem`` when the study has one active case. Move to
+``PinchWorkspace`` when the study itself needs named baseline and variant
+cases:
 
 .. code-block:: python
 
@@ -135,49 +106,16 @@ When you want one notebook or script to keep named study cases together, use
        source="crude_preheat_train.json",
        project_name="crude_preheat_train",
    )
-   baseline = workspace.case("baseline")
-   workspace.copy_case("baseline", "wide_dt", activate=False)
-   workspace.set_dt_cont_multiplier(0.5, case_name="wide_dt")
+   workspace.scenario("wide_dt", dt_cont_multiplier=0.5)
    comparison = workspace.compare_cases("baseline", "wide_dt")
 
-Use ``PinchWorkspace`` when the study itself needs to remember multiple cases.
-Stay on ``PinchProblem`` when you only need one case at a time.
-
-Schema-First Alternative
-------------------------
-
-When you do not want a multiperiod wrapper object, use the service boundary:
-
-.. code-block:: python
-
-   from OpenPinch import pinch_analysis_service
-   from OpenPinch.lib.schemas.io import StreamSchema, TargetInput
-
-   input_data = TargetInput(
-       streams=[
-           StreamSchema(
-               zone="Process",
-               name="Hot Feed",
-               t_supply=180.0,
-               t_target=80.0,
-               heat_flow=2500.0,
-               dt_cont=10.0,
-           )
-       ]
-   )
-
-   result = pinch_analysis_service(input_data, project_name="Example")
-
-When To Drop Lower
-------------------
-
-Use the lower-level service and prepared-zone workflow only when you need to
-inspect or mutate the intermediate `Zone` hierarchy directly.
+Use ``pinch_analysis_service`` only when another application needs a typed
+``TargetInput`` to ``TargetOutput`` boundary instead of a live wrapper object.
 
 Next Steps
 ----------
 
-- For input modeling guidance, see :doc:`input-formats-and-validation`.
-- For named study-case orchestration, see :doc:`../api/pinchworkspace`.
-- For zonal and site workflows, see :doc:`zonal-and-total-site-workflows`.
-- For the exact `PinchProblem` API, see :doc:`../api/pinchproblem`.
+- :doc:`input-formats-and-validation` for accepted source shapes.
+- :doc:`graphing-and-interpretation` for reading curves after a solve.
+- :doc:`notebooks-and-sample-cases` for maintained example assets.
+- :doc:`../api/pinchproblem` for the full object contract.

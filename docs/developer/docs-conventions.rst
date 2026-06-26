@@ -12,10 +12,15 @@ Content Rules
 - Keep a clear separation between ``Stable``, ``Advanced``, and
   ``Experimental / partial`` capabilities.
 - Explain the thermodynamic decision question before explaining the API call.
-- Prefer one practical workflow example per page over long enumerations of
+- Keep each guide on the standard structure: purpose, prerequisites, sample
+  case or asset, runnable workflow, expected output, interpretation, and next
+  steps.
+- Prefer one practical workflow example per guide over long enumerations of
   loosely related features.
 - When a new public method or CLI command is added, update both the curated
   narrative page and the exhaustive reference appendix.
+- Do not present removed solver, graph-export, or validation command surfaces
+  as supported CLI workflows.
 
 Page Categories
 ---------------
@@ -53,6 +58,13 @@ Docs Maintenance Expectations
 -----------------------------
 
 - Public API changes should ship with docs updates in the same change.
+- Stable public API changes must update both a task-oriented page and the
+  curated API page for that contract.
 - New packaged notebooks or sample cases should be added to the examples pages.
+- New packaged notebooks or sample cases should update docs consistency tests
+  that compare examples docs with ``OpenPinch.resources``.
 - If a surface is intentionally experimental, keep it out of the stable guides
   and mark it clearly in the support matrix.
+- Legacy pages under ``docs/user-guide`` and moved ``docs/reference`` entry
+  points should remain as orphan transition pages unless a deliberate redirect
+  strategy replaces them.

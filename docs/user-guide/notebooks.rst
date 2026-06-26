@@ -3,31 +3,12 @@
 Notebook Workflows
 ==================
 
-This page has moved, but the packaged notebook workflow still depends on
-``python -m pip install "openpinch[notebook]"`` and the current series is:
-
-- ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
-- ``02_total_site_targets_and_sugcc.ipynb``
-- ``03_carnot_hpr_comparison.ipynb``
-- ``04_multiperiod_targeting_and_period_comparison.ipynb``
-- ``05_schema_service_and_output_workflows.ipynb``
-- ``06_energy_transfer_analysis.ipynb``
-- ``07_vapour_compression_mvr_cascade_hpr.ipynb``
-- ``08_direct_gas_stream_mvr.ipynb``
-- ``09_hen_design_service_four_stream.ipynb``
-
-These notebooks now span the main single-case ``PinchProblem`` workflow, named
-``PinchWorkspace`` studies, real multiperiod targeting, and the typed/service
-and serialized workspace boundaries, plus energy-transfer analysis and the
-vapour-compression plus MVR cascade HPR backend. The series also includes the
-direct gas/vapour stream MVR process-component workflow and the problem-owned
-heat exchanger network design-service workflow on a four-stream synthesis case,
-including ``problem.design.enhanced_synthesis_method(quality_tier=...)`` for
-tiered search and ``problem.design.open_hens_method()`` for the original
-tier-1 route.
+This legacy page has moved. Packaged notebooks and sample cases are now
+documented in the task guide and examples section.
 
 Use these pages instead:
 
 - :doc:`../guides/notebooks-and-sample-cases`
 - :doc:`../examples/notebook-series`
 - :doc:`../examples/sample-cases`
+- :doc:`../api/cli-and-resources`

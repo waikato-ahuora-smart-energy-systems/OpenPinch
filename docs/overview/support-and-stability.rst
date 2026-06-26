@@ -1,91 +1,76 @@
 Support and Stability
 =====================
 
-Not every exposed OpenPinch surface should be read the same way. This page
-defines the support levels used throughout the documentation.
-
-Support Levels
---------------
-
-Stable public API
-   Preferred user-facing surfaces documented as the main package entrypoints.
-
-Advanced public API
-   Supported surfaces intended for expert workflows, deeper post-processing, or
-   greater control over the targeting pipeline.
-
-Experimental / partial
-   Exposed modules or concepts that are present in the package but are not yet
-   documented or polished to the same standard as the core workflow.
-
-Internal implementation
-   Package internals that may be useful for understanding the codebase but
-   should not be treated as a stable extension surface by default.
+OpenPinch documents different surfaces with different promises. Use this page
+when deciding whether a callable is a stable user interface, an advanced
+workflow, or an implementation detail.
 
 Stable Public Surfaces
 ----------------------
 
-- :class:`OpenPinch.PinchProblem`
-- :class:`OpenPinch.PinchWorkspace`
-- :func:`OpenPinch.main.pinch_analysis_service`
-- root package imports from :mod:`OpenPinch`
-- `TargetInput`, `TargetOutput`, and the main I/O schema models
-- packaged sample-case and notebook resource helpers
-- ``validation_report()``, ``report()``, ``metrics()``, and
-  ``Configuration.options_catalog()`` helper surfaces
+Stable surfaces are the preferred way to build user workflows:
+
+- ``PinchProblem``
+- ``PinchWorkspace``
+- ``pinch_analysis_service``
+- root package imports listed in :mod:`OpenPinch`
+- ``TargetInput``, ``TargetOutput``, and the main I/O schema models
+- packaged resource helpers such as ``list_sample_cases()`` and
+  ``copy_notebook()``
+- ``openpinch notebook`` for copying notebooks only
+- ``validation_report()``, ``summary_frame()``, ``report()``, ``metrics()``,
+  and ``config_options()``
 
 Advanced Public Surfaces
 ------------------------
 
-- ``problem.target.*`` targeting accessors
+Advanced surfaces are supported, but they require more interpretation:
+
+- ``problem.target.*`` specialized targeting accessors
 - ``problem.plot.*`` graph accessors
-- exergy post-processing through ``problem.target.exergy(...)`` and the
-  matching exergetic plot accessors
-- :func:`OpenPinch.services.input_data_processing.data_preparation.prepare_problem`
-- service-layer targeting helpers under :mod:`OpenPinch.services`
-- domain classes such as `Zone`, `Stream`, `StreamCollection`, and
-  `ProblemTable`
-- stream linearisation and some other utility helpers
-- the narrow ``openpinch notebook`` command for copying packaged notebooks
+- ``problem.add_component.process_mvr(...)``
+- ``problem.design.*`` heat exchanger network synthesis accessors
+- exergy and cogeneration post-processing
+- service-layer helpers under :mod:`OpenPinch.services`
+- domain classes such as ``Zone``, ``Stream``, ``StreamCollection``, and
+  ``ProblemTable``
 
 Experimental or Partial Surfaces
 --------------------------------
 
-- community and region framing as a user-facing multiscale workflow
-- energy transfer analysis modules
-- lower-level exergy helper modules below the accessor surface
-- some lower-level HPR comparison concepts that sit below the explicit
-  ``problem.target.*`` targeting workflows
+These surfaces may be useful, but they are not presented as primary user
+workflows:
 
-These surfaces may still be valuable, but the docs treat them with more
-qualification than the core package workflows.
+- community and region framing
+- lower-level energy-transfer and exergy helper modules
+- optimizer backend internals
+- implementation modules below the curated service/API pages
 
-Internal or Cautionary Surfaces
--------------------------------
+Dependency Boundaries
+---------------------
 
-- helper functions inside `PinchProblem` and lower-level service modules that
-  exist mainly to support public entrypoints
-- low-level optimizer backends
-- specialist cycle implementation internals
+Optional dependencies are intentionally workflow-specific:
+
+- ``openpinch[notebook]`` for Jupyter, Plotly graph rendering, and Excel I/O
+- ``openpinch[dashboard]`` for Streamlit dashboard review
+- ``openpinch[synthesis]`` plus solver extensions for solver-backed HEN synthesis
+- ``openpinch[brayton_cycle]`` for TESPy-backed Brayton-cycle tooling
 
 Documentation Rule
 ------------------
 
-When reading the API reference:
+When a stable public surface changes, update:
 
-- start with the curated pages in :doc:`../api/index`
-- use the generated appendix only after you know which layer you want
-- assume undocumented helpers are internal unless explicitly called out here or
-  in the curated API pages
+1. the task guide that teaches the workflow
+2. the curated API page that documents the contract
+3. examples or packaged asset docs when the change affects learning workflows
+4. docs consistency tests
 
-Implications For Contributors
------------------------------
+When an advanced or experimental surface changes, document it in proportion to
+its intended user visibility and mark the support level clearly.
 
-Changes to stable public surfaces should trigger:
+Next Steps
+----------
 
-- docs updates
-- example updates where relevant
-- tests for user-facing behavior
-
-Changes to advanced, experimental, or internal surfaces still matter, but they
-should be documented in proportion to their intended user visibility.
+- :doc:`capability-matrix` for feature status by workflow.
+- :doc:`../developer/docs-conventions` for contributor standards.

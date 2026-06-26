@@ -1,362 +1,248 @@
-"""Consistency checks for the user-facing documentation surface."""
+"""Structural checks for the user-facing documentation surface."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import OpenPinch
 from OpenPinch.resources import list_notebooks, list_sample_cases
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DOCS_ROOT = REPO_ROOT / "docs"
 README = REPO_ROOT / "README.md"
-GETTING_STARTED = REPO_ROOT / "docs" / "getting-started.rst"
-QUICKSTART = REPO_ROOT / "docs" / "user-guide" / "quickstart.rst"
-NOTEBOOKS = REPO_ROOT / "docs" / "user-guide" / "notebooks.rst"
-HEAT_PUMP_TARGETING = REPO_ROOT / "docs" / "user-guide" / "heat-pump-targeting.rst"
-INTERPRETING_RESULTS = REPO_ROOT / "docs" / "user-guide" / "interpreting-results.rst"
-GUIDE_FIRST_SOLVE_CLI = REPO_ROOT / "docs" / "guides" / "first-solve-cli.rst"
-GUIDE_NOTEBOOKS_AND_CASES = (
-    REPO_ROOT / "docs" / "guides" / "notebooks-and-sample-cases.rst"
+RTD_CONFIG = REPO_ROOT / ".readthedocs.yaml"
+
+GUIDES_ROOT = DOCS_ROOT / "guides"
+API_ROOT = DOCS_ROOT / "api"
+EXAMPLES_ROOT = DOCS_ROOT / "examples"
+
+LEGACY_PAGE_TARGETS = {
+    DOCS_ROOT / "user-guide" / "quickstart.rst": (
+        "../guides/first-solve-python",
+        "../guides/notebooks-and-sample-cases",
+    ),
+    DOCS_ROOT / "user-guide" / "notebooks.rst": (
+        "../guides/notebooks-and-sample-cases",
+        "../examples/notebook-series",
+    ),
+    DOCS_ROOT / "user-guide" / "heat-pump-targeting.rst": (
+        "../guides/heat-pump-workflows",
+        "../fundamentals/heat-pump-and-refrigeration-methods",
+    ),
+    DOCS_ROOT / "user-guide" / "interpreting-results.rst": (
+        "../guides/graphing-and-interpretation",
+        "../fundamentals/graphs-and-interpretation",
+    ),
+    DOCS_ROOT / "reference" / "api.rst": (
+        "../api/package-root",
+        "../api/generated-index",
+    ),
+    DOCS_ROOT / "reference" / "architecture.rst": (
+        "../overview/workflow-map",
+        "../fundamentals/pinch-analysis",
+    ),
+    DOCS_ROOT / "reference" / "index.rst": (
+        "../api/index",
+        "../developer/index",
+    ),
+}
+
+STALE_DOC_STRINGS = (
+    "openpinch run",
+    "openpinch graph",
+    "openpinch validate",
+    "openpinch sample",
+    "``run`` for end-to-end analysis",
+    "``graph`` for HTML graph export",
+    "``validate`` for payload preflight checks",
+    "``sample`` for copying packaged sample cases",
 )
-GUIDE_EXPORTING_RESULTS = REPO_ROOT / "docs" / "guides" / "exporting-results.rst"
-GUIDE_HEN_SYNTHESIS = (
-    REPO_ROOT / "docs" / "guides" / "heat-exchanger-network-synthesis.rst"
+
+GUIDE_REQUIRED_HEADINGS = (
+    "Purpose\n-------",
+    "Prerequisites\n-------------",
+    "Runnable Workflow\n-----------------",
+    "Expected Output\n---------------",
+    "Interpretation\n--------------",
+    "Next Steps\n----------",
 )
-GUIDE_GRAPHING = REPO_ROOT / "docs" / "guides" / "graphing-and-interpretation.rst"
-FUNDAMENTALS_GRAPHS = (
-    REPO_ROOT / "docs" / "fundamentals" / "graphs-and-interpretation.rst"
-)
-EXAMPLE_NOTEBOOK_SERIES = REPO_ROOT / "docs" / "examples" / "notebook-series.rst"
-EXAMPLE_SAMPLE_CASES = REPO_ROOT / "docs" / "examples" / "sample-cases.rst"
-OVERVIEW_CAPABILITY_MATRIX = REPO_ROOT / "docs" / "overview" / "capability-matrix.rst"
-OVERVIEW_SUPPORT = REPO_ROOT / "docs" / "overview" / "support-and-stability.rst"
-API_PINCHWORKSPACE = REPO_ROOT / "docs" / "api" / "pinchworkspace.rst"
-API_PACKAGE_ROOT = REPO_ROOT / "docs" / "api" / "package-root.rst"
-API_CLI_RESOURCES = REPO_ROOT / "docs" / "api" / "cli-and-resources.rst"
-API_SERVICE_LAYER = REPO_ROOT / "docs" / "api" / "service-layer.rst"
-API_SCHEMAS_CONFIG = REPO_ROOT / "docs" / "api" / "schemas-and-config.rst"
-API_CLASSES = REPO_ROOT / "docs" / "reference" / "api-classes.rst"
-API_LIB = REPO_ROOT / "docs" / "reference" / "api-lib.rst"
-API_ANALYSIS = REPO_ROOT / "docs" / "reference" / "api-analysis.rst"
-API_ENTRYPOINTS = REPO_ROOT / "docs" / "reference" / "api-entrypoints.rst"
-REFERENCE_INDEX = REPO_ROOT / "docs" / "reference" / "index.rst"
 
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_docs_highlight_current_pinchproblem_methods():
-    combined = "\n".join(
+def _docs_text(paths: list[Path] | None = None) -> str:
+    if paths is None:
+        paths = [*DOCS_ROOT.rglob("*.rst"), README]
+    return "\n".join(_read(path) for path in paths)
+
+
+def test_rtd_configuration_keeps_strict_python314_build():
+    config = _read(RTD_CONFIG)
+
+    assert 'python: "3.14"' in config
+    assert "configuration: docs/conf.py" in config
+    assert "fail_on_warning: true" in config
+    assert "requirements: docs/requirements.txt" in config
+
+
+def test_top_level_navigation_uses_user_first_information_architecture():
+    index = _read(DOCS_ROOT / "index.rst")
+
+    for phrase in (
+        "I want to solve a case",
+        "I need to understand the method",
+        "I am integrating or extending OpenPinch",
+        "getting-started",
+        "overview/index",
+        "fundamentals/index",
+        "guides/index",
+        "api/index",
+        "examples/index",
+        "developer/index",
+    ):
+        assert phrase in index
+
+    assert index.index("getting-started") < index.index("overview/index")
+
+
+def test_getting_started_is_canonical_first_run_page():
+    page = _read(DOCS_ROOT / "getting-started.rst")
+
+    assert ":orphan:" not in page
+    assert "python -m pip install openpinch" in page
+    assert "PinchProblem(\"basic_pinch.json\"" in page
+    assert "PinchWorkspace" in page
+    assert "openpinch notebook -o notebooks" in page
+    assert "Use the CLI Only for Notebook Assets" in page
+
+
+def test_guides_follow_the_standard_task_structure():
+    guide_pages = sorted(
+        path
+        for path in GUIDES_ROOT.glob("*.rst")
+        if path.name != "index.rst"
+    )
+
+    assert guide_pages
+    for path in guide_pages:
+        text = _read(path)
+        for heading in GUIDE_REQUIRED_HEADINGS:
+            assert heading in text, f"{path} is missing {heading!r}"
+        assert (
+            "Sample Case" in text
+            or "Sample Asset" in text
+            or "Sample Cases" in text
+        ), f"{path} is missing a sample section"
+
+
+def test_packaged_assets_are_documented_in_examples_and_guides():
+    combined = _docs_text(
         [
-            _read(README),
-            _read(GETTING_STARTED),
-            _read(QUICKSTART),
-            _read(NOTEBOOKS),
-            _read(HEAT_PUMP_TARGETING),
-            _read(INTERPRETING_RESULTS),
+            EXAMPLES_ROOT / "notebook-series.rst",
+            EXAMPLES_ROOT / "sample-cases.rst",
+            GUIDES_ROOT / "notebooks-and-sample-cases.rst",
+            GUIDES_ROOT / "first-solve-cli.rst",
+            README,
         ]
     )
-    assert "target()" in combined
-    assert "validation_report()" in combined
-    assert "summary_frame()" in combined
-    assert "report()" in combined
-    assert "metrics()" in combined
-    assert "export_excel" in combined
-    assert "show_dashboard()" in combined
-    assert "plot.export_gallery" in combined
-    assert "plot.grand_composite_curve" in combined
-    assert "problem.target.direct_heat_pump" in combined
-    assert "workspace.scenario" in combined
-    assert 'period_id="peak"' in combined or 'period_id="winter"' in combined
 
-
-def test_docs_do_not_reference_stale_workflow_names():
-    combined = "\n".join(
-        [
-            _read(README),
-            _read(GETTING_STARTED),
-            _read(QUICKSTART),
-            _read(NOTEBOOKS),
-            _read(GUIDE_FIRST_SOLVE_CLI),
-            _read(GUIDE_EXPORTING_RESULTS),
-            _read(GUIDE_GRAPHING),
-            _read(FUNDAMENTALS_GRAPHS),
-            _read(OVERVIEW_CAPABILITY_MATRIX),
-            _read(OVERVIEW_SUPPORT),
-            _read(API_CLI_RESOURCES),
-        ]
-    )
-    assert "problem.export(" not in combined
-    assert "openpinch graph" not in combined
-    assert "openpinch run" not in combined
-    assert "openpinch validate" not in combined
-    assert "openpinch sample" not in combined
-    assert "Python 3.11 or newer" not in combined
-
-
-def test_docs_present_python_resources_before_cli_shortcuts():
-    readme = _read(README)
-    resource_guide = _read(GUIDE_NOTEBOOKS_AND_CASES)
-
-    assert "sample_case_metadata" in readme
-    assert "notebook_metadata" in readme
-    assert "sample_case_metadata" in resource_guide
-    assert "notebook_metadata" in resource_guide
-    assert readme.index("list_sample_cases") < readme.index("openpinch notebook")
-    assert resource_guide.index("sample_case_metadata") < resource_guide.index(
-        "openpinch notebook"
-    )
-
-
-def test_support_and_cli_docs_match_the_current_command_surface():
-    combined = "\n".join([_read(OVERVIEW_SUPPORT), _read(API_CLI_RESOURCES)])
-
-    assert "openpinch notebook" in combined
-    assert "``notebook`` for copying packaged example notebooks" in combined
-    assert "``run`` for end-to-end analysis" not in combined
-    assert "``graph`` for HTML graph export" not in combined
-    assert "``validate`` for payload preflight checks" not in combined
-    assert "``sample`` for copying packaged sample cases" not in combined
-    assert "``heat-pump`` for evaluating" not in combined
-
-
-def test_docs_highlight_interpretation_and_heat_pump_integration():
-    combined = "\n".join(
-        [
-            _read(README),
-            _read(QUICKSTART),
-            _read(NOTEBOOKS),
-            _read(HEAT_PUMP_TARGETING),
-            _read(INTERPRETING_RESULTS),
-        ]
-    )
-    assert "Interpreting Results" in combined
-    assert "heat pump" in combined
-    assert "heat_pump_targeting.json" in combined
-    assert "03_carnot_hpr_comparison.ipynb" in combined
-
-
-def test_docs_reference_the_current_notebook_series():
-    combined = "\n".join(
-        [
-            _read(README),
-            _read(QUICKSTART),
-            _read(NOTEBOOKS),
-            _read(GUIDE_FIRST_SOLVE_CLI),
-            _read(GUIDE_NOTEBOOKS_AND_CASES),
-            _read(EXAMPLE_NOTEBOOK_SERIES),
-        ]
-    )
-    assert "01_basic_pinch_and_dtcont_sensitivity.ipynb" in combined
-    assert "02_total_site_targets_and_sugcc.ipynb" in combined
-    assert "03_carnot_hpr_comparison.ipynb" in combined
-    assert "04_multiperiod_targeting_and_period_comparison.ipynb" in combined
-    assert "05_schema_service_and_output_workflows.ipynb" in combined
-    assert "06_energy_transfer_analysis.ipynb" in combined
-    assert "07_vapour_compression_mvr_cascade_hpr.ipynb" in combined
-    assert "08_direct_gas_stream_mvr.ipynb" in combined
     for notebook_name in list_notebooks():
         assert notebook_name in combined
-    assert "multiperiod" in combined or 'period_id="' in combined
-    assert "direct gas/vapour" in combined
-    assert "add_component.process_mvr" in combined
-
-
-def test_docs_reference_current_packaged_sample_cases():
-    combined = "\n".join(
-        [
-            _read(GUIDE_NOTEBOOKS_AND_CASES),
-            _read(EXAMPLE_SAMPLE_CASES),
-        ]
-    )
-
     for sample_case_name in list_sample_cases():
         assert sample_case_name in combined
 
 
-def test_docs_explain_base_and_notebook_installs():
-    readme = _read(README)
-    getting_started = _read(GETTING_STARTED)
-    quickstart = _read(QUICKSTART)
-    notebooks = _read(NOTEBOOKS)
+def test_public_root_exports_are_covered_by_curated_api_docs():
+    combined_api = _docs_text(sorted(API_ROOT.glob("*.rst")))
 
-    assert "python -m pip install openpinch" in readme
-    assert 'python -m pip install "openpinch[notebook]"' in readme
-
-    assert "python -m pip install openpinch" in getting_started
-    assert 'python -m pip install "openpinch[notebook]"' in getting_started
-
-    notebook_guides = "\n".join([readme, getting_started, quickstart, notebooks])
-    assert notebook_guides.count('python -m pip install "openpinch[notebook]"') >= 4
-    assert 'python -m pip install "openpinch[dashboard]"' in readme
-    assert 'python -m pip install "openpinch[dashboard]"' in getting_started
-    assert 'python -m pip install "openpinch[dashboard]"' in quickstart
-    assert 'python -m pip install "openpinch[brayton_cycle]"' in readme
-    assert 'python -m pip install "openpinch[brayton_cycle]"' in getting_started
-    assert "Optional: Jupyter" not in getting_started
+    for export_name in OpenPinch.__all__:
+        assert export_name in combined_api, f"{export_name} missing from curated API docs"
 
 
-def test_docs_expose_pinchworkspace_as_the_named_study_surface():
-    combined = "\n".join(
+def test_docs_define_stability_and_optional_dependency_boundaries():
+    combined = _docs_text(
         [
-            _read(README),
-            _read(GETTING_STARTED),
-            _read(API_PACKAGE_ROOT),
-            _read(API_PINCHWORKSPACE),
+            DOCS_ROOT / "overview" / "capability-matrix.rst",
+            DOCS_ROOT / "overview" / "support-and-stability.rst",
+            DOCS_ROOT / "developer" / "docs-conventions.rst",
+            DOCS_ROOT / "developer" / "build-and-coverage.rst",
         ]
     )
 
-    assert "PinchWorkspace" in combined
-    assert 'source="crude_preheat_train.json"' in combined
-    assert 'project_name="crude_preheat_train"' in combined
-    assert "scenario" in combined
-    assert "compare_cases" in combined
+    for phrase in (
+        "Stable",
+        "Advanced",
+        "Experimental / partial",
+        "openpinch[notebook]",
+        "openpinch[dashboard]",
+        "openpinch[synthesis]",
+        "optional local audit",
+    ):
+        assert phrase in combined
 
 
-def test_docs_explain_hen_synthesis_public_workflow_and_cutover():
-    guide = _read(GUIDE_HEN_SYNTHESIS)
-    service_layer = _read(API_SERVICE_LAYER)
-    schemas_config = _read(API_SCHEMAS_CONFIG)
-    api_entrypoints = _read(API_ENTRYPOINTS)
+def test_old_url_pages_remain_orphan_transition_stubs():
+    for path, targets in LEGACY_PAGE_TARGETS.items():
+        text = _read(path)
+        assert ":orphan:" in text
+        assert "Use these pages instead" in text or "Use these sections instead" in text
+        for target in targets:
+            assert target in text, f"{path} missing transition target {target}"
 
-    assert "problem.design.heat_exchanger_network_synthesis()" in guide
-    assert 'workflow="heat_exchanger_network_synthesis"' in guide
-    assert "heat_exchanger_network_synthesis_entry.py" in guide
-    assert "problem.design.open_hens_method(...)" in guide
-    assert "problem.design.open_hens_method()" in guide
-    assert "problem.design.pinch_design_method()" in guide
-    assert "problem.design.thermal_derivative_method(initial_networks=" in guide
-    assert "problem.design.network_evolution_method(initial_networks=" in guide
-    assert "HENDesignMethod.OpenHENS" in guide
-    assert "HENDesignMethod.PinchDesign" in guide
-    assert "HENDesignMethod.ThermalDerivative" in guide
-    assert "HENDesignMethod.NetworkEvolution" in guide
-    assert "design.design_method" in guide
-    assert "design.manifest.method_sequence" in guide
-    assert "targeting_services/" in guide
-    assert "common/" in guide
-    assert "unit_models/" in guide
-    assert "Old import paths" in guide
-    assert "have been removed" in guide
-    assert "internal and" in guide
-    assert "TargetInput.options" in guide
-    assert "``Configuration``" in guide
-    assert "TargetOutput.design" in guide
-    assert "export_heat_exchanger_network_synthesis_results" in guide
-    assert "CaseStudy.from_csv" in guide
-    assert "OpenPinch does not provide runtime import" in guide
-    assert "aliases, OpenHENS field aliases" in guide
-    assert "OpenHENS field aliases" in guide
-    assert "command parity" in guide
-    assert "Source OpenHENS CSV files are migration" in guide
-    assert "source material only" in guide
-    assert 'python -m pip install "openpinch[synthesis]"' in guide
-    assert 'pytest -m "not synthesis and not solver"' in guide
-    assert "pytest -m synthesis" in guide
-    assert "pytest -m solver" in guide
 
-    for page in (service_layer, api_entrypoints):
-        assert (
-            "OpenPinch.services.heat_exchanger_network_synthesis."
-            "heat_exchanger_network_synthesis_entry" in page
-        )
+def test_docs_do_not_present_removed_cli_surfaces():
+    combined = _docs_text()
+
+    for stale in STALE_DOC_STRINGS:
+        assert stale not in combined
+
+    assert "openpinch notebook" in combined
+
+
+def test_hen_synthesis_docs_keep_public_cutover_and_dependency_notes():
+    guide = _read(GUIDES_ROOT / "heat-exchanger-network-synthesis.rst")
+    service_layer = _read(API_ROOT / "service-layer.rst")
+    schemas_config = _read(API_ROOT / "schemas-and-config.rst")
+
+    for phrase in (
+        'python -m pip install "openpinch[synthesis]"',
+        "idaes get-extensions",
+        "problem.design.enhanced_synthesis_method(quality_tier=2)",
+        "problem.design.open_hens_method()",
+        "problem.design.network_evolution_method(initial_networks=",
+        "TargetOutput.design",
+        "old import paths",
+        "OpenHENS field aliases",
+        "pytest -m synthesis",
+        "pytest -m solver",
+    ):
+        assert phrase in guide
+
     assert (
         "OpenPinch.services.heat_exchanger_network_synthesis."
-        "targeting_services.open_hens_method" in api_entrypoints
+        "heat_exchanger_network_synthesis_entry" in service_layer
     )
     assert "HeatExchangerNetworkDesignMethod" in schemas_config
-    assert "HeatExchangerNetworkSynthesisMethodInput" in schemas_config
-    assert "HeatExchangerNetworkSynthesisMethodOutput" in schemas_config
 
 
-def test_reference_docs_match_current_heat_pump_and_schema_surface():
-    api_classes = _read(API_CLASSES)
-    api_lib = _read(API_LIB)
-    api_analysis = _read(API_ANALYSIS)
-
-    assert (
-        "OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle"
-        in api_classes
-    )
-    assert (
-        "OpenPinch.services.heat_pump_integration.unit_models.parallel_vapour_compression_cycles"
-        in api_classes
-    )
-    assert (
-        "OpenPinch.services.heat_pump_integration.unit_models.cascade_vapour_compression_cycle"
-        in api_classes
-    )
-    assert (
-        "OpenPinch.services.heat_pump_integration.unit_models.mechanical_vapour_recompression_cycle"
-        in api_classes
-    )
-    assert (
-        "OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_mvr_cascade"
-        in api_classes
-    )
-    assert (
-        "OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump"
-        in api_classes
-    )
-    assert (
-        "OpenPinch.services.power_cogeneration.unit_models.multi_stage_steam_turbine"
-        in api_classes
-    )
-    assert "OpenPinch.services.heat_pump_integration.targeting_services" in _read(
-        REPO_ROOT / "docs" / "reference" / "api-heat-pump.rst"
-    )
-    assert "OpenPinch.services.components.process_mvr" in api_classes
-    assert "OpenPinch.services.components.direct_mvr.direct_gas_mvr" in api_classes
-    assert "OpenPinch.classes.simple_heat_pump" not in api_classes
-    assert "OpenPinch.classes.parallel_heat_pump" not in api_classes
-    assert "OpenPinch.classes.cascade_heat_pump" not in api_classes
-    assert "OpenPinch.classes.brayton_heat_pump" not in api_classes
-    assert "OpenPinch.classes.multi_stage_steam_turbine" not in api_classes
-    assert "period_ids" in api_classes
-    assert "weights" in api_classes
-    assert "OpenPinch.classes.heat_exchanger" in api_classes
-    assert "OpenPinch.classes.heat_exchanger_network" in api_classes
-    assert (
-        "OpenPinch.services.heat_exchanger_network_synthesis.unit_models.pinch_design"
-        in api_classes
-    )
-    assert (
-        "OpenPinch.services.heat_exchanger_network_synthesis.unit_models.stagewise"
-        in api_classes
+def test_heat_pump_docs_keep_advanced_workflow_boundaries():
+    guide = _read(GUIDES_ROOT / "heat-pump-workflows.rst")
+    fundamentals = _read(
+        DOCS_ROOT / "fundamentals" / "heat-pump-and-refrigeration-methods.rst"
     )
 
-    assert "compute_direct_heat_pump_or_refrigeration_target" in api_analysis
-    assert "compute_indirect_heat_pump_or_refrigeration_target" in api_analysis
-    assert "HeatPumpTargetOutputs" in api_lib
-    assert "OpenPinch.lib.schemas.synthesis" in api_lib
-    assert "OpenPinch.services.input_data_processing.data_preparation" in api_analysis
-    assert "OpenPinch.services.data_preparation" not in api_analysis
+    for phrase in (
+        "problem.target.direct_heat_pump",
+        "problem.target.indirect_heat_pump",
+        "problem.add_component.process_mvr",
+        "Cascade Carnot cycles",
+        "Parallel vapour compression cycles",
+        "Vapour compression with MVR cascade",
+        "03_carnot_hpr_comparison.ipynb",
+        "08_direct_gas_stream_mvr.ipynb",
+    ):
+        assert phrase in guide
 
-
-def test_reference_docs_mark_partial_analysis_modules_as_partial():
-    api_analysis = _read(API_ANALYSIS)
-
-    assert "Experimental or Partial Analysis Modules" in api_analysis
-    assert "they should not be read as stable production workflows" in api_analysis
-    assert "OpenPinch.services.exergy_analysis.exergy_targeting_entry" in api_analysis
-
-
-def test_reference_docs_show_uv_docs_build_command():
-    reference_index = _read(REFERENCE_INDEX)
-
-    assert "uv run scripts/build_docs.py" in reference_index
-    assert "sphinx-build -b html docs/ docs/_build/html" not in reference_index
-
-
-def test_reference_docs_use_current_data_preparation_module_path():
-    combined = "\n".join(
-        [
-            _read(REPO_ROOT / "docs" / "reference" / "api.rst"),
-            _read(REPO_ROOT / "docs" / "reference" / "architecture.rst"),
-            _read(API_CLASSES),
-            _read(API_ANALYSIS),
-        ]
-    )
-
-    assert "OpenPinch.services.input_data_processing.data_preparation" in combined
-    assert "OpenPinch.services.data_preparation" not in combined
+    assert "Simulated-cycle integration accounting" in fundamentals

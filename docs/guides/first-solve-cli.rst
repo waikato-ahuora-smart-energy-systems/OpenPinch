@@ -1,18 +1,34 @@
 Working with the CLI
 ====================
 
-The supported OpenPinch CLI is intentionally narrow. It copies the packaged
-notebook series so you can start from maintained learning assets, while the
-actual solving, validation, and export workflows live in Python.
+Purpose
+-------
 
-Question This Guide Answers
----------------------------
+Use the OpenPinch CLI when you want to copy maintained notebook sources into a
+working directory. The CLI is an onboarding and asset-copy surface only.
+Validation, targeting, graph export, Excel export, dashboards, and advanced
+workflows are Python workflows.
 
-What is the supported OpenPinch CLI surface, and when should I move into
-Python?
+Prerequisites
+-------------
 
-Supported CLI Workflow
-----------------------
+Install the package and, if you plan to run notebooks, the notebook extra:
+
+.. code-block:: bash
+
+   python -m pip install openpinch
+   python -m pip install "openpinch[notebook]"
+
+Sample Asset
+------------
+
+Notebook 01 is the recommended first copied asset:
+
+``01_basic_pinch_and_dtcont_sensitivity.ipynb``
+   First solve, summary tables, graphing, and workspace sensitivity.
+
+Runnable Workflow
+-----------------
 
 Copy the full notebook series:
 
@@ -20,13 +36,13 @@ Copy the full notebook series:
 
    openpinch notebook -o notebooks
 
-Or copy one notebook:
+Copy one notebook:
 
 .. code-block:: bash
 
-   openpinch notebook --name 02_total_site_targets_and_sugcc.ipynb -o notebooks
+   openpinch notebook --name 01_basic_pinch_and_dtcont_sensitivity.ipynb -o notebooks
 
-The current packaged notebooks are:
+The packaged notebook series is:
 
 - ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
 - ``02_total_site_targets_and_sugcc.ipynb``
@@ -36,22 +52,32 @@ The current packaged notebooks are:
 - ``06_energy_transfer_analysis.ipynb``
 - ``07_vapour_compression_mvr_cascade_hpr.ipynb``
 - ``08_direct_gas_stream_mvr.ipynb``
+- ``09_hen_design_service_four_stream.ipynb``
 
-When To Leave the CLI
----------------------
+Expected Output
+---------------
 
-Move to the Python workflow immediately when you need to:
+The command writes clean notebook source files into the output directory. The
+packaged notebooks ship without execution counts, stored Plotly data, cached
+tracebacks, or hidden local-state assumptions.
+
+Interpretation
+--------------
+
+Move to Python as soon as you need to:
 
 - solve a case
-- validate the input data
-- export Excel or graph artifacts
-- work with ``problem.target.*`` or ``problem.plot.*``
-- use packaged sample cases directly by name
+- validate source data
+- export Excel or HTML graph artifacts
+- use ``PinchProblem`` or ``PinchWorkspace``
+- call ``problem.target.*``, ``problem.plot.*``, or ``problem.design.*``
+
+OpenPinch intentionally does not provide CLI commands for solving, graph
+export, or validation.
 
 Next Steps
 ----------
 
-- For the Python-first workflow, see :doc:`first-solve-python`.
-- For file format guidance, see :doc:`input-formats-and-validation`.
-- For notebooks and bundled cases, see :doc:`notebooks-and-sample-cases`.
-- For graph interpretation, see :doc:`graphing-and-interpretation`.
+- :doc:`first-solve-python` for the canonical solve workflow.
+- :doc:`notebooks-and-sample-cases` for Python resource helpers.
+- :doc:`../api/cli-and-resources` for the exact CLI and asset APIs.

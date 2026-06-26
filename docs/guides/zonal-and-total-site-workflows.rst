@@ -1,92 +1,69 @@
 Zonal and Total Site Workflows
 ==============================
 
-OpenPinch becomes substantially more powerful once you move beyond a single
-process-zone view and start using explicit zone hierarchies.
+Purpose
+-------
 
-Question This Guide Answers
----------------------------
+Use zonal workflows when a study needs more than one process boundary. Zones
+let OpenPinch solve local direct targets and then aggregate solved subzones
+into Total Process or Total Site utility-system views.
 
-How do I use OpenPinch for nested process areas and higher-level utility
-integration studies?
-
-Why Zones Matter
-----------------
-
-Zones control analysis scope.
-
-At small scale, a zone may represent:
-
-- a unit operation
-- a process area
-
-At larger scale, zones can be aggregated into:
-
-- a plant
-- a site
-
-Direct integration usually answers the local question. Indirect integration
-usually answers the higher-level utility system question.
-
-Practical Workflow
-------------------
-
-1. define a zone hierarchy explicitly when the study is multiscale
-2. solve the local or process-zone picture
-3. compare it to the aggregated Total Process or Total Site picture
-4. use higher-level graph views to understand what changed
-
-Useful Assets
+Prerequisites
 -------------
 
-Packaged sample:
-   Load ``zonal_site.json`` directly by name from Python, or copy it through
-   :mod:`OpenPinch.resources` when you need a local editable file.
+You should understand the first-solve workflow and the difference between
+direct and indirect integration. See :doc:`first-solve-python` and
+:doc:`../fundamentals/direct-vs-indirect-integration`.
 
-Packaged notebook:
+Sample Case
+-----------
 
-.. code-block:: bash
+Use ``zonal_site.json`` for a compact multizone example or ``pulp_mill.json``
+for a richer Total Site and cogeneration context.
 
-   openpinch notebook --name 02_total_site_targets_and_sugcc.ipynb -o notebooks
-
-Python Pattern
---------------
+Runnable Workflow
+-----------------
 
 .. code-block:: python
 
    from OpenPinch import PinchWorkspace
 
    workspace = PinchWorkspace(source="pulp_mill.json", project_name="Site")
-   baseline = workspace.case("baseline")
-   summary = baseline.summary_frame()
-   total_site = baseline.target.indirect_heat_integration()
-   selected_period_total_site = baseline.target.indirect_heat_integration(
-       period_id="peak",
-   )
+   case = workspace.case("baseline")
 
-What To Compare
+   direct = case.target.direct_heat_integration()
+   total_site = case.target.indirect_heat_integration()
+   summary = case.summary_frame()
+
+   print(summary[["Target", "Zone", "Hot Utility Target", "Cold Utility Target"]])
+
+Expected Output
 ---------------
 
-When comparing local and aggregated answers:
+The summary contains target rows for different scopes and target families.
+Direct rows describe local recovery inside a zone. Indirect or Total Site rows
+describe utility-mediated recovery across solved subzones.
 
-- compare hot utility targets
-- compare cold utility targets
-- compare graph types at the same scope
-- confirm that target row names refer to the zone and target family you think
-  they do
+Interpretation
+--------------
 
-Useful Graphs
--------------
+Compare zonal results by scope before comparing numbers:
 
-For multiscale workflows, the most useful views are often:
+- Check the target family: Direct Integration, Total Process, or Total Site.
+- Check the zone name and hierarchy level.
+- Compare hot and cold utility targets first.
+- Use Grand Composite Curves, Total Site profiles, and SUGCC views to explain
+  why the utility targets changed.
 
-- grand composite curves
-- Total Site profiles
-- site utility grand composite curves
+For multiperiod inputs, pass ``period_id=...`` to the targeting accessor:
+
+.. code-block:: python
+
+   winter_site = case.target.indirect_heat_integration(period_id="winter")
 
 Next Steps
 ----------
 
-- For the technical basis, see :doc:`../fundamentals/direct-vs-indirect-integration`.
-- For graphs, see :doc:`graphing-and-interpretation`.
-- For packaged assets, see :doc:`notebooks-and-sample-cases`.
+- :doc:`../fundamentals/zones-streams-utilities-and-targets` for the model.
+- :doc:`graphing-and-interpretation` for graph reading order.
+- :doc:`notebooks-and-sample-cases` for notebook 02 and zonal sample cases.

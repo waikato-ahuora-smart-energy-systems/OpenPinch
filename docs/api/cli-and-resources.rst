@@ -50,6 +50,7 @@ The current optional install split is:
 
 - ``openpinch[notebook]`` for Jupyter, Plotly graph rendering, and Excel I/O
 - ``openpinch[dashboard]`` for Streamlit plus the same plotting/export stack
+- ``openpinch[synthesis]`` for solver-backed heat exchanger network synthesis
 - ``openpinch[brayton_cycle]`` for TESPy-backed Brayton-cycle tooling
 - ``openpinch[full]`` for the combined optional surface
 

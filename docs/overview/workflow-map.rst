@@ -1,97 +1,51 @@
 Workflow Map
 ============
 
-OpenPinch supports several valid entrypoints, but they are not interchangeable.
-The right one depends on what owns the study state, where the inputs come from,
-and whether you need a live notebook object, a typed service contract, or just
-the packaged learning assets.
+OpenPinch has several valid entrypoints. Choose by what owns the study state
+and how much control you need.
 
-Recommended Entry Points
-------------------------
-
-Notebook-copy CLI
-   Use this when you want the packaged notebook series copied into your working
-   directory. The CLI does not solve cases, validate data, or export results.
-
-Packaged resource workflow
-   Use :mod:`OpenPinch.resources` when you want packaged sample cases or
-   notebooks from Python without relying on filesystem-relative paths.
-
-``PinchProblem`` workflow
-   Use this for notebooks and scripts when you want one object that owns the
-   problem definition, validation, prepared zone tree, solved result, graph
-   accessors, summaries, period selection, process-component mutation, and
-   exports.
-
-``PinchWorkspace`` workflow
-   Use this for notebooks and scripts when you want named study cases,
-   baseline-versus-variant comparison, serializable variant views, and
-   bundle save/load on top of real ``PinchProblem`` cases.
-
-Service-layer workflow
-   Use :func:`OpenPinch.main.pinch_analysis_service` when you want a typed
-   request/response boundary for another application or automation layer.
-
-Prepared-zone workflow
-   Use :func:`OpenPinch.services.input_data_processing.data_preparation.prepare_problem`
-   and the lower-level service helpers only when you need to inspect or mutate
-   the intermediate `Zone` hierarchy directly.
-
-Decision Guide
---------------
-
-Use the CLI when:
-
-- you want ``openpinch notebook -o notebooks``
-- you want a maintained onboarding asset copied locally
-- you do not need a solve yet
-
-Use :mod:`OpenPinch.resources` when:
-
-- you want to list, read, or copy packaged sample cases from Python
-- you want code to be explicit about where examples come from
-- you want notebook or sample-case assets without hard-coding repo paths
+Choose an Entrypoint
+--------------------
 
 Use ``PinchProblem`` when:
 
-- you are working in notebooks or scripts
-- you want to load one case from JSON, Excel, CSV, or a packaged sample name
-- you want validation, summaries, graphs, exports, and advanced targeting on
-  one object
-- you want access to ``problem.plot.*``, ``problem.target.*``,
-  ``problem.add_component.*``, ``problem.period_ids``, or
-  ``problem.target_all_periods()``
-- you want heat exchanger network design through
-  ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
-  ``problem.design.open_hens_method(...)``, or the explicit HEN ``*_method``
-  accessors
+- you are solving one active case
+- inputs come from JSON, Excel, CSV, sample cases, ``TargetInput``, or mappings
+- you want validation, targeting, summaries, graphs, exports, period selection,
+  advanced target accessors, and HEN design from one object
 
 Use ``PinchWorkspace`` when:
 
-- you need named baseline and variant cases in one session
-- you want to compare cases without rebuilding case-input management helpers
-- you want both live ``PinchProblem`` cases and serializable variant views in
-  the same study
-- you want to persist the full study as a bundle
+- the study has named baseline and variant cases
+- you need case copying, scenario edits, comparisons, or bundle save/load
+- an application needs serializable variant views as well as live cases
 
 Use ``pinch_analysis_service`` when:
 
-- you are integrating OpenPinch into another codebase
-- you want a typed `TargetInput -> TargetOutput` boundary
-- you do not need the convenience wrapper period model
+- another system wants a typed ``TargetInput`` to ``TargetOutput`` boundary
+- you do not need wrapper state, period reruns, graph accessors, or exports
 
-Use the lower-level service stack when:
+Use ``OpenPinch.resources`` when:
 
-- you need direct access to the prepared `Zone` tree
-- you want to separate validation, preparation, targeting, and extraction
-- you are doing advanced or research-oriented post-processing
+- you need to list, inspect, read, or copy packaged sample cases and notebooks
+- you want examples without hard-coding repository paths
+
+Use ``openpinch notebook`` when:
+
+- you want clean packaged notebooks copied from a shell
+- you do not need the command itself to solve or export anything
+
+Use lower-level services when:
+
+- you need direct access to the prepared ``Zone`` hierarchy
+- you are extending OpenPinch or running research-oriented intermediate stages
 
 Workflow Layering
 -----------------
 
 .. code-block:: text
 
-   notebooks / scripts / external app
+   notebooks / scripts / external applications
                  |
                  +--> openpinch notebook
                  +--> OpenPinch.resources
@@ -100,65 +54,44 @@ Workflow Layering
    PinchWorkspace / PinchProblem / pinch_analysis_service
                  |
                  v
-         data_preprocessing_service
+        validation and data preparation
                  |
                  v
               Zone tree
                  |
                  v
-   direct / indirect / HPR / exergy / cogeneration services
-   heat exchanger network synthesis design services
+   direct / indirect / HPR / exergy / cogeneration / HEN services
                  |
                  v
-      TargetOutput + summaries + graphs + exports
+       summaries + graph data + exports + design results
 
-Typical User Paths
-------------------
+Common User Paths
+-----------------
 
-First-time user
-   ``openpinch notebook -o notebooks -> run notebook 01 -> inspect real
-   PinchWorkspace and PinchProblem calls``
+First-time solve
+   ``PinchProblem("basic_pinch.json") -> validation_report -> target -> summary_frame``
 
-Notebook user
-   ``PinchWorkspace(source="crude_preheat_train.json") -> copy_case ->
-   set_dt_cont_multiplier -> compare_cases``
+Named sensitivity study
+   ``PinchWorkspace(source=...) -> scenario -> compare_cases``
 
-Single-case script
-   ``PinchProblem("basic_pinch.json") -> validate -> target -> summary_frame ->
-   plot.grand_composite_curve()``
+Multiperiod study
+   ``problem.period_ids -> problem.target.*(period_id="peak") -> target_all_periods``
 
-Period-valued study
-   ``problem.period_ids -> problem.target.direct_heat_integration(period_id="peak")
-   -> problem.target_all_periods()``
+Heat Pump screening
+   ``base direct/indirect target -> problem.target.direct_heat_pump(...) -> compare summary and graphs``
 
-Advanced HPR study
-   ``base case -> problem.target.direct_heat_pump(...) -> compare summary rows
-   and GCC / HPR graph surfaces``
+Heat exchanger network synthesis
+   ``PinchProblem("Four-stream-Yee-and-Grossmann-1990-1.json") -> problem.design.enhanced_synthesis_method(quality_tier=2)``
 
-Heat exchanger network synthesis study
-   ``PinchProblem("four_stream.json") ->
-   problem.design.enhanced_synthesis_method(quality_tier=2) -> inspect ranked
-   networks -> build grid diagrams``
+Direct process MVR
+   ``workspace.copy_case -> problem.add_component.process_mvr(...) -> re-solve -> compare_cases``
 
-Retrofit network evolution study
-   ``existing HeatExchangerNetwork -> problem.design.network_evolution_method(
-   initial_networks=(network,)) -> compare ranked retrofit candidates``
+Typed application integration
+   ``TargetInput -> pinch_analysis_service(...) -> TargetOutput``
 
-Direct process MVR study
-   ``workspace.copy_case -> problem.add_component.process_mvr(...) -> re-solve
-   direct / Total Site targets -> compare cases``
+Next Steps
+----------
 
-Advanced exergy study
-   ``base case -> problem.target.exergy(...) -> inspect enriched target row and
-   exergetic GCC / NLP surfaces``
-
-Programmatic integration
-   ``TargetInput schema -> pinch_analysis_service(...) -> TargetOutput``
-
-Where To Go Next
-----------------
-
-- For runnable first workflows, go to :doc:`../guides/index`.
-- For the thermodynamic model behind these workflows, go to
-  :doc:`../fundamentals/index`.
-- For the exact callable surfaces, go to :doc:`../api/index`.
+- :doc:`../getting-started` for the first runnable solve.
+- :doc:`../guides/index` for task workflows.
+- :doc:`../api/index` for exact public contracts.
