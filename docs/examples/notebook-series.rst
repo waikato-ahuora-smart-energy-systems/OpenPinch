@@ -43,7 +43,7 @@ Included Notebooks
 
 ``06_energy_transfer_analysis.ipynb``
    Energy-transfer targeting on ``pulp_mill.json``, including the
-   heat-surplus/deficit table, graph-ready energy-transfer diagram payload,
+   heat-surplus/deficit table, graph-ready energy-transfer diagram data,
    standard plot accessor, and Total Site versus local Direct Integration base
    target selection.
 
@@ -100,7 +100,7 @@ Recommended Learning Order
 5. Use the schema/service notebook when you need typed validation, serialized
    workspace views, or repeatable export workflows.
 6. Use the energy-transfer notebook when you need interval-level surplus/deficit
-   accounting or a diagram payload derived from an existing thermal target.
+   accounting or diagram data derived from an existing thermal target.
 7. Use the VC+MVR cascade notebook when you need a refrigerant low stage feeding
    a serial mechanical-vapour-recompression high stage.
 8. Use the direct gas/vapour MVR notebook when a process vapour stream itself

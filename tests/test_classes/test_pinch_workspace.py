@@ -36,7 +36,7 @@ def test_pinch_workspace_returns_real_cases_and_delegates_to_pinchproblem():
 
     assert isinstance(baseline, PinchProblem)
     assert workspace.active_case_name == "baseline"
-    assert "zone_tree" in workspace.get_case_payload("baseline")
+    assert "zone_tree" in workspace.get_case_input("baseline")
     assert not summary.empty
     assert not workspace.plot.catalog().empty
 
@@ -62,10 +62,10 @@ def test_pinch_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: P
     bundle_path = workspace.save_bundle(tmp_path / "pinch_workspace_bundle.json")
     reloaded = PinchWorkspace.load_bundle(bundle_path)
 
-    assert workspace.get_case_payload("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
+    assert workspace.get_case_input("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
     assert bundle_path.exists()
     assert reloaded.list_cases() == ["baseline", "wide_dt"]
-    assert reloaded.get_case_payload("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
+    assert reloaded.get_case_input("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
 
 
 def test_pinch_workspace_scenario_helper_and_report_delegates():
@@ -84,7 +84,7 @@ def test_pinch_workspace_scenario_helper_and_report_delegates():
 
     assert isinstance(scenario, PinchProblem)
     assert workspace.active_case_name == "wide_dt"
-    assert workspace.get_case_payload("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
+    assert workspace.get_case_input("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
     assert validation.valid is True
     assert report.solved is True
     assert any(metric.metric == "Hot Utility Target" for metric in metrics)
@@ -93,12 +93,12 @@ def test_pinch_workspace_scenario_helper_and_report_delegates():
 def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
     workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
 
-    payload_view = workspace.payload_view("baseline")
-    assert payload_view.variant_name == "baseline"
-    assert payload_view.streams
-    assert payload_view.streams[0].record_id == "streams[0]"
+    input_view = workspace.input_view("baseline")
+    assert input_view.variant_name == "baseline"
+    assert input_view.streams
+    assert input_view.streams[0].record_id == "streams[0]"
 
-    workspace.set_variant_payload(
+    workspace.set_variant_input(
         "wide_dt",
         {"options": {"THERMAL_DT_CONT": 15}},
         base="baseline",
@@ -110,7 +110,7 @@ def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
     assert baseline_view.status == "solved"
     assert baseline_view.summary_table is not None
     assert baseline_view.graph_catalog
-    assert baseline_view.graph_payloads
+    assert baseline_view.graph_data_entries
     assert any(table.table_kind == "shifted" for table in baseline_view.problem_tables)
     assert variant_view.status == "solved"
     assert comparison.metric_deltas
@@ -217,7 +217,7 @@ def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
 
     assert target.name.endswith("Direct Heat Pump")
     assert (
-        workspace.get_case_payload("direct_hp_full_load")["options"][
+        workspace.get_case_input("direct_hp_full_load")["options"][
             "HPR_LOAD_FRACTION"
         ]
         == 1.0
@@ -231,7 +231,7 @@ def test_pinch_workspace_accepts_existing_problem_as_constructor_source():
 
     assert workspace.active_case_name == "baseline"
     assert workspace.case("baseline").project_name == "Demo"
-    assert workspace.get_case_payload("baseline")["zone_tree"] is not None
+    assert workspace.get_case_input("baseline")["zone_tree"] is not None
 
 
 def test_pinch_workspace_accepts_packaged_sample_case_name_as_source():
@@ -242,7 +242,7 @@ def test_pinch_workspace_accepts_packaged_sample_case_name_as_source():
 
     case = workspace.case("baseline")
     summary = workspace.summary_frame()
-    payload = workspace.get_case_payload("baseline")
+    payload = workspace.get_case_input("baseline")
 
     assert workspace.active_case_name == "baseline"
     assert case.project_name == "crude_preheat_train"

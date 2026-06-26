@@ -18,7 +18,7 @@ _PreparedItem = tuple[str, Stream, Any | None]
 
 @dataclass(frozen=True)
 class PreparedSolverArrays:
-    """Immutable private solver-array payload for migrated equation models."""
+    """Immutable private solver-array data for migrated equation models."""
 
     arrays: dict[str, np.ndarray]
     axis_maps: dict[str, dict[str, int]]
@@ -58,10 +58,10 @@ def problem_to_solver_arrays(
     problem: PinchProblem,
     dTmin: float,
 ) -> PreparedSolverArrays:
-    """Build the private solver-array payload from a prepared ``PinchProblem``.
+    """Build the private solver-array data from a prepared ``PinchProblem``.
 
     The adapter intentionally accepts only a live ``PinchProblem`` so raw fixture
-    rows, raw ``TargetInput`` payloads, heat exchanger network schemas, cached
+    rows, raw ``TargetInput`` dictionaries, heat exchanger network schemas, cached
     array dictionaries, and standalone DTOs cannot bypass OpenPinch validation
     and preparation.
     """

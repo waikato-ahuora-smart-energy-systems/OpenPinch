@@ -412,28 +412,28 @@ class Value:
         data,
         unit: str | None,
     ) -> tuple[Any, np.ndarray]:
-        payload = self._normalise_input_object(data)
+        normalised_data = self._normalise_input_object(data)
 
-        if isinstance(payload, Value):
-            quantity = payload._quantity
-            weights = payload.weights
-        elif isinstance(payload, Mapping):
-            quantity, weights = self._coerce_mapping_input(payload, unit)
+        if isinstance(normalised_data, Value):
+            quantity = normalised_data._quantity
+            weights = normalised_data.weights
+        elif isinstance(normalised_data, Mapping):
+            quantity, weights = self._coerce_mapping_input(normalised_data, unit)
             return quantity, weights
-        elif hasattr(payload, "units"):
-            quantity = payload
+        elif hasattr(normalised_data, "units"):
+            quantity = normalised_data
             weights = None
-        elif self._is_array_like_input(payload):
-            quantity = self._quantity_from_values(payload, unit)
+        elif self._is_array_like_input(normalised_data):
+            quantity = self._quantity_from_values(normalised_data, unit)
             weights = None
-        elif _is_value_with_unit(payload):
-            quantity, weights = self._coerce_object_with_unit(payload, unit)
+        elif _is_value_with_unit(normalised_data):
+            quantity, weights = self._coerce_object_with_unit(normalised_data, unit)
             return quantity, weights
-        elif payload is None:
+        elif normalised_data is None:
             quantity = self._quantity_from_scalar(0.0, unit)
             weights = None
         else:
-            quantity = self._quantity_from_scalar(payload, unit)
+            quantity = self._quantity_from_scalar(normalised_data, unit)
             weights = None
 
         quantity = self._coerce_quantity_to_unit(quantity, unit)
@@ -449,13 +449,13 @@ class Value:
         data: Mapping[Any, Any],
         unit: str | None,
     ) -> tuple[Any, np.ndarray]:
-        if self._is_serialized_period_payload(data):
+        if self._is_serialized_period_data(data):
             quantity = self._quantity_from_values(
                 data.get("values"),
                 data.get("unit") or unit,
             )
             weights = data.get("weights")
-        elif self._is_serialized_scalar_payload(data):
+        elif self._is_serialized_scalar_data(data):
             quantity = self._missing_or_zero_quantity(
                 data.get("value"),
                 data.get("unit") or unit,
@@ -603,11 +603,11 @@ class Value:
         return True
 
     @staticmethod
-    def _is_serialized_scalar_payload(data: Mapping[Any, Any]) -> bool:
+    def _is_serialized_scalar_data(data: Mapping[Any, Any]) -> bool:
         return set(data).issubset(_SERIALIZED_SCALAR_KEYS) and "value" in data
 
     @staticmethod
-    def _is_serialized_period_payload(data: Mapping[Any, Any]) -> bool:
+    def _is_serialized_period_data(data: Mapping[Any, Any]) -> bool:
         return set(data).issubset(_SERIALIZED_PERIOD_KEYS) and ("values" in data)
 
     def _format_units(self, units) -> str:
@@ -667,6 +667,6 @@ class Value:
         """Instantiate from a scalar or multiperiod serialized mapping."""
         if not isinstance(data, Mapping):
             raise TypeError("data must be a mapping.")
-        if cls._is_serialized_period_payload(data):
+        if cls._is_serialized_period_data(data):
             return cls(data)
         return cls(data)

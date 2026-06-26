@@ -45,13 +45,13 @@ The main schema modules are:
 
 - :mod:`OpenPinch.lib.schemas.common` for shared primitives such as
   ``ValueWithUnit``
-- :mod:`OpenPinch.lib.schemas.graphs` for graph payload contracts
+- :mod:`OpenPinch.lib.schemas.graphs` for graph data contracts
 - :mod:`OpenPinch.lib.schemas.io` for public request and response models
 - :mod:`OpenPinch.lib.schemas.reporting` for summary and report-facing models
 - :mod:`OpenPinch.lib.schemas.hpr` for lower-level heat pump solver data models
 - :mod:`OpenPinch.lib.schemas.synthesis` for heat exchanger network synthesis
   method input/output, task, manifest, optional export, and design-result
-  payloads
+  result data
 - :mod:`OpenPinch.lib.schemas.targets` for runtime target models stored on
   solved zones
 - :mod:`OpenPinch.lib.schemas.turbine` for turbine solve result models

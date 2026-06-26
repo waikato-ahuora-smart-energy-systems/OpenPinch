@@ -169,7 +169,7 @@ def extract_network_synthesis_result(
     stage_count: int | None = None,
     objective_value: float | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
-    """Build the result payload that may cross the OpenPinch service boundary."""
+    """Build the result data that may cross the OpenPinch service boundary."""
 
     result_method = _result_method(method)
     network = extract_heat_exchanger_network(

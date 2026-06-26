@@ -599,7 +599,7 @@ class Stream:
         if hasattr(raw_value, "model_dump") and not isinstance(raw_value, Mapping):
             raw_value = raw_value.model_dump(mode="python")
 
-        if isinstance(raw_value, Mapping) and self._is_period_value_payload(raw_value):
+        if isinstance(raw_value, Mapping) and self._is_period_value_data(raw_value):
             raw_value = {
                 "values": raw_value.get("values"),
                 "unit": raw_value.get("unit"),
@@ -871,7 +871,7 @@ class Stream:
         raise AttributeError(f"Stream has no attribute {attr_name!r}.")
 
     @staticmethod
-    def _is_period_value_payload(value: Mapping) -> bool:
+    def _is_period_value_data(value: Mapping) -> bool:
         keys = set(value)
         return keys.issubset({"values", "period_ids", "weights", "unit"}) and (
             "values" in keys or "period_ids" in keys or "weights" in keys

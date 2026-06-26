@@ -40,7 +40,7 @@ from ._problem import (
     _ProblemSourceAdapters,
     _TargetAccessorDescriptor,
     _validate_problem_semantics,
-    build_graph_payload,
+    build_graph_data,
     build_problem_report,
     build_problem_summary_frame,
     build_report_metrics,
@@ -578,12 +578,12 @@ class PinchProblem:
         results = self._results
         if results is None and solve:
             results = self.target()
-        graph_payload = build_graph_payload(results) if results is not None else None
+        graph_data = build_graph_data(results) if results is not None else None
         return build_problem_report(
             project_name=self.project_name,
             validation=self.validation_report(),
             results=results,
-            graph_payload=graph_payload,
+            graph_data=graph_data,
         )
 
     def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
@@ -630,11 +630,11 @@ class PinchProblem:
         unit_columns = {col: f"{col} (unit)" for col in columns}
 
         row_columns = [*columns, *unit_columns.values()]
-        base_payload = {
+        base_row_data = {
             "Target": str(base_row["Target"]),
             **{col: base_row.get(col) for col in row_columns},
         }
-        other_payload = {
+        other_row_data = {
             "Target": str(other_row["Target"]),
             **{col: other_row.get(col) for col in row_columns},
         }
@@ -657,8 +657,8 @@ class PinchProblem:
 
         return pd.DataFrame.from_dict(
             {
-                base_label: base_payload,
-                other_label: other_payload,
+                base_label: base_row_data,
+                other_label: other_row_data,
                 "Change": change_row,
             },
             orient="index",
@@ -814,7 +814,7 @@ class PinchProblem:
         self,
         *,
         zone: Optional["Zone"] = None,
-        graph_payload: Optional[Dict[str, Any]] = None,
+        graph_data: Optional[Dict[str, Any]] = None,
         page_title: Optional[str] = "OpenPinch Dashboard",
         value_rounding: int = 2,
     ) -> None:
@@ -825,13 +825,13 @@ class PinchProblem:
                 "No analysed zone is available. Run target() before rendering."
             )
 
-        payload = graph_payload
-        if payload is None and self._results is not None:
-            payload = build_graph_payload(self._results)
+        dashboard_graph_data = graph_data
+        if dashboard_graph_data is None and self._results is not None:
+            dashboard_graph_data = build_graph_data(self._results)
 
         _render_streamlit_dashboard(
             active_zone,
-            graph_payload=payload,
+            graph_data=dashboard_graph_data,
             page_title=page_title,
             value_rounding=value_rounding,
         )

@@ -38,7 +38,7 @@ Core Workflow Members
 ---------------------
 
 The main user-facing workflow members are ``case()``, ``use_case()``,
-``copy_case()``, ``list_cases()``, ``get_case_payload()``,
+``copy_case()``, ``list_cases()``, ``get_case_input()``,
 ``update_options()``, ``set_dt_cont_multiplier()``, ``compare_cases()``,
 ``solve_variant()``, ``compare_variants()``, ``save_bundle()``, and
 ``load_bundle()``.
@@ -54,7 +54,7 @@ Live-case surface
    exergetic plot accessors exactly like any other ``PinchProblem``.
 
 Serializable variant surface
-   ``payload_view()``, ``validate_variant()``, ``solve_variant()``, and
+   ``input_view()``, ``validate_variant()``, ``solve_variant()``, and
    ``compare_variants()`` return schema-backed views that are deterministic and
    easier to pass to another application layer.
 

@@ -100,11 +100,11 @@ class StreamlitGraphSet:
     graphs: List[MutableMapping]
 
     @classmethod
-    def from_payload(cls, payload: Mapping[str, object]) -> "StreamlitGraphSet":
-        """Build a graph-set wrapper from the JSON-style graph payload."""
+    def from_graph_data(cls, graph_set_data: Mapping[str, object]) -> "StreamlitGraphSet":
+        """Build a graph-set wrapper from JSON-style graph data."""
         return cls(
-            name=str(payload.get("name", "Graph Set")),
-            graphs=list(payload.get("graphs", [])),
+            name=str(graph_set_data.get("name", "Graph Set")),
+            graphs=list(graph_set_data.get("graphs", [])),
         )
 
 
@@ -142,7 +142,7 @@ def problem_table_to_dataframe(
 def render_streamlit_dashboard(
     zone: Zone,
     *,
-    graph_payload: Optional[Mapping[str, Mapping[str, object]]] = None,
+    graph_data: Optional[Mapping[str, Mapping[str, object]]] = None,
     page_title: Optional[str] = None,
     value_rounding: int = 2,
 ) -> None:
@@ -178,10 +178,10 @@ def render_streamlit_dashboard(
         st.warning("No targets available for the selected zone.")
         return
 
-    graph_payload = graph_payload or get_output_graph_data(zone)
+    graph_data = graph_data or get_output_graph_data(zone)
     graph_sets = {
-        name: StreamlitGraphSet.from_payload(payload)
-        for name, payload in graph_payload.items()
+        name: StreamlitGraphSet.from_graph_data(graph_set_data)
+        for name, graph_set_data in graph_data.items()
     }
 
     base_key = f"{zone.name}_{id(zone)}"
@@ -391,7 +391,7 @@ def _build_download(
 
 
 def _build_plotly_graph(graph: Mapping[str, object]):
-    """Create a Plotly figure for the provided graph payload."""
+    """Create a Plotly figure for the provided graph data."""
     plotly_go = _require_plotly()
     fig = plotly_go.Figure()
     legend_seen: Dict[str, bool] = {}
@@ -542,7 +542,7 @@ def _apply_default_layout(fig) -> None:
 def _extract_segment_xy(
     segment: Mapping[str, object],
 ) -> tuple[List[float], List[float]]:
-    """Return x/y coordinate lists for a graph segment payload."""
+    """Return x/y coordinate lists for graph segment data."""
     points = segment.get("data_points", []) or []
     x_vals = [point["x"] for point in points if "x" in point and "y" in point]
     y_vals = [point["y"] for point in points if "x" in point and "y" in point]

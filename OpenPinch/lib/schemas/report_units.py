@@ -49,7 +49,7 @@ def _is_numeric_array_like(value: Any) -> bool:
     return True
 
 
-def _is_array_payload(value: Any) -> bool:
+def _is_array_value_data(value: Any) -> bool:
     return (
         isinstance(value, Mapping)
         and value.get("kind") == "array"
@@ -58,7 +58,7 @@ def _is_array_payload(value: Any) -> bool:
     )
 
 
-def _is_scalar_payload(value: Any) -> bool:
+def _is_scalar_value_data(value: Any) -> bool:
     return (
         isinstance(value, Mapping)
         and "value" in value
@@ -66,7 +66,7 @@ def _is_scalar_payload(value: Any) -> bool:
     )
 
 
-def _is_period_payload(value: Any) -> bool:
+def _is_period_value_data(value: Any) -> bool:
     return (
         isinstance(value, Mapping)
         and "values" in value
@@ -121,9 +121,9 @@ def _resolve_scalar_value(value: Any, *, period_idx: int | None = None) -> float
         return _resolve_period_values(value.period_values, period_idx=period_idx)
     if _is_numeric_scalar(value):
         return float(value)
-    if _is_scalar_payload(value):
+    if _is_scalar_value_data(value):
         return _coerce_optional_float(value.get("value"))
-    if _is_period_payload(value):
+    if _is_period_value_data(value):
         return _resolve_period_values(value.get("values"), period_idx=period_idx)
     if hasattr(value, "value") and hasattr(value, "unit"):
         return _coerce_optional_float(getattr(value, "value"))
@@ -139,7 +139,7 @@ def split_report_value(
     *,
     period_idx: int | None = None,
 ) -> tuple[Any, Optional[str]]:
-    """Return ``(value, unit)`` for scalar, multiperiod, or array report payloads."""
+    """Return ``(value, unit)`` for scalar, multiperiod, or array report data."""
     value = _normalise_input_object(value)
     if value is None:
         return None, None
@@ -156,7 +156,7 @@ def split_report_value(
             value.period_values, period_idx=period_idx
         ), value.unit
 
-    if _is_array_payload(value):
+    if _is_array_value_data(value):
         return _coerce_array_values(value.get("values")), value.get("unit")
 
     unit = (

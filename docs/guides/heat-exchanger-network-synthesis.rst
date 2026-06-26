@@ -3,11 +3,11 @@ Heat Exchanger Network Synthesis
 
 Heat exchanger network synthesis is exposed through the same problem and
 workspace roots as the rest of OpenPinch. A heat exchanger network run starts from an
-OpenPinch-compatible JSON payload, a native
+OpenPinch-compatible JSON case input, a native
 :class:`~OpenPinch.lib.schemas.io.TargetInput`, or an already loaded
 :class:`~OpenPinch.PinchProblem`. Source OpenHENS CSV files are migration
 source material only; convert them once into OpenPinch JSON or native
-``TargetInput`` payloads before running synthesis.
+``TargetInput`` models before running synthesis.
 
 The service ingress is
 ``heat_exchanger_network_synthesis_entry.py``. It is internal and
@@ -126,7 +126,7 @@ solver names, tolerance, output formats, and run id.
    for exchanger in network.exchangers:
        print(exchanger.source_stream, "->", exchanger.sink_stream, exchanger.duty)
 
-The ``source`` file above is an OpenPinch-compatible JSON payload. The original
+The ``source`` file above is an OpenPinch-compatible JSON case input. The original
 OpenHENS CSV example is not loaded at runtime by synthesis. Its process streams
 map to ``StreamSchema`` records, utilities and utility prices map to
 ``UtilitySchema`` records, and the synthesis controls map to ``TargetInput``
@@ -136,7 +136,7 @@ map to ``StreamSchema`` records, utilities and utility prices map to
 
    from OpenPinch.lib.schemas.io import TargetInput
 
-   payload = TargetInput.model_validate(
+   target_input = TargetInput.model_validate(
        {
            "streams": [...],
            "utilities": [...],
@@ -171,12 +171,12 @@ map to ``StreamSchema`` records, utilities and utility prices map to
        }
    )
 
-   problem = PinchProblem(source=payload, project_name="Four-stream example")
+   problem = PinchProblem(source=target_input, project_name="Four-stream example")
    design = problem.design.open_hens_method()
 
 Do not pass heat exchanger network design-space or solver controls as a separate object to the
 design call. The call may receive non-design runtime context options, but
-persistent heat exchanger network controls belong in the loaded problem payload.
+persistent heat exchanger network controls belong in the loaded problem input.
 
 Quality Tiers
 -------------

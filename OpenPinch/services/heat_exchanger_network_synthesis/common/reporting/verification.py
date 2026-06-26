@@ -1,4 +1,4 @@
-"""Validation shell for accepted heat exchanger network synthesis design payloads."""
+"""Validation shell for accepted heat exchanger network synthesis design data."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def verify_network_feasibility(
 ) -> tuple[str, ...]:
     """Return feasibility failures for one extracted HEN candidate.
 
-    The checks intentionally operate on the service-boundary network payload,
+    The checks intentionally operate on the service-boundary network data,
     not the private solver model. They therefore catch under-costed or
     heat-balance-inconsistent EVM candidates after solution extraction and before
     ranking/selection.
@@ -488,7 +488,7 @@ def _uses_isothermal_stage_boundaries(metadata: dict) -> bool:
     intermediate networks expose stage-boundary temperatures, not unique outlet
     temperatures for every match inside a mixed stage. Stream-level heat
     balances still apply, while per-exchanger duty and LMTD checks are reserved
-    for non-isothermal EVM candidates or hand-built network payloads.
+    for non-isothermal EVM candidates or hand-built network data.
     """
 
     if metadata.get("solver_non_isothermal_model", True):

@@ -148,7 +148,8 @@ Typical Preparation and Solve Pattern
        indirect_heat_integration_service,
    )
 
-   input_data = TargetInput.model_validate(payload)
+   source_data = {"streams": [...], "utilities": [...]}
+   input_data = TargetInput.model_validate(source_data)
    zone = data_preprocessing_service(input_data, project_name="Example")
 
    direct_heat_integration_service(zone, {"period_id": "peak"})

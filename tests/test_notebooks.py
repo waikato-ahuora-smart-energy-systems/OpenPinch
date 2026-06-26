@@ -182,7 +182,7 @@ def test_notebook_5_covers_service_boundary_and_output_workflows(tmp_path: Path)
     assert "pinch_analysis_service" in combined_source
     assert "export_excel" in combined_source
     assert "plot.export" in combined_source
-    assert "payload_view(" in combined_source
+    assert "input_view(" in combined_source
     assert "validate_variant(" in combined_source
     assert "solve_variant(" in combined_source
     assert "compare_variants(" in combined_source

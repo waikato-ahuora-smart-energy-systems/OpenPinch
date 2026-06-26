@@ -73,13 +73,13 @@ class StreamCollection:
         return self._num_periods
 
     def _rebuild_sort_key(self):
-        mode, payload = self._sort_spec
+        mode, sort_detail = self._sort_spec
         if mode == "attr":
-            self._sort_key = partial(_sort_by_attr, payload)
+            self._sort_key = partial(_sort_by_attr, sort_detail)
         elif mode == "attrs":
-            self._sort_key = partial(_sort_by_attrs, payload)
+            self._sort_key = partial(_sort_by_attrs, sort_detail)
         else:
-            self._sort_key = payload
+            self._sort_key = sort_detail
 
     def add(
         self, stream: "Stream", key: str = None, prevent_overwrite: bool = True
@@ -383,8 +383,8 @@ class StreamCollection:
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        mode, payload = state.get("_sort_spec", ("attr", "t_supply"))
-        if mode == "callable" and not _is_picklable(payload):
+        mode, sort_detail = state.get("_sort_spec", ("attr", "t_supply"))
+        if mode == "callable" and not _is_picklable(sort_detail):
             state["_sort_spec"] = ("attr", "t_supply")
         state["_sort_key"] = None
         return state

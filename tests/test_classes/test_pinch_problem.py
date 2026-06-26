@@ -383,7 +383,7 @@ def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
     assert float(hot_stream.t_max) == pytest.approx(195.0)
 
 
-def test_show_dashboard_builds_graph_payload(monkeypatch):
+def test_show_dashboard_builds_graph_data(monkeypatch):
     mod = sys.modules[PinchProblem.__module__]
     captured = {}
 
@@ -394,9 +394,9 @@ def test_show_dashboard_builds_graph_payload(monkeypatch):
     class ResultContainer:
         graphs = {"g1": GraphWithDump(), "g2": {"y": 2}}
 
-    def fake_render(zone, graph_payload, page_title, value_rounding):
+    def fake_render(zone, graph_data, page_title, value_rounding):
         captured["zone"] = zone
-        captured["payload"] = graph_payload
+        captured["graph_data"] = graph_data
         captured["title"] = page_title
         captured["rounding"] = value_rounding
 
@@ -408,8 +408,8 @@ def test_show_dashboard_builds_graph_payload(monkeypatch):
     obj.show_dashboard(page_title="Dash", value_rounding=3)
 
     assert captured["zone"] == {"name": "root"}
-    assert captured["payload"]["g1"] == {"x": 1}
-    assert captured["payload"]["g2"] == {"y": 2}
+    assert captured["graph_data"]["g1"] == {"x": 1}
+    assert captured["graph_data"]["g2"] == {"y": 2}
     assert captured["title"] == "Dash"
     assert captured["rounding"] == 3
 

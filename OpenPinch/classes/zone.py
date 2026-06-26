@@ -238,7 +238,7 @@ class Zone:
 
     @graphs.setter
     def graphs(self, data):
-        """Replace the graph payloads cached on this zone."""
+        """Replace the graph data cached on this zone."""
         self._graphs = data
 
     @property

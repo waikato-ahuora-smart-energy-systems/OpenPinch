@@ -319,7 +319,7 @@ class LineColour(Enum):
 
 
 class GraphType(Enum):
-    """Graph groups available in the OpenPinch reporting payload."""
+    """Graph groups available in OpenPinch reporting data."""
 
     CC = "Composite Curves"
     SCC = "Shifted Composite Curves"

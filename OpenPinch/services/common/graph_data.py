@@ -726,7 +726,7 @@ def _column_to_list(data, column_key: str) -> List[float]:
             column = data[column_key]
     except (KeyError, AttributeError, TypeError) as exc:
         raise KeyError(
-            f"Column '{column_key}' not found in graph data payload."
+            f"Column '{column_key}' not found in graph data."
         ) from exc
 
     if hasattr(column, "to_list"):

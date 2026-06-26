@@ -75,12 +75,12 @@ def problem_records_from_frame(df_data: pd.DataFrame, units_map: dict) -> list:
         column_values = clean_df[column_name]
         if isinstance(unit, str) and unit.strip():
             numeric_values = pd.to_numeric(column_values, errors="coerce")
-            payloads = [
+            value_entries = [
                 {"value": (None if pd.isna(val) else float(val)), "unit": unit}
                 for val in numeric_values
             ]
-            for record, payload in zip(records, payloads):
-                record[column_name] = payload
+            for record, value_entry in zip(records, value_entries):
+                record[column_name] = value_entry
         else:
             for record, value in zip(records, column_values):
                 record[column_name] = value if not pd.isna(value) else None
@@ -120,7 +120,7 @@ def target_records_from_frame(
         }
         for column_name, value in record.items():
             unit = units_map.get(column_name)
-            entry[column_name] = _summary_field_payload(
+            entry[column_name] = _summary_field_data(
                 column_name,
                 value,
                 unit=unit,
@@ -197,7 +197,7 @@ def _utility_records_from_row(
     return records
 
 
-def _summary_field_payload(
+def _summary_field_data(
     column_name: str,
     value: Any,
     *,
@@ -206,7 +206,7 @@ def _summary_field_payload(
     record_name: str,
 ) -> Any:
     if column_name == "pinch_temp":
-        return _temp_pinch_payload(
+        return _temp_pinch_data(
             value,
             unit=unit,
             is_total_process_target=(
@@ -222,7 +222,7 @@ def _summary_field_payload(
     return value if value is not None else None
 
 
-def _temp_pinch_payload(
+def _temp_pinch_data(
     value: Any,
     *,
     unit: Optional[str],

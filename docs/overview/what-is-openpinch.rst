@@ -55,7 +55,7 @@ At a high level, the codebase turns validated inputs into a solved target set:
                +--> cogeneration post-processing
                |
                v
-   TargetOutput + summaries + graphs + export payloads
+   TargetOutput + summaries + graphs + export data
 
 The same underlying analysis engine can be reached through:
 

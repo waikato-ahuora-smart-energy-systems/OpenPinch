@@ -124,7 +124,7 @@ def _build_pathway_pinch_design_method_tasks(
         grouped.setdefault(key, []).append(pathway)
 
     for (pdm_mode, approach_temperature), grouped_pathways in grouped.items():
-        settings_payload = {"pdm_mode": pdm_mode}
+        settings_data = {"pdm_mode": pdm_mode}
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
@@ -133,7 +133,7 @@ def _build_pathway_pinch_design_method_tasks(
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
                 period_id=settings.period_id,
-                settings=settings_payload,
+                settings=settings_data,
                 metadata=pathway_metadata(grouped_pathways),
             )
         )

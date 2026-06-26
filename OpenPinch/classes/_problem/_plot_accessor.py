@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 PathLike = Union[str, Path]
 GraphRecord = Dict[str, Any]
-GraphPayload = Dict[str, GraphRecord]
+GraphData = Dict[str, GraphRecord]
 
 _GRAPH_TYPE_ALIASES = {
     "etd": GT.ETD.value,
@@ -114,7 +114,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Select one graph and return either its figure or raw payload."""
+        """Select one graph and return either its figure or raw data."""
         graph_data = self._select_graph(
             zone_name=zone_name,
             graph_type=graph_type,
@@ -147,7 +147,7 @@ class _PlotAccessor:
         graph_type: Optional[str] = None,
         index: int = 0,
     ) -> GraphRecord:
-        """Return one graph payload from the filtered graph selection."""
+        """Return one graph from the filtered graph selection."""
         graphs = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
         if not graphs:
             raise ValueError("No graphs matched the requested selection.")
@@ -164,15 +164,15 @@ class _PlotAccessor:
         zone_name: Optional[str] = None,
         graph_type: Optional[str] = None,
     ) -> list[tuple[str, GraphRecord]]:
-        """Return all graph payloads matching the optional zone and type filters."""
-        payload = self.get_graph_data()
+        """Return all graphs matching the optional zone and type filters."""
+        graph_data = self.get_graph_data()
         selected_graph_type = _normalise_graph_type_selector(graph_type)
 
-        zone_items = payload.items()
+        zone_items = graph_data.items()
         if zone_name is not None:
             matched_zone_items = [
                 (graph_key, graph_set)
-                for graph_key, graph_set in payload.items()
+                for graph_key, graph_set in graph_data.items()
                 if _graph_set_matches_zone_selector(
                     selector=str(zone_name),
                     graph_key=graph_key,
@@ -181,7 +181,8 @@ class _PlotAccessor:
             ]
             if not matched_zone_items:
                 raise KeyError(
-                    f"Unknown zone {zone_name!r}. Available zones: {', '.join(payload)}"
+                    f"Unknown zone {zone_name!r}. "
+                    f"Available zones: {', '.join(graph_data)}"
                 )
             zone_items = matched_zone_items
 
@@ -199,8 +200,8 @@ class _PlotAccessor:
                 selected.append((zone_identifier, graph))
         return selected
 
-    def get_graph_data(self) -> GraphPayload:
-        """Return the serialized graph payload for the solved problem."""
+    def get_graph_data(self) -> GraphData:
+        """Return the serialized graph data for the solved problem."""
         if getattr(self._problem._results, "graphs", None) is None:
             self._problem.target()
 
@@ -268,7 +269,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching Composite Curve figure or raw payload."""
+        """Return the first matching Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.CC.value,
@@ -285,7 +286,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching Shifted Composite Curve figure or raw payload."""
+        """Return the first matching Shifted Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.SCC.value,
@@ -302,7 +303,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching Balanced Composite Curve figure or raw payload."""
+        """Return the first matching Balanced Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.BCC.value,
@@ -319,7 +320,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching Grand Composite Curve figure or raw payload."""
+        """Return the first matching Grand Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC.value,
@@ -336,7 +337,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching real temperature GCC payload or figure."""
+        """Return the first matching real temperature GCC data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC_R.value,
@@ -370,7 +371,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching GCC with Heat Pump payload or figure."""
+        """Return the first matching GCC with Heat Pump data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.GCC_HP.value,
@@ -387,7 +388,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching net load profile payload or figure."""
+        """Return the first matching net load profile data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.NLP.value,
@@ -421,7 +422,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching exergetic NLP payload or figure."""
+        """Return the first matching exergetic NLP data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.NLP_X.value,
@@ -438,7 +439,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching Total Site profiles payload or figure."""
+        """Return the first matching Total Site profiles data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.TSP.value,
@@ -455,7 +456,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching site-utility GCC payload or figure."""
+        """Return the first matching site-utility GCC data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.SUGCC.value,
@@ -472,7 +473,7 @@ class _PlotAccessor:
         show: bool = False,
         return_graph_data: bool = False,
     ):
-        """Return the first matching energy-transfer diagram payload or figure."""
+        """Return the first matching energy-transfer diagram data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
             graph_type=GT.ETD.value,

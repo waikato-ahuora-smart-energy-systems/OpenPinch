@@ -1,4 +1,4 @@
-"""Helpers for converting solved zone trees into serializable result payloads."""
+"""Helpers for converting solved zone trees into serializable result data."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ __all__ = ["extract_results"]
 
 
 def extract_results(zone: Zone, period_id: str | None = None) -> dict:
-    """Serialise solved targets, generated utilities, and graph payloads."""
+    """Serialise solved targets, generated utilities, and graph data."""
     return {
         "name": zone.name,
         "period_id": period_id,
@@ -24,14 +24,14 @@ def extract_results(zone: Zone, period_id: str | None = None) -> dict:
 
 
 def _get_report(zone: Zone, period_id: str | None = None) -> dict:
-    """Create the report payload from one zone and all nested subzones."""
+    """Create the report data from one zone and all nested subzones."""
     targets: List[dict] = []
 
     for target in zone.targets.values():
-        target_payload = target.serialize_json()
+        target_data = target.serialize_json()
         if period_id is not None:
-            target_payload["period_id"] = period_id
-        targets.append(target_payload)
+            target_data["period_id"] = period_id
+        targets.append(target_data)
 
     if len(zone.subzones) > 0:
         for subzone in zone.subzones.values():

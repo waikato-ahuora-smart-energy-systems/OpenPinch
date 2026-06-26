@@ -101,7 +101,7 @@ class ProblemTable:
         return validated
 
     def _initialise_named_column(self, col_name: str, values) -> None:
-        """Initialise the table data from a single named column payload."""
+        """Initialise the table data from a single named column mapping."""
         data_input = {col_name: values}
         self.data = np.array(
             [
@@ -943,7 +943,7 @@ class ProblemTable:
     def _validate_updates(
         self, updates: ProblemTableColumnUpdates, T_col: np.ndarray
     ) -> ProblemTableColumnUpdates:
-        """Validate update payloads and normalise keys to canonical column names."""
+        """Validate update data and normalise keys to canonical column names."""
         if not isinstance(updates, dict):
             raise TypeError("`updates` must be a dictionary of ProblemTable columns.")
 

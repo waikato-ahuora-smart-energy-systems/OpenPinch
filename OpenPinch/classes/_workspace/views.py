@@ -16,8 +16,8 @@ from ...lib.config_metadata import (
 from ...lib.schemas.workspace import (
     ConfigurationFieldMetadata,
     GraphCatalogEntry,
-    GraphPayloadEntry,
-    PayloadRecordView,
+    GraphDataEntry,
+    InputRecordView,
     ProblemTableDiffView,
     ProblemTableView,
     ScenarioVariantView,
@@ -106,9 +106,9 @@ def problem_to_variant_view(
 ) -> ScenarioVariantView:
     """Convert one solved problem into the workspace frontend view model."""
     summary_frame = problem.summary_frame()
-    graph_payload = problem.plot.get_graph_data()
-    graph_catalog = graph_catalog_entries(graph_payload)
-    graph_payloads = graph_payload_entries(graph_payload)
+    graph_data = problem.plot.get_graph_data()
+    graph_catalog = graph_catalog_entries(graph_data)
+    graph_entries = graph_data_entries(graph_data)
     problem_tables = problem_table_views(problem)
 
     return ScenarioVariantView(
@@ -124,7 +124,7 @@ def problem_to_variant_view(
         summary_cards=summary_cards(summary_frame),
         summary_table=dataframe_to_table_view(summary_frame),
         graph_catalog=graph_catalog,
-        graph_payloads=graph_payloads,
+        graph_data_entries=graph_entries,
         problem_tables=problem_tables,
     )
 
@@ -173,10 +173,10 @@ def summary_cards(frame: pd.DataFrame) -> list[SummaryCard]:
     return cards
 
 
-def graph_catalog_entries(graph_payload: dict[str, Any]) -> list[GraphCatalogEntry]:
-    """Flatten graph payload metadata into a catalog view."""
+def graph_catalog_entries(graph_data: dict[str, Any]) -> list[GraphCatalogEntry]:
+    """Flatten graph metadata into a catalog view."""
     entries = []
-    for graph_set_id, graph_set in graph_payload.items():
+    for graph_set_id, graph_set in graph_data.items():
         target_name = str(graph_set.get("name", graph_set_id))
         target_id = target_name
         zone_name = maybe_string(graph_set.get("zone_name"))
@@ -202,27 +202,27 @@ def graph_catalog_entries(graph_payload: dict[str, Any]) -> list[GraphCatalogEnt
     return entries
 
 
-def graph_payload_entries(graph_payload: dict[str, Any]) -> list[GraphPayloadEntry]:
-    """Flatten raw graph payloads into stable graph entry records."""
-    payloads = []
-    for graph_set_id, graph_set in graph_payload.items():
+def graph_data_entries(graph_data: dict[str, Any]) -> list[GraphDataEntry]:
+    """Flatten raw graph data into stable graph entry records."""
+    entries = []
+    for graph_set_id, graph_set in graph_data.items():
         target_name = str(graph_set.get("name", graph_set_id))
         target_id = target_name
         for index, graph in enumerate(graph_set.get("graphs", [])):
             graph_type = maybe_string(graph.get("type"))
             graph_name = str(graph.get("name") or graph_type or f"Graph {index + 1}")
-            payloads.append(
-                GraphPayloadEntry(
+            entries.append(
+                GraphDataEntry(
                     graph_id=f"{graph_set_id}::{index}::{graph_type or 'graph'}",
                     graph_set_id=str(graph_set_id),
                     target_id=target_id,
                     target_name=target_name,
                     graph_type=graph_type,
                     graph_name=graph_name,
-                    payload=json_safe(graph),
+                    graph_data=json_safe(graph),
                 )
             )
-    return payloads
+    return entries
 
 
 def problem_table_views(problem: PinchProblem) -> list[ProblemTableView]:
@@ -426,8 +426,8 @@ def zone_tree_view(zone_tree: Any) -> list[ZoneNodeView]:
     return nodes
 
 
-def record_views(records: Any, *, section: str) -> list[PayloadRecordView]:
-    """Convert stream/utility payload rows into editable frontend records."""
+def record_views(records: Any, *, section: str) -> list[InputRecordView]:
+    """Convert stream/utility input rows into editable frontend records."""
     if not isinstance(records, list):
         return []
     views = []
@@ -436,7 +436,7 @@ def record_views(records: Any, *, section: str) -> list[PayloadRecordView]:
             continue
         path = f"{section}[{index}]"
         views.append(
-            PayloadRecordView(
+            InputRecordView(
                 record_id=path,
                 path=path,
                 section=section,

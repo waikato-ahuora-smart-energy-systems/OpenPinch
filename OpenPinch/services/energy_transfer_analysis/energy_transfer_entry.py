@@ -75,14 +75,14 @@ def create_energy_transfer_diagram(
     simplify: bool = True,
 ) -> dict[str, Any]:
     """Build operation-level ETD curves on one shared temperature interval grid."""
-    source_payloads = _normalise_source_targets(source_targets)
-    if not source_payloads:
+    source_records = _normalise_source_targets(source_targets)
+    if not source_records:
         return _empty_diagram(base_target=base_target)
 
     base_pt = _get_base_problem_table(base_target) if base_target is not None else None
-    temperatures = _compile_temperature_intervals(source_payloads, base_pt)
+    temperatures = _compile_temperature_intervals(source_records, base_pt)
     names, modes, interval_heat, cascades = _transpose_operation_cascades(
-        source_payloads,
+        source_records,
         temperatures,
     )
 
@@ -137,7 +137,7 @@ def create_energy_transfer_diagram(
 def create_heat_surplus_deficit_table(
     diagram: dict[str, Any] | Iterable[UtilitySummaryTarget] | ProblemTable,
 ) -> list[dict[str, Any]]:
-    """Return the ETD heat-surplus/deficit table from a diagram payload."""
+    """Return the ETD heat-surplus/deficit table from diagram data."""
     if not isinstance(diagram, dict):
         diagram = create_energy_transfer_diagram(diagram)
 
@@ -349,7 +349,7 @@ def _normalise_source_targets(
             }
         ]
 
-    payloads = []
+    source_records = []
     for index, source in enumerate(source_targets):
         name_override = None
         target = source
@@ -358,7 +358,7 @@ def _normalise_source_targets(
             name_override = source.get("name")
 
         pt = _get_source_problem_table(target)
-        payloads.append(
+        source_records.append(
             {
                 "name": (
                     str(name_override)
@@ -371,14 +371,14 @@ def _normalise_source_targets(
                 "cold_utility_target": getattr(target, "cold_utility_target", 0.0),
             }
         )
-    return payloads
+    return source_records
 
 
 def _compile_temperature_intervals(
-    source_payloads: list[dict[str, Any]],
+    source_records: list[dict[str, Any]],
     base_pt: ProblemTable | None,
 ) -> np.ndarray:
-    arrays = [_as_float_array(payload["pt"][PT.T]) for payload in source_payloads]
+    arrays = [_as_float_array(record["pt"][PT.T]) for record in source_records]
     if base_pt is not None:
         arrays.append(_as_float_array(base_pt[PT.T]))
     temperatures = np.concatenate([array for array in arrays if array.size > 0])
@@ -390,14 +390,14 @@ def _compile_temperature_intervals(
 
 
 def _transpose_operation_cascades(
-    source_payloads: list[dict[str, Any]],
+    source_records: list[dict[str, Any]],
     temperatures: np.ndarray,
 ) -> tuple[list[str], list[str], np.ndarray, np.ndarray]:
-    names = [str(payload["name"]) for payload in source_payloads]
-    modes = [str(payload["mode"]) for payload in source_payloads]
+    names = [str(record["name"]) for record in source_records]
+    modes = [str(record["mode"]) for record in source_records]
     interval_count = max(len(temperatures) - 1, 0)
-    interval_heat = np.zeros((len(source_payloads), interval_count), dtype=float)
-    cascades = np.zeros((len(source_payloads), len(temperatures)), dtype=float)
+    interval_heat = np.zeros((len(source_records), interval_count), dtype=float)
+    cascades = np.zeros((len(source_records), len(temperatures)), dtype=float)
 
     if interval_count == 0:
         return names, modes, interval_heat, cascades
@@ -406,8 +406,8 @@ def _transpose_operation_cascades(
     common_lower = temperatures[1:]
     dt = common_upper - common_lower
 
-    for row, payload in enumerate(source_payloads):
-        pt = payload["pt"]
+    for row, record in enumerate(source_records):
+        pt = record["pt"]
         source_t = _as_float_array(pt[PT.T])
         h_net = _as_float_array(pt[PT.H_NET])
         cascades[row, 0] = h_net[0] if h_net.size else 0.0

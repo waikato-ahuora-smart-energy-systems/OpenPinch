@@ -1,4 +1,4 @@
-"""Graph payload schemas."""
+"""Graph data schemas."""
 
 from __future__ import annotations
 

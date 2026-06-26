@@ -224,8 +224,8 @@ def small_hens_benchmark_cases(
     for fixture_path in sorted(_HENS_FIXTURE_ROOT.glob("*.json")):
         if not include_reordered and fixture_path.stem.endswith(".reordered"):
             continue
-        payload = json.loads(fixture_path.read_text(encoding="utf-8"))
-        if len(payload.get("streams", ())) <= int(max_streams):
+        case_input = json.loads(fixture_path.read_text(encoding="utf-8"))
+        if len(case_input.get("streams", ())) <= int(max_streams):
             cases.append(fixture_path.name)
     return tuple(cases)
 
@@ -234,14 +234,14 @@ HENS_BENCHMARK_CASES = small_hens_benchmark_cases()
 
 
 def _hens_case_options(
-    payload: dict[str, Any],
+    case_input: dict[str, Any],
     *,
     options: dict[str, Any],
     tier: int,
     run_id: str,
     use_fixture_defaults: bool,
 ) -> dict[str, Any]:
-    fixture_options = copy.deepcopy(payload.get("options", {}))
+    fixture_options = copy.deepcopy(case_input.get("options", {}))
     benchmark_overrides = {
         "HENS_SYNTHESIS_QUALITY_TIER": int(tier),
         "HENS_RUN_ID": run_id,
@@ -385,9 +385,9 @@ class BenchmarkTraceExecutor:
         self.stage_records.append(record)
         self._emit_progress({"event": "stage_record", "record": record})
 
-    def _emit_progress(self, payload: dict[str, Any]) -> None:
+    def _emit_progress(self, event_data: dict[str, Any]) -> None:
         if self.progress_queue is not None:
-            self.progress_queue.put(payload)
+            self.progress_queue.put(event_data)
 
 
 def time_hens_tier_case(
@@ -399,16 +399,16 @@ def time_hens_tier_case(
     progress_queue=None,
 ) -> dict[str, Any]:
     fixture_path = _HENS_FIXTURE_ROOT / case_name
-    payload = copy.deepcopy(json.loads(fixture_path.read_text(encoding="utf-8")))
+    case_input = copy.deepcopy(json.loads(fixture_path.read_text(encoding="utf-8")))
     run_id = f"benchmark-{fixture_path.stem}-tier-{tier}"
-    payload["options"] = _hens_case_options(
-        payload,
+    case_input["options"] = _hens_case_options(
+        case_input,
         options=options,
         tier=tier,
         run_id=run_id,
         use_fixture_defaults=use_fixture_defaults,
     )
-    problem = PinchProblem(source=payload, project_name=case_name)
+    problem = PinchProblem(source=case_input, project_name=case_name)
     solver_tracer = BenchmarkSolverCallTracer(
         case_name=case_name,
         tier=tier,
@@ -514,7 +514,7 @@ def time_hens_tier_case_with_timeout(
     elapsed = time.perf_counter() - start
     if result is not None:
         if result["status"] == "success":
-            return result["payload"]
+            return result["result_data"]
         return _failed_hens_result(
             case_name,
             tier=tier,
@@ -574,7 +574,7 @@ def _time_hens_tier_case_worker(
     except OSError:
         pass
     try:
-        payload = time_hens_tier_case(
+        result_data = time_hens_tier_case(
             case_name,
             tier=tier,
             options=options,
@@ -590,7 +590,7 @@ def _time_hens_tier_case_worker(
             }
         )
     else:
-        queue.put({"event": "result", "status": "success", "payload": payload})
+        queue.put({"event": "result", "status": "success", "result_data": result_data})
 
 
 def _empty_partial_trace() -> dict[str, Any]:
@@ -679,7 +679,7 @@ def _failed_hens_result(
     error: str,
     diagnostics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    payload = {
+    result_data = {
         "name": case_name,
         "benchmark": "hens_quality_tier",
         "variant": f"tier_{tier}",
@@ -689,8 +689,8 @@ def _failed_hens_result(
         "error": error,
     }
     if diagnostics is not None:
-        payload["diagnostics"] = diagnostics
-    return payload
+        result_data["diagnostics"] = diagnostics
+    return result_data
 
 
 def _benchmark_diagnostics(
@@ -1431,14 +1431,14 @@ def _successful_hens_result(result: dict[str, Any]) -> bool:
     )
 
 
-def _results_payload(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _results_data(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [*results, *summarize_hens_tier_comparisons(results)]
 
 
 def _write_incremental_results(path: Path, results: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(_results_payload(results), indent=2) + "\n",
+        json.dumps(_results_data(results), indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -1616,7 +1616,7 @@ def main() -> None:
             print(_format_comparison_row(comparison), flush=True)
 
     if args.json is None:
-        print(json.dumps(_results_payload(results), indent=2))
+        print(json.dumps(_results_data(results), indent=2))
     else:
         _write_incremental_results(args.json, results)
 

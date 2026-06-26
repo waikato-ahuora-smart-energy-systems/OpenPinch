@@ -28,7 +28,7 @@ class InternalHeatExchangerNetworkProblem:
 
     This object is private solver state. HENS-07 constructs moved PDM and
     StageWise models from OpenPinch-prepared solver arrays and emits OpenPinch
-    network/result payloads at the extraction boundary. HENS-08 still owns
+    network/result data at the extraction boundary. HENS-08 still owns
     stage reduction and topology evolution.
     """
 
@@ -134,7 +134,7 @@ class InternalHeatExchangerNetworkProblem:
         workspace_variant: str | None = None,
         period_id: str | None = None,
     ) -> HeatExchangerNetworkSynthesisResult:
-        """Return the serializable result payload for the service boundary."""
+        """Return the serializable result data for the service boundary."""
 
         return extract_network_synthesis_result(
             self.case,

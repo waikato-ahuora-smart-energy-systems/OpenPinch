@@ -152,13 +152,13 @@ def build_report_metrics(results: Any) -> list[ReportMetric]:
 
 
 def build_graph_availability(
-    graph_payload: dict[str, Any] | None,
+    graph_data: dict[str, Any] | None,
 ) -> list[GraphAvailability]:
-    """Flatten graph payloads into typed graph availability records."""
-    if not graph_payload:
+    """Flatten graph data into typed graph availability records."""
+    if not graph_data:
         return []
     entries = []
-    for graph_set_id, graph_set in graph_payload.items():
+    for graph_set_id, graph_set in graph_data.items():
         target_name = str(graph_set.get("name", graph_set_id))
         for index, graph in enumerate(graph_set.get("graphs", [])):
             graph_type = graph.get("type")
@@ -184,7 +184,7 @@ def build_problem_report(
     project_name: str,
     validation: ValidationReport,
     results: Any | None,
-    graph_payload: dict[str, Any] | None = None,
+    graph_data: dict[str, Any] | None = None,
     warnings: list[str] | None = None,
 ) -> ProblemReport:
     """Build a typed report from current validation and optional solved results."""
@@ -194,7 +194,7 @@ def build_problem_report(
         validation=validation,
         targets=list(getattr(results, "targets", []) or []),
         metrics=build_report_metrics(results) if results is not None else [],
-        graph_catalog=build_graph_availability(graph_payload),
+        graph_catalog=build_graph_availability(graph_data),
         warnings=list(warnings or []),
     )
 
@@ -231,8 +231,8 @@ def locate_summary_row(
     return frame.iloc[0]
 
 
-def build_graph_payload(results: Any) -> Optional[dict[str, Any]]:
-    """Extract a JSON-safe graph payload from solved results when available."""
+def build_graph_data(results: Any) -> Optional[dict[str, Any]]:
+    """Extract JSON-safe graph data from solved results when available."""
     graphs = getattr(results, "graphs", None)
     if not graphs:
         return None

@@ -270,7 +270,7 @@ def test_apply_dashboard_theme_and_render_dashboard_branches(monkeypatch, tmp_pa
     target = _make_target("Master/DI")
     zone.add_target(target)
 
-    graph_payload = {
+    graph_data = {
         "Master/DI": {
             "name": "Master/DI",
             "graphs": [
@@ -295,7 +295,7 @@ def test_apply_dashboard_theme_and_render_dashboard_branches(monkeypatch, tmp_pa
 
     wg.render_streamlit_dashboard(
         zone,
-        graph_payload=graph_payload,
+        graph_data=graph_data,
         page_title="Master Dashboard",
         value_rounding=2,
     )
@@ -309,7 +309,7 @@ def test_render_dashboard_no_targets_issues_warning(monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "streamlit", st_render)
 
     zone = Zone(name="NoTargets")
-    wg.render_streamlit_dashboard(zone, graph_payload={})
+    wg.render_streamlit_dashboard(zone, graph_data={})
 
     assert st_render.warnings
     assert "No targets available" in st_render.warnings[0]
@@ -409,7 +409,7 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     )
     zone.add_target(target)
 
-    wg.render_streamlit_dashboard(zone, graph_payload={})
+    wg.render_streamlit_dashboard(zone, graph_data={})
 
     assert any("No graphs available" in msg for msg in st.infos)
     assert any("No shifted problem table data" in msg for msg in st.infos)
@@ -438,7 +438,7 @@ def test_render_streamlit_dashboard_handles_energy_transfer_target(monkeypatch):
 
     wg.render_streamlit_dashboard(
         zone,
-        graph_payload={
+        graph_data={
             "Plant/Energy Transfer Analysis": {
                 "name": "Plant/Energy Transfer Analysis",
                 "graphs": [

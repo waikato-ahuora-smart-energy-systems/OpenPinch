@@ -11,7 +11,7 @@ from ._loading import (
     prepare_in_memory_problem_source,
 )
 from ._output import (
-    build_graph_payload,
+    build_graph_data,
     build_problem_report,
     build_problem_summary_frame,
     build_report_metrics,
@@ -38,7 +38,7 @@ __all__ = [
     "_TargetAccessorDescriptor",
     "_validate_problem_semantics",
     "build_validation_report",
-    "build_graph_payload",
+    "build_graph_data",
     "build_problem_report",
     "build_problem_summary_frame",
     "build_report_metrics",

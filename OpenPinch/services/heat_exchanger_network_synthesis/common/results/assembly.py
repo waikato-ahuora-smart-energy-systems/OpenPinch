@@ -26,7 +26,7 @@ _METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
 
 @dataclass(frozen=True)
 class SynthesisWorkflowResult:
-    """Executed task graph plus accepted design payload."""
+    """Executed task graph plus accepted design data."""
 
     tasks: tuple[HeatExchangerNetworkSynthesisTask, ...]
     outcomes: tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]
@@ -39,7 +39,7 @@ def build_synthesis_result(
     tasks: Sequence[HeatExchangerNetworkSynthesisTask],
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> HeatExchangerNetworkSynthesisResult:
-    """Convert accepted task outcomes into the canonical design payload."""
+    """Convert accepted task outcomes into the canonical design data."""
     _assert_successful_outcomes_feasible(outcomes)
     accepted = _accepted_outcome(outcomes)
     if accepted.network is None:

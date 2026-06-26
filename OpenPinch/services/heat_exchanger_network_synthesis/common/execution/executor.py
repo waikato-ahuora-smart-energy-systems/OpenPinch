@@ -128,7 +128,7 @@ class LocalSynthesisExecutor:
         )
         if worker_count == 1:
             solved_results = tuple(
-                _solve_built_task(payload) for payload in solve_inputs
+                _solve_built_task(worker_args) for worker_args in solve_inputs
             )
         else:
             with self.worker_pool_factory(worker_count) as pool:
@@ -279,14 +279,14 @@ class LocalSynthesisExecutor:
 
 
 def _solve_built_task(
-    payload: tuple[Any, ...],
+    worker_args: tuple[Any, ...],
 ) -> tuple[
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
     InternalHeatExchangerNetworkProblem | None,
 ]:
-    if len(payload) == 4:
-        task, internal_problem, print_output, model_factories = payload
+    if len(worker_args) == 4:
+        task, internal_problem, print_output, model_factories = worker_args
         evolution_options = {
             "n_ad_branches": 1,
             "n_rm_branches": 1,
@@ -295,7 +295,7 @@ def _solve_built_task(
         }
     else:
         task, internal_problem, print_output, model_factories, evolution_options = (
-            payload
+            worker_args
         )
     try:
         solve_kwargs: dict[str, Any] = {
@@ -354,7 +354,7 @@ def _solve_built_task(
 
 
 def _build_and_solve_root_task(
-    payload: tuple[
+    worker_args: tuple[
         HeatExchangerNetworkSynthesisTask,
         Any,
         bool,
@@ -366,7 +366,7 @@ def _build_and_solve_root_task(
     HeatExchangerNetworkSynthesisTaskOutcome,
     InternalHeatExchangerNetworkProblem | None,
 ]:
-    task, problem, print_output, model_factories, evolution_options = payload
+    task, problem, print_output, model_factories, evolution_options = worker_args
     executor = LocalSynthesisExecutor(
         print_output=print_output,
         model_factories=model_factories,

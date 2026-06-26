@@ -41,7 +41,7 @@ The core OpenPinch solve path can be read as one analysis-dataflow diagram:
        -> prepared Zone hierarchy
        -> direct and/or indirect targeting services
        -> target models attached to zones
-       -> TargetOutput summaries and graph payloads
+       -> TargetOutput summaries and graph data
        -> tables, plots, Excel export, and dashboard views
 
 This matters because the same prepared model feeds the CLI, the

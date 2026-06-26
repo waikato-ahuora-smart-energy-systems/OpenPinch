@@ -15,7 +15,7 @@ Use ``PinchProblem`` when you want:
   inputs
 - one object that keeps both the original case and the solved result state
 - compact and detailed summary tables
-- graph building and graph export without manually wiring result payloads
+- graph building and graph export without manually wiring result data
 - notebook-friendly advanced workflows such as HPR screening or
   ``dt_cont`` sensitivity studies
 - selected-period reruns through ``period_id`` and batch reruns through
@@ -72,7 +72,7 @@ When the prepared data contains multiple periods, the main period surfaces are:
   batch solves across every canonical period
 
 Period selection happens at targeting time, not at load time. The cached result,
-summary frame, export surface, and graph payload then reflect the selected
+summary frame, export surface, and graph data then reflect the selected
 state.
 
 Advanced Entry Points
@@ -118,7 +118,7 @@ After solving, the main read and export surfaces are:
 
 - ``summary_frame()`` for compact or detailed pandas views
 - ``problem.plot.catalog()`` for the available graph inventory
-- ``problem.plot.*`` for Plotly figures and raw graph payloads
+- ``problem.plot.*`` for Plotly figures and raw graph data
 - ``problem.plot.export(...)`` for standalone HTML graph files
 - ``export_excel(...)`` for workbook output
 - ``show_dashboard()`` for the Streamlit-based review surface

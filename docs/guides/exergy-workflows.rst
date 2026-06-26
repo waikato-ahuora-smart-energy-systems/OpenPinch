@@ -16,7 +16,7 @@ Typical Workflow
 1. solve the base thermal case
 2. choose the target family whose GCC or net-load view you want to interpret
 3. run the exergy workflow on that existing result
-4. inspect the exergy summary fields and exergetic graph payloads together
+4. inspect the exergy summary fields and exergetic graph data together
 
 Python Surface
 --------------

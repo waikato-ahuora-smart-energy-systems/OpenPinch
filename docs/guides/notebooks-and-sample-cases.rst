@@ -66,7 +66,7 @@ the direct gas/vapour MVR process-component workflow, where live
 in a ``PinchWorkspace``. Notebook 09 covers the problem-owned heat exchanger
 network design service on a compact four-stream synthesis case, including grid
 configuration, live solver execution, and top-network inspection. The distributed assets are
-packaged as clean sources: no stored Plotly payloads, no cached execution
+packaged as clean sources: no stored Plotly data, no cached execution
 counts, and no stale traceback output.
 
 Access notebook assets directly from Python:

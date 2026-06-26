@@ -1,4 +1,4 @@
-"""Helpers for resolving scalar and multiperiod value payloads."""
+"""Helpers for resolving scalar and multiperiod value data."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import numpy as np
 
 from ..classes.value import Value
 
-_SCALAR_PAYLOAD_KEYS = {"value", "unit", "weights"}
-_PERIOD_PAYLOAD_KEYS = {"values", "period_ids", "weights", "unit"}
+_SCALAR_VALUE_DATA_KEYS = {"value", "unit", "weights"}
+_PERIOD_VALUE_DATA_KEYS = {"values", "period_ids", "weights", "unit"}
 
 __all__ = [
     "get_scalar_value",
@@ -43,19 +43,19 @@ def _is_period_value_object(value: Any) -> bool:
     return hasattr(value, "values")
 
 
-def _is_scalar_value_payload(value: Any) -> bool:
+def _is_scalar_value_data(value: Any) -> bool:
     return (
         isinstance(value, Mapping)
         and "value" in value
-        and set(value).issubset(_SCALAR_PAYLOAD_KEYS)
+        and set(value).issubset(_SCALAR_VALUE_DATA_KEYS)
     )
 
 
-def _is_period_value_payload(value: Any) -> bool:
+def _is_period_value_data(value: Any) -> bool:
     if not isinstance(value, Mapping):
         return False
     keys = set(value)
-    return keys.issubset(_PERIOD_PAYLOAD_KEYS) and (
+    return keys.issubset(_PERIOD_VALUE_DATA_KEYS) and (
         "values" in keys or "period_ids" in keys or "weights" in keys
     )
 
@@ -113,7 +113,7 @@ def get_period_value(
         raise TypeError("Boolean values are not supported.")
 
     if isinstance(value, Mapping):
-        if _is_period_value_payload(value):
+        if _is_period_value_data(value):
             if "values" not in value:
                 raise KeyError("values")
             return _resolve_period_values(
@@ -121,7 +121,7 @@ def get_period_value(
                 period_idx=period_idx,
                 default_allowed=default_allowed,
             )
-        if _is_scalar_value_payload(value):
+        if _is_scalar_value_data(value):
             return get_period_value(
                 value.get("value"),
                 period_idx=period_idx,
@@ -173,7 +173,7 @@ def get_period_value(
 
     raise TypeError(
         "Unsupported type: expected numeric scalar, Value, ValueWithUnit, "
-        "or serialized scalar/period value payload."
+        "or serialized scalar/period value data."
     )
 
 
@@ -183,7 +183,7 @@ def get_scalar_value(
     period_idx: int | None = None,
     default_allowed: bool = True,
 ) -> float | None:
-    """Resolve one scalar value and reject operator or zone-spec payloads."""
+    """Resolve one scalar value and reject operator or zone-spec data."""
     if value is None:
         return None
     value = _normalise_input_object(value)
@@ -195,7 +195,7 @@ def get_scalar_value(
 
 
 def resolve_value_array(value: Any) -> np.ndarray:
-    """Resolve scalar or multiperiod value-like payloads into a 1-D float array."""
+    """Resolve scalar or multiperiod value-like data into a 1-D float array."""
     value = _normalise_input_object(value)
     if value is None:
         return np.array([], dtype=float)
@@ -203,11 +203,11 @@ def resolve_value_array(value: Any) -> np.ndarray:
         raise TypeError("Boolean values are not supported.")
 
     if isinstance(value, Mapping):
-        if _is_period_value_payload(value):
+        if _is_period_value_data(value):
             if "values" not in value:
                 raise KeyError("values")
             return np.asarray(value.get("values"), dtype=float).reshape(-1)
-        if _is_scalar_value_payload(value):
+        if _is_scalar_value_data(value):
             scalar = get_scalar_value(value)
             return (
                 np.array([], dtype=float)
@@ -241,5 +241,5 @@ def resolve_value_array(value: Any) -> np.ndarray:
 
     raise TypeError(
         "Unsupported type: expected numeric scalar, Value, ValueWithUnit, "
-        "or serialized scalar or multiperiod value payload."
+        "or serialized scalar or multiperiod value data."
     )

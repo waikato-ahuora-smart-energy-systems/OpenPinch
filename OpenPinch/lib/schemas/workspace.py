@@ -20,14 +20,14 @@ class ValidationIssue(BaseModel):
 
 
 class ValidationReport(BaseModel):
-    """Structured validation report for one editable payload."""
+    """Structured validation report for one editable case input."""
 
     valid: bool
     issues: List[ValidationIssue] = Field(default_factory=list)
 
 
 class TableView(BaseModel):
-    """Generic tabular payload for frontend data-grid rendering."""
+    """Generic tabular data for frontend data-grid rendering."""
 
     columns: List[str] = Field(default_factory=list)
     rows: List[Dict[str, Any]] = Field(default_factory=list)
@@ -59,8 +59,8 @@ class GraphCatalogEntry(BaseModel):
     index: int
 
 
-class GraphPayloadEntry(BaseModel):
-    """Serializable graph payload attached to one graph identifier."""
+class GraphDataEntry(BaseModel):
+    """Serializable graph data attached to one graph identifier."""
 
     graph_id: str
     graph_set_id: str
@@ -68,7 +68,7 @@ class GraphPayloadEntry(BaseModel):
     target_name: str
     graph_type: Optional[str] = None
     graph_name: str
-    payload: Dict[str, Any]
+    graph_data: Dict[str, Any]
 
 
 class ProblemTableView(BaseModel):
@@ -92,7 +92,7 @@ class ZoneNodeView(BaseModel):
     dt_cont_multiplier: Optional[float] = None
 
 
-class PayloadRecordView(BaseModel):
+class InputRecordView(BaseModel):
     """Editable stream or utility record with a stable path identifier."""
 
     record_id: str
@@ -104,13 +104,13 @@ class PayloadRecordView(BaseModel):
     data: Dict[str, Any]
 
 
-class VariantPayloadView(BaseModel):
-    """Frontend-friendly editable payload view for one workspace variant."""
+class VariantInputView(BaseModel):
+    """Frontend-friendly editable input view for one workspace variant."""
 
     variant_name: str
     zones: List[ZoneNodeView] = Field(default_factory=list)
-    streams: List[PayloadRecordView] = Field(default_factory=list)
-    utilities: List[PayloadRecordView] = Field(default_factory=list)
+    streams: List[InputRecordView] = Field(default_factory=list)
+    utilities: List[InputRecordView] = Field(default_factory=list)
     options: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -153,7 +153,7 @@ class ScenarioVariantView(BaseModel):
     summary_cards: List[SummaryCard] = Field(default_factory=list)
     summary_table: Optional[TableView] = None
     graph_catalog: List[GraphCatalogEntry] = Field(default_factory=list)
-    graph_payloads: List[GraphPayloadEntry] = Field(default_factory=list)
+    graph_data_entries: List[GraphDataEntry] = Field(default_factory=list)
     problem_tables: List[ProblemTableView] = Field(default_factory=list)
 
 
@@ -199,7 +199,7 @@ class ScenarioComparisonView(BaseModel):
 class ScenarioVariantBundleEntry(BaseModel):
     """One persisted variant entry inside a scenario workspace bundle."""
 
-    payload: Dict[str, Any]
+    case_input: Dict[str, Any]
     workflow: ScenarioWorkflowConfig = Field(default_factory=ScenarioWorkflowConfig)
     cached_view: Optional[ScenarioVariantView] = None
 
@@ -216,8 +216,8 @@ class PinchWorkspaceBundle(BaseModel):
 __all__ = [
     "ConfigurationFieldMetadata",
     "GraphCatalogEntry",
-    "GraphPayloadEntry",
-    "PayloadRecordView",
+    "GraphDataEntry",
+    "InputRecordView",
     "ProblemTableDiffView",
     "ProblemTableView",
     "ScenarioComparisonView",
@@ -230,6 +230,6 @@ __all__ = [
     "ValidationIssue",
     "ValidationReport",
     "VariantMetricDelta",
-    "VariantPayloadView",
+    "VariantInputView",
     "ZoneNodeView",
 ]

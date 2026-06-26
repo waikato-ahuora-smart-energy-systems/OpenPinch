@@ -88,8 +88,8 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
         return self
 
     def generate_task_id(self) -> str:
-        """Return the deterministic identifier for this task payload."""
-        payload = {
+        """Return the deterministic identifier for this task definition."""
+        task_key_data = {
             "approach_temperature": self.approach_temperature,
             "derivative_threshold": self.derivative_threshold,
             "method": self.method,
@@ -106,8 +106,12 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
             "workspace_variant": self.workspace_variant,
         }
         if self.seed_network_index is not None:
-            payload["seed_network_index"] = self.seed_network_index
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+            task_key_data["seed_network_index"] = self.seed_network_index
+        encoded = json.dumps(
+            task_key_data,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
         digest = hashlib.sha256(encoded).hexdigest()[:16]
         return f"hens-task-{digest}"
 
@@ -363,7 +367,7 @@ class HeatExchangerNetworkSynthesisTaskOutcome(
 
 
 class HeatExchangerNetworkSynthesisResult(BaseModel):
-    """Problem-owned heat exchanger network synthesis result payload."""
+    """Problem-owned heat exchanger network synthesis result data."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 

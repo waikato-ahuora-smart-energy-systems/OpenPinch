@@ -141,7 +141,7 @@ workspace.scenario("wide_dt", dt_cont_multiplier=0.5)
 comparison = workspace.compare_cases("baseline", "wide_dt")
 ```
 
-You can also build a payload directly from the validated schema models:
+You can also build a case input directly from the validated schema models:
 
 ```python
 from OpenPinch import pinch_analysis_service
@@ -182,8 +182,8 @@ utilities = [
     )
 ]
 
-payload = TargetInput(streams=streams, utilities=utilities)
-result = pinch_analysis_service(payload, project_name="Example")
+case_input = TargetInput(streams=streams, utilities=utilities)
+result = pinch_analysis_service(case_input, project_name="Example")
 ```
 
 ## Graphing and Dashboard

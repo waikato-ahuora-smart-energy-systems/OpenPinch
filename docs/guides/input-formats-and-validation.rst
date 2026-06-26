@@ -33,8 +33,8 @@ Schema-first Python input
    Best for application integration and typed construction in code.
 
 Plain mapping
-   Useful when another part of your application already assembled the payload
-   in memory.
+   Useful when another part of your application already assembled the case
+   input in memory.
 
 Core Data Contract
 ------------------
@@ -79,7 +79,8 @@ For schema-first usage:
 
    from OpenPinch.lib.schemas.io import TargetInput
 
-   input_data = TargetInput.model_validate(payload)
+   source_data = {"streams": [...], "utilities": [...]}
+   input_data = TargetInput.model_validate(source_data)
 
 Configuration Inputs
 --------------------

@@ -680,15 +680,16 @@ def _run_source_problem_child(
 
 def _queue_result(queue, problem) -> Any:
     try:
-        status, payload = queue.get_nowait()
+        status, result = queue.get_nowait()
     except queue_module.Empty:
         return _NO_RESULT
     if status == "ok":
-        return payload
+        return result
+    error_message = result
     logging.getLogger("openhens").warning(
         "[Failed] source task %s raised %s",
         getattr(problem, "name", repr(problem)),
-        payload,
+        error_message,
     )
     return None
 
@@ -1003,16 +1004,17 @@ def _openpinch_queue_result(
     dqda: float,
 ) -> Any:
     try:
-        status, payload = queue.get_nowait()
+        status, result = queue.get_nowait()
     except queue_module.Empty:
         return _NO_RESULT
     if status == "ok":
-        return payload
+        return result
+    error_message = result
     logging.getLogger("openhens").warning(
         "[Failed] OpenPinch task dTmin=%s min_dQ/dA=%s raised %s",
         _format_number(d_tmin, digits=3),
         _format_number(dqda, digits=3),
-        payload,
+        error_message,
     )
     return None
 
@@ -1125,10 +1127,10 @@ def _openpinch_signature(network: Any, stream_maps: dict[str, dict[str, int]]):
 
 
 def _stream_index_maps(fixture_path: Path) -> dict[str, dict[str, int]]:
-    payload = json.loads(fixture_path.read_text())
+    case_input = json.loads(fixture_path.read_text())
     hot: dict[str, int] = {}
     cold: dict[str, int] = {}
-    for stream in payload["streams"]:
+    for stream in case_input["streams"]:
         name = stream["name"]
         zone_name = str(stream.get("zone", "")).split("/")[-1]
         supply = float(stream["t_supply"]["value"])

@@ -137,18 +137,18 @@ def compute_direct_integration_targets(
                 num_units=num_units,
                 config=zone.config,
             )
-            area_payload = {
+            area_data = {
                 "area": area,
                 "num_units": num_units,
                 "capital_cost": capital_cost,
                 "total_cost": annual_capital_cost,
             }
         else:
-            area_payload = {}
+            area_data = {}
     else:
-        area_payload = {}
+        area_data = {}
 
-    payload = (
+    target_data = (
         set_zonal_targets(
             pt=pt,
             pt_real=pt_real,
@@ -168,9 +168,9 @@ def compute_direct_integration_targets(
             "period_id": sid,
             "period_idx": idx,
         }
-        | area_payload
+        | area_data
     )
-    return DirectIntegrationTarget.model_validate(payload)
+    return DirectIntegrationTarget.model_validate(target_data)
 
 
 ################################################################################

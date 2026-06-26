@@ -1,4 +1,4 @@
-"""Payload normalization helpers for :class:`OpenPinch.classes.PinchWorkspace`."""
+"""Case input normalization helpers for :class:`OpenPinch.classes.PinchWorkspace`."""
 
 from __future__ import annotations
 
@@ -13,18 +13,18 @@ JsonDict = Dict[str, Any]
 PathLike = str | Path
 
 
-def normalise_payload(payload: TargetInput | JsonDict) -> JsonDict:
-    """Return a defensive JSON-style payload copy for workspace storage."""
-    if isinstance(payload, TargetInput):
-        return payload.model_dump(mode="python")
-    if not isinstance(payload, dict):
-        raise TypeError("Workspace payloads must be a dict or TargetInput instance.")
-    return deepcopy(payload)
+def normalise_case_input(case_input: TargetInput | JsonDict) -> JsonDict:
+    """Return a defensive JSON-style case input copy for workspace storage."""
+    if isinstance(case_input, TargetInput):
+        return case_input.model_dump(mode="python")
+    if not isinstance(case_input, dict):
+        raise TypeError("Workspace case inputs must be a dict or TargetInput instance.")
+    return deepcopy(case_input)
 
 
-def project_name_from_payload(payload: JsonDict) -> Optional[str]:
+def project_name_from_case_input(case_input: JsonDict) -> Optional[str]:
     """Extract the root project name from a canonical zone tree when present."""
-    zone_tree = payload.get("zone_tree")
+    zone_tree = case_input.get("zone_tree")
     if isinstance(zone_tree, dict):
         name = zone_tree.get("name")
         if name not in (None, ""):
@@ -32,18 +32,18 @@ def project_name_from_payload(payload: JsonDict) -> Optional[str]:
     return None
 
 
-def merge_payloads(base: JsonDict, overlay: JsonDict) -> JsonDict:
-    """Deep-merge two payload fragments for variant editing workflows."""
+def merge_case_inputs(base: JsonDict, overlay: JsonDict) -> JsonDict:
+    """Deep-merge two case input fragments for variant editing workflows."""
     merged = deepcopy(base)
     for key, value in overlay.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = merge_payloads(merged[key], value)
+            merged[key] = merge_case_inputs(merged[key], value)
         else:
             merged[key] = deepcopy(value)
     return merged
 
 
-def canonical_payload_from_source(
+def canonical_case_input_from_source(
     source: (
         TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike] | PinchProblem
     ),
@@ -51,34 +51,34 @@ def canonical_payload_from_source(
     project_name: Optional[str],
     workspace_project_name: Optional[str],
 ) -> tuple[JsonDict, str]:
-    """Normalize one workspace source into a canonical stored payload."""
+    """Normalize one workspace source into a canonical stored case input."""
     if isinstance(source, PinchProblem):
-        payload = source.canonical_problem_json()
+        case_input = source.canonical_problem_json()
         resolved_project_name = (
             project_name
             or source.project_name
-            or project_name_from_payload(payload)
+            or project_name_from_case_input(case_input)
             or workspace_project_name
             or "Site"
         )
-        return payload, resolved_project_name
+        return case_input, resolved_project_name
 
     if isinstance(source, TargetInput):
-        payload = normalise_payload(source)
+        case_input = normalise_case_input(source)
         resolved_project_name = (
             project_name
-            or project_name_from_payload(payload)
+            or project_name_from_case_input(case_input)
             or workspace_project_name
             or "Site"
         )
-        return payload, resolved_project_name
+        return case_input, resolved_project_name
 
-    normalized = normalise_payload(source) if isinstance(source, dict) else source
+    normalized = normalise_case_input(source) if isinstance(source, dict) else source
     seed_project_name = (
         project_name
         or workspace_project_name
         or (
-            project_name_from_payload(normalized)
+            project_name_from_case_input(normalized)
             if isinstance(normalized, dict)
             else None
         )
@@ -94,12 +94,12 @@ def canonical_payload_from_source(
             return normalized, seed_project_name
         raise
 
-    payload = problem.canonical_problem_json()
+    case_input = problem.canonical_problem_json()
     resolved_project_name = (
         project_name
-        or project_name_from_payload(payload)
+        or project_name_from_case_input(case_input)
         or problem.project_name
         or workspace_project_name
         or "Site"
     )
-    return payload, resolved_project_name
+    return case_input, resolved_project_name

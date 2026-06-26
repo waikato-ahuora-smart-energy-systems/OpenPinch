@@ -18,7 +18,7 @@ _REPORT_MODEL_CONFIG = ConfigDict(
 )
 
 
-def _report_value_payload(value, *, metric_name: str) -> Value | None:
+def _report_value_data(value, *, metric_name: str) -> Value | None:
     if value is None:
         return None
     if isinstance(value, Value):
@@ -43,7 +43,7 @@ class HeatUtility(BaseModel):
     @field_validator("heat_flow", mode="before")
     @classmethod
     def _coerce_heat_flow(cls, value):
-        return _report_value_payload(value, metric_name="utility_heat_flow")
+        return _report_value_data(value, metric_name="utility_heat_flow")
 
 
 class PinchTemp(BaseModel):
@@ -57,12 +57,12 @@ class PinchTemp(BaseModel):
     @field_validator("cold_temp", mode="before")
     @classmethod
     def _coerce_cold_temp(cls, value):
-        return _report_value_payload(value, metric_name="cold_temp")
+        return _report_value_data(value, metric_name="cold_temp")
 
     @field_validator("hot_temp", mode="before")
     @classmethod
     def _coerce_hot_temp(cls, value):
-        return _report_value_payload(value, metric_name="hot_temp")
+        return _report_value_data(value, metric_name="hot_temp")
 
 
 class TargetResults(BaseModel):
@@ -146,7 +146,7 @@ class TargetResults(BaseModel):
     )
     @classmethod
     def _coerce_report_values(cls, value, info):
-        return _report_value_payload(value, metric_name=info.field_name)
+        return _report_value_data(value, metric_name=info.field_name)
 
 
 class ReportMetric(BaseModel):
@@ -161,7 +161,7 @@ class ReportMetric(BaseModel):
 
 
 class GraphAvailability(BaseModel):
-    """One graph available from a solved report payload."""
+    """One graph available from a solved report data."""
 
     graph_id: str
     graph_set_id: str
@@ -175,7 +175,7 @@ class GraphAvailability(BaseModel):
 
 
 class ProblemReport(BaseModel):
-    """Typed report payload for script, notebook, and export workflows."""
+    """Typed report data for script, notebook, and export workflows."""
 
     project_name: str
     solved: bool

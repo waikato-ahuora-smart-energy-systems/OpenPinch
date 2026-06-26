@@ -235,11 +235,11 @@ def convert_case_to_target_input(
     """Return standard OpenPinch ``TargetInput`` JSON data."""
     exchange = parsed.economics("exchange")
     streams = [
-        _stream_payload(row, parsed)
+        _stream_record(row, parsed)
         for row in [*parsed.hot_streams, *parsed.cold_streams]
     ]
     utilities = [
-        _utility_payload(row) for row in [*parsed.hot_utilities, *parsed.cold_utilities]
+        _utility_record(row) for row in [*parsed.hot_utilities, *parsed.cold_utilities]
     ]
     return {
         "streams": streams,
@@ -372,12 +372,12 @@ def _write_adapter_snapshot(
     )
 
 
-def _stream_payload(
+def _stream_record(
     row: ProcessStreamRow, parsed: ParsedOpenHENSCase
 ) -> dict[str, Any]:
     name = _unique_process_stream_name(row, parsed)
     delta_t = abs(row.supply_temperature - row.target_temperature)
-    payload = {
+    stream_record = {
         "zone": "Site/Process A",
         "name": name,
         "t_supply": {"value": row.supply_temperature, "unit": "K"},
@@ -396,11 +396,11 @@ def _stream_payload(
         },
     }
     if row.temperature_contribution is not None:
-        payload["dt_cont"] = {"value": row.temperature_contribution, "unit": "K"}
-    return payload
+        stream_record["dt_cont"] = {"value": row.temperature_contribution, "unit": "K"}
+    return stream_record
 
 
-def _utility_payload(row: UtilityRow) -> dict[str, Any]:
+def _utility_record(row: UtilityRow) -> dict[str, Any]:
     utility_type = "Hot" if row.designation == "Hot Utility" else "Cold"
     return {
         "name": row.name.strip(),
@@ -698,9 +698,9 @@ def _display_path(path: Path, repo_root: Path) -> str:
         return str(path)
 
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
+def _write_json(path: Path, json_data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    path.write_text(json.dumps(json_data, indent=2, sort_keys=True) + "\n")
 
 
 def main() -> None:

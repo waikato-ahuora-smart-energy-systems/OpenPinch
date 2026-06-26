@@ -63,8 +63,8 @@ from .turbine import TurbineSolveResult, TurbineStageResult
 from .workspace import (
     ConfigurationFieldMetadata,
     GraphCatalogEntry,
-    GraphPayloadEntry,
-    PayloadRecordView,
+    GraphDataEntry,
+    InputRecordView,
     PinchWorkspaceBundle,
     ProblemTableDiffView,
     ProblemTableView,
@@ -77,7 +77,7 @@ from .workspace import (
     ValidationIssue,
     ValidationReport,
     VariantMetricDelta,
-    VariantPayloadView,
+    VariantInputView,
     ZoneNodeView,
 )
 
@@ -136,8 +136,8 @@ __all__ = [
     "TurbineStageResult",
     "ConfigurationFieldMetadata",
     "GraphCatalogEntry",
-    "GraphPayloadEntry",
-    "PayloadRecordView",
+    "GraphDataEntry",
+    "InputRecordView",
     "ProblemTableDiffView",
     "ProblemTableView",
     "ScenarioComparisonView",
@@ -150,6 +150,6 @@ __all__ = [
     "ValidationIssue",
     "ValidationReport",
     "VariantMetricDelta",
-    "VariantPayloadView",
+    "VariantInputView",
     "ZoneNodeView",
 ]
