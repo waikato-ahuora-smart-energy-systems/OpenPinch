@@ -42,9 +42,10 @@ exists.
 The packaged notebooks are intended to be copied as clean source assets. They
 ship without stored execution output and rely on the same public
 ``PinchWorkspace`` and plotting surfaces documented elsewhere in RTD. The
-series includes the direct gas/vapour MVR process-component notebook
-``08_direct_gas_stream_mvr.ipynb`` as well as the core pinch, Total Site,
-multiperiod, schema/service, energy-transfer, and HPR notebooks.
+series is ordered around first solves, Total Site method interpretation,
+multiperiod studies, advanced Heat Pump screening, direct gas/vapour MVR,
+VC+MVR cascade mechanics, HEN synthesis, energy-transfer analysis, and
+schema/service integration.
 
 The current optional install split is:
 

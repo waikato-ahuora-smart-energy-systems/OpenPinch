@@ -112,7 +112,7 @@ def test_getting_started_is_canonical_first_run_page():
 
     assert ":orphan:" not in page
     assert "python -m pip install openpinch" in page
-    assert "PinchProblem(\"basic_pinch.json\"" in page
+    assert 'PinchProblem("basic_pinch.json"' in page
     assert "PinchWorkspace" in page
     assert "openpinch notebook -o notebooks" in page
     assert "Use the CLI Only for Notebook Assets" in page
@@ -120,9 +120,7 @@ def test_getting_started_is_canonical_first_run_page():
 
 def test_guides_follow_the_standard_task_structure():
     guide_pages = sorted(
-        path
-        for path in GUIDES_ROOT.glob("*.rst")
-        if path.name != "index.rst"
+        path for path in GUIDES_ROOT.glob("*.rst") if path.name != "index.rst"
     )
 
     assert guide_pages
@@ -131,9 +129,7 @@ def test_guides_follow_the_standard_task_structure():
         for heading in GUIDE_REQUIRED_HEADINGS:
             assert heading in text, f"{path} is missing {heading!r}"
         assert (
-            "Sample Case" in text
-            or "Sample Asset" in text
-            or "Sample Cases" in text
+            "Sample Case" in text or "Sample Asset" in text or "Sample Cases" in text
         ), f"{path} is missing a sample section"
 
 
@@ -154,11 +150,35 @@ def test_packaged_assets_are_documented_in_examples_and_guides():
         assert sample_case_name in combined
 
 
+def test_notebook_docs_keep_user_paths_and_numbered_order():
+    pages = [
+        GUIDES_ROOT / "notebooks-and-sample-cases.rst",
+        EXAMPLES_ROOT / "notebook-series.rst",
+    ]
+
+    for path in pages:
+        text = _read(path)
+        for phrase in (
+            "I want to solve a case with advanced methods",
+            "I need to understand the method",
+            "I am integrating or extending OpenPinch",
+        ):
+            assert phrase in text, f"{path} missing user path {phrase!r}"
+
+        last_position = -1
+        for notebook_name in list_notebooks():
+            position = text.index(notebook_name)
+            assert position > last_position, f"{path} has notebooks out of order"
+            last_position = position
+
+
 def test_public_root_exports_are_covered_by_curated_api_docs():
     combined_api = _docs_text(sorted(API_ROOT.glob("*.rst")))
 
     for export_name in OpenPinch.__all__:
-        assert export_name in combined_api, f"{export_name} missing from curated API docs"
+        assert export_name in combined_api, (
+            f"{export_name} missing from curated API docs"
+        )
 
 
 def test_docs_define_stability_and_optional_dependency_boundaries():
@@ -240,8 +260,8 @@ def test_heat_pump_docs_keep_advanced_workflow_boundaries():
         "Cascade Carnot cycles",
         "Parallel vapour compression cycles",
         "Vapour compression with MVR cascade",
-        "03_carnot_hpr_comparison.ipynb",
-        "08_direct_gas_stream_mvr.ipynb",
+        "04_carnot_heat_pump_screening.ipynb",
+        "05_direct_gas_stream_mvr_scenarios.ipynb",
     ):
         assert phrase in guide
 

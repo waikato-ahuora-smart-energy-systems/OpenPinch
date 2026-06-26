@@ -24,7 +24,7 @@ Sample Asset
 
 Notebook 01 is the recommended first copied asset:
 
-``01_basic_pinch_and_dtcont_sensitivity.ipynb``
+``01_first_solve_summary_graphs.ipynb``
    First solve, summary tables, graphing, and workspace sensitivity.
 
 Runnable Workflow
@@ -40,19 +40,19 @@ Copy one notebook:
 
 .. code-block:: bash
 
-   openpinch notebook --name 01_basic_pinch_and_dtcont_sensitivity.ipynb -o notebooks
+   openpinch notebook --name 01_first_solve_summary_graphs.ipynb -o notebooks
 
 The packaged notebook series is:
 
-- ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
-- ``02_total_site_targets_and_sugcc.ipynb``
-- ``03_carnot_hpr_comparison.ipynb``
-- ``04_multiperiod_targeting_and_period_comparison.ipynb``
-- ``05_schema_service_and_output_workflows.ipynb``
-- ``06_energy_transfer_analysis.ipynb``
-- ``07_vapour_compression_mvr_cascade_hpr.ipynb``
-- ``08_direct_gas_stream_mvr.ipynb``
-- ``09_hen_design_service_four_stream.ipynb``
+- ``01_first_solve_summary_graphs.ipynb``
+- ``02_total_site_sugcc_interpretation.ipynb``
+- ``03_multiperiod_workspace_scenarios.ipynb``
+- ``04_carnot_heat_pump_screening.ipynb``
+- ``05_direct_gas_stream_mvr_scenarios.ipynb``
+- ``06_vapour_compression_mvr_cascade_hpr.ipynb``
+- ``07_heat_exchanger_network_synthesis.ipynb``
+- ``08_energy_transfer_analysis.ipynb``
+- ``09_schema_service_exports_and_bundles.ipynb``
 
 Expected Output
 ---------------

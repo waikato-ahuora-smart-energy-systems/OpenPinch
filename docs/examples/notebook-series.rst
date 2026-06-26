@@ -2,74 +2,65 @@ Notebook Series
 ===============
 
 OpenPinch ships with a packaged notebook series that is treated as part of the
-supported learning and regression surface. Each notebook is built around one
-decision question rather than a generic feature tour. The series now spans the
-main single-case API, named multi-case studies, multiperiod targeting, the
-typed/service boundary, the energy-transfer analysis view, and the
-vapour-compression plus MVR cascade HPR backend. It also covers direct
-gas/vapour stream MVR as a process-component workflow on live workspace cases
-and the heat exchanger network design service on a compact four-stream
-synthesis case.
+supported learning and regression surface. The notebooks are ordered so users
+can choose one of three paths: solve a case with advanced methods, understand
+the method behind the outputs, or integrate OpenPinch into another application.
 
 Included Notebooks
 ------------------
 
-``01_basic_pinch_and_dtcont_sensitivity.ipynb``
-   Single-case ``PinchProblem`` front door, direct graph interpretation,
-   ``area_cost()`` appendix, and ``PinchWorkspace``-based ``dt_cont``
-   sensitivity on the real crude preheat train case.
+``01_first_solve_summary_graphs.ipynb``
+   Foundation notebook for a single ``PinchProblem`` solve, validation,
+   summary tables, graph interpretation, ``area_cost()`` output, and a
+   ``PinchWorkspace`` ``dt_cont`` sensitivity study on a real crude preheat
+   train case.
 
-``02_total_site_targets_and_sugcc.ipynb``
-   Packaged ``pulp_mill.json`` Total Site workflow, including scope-ladder
-   comparison, a real ``Bleaching`` local GCC screen, serialized graph output
-   inspection, and local-versus-site cogeneration screens.
+``02_total_site_sugcc_interpretation.ipynb``
+   Method notebook for ``pulp_mill.json`` Total Site analysis, local versus
+   site targeting, a real ``Bleaching`` local GCC screen, serialized graph data
+   inspection, SUGCC interpretation, and cogeneration context.
 
-``03_carnot_hpr_comparison.ipynb``
-   Advanced HPR and refrigeration comparison on ``chocolate_factory.json``
-   across the direct heat pump, indirect heat pump, direct refrigeration, and
-   indirect refrigeration workflows. The notebook uses the current
-   ``HPRcycle.CascadeCarnot`` enum value for broad screening and calls out
-   ``HPRcycle.ParallelCarnot`` as the staged Carnot alternative.
-
-``04_multiperiod_targeting_and_period_comparison.ipynb``
-   Real named-period targeting on ``crude_preheat_train_multiperiod.json`` and
+``03_multiperiod_workspace_scenarios.ipynb``
+   Scenario notebook for ``crude_preheat_train_multiperiod.json`` and
    ``zonal_site_multiperiod.json``, including ``period_ids``,
-   ``target_all_periods()``, and cross-period utility tables.
+   ``target_all_periods()``, period-specific direct and indirect integration,
+   and cross-period utility comparison.
 
-``05_schema_service_and_output_workflows.ipynb``
-   ``copy_sample_case(...)``, local-file ``PinchProblem``, typed
-   ``TargetInput`` plus ``pinch_analysis_service(...)``, artifact export, and
-   serialized ``PinchWorkspace`` variant views.
+``04_carnot_heat_pump_screening.ipynb``
+   Advanced-method notebook for direct and indirect Heat Pump screening on
+   ``chocolate_factory.json``. It uses the public ``problem.target.*`` and
+   ``problem.plot.*`` surfaces with ``HPRcycle.CascadeCarnot`` and
+   ``HPRcycle.ParallelCarnot`` options.
 
-``06_energy_transfer_analysis.ipynb``
-   Energy-transfer targeting on ``pulp_mill.json``, including the
-   heat-surplus/deficit table, graph-ready energy-transfer diagram data,
-   standard plot accessor, and Total Site versus local Direct Integration base
-   target selection.
+``05_direct_gas_stream_mvr_scenarios.ipynb``
+   Advanced-method notebook for direct gas/vapour process MVR on an in-memory
+   ``PinchWorkspace`` study. It compares baseline, dry MVR, and
+   liquid-injection MVR cases, inspects replacement streams, and toggles the
+   process component active state.
 
-``07_vapour_compression_mvr_cascade_hpr.ipynb``
-   Heat-pump-only targeting with
-   ``HPR_TYPE = "Vapour compression with MVR cascade"``, including the
-   configuration fields for VC and MVR stages, split-fraction source/process
-   routing, a solved backend result, and the external stream accounting used
-   for the combined cascade.
+``06_vapour_compression_mvr_cascade_hpr.ipynb``
+   Method notebook for the VC+MVR cascade HPR backend, including the
+   configuration fields for VC and MVR stages, standalone MVR thermodynamics,
+   stream profiles, graph interpretation, and external stream accounting.
 
-``08_direct_gas_stream_mvr.ipynb``
-   Direct gas/vapour process MVR on an in-memory ``PinchWorkspace`` study,
-   including baseline, dry MVR, and liquid-injection MVR cases. The notebook
-   adds memory-only ``problem.add_component.process_mvr(...)`` components,
-   solves direct and Total Site targets after the stream mutation, compares
-   target summaries, inspects replacement streams, and toggles the component
-   active state.
+``07_heat_exchanger_network_synthesis.ipynb``
+   Advanced-method notebook for the public HEN design accessors on the compact
+   four-stream Yee and Grossmann benchmark. It covers
+   ``problem.design.enhanced_synthesis_method(...)``,
+   ``problem.design.open_hens_method()``, ranked network selection, manifests,
+   and grid diagrams. The public ``open_hens`` name is retained.
 
-``09_hen_design_service_four_stream.ipynb``
-   Heat exchanger network design-service execution on a compact four-stream
-   synthesis problem, including
-   ``problem.design.enhanced_synthesis_method(quality_tier=...)`` for tiered
-   OpenHENS search, ``problem.design.open_hens_method()`` for the original
-   tier-1 route, the ``problem.design.heat_exchanger_network_synthesis(...)``
-   dispatcher, workspace workflow dispatch, concise task metadata, and grid
-   views for the top networks.
+``08_energy_transfer_analysis.ipynb``
+   Method notebook for energy-transfer targeting on ``pulp_mill.json``,
+   including heat-surplus/deficit tables, graph-ready energy-transfer diagram
+   data, standard plot accessors, and Total Site versus local Direct
+   Integration target selection.
+
+``09_schema_service_exports_and_bundles.ipynb``
+   Integrator notebook for ``copy_sample_case(...)``, local-file
+   ``PinchProblem`` loading, typed ``TargetInput`` requests,
+   ``pinch_analysis_service(...)``, Excel/graph export, workspace variant
+   views, and bundle persistence.
 
 How To Use Them
 ---------------
@@ -84,29 +75,25 @@ Copy one notebook:
 
 .. code-block:: bash
 
-   openpinch notebook --name 02_total_site_targets_and_sugcc.ipynb -o notebooks
+   openpinch notebook --name 02_total_site_sugcc_interpretation.ipynb -o notebooks
 
-Recommended Learning Order
---------------------------
+Recommended Paths
+-----------------
 
-1. Start with the basic pinch and ``dt_cont`` notebook to understand the
-   single-case workflow and the named-study sensitivity pattern.
-2. Move to the Total Site notebook once you are comfortable with zonal and
-   indirect integration concepts.
-3. Use the Carnot HPR notebook after you understand how to read the base
-   utility and graph outputs.
-4. Move to the multiperiod notebook when your case has named operating periods or
-   seasonal variation.
-5. Use the schema/service notebook when you need typed validation, serialized
-   workspace views, or repeatable export workflows.
-6. Use the energy-transfer notebook when you need interval-level surplus/deficit
-   accounting or diagram data derived from an existing thermal target.
-7. Use the VC+MVR cascade notebook when you need a refrigerant low stage feeding
-   a serial mechanical-vapour-recompression high stage.
-8. Use the direct gas/vapour MVR notebook when a process vapour stream itself
-   is the recompression source and you need before/after workspace comparison.
-9. Use the heat exchanger network design-service notebook when you need network
-   synthesis on a compact four-stream case and top-network grid inspection.
+I want to solve a case with advanced methods
+   Work through notebooks 01, 03, 04, 05, and 07. This path starts with the
+   single-case solve and summary workflow, then moves into named periods,
+   Heat Pump screening, process MVR case mutation, and HEN synthesis.
+
+I need to understand the method
+   Work through notebooks 02, 06, and 08. This path explains Total Site and
+   SUGCC interpretation, VC+MVR cascade mechanics, and interval-level
+   energy-transfer accounting.
+
+I am integrating or extending OpenPinch
+   Start with notebook 09 and pair it with :doc:`../api/index`. Add notebook
+   07 when your integration touches HEN synthesis, ranked network inspection,
+   or solver-backed design workflows.
 
 Why These Matter
 ----------------
@@ -115,6 +102,6 @@ The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
 hierarchical targeting, graph-based interpretation, real multiperiod studies,
 advanced HPR cycle targeting, process-component MVR mutation, heat exchanger
-network synthesis, and stable programmatic boundaries built on the same packaged
-assets. The distributed copies are also kept output-free so they do not ship
-stale plots, tracebacks, or machine-specific execution state.
+network synthesis, and stable programmatic boundaries built on the same
+packaged assets. The distributed copies are kept output-free so they do not
+ship stale plots, tracebacks, or machine-specific execution state.

@@ -89,61 +89,86 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
 
 
 _NOTEBOOK_METADATA: dict[str, NotebookMetadata] = {
-    "01_basic_pinch_and_dtcont_sensitivity.ipynb": NotebookMetadata(
-        name="01_basic_pinch_and_dtcont_sensitivity.ipynb",
-        title="Basic Pinch and DT Cont Sensitivity",
-        description="First solve, summary tables, graphing, and workspace sensitivity.",
-        topics=("quickstart", "workspace"),
-    ),
-    "02_total_site_targets_and_sugcc.ipynb": NotebookMetadata(
-        name="02_total_site_targets_and_sugcc.ipynb",
-        title="Total Site Targets and SUGCC",
-        description="Zonal total-site targets, SUGCC, and cogeneration workflows.",
-        topics=("total site", "cogeneration"),
-    ),
-    "03_carnot_hpr_comparison.ipynb": NotebookMetadata(
-        name="03_carnot_hpr_comparison.ipynb",
-        title="Carnot HPR Comparison",
+    "01_first_solve_summary_graphs.ipynb": NotebookMetadata(
+        name="01_first_solve_summary_graphs.ipynb",
+        title="First Solve, Summary, and Graphs",
         description=(
-            "Direct/indirect heat-pump targeting and Carnot backend comparison."
+            "Foundation notebook for solving one case, reading summary metrics, "
+            "graphing, area/cost, and dt_cont workspace sensitivity."
         ),
-        topics=("heat pump", "comparison"),
+        topics=("solve", "quickstart", "graphs", "workspace"),
     ),
-    "04_multiperiod_targeting_and_period_comparison.ipynb": NotebookMetadata(
-        name="04_multiperiod_targeting_and_period_comparison.ipynb",
-        title="Multiperiod Targeting and Period Comparison",
-        description="Period-specific solves and multiperiod result comparison.",
-        topics=("multiperiod",),
+    "02_total_site_sugcc_interpretation.ipynb": NotebookMetadata(
+        name="02_total_site_sugcc_interpretation.ipynb",
+        title="Total Site and SUGCC Interpretation",
+        description=(
+            "Method notebook for local-vs-site targeting, Total Site profiles, "
+            "SUGCC, and cogeneration context."
+        ),
+        topics=("method", "total site", "sugcc", "cogeneration"),
     ),
-    "05_schema_service_and_output_workflows.ipynb": NotebookMetadata(
-        name="05_schema_service_and_output_workflows.ipynb",
-        title="Schema Service and Output Workflows",
-        description="Typed inputs, service boundary, exports, and workspace bundles.",
-        topics=("schemas", "exports"),
+    "03_multiperiod_workspace_scenarios.ipynb": NotebookMetadata(
+        name="03_multiperiod_workspace_scenarios.ipynb",
+        title="Multiperiod Workspace Scenarios",
+        description=(
+            "Scenario notebook for named periods, period-specific targeting, "
+            "target_all_periods, and workspace comparison."
+        ),
+        topics=("solve", "multiperiod", "workspace"),
     ),
-    "06_energy_transfer_analysis.ipynb": NotebookMetadata(
-        name="06_energy_transfer_analysis.ipynb",
-        title="Energy Transfer Analysis",
-        description="Energy transfer targeting and diagram workflows.",
-        topics=("energy transfer",),
+    "04_carnot_heat_pump_screening.ipynb": NotebookMetadata(
+        name="04_carnot_heat_pump_screening.ipynb",
+        title="Carnot Heat Pump Screening",
+        description=(
+            "Advanced-method notebook for direct/indirect Carnot Heat Pump "
+            "screening and HPR graph interpretation."
+        ),
+        topics=("solve", "advanced", "heat pump", "comparison"),
     ),
-    "07_vapour_compression_mvr_cascade_hpr.ipynb": NotebookMetadata(
-        name="07_vapour_compression_mvr_cascade_hpr.ipynb",
+    "05_direct_gas_stream_mvr_scenarios.ipynb": NotebookMetadata(
+        name="05_direct_gas_stream_mvr_scenarios.ipynb",
+        title="Direct Gas Stream MVR Scenarios",
+        description=(
+            "Advanced-method notebook for process-component MVR, replacement "
+            "streams, and baseline-vs-MVR case comparison."
+        ),
+        topics=("solve", "advanced", "mvr", "workspace"),
+    ),
+    "06_vapour_compression_mvr_cascade_hpr.ipynb": NotebookMetadata(
+        name="06_vapour_compression_mvr_cascade_hpr.ipynb",
         title="Vapour Compression MVR Cascade HPR",
-        description="Vapour-compression, MVR, and cascade heat-pump examples.",
-        topics=("heat pump", "mvr"),
+        description=(
+            "Method notebook for VC+MVR cascade mechanics, standalone MVR "
+            "thermodynamics, stream profiles, and HPR targeting."
+        ),
+        topics=("method", "heat pump", "mvr", "vapour compression"),
     ),
-    "08_direct_gas_stream_mvr.ipynb": NotebookMetadata(
-        name="08_direct_gas_stream_mvr.ipynb",
-        title="Direct Gas Stream MVR",
-        description="Direct gas-stream MVR component scenarios.",
-        topics=("mvr", "scenario"),
+    "07_heat_exchanger_network_synthesis.ipynb": NotebookMetadata(
+        name="07_heat_exchanger_network_synthesis.ipynb",
+        title="Heat Exchanger Network Synthesis",
+        description=(
+            "Advanced-method notebook for public HEN design accessors, ranked "
+            "networks, manifests, and grid diagrams."
+        ),
+        topics=("solve", "advanced", "synthesis", "design"),
     ),
-    "09_hen_design_service_four_stream.ipynb": NotebookMetadata(
-        name="09_hen_design_service_four_stream.ipynb",
-        title="HEN Design Service Four Stream",
-        description="Four-stream HEN synthesis through the public design accessor.",
-        topics=("synthesis",),
+    "08_energy_transfer_analysis.ipynb": NotebookMetadata(
+        name="08_energy_transfer_analysis.ipynb",
+        title="Energy Transfer Analysis",
+        description=(
+            "Method notebook for heat-surplus/deficit tables, energy-transfer "
+            "diagrams, and target-family selection."
+        ),
+        topics=("method", "energy transfer", "graphs"),
+    ),
+    "09_schema_service_exports_and_bundles.ipynb": NotebookMetadata(
+        name="09_schema_service_exports_and_bundles.ipynb",
+        title="Schema Service Exports and Bundles",
+        description=(
+            "Integrator notebook for TargetInput, pinch_analysis_service, "
+            "exports, workspace variant views, and bundles."
+        ),
+        topics=("integrator", "schemas", "exports", "workspace"),
     ),
 }
 

@@ -80,7 +80,7 @@ from OpenPinch import (
 print(list_sample_cases())
 print(sample_case_metadata("basic_pinch.json").description)
 print(list_notebooks())
-print(notebook_metadata("01_basic_pinch_and_dtcont_sensitivity.ipynb").title)
+print(notebook_metadata("01_first_solve_summary_graphs.ipynb").title)
 ```
 
 Copy the notebook series from the CLI:
@@ -88,6 +88,10 @@ Copy the notebook series from the CLI:
 ```bash
 openpinch notebook -o notebooks
 ```
+
+The series is ordered for three paths: solve cases with advanced methods,
+understand the targeting methods, and integrate or extend OpenPinch through
+typed service and export workflows.
 
 The CLI intentionally copies notebooks only. Solves, validation, graph export,
 Excel export, dashboards, and advanced targeting happen through Python.

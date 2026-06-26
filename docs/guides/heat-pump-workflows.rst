@@ -79,16 +79,16 @@ behavior matters.
 Recommended Learning Assets
 ---------------------------
 
-- ``03_carnot_hpr_comparison.ipynb`` for direct/indirect HPR comparison.
-- ``07_vapour_compression_mvr_cascade_hpr.ipynb`` for the VC+MVR cascade
+- ``04_carnot_heat_pump_screening.ipynb`` for direct/indirect HPR comparison.
+- ``05_direct_gas_stream_mvr_scenarios.ipynb`` for process-component MVR scenarios.
+- ``06_vapour_compression_mvr_cascade_hpr.ipynb`` for the VC+MVR cascade
   backend.
-- ``08_direct_gas_stream_mvr.ipynb`` for process-component MVR scenarios.
 
 Copy them with:
 
 .. code-block:: bash
 
-   openpinch notebook --name 03_carnot_hpr_comparison.ipynb -o notebooks
+   openpinch notebook --name 04_carnot_heat_pump_screening.ipynb -o notebooks
 
 Next Steps
 ----------

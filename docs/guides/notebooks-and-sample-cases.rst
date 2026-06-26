@@ -66,8 +66,8 @@ Copy notebooks from Python:
    from OpenPinch.resources import copy_notebook, list_notebooks, notebook_metadata
 
    print(list_notebooks())
-   print(notebook_metadata("02_total_site_targets_and_sugcc.ipynb").description)
-   copy_notebook("01_basic_pinch_and_dtcont_sensitivity.ipynb", "notebooks")
+   print(notebook_metadata("01_first_solve_summary_graphs.ipynb").description)
+   copy_notebook("01_first_solve_summary_graphs.ipynb", "notebooks")
 
 Copy notebooks from the shell:
 
@@ -83,30 +83,45 @@ cached execution counts, and no stale traceback output.
 
 The current notebook series is:
 
-1. ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
-2. ``02_total_site_targets_and_sugcc.ipynb``
-3. ``03_carnot_hpr_comparison.ipynb``
-4. ``04_multiperiod_targeting_and_period_comparison.ipynb``
-5. ``05_schema_service_and_output_workflows.ipynb``
-6. ``06_energy_transfer_analysis.ipynb``
-7. ``07_vapour_compression_mvr_cascade_hpr.ipynb``
-8. ``08_direct_gas_stream_mvr.ipynb``
-9. ``09_hen_design_service_four_stream.ipynb``
+1. ``01_first_solve_summary_graphs.ipynb``
+2. ``02_total_site_sugcc_interpretation.ipynb``
+3. ``03_multiperiod_workspace_scenarios.ipynb``
+4. ``04_carnot_heat_pump_screening.ipynb``
+5. ``05_direct_gas_stream_mvr_scenarios.ipynb``
+6. ``06_vapour_compression_mvr_cascade_hpr.ipynb``
+7. ``07_heat_exchanger_network_synthesis.ipynb``
+8. ``08_energy_transfer_analysis.ipynb``
+9. ``09_schema_service_exports_and_bundles.ipynb``
 
 Interpretation
 --------------
 
-Recommended learning path:
+Use the series according to the work you are doing, not just by notebook
+number.
 
-1. ``basic_pinch.json`` and notebook 01 for first solves and ``dt_cont`` sensitivity.
-2. ``zonal_site.json`` or ``pulp_mill.json`` and notebook 02 for Total Site and SUGCC.
-3. ``chocolate_factory.json`` and notebook 03 for direct-versus-indirect HPR.
-4. multiperiod sample cases and notebook 04 for named-period targeting.
-5. notebook 05 for typed ``TargetInput`` and serialized workspace views.
-6. notebook 06 for energy-transfer diagrams and interval surplus/deficit tables.
-7. notebook 07 for vapour-compression plus MVR cascade HPR.
-8. notebook 08 for direct gas/vapour MVR process components.
-9. notebook 09 for heat exchanger network synthesis and top-network inspection.
+I want to solve a case with advanced methods
+   Start with ``01_first_solve_summary_graphs.ipynb`` for the single-case
+   solve, summary, graph, and ``dt_cont`` sensitivity pattern. Move to
+   ``03_multiperiod_workspace_scenarios.ipynb`` when operating periods matter.
+   Use ``04_carnot_heat_pump_screening.ipynb`` for direct/indirect heat-pump
+   screening, ``05_direct_gas_stream_mvr_scenarios.ipynb`` for process MVR
+   case mutation, and ``07_heat_exchanger_network_synthesis.ipynb`` for HEN
+   synthesis and ranked network inspection.
+
+I need to understand the method
+   Use ``02_total_site_sugcc_interpretation.ipynb`` to connect local targets,
+   Total Site targets, SUGCC profiles, and cogeneration screens. Use
+   ``06_vapour_compression_mvr_cascade_hpr.ipynb`` to understand the
+   VC+MVR cascade mechanics and ``08_energy_transfer_analysis.ipynb`` for
+   interval surplus/deficit accounting and energy-transfer diagrams.
+
+I am integrating or extending OpenPinch
+   Use ``09_schema_service_exports_and_bundles.ipynb`` for typed
+   ``TargetInput`` requests, ``pinch_analysis_service(...)``, exports,
+   workspace variant views, and bundle persistence. Pair it with
+   :doc:`../api/index` when you need public contract details, and use
+   ``07_heat_exchanger_network_synthesis.ipynb`` when extending synthesis
+   workflows.
 
 Next Steps
 ----------
