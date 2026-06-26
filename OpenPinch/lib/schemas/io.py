@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..config_metadata import validate_configuration_options
 from ..enums import ST, FluidPhase
@@ -34,11 +34,22 @@ class StreamSchema(BaseModel):
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True
 
-    model_config = ConfigDict(
-        use_enum_values=True,
-        populate_by_name=True,
-        extra="forbid",
-    )
+    model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_retired_field_aliases(cls, value):
+        if isinstance(value, dict):
+            retired_aliases = {
+                "stream_name",
+                "heat_capacity_flow_rate",
+                "flow_heat_capacity",
+            }
+            present = retired_aliases & set(value)
+            if present:
+                aliases = ", ".join(sorted(present))
+                raise ValueError(f"Retired stream field alias(es): {aliases}.")
+        return value
 
     @field_validator("fluid_name")
     @classmethod
