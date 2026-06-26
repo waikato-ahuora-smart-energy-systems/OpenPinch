@@ -11,6 +11,7 @@ from ...targeting_services.topology import (
     canonical_topology_restrictions,
     topology_restriction_signature,
 )
+from .verification import is_network_feasible
 
 if TYPE_CHECKING:
     from .....lib.schemas.synthesis import (
@@ -92,6 +93,7 @@ def _ranked_candidate_outcomes(
         if outcome.status == "success"
         and outcome.network is not None
         and outcome.objective_value is not None
+        and is_network_feasible(outcome.network)
     ]
     accepted_method = [
         outcome for outcome in candidates if outcome.task.method == result.method

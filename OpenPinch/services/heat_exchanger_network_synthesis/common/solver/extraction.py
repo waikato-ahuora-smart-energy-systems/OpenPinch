@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from .....classes.heat_exchanger import (
@@ -103,7 +104,42 @@ def extract_heat_exchanger_network(
         source_metadata={
             "solver_model_class": type(solved_model).__name__,
             "solver_model_name": getattr(solved_model, "name", None),
+            "solver_framework": getattr(solved_model, "framework", None),
+            "solver_non_isothermal_model": bool(
+                getattr(solved_model, "non_isothermal_model", False)
+            ),
             "solver_dTmin": _optional_float(getattr(solved_model, "dTmin", None)),
+            "operating_states": _operating_state_metadata(solved_model),
+            "hot_stream_heat_capacity_flowrates": _float_list(
+                getattr(solved_model, "f_h", None)
+            ),
+            "cold_stream_heat_capacity_flowrates": _float_list(
+                getattr(solved_model, "f_c", None)
+            ),
+            "hot_stream_heat_transfer_coefficients": _float_list(
+                getattr(solved_model, "htc_h", None)
+            ),
+            "cold_stream_heat_transfer_coefficients": _float_list(
+                getattr(solved_model, "htc_c", None)
+            ),
+            "hot_utility_heat_transfer_coefficients": _float_list(
+                getattr(solved_model, "htc_hu", None)
+            ),
+            "cold_utility_heat_transfer_coefficients": _float_list(
+                getattr(solved_model, "htc_cu", None)
+            ),
+            "hot_stream_supply_temperatures": _float_list(
+                getattr(solved_model, "T_h_in", None)
+            ),
+            "hot_stream_target_temperatures": _float_list(
+                getattr(solved_model, "T_h_out", None)
+            ),
+            "cold_stream_supply_temperatures": _float_list(
+                getattr(solved_model, "T_c_in", None)
+            ),
+            "cold_stream_target_temperatures": _float_list(
+                getattr(solved_model, "T_c_out", None)
+            ),
             "hot_stage_boundary_temperatures": _boundary_temperature_matrix(
                 getattr(solved_model, "T_h", None),
                 rows=len(hot_streams),
@@ -222,6 +258,7 @@ def _recovery_exchangers(
                             i,
                             j,
                             k,
+                            duty,
                         ),
                         sink_inlet_temperature=_optional_float(
                             _index(getattr(solved_model, "T_c", None), j, k + 1)
@@ -231,6 +268,7 @@ def _recovery_exchangers(
                             i,
                             j,
                             k,
+                            duty,
                         ),
                     )
                 )
@@ -364,7 +402,17 @@ def _single_utility(identities: tuple[str, ...], label: str) -> str:
     return identities[0]
 
 
-def _hot_recovery_outlet(solved_model: Any, i: int, j: int, k: int) -> float | None:
+def _hot_recovery_outlet(
+    solved_model: Any,
+    i: int,
+    j: int,
+    k: int,
+    duty: float,
+) -> float | None:
+    inlet = _optional_float(_index(getattr(solved_model, "T_h", None), i, k))
+    heat_capacity = _optional_float(_index(getattr(solved_model, "f_h", None), i))
+    if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
+        return inlet - duty / heat_capacity
     explicit = _optional_float(
         _index(getattr(solved_model, "T_h_out_x", None), i, j, k)
     )
@@ -373,7 +421,17 @@ def _hot_recovery_outlet(solved_model: Any, i: int, j: int, k: int) -> float | N
     return _optional_float(_index(getattr(solved_model, "T_h", None), i, k + 1))
 
 
-def _cold_recovery_outlet(solved_model: Any, i: int, j: int, k: int) -> float | None:
+def _cold_recovery_outlet(
+    solved_model: Any,
+    i: int,
+    j: int,
+    k: int,
+    duty: float,
+) -> float | None:
+    inlet = _optional_float(_index(getattr(solved_model, "T_c", None), j, k + 1))
+    heat_capacity = _optional_float(_index(getattr(solved_model, "f_c", None), j))
+    if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
+        return inlet + duty / heat_capacity
     explicit = _optional_float(
         _index(getattr(solved_model, "T_c_out_y", None), j, i, k)
     )
@@ -418,6 +476,12 @@ def _utility_cost(solved_model: Any) -> float | None:
 
 
 def _capital_cost(solved_model: Any) -> float | None:
+    explicit = _optional_float(getattr(solved_model, "capital_cost_value", None))
+    if explicit is None:
+        explicit = _optional_float(getattr(solved_model, "capital_cost_total", None))
+    if explicit is not None:
+        return explicit
+
     total = 0.0
     found = False
     for name in (
@@ -431,6 +495,16 @@ def _capital_cost(solved_model: Any) -> float | None:
         if value is not None:
             total += value
             found = True
+
+    tac = _optional_float(getattr(solved_model, "TAC", None))
+    utility = _utility_cost(solved_model)
+    implied = None
+    if tac is not None and utility is not None and tac >= utility:
+        implied = tac - utility
+    if implied is not None and (
+        not found or not math.isclose(total, implied, rel_tol=1e-4, abs_tol=1.0)
+    ):
+        return implied
     return total if found else None
 
 
@@ -452,6 +526,48 @@ def _summary_metrics(solved_model: Any) -> dict[str, float | int | str | bool | 
         else:
             metrics[label] = _optional_float(value)
     return {name: value for name, value in metrics.items() if value is not None}
+
+
+def _operating_state_metadata(solved_model: Any) -> dict[str, Any]:
+    state_count = _optional_int(getattr(solved_model, "N_states", None)) or 1
+    if state_count <= 1:
+        return {}
+    state_ids = [str(item) for item in list(getattr(solved_model, "state_ids", ()))]
+    state_weights = [
+        float(item) for item in list(getattr(solved_model, "state_weights", ()))
+    ]
+    return {
+        "state_ids": state_ids,
+        "state_weights": state_weights,
+        "hot_utility_load_by_state": _float_list(
+            getattr(solved_model, "Q_hu_total_by_state", None)
+        ),
+        "cold_utility_load_by_state": _float_list(
+            getattr(solved_model, "Q_cu_total_by_state", None)
+        ),
+        "recovery_load_by_state": _float_list(
+            getattr(solved_model, "Q_r_total_by_state", None)
+        ),
+        "operating_cost_by_state": _float_list(
+            getattr(solved_model, "operating_cost_by_state", None)
+        ),
+        "weighted_operating_cost": _optional_float(
+            getattr(solved_model, "weighted_operating_cost_value", None)
+        ),
+        "shared_capital_cost": _optional_float(
+            getattr(solved_model, "capital_cost_value", None)
+        ),
+    }
+
+
+def _float_list(values: Any) -> list[float]:
+    if values is None:
+        return []
+    return [
+        float_value
+        for item in values
+        if (float_value := _optional_float(item)) is not None
+    ]
 
 
 def _result_method(method: str | None):

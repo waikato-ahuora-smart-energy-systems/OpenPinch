@@ -10,7 +10,7 @@ import numpy as np
 from ..common.solver.arrays import PreparedSolverArrays
 from ..common.solver.pinch_design_snapshot import PinchDecompositionSnapshot
 from .base import BaseHeatExchangerNetworkModel
-from .stagewise import StageWiseModel
+from .stagewise import StageWiseModel, _value as _scalar_value
 
 
 class PinchDecompModel(BaseHeatExchangerNetworkModel):
@@ -91,66 +91,194 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             raise ValueError("PDM construction requires a shifted pinch temperature.")
 
     def set_preprocessing(self) -> None:
-        """Pre-process source PDM superstructure parameters unchanged."""
+        """Pre-process PDM superstructure parameters."""
 
-        self.I = len(self.f_h)
-        self.J = len(self.f_c)
+        self._set_multistate_preprocessing()
+
+    def _set_multistate_preprocessing(self) -> None:
+        self.I = self.f_h_state.shape[1]
+        self.J = self.f_c_state.shape[1]
 
         snapshot = self.pinch_snapshot
-        self.z_i_active = list(snapshot.z_i_active)
-        self.z_j_active = list(snapshot.z_j_active)
-        self.T_h_in = np.array(snapshot.clipped_hot_supply_temperatures, dtype=float)
-        self.T_h_out = np.array(snapshot.clipped_hot_target_temperatures, dtype=float)
-        self.T_c_in = np.array(snapshot.clipped_cold_supply_temperatures, dtype=float)
-        self.T_c_out = np.array(snapshot.clipped_cold_target_temperatures, dtype=float)
-        self.S = snapshot.S
-        self.K = snapshot.K
+        shifted_pinch = float(self.T_pinch)
+        hot_threshold = shifted_pinch + self.dTmin / 2.0
+        cold_threshold = shifted_pinch - self.dTmin / 2.0
 
-        self.Qtot_sh = np.array(
-            [
-                (self.T_h_in[i] - self.T_h_out[i]) * self.f_h[i] * self.z_i_active[i]
-                for i in range(self.I)
-            ]
-        )
-        self.Qtot_sc = np.array(
-            [
-                self.f_c[j] * (self.T_c_out[j] - self.T_c_in[j]) * self.z_j_active[j]
-                for j in range(self.J)
-            ]
-        )
-        self.U_r = np.array(
-            [
-                [1 / (1 / self.htc_h[i] + 1 / self.htc_c[j]) for j in range(self.J)]
-                for i in range(self.I)
-            ]
-        )
-        self.U_hu = np.array(
-            [1 / (1 / self.htc_hu[0] + 1 / self.htc_c[j]) for j in range(self.J)]
-        )
-        self.U_cu = np.array(
-            [1 / (1 / self.htc_h[i] + 1 / self.htc_cu[0]) for i in range(self.I)]
-        )
-        self.Q_max = np.array(
+        self.T_h_in_state = self.T_h_in_state.copy()
+        self.T_h_out_state = self.T_h_out_state.copy()
+        self.T_c_in_state = self.T_c_in_state.copy()
+        self.T_c_out_state = self.T_c_out_state.copy()
+        self.z_i_active_state = []
+        self.z_j_active_state = []
+        for n in range(self.N_states):
+            if self.pinch_loc == "above":
+                z_i_active = [
+                    1 if value > hot_threshold else 0 for value in self.T_h_in_state[n]
+                ]
+                z_j_active = [
+                    1 if value > cold_threshold else 0
+                    for value in self.T_c_out_state[n]
+                ]
+                for i, is_active in enumerate(z_i_active):
+                    if is_active:
+                        self.T_h_out_state[n][i] = max(
+                            self.T_h_out_state[n][i],
+                            hot_threshold,
+                        )
+                    else:
+                        self.T_h_in_state[n][i] = 0.0
+                        self.T_h_out_state[n][i] = 0.0
+                for j, is_active in enumerate(z_j_active):
+                    if is_active:
+                        self.T_c_in_state[n][j] = max(
+                            self.T_c_in_state[n][j],
+                            cold_threshold,
+                        )
+                    else:
+                        self.T_c_in_state[n][j] = 0.0
+                        self.T_c_out_state[n][j] = 0.0
+            else:
+                z_i_active = [
+                    1 if value < hot_threshold else 0 for value in self.T_h_out_state[n]
+                ]
+                z_j_active = [
+                    1 if value < cold_threshold else 0 for value in self.T_c_in_state[n]
+                ]
+                for i, is_active in enumerate(z_i_active):
+                    if is_active:
+                        self.T_h_in_state[n][i] = min(
+                            self.T_h_in_state[n][i],
+                            hot_threshold,
+                        )
+                    else:
+                        self.T_h_in_state[n][i] = 0.0
+                        self.T_h_out_state[n][i] = 0.0
+                for j, is_active in enumerate(z_j_active):
+                    if is_active:
+                        self.T_c_out_state[n][j] = min(
+                            self.T_c_out_state[n][j],
+                            cold_threshold,
+                        )
+                    else:
+                        self.T_c_in_state[n][j] = 0.0
+                        self.T_c_out_state[n][j] = 0.0
+            self.z_i_active_state.append(z_i_active)
+            self.z_j_active_state.append(z_j_active)
+
+        self.z_i_active = [
+            (1 if any(self.z_i_active_state[n][i] for n in range(self.N_states)) else 0)
+            for i in range(self.I)
+        ]
+        self.z_j_active = [
+            (1 if any(self.z_j_active_state[n][j] for n in range(self.N_states)) else 0)
+            for j in range(self.J)
+        ]
+        if snapshot.manual_stage_selection is None:
+            self.S = max(sum(self.z_i_active), sum(self.z_j_active))
+        else:
+            self.S = snapshot.S
+        self.K = self.S + 1
+        self.T_h_in = self.T_h_in_state[0].copy()
+        self.T_h_out = self.T_h_out_state[0].copy()
+        self.T_c_in = self.T_c_in_state[0].copy()
+        self.T_c_out = self.T_c_out_state[0].copy()
+
+        self.Qtot_sh_state = np.array(
             [
                 [
-                    max(
-                        self.T_h_in[i]
-                        - self.T_c_in[j]
-                        - self._recovery_approach_temperature(i, j),
-                        0.0,
-                    )
-                    * min(
-                        self.f_h[i] * self.z_i_active[i],
-                        self.f_c[j] * self.z_j_active[j],
-                    )
+                    (self.T_h_in_state[n][i] - self.T_h_out_state[n][i])
+                    * self.f_h_state[n][i]
+                    * self.z_i_active_state[n][i]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.Qtot_sc_state = np.array(
+            [
+                [
+                    self.f_c_state[n][j]
+                    * (self.T_c_out_state[n][j] - self.T_c_in_state[n][j])
+                    * self.z_j_active_state[n][j]
                     for j in range(self.J)
                 ]
-                for i in range(self.I)
-            ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
         )
+        self.Qtot_sh = np.max(self.Qtot_sh_state, axis=0)
+        self.Qtot_sc = np.max(self.Qtot_sc_state, axis=0)
+        self.U_r_state = np.array(
+            [
+                [
+                    [
+                        1 / (1 / self.htc_h_state[n][i] + 1 / self.htc_c_state[n][j])
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.U_hu_state = np.array(
+            [
+                [
+                    1 / (1 / self.htc_hu_state[n][0] + 1 / self.htc_c_state[n][j])
+                    for j in range(self.J)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.U_cu_state = np.array(
+            [
+                [
+                    1 / (1 / self.htc_h_state[n][i] + 1 / self.htc_cu_state[n][0])
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.U_r = self.U_r_state[0].copy()
+        self.U_hu = self.U_hu_state[0].copy()
+        self.U_cu = self.U_cu_state[0].copy()
+        self.Q_max_state = np.array(
+            [
+                [
+                    [
+                        max(
+                            self.T_h_in_state[n][i]
+                            - self.T_c_in_state[n][j]
+                            - self._recovery_approach_temperature(i, j, n),
+                            0.0,
+                        )
+                        * min(
+                            self.f_h_state[n][i] * self.z_i_active_state[n][i],
+                            self.f_c_state[n][j] * self.z_j_active_state[n][j],
+                        )
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.Q_max = np.max(self.Q_max_state, axis=0)
         self.z_feasible = [
             [
-                [1 if self.Q_max[i][j] > self.tol else 0 for k in range(self.S)]
+                [
+                    (
+                        1
+                        if max(self.Q_max_state[n][i][j] for n in range(self.N_states))
+                        > self.tol
+                        else 0
+                    )
+                    for k in range(self.S)
+                ]
                 for j in range(self.J)
             ]
             for i in range(self.I)
@@ -165,142 +293,181 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         ]
 
     def set_stage_wise_superstructure(self) -> None:
-        """Create the source PDM variables, constraints, and binaries."""
+        """Create PDM variables, constraints, and binaries."""
 
-        self.Q_r = [
+        self._set_multistate_stage_wise_superstructure()
+
+    def _set_multistate_stage_wise_superstructure(self) -> None:
+        self.Q_r_by_state = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=self.Q_max_state[n][i][j] / 3,
+                                ub=self.Q_max_state[n][i][j],
+                                lb=0.0,
+                                name=f"Q_H{i}_to_C{j}_at_S{k}_state{n}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=0.0,
+                                name=f"Q_H{i}_to_C{j}_at_S{k}_state{n}",
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.Q_c_by_state = [
+            [
+                (
+                    self.m.Var(
+                        value=0,
+                        ub=self.Qtot_sh_state[n][i],
+                        lb=0.0,
+                        name=f"Q_H{i}_to_CU_state{n}",
+                    )
+                    if self.z_cu_allowed[i] > 0
+                    else self.m.Param(value=0, name=f"Q_H{i}_to_CU_state{n}")
+                )
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.Q_h_by_state = [
+            [
+                (
+                    self.m.Var(
+                        value=0,
+                        ub=self.Qtot_sc_state[n][j],
+                        lb=0.0,
+                        name=f"Q_HU_to_C{j}_state{n}",
+                    )
+                    if self.z_hu_allowed[j] > 0
+                    else self.m.Param(value=0, name=f"Q_HU_to_C{j}_state{n}")
+                )
+                for j in range(self.J)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.T_h_by_state = [
             [
                 [
                     (
                         self.m.Var(
-                            value=self.Q_max[i][j] / 3,
-                            ub=self.Q_max[i][j],
-                            lb=0.0,
-                            name=f"Q_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_h_in_state[n][i],
+                            ub=self.T_h_in_state[n][i],
+                            lb=self.T_h_out_state[n][i],
+                            name=f"T_H{i}_at_B{k}_state{n}",
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0.0, name=f"Q_H{i}_to_C{j}_at_S{k}")
+                        if k > 0 and self.z_i_active[i] > 0
+                        else self.m.Param(
+                            value=self.T_h_in_state[n][i],
+                            name=f"T_H{i}_at_B{k}_state{n}",
+                        )
                     )
-                    for k in range(self.S)
+                    for k in range(self.K)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.T_c_by_state = [
+            [
+                [
+                    (
+                        self.m.Var(
+                            value=self.T_c_in_state[n][j],
+                            ub=self.T_c_out_state[n][j],
+                            lb=self.T_c_in_state[n][j],
+                            name=f"T_C{j}_at_B{k}_state{n}",
+                        )
+                        if k < self.S and self.z_j_active[j] > 0
+                        else self.m.Param(
+                            value=self.T_c_in_state[n][j],
+                            name=f"T_C{j}_at_B{k}_state{n}",
+                        )
+                    )
+                    for k in range(self.K)
                 ]
                 for j in range(self.J)
             ]
-            for i in range(self.I)
+            for n in range(self.N_states)
         ]
-        self.Q_c = [
-            (
-                self.m.Var(
-                    value=0,
-                    ub=self.Qtot_sh[i],
-                    lb=0.0,
-                    name=f"Q_H{i}_to_CU",
-                )
-                if self.z_cu_allowed[i] > 0
-                else self.m.Param(value=0, name=f"Q_H{i}_to_CU")
-            )
-            for i in range(self.I)
-        ]
-        self.Q_h = [
-            (
-                self.m.Var(
-                    value=0,
-                    ub=self.Qtot_sc[j],
-                    lb=0.0,
-                    name=f"Q_HU_to_C{j}",
-                )
-                if self.z_hu_allowed[j] > 0
-                else self.m.Param(value=0, name=f"Q_HU_to_C{j}")
-            )
-            for j in range(self.J)
-        ]
-        self.T_h = [
-            [
-                (
-                    self.m.Var(
-                        value=self.T_h_in[i],
-                        ub=self.T_h_in[i],
-                        lb=self.T_h_out[i],
-                        name=f"T_H{i}_at_B{k}",
-                    )
-                    if k > 0 and self.z_i_active[i] > 0
-                    else self.m.Param(value=self.T_h_in[i], name=f"T_H{i}_at_B{k}")
-                )
-                for k in range(self.K)
-            ]
-            for i in range(self.I)
-        ]
-        self.T_c = [
-            [
-                (
-                    self.m.Var(
-                        value=self.T_c_in[j],
-                        ub=self.T_c_out[j],
-                        lb=self.T_c_in[j],
-                        name=f"T_C{j}_at_B{k}",
-                    )
-                    if k < self.S and self.z_j_active[j] > 0
-                    else self.m.Param(value=self.T_c_in[j], name=f"T_C{j}_at_B{k}")
-                )
-                for k in range(self.K)
-            ]
-            for j in range(self.J)
-        ]
+        self.Q_r = self.Q_r_by_state[0]
+        self.Q_c = self.Q_c_by_state[0]
+        self.Q_h = self.Q_h_by_state[0]
+        self.T_h = self.T_h_by_state[0]
+        self.T_c = self.T_c_by_state[0]
 
-        _ = [
-            (
-                self.m.Equation(
-                    self.Qtot_sh[i]
-                    - sum(
-                        self.Q_r[i][j][k] for k in range(self.S) for j in range(self.J)
+        for n in range(self.N_states):
+            _ = [
+                (
+                    self.m.Equation(
+                        self.Qtot_sh_state[n][i]
+                        - sum(
+                            self.Q_r_by_state[n][i][j][k]
+                            for k in range(self.S)
+                            for j in range(self.J)
+                        )
+                        - self.Q_c_by_state[n][i]
+                        == 0.0
                     )
-                    - self.Q_c[i]
-                    == 0.0
+                    if self.z_i_active_state[n][i] > 0
+                    else None
                 )
-                if self.z_i_active[i] > 0
-                else None
-            )
-            for i in range(self.I)
-        ]
-        _ = [
-            (
-                self.m.Equation(
-                    self.Qtot_sc[j]
-                    - sum(
-                        self.Q_r[i][j][k] for k in range(self.S) for i in range(self.I)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.Qtot_sc_state[n][j]
+                        - sum(
+                            self.Q_r_by_state[n][i][j][k]
+                            for k in range(self.S)
+                            for i in range(self.I)
+                        )
+                        - self.Q_h_by_state[n][j]
+                        == 0.0
                     )
-                    - self.Q_h[j]
-                    == 0.0
+                    if self.z_j_active_state[n][j] > 0
+                    else None
                 )
-                if self.z_j_active[j] > 0
-                else None
-            )
-            for j in range(self.J)
-        ]
-        _ = [
-            (
-                self.m.Equation(
-                    (self.T_h[i][k + 1] - self.T_h[i][k]) * self.f_h[i]
-                    + sum(self.Q_r[i][j][k] for j in range(self.J))
-                    == 0
+                for j in range(self.J)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        (self.T_h_by_state[n][i][k + 1] - self.T_h_by_state[n][i][k])
+                        * self.f_h_state[n][i]
+                        + sum(self.Q_r_by_state[n][i][j][k] for j in range(self.J))
+                        == 0
+                    )
+                    if self.z_i_active_state[n][i] > 0
+                    else None
                 )
-                if self.z_i_active[i] > 0
-                else None
-            )
-            for k in range(self.S)
-            for i in range(self.I)
-        ]
-        _ = [
-            (
-                self.m.Equation(
-                    (self.T_c[j][k + 1] - self.T_c[j][k]) * self.f_c[j]
-                    + sum(self.Q_r[i][j][k] for i in range(self.I))
-                    == 0
+                for k in range(self.S)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        (self.T_c_by_state[n][j][k + 1] - self.T_c_by_state[n][j][k])
+                        * self.f_c_state[n][j]
+                        + sum(self.Q_r_by_state[n][i][j][k] for i in range(self.I))
+                        == 0
+                    )
+                    if self.z_j_active_state[n][j] > 0
+                    else None
                 )
-                if self.z_j_active[j] > 0
-                else None
-            )
-            for k in range(self.S)
-            for j in range(self.J)
-        ]
+                for k in range(self.S)
+                for j in range(self.J)
+            ]
 
         if self.integers:
             self.z = [
@@ -351,32 +518,39 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 )
                 for j in range(self.J)
             ]
-            _ = [
-                (
-                    self.m.Equation(self.Q_r[i][j][k] * (1 - self.z[i][j][k]) == 0.0)
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(self.Q_c[i] * (1 - self.z_cu[i]) == 0.0)
-                    if self.z_cu_allowed[i] > 0
-                    else None
-                )
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(self.Q_h[j] * (1 - self.z_hu[j]) == 0.0)
-                    if self.z_hu_allowed[j] > 0
-                    else None
-                )
-                for j in range(self.J)
-            ]
+            for n in range(self.N_states):
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_r_by_state[n][i][j][k] * (1 - self.z[i][j][k]) == 0.0
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else None
+                    )
+                    for k in range(self.S)
+                    for j in range(self.J)
+                    for i in range(self.I)
+                ]
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_c_by_state[n][i] * (1 - self.z_cu[i]) == 0.0
+                        )
+                        if self.z_cu_allowed[i] > 0
+                        else None
+                    )
+                    for i in range(self.I)
+                ]
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_h_by_state[n][j] * (1 - self.z_hu[j]) == 0.0
+                        )
+                        if self.z_hu_allowed[j] > 0
+                        else None
+                    )
+                    for j in range(self.J)
+                ]
         else:
             self.z = [
                 [
@@ -409,70 +583,99 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
 
-        M_ij = [
+        M_ij_state = [
             [
-                max(
-                    abs(self.T_h_in[i] - self.T_c_in[j]),
-                    abs(self.T_h_in[i] - self.T_c_out[j]),
-                    abs(self.T_h_out[i] - self.T_c_in[j]),
-                    abs(self.T_h_out[i] - self.T_c_out[j]),
-                )
-                + self._recovery_approach_temperature(i, j)
-                for j in range(self.J)
+                [
+                    max(
+                        abs(self.T_h_in_state[n][i] - self.T_c_in_state[n][j]),
+                        abs(self.T_h_in_state[n][i] - self.T_c_out_state[n][j]),
+                        abs(self.T_h_out_state[n][i] - self.T_c_in_state[n][j]),
+                        abs(self.T_h_out_state[n][i] - self.T_c_out_state[n][j]),
+                    )
+                    + self._recovery_approach_temperature(i, j, n)
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
             ]
-            for i in range(self.I)
+            for n in range(self.N_states)
         ]
-        _ = [
-            (
-                self.m.Equation(
-                    (self.T_h[i][k] - self.T_c[j][k])
-                    >= self._recovery_approach_temperature(i, j)
-                    - M_ij[i][j] * (1 - self.z[i][j][k])
+        for n in range(self.N_states):
+            _ = [
+                (
+                    self.m.Equation(
+                        (self.T_h_by_state[n][i][k] - self.T_c_by_state[n][j][k])
+                        >= self._recovery_approach_temperature(i, j, n)
+                        - M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
-            )
-            for k in range(self.S)
-            for j in range(self.J)
-            for i in range(self.I)
-        ]
-        _ = [
-            (
-                self.m.Equation(
-                    (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                    >= self._recovery_approach_temperature(i, j)
-                    - M_ij[i][j] * (1 - self.z[i][j][k])
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        (
+                            self.T_h_by_state[n][i][k + 1]
+                            - self.T_c_by_state[n][j][k + 1]
+                        )
+                        >= self._recovery_approach_temperature(i, j, n)
+                        - M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
                 )
-                if self.z_allowed[i][j][k] > 0
-                else None
-            )
-            for k in range(self.S)
-            for j in range(self.J)
-            for i in range(self.I)
-        ]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
 
         self.dqda = []
         self.alpha = []
 
     def set_obj(self) -> None:
-        """Attach source PDM objective expressions unchanged."""
+        """Attach PDM objective expressions."""
 
         if self.minimisation_goal == "hot utility":
-            self.m.Equation(sum(self.Q_h) - self.HU_target >= 0.0)
-            self.m.Minimize(sum(self.Q_h))
+            for n in range(self.N_states):
+                self.m.Equation(sum(self.Q_h_by_state[n]) - self.HU_target >= 0.0)
+            self.m.Minimize(
+                self._weighted_state_average(
+                    [sum(self.Q_h_by_state[n]) for n in range(self.N_states)]
+                )
+            )
         elif self.minimisation_goal == "cold utility":
-            self.m.Equation(sum(self.Q_c) - self.CU_target >= 0.0)
-            self.m.Minimize(sum(self.Q_c))
+            for n in range(self.N_states):
+                self.m.Equation(sum(self.Q_c_by_state[n]) - self.CU_target >= 0.0)
+            self.m.Minimize(
+                self._weighted_state_average(
+                    [sum(self.Q_c_by_state[n]) for n in range(self.N_states)]
+                )
+            )
         elif self.minimisation_goal == "total utility":
-            self.m.Minimize(sum(self.Q_h) + sum(self.Q_c))
+            self.m.Minimize(
+                self._weighted_state_average(
+                    [
+                        sum(self.Q_h_by_state[n]) + sum(self.Q_c_by_state[n])
+                        for n in range(self.N_states)
+                    ]
+                )
+            )
         elif self.minimisation_goal == "heat recovery":
             self.m.Maximize(
-                self.m.sum(
+                self._weighted_state_average(
                     [
-                        self.Q_r[i][j][k]
-                        for i in range(self.I)
-                        for j in range(self.J)
-                        for k in range(self.S)
+                        self.m.sum(
+                            [
+                                self.Q_r_by_state[n][i][j][k]
+                                for i in range(self.I)
+                                for j in range(self.J)
+                                for k in range(self.S)
+                            ]
+                        )
+                        for n in range(self.N_states)
                     ]
                 )
             )
@@ -493,212 +696,298 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         if self.mSuccess != 1:
             return
+        self._get_multistate_post_process()
 
-        self.n_units = (
+    def _get_multistate_post_process(self) -> None:
+        q_r = [
+            [
+                [
+                    [
+                        self._active_binary_value(self.Q_r_by_state[n][i][j][k])
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        q_h = [
+            [self._active_binary_value(self.Q_h_by_state[n][j]) for j in range(self.J)]
+            for n in range(self.N_states)
+        ]
+        q_c = [
+            [self._active_binary_value(self.Q_c_by_state[n][i]) for i in range(self.I)]
+            for n in range(self.N_states)
+        ]
+        self.z = [
+            [
+                [
+                    [
+                        (
+                            1
+                            if max(q_r[n][i][j][k] for n in range(self.N_states))
+                            > self.tol
+                            else 0
+                        )
+                    ]
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.z_hu = [
+            [1 if max(q_h[n][j] for n in range(self.N_states)) > self.tol else 0]
+            for j in range(self.J)
+        ]
+        self.z_cu = [
+            [1 if max(q_c[n][i] for n in range(self.N_states)) > self.tol else 0]
+            for i in range(self.I)
+        ]
+        self.n_recovery_units = sum(
+            self.z[i][j][k][0]
+            for k in range(self.S)
+            for j in range(self.J)
+            for i in range(self.I)
+        )
+        self.n_hu_units = sum(self.z_hu[j][0] for j in range(self.J))
+        self.n_cu_units = sum(self.z_cu[i][0] for i in range(self.I))
+        self.n_units = self.n_recovery_units + self.n_hu_units + self.n_cu_units
+
+        self.theta_1_by_state = [
+            [
+                [
+                    [
+                        (
+                            [
+                                self._active_binary_value(self.T_h_by_state[n][i][k])
+                                - self._active_binary_value(self.T_c_by_state[n][j][k])
+                            ]
+                            if self.z[i][j][k][0] > 0
+                            else [self._recovery_approach_temperature(i, j, n)]
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.theta_2_by_state = [
+            [
+                [
+                    [
+                        (
+                            [
+                                self._active_binary_value(
+                                    self.T_h_by_state[n][i][k + 1]
+                                )
+                                - self._active_binary_value(
+                                    self.T_c_by_state[n][j][k + 1]
+                                )
+                            ]
+                            if self.z[i][j][k][0] > 0
+                            else [self._recovery_approach_temperature(i, j, n)]
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.theta_1 = self.theta_1_by_state[0]
+        self.theta_2 = self.theta_2_by_state[0]
+
+        self.LMTD_r_by_state = [
+            [
+                [
+                    [
+                        self._post_process_lmtd(
+                            self.theta_1_by_state[n][i][j][k][0],
+                            self.theta_2_by_state[n][i][j][k][0],
+                            self.z[i][j][k][0],
+                            formula_allowed=(
+                                abs(
+                                    self.theta_1_by_state[n][i][j][k][0]
+                                    - self.theta_2_by_state[n][i][j][k][0]
+                                )
+                                > self.tol
+                                and abs(
+                                    self.theta_1_by_state[n][i][j][k][0]
+                                    - self._recovery_approach_temperature(i, j, n)
+                                )
+                                >= self.tol
+                                and abs(
+                                    self.theta_2_by_state[n][i][j][k][0]
+                                    - self._recovery_approach_temperature(i, j, n)
+                                )
+                                >= self.tol
+                            ),
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.area_r_by_state = [
+            [
+                [
+                    [
+                        (
+                            q_r[n][i][j][k]
+                            / self.U_r_state[n][i][j]
+                            / self.LMTD_r_by_state[n][i][j][k]
+                            if self.LMTD_r_by_state[n][i][j][k] > self.tol
+                            and q_r[n][i][j][k] > self.tol
+                            else 0.0
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.LMTD_r = self.LMTD_r_by_state[0]
+        self.area_r = [
+            [
+                [
+                    max(self.area_r_by_state[n][i][j][k] for n in range(self.N_states))
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.LMTD_hu_by_state = [
+            [
+                self._post_process_lmtd(
+                    self.T_hu_in_state[n][0] - self.T_c_out_state[n][j],
+                    self.T_hu_out_state[n][0]
+                    - self._active_binary_value(self.T_c_by_state[n][j][0]),
+                    self.z_hu[j][0],
+                    formula_allowed=(
+                        abs(
+                            (self.T_hu_in_state[n][0] - self.T_c_out_state[n][j])
+                            - (
+                                self.T_hu_out_state[n][0]
+                                - self._active_binary_value(self.T_c_by_state[n][j][0])
+                            )
+                        )
+                        > self.tol
+                        and self.T_hu_in_state[n][0]
+                        - self.T_c_out_state[n][j]
+                        - self._hot_utility_approach_temperature(j, n)
+                        >= self.tol
+                        and self.T_hu_out_state[n][0]
+                        - self._active_binary_value(self.T_c_by_state[n][j][0])
+                        - self._hot_utility_approach_temperature(j, n)
+                        >= self.tol
+                    ),
+                )
+                for j in range(self.J)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.area_hu_by_state = [
+            [
+                (
+                    q_h[n][j] / self.U_hu_state[n][j] / self.LMTD_hu_by_state[n][j]
+                    if self.LMTD_hu_by_state[n][j] > self.tol and q_h[n][j] > self.tol
+                    else 0.0
+                )
+                for j in range(self.J)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.LMTD_cu_by_state = [
+            [
+                self._post_process_lmtd(
+                    self._active_binary_value(self.T_h_by_state[n][i][self.S])
+                    - self.T_cu_out_state[n][0],
+                    self.T_h_out_state[n][i] - self.T_cu_in_state[n][0],
+                    self.z_cu[i][0],
+                    formula_allowed=(
+                        abs(
+                            (
+                                self._active_binary_value(
+                                    self.T_h_by_state[n][i][self.S]
+                                )
+                                - self.T_cu_out_state[n][0]
+                            )
+                            - (self.T_h_out_state[n][i] - self.T_cu_in_state[n][0])
+                        )
+                        > self.tol
+                        and self._active_binary_value(self.T_h_by_state[n][i][self.S])
+                        - self.T_cu_out_state[n][0]
+                        - self._cold_utility_approach_temperature(i, n)
+                        >= self.tol
+                        and self.T_h_out_state[n][i]
+                        - self.T_cu_in_state[n][0]
+                        - self._cold_utility_approach_temperature(i, n)
+                        >= self.tol
+                    ),
+                    fallback_delta=(
+                        self.T_h_out_state[n][i] - self.T_cu_in_state[n][0]
+                    ),
+                )
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.area_cu_by_state = [
+            [
+                (
+                    q_c[n][i] / self.U_cu_state[n][i] / self.LMTD_cu_by_state[n][i]
+                    if self.LMTD_cu_by_state[n][i] > self.tol and q_c[n][i] > self.tol
+                    else 0.0
+                )
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.LMTD_hu = self.LMTD_hu_by_state[0]
+        self.LMTD_cu = self.LMTD_cu_by_state[0]
+        self.area_hu = [
+            max(self.area_hu_by_state[n][j] for n in range(self.N_states))
+            for j in range(self.J)
+        ]
+        self.area_cu = [
+            max(self.area_cu_by_state[n][i] for n in range(self.N_states))
+            for i in range(self.I)
+        ]
+        self.Q_hu_total_by_state = [sum(q_h[n]) for n in range(self.N_states)]
+        self.Q_cu_total_by_state = [sum(q_c[n]) for n in range(self.N_states)]
+        self.Q_r_total_by_state = [
             sum(
-                self.z[i][j][k][0] if self.Q_r[i][j][k][0] > self.tol else 0
+                q_r[n][i][j][k]
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             )
-            + sum(
-                self.z_cu[i][0] if self.Q_c[i][0] > self.tol else 0
-                for i in range(self.I)
-            )
-            + sum(
-                self.z_hu[j][0] if self.Q_h[j][0] > self.tol else 0
-                for j in range(self.J)
-            )
+            for n in range(self.N_states)
+        ]
+        self.Q_hu_total = self._weighted_numeric_average(self.Q_hu_total_by_state)
+        self.Q_cu_total = self._weighted_numeric_average(self.Q_cu_total_by_state)
+        self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_state)
+        self.operating_cost_by_state = [
+            self.hu_cost_state[n][0] * self.Q_hu_total_by_state[n]
+            + self.cu_cost_state[n][0] * self.Q_cu_total_by_state[n]
+            for n in range(self.N_states)
+        ]
+        self.weighted_operating_cost_value = self._weighted_numeric_average(
+            self.operating_cost_by_state
         )
-        self.n_recovery_units = sum(
-            self.z[i][j][k][0] if self.Q_r[i][j][k][0] > self.tol else 0
-            for k in range(self.S)
-            for j in range(self.J)
-            for i in range(self.I)
-        )
-        self.n_hu_units = sum(
-            self.z_hu[j][0] if self.Q_h[j][0] > self.tol else 0 for j in range(self.J)
-        )
-        self.n_cu_units = sum(
-            self.z_cu[i][0] if self.Q_c[i][0] > self.tol else 0 for i in range(self.I)
-        )
-
-        if self.minimisation_goal not in {"total cost", "variable total cost"}:
-            self.theta_1 = [
-                [
-                    [
-                        (
-                            [self.T_h[i][k][0] - self.T_c[j][k][0]]
-                            if self.z[i][j][k][0] > 0
-                            else [self._recovery_approach_temperature(i, j)]
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            self.theta_2 = [
-                [
-                    [
-                        (
-                            [self.T_h[i][k + 1][0] - self.T_c[j][k + 1][0]]
-                            if self.z[i][j][k][0] > 0
-                            else [self._recovery_approach_temperature(i, j)]
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-
-        self.LMTD_r = [
-            [
-                [
-                    self._post_process_lmtd(
-                        self.theta_1[i][j][k][0],
-                        self.theta_2[i][j][k][0],
-                        self.z[i][j][k][0],
-                        formula_allowed=(
-                            abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
-                            > self.tol
-                            and self.theta_1[i][j][k][0]
-                            >= self._recovery_approach_temperature(i, j)
-                            and self.theta_2[i][j][k][0]
-                            >= self._recovery_approach_temperature(i, j)
-                        ),
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
-        self.area_r = [
-            [
-                [
-                    (
-                        self.Q_r[i][j][k][0] / self.U_r[i][j] / self.LMTD_r[i][j][k]
-                        if self.LMTD_r[i][j][k] > self.tol
-                        and self.Q_r[i][j][k][0] > self.tol
-                        else 0.0
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
-        self.LMTD_hu = [
-            self._post_process_lmtd(
-                self.T_hu_in[0] - self.T_c_out[j],
-                self.T_hu_out[0] - self.T_c[j][0][0],
-                self.z_hu[j][0],
-                formula_allowed=(
-                    abs(
-                        (self.T_hu_in[0] - self.T_c_out[j])
-                        - (self.T_hu_out[0] - self.T_c[j][0][0])
-                    )
-                    > self.tol
-                    and self.T_hu_in[0] - self.T_c_out[j]
-                    >= self._hot_utility_approach_temperature(j)
-                    and self.T_hu_out[0] - self.T_c[j][0][0]
-                    >= self._hot_utility_approach_temperature(j)
-                ),
-            )
-            for j in range(self.J)
-        ]
-        self.area_hu = [
-            (
-                self.Q_h[j][0] / self.U_hu[j] / self.LMTD_hu[j]
-                if self.LMTD_hu[j] > self.tol and self.Q_h[j][0] > self.tol
-                else 0.0
-            )
-            for j in range(self.J)
-        ]
-        self.LMTD_cu = [
-            self._post_process_lmtd(
-                self.T_h[i][self.S][0] - self.T_cu_out[0],
-                self.T_h_out[i] - self.T_cu_in[0],
-                self.z_cu[i][0],
-                formula_allowed=(
-                    abs(
-                        (self.T_h[i][self.S][0] - self.T_cu_out[0])
-                        - (self.T_h_out[i] - self.T_cu_in[0])
-                    )
-                    > self.tol
-                    and self.T_h[i][self.S][0] - self.T_cu_out[0]
-                    >= self._cold_utility_approach_temperature(i)
-                    and self.T_h_out[i] - self.T_cu_in[0]
-                    >= self._cold_utility_approach_temperature(i)
-                ),
-                fallback_delta=self.T_h_out[i] - self.T_cu_in[0],
-            )
-            for i in range(self.I)
-        ]
-        self.area_cu = [
-            (
-                self.Q_c[i][0] / self.U_cu[i] / self.LMTD_cu[i]
-                if self.LMTD_cu[i] > self.tol and self.Q_c[i][0] > self.tol
-                else 0.0
-            )
-            for i in range(self.I)
-        ]
-        self.Q_cu_total = sum(self.Q_c[i][0] for i in range(self.I))
-        self.Q_hu_total = sum(self.Q_h[j][0] for j in range(self.J))
-        self.Q_r_total = sum(
-            self.Q_r[i][j][k][0]
-            for k in range(self.S)
-            for j in range(self.J)
-            for i in range(self.I)
-        )
-        self.dqda = [
-            [
-                [
-                    (
-                        (
-                            self.theta_1[i][j][k][0]
-                            * self.theta_2[i][j][k][0]
-                            * self.U_r[i][j]
-                        )
-                        / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                        * self.z[i][j][k][0]
-                        if (self.T_h[i][k][0] - self.T_c[j][k + 1][0]) > 0.0
-                        else 0.0
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
-        self.alpha = self.get_alpha_values()
-        self.dtacda = [
-            [[None for _k in range(self.S)] for _j in range(self.J)]
-            for _i in range(self.I)
-        ]
-        for k in range(self.S):
-            for j in range(self.J):
-                for i in range(self.I):
-                    if self.area_r[i][j][k] > 0.0:
-                        self.dtacda[i][j][k] = self.dqda[i][j][k] * (
-                            self.hu_cost[0] + self.cu_cost[0]
-                        ) - (
-                            self.A_coeff[0]
-                            * self.A_exp[0]
-                            * self.area_r[i][j][k] ** (self.A_exp[0] - 1)
-                        )
-                    else:
-                        self.dtacda[i][j][k] = self.dqda[i][j][k] * (
-                            self.hu_cost[0] + self.cu_cost[0]
-                        ) - (self.A_coeff[0] * self.A_exp[0])
-
-        self.TAC_model = self.m.options.objfcnval
-        self.TAC = (
-            self.hu_cost[0] * sum(self.Q_h[j][0] for j in range(self.J))
-            + self.cu_cost[0] * sum(self.Q_c[i][0] for i in range(self.I))
-            + self.unit_cost[0] * self.n_units
+        self.capital_cost_value = (
+            self.unit_cost[0] * self.n_units
             + self.A_coeff[0]
             * sum(
                 self.area_r[i][j][k] ** self.A_exp[0]
@@ -707,9 +996,47 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             )
             + self.hu_coeff[0]
-            * sum(self.area_hu[j] ** self.A_exp[0] for j in range(self.J))
+            * sum(self.area_hu[j] ** self.hu_exp[0] for j in range(self.J))
             + self.cu_coeff[0]
-            * sum(self.area_cu[i] ** self.A_exp[0] for i in range(self.I))
+            * sum(self.area_cu[i] ** self.cu_exp[0] for i in range(self.I))
+        )
+        self.hu_cost_total = self._weighted_numeric_average(
+            [
+                self.hu_cost_state[n][0] * self.Q_hu_total_by_state[n]
+                for n in range(self.N_states)
+            ]
+        )
+        self.cu_cost_total = self._weighted_numeric_average(
+            [
+                self.cu_cost_state[n][0] * self.Q_cu_total_by_state[n]
+                for n in range(self.N_states)
+            ]
+        )
+        self.recovery_area_cost_total = self.A_coeff[0] * sum(
+            self.area_r[i][j][k] ** self.A_exp[0]
+            for k in range(self.S)
+            for j in range(self.J)
+            for i in range(self.I)
+        )
+        self.hu_area_cost_total = self.hu_coeff[0] * sum(
+            self.area_hu[j] ** self.hu_exp[0] for j in range(self.J)
+        )
+        self.cu_area_cost_total = self.cu_coeff[0] * sum(
+            self.area_cu[i] ** self.cu_exp[0] for i in range(self.I)
+        )
+        self.TAC_model = self.m.options.objfcnval
+        self.TAC = self.capital_cost_value + self.weighted_operating_cost_value
+
+    def _active_binary_value(self, value) -> float:
+        return _scalar_value(value)
+
+    def _weighted_numeric_average(self, values: Sequence[float]) -> float:
+        return float(
+            sum(
+                float(self.state_weights[n]) * float(values[n])
+                for n in range(self.N_states)
+            )
+            / self.state_weight_sum
         )
 
     def amalgamate_networks(
@@ -842,7 +1169,19 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         amalgamated.z_allowed = [
             [
                 [
-                    1 if amalgamated.Q_r[i][j][k][0] > self.tol else 0
+                    (
+                        1
+                        if (
+                            max(
+                                amalgamated.Q_r_by_state[n][i][j][k][0]
+                                for n in range(amalgamated.N_states)
+                            )
+                            if hasattr(amalgamated, "Q_r_by_state")
+                            else amalgamated.Q_r[i][j][k][0]
+                        )
+                        > self.tol
+                        else 0
+                    )
                     for k in range(amalgamated.S)
                 ]
                 for j in range(amalgamated.J)
@@ -861,6 +1200,19 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         target_stage: int,
     ) -> None:
         target.z[i][j][target_stage].VALUE.value = [source.z[i][j][source_stage][0]]
+        if hasattr(target, "Q_r_by_state") and hasattr(source, "Q_r_by_state"):
+            for n in range(target.N_states):
+                source_state_idx = min(n, source.N_states - 1)
+                target.Q_r_by_state[n][i][j][target_stage].VALUE.value = [
+                    source.Q_r_by_state[source_state_idx][i][j][source_stage][0]
+                ]
+                target.theta_1_by_state[n][i][j][target_stage].VALUE.value = [
+                    source.theta_1_by_state[source_state_idx][i][j][source_stage][0]
+                ]
+                target.theta_2_by_state[n][i][j][target_stage].VALUE.value = [
+                    source.theta_2_by_state[source_state_idx][i][j][source_stage][0]
+                ]
+            return
         target.Q_r[i][j][target_stage].VALUE.value = [source.Q_r[i][j][source_stage][0]]
         target.theta_1[i][j][target_stage].VALUE.value = [
             source.theta_1[i][j][source_stage][0]

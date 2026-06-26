@@ -622,55 +622,169 @@ class BaseHeatExchangerNetworkModel(ABC):
         self.unit_cost = np.array([], dtype=float)
         self.A_coeff = np.array([], dtype=float)
         self.A_exp = np.array([], dtype=float)
+        self.state_ids = np.array(["0"], dtype=str)
+        self.state_weights = np.array([1.0], dtype=float)
+        self.N_states = 1
+        self.state_weight_sum = 1.0
 
     def get_model_parameters_from_solver_arrays(self) -> None:
         """Populate model attributes from the OpenPinch private array adapter."""
 
         for name, values in self.solver_arrays.arrays.items():
             setattr(self, name, np.array(values, copy=True))
+        self._normalise_state_arrays()
         self._set_minimum_approach_temperatures()
+
+    def _normalise_state_arrays(self) -> None:
+        """Validate the explicit operating-state axis used by HEN models."""
+
+        if "state_ids" not in self.solver_arrays.arrays:
+            raise ValueError("state_ids is required for HEN model setup.")
+        if "state_weights" not in self.solver_arrays.arrays:
+            raise ValueError("state_weights is required for HEN model setup.")
+
+        self.state_ids = np.asarray(self.state_ids, dtype=str)
+        self.state_weights = np.asarray(self.state_weights, dtype=float)
+        self.N_states = int(len(self.state_ids))
+        if self.N_states <= 0:
+            raise ValueError("HEN model construction requires at least one state.")
+        if len(self.state_weights) != self.N_states:
+            raise ValueError("HEN state weight count must match state_id count.")
+        if not np.isfinite(self.state_weights).all():
+            raise ValueError("HEN state weights must be finite.")
+        self.state_weight_sum = float(np.sum(self.state_weights))
+        if self.state_weight_sum <= 0.0:
+            raise ValueError("HEN state weights must have a positive sum.")
+
+        for base_name in (
+            "T_h_in",
+            "T_h_out",
+            "f_h",
+            "htc_h",
+            "h_cost",
+            "T_h_cont",
+            "T_c_in",
+            "T_c_out",
+            "f_c",
+            "htc_c",
+            "c_cost",
+            "T_c_cont",
+            "T_hu_in",
+            "T_hu_out",
+            "htc_hu",
+            "hu_cost",
+            "T_hu_cont",
+            "T_cu_in",
+            "T_cu_out",
+            "htc_cu",
+            "cu_cost",
+            "T_cu_cont",
+        ):
+            state_name = f"{base_name}_state"
+            values = np.asarray(getattr(self, state_name, []), dtype=float)
+            if values.size == 0:
+                raise ValueError(f"{state_name} is required for HEN model setup.")
+            if values.ndim != 2:
+                raise ValueError(f"{state_name} must be indexed by operating state.")
+            if values.shape[0] != self.N_states:
+                raise ValueError(
+                    f"{state_name} has {values.shape[0]} state rows; "
+                    f"expected {self.N_states}."
+                )
+            setattr(self, state_name, values)
+            setattr(self, base_name, values[0].copy())
 
     def _set_minimum_approach_temperatures(self) -> None:
         """Derive pair-specific approach limits from stream contributions."""
 
-        self.dT_r = np.array(
+        self.dT_r_state = np.array(
             [
-                [self.T_h_cont[i] + self.T_c_cont[j] for j in range(len(self.T_c_cont))]
-                for i in range(len(self.T_h_cont))
+                [
+                    [
+                        self.T_h_cont_state[n][i] + self.T_c_cont_state[n][j]
+                        for j in range(len(self.T_c_cont_state[n]))
+                    ]
+                    for i in range(len(self.T_h_cont_state[n]))
+                ]
+                for n in range(self.N_states)
             ],
             dtype=float,
         )
-        self.dT_hu = np.array(
+        self.dT_hu_state = np.array(
             [
-                (self.T_hu_cont[0] if len(self.T_hu_cont) else self.dTmin / 2.0)
-                + self.T_c_cont[j]
-                for j in range(len(self.T_c_cont))
+                [
+                    (
+                        self.T_hu_cont_state[n][0]
+                        if len(self.T_hu_cont_state[n])
+                        else self.dTmin / 2.0
+                    )
+                    + self.T_c_cont_state[n][j]
+                    for j in range(len(self.T_c_cont_state[n]))
+                ]
+                for n in range(self.N_states)
             ],
             dtype=float,
         )
-        self.dT_cu = np.array(
+        self.dT_cu_state = np.array(
             [
-                self.T_h_cont[i]
-                + (self.T_cu_cont[0] if len(self.T_cu_cont) else self.dTmin / 2.0)
-                for i in range(len(self.T_h_cont))
+                [
+                    self.T_h_cont_state[n][i]
+                    + (
+                        self.T_cu_cont_state[n][0]
+                        if len(self.T_cu_cont_state[n])
+                        else self.dTmin / 2.0
+                    )
+                    for i in range(len(self.T_h_cont_state[n]))
+                ]
+                for n in range(self.N_states)
             ],
             dtype=float,
         )
+        self.dT_r = self.dT_r_state[0].copy()
+        self.dT_hu = self.dT_hu_state[0].copy()
+        self.dT_cu = self.dT_cu_state[0].copy()
 
-    def _recovery_approach_temperature(self, i: int, j: int) -> float:
+    def _recovery_approach_temperature(
+        self,
+        i: int,
+        j: int,
+        state_idx: int = 0,
+    ) -> float:
         if not hasattr(self, "dT_r"):
             return float(self.dTmin)
+        if hasattr(self, "dT_r_state"):
+            return float(self.dT_r_state[state_idx][i][j])
         return float(self.dT_r[i][j])
 
-    def _hot_utility_approach_temperature(self, j: int) -> float:
+    def _hot_utility_approach_temperature(
+        self,
+        j: int,
+        state_idx: int = 0,
+    ) -> float:
         if not hasattr(self, "dT_hu"):
             return float(self.dTmin)
+        if hasattr(self, "dT_hu_state"):
+            return float(self.dT_hu_state[state_idx][j])
         return float(self.dT_hu[j])
 
-    def _cold_utility_approach_temperature(self, i: int) -> float:
+    def _cold_utility_approach_temperature(
+        self,
+        i: int,
+        state_idx: int = 0,
+    ) -> float:
         if not hasattr(self, "dT_cu"):
             return float(self.dTmin)
+        if hasattr(self, "dT_cu_state"):
+            return float(self.dT_cu_state[state_idx][i])
         return float(self.dT_cu[i])
+
+    def _weighted_state_average(self, values: Sequence[Any]) -> Any:
+        """Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for GEKKO expressions."""
+
+        return (
+            sum(float(self.state_weights[n]) * values[n] for n in range(self.N_states))
+            / self.state_weight_sum
+        )
 
     def set_match_restrictions(self, restrictions) -> None:
         """Apply inherited topology restrictions in the source array shape."""

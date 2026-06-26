@@ -425,6 +425,8 @@ def _legacy_objective(method: SynthesisMethod) -> str:
 
 
 def _legacy_task_dTmin(task: HeatExchangerNetworkSynthesisTask) -> float:
+    if task.method in {"thermal_derivative_method", "network_evolution_method"}:
+        return 0.1
     return float(task.approach_temperature)
 
 

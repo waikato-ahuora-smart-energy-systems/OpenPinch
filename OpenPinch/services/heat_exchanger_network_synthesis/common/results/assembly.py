@@ -15,6 +15,7 @@ from .....lib.schemas.synthesis import (
 from ..errors import WorkflowContractError
 from ..execution.pathways import pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
+from ..reporting.verification import verify_network_feasibility
 
 _METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
     "pinch_design_method",
@@ -39,6 +40,7 @@ def build_synthesis_result(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> HeatExchangerNetworkSynthesisResult:
     """Convert accepted task outcomes into the canonical design payload."""
+    _assert_successful_outcomes_feasible(outcomes)
     accepted = _accepted_outcome(outcomes)
     if accepted.network is None:
         raise WorkflowContractError(
@@ -153,6 +155,25 @@ def _accepted_outcome(
     raise WorkflowContractError(message)
 
 
+def _assert_successful_outcomes_feasible(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> None:
+    infeasible = [
+        (outcome, failures)
+        for outcome in outcomes
+        if outcome.status == "success"
+        and (failures := verify_network_feasibility(outcome.network))
+    ]
+    if not infeasible:
+        return
+
+    raise WorkflowContractError(
+        "solver-success heat exchanger network task failed post-solve "
+        "feasibility checks, which indicates a solver model or extraction "
+        "contract issue. Details: " + _infeasible_outcome_summary(infeasible)
+    )
+
+
 def _failed_outcome_summary(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> str:
@@ -172,6 +193,22 @@ def _failed_outcome_summary(
         )
     if len(failed) > len(summaries):
         summaries.append(f"{len(failed) - len(summaries)} more failed task(s)")
+    return "; ".join(summaries)
+
+
+def _infeasible_outcome_summary(
+    outcomes: Sequence[
+        tuple[HeatExchangerNetworkSynthesisTaskOutcome, tuple[str, ...]]
+    ],
+) -> str:
+    if not outcomes:
+        return ""
+    summaries = []
+    for outcome, failures in outcomes[:3]:
+        task_id = outcome.task.task_id or "unknown-task"
+        summaries.append(f"{outcome.task.method}({task_id}) infeasible: {failures[0]}")
+    if len(outcomes) > len(summaries):
+        summaries.append(f"{len(outcomes) - len(summaries)} more infeasible task(s)")
     return "; ".join(summaries)
 
 

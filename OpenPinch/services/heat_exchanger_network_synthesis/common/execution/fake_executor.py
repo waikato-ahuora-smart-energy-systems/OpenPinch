@@ -97,6 +97,14 @@ def _fake_network(
     utility_cost = round(duty * 0.35, 6)
     capital_cost = round(duty * 1.15, 6)
     total_annual_cost = round(utility_cost + capital_cost, 6)
+    approach_temperature = max(float(task.approach_temperature), 1.0)
+    temperatures = _fake_temperatures(
+        hot_supply=_temperature(hot_stream.t_supply, "K"),
+        cold_supply=_temperature(cold_stream.t_supply, "K"),
+        approach_temperature=approach_temperature,
+    )
+    hot_utility_duty = round(duty * 0.1, 6)
+    cold_utility_duty = round(duty * 0.08, 6)
 
     exchangers = (
         HeatExchanger(
@@ -109,11 +117,14 @@ def _fake_network(
             stage=stage_count,
             duty=duty,
             area=round(duty / 10.0, 6),
-            approach_temperatures=(task.approach_temperature,),
-            source_inlet_temperature=_temperature(hot_stream.t_supply, "K"),
-            source_outlet_temperature=_temperature(hot_stream.t_target, "K"),
-            sink_inlet_temperature=_temperature(cold_stream.t_supply, "K"),
-            sink_outlet_temperature=_temperature(cold_stream.t_target, "K"),
+            approach_temperatures=(
+                temperatures["source_inlet"] - temperatures["sink_outlet"],
+                temperatures["source_outlet"] - temperatures["sink_inlet"],
+            ),
+            source_inlet_temperature=temperatures["source_inlet"],
+            source_outlet_temperature=temperatures["source_outlet"],
+            sink_inlet_temperature=temperatures["sink_inlet"],
+            sink_outlet_temperature=temperatures["sink_outlet"],
             capital_cost=capital_cost,
             total_annual_cost=total_annual_cost,
         ),
@@ -124,7 +135,12 @@ def _fake_network(
             sink_stream=cold_key,
             source_stream_role=HeatExchangerStreamRole.UTILITY,
             sink_stream_role=HeatExchangerStreamRole.PROCESS,
-            duty=round(duty * 0.1, 6),
+            duty=hot_utility_duty,
+            area=round(hot_utility_duty / 10.0, 6),
+            source_inlet_temperature=temperatures["hot_utility_inlet"],
+            source_outlet_temperature=temperatures["hot_utility_outlet"],
+            sink_inlet_temperature=temperatures["sink_outlet"],
+            sink_outlet_temperature=temperatures["sink_outlet"] + 10.0,
             operating_cost=round(utility_cost * 0.5, 6),
         ),
         HeatExchanger(
@@ -134,7 +150,12 @@ def _fake_network(
             sink_stream=cold_utility_key,
             source_stream_role=HeatExchangerStreamRole.PROCESS,
             sink_stream_role=HeatExchangerStreamRole.UTILITY,
-            duty=round(duty * 0.08, 6),
+            duty=cold_utility_duty,
+            area=round(cold_utility_duty / 10.0, 6),
+            source_inlet_temperature=temperatures["source_outlet"],
+            source_outlet_temperature=temperatures["source_outlet"] - 10.0,
+            sink_inlet_temperature=temperatures["cold_utility_inlet"],
+            sink_outlet_temperature=temperatures["cold_utility_outlet"],
             operating_cost=round(utility_cost * 0.5, 6),
         ),
     )
@@ -150,6 +171,13 @@ def _fake_network(
         utility_cost=utility_cost,
         capital_cost=capital_cost,
         summary_metrics={
+            "total_units": 3,
+            "recovery_units": 1,
+            "hot_utility_units": 1,
+            "cold_utility_units": 1,
+            "recovery_load": duty,
+            "hot_utility_load": hot_utility_duty,
+            "cold_utility_load": cold_utility_duty,
             "recovery_unit_count": 1,
             "hot_utility_unit_count": 1,
             "cold_utility_unit_count": 1,
@@ -183,6 +211,33 @@ def _temperature(value, unit: str) -> float | None:
     if hasattr(value, "to"):
         return float(value.to(unit).value)
     return float(value)
+
+
+def _fake_temperatures(
+    *,
+    hot_supply: float | None,
+    cold_supply: float | None,
+    approach_temperature: float,
+) -> dict[str, float]:
+    sink_inlet = cold_supply if cold_supply is not None else 300.0
+    source_inlet = hot_supply if hot_supply is not None else sink_inlet + 200.0
+    source_inlet = max(source_inlet, sink_inlet + approach_temperature + 100.0)
+    sink_outlet = min(sink_inlet + 50.0, source_inlet - approach_temperature - 10.0)
+    source_outlet = max(
+        sink_inlet + approach_temperature + 10.0,
+        source_inlet - 80.0,
+    )
+    source_outlet = min(source_outlet, source_inlet - approach_temperature - 10.0)
+    return {
+        "source_inlet": source_inlet,
+        "source_outlet": source_outlet,
+        "sink_inlet": sink_inlet,
+        "sink_outlet": sink_outlet,
+        "hot_utility_inlet": sink_outlet + approach_temperature + 50.0,
+        "hot_utility_outlet": sink_outlet + approach_temperature + 40.0,
+        "cold_utility_inlet": sink_inlet - 30.0,
+        "cold_utility_outlet": sink_inlet - 20.0,
+    }
 
 
 __all__ = ["FakeSynthesisExecutor"]

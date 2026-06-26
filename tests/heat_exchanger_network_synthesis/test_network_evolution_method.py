@@ -53,15 +53,19 @@ def test_seeded_network_evolution_prefers_solver_dtmin_metadata() -> None:
     assert tasks[0].approach_temperature == 12.0
 
 
-def test_non_pdm_tasks_use_task_approach_for_solver_arrays() -> None:
-    task = HeatExchangerNetworkSynthesisTask(
+def test_legacy_solver_dtmin_matches_openhens_layer_behavior() -> None:
+    pdm_task = HeatExchangerNetworkSynthesisTask(
         run_id="method-test",
-        method="network_evolution_method",
+        method="pinch_design_method",
         approach_temperature=14.0,
         stage_count=1,
     )
+    tdm_task = pdm_task.model_copy(update={"method": "thermal_derivative_method"})
+    evm_task = pdm_task.model_copy(update={"method": "network_evolution_method"})
 
-    assert _legacy_task_dTmin(task) == 14.0
+    assert _legacy_task_dTmin(pdm_task) == 14.0
+    assert _legacy_task_dTmin(tdm_task) == 0.1
+    assert _legacy_task_dTmin(evm_task) == 0.1
 
 
 def test_quality_seeded_network_evolution_uses_canonical_topology() -> None:

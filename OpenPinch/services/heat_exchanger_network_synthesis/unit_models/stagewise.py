@@ -98,64 +98,134 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.set_obj()
 
     def set_preprocessing(self) -> None:
-        """Pre-process source SynHEAT superstructure parameters unchanged."""
+        """Pre-process SynHEAT superstructure parameters for all states."""
 
         self.S = self.stages
         self.K = self.S + 1
-        self.I = len(self.f_h)
-        self.J = len(self.f_c)
+        self.I = self.f_h_state.shape[1]
+        self.J = self.f_c_state.shape[1]
 
-        self.Qtot_sh = np.array(
-            [(self.T_h_in[i] - self.T_h_out[i]) * self.f_h[i] for i in range(self.I)]
-        )
-        self.Qtot_sc = np.array(
-            [self.f_c[j] * (self.T_c_out[j] - self.T_c_in[j]) for j in range(self.J)]
-        )
-
-        self.U_r = np.array(
-            [
-                [1 / (1 / self.htc_h[i] + 1 / self.htc_c[j]) for j in range(self.J)]
-                for i in range(self.I)
-            ]
-        )
-        self.U_hu = np.array(
-            [1 / (1 / self.htc_hu[0] + 1 / self.htc_c[j]) for j in range(self.J)]
-        )
-        self.U_cu = np.array(
-            [1 / (1 / self.htc_h[i] + 1 / self.htc_cu[0]) for i in range(self.I)]
-        )
-        self.Q_max = np.array(
+        self.Qtot_sh_state = np.array(
             [
                 [
-                    max(
-                        self.T_h_in[i]
-                        - self.T_c_in[j]
-                        - self._recovery_approach_temperature(i, j),
-                        0.0,
-                    )
-                    * min(self.f_h[i], self.f_c[j])
+                    (self.T_h_in_state[n][i] - self.T_h_out_state[n][i])
+                    * self.f_h_state[n][i]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.Qtot_sc_state = np.array(
+            [
+                [
+                    self.f_c_state[n][j]
+                    * (self.T_c_out_state[n][j] - self.T_c_in_state[n][j])
                     for j in range(self.J)
                 ]
-                for i in range(self.I)
-            ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
         )
-        self.M_ij = [
+        self.Qtot_sh = np.max(self.Qtot_sh_state, axis=0)
+        self.Qtot_sc = np.max(self.Qtot_sc_state, axis=0)
+
+        self.U_r_state = np.array(
             [
-                max(
-                    abs(self.T_h_in[i] - self.T_c_in[j]),
-                    abs(self.T_h_in[i] - self.T_c_out[j]),
-                    abs(self.T_h_out[i] - self.T_c_in[j]),
-                    abs(self.T_h_out[i] - self.T_c_out[j]),
-                )
-                + self._recovery_approach_temperature(i, j)
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
+                [
+                    [
+                        1 / (1 / self.htc_h_state[n][i] + 1 / self.htc_c_state[n][j])
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.U_hu_state = np.array(
+            [
+                [
+                    1 / (1 / self.htc_hu_state[n][0] + 1 / self.htc_c_state[n][j])
+                    for j in range(self.J)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.U_cu_state = np.array(
+            [
+                [
+                    1 / (1 / self.htc_h_state[n][i] + 1 / self.htc_cu_state[n][0])
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.U_r = self.U_r_state[0].copy()
+        self.U_hu = self.U_hu_state[0].copy()
+        self.U_cu = self.U_cu_state[0].copy()
+
+        self.Q_max_state = np.array(
+            [
+                [
+                    [
+                        max(
+                            self.T_h_in_state[n][i]
+                            - self.T_c_in_state[n][j]
+                            - self._recovery_approach_temperature(
+                                i,
+                                j,
+                                n,
+                            ),
+                            0.0,
+                        )
+                        * min(
+                            self.f_h_state[n][i],
+                            self.f_c_state[n][j],
+                        )
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.Q_max = np.max(self.Q_max_state, axis=0)
+        self.M_ij_state = np.array(
+            [
+                [
+                    [
+                        max(
+                            abs(self.T_h_in_state[n][i] - self.T_c_in_state[n][j]),
+                            abs(self.T_h_in_state[n][i] - self.T_c_out_state[n][j]),
+                            abs(self.T_h_out_state[n][i] - self.T_c_in_state[n][j]),
+                            abs(self.T_h_out_state[n][i] - self.T_c_out_state[n][j]),
+                        )
+                        + self._recovery_approach_temperature(i, j, n)
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ],
+            dtype=float,
+        )
+        self.M_ij = np.max(self.M_ij_state, axis=0)
 
         self.z_feasible = [
             [
-                [1 if self.Q_max[i][j] > self.tol else 0 for k in range(self.S)]
+                [
+                    (
+                        1
+                        if max(self.Q_max_state[n][i][j] for n in range(self.N_states))
+                        > self.tol
+                        else 0
+                    )
+                    for k in range(self.S)
+                ]
                 for j in range(self.J)
             ]
             for i in range(self.I)
@@ -164,170 +234,252 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.z_cu_feasible = [1 for _i in range(self.I)]
 
     def set_stage_wise_superstructure(self) -> None:
-        """Create the source StageWise variables, constraints, and binaries."""
+        """Create StageWise variables, constraints, and binaries."""
 
-        self.Q_r = [
+        self._set_multistate_stage_wise_superstructure()
+
+    def _set_multistate_stage_wise_superstructure(self) -> None:
+        """Create shared topology with state-indexed operating variables."""
+
+        self.Q_r_by_state = [
             [
                 [
-                    (
-                        self.m.Var(
-                            value=self.Q_max[i][j] / 3,
-                            ub=self.Q_max[i][j],
-                            lb=0.0,
-                            name=f"Q_H{i}_to_C{j}_at_S{k}",
+                    [
+                        (
+                            self.m.Var(
+                                value=self.Q_max_state[n][i][j] / 3,
+                                ub=self.Q_max_state[n][i][j],
+                                lb=0.0,
+                                name=(f"Q_H{i}_to_C{j}_at_S{k}_state{n}"),
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=0.0,
+                                name=f"Q_H{i}_to_C{j}_at_S{k}_state{n}",
+                            )
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0.0, name=f"Q_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(self.S)
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
                 ]
-                for j in range(self.J)
+                for i in range(self.I)
             ]
-            for i in range(self.I)
+            for n in range(self.N_states)
         ]
-        self.Q_c = [
-            (
-                self.m.Var(
-                    value=0,
-                    ub=self.Qtot_sh[i],
-                    lb=0.0,
-                    name=f"Q_H{i}_to_CU",
-                )
-                if self.z_cu_allowed[i] > 0
-                else self.m.Param(value=0, name=f"Q_H{i}_to_CU")
-            )
-            for i in range(self.I)
-        ]
-        self.Q_h = [
-            (
-                self.m.Var(
-                    value=0,
-                    ub=self.Qtot_sc[j],
-                    lb=0.0,
-                    name=f"Q_HU_to_C{j}",
-                )
-                if self.z_hu_allowed[j] > 0
-                else self.m.Param(value=0, name=f"Q_HU_to_C{j}")
-            )
-            for j in range(self.J)
-        ]
-        self.T_h = [
+        self.Q_c_by_state = [
             [
                 (
                     self.m.Var(
-                        value=self.T_h_in[i],
-                        ub=self.T_h_in[i],
-                        lb=self.T_h_out[i],
-                        name=f"T_H{i}_at_B{k}",
+                        value=0,
+                        ub=self.Qtot_sh_state[n][i],
+                        lb=0.0,
+                        name=f"Q_H{i}_to_CU_state{n}",
                     )
-                    if k > 0
-                    else self.m.Param(value=self.T_h_in[i], name=f"T_H{i}_at_B{k}")
+                    if self.z_cu_allowed[i] > 0
+                    else self.m.Param(value=0, name=f"Q_H{i}_to_CU_state{n}")
                 )
-                for k in range(self.K)
+                for i in range(self.I)
             ]
-            for i in range(self.I)
+            for n in range(self.N_states)
         ]
-        self.T_c = [
+        self.Q_h_by_state = [
             [
                 (
                     self.m.Var(
-                        value=self.T_c_in[j],
-                        ub=self.T_c_out[j],
-                        lb=self.T_c_in[j],
-                        name=f"T_C{j}_at_B{k}",
+                        value=0,
+                        ub=self.Qtot_sc_state[n][j],
+                        lb=0.0,
+                        name=f"Q_HU_to_C{j}_state{n}",
                     )
-                    if k < self.S
-                    else self.m.Param(value=self.T_c_in[j], name=f"T_C{j}_at_B{k}")
+                    if self.z_hu_allowed[j] > 0
+                    else self.m.Param(value=0, name=f"Q_HU_to_C{j}_state{n}")
                 )
-                for k in range(self.K)
+                for j in range(self.J)
             ]
-            for j in range(self.J)
+            for n in range(self.N_states)
         ]
-        self.theta_1 = [
+        self.T_h_by_state = [
             [
                 [
                     (
                         self.m.Var(
-                            value=self._recovery_approach_temperature(i, j),
-                            ub=abs(self.T_h_in[i] - self.T_c_in[j]),
-                            lb=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_h_in_state[n][i],
+                            ub=self.T_h_in_state[n][i],
+                            lb=self.T_h_out_state[n][i],
+                            name=f"T_H{i}_at_B{k}_state{n}",
                         )
-                        if self.z_allowed[i][j][k] > 0
+                        if k > 0
                         else self.m.Param(
-                            value=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_h_in_state[n][i],
+                            name=f"T_H{i}_at_B{k}_state{n}",
                         )
                     )
-                    for k in range(self.S)
+                    for k in range(self.K)
                 ]
-                for j in range(self.J)
+                for i in range(self.I)
             ]
-            for i in range(self.I)
+            for n in range(self.N_states)
         ]
-        self.theta_2 = [
+        self.T_c_by_state = [
             [
                 [
                     (
                         self.m.Var(
-                            value=self._recovery_approach_temperature(i, j),
-                            ub=abs(self.T_h_in[i] - self.T_c_in[j]),
-                            lb=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_c_in_state[n][j],
+                            ub=self.T_c_out_state[n][j],
+                            lb=self.T_c_in_state[n][j],
+                            name=f"T_C{j}_at_B{k}_state{n}",
                         )
-                        if self.z_allowed[i][j][k] > 0
+                        if k < self.S
                         else self.m.Param(
-                            value=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_c_in_state[n][j],
+                            name=f"T_C{j}_at_B{k}_state{n}",
                         )
                     )
-                    for k in range(self.S)
+                    for k in range(self.K)
                 ]
                 for j in range(self.J)
             ]
-            for i in range(self.I)
+            for n in range(self.N_states)
+        ]
+        self.theta_1_by_state = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                ub=abs(
+                                    self.T_h_in_state[n][i] - self.T_c_in_state[n][j]
+                                ),
+                                lb=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T1_H{i}_to_C{j}_at_S{k}_state{n}"),
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T1_H{i}_to_C{j}_at_S{k}_state{n}"),
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.theta_2_by_state = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                ub=abs(
+                                    self.T_h_in_state[n][i] - self.T_c_in_state[n][j]
+                                ),
+                                lb=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T2_H{i}_to_C{j}_at_S{k}_state{n}"),
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T2_H{i}_to_C{j}_at_S{k}_state{n}"),
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
         ]
 
-        self.m.Equations(
-            [
-                self.Qtot_sh[i]
-                - self.m.sum(
-                    [self.Q_r[i][j][k] for k in range(self.S) for j in range(self.J)]
-                )
-                - self.Q_c[i]
-                == 0.0
-                for i in range(self.I)
-            ]
-        )
-        self.m.Equations(
-            [
-                self.Qtot_sc[j]
-                - self.m.sum(
-                    [self.Q_r[i][j][k] for k in range(self.S) for i in range(self.I)]
-                )
-                - self.Q_h[j]
-                == 0.0
-                for j in range(self.J)
-            ]
-        )
-        self.m.Equations(
-            [
-                (self.T_h[i][k + 1] - self.T_h[i][k]) * self.f_h[i]
-                + sum(self.Q_r[i][j][k] for j in range(self.J))
-                == 0
-                for k in range(self.S)
-                for i in range(self.I)
-            ]
-        )
-        self.m.Equations(
-            [
-                (self.T_c[j][k + 1] - self.T_c[j][k]) * self.f_c[j]
-                + sum(self.Q_r[i][j][k] for i in range(self.I))
-                == 0
-                for k in range(self.S)
-                for j in range(self.J)
-            ]
-        )
+        self.Q_r = self.Q_r_by_state[0]
+        self.Q_c = self.Q_c_by_state[0]
+        self.Q_h = self.Q_h_by_state[0]
+        self.T_h = self.T_h_by_state[0]
+        self.T_c = self.T_c_by_state[0]
+        self.theta_1 = self.theta_1_by_state[0]
+        self.theta_2 = self.theta_2_by_state[0]
+
+        for n in range(self.N_states):
+            self.m.Equations(
+                [
+                    self.Qtot_sh_state[n][i]
+                    - self.m.sum(
+                        [
+                            self.Q_r_by_state[n][i][j][k]
+                            for k in range(self.S)
+                            for j in range(self.J)
+                        ]
+                    )
+                    - self.Q_c_by_state[n][i]
+                    == 0.0
+                    for i in range(self.I)
+                ]
+            )
+            self.m.Equations(
+                [
+                    self.Qtot_sc_state[n][j]
+                    - self.m.sum(
+                        [
+                            self.Q_r_by_state[n][i][j][k]
+                            for k in range(self.S)
+                            for i in range(self.I)
+                        ]
+                    )
+                    - self.Q_h_by_state[n][j]
+                    == 0.0
+                    for j in range(self.J)
+                ]
+            )
+            self.m.Equations(
+                [
+                    (self.T_h_by_state[n][i][k + 1] - self.T_h_by_state[n][i][k])
+                    * self.f_h_state[n][i]
+                    + sum(self.Q_r_by_state[n][i][j][k] for j in range(self.J))
+                    == 0
+                    for k in range(self.S)
+                    for i in range(self.I)
+                ]
+            )
+            self.m.Equations(
+                [
+                    (self.T_c_by_state[n][j][k + 1] - self.T_c_by_state[n][j][k])
+                    * self.f_c_state[n][j]
+                    + sum(self.Q_r_by_state[n][i][j][k] for i in range(self.I))
+                    == 0
+                    for k in range(self.S)
+                    for j in range(self.J)
+                ]
+            )
 
         if self.integers:
             self.z = [
@@ -378,34 +530,42 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 )
                 for j in range(self.J)
             ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.Q_r[i][j][k] <= self.Q_max[i][j] * self.z[i][j][k]
+            for n in range(self.N_states):
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_r_by_state[n][i][j][k]
+                            <= self.Q_max_state[n][i][j] * self.z[i][j][k]
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else None
                     )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(self.Q_c[i] <= self.Qtot_sh[i] * self.z_cu[i])
-                    if self.z_cu_allowed[i] > 0
-                    else None
-                )
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(self.Q_h[j] <= self.Qtot_sc[j] * self.z_hu[j])
-                    if self.z_hu_allowed[j] > 0
-                    else None
-                )
-                for j in range(self.J)
-            ]
+                    for k in range(self.S)
+                    for j in range(self.J)
+                    for i in range(self.I)
+                ]
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_c_by_state[n][i]
+                            <= self.Qtot_sh_state[n][i] * self.z_cu[i]
+                        )
+                        if self.z_cu_allowed[i] > 0
+                        else None
+                    )
+                    for i in range(self.I)
+                ]
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_h_by_state[n][j]
+                            <= self.Qtot_sc_state[n][j] * self.z_hu[j]
+                        )
+                        if self.z_hu_allowed[j] > 0
+                        else None
+                    )
+                    for j in range(self.J)
+                ]
         else:
             self.z = [
                 [
@@ -439,88 +599,21 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             ]
 
         if self.non_isothermal_model:
-            self.X = [
-                [
-                    [
-                        (
-                            self.m.Var(
-                                value=0.5,
-                                ub=1.0,
-                                lb=0.0,
-                                name=f"X_H{i}_to_C{j}_at_S{k}",
-                            )
-                            if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0.0, name=f"X_H{i}_to_C{j}_at_S{k}")
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            self.Y = [
-                [
-                    [
-                        (
-                            self.m.Var(
-                                value=0.5,
-                                ub=1.0,
-                                lb=0.0,
-                                name=f"Y_C{j}_to_H{i}_at_S{k}",
-                            )
-                            if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0.0, name=f"Y_C{j}_to_H{i}_at_S{k}")
-                        )
-                        for k in range(self.S)
-                    ]
-                    for i in range(self.I)
-                ]
-                for j in range(self.J)
-            ]
-            self.T_h_out_x = [
-                [
-                    [
-                        (
-                            self.m.Var(
-                                value=self.T_h_in[i],
-                                ub=self.T_h_in[i],
-                                lb=self.T_h_out[i],
-                                name=f"Thout_x_H{i}_to_C{j}_at_S{k}",
-                            )
-                            if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0, name=f"Tx_H{i}_to_C{j}_at_S{k}")
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            self.T_c_out_y = [
-                [
-                    [
-                        (
-                            self.m.Var(
-                                value=self.T_c_in[j],
-                                ub=self.T_c_out[j],
-                                lb=self.T_c_in[j],
-                                name=f"Tcout_y_C{j}_to_H{i}_at_S{k}",
-                            )
-                            if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0, name=f"Ty_C{j}_to_H{i}_at_S{k}")
-                        )
-                        for k in range(self.S)
-                    ]
-                    for i in range(self.I)
-                ]
-                for j in range(self.J)
-            ]
+            self._set_multistate_non_isothermal_equations()
+        else:
+            self._set_multistate_isothermal_approach_equations()
+
+        self.dqda = []
+        self.alpha = []
+
+    def _set_multistate_isothermal_approach_equations(self) -> None:
+        for n in range(self.N_states):
             _ = [
                 (
                     self.m.Equation(
-                        self.theta_1[i][j][k]
-                        <= (self.T_h[i][k] - self.T_c_out_y[j][i][k])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                        self.theta_1_by_state[n][i][j][k]
+                        <= (self.T_h_by_state[n][i][k] - self.T_c_by_state[n][j][k])
+                        + self.M_ij_state[n][i][j] * (1 - self.z[i][j][k])
                     )
                     if self.z_allowed[i][j][k] > 0
                     else None
@@ -532,9 +625,9 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.theta_2[i][j][k]
-                        <= (self.T_h_out_x[i][j][k] - self.T_c[j][k + 1])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                        self.theta_1_by_state[n][i][j][k]
+                        >= (self.T_h_by_state[n][i][k] - self.T_c_by_state[n][j][k])
+                        - self.M_ij_state[n][i][j] * (1 - self.z[i][j][k])
                     )
                     if self.z_allowed[i][j][k] > 0
                     else None
@@ -546,10 +639,189 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.Q_r[i][j][k]
-                        - self.X[i][j][k]
-                        * self.f_h[i]
-                        * (self.T_h[i][k] - self.T_h_out_x[i][j][k])
+                        self.theta_2_by_state[n][i][j][k]
+                        <= (
+                            self.T_h_by_state[n][i][k + 1]
+                            - self.T_c_by_state[n][j][k + 1]
+                        )
+                        + self.M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.theta_2_by_state[n][i][j][k]
+                        >= (
+                            self.T_h_by_state[n][i][k + 1]
+                            - self.T_c_by_state[n][j][k + 1]
+                        )
+                        - self.M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+
+    def _set_multistate_non_isothermal_equations(self) -> None:
+        self.X_by_state = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=0.5,
+                                ub=1.0,
+                                lb=0.0,
+                                name=f"X_H{i}_to_C{j}_at_S{k}_state{n}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=0.0,
+                                name=f"X_H{i}_to_C{j}_at_S{k}_state{n}",
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.Y_by_state = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=0.5,
+                                ub=1.0,
+                                lb=0.0,
+                                name=f"Y_C{j}_to_H{i}_at_S{k}_state{n}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=0.0,
+                                name=f"Y_C{j}_to_H{i}_at_S{k}_state{n}",
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for i in range(self.I)
+                ]
+                for j in range(self.J)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.T_h_out_x_by_state = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=self.T_h_in_state[n][i],
+                                ub=self.T_h_in_state[n][i],
+                                lb=self.T_h_out_state[n][i],
+                                name=f"Thout_x_H{i}_to_C{j}_at_S{k}_state{n}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=0,
+                                name=f"Tx_H{i}_to_C{j}_at_S{k}_state{n}",
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.T_c_out_y_by_state = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=self.T_c_in_state[n][j],
+                                ub=self.T_c_out_state[n][j],
+                                lb=self.T_c_in_state[n][j],
+                                name=f"Tcout_y_C{j}_to_H{i}_at_S{k}_state{n}",
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=0,
+                                name=f"Ty_C{j}_to_H{i}_at_S{k}_state{n}",
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for i in range(self.I)
+                ]
+                for j in range(self.J)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.X = self.X_by_state[0]
+        self.Y = self.Y_by_state[0]
+        self.T_h_out_x = self.T_h_out_x_by_state[0]
+        self.T_c_out_y = self.T_c_out_y_by_state[0]
+
+        for n in range(self.N_states):
+            _ = [
+                (
+                    self.m.Equation(
+                        self.theta_1_by_state[n][i][j][k]
+                        <= (
+                            self.T_h_by_state[n][i][k]
+                            - self.T_c_out_y_by_state[n][j][i][k]
+                        )
+                        + self.M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.theta_2_by_state[n][i][j][k]
+                        <= (
+                            self.T_h_out_x_by_state[n][i][j][k]
+                            - self.T_c_by_state[n][j][k + 1]
+                        )
+                        + self.M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.Q_r_by_state[n][i][j][k]
+                        - self.X_by_state[n][i][j][k]
+                        * self.f_h_state[n][i]
+                        * (
+                            self.T_h_by_state[n][i][k]
+                            - self.T_h_out_x_by_state[n][i][j][k]
+                        )
                         == 0.0
                     )
                     if self.z_allowed[i][j][k] > 0
@@ -562,10 +834,13 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.Q_r[i][j][k]
-                        - self.Y[j][i][k]
-                        * self.f_c[j]
-                        * (self.T_c_out_y[j][i][k] - self.T_c[j][k + 1])
+                        self.Q_r_by_state[n][i][j][k]
+                        - self.Y_by_state[n][j][i][k]
+                        * self.f_c_state[n][j]
+                        * (
+                            self.T_c_out_y_by_state[n][j][i][k]
+                            - self.T_c_by_state[n][j][k + 1]
+                        )
                         == 0.0
                     )
                     if self.z_allowed[i][j][k] > 0
@@ -578,7 +853,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.m.sum([self.X[i][j][k] for j in range(self.J)]) == 1.0
+                        self.m.sum([self.X_by_state[n][i][j][k] for j in range(self.J)])
+                        == 1.0
                     )
                     if sum(self.z_allowed[i][j][k] for j in range(self.J)) > 0
                     else None
@@ -589,7 +865,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.m.sum([self.Y[j][i][k] for i in range(self.I)]) == 1.0
+                        self.m.sum([self.Y_by_state[n][j][i][k] for i in range(self.I)])
+                        == 1.0
                     )
                     if sum(self.z_allowed[i][j][k] for i in range(self.I)) > 0
                     else None
@@ -597,69 +874,55 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for k in range(self.S)
                 for j in range(self.J)
             ]
-        else:
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_1[i][j][k]
-                        <= (self.T_h[i][k] - self.T_c[j][k])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_1[i][j][k]
-                        >= (self.T_h[i][k] - self.T_c[j][k])
-                        - self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_2[i][j][k]
-                        <= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_2[i][j][k]
-                        >= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                        - self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-
-        self.dqda = []
-        self.alpha = []
 
     def set_dqda_equations(self) -> None:
         """Apply the source TDM minimum dQ/dA restriction."""
+
+        if getattr(self, "N_states", 1) > 1:
+            self.min_dqda_int = [
+                [
+                    [
+                        [
+                            (
+                                self.m.Intermediate(
+                                    self.min_dqda
+                                    * (
+                                        self.T_h_by_state[n][i][k]
+                                        - self.T_c_by_state[n][j][k + 1]
+                                    )
+                                    - self.theta_1_by_state[n][i][j][k]
+                                    * self.theta_2_by_state[n][i][j][k]
+                                    * self.U_r_state[n][i][j],
+                                    name=(f"dqda_calc_H{i}_to_C{j}_at_S{k}_state{n}"),
+                                )
+                                if self.z_allowed[i][j][k] > 0
+                                else None
+                            )
+                            for k in range(self.S)
+                        ]
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_states)
+            ]
+            self.min_dQ_dA_eqn = [
+                (
+                    self.m.Equation(
+                        self.min_dqda_int[n][i][j][k]
+                        <= self.min_dqda
+                        * self.M_ij_state[n][i][j]
+                        * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for n in range(self.N_states)
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            return
 
         self.min_dqda_int = [
             [
@@ -702,6 +965,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         brackets: bool = False,
     ) -> None:
         """Warm-start this model from a solved parent model."""
+
+        if getattr(self, "N_states", 1) > 1 and hasattr(self, "Q_r_by_state"):
+            self._set_multistate_initial_values(init_solution, brackets=brackets)
+            return
 
         for k in range(self.S):
             for j in range(self.J):
@@ -829,81 +1096,253 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 )
             else:
                 for k in range(self.S):
-                    for i in range(self.I):
-                        sum_Q_r_i = sum(
-                            init_solution.Q_r[i][j][k].VALUE[0] for j in range(self.J)
-                        )
-                        allowed_js = [
-                            j for j in range(self.J) if self.z_allowed[i][j][k] > 0
-                        ]
-                        for j in range(self.J):
-                            if self.z_allowed[i][j][k] <= 0:
-                                self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
-                                continue
-                            q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                            if sum_Q_r_i > self.tol:
-                                value = q_val / sum_Q_r_i
-                            else:
-                                value = 1.0 / len(allowed_js) if allowed_js else 0.0
-                            self._set_value(
-                                self.X[i][j][k],
-                                value,
-                                brackets=brackets,
-                            )
                     for j in range(self.J):
                         sum_Q_r_j = sum(
                             init_solution.Q_r[i][j][k].VALUE[0] for i in range(self.I)
                         )
-                        allowed_is = [
-                            i for i in range(self.I) if self.z_allowed[i][j][k] > 0
-                        ]
-                        for i in range(self.I):
-                            if self.z_allowed[i][j][k] <= 0:
-                                self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
-                                continue
+                    for i in range(self.I):
+                        sum_Q_r_i = sum(
+                            init_solution.Q_r[i][j][k].VALUE[0] for j in range(self.J)
+                        )
+
+                        if self.z_allowed[i][j][k] > 0:
                             q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                            if sum_Q_r_j > self.tol:
-                                value = q_val / sum_Q_r_j
+                            if q_val > 0.0:
+                                self._set_value(
+                                    self.X[i][j][k],
+                                    q_val / sum_Q_r_j if sum_Q_r_j else 0.0,
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.Y[j][i][k],
+                                    q_val / sum_Q_r_i if sum_Q_r_i else 0.0,
+                                    brackets=brackets,
+                                )
                             else:
-                                value = 1.0 / len(allowed_is) if allowed_is else 0.0
+                                self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
+                                self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
                             self._set_value(
-                                self.Y[j][i][k],
-                                value,
+                                self.T_h_out_x[i][j][k],
+                                init_solution.T_h[i][k + 1].VALUE[0],
                                 brackets=brackets,
                             )
+                            self._set_value(
+                                self.T_c_out_y[j][i][k],
+                                init_solution.T_c[j][k].VALUE[0],
+                                brackets=brackets,
+                            )
+                        else:
+                            self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
+                            self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
+                            self._set_value(
+                                self.T_h_out_x[i][j][k],
+                                init_solution.T_h[i][k + 1].VALUE[0],
+                                brackets=brackets,
+                            )
+                            self._set_value(
+                                self.T_c_out_y[j][i][k],
+                                init_solution.T_c[j][k].VALUE[0],
+                                brackets=brackets,
+                            )
+
+    def _set_multistate_initial_values(self, init_solution, *, brackets: bool) -> None:
+        source_q_r = getattr(init_solution, "Q_r_by_state", None)
+        source_q_c = getattr(init_solution, "Q_c_by_state", None)
+        source_q_h = getattr(init_solution, "Q_h_by_state", None)
+        source_t_h = getattr(init_solution, "T_h_by_state", None)
+        source_t_c = getattr(init_solution, "T_c_by_state", None)
+        source_theta_1 = getattr(init_solution, "theta_1_by_state", None)
+        source_theta_2 = getattr(init_solution, "theta_2_by_state", None)
+        if source_q_r is None:
+            source_q_r = [init_solution.Q_r for _ in range(self.N_states)]
+            source_q_c = [init_solution.Q_c for _ in range(self.N_states)]
+            source_q_h = [init_solution.Q_h for _ in range(self.N_states)]
+            source_t_h = [init_solution.T_h for _ in range(self.N_states)]
+            source_t_c = [init_solution.T_c for _ in range(self.N_states)]
+            source_theta_1 = [init_solution.theta_1 for _ in range(self.N_states)]
+            source_theta_2 = [init_solution.theta_2 for _ in range(self.N_states)]
+
+        for n in range(self.N_states):
+            source_state_idx = min(n, len(source_q_r) - 1)
+            for k in range(self.S):
+                for j in range(self.J):
                     for i in range(self.I):
+                        if self.z_allowed[i][j][k] > 0:
+                            self._set_value(
+                                self.Q_r_by_state[n][i][j][k],
+                                self._active_binary_value(
+                                    source_q_r[source_state_idx][i][j][k]
+                                ),
+                                brackets=brackets,
+                            )
+                            self._set_value(
+                                self.theta_1_by_state[n][i][j][k],
+                                self._active_binary_value(
+                                    source_theta_1[source_state_idx][i][j][k]
+                                ),
+                                brackets=brackets,
+                            )
+                            self._set_value(
+                                self.theta_2_by_state[n][i][j][k],
+                                self._active_binary_value(
+                                    source_theta_2[source_state_idx][i][j][k]
+                                ),
+                                brackets=brackets,
+                            )
+                        else:
+                            self._set_value(
+                                self.Q_r_by_state[n][i][j][k],
+                                0.0,
+                                brackets=brackets,
+                            )
+                            approach = self._recovery_approach_temperature(
+                                i,
+                                j,
+                                n,
+                            )
+                            self._set_value(
+                                self.theta_1_by_state[n][i][j][k],
+                                approach,
+                                brackets=brackets,
+                            )
+                            self._set_value(
+                                self.theta_2_by_state[n][i][j][k],
+                                approach,
+                                brackets=brackets,
+                            )
+
+            for i in range(self.I):
+                for k in range(self.K):
+                    self._set_value(
+                        self.T_h_by_state[n][i][k],
+                        self._active_binary_value(source_t_h[source_state_idx][i][k]),
+                        brackets=brackets,
+                    )
+            for j in range(self.J):
+                for k in range(self.K):
+                    self._set_value(
+                        self.T_c_by_state[n][j][k],
+                        self._active_binary_value(source_t_c[source_state_idx][j][k]),
+                        brackets=brackets,
+                    )
+            for i in range(self.I):
+                value = (
+                    self._active_binary_value(source_q_c[source_state_idx][i])
+                    if self.z_cu_allowed[i] > 0
+                    else 0.0
+                )
+                self._set_value(
+                    self.Q_c_by_state[n][i],
+                    value,
+                    brackets=brackets,
+                )
+            for j in range(self.J):
+                value = (
+                    self._active_binary_value(source_q_h[source_state_idx][j])
+                    if self.z_hu_allowed[j] > 0
+                    else 0.0
+                )
+                self._set_value(
+                    self.Q_h_by_state[n][j],
+                    value,
+                    brackets=brackets,
+                )
+
+        for k in range(self.S):
+            for j in range(self.J):
+                for i in range(self.I):
+                    self._set_value(
+                        self.z[i][j][k],
+                        self._active_binary_value(init_solution.z[i][j][k]),
+                        brackets=brackets,
+                    )
+        for i in range(self.I):
+            self._set_value(
+                self.z_cu[i],
+                self._active_binary_value(init_solution.z_cu[i]),
+                brackets=brackets,
+            )
+        for j in range(self.J):
+            self._set_value(
+                self.z_hu[j],
+                self._active_binary_value(init_solution.z_hu[j]),
+                brackets=brackets,
+            )
+
+        source_area_r = getattr(init_solution, "area_r_shared", None)
+        source_area_hu = getattr(init_solution, "area_hu_shared", None)
+        source_area_cu = getattr(init_solution, "area_cu_shared", None)
+        if source_area_r is not None and hasattr(self, "area_r_shared"):
+            for k in range(self.S):
+                for j in range(self.J):
+                    for i in range(self.I):
+                        self._set_value(
+                            self.area_r_shared[i][j][k],
+                            self._active_binary_value(source_area_r[i][j][k]),
+                            brackets=brackets,
+                        )
+        if source_area_hu is not None and hasattr(self, "area_hu_shared"):
+            for j in range(self.J):
+                self._set_value(
+                    self.area_hu_shared[j],
+                    self._active_binary_value(source_area_hu[j]),
+                    brackets=brackets,
+                )
+        if source_area_cu is not None and hasattr(self, "area_cu_shared"):
+            for i in range(self.I):
+                self._set_value(
+                    self.area_cu_shared[i],
+                    self._active_binary_value(source_area_cu[i]),
+                    brackets=brackets,
+                )
+
+        if self.non_isothermal_model and hasattr(self, "X_by_state"):
+            source_x = getattr(init_solution, "X_by_state", None)
+            source_y = getattr(init_solution, "Y_by_state", None)
+            source_thx = getattr(init_solution, "T_h_out_x_by_state", None)
+            source_tcy = getattr(init_solution, "T_c_out_y_by_state", None)
+            if source_x is None and getattr(
+                init_solution, "non_isothermal_model", False
+            ):
+                source_x = [init_solution.X for _ in range(self.N_states)]
+                source_y = [init_solution.Y for _ in range(self.N_states)]
+                source_thx = [init_solution.T_h_out_x for _ in range(self.N_states)]
+                source_tcy = [init_solution.T_c_out_y for _ in range(self.N_states)]
+            if source_x is not None:
+                for n in range(self.N_states):
+                    source_state_idx = min(n, len(source_x) - 1)
+                    for k in range(self.S):
                         for j in range(self.J):
-                            if self.z_allowed[i][j][k] > 0:
-                                q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                                self._set_value(
-                                    self.T_h_out_x[i][j][k],
-                                    (
-                                        init_solution.T_h[i][k + 1].VALUE[0]
-                                        if q_val > self.tol
-                                        else init_solution.T_h[i][k].VALUE[0]
-                                    ),
-                                    brackets=brackets,
-                                )
-                                self._set_value(
-                                    self.T_c_out_y[j][i][k],
-                                    (
-                                        init_solution.T_c[j][k].VALUE[0]
-                                        if q_val > self.tol
-                                        else init_solution.T_c[j][k + 1].VALUE[0]
-                                    ),
-                                    brackets=brackets,
-                                )
-                            else:
-                                self._set_value(
-                                    self.T_h_out_x[i][j][k],
-                                    init_solution.T_h[i][k + 1].VALUE[0],
-                                    brackets=brackets,
-                                )
-                                self._set_value(
-                                    self.T_c_out_y[j][i][k],
-                                    init_solution.T_c[j][k].VALUE[0],
-                                    brackets=brackets,
-                                )
+                            for i in range(self.I):
+                                if self.z_allowed[i][j][k] > 0:
+                                    self._set_value(
+                                        self.X_by_state[n][i][j][k],
+                                        self._active_binary_value(
+                                            source_x[source_state_idx][i][j][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.Y_by_state[n][j][i][k],
+                                        self._active_binary_value(
+                                            source_y[source_state_idx][j][i][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.T_h_out_x_by_state[n][i][j][k],
+                                        self._active_binary_value(
+                                            source_thx[source_state_idx][i][j][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.T_c_out_y_by_state[n][j][i][k],
+                                        self._active_binary_value(
+                                            source_tcy[source_state_idx][j][i][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
 
     def get_net_benefit_evolution(
         self,
@@ -925,6 +1364,15 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         max_parallel = max(1, int(max_parallel))
         if no_improvement_patience is not None:
             no_improvement_patience = max(1, int(no_improvement_patience))
+        if (
+            n_ad_branches == 1
+            and n_rm_branches == 1
+            and no_improvement_patience is None
+        ):
+            return self._get_source_net_benefit_evolution(
+                print_output=print_output,
+                max_depth=max_depth,
+            )
         frontier = [_EvolutionBranchState(model=self, best_tac=float(self.TAC))]
         best_model = self
 
@@ -1000,6 +1448,83 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             logger.debug("No evolution improvement found over original model.")
         self.m.cleanup()
         return self
+
+    def _get_source_net_benefit_evolution(
+        self,
+        *,
+        print_output: bool,
+        max_depth: int,
+    ):
+        """Run the original OpenHENS single-path add/remove evolution search."""
+
+        model = self
+        best_model = self
+        for unit in range(max_depth):
+            logger.debug(
+                "Evolution step %s/%s - Current TAC: %s",
+                unit + 1,
+                max_depth,
+                model.TAC,
+            )
+            model_minus_one = self.get_n_minus_one_evolution(
+                print_output=print_output,
+                unit=unit,
+                prev_case=model,
+            )
+            model_plus_one = self.get_n_plus_one_evolution(
+                print_output=print_output,
+                unit=unit,
+                prev_case=model,
+            )
+            model = self._select_source_best_candidate(
+                model,
+                model_minus_one,
+                model_plus_one,
+            )
+            if model is None:
+                logger.debug("No viable model found; ending evolution.")
+                break
+            if model.TAC < best_model.TAC:
+                best_model = model
+                logger.debug(
+                    "New best model: %s found with TAC: %.6f",
+                    model.name,
+                    best_model.TAC,
+                )
+
+        if best_model.mSuccess and best_model.TAC < self.TAC:
+            self._update_with_best_model(best_model)
+        else:
+            logger.debug("No improvement found over original model.")
+        self.m.cleanup()
+        return self
+
+    def _select_source_best_candidate(
+        self,
+        current_model,
+        model_minus_one,
+        model_plus_one,
+    ):
+        """Select the next OpenHENS tier-1 evolution candidate by success and TAC."""
+
+        del current_model
+        minus_success = bool(getattr(model_minus_one, "mSuccess", 0))
+        plus_success = bool(getattr(model_plus_one, "mSuccess", 0))
+        if not minus_success and not plus_success:
+            return None
+        if minus_success and not plus_success:
+            return model_minus_one
+        if not minus_success and plus_success:
+            return model_plus_one
+        logger.debug(
+            "TAC comparison -1: %.6f, +1: %.6f",
+            model_minus_one.TAC,
+            model_plus_one.TAC,
+        )
+        return min(
+            [model_minus_one, model_plus_one],
+            key=lambda candidate: candidate.TAC,
+        )
 
     def _evolution_candidate_specs(
         self,
@@ -1207,9 +1732,26 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
 
         self.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
         self.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
-        self.recovery_area_cost_filtered = copy.deepcopy(
-            best_model.recovery_area_cost_filtered
-        )
+        if hasattr(best_model, "recovery_area_cost_filtered"):
+            self.recovery_area_cost_filtered = copy.deepcopy(
+                best_model.recovery_area_cost_filtered
+            )
+        if hasattr(best_model, "recovery_area_cost_total"):
+            self.recovery_area_cost_total = copy.deepcopy(
+                best_model.recovery_area_cost_total
+            )
+        if hasattr(best_model, "capital_cost_total"):
+            self.capital_cost_total = copy.deepcopy(best_model.capital_cost_total)
+        if hasattr(best_model, "weighted_operating_cost"):
+            self.weighted_operating_cost = copy.deepcopy(
+                best_model.weighted_operating_cost
+            )
+        if hasattr(best_model, "area_r_shared"):
+            self.area_r_shared = copy.deepcopy(best_model.area_r_shared)
+        if hasattr(best_model, "area_hu_shared"):
+            self.area_hu_shared = copy.deepcopy(best_model.area_hu_shared)
+        if hasattr(best_model, "area_cu_shared"):
+            self.area_cu_shared = copy.deepcopy(best_model.area_cu_shared)
         self.hu_area_cost_total = copy.deepcopy(best_model.hu_area_cost_total)
         self.cu_area_cost_total = copy.deepcopy(best_model.cu_area_cost_total)
         self.get_post_process()
@@ -1390,16 +1932,84 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         )
 
     def _active_binary_value(self, value) -> float:
-        try:
-            return float(value[0])
-        except TypeError, IndexError:
-            pass
-        if hasattr(value, "VALUE"):
-            return float(value.VALUE[0])
-        return float(value)
+        return _value(value)
 
     def set_obj(self) -> None:
         """Attach source StageWise objective expressions unchanged."""
+
+        if getattr(self, "N_states", 1) > 1:
+            if self.minimisation_goal == "hot utility":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum([self.Q_h_by_state[n][j] for j in range(self.J)])
+                            for n in range(self.N_states)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "cold utility":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum([self.Q_c_by_state[n][i] for i in range(self.I)])
+                            for n in range(self.N_states)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "total utility":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum([self.Q_h_by_state[n][j] for j in range(self.J)])
+                            + self.m.sum(
+                                [self.Q_c_by_state[n][i] for i in range(self.I)]
+                            )
+                            for n in range(self.N_states)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "utility costs":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [
+                            self.hu_cost_state[n][0]
+                            * self.m.sum(
+                                [self.Q_h_by_state[n][j] for j in range(self.J)]
+                            )
+                            + self.cu_cost_state[n][0]
+                            * self.m.sum(
+                                [self.Q_c_by_state[n][i] for i in range(self.I)]
+                            )
+                            for n in range(self.N_states)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "heat recovery":
+                self.m.Maximize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum(
+                                [
+                                    self.Q_r_by_state[n][i][j][k]
+                                    for i in range(self.I)
+                                    for j in range(self.J)
+                                    for k in range(self.S)
+                                ]
+                            )
+                            for n in range(self.N_states)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "dQ/dA obj":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [sum(self.Q_h_by_state[n]) for n in range(self.N_states)]
+                    )
+                    - self.HU_target
+                )
+            elif self.minimisation_goal in {"total cost", "variable total cost"}:
+                self._set_total_cost_objective()
+            return
 
         if self.minimisation_goal == "hot utility":
             self.m.Minimize(self.m.sum([self.Q_h[j] for j in range(self.J)]))
@@ -1432,6 +2042,12 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self._set_total_cost_objective()
 
     def _set_total_cost_objective(self) -> None:
+        if getattr(self, "N_states", 1) == 1:
+            self._set_source_total_cost_objective()
+            return
+        self._set_multistate_total_cost_objective()
+
+    def _set_source_total_cost_objective(self) -> None:
         self.hu_cost_total = self.m.Intermediate(
             self.hu_cost[0] * self.m.sum([self.Q_h[j] for j in range(self.J)]),
             name="Hot utility cost",
@@ -1446,30 +2062,32 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         for k in range(self.S):
             for j in range(self.J):
                 allowed_hots = [i for i in range(self.I) if self.z_allowed[i][j][k] > 0]
-                if sum(self.z_allowed[z][j][k] for z in range(self.I)) > 0:
+                if sum(self.z_allowed[i][j][k] for i in range(self.I)) > 0:
                     self.recovery_area_cost_filtered[k][j] = self.m.Intermediate(
                         self.A_coeff[0]
                         * sum(
                             (
-                                self.Q_r[n][j][k]
-                                / (
-                                    self.U_r[n][j]
-                                    * (
-                                        self.theta_1[n][j][k]
-                                        * self.theta_2[n][j][k]
+                                (
+                                    self.Q_r[i][j][k]
+                                    / (
+                                        self.U_r[i][j]
                                         * (
-                                            self.theta_1[n][j][k]
-                                            + self.theta_2[n][j][k]
+                                            self.theta_1[i][j][k]
+                                            * self.theta_2[i][j][k]
+                                            * (
+                                                self.theta_1[i][j][k]
+                                                + self.theta_2[i][j][k]
+                                            )
+                                            / 2
+                                            + 1e-3
                                         )
-                                        / 2
-                                        + 1e-3
+                                        ** (1 / 3)
                                     )
-                                    ** (1 / 3)
                                 )
                                 + 1e-3
                             )
                             ** self.A_exp[0]
-                            for n in allowed_hots
+                            for i in allowed_hots
                         ),
                         name=f"Recovery HX area cost in stage {k} cold {j}",
                     )
@@ -1478,20 +2096,22 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.hu_coeff[0]
             * sum(
                 (
-                    self.Q_h[j]
-                    / (
-                        self.U_hu[j]
-                        * (
-                            (self.T_hu_in[0] - self.T_c_out[j])
-                            * (self.T_hu_out[0] - self.T_c[j][0])
+                    (
+                        self.Q_h[j]
+                        / (
+                            self.U_hu[j]
                             * (
                                 (self.T_hu_in[0] - self.T_c_out[j])
-                                + (self.T_hu_out[0] - self.T_c[j][0])
+                                * (self.T_hu_out[0] - self.T_c[j][0])
+                                * (
+                                    (self.T_hu_in[0] - self.T_c_out[j])
+                                    + (self.T_hu_out[0] - self.T_c[j][0])
+                                )
+                                / 2
+                                + 1e-3
                             )
-                            / 2
-                            + 1e-3
+                            ** (1 / 3)
                         )
-                        ** (1 / 3)
                     )
                     + 1e-3
                 )
@@ -1504,20 +2124,22 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.cu_coeff[0]
             * sum(
                 (
-                    self.Q_c[i]
-                    / (
-                        self.U_cu[i]
-                        * (
-                            (self.T_h[i][self.S] - self.T_cu_out[0])
-                            * (self.T_h_out[i] - self.T_cu_in[0])
+                    (
+                        self.Q_c[i]
+                        / (
+                            self.U_cu[i]
                             * (
                                 (self.T_h[i][self.S] - self.T_cu_out[0])
-                                + (self.T_h_out[i] - self.T_cu_in[0])
+                                * (self.T_h_out[i] - self.T_cu_in[0])
+                                * (
+                                    (self.T_h[i][self.S] - self.T_cu_out[0])
+                                    + (self.T_h_out[i] - self.T_cu_in[0])
+                                )
+                                / 2
+                                + 1e-3
                             )
-                            / 2
-                            + 1e-3
+                            ** (1 / 3)
                         )
-                        ** (1 / 3)
                     )
                     + 1e-3
                 )
@@ -1572,162 +2194,545 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 + self.cu_area_cost_total
             )
 
+    def _set_multistate_total_cost_objective(self) -> None:
+        self.hu_cost_total_by_state = [
+            self.m.Intermediate(
+                self.hu_cost_state[n][0]
+                * self.m.sum([self.Q_h_by_state[n][j] for j in range(self.J)]),
+                name=f"Hot utility cost state {n}",
+            )
+            for n in range(self.N_states)
+        ]
+        self.cu_cost_total_by_state = [
+            self.m.Intermediate(
+                self.cu_cost_state[n][0]
+                * self.m.sum([self.Q_c_by_state[n][i] for i in range(self.I)]),
+                name=f"Cold utility cost state {n}",
+            )
+            for n in range(self.N_states)
+        ]
+        self.operating_cost_by_state_expr = [
+            self.m.Intermediate(
+                self.hu_cost_total_by_state[n] + self.cu_cost_total_by_state[n],
+                name=f"Operating cost state {n}",
+            )
+            for n in range(self.N_states)
+        ]
+        self.hu_cost_total = self._weighted_state_average(self.hu_cost_total_by_state)
+        self.cu_cost_total = self._weighted_state_average(self.cu_cost_total_by_state)
+        self.weighted_operating_cost = self._weighted_state_average(
+            self.operating_cost_by_state_expr
+        )
+
+        self.area_r_shared = [
+            [
+                [
+                    (
+                        self.m.Var(
+                            value=0.0,
+                            lb=0.0,
+                            name=f"area_H{i}_to_C{j}_at_S{k}",
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else self.m.Param(
+                            value=0.0,
+                            name=f"area_H{i}_to_C{j}_at_S{k}",
+                        )
+                    )
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.area_hu_shared = [
+            (
+                self.m.Var(value=0.0, lb=0.0, name=f"area_HU_to_C{j}")
+                if self.z_hu_allowed[j] > 0
+                else self.m.Param(value=0.0, name=f"area_HU_to_C{j}")
+            )
+            for j in range(self.J)
+        ]
+        self.area_cu_shared = [
+            (
+                self.m.Var(value=0.0, lb=0.0, name=f"area_H{i}_to_CU")
+                if self.z_cu_allowed[i] > 0
+                else self.m.Param(value=0.0, name=f"area_H{i}_to_CU")
+            )
+            for i in range(self.I)
+        ]
+
+        for n in range(self.N_states):
+            _ = [
+                (
+                    self.m.Equation(
+                        self.area_r_shared[i][j][k]
+                        >= self.Q_r_by_state[n][i][j][k]
+                        / (
+                            self.U_r_state[n][i][j]
+                            * (
+                                self.theta_1_by_state[n][i][j][k]
+                                * self.theta_2_by_state[n][i][j][k]
+                                * (
+                                    self.theta_1_by_state[n][i][j][k]
+                                    + self.theta_2_by_state[n][i][j][k]
+                                )
+                                / 2
+                                + 1e-3
+                            )
+                            ** (1 / 3)
+                        )
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.area_hu_shared[j]
+                        >= self.Q_h_by_state[n][j]
+                        / (
+                            self.U_hu_state[n][j]
+                            * (
+                                (self.T_hu_in_state[n][0] - self.T_c_out_state[n][j])
+                                * (
+                                    self.T_hu_out_state[n][0]
+                                    - self.T_c_by_state[n][j][0]
+                                )
+                                * (
+                                    (
+                                        self.T_hu_in_state[n][0]
+                                        - self.T_c_out_state[n][j]
+                                    )
+                                    + (
+                                        self.T_hu_out_state[n][0]
+                                        - self.T_c_by_state[n][j][0]
+                                    )
+                                )
+                                / 2
+                                + 1e-3
+                            )
+                            ** (1 / 3)
+                        )
+                    )
+                    if self.z_hu_allowed[j] > 0
+                    else None
+                )
+                for j in range(self.J)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.area_cu_shared[i]
+                        >= self.Q_c_by_state[n][i]
+                        / (
+                            self.U_cu_state[n][i]
+                            * (
+                                (
+                                    self.T_h_by_state[n][i][self.S]
+                                    - self.T_cu_out_state[n][0]
+                                )
+                                * (self.T_h_out_state[n][i] - self.T_cu_in_state[n][0])
+                                * (
+                                    (
+                                        self.T_h_by_state[n][i][self.S]
+                                        - self.T_cu_out_state[n][0]
+                                    )
+                                    + (
+                                        self.T_h_out_state[n][i]
+                                        - self.T_cu_in_state[n][0]
+                                    )
+                                )
+                                / 2
+                                + 1e-3
+                            )
+                            ** (1 / 3)
+                        )
+                    )
+                    if self.z_cu_allowed[i] > 0
+                    else None
+                )
+                for i in range(self.I)
+            ]
+
+        self.recovery_area_cost_total = self.m.Intermediate(
+            self.A_coeff[0]
+            * sum(
+                self.area_r_shared[i][j][k] ** self.A_exp[0]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ),
+            name="Total recovery HX area cost",
+        )
+        self.hu_area_cost_total = self.m.Intermediate(
+            self.hu_coeff[0]
+            * sum(self.area_hu_shared[j] ** self.hu_exp[0] for j in range(self.J)),
+            name="Total hot utility HX area cost",
+        )
+        self.cu_area_cost_total = self.m.Intermediate(
+            self.cu_coeff[0]
+            * sum(self.area_cu_shared[i] ** self.cu_exp[0] for i in range(self.I)),
+            name="Total cold utility HX area cost",
+        )
+        self.unit_cost_total = self.m.Intermediate(
+            self.unit_cost[0]
+            * sum(
+                self.z[i][j][k]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ),
+            name="Total recovery base cost",
+        )
+        self.utility_unit_cost_total = self.m.Intermediate(
+            self.hu_unit_cost[0] * sum(self.z_hu[j] for j in range(self.J))
+            + self.cu_unit_cost[0] * sum(self.z_cu[i] for i in range(self.I)),
+            name="Total utility base cost",
+        )
+        self.capital_cost_total = self.m.Intermediate(
+            self.unit_cost_total
+            + self.utility_unit_cost_total
+            + self.recovery_area_cost_total
+            + self.hu_area_cost_total
+            + self.cu_area_cost_total,
+            name="Total shared capital cost",
+        )
+        self.m.Minimize(self.capital_cost_total + self.weighted_operating_cost)
+
     def get_post_process(self) -> None:
         """Extract source post-process arrays after a successful solve."""
 
         if self.mSuccess != 1:
             return
+        self._get_multistate_post_process()
+
+    def _get_multistate_post_process(self) -> None:
+        q_r = [
+            [
+                [
+                    [
+                        self._active_binary_value(self.Q_r_by_state[n][i][j][k])
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        q_h = [
+            [self._active_binary_value(self.Q_h_by_state[n][j]) for j in range(self.J)]
+            for n in range(self.N_states)
+        ]
+        q_c = [
+            [self._active_binary_value(self.Q_c_by_state[n][i]) for i in range(self.I)]
+            for n in range(self.N_states)
+        ]
 
         self.z = [
             [
-                [[1] if self.Q_r[i][j][k][0] > self.tol else [0] for k in range(self.S)]
+                [
+                    [
+                        (
+                            1
+                            if max(q_r[n][i][j][k] for n in range(self.N_states))
+                            > self.tol
+                            else 0
+                        )
+                    ]
+                    for k in range(self.S)
+                ]
                 for j in range(self.J)
             ]
+            for i in range(self.I)
+        ]
+        self.z_hu = [
+            [1 if max(q_h[n][j] for n in range(self.N_states)) > self.tol else 0]
+            for j in range(self.J)
+        ]
+        self.z_cu = [
+            [1 if max(q_c[n][i] for n in range(self.N_states)) > self.tol else 0]
             for i in range(self.I)
         ]
         self.n_recovery_units = sum(
-            self.z[i][j][k][0] if self.Q_r[i][j][k][0] > self.tol else 0
+            self.z[i][j][k][0]
             for k in range(self.S)
             for j in range(self.J)
             for i in range(self.I)
         )
-        self.z_hu = [[1] if self.Q_h[j][0] > self.tol else [0] for j in range(self.J)]
-        self.n_hu_units = sum(
-            self.z_hu[j][0] if self.Q_h[j][0] > self.tol else 0 for j in range(self.J)
-        )
-        self.z_cu = [[1] if self.Q_c[i][0] > self.tol else [0] for i in range(self.I)]
-        self.n_cu_units = sum(
-            self.z_cu[i][0] if self.Q_c[i][0] > self.tol else 0 for i in range(self.I)
-        )
+        self.n_hu_units = sum(self.z_hu[j][0] for j in range(self.J))
+        self.n_cu_units = sum(self.z_cu[i][0] for i in range(self.I))
         self.n_units = self.n_recovery_units + self.n_hu_units + self.n_cu_units
 
-        self.LMTD_r = [
+        self.LMTD_r_by_state = [
             [
                 [
-                    self._post_process_lmtd(
-                        self.theta_1[i][j][k][0],
-                        self.theta_2[i][j][k][0],
-                        self.z[i][j][k][0],
-                        formula_allowed=(
-                            abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
-                            > self.tol
-                            and abs(
-                                self.theta_1[i][j][k][0]
-                                - self._recovery_approach_temperature(i, j)
-                            )
-                            >= self.tol
-                            and abs(
-                                self.theta_2[i][j][k][0]
-                                - self._recovery_approach_temperature(i, j)
-                            )
-                            >= self.tol
-                        ),
-                    )
-                    for k in range(self.S)
+                    [
+                        self._post_process_lmtd(
+                            self._active_binary_value(
+                                self.theta_1_by_state[n][i][j][k]
+                            ),
+                            self._active_binary_value(
+                                self.theta_2_by_state[n][i][j][k]
+                            ),
+                            self.z[i][j][k][0],
+                            formula_allowed=(
+                                abs(
+                                    self._active_binary_value(
+                                        self.theta_1_by_state[n][i][j][k]
+                                    )
+                                    - self._active_binary_value(
+                                        self.theta_2_by_state[n][i][j][k]
+                                    )
+                                )
+                                > self.tol
+                                and abs(
+                                    self._active_binary_value(
+                                        self.theta_1_by_state[n][i][j][k]
+                                    )
+                                    - self._recovery_approach_temperature(i, j, n)
+                                )
+                                >= self.tol
+                                and abs(
+                                    self._active_binary_value(
+                                        self.theta_2_by_state[n][i][j][k]
+                                    )
+                                    - self._recovery_approach_temperature(i, j, n)
+                                )
+                                >= self.tol
+                            ),
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
                 ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.area_r_by_state = [
+            [
+                [
+                    [
+                        (
+                            q_r[n][i][j][k]
+                            / self.U_r_state[n][i][j]
+                            / self.LMTD_r_by_state[n][i][j][k]
+                            if self.LMTD_r_by_state[n][i][j][k] > self.tol
+                            and q_r[n][i][j][k] > self.tol
+                            else 0.0
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+
+        self.LMTD_hu_by_state = [
+            [
+                self._post_process_lmtd(
+                    self.T_hu_in_state[n][0] - self.T_c_out_state[n][j],
+                    self.T_hu_out_state[n][0]
+                    - self._active_binary_value(self.T_c_by_state[n][j][0]),
+                    self.z_hu[j][0],
+                    formula_allowed=(
+                        abs(
+                            (self.T_hu_in_state[n][0] - self.T_c_out_state[n][j])
+                            - (
+                                self.T_hu_out_state[n][0]
+                                - self._active_binary_value(self.T_c_by_state[n][j][0])
+                            )
+                        )
+                        > self.tol
+                        and self.T_hu_in_state[n][0]
+                        - self.T_c_out_state[n][j]
+                        - self._hot_utility_approach_temperature(j, n)
+                        >= self.tol
+                        and self.T_hu_out_state[n][0]
+                        - self._active_binary_value(self.T_c_by_state[n][j][0])
+                        - self._hot_utility_approach_temperature(j, n)
+                        >= self.tol
+                    ),
+                )
                 for j in range(self.J)
             ]
-            for i in range(self.I)
+            for n in range(self.N_states)
         ]
+        self.area_hu_by_state = [
+            [
+                (
+                    q_h[n][j] / self.U_hu_state[n][j] / self.LMTD_hu_by_state[n][j]
+                    if self.LMTD_hu_by_state[n][j] > self.tol and q_h[n][j] > self.tol
+                    else 0.0
+                )
+                for j in range(self.J)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.LMTD_cu_by_state = [
+            [
+                self._post_process_lmtd(
+                    self._active_binary_value(self.T_h_by_state[n][i][self.S])
+                    - self.T_cu_out_state[n][0],
+                    self.T_h_out_state[n][i] - self.T_cu_in_state[n][0],
+                    self.z_cu[i][0],
+                    formula_allowed=(
+                        abs(
+                            (
+                                self._active_binary_value(
+                                    self.T_h_by_state[n][i][self.S]
+                                )
+                                - self.T_cu_out_state[n][0]
+                            )
+                            - (self.T_h_out_state[n][i] - self.T_cu_in_state[n][0])
+                        )
+                        > self.tol
+                        and self._active_binary_value(self.T_h_by_state[n][i][self.S])
+                        - self.T_cu_out_state[n][0]
+                        - self._cold_utility_approach_temperature(i, n)
+                        >= self.tol
+                        and self.T_h_out_state[n][i]
+                        - self.T_cu_in_state[n][0]
+                        - self._cold_utility_approach_temperature(i, n)
+                        >= self.tol
+                    ),
+                    fallback_delta=(
+                        self.T_h_out_state[n][i] - self.T_cu_in_state[n][0]
+                    ),
+                )
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+        self.area_cu_by_state = [
+            [
+                (
+                    q_c[n][i] / self.U_cu_state[n][i] / self.LMTD_cu_by_state[n][i]
+                    if self.LMTD_cu_by_state[n][i] > self.tol and q_c[n][i] > self.tol
+                    else 0.0
+                )
+                for i in range(self.I)
+            ]
+            for n in range(self.N_states)
+        ]
+
+        self.LMTD_r = self.LMTD_r_by_state[0]
+        self.LMTD_hu = self.LMTD_hu_by_state[0]
+        self.LMTD_cu = self.LMTD_cu_by_state[0]
         self.area_r = [
             [
                 [
-                    (
-                        self.Q_r[i][j][k][0] / self.U_r[i][j] / self.LMTD_r[i][j][k]
-                        if self.LMTD_r[i][j][k] > self.tol
-                        and self.Q_r[i][j][k][0] > self.tol
-                        else 0.0
-                    )
+                    max(self.area_r_by_state[n][i][j][k] for n in range(self.N_states))
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
             ]
             for i in range(self.I)
         ]
-        self.LMTD_hu = [
-            self._post_process_lmtd(
-                self.T_hu_in[0] - self.T_c_out[j],
-                self.T_hu_out[0] - self.T_c[j][0][0],
-                self.z_hu[j][0],
-                formula_allowed=(
-                    abs(
-                        (self.T_hu_in[0] - self.T_c_out[j])
-                        - (self.T_hu_out[0] - self.T_c[j][0][0])
-                    )
-                    > self.tol
-                    and (
-                        self.T_hu_in[0]
-                        - self.T_c_out[j]
-                        - self._hot_utility_approach_temperature(j)
-                    )
-                    >= self.tol
-                    and (
-                        self.T_hu_out[0]
-                        - self.T_c[j][0][0]
-                        - self._hot_utility_approach_temperature(j)
-                    )
-                    >= self.tol
-                ),
-            )
-            for j in range(self.J)
-        ]
         self.area_hu = [
-            (
-                self.Q_h[j][0] / self.U_hu[j] / self.LMTD_hu[j]
-                if self.LMTD_hu[j] > self.tol and self.Q_h[j][0] > self.tol
-                else 0.0
-            )
+            max(self.area_hu_by_state[n][j] for n in range(self.N_states))
             for j in range(self.J)
-        ]
-        self.LMTD_cu = [
-            self._post_process_lmtd(
-                self.T_h[i][self.S][0] - self.T_cu_out[0],
-                self.T_h_out[i] - self.T_cu_in[0],
-                self.z_cu[i][0],
-                formula_allowed=(
-                    abs(
-                        (self.T_h[i][self.S][0] - self.T_cu_out[0])
-                        - (self.T_h_out[i] - self.T_cu_in[0])
-                    )
-                    > self.tol
-                    and (
-                        self.T_h[i][self.S][0]
-                        - self.T_cu_out[0]
-                        - self._cold_utility_approach_temperature(i)
-                    )
-                    >= self.tol
-                    and (
-                        self.T_h_out[i]
-                        - self.T_cu_in[0]
-                        - self._cold_utility_approach_temperature(i)
-                    )
-                    >= self.tol
-                ),
-                fallback_delta=self.T_h_out[i] - self.T_cu_in[0],
-            )
-            for i in range(self.I)
         ]
         self.area_cu = [
-            (
-                self.Q_c[i][0] / self.U_cu[i] / self.LMTD_cu[i]
-                if self.LMTD_cu[i] > self.tol and self.Q_c[i][0] > self.tol
-                else 0.0
-            )
+            max(self.area_cu_by_state[n][i] for n in range(self.N_states))
             for i in range(self.I)
         ]
-        self.Q_cu_total = sum(self.Q_c[i][0] for i in range(self.I))
-        self.Q_hu_total = sum(self.Q_h[j][0] for j in range(self.J))
-        self.Q_r_total = sum(
-            self.Q_r[i][j][k][0]
+
+        self.Q_hu_total_by_state = [sum(q_h[n]) for n in range(self.N_states)]
+        self.Q_cu_total_by_state = [sum(q_c[n]) for n in range(self.N_states)]
+        self.Q_r_total_by_state = [
+            sum(
+                q_r[n][i][j][k]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            )
+            for n in range(self.N_states)
+        ]
+        self.Q_hu_total = self._weighted_numeric_average(self.Q_hu_total_by_state)
+        self.Q_cu_total = self._weighted_numeric_average(self.Q_cu_total_by_state)
+        self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_state)
+
+        self.operating_cost_by_state = [
+            self.hu_cost_state[n][0] * self.Q_hu_total_by_state[n]
+            + self.cu_cost_state[n][0] * self.Q_cu_total_by_state[n]
+            for n in range(self.N_states)
+        ]
+        self.weighted_operating_cost_value = self._weighted_numeric_average(
+            self.operating_cost_by_state
+        )
+        self.capital_cost_value = (
+            self.unit_cost[0] * self.n_units
+            + self.A_coeff[0]
+            * sum(
+                self.area_r[i][j][k] ** self.A_exp[0]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            )
+            + self.hu_coeff[0]
+            * sum(self.area_hu[j] ** self.hu_exp[0] for j in range(self.J))
+            + self.cu_coeff[0]
+            * sum(self.area_cu[i] ** self.cu_exp[0] for i in range(self.I))
+        )
+        self.hu_cost_total = self._weighted_numeric_average(
+            [
+                self.hu_cost_state[n][0] * self.Q_hu_total_by_state[n]
+                for n in range(self.N_states)
+            ]
+        )
+        self.cu_cost_total = self._weighted_numeric_average(
+            [
+                self.cu_cost_state[n][0] * self.Q_cu_total_by_state[n]
+                for n in range(self.N_states)
+            ]
+        )
+        self.recovery_area_cost_total = self.A_coeff[0] * sum(
+            self.area_r[i][j][k] ** self.A_exp[0]
             for k in range(self.S)
             for j in range(self.J)
             for i in range(self.I)
         )
-        self.alpha = self.get_alpha_values()
+        self.hu_area_cost_total = self.hu_coeff[0] * sum(
+            self.area_hu[j] ** self.hu_exp[0] for j in range(self.J)
+        )
+        self.cu_area_cost_total = self.cu_coeff[0] * sum(
+            self.area_cu[i] ** self.cu_exp[0] for i in range(self.I)
+        )
+        self.unit_cost_total = self.unit_cost[0] * self.n_recovery_units
+        self.utility_unit_cost_total = self.unit_cost[0] * (
+            self.n_hu_units + self.n_cu_units
+        )
+
         self.dqda = [
             [[None for _k in range(self.S)] for _j in range(self.J)]
             for _i in range(self.I)
         ]
+        for k in range(self.S):
+            for j in range(self.J):
+                for i in range(self.I):
+                    driving_force = self._active_binary_value(
+                        self.T_h[i][k]
+                    ) - self._active_binary_value(self.T_c[j][k + 1])
+                    if q_r[0][i][j][k] > 0.0 and driving_force > 0.0:
+                        self.dqda[i][j][k] = (
+                            self._active_binary_value(self.theta_1[i][j][k])
+                            * self._active_binary_value(self.theta_2[i][j][k])
+                            * self.U_r[i][j]
+                        ) / driving_force
+                    elif driving_force > 0.0:
+                        self.dqda[i][j][k] = self.U_r[i][j] * driving_force
+                    else:
+                        self.dqda[i][j][k] = 0.0
+        self.alpha = self.get_alpha_values()
         self.dtacda = [
             [[None for _k in range(self.S)] for _j in range(self.J)]
             for _i in range(self.I)
@@ -1735,22 +2740,6 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         for k in range(self.S):
             for j in range(self.J):
                 for i in range(self.I):
-                    if (
-                        self.Q_r[i][j][k][0] > 0
-                        and (self.T_h[i][k][0] - self.T_c[j][k + 1][0]) > 0.0
-                    ):
-                        self.dqda[i][j][k] = (
-                            self.theta_1[i][j][k][0]
-                            * self.theta_2[i][j][k][0]
-                            * self.U_r[i][j]
-                        ) / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                    elif (self.T_h[i][k][0] - self.T_c[j][k + 1][0]) > 0.0:
-                        self.dqda[i][j][k] = self.U_r[i][j] * (
-                            self.T_h[i][k][0] - self.T_c[j][k + 1][0]
-                        )
-                    else:
-                        self.dqda[i][j][k] = 0
-
                     if self.area_r[i][j][k] > 0.0:
                         self.dtacda[i][j][k] = self.dqda[i][j][k] * (
                             self.hu_cost[0] + self.cu_cost[0]
@@ -1772,21 +2761,15 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         ]
 
         self.TAC_model = self.m.options.objfcnval
-        self.TAC = (
-            self.hu_cost[0] * sum(self.Q_h[j][0] for j in range(self.J))
-            + self.cu_cost[0] * sum(self.Q_c[i][0] for i in range(self.I))
-            + self.unit_cost[0] * self.n_units
-            + self.A_coeff[0]
-            * sum(
-                self.area_r[i][j][k] ** self.A_exp[0]
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
+        self.TAC = self.capital_cost_value + self.weighted_operating_cost_value
+
+    def _weighted_numeric_average(self, values: Sequence[float]) -> float:
+        return float(
+            sum(
+                float(self.state_weights[n]) * float(values[n])
+                for n in range(self.N_states)
             )
-            + self.hu_coeff[0]
-            * sum(self.area_hu[j] ** self.A_exp[0] for j in range(self.J))
-            + self.cu_coeff[0]
-            * sum(self.area_cu[i] ** self.A_exp[0] for i in range(self.I))
+            / self.state_weight_sum
         )
 
     def get_lowest_benefit_HX(self) -> list[list[int]]:
@@ -1907,6 +2890,14 @@ def _check_temperatures(
     abs_tol: float = 1e-2,
     q_tol: float = 1e-2,
 ) -> bool:
+    if hasattr(case, "Q_r_by_state"):
+        return _check_state_temperatures(
+            case,
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+            q_tol=q_tol,
+        )
+
     issues = False
     for i in range(case.I):
         for j in range(case.J):
@@ -1949,14 +2940,84 @@ def _check_temperatures(
     return not issues
 
 
+def _check_state_temperatures(
+    case,
+    *,
+    rel_tol: float,
+    abs_tol: float,
+    q_tol: float,
+) -> bool:
+    issues = False
+    for n in range(case.N_states):
+        for i in range(case.I):
+            for j in range(case.J):
+                for k in range(case.S):
+                    if _value(case.Q_r_by_state[n][i][j][k]) <= q_tol:
+                        continue
+                    if case.non_isothermal_model:
+                        t_h_in = _value(case.T_h_by_state[n][i][k])
+                        t_c_out_y = _value(case.T_c_out_y_by_state[n][j][i][k])
+                        theta_1 = _value(case.theta_1_by_state[n][i][j][k])
+                        if (
+                            not math.isclose(
+                                t_h_in,
+                                t_c_out_y + theta_1,
+                                rel_tol=rel_tol,
+                                abs_tol=abs_tol,
+                            )
+                            or t_h_in < t_c_out_y
+                        ):
+                            issues = True
+
+                        t_h_out = _value(case.T_h_out_x_by_state[n][i][j][k])
+                        t_c_in = _value(case.T_c_by_state[n][j][k + 1])
+                        theta_2 = _value(case.theta_2_by_state[n][i][j][k])
+                        if (
+                            not math.isclose(
+                                t_h_out,
+                                t_c_in + theta_2,
+                                rel_tol=rel_tol,
+                                abs_tol=abs_tol,
+                            )
+                            or t_h_out < t_c_in
+                        ):
+                            issues = True
+                    else:
+                        if _value(case.T_h_by_state[n][i][k]) < _value(
+                            case.T_c_by_state[n][j][k]
+                        ):
+                            issues = True
+                        if _value(case.T_h_by_state[n][i][k + 1]) < _value(
+                            case.T_c_by_state[n][j][k + 1]
+                        ):
+                            issues = True
+    return not issues
+
+
 def _check_utility_costs(
     case,
     *,
     rel_tol: float = 0.1,
     abs_tol: float = 1.0,
 ) -> bool:
-    post_hot_utility = case.hu_cost[0] * sum(case.Q_h[j][0] for j in range(case.J))
-    post_cold_utility = case.cu_cost[0] * sum(case.Q_c[i][0] for i in range(case.I))
+    if hasattr(case, "Q_h_by_state"):
+        post_hot_utility = case._weighted_numeric_average(
+            [
+                case.hu_cost_state[n][0]
+                * sum(_value(case.Q_h_by_state[n][j]) for j in range(case.J))
+                for n in range(case.N_states)
+            ]
+        )
+        post_cold_utility = case._weighted_numeric_average(
+            [
+                case.cu_cost_state[n][0]
+                * sum(_value(case.Q_c_by_state[n][i]) for i in range(case.I))
+                for n in range(case.N_states)
+            ]
+        )
+    else:
+        post_hot_utility = case.hu_cost[0] * sum(case.Q_h[j][0] for j in range(case.J))
+        post_cold_utility = case.cu_cost[0] * sum(case.Q_c[i][0] for i in range(case.I))
     model_hot_utility = _value(case.hu_cost_total)
     model_cold_utility = _value(case.cu_cost_total)
     return math.isclose(
@@ -1979,6 +3040,14 @@ def _check_area_costs(
     abs_tol: float = 1.0,
     q_tol: float = 1e-2,
 ) -> bool:
+    if hasattr(case, "area_r_shared"):
+        return _check_shared_area_costs(
+            case,
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+            q_tol=q_tol,
+        )
+
     for k in range(case.S):
         for j in range(case.J):
             allowed_hots = [i for i in range(case.I) if case.z_allowed[i][j][k] > 0]
@@ -1992,16 +3061,16 @@ def _check_area_costs(
             post_area_chen = (
                 sum(
                     (
-                        case.Q_r[n][j][k][0]
+                        case.Q_r[hot_idx][j][k][0]
                         / (
-                            case.U_r[n][j]
+                            case.U_r[hot_idx][j]
                             * (
                                 (
-                                    case.theta_1[n][j][k][0]
-                                    * case.theta_2[n][j][k][0]
+                                    case.theta_1[hot_idx][j][k][0]
+                                    * case.theta_2[hot_idx][j][k][0]
                                     * (
-                                        case.theta_1[n][j][k][0]
-                                        + case.theta_2[n][j][k][0]
+                                        case.theta_1[hot_idx][j][k][0]
+                                        + case.theta_2[hot_idx][j][k][0]
                                     )
                                     / 2
                                     + 1e-3
@@ -2011,7 +3080,7 @@ def _check_area_costs(
                         )
                     )
                     ** case.A_exp[0]
-                    for n in allowed_hots
+                    for hot_idx in allowed_hots
                 )
                 * case.A_coeff[0]
             )
@@ -2026,7 +3095,141 @@ def _check_area_costs(
     return True
 
 
+def _check_shared_area_costs(
+    case,
+    *,
+    rel_tol: float,
+    abs_tol: float,
+    q_tol: float,
+) -> bool:
+    for n in range(case.N_states):
+        for k in range(case.S):
+            for j in range(case.J):
+                for i in range(case.I):
+                    q = _value(case.Q_r_by_state[n][i][j][k])
+                    if q <= q_tol:
+                        continue
+                    required_area = q / (
+                        case.U_r_state[n][i][j]
+                        * (
+                            _value(case.theta_1_by_state[n][i][j][k])
+                            * _value(case.theta_2_by_state[n][i][j][k])
+                            * (
+                                _value(case.theta_1_by_state[n][i][j][k])
+                                + _value(case.theta_2_by_state[n][i][j][k])
+                            )
+                            / 2
+                            + 1e-3
+                        )
+                        ** (1 / 3)
+                    )
+                    if _value(case.area_r_shared[i][j][k]) + abs_tol < required_area:
+                        return False
+        for j in range(case.J):
+            q = _value(case.Q_h_by_state[n][j])
+            if q > q_tol:
+                required_area = q / (
+                    case.U_hu_state[n][j]
+                    * (
+                        (case.T_hu_in_state[n][0] - case.T_c_out_state[n][j])
+                        * (
+                            case.T_hu_out_state[n][0]
+                            - _value(case.T_c_by_state[n][j][0])
+                        )
+                        * (
+                            (case.T_hu_in_state[n][0] - case.T_c_out_state[n][j])
+                            + (
+                                case.T_hu_out_state[n][0]
+                                - _value(case.T_c_by_state[n][j][0])
+                            )
+                        )
+                        / 2
+                        + 1e-3
+                    )
+                    ** (1 / 3)
+                )
+                if _value(case.area_hu_shared[j]) + abs_tol < required_area:
+                    return False
+        for i in range(case.I):
+            q = _value(case.Q_c_by_state[n][i])
+            if q > q_tol:
+                required_area = q / (
+                    case.U_cu_state[n][i]
+                    * (
+                        (
+                            _value(case.T_h_by_state[n][i][case.S])
+                            - case.T_cu_out_state[n][0]
+                        )
+                        * (case.T_h_out_state[n][i] - case.T_cu_in_state[n][0])
+                        * (
+                            (
+                                _value(case.T_h_by_state[n][i][case.S])
+                                - case.T_cu_out_state[n][0]
+                            )
+                            + (case.T_h_out_state[n][i] - case.T_cu_in_state[n][0])
+                        )
+                        / 2
+                        + 1e-3
+                    )
+                    ** (1 / 3)
+                )
+                if _value(case.area_cu_shared[i]) + abs_tol < required_area:
+                    return False
+
+    recovery_area_cost = case.A_coeff[0] * sum(
+        _value(case.area_r_shared[i][j][k]) ** case.A_exp[0]
+        for k in range(case.S)
+        for j in range(case.J)
+        for i in range(case.I)
+    )
+    hu_area_cost = case.hu_coeff[0] * sum(
+        _value(case.area_hu_shared[j]) ** case.hu_exp[0] for j in range(case.J)
+    )
+    cu_area_cost = case.cu_coeff[0] * sum(
+        _value(case.area_cu_shared[i]) ** case.cu_exp[0] for i in range(case.I)
+    )
+    return (
+        math.isclose(
+            recovery_area_cost,
+            _value(case.recovery_area_cost_total),
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+        )
+        and math.isclose(
+            hu_area_cost,
+            _value(case.hu_area_cost_total),
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+        )
+        and math.isclose(
+            cu_area_cost,
+            _value(case.cu_area_cost_total),
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+        )
+    )
+
+
 def _value(value) -> float:
     if isinstance(value, int | float):
         return float(value)
-    return float(value.value[0])
+    try:
+        return float(value[0])
+    except (TypeError, IndexError, KeyError):
+        pass
+    for attr in ("VALUE", "value"):
+        if not hasattr(value, attr):
+            continue
+        raw = getattr(value, attr)
+        try:
+            return float(raw[0])
+        except (TypeError, IndexError, KeyError):
+            pass
+        raw_value = getattr(raw, "value", raw)
+        if isinstance(raw_value, int | float):
+            return float(raw_value)
+        try:
+            return float(raw_value[0])
+        except (TypeError, IndexError, KeyError):
+            return float(raw_value)
+    return float(value)

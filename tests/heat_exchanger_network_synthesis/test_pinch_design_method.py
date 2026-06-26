@@ -326,7 +326,7 @@ def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
     ]
 
 
-def test_stagewise_evolution_defaults_solve_one_add_and_one_remove_branch() -> None:
+def test_stagewise_source_evolution_solves_one_add_and_one_remove_candidate() -> None:
     model = _branching_root_model(
         rm_candidates=((0, 0, 0), (0, 0, 1)),
         add_candidates=((0, 0, 2), (0, 0, 3)),
@@ -334,7 +334,7 @@ def test_stagewise_evolution_defaults_solve_one_add_and_one_remove_branch() -> N
     solved: list[str] = []
 
     def solve_minus(**kwargs):
-        solved.append(kwargs["branch_label"])
+        solved.append(kwargs.get("branch_label"))
         return _BranchEvolutionCase(
             name="minus",
             tac=90.0,
@@ -342,7 +342,7 @@ def test_stagewise_evolution_defaults_solve_one_add_and_one_remove_branch() -> N
         )
 
     def solve_plus(**kwargs):
-        solved.append(kwargs["branch_label"])
+        solved.append(kwargs.get("branch_label"))
         return _BranchEvolutionCase(
             name="plus",
             tac=95.0,
@@ -354,7 +354,7 @@ def test_stagewise_evolution_defaults_solve_one_add_and_one_remove_branch() -> N
 
     model.get_net_benefit_evolution(print_output=False, max_depth=1)
 
-    assert solved == ["0-b0-minus1", "0-b0-plus1"]
+    assert solved == [None, None]
     assert model.updated_with == "minus"
 
 
@@ -440,7 +440,11 @@ def test_stagewise_evolution_failed_child_does_not_stop_siblings() -> None:
     model._build_and_solve_n_minus_one_evolution = solve_minus
     model._build_and_solve_n_plus_one_evolution = solve_plus
 
-    model.get_net_benefit_evolution(print_output=False, max_depth=1)
+    model.get_net_benefit_evolution(
+        print_output=False,
+        max_depth=1,
+        no_improvement_patience=2,
+    )
 
     assert solved == ["0-b0-minus1", "0-b0-plus1"]
     assert model.updated_with == "usable-plus"
@@ -459,6 +463,112 @@ def test_solver_arrays_include_evm_branch_options() -> None:
 
     assert arrays.configuration["HENS_EVM_N_AD_BRANCHES"] == 2
     assert arrays.configuration["HENS_EVM_N_RM_BRANCHES"] == 3
+
+
+def test_solver_arrays_expand_stateful_stream_data_and_weights() -> None:
+    arrays = problem_to_solver_arrays(_two_state_problem(), 14.0)
+
+    assert arrays.axis_maps["states"] == {"base": 0, "peak": 1}
+    assert arrays.arrays["state_weights"].tolist() == [1.0, 3.0]
+    assert arrays.arrays["f_h_state"].shape[0] == 2
+    assert "f_h" not in arrays.arrays
+    assert arrays.arrays["f_h_state"][0][0] == pytest.approx(10.0)
+    assert arrays.arrays["f_h_state"][1][0] == pytest.approx(20.0)
+    assert arrays.arrays["T_h_in_state"][1][0] == pytest.approx(660.0)
+
+
+def test_solver_arrays_represent_single_state_as_one_state_row() -> None:
+    arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
+
+    assert arrays.axis_maps["states"] == {"0": 0}
+    assert arrays.arrays["state_ids"].tolist() == ["0"]
+    assert arrays.arrays["state_weights"].tolist() == [1.0]
+    assert arrays.arrays["T_h_in_state"].shape[0] == 1
+    assert arrays.arrays["T_c_in_state"].shape[0] == 1
+    assert "T_h_in" not in arrays.arrays
+    assert "T_c_in" not in arrays.arrays
+
+
+def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
+    arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
+    legacy_arrays = {
+        key: value
+        for key, value in arrays.arrays.items()
+        if key not in {"state_ids", "state_weights"}
+    }
+    bad_arrays = PreparedSolverArrays(
+        arrays=legacy_arrays,
+        axis_maps=arrays.axis_maps,
+        unit_conventions=arrays.unit_conventions,
+        stream_identities=arrays.stream_identities,
+        utility_identities=arrays.utility_identities,
+        configuration=arrays.configuration,
+        preparation=arrays.preparation,
+    )
+
+    with pytest.raises(ValueError, match="state_ids is required"):
+        StageWiseModel(
+            name="legacy-arrays",
+            framework="ESM",
+            solver="apopt",
+            solver_arrays=bad_arrays,
+            stages=1,
+            dTmin=14.0,
+            z_restriction=None,
+            min_dqda=0.0,
+            minimisation_goal="variable total cost",
+            non_isothermal_model=False,
+            integers=True,
+            tol=1e-3,
+        )
+
+
+def test_solver_arrays_reject_zero_total_state_weight() -> None:
+    with pytest.raises(ValueError, match="positive finite state-weight sum"):
+        problem_to_solver_arrays(
+            _two_state_problem(
+                options={"PROBLEM_STATE_WEIGHTS": [0.0, 0.0]},
+            ),
+            14.0,
+        )
+
+
+def test_stagewise_multistate_cost_objective_uses_shared_topology_and_area() -> None:
+    arrays = problem_to_solver_arrays(
+        _two_state_problem(
+            options={
+                "COSTING_HX_AREA_EXP": 1.0,
+                "COSTING_HX_AREA_COEFF": 150.0,
+                "COSTING_HX_UNIT_COST": 5500.0,
+            }
+        ),
+        14.0,
+    )
+
+    model = StageWiseModel(
+        name="two-state-cost",
+        framework="ESM",
+        solver="apopt",
+        solver_arrays=arrays,
+        stages=1,
+        dTmin=14.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="variable total cost",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+    )
+
+    assert model.N_states == 2
+    assert len(model.Q_r_by_state) == 2
+    assert model.Q_r_by_state[0][0][0][0] is not model.Q_r_by_state[1][0][0][0]
+    assert len(model.z) == model.I
+    assert not isinstance(model.z[0][0][0], list)
+    assert hasattr(model, "area_r_shared")
+    assert hasattr(model, "capital_cost_total")
+    assert hasattr(model, "weighted_operating_cost")
+    assert model._weighted_state_average([10.0, 20.0]) == pytest.approx(17.5)
 
 
 def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
@@ -696,15 +806,21 @@ def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) ->
 
 
 @pytest.mark.parametrize("model_cls", [StageWiseModel, PinchDecompModel])
-def test_lmtd_replacement_preserves_openhens_post_process_metrics(model_cls) -> None:
+def test_lmtd_replacement_uses_endpoint_lmtd_for_active_units(model_cls) -> None:
     model = _source_shaped_lmtd_post_process_model(model_cls)
 
     model.get_post_process()
 
-    recovery_lmtd = [
-        _source_openhens_lmtd(70.0, 40.0, 1.0, formula_allowed=True),
-        _source_openhens_lmtd(20.0, 20.0, 1.0, formula_allowed=False),
-    ]
+    if model_cls is PinchDecompModel:
+        recovery_lmtd = [
+            _source_openhens_lmtd(200.0, 140.0, 1.0, formula_allowed=True),
+            _source_openhens_lmtd(140.0, 40.0, 1.0, formula_allowed=True),
+        ]
+    else:
+        recovery_lmtd = [
+            _source_openhens_lmtd(70.0, 40.0, 1.0, formula_allowed=True),
+            _source_openhens_lmtd(70.0, 20.0, 1.0, formula_allowed=False),
+        ]
     hot_utility_lmtd = _source_openhens_lmtd(
         220.0,
         320.0,
@@ -812,6 +928,16 @@ def test_extraction_converts_solver_arrays_to_identity_labelled_network() -> Non
         [480.0, 420.0, 300.0],
         [510.0, 470.0, 330.0],
     ]
+    assert network.source_metadata["hot_stream_heat_transfer_coefficients"] == [
+        1.0,
+        2.0,
+    ]
+    assert network.source_metadata["cold_stream_heat_transfer_coefficients"] == [
+        3.0,
+        4.0,
+    ]
+    assert network.source_metadata["hot_utility_heat_transfer_coefficients"] == [5.0]
+    assert network.source_metadata["cold_utility_heat_transfer_coefficients"] == [6.0]
 
 
 def test_internal_problem_result_serializes_without_solver_arrays() -> None:
@@ -846,6 +972,34 @@ def _four_stream_problem(*, options: dict | None = None) -> PinchProblem:
     if options:
         payload["options"] = {**payload["options"], **options}
     return PinchProblem(source=payload, project_name="HENS-07 Four-stream")
+
+
+def _two_state_problem(*, options: dict | None = None) -> PinchProblem:
+    payload = json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8"))
+    payload["options"] = {
+        **payload["options"],
+        "PROBLEM_STATE_IDS": ["base", "peak"],
+        "PROBLEM_STATE_WEIGHTS": [1.0, 3.0],
+        **(options or {}),
+    }
+    first_hot = payload["streams"][0]
+    first_hot["heat_capacity_flowrate"] = {
+        "unit": "kW/delta_degC",
+        "values": [10.0, 20.0],
+    }
+    first_hot["t_supply"] = {
+        "unit": "K",
+        "values": [650.0, 660.0],
+    }
+    first_hot["t_target"] = {
+        "unit": "K",
+        "values": [370.0, 360.0],
+    }
+    first_hot["heat_flow"] = {
+        "unit": "kW",
+        "values": [2800.0, 6000.0],
+    }
+    return PinchProblem(source=payload, project_name="HENS two-state")
 
 
 def _pdm_snapshots(
@@ -919,6 +1073,9 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.I = 1
     model.J = 1
     model.S = 2
+    model.N_states = 1
+    model.state_weights = [1.0]
+    model.state_weight_sum = 1.0
     model.tol = 1e-3
     model.dTmin = 20.0
     model.minimisation_goal = "variable total cost"
@@ -928,7 +1085,7 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.z = [[[[1.0], [1.0]]]]
     model.z_hu = [[1.0]]
     model.z_cu = [[1.0]]
-    model.theta_1 = [[[[70.0], [20.0]]]]
+    model.theta_1 = [[[[70.0], [70.0]]]]
     model.theta_2 = [[[[40.0], [20.0]]]]
     model.U_r = [[0.5]]
     model.U_hu = [0.25]
@@ -941,13 +1098,33 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.T_hu_out = [620.0]
     model.T_cu_in = [300.0]
     model.T_cu_out = [320.0]
+    model.Q_r_by_state = [model.Q_r]
+    model.Q_h_by_state = [model.Q_h]
+    model.Q_c_by_state = [model.Q_c]
+    model.T_h_by_state = [model.T_h]
+    model.T_c_by_state = [model.T_c]
+    model.theta_1_by_state = [model.theta_1]
+    model.theta_2_by_state = [model.theta_2]
+    model.U_r_state = [model.U_r]
+    model.U_hu_state = [model.U_hu]
+    model.U_cu_state = [model.U_cu]
+    model.T_h_out_state = [model.T_h_out]
+    model.T_c_out_state = [model.T_c_out]
+    model.T_hu_in_state = [model.T_hu_in]
+    model.T_hu_out_state = [model.T_hu_out]
+    model.T_cu_in_state = [model.T_cu_in]
+    model.T_cu_out_state = [model.T_cu_out]
     model.hu_cost = [2.0]
     model.cu_cost = [3.0]
+    model.hu_cost_state = [model.hu_cost]
+    model.cu_cost_state = [model.cu_cost]
     model.unit_cost = [7.0]
     model.A_coeff = [11.0]
     model.A_exp = [0.6]
     model.hu_coeff = [13.0]
+    model.hu_exp = [0.6]
     model.cu_coeff = [17.0]
+    model.cu_exp = [0.6]
     model.alpha = [[[[1.0], [1.0]]]]
     model.get_alpha_values = lambda: [[[[1.0], [1.0]]]]
     model.m = SimpleNamespace(options=SimpleNamespace(objfcnval=123.45))
@@ -1153,6 +1330,10 @@ class _SolvedCase:
     hu_area_cost_total = 11.0
     cu_area_cost_total = 7.0
     recovery_area_cost_total = 40.0
+    htc_h = [1.0, 2.0]
+    htc_c = [3.0, 4.0]
+    htc_hu = [5.0]
+    htc_cu = [6.0]
 
     Q_r = [
         [[[10.0], [0.0]], [[0.0], [0.0]]],

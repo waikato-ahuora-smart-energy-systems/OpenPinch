@@ -726,6 +726,7 @@ def _diagnostics_from_records(
     return {
         "stage_runtime_seconds": _sum_stage_runtime(stage_records),
         "stage_records": stage_records,
+        "task_records": task_records,
         "task_counts": _task_count_statistics(task_records),
         "robustness": _robustness_statistics(
             task_records,

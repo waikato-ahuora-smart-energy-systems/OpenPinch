@@ -112,8 +112,8 @@ def _calculate_openpinch_targets(
         shifted_pinch_temperature=shifted_pinch_temperature,
         target_access_contract=(
             "source-style shifted process heat cascade",
-            "PreparedSolverArrays.T_h_cont",
-            "PreparedSolverArrays.T_c_cont",
+            "PreparedSolverArrays.T_h_cont_state[0]",
+            "PreparedSolverArrays.T_c_cont_state[0]",
         ),
     )
 
@@ -134,14 +134,14 @@ def _source_style_target_snapshot(
         reference_temperature = _DEFAULT_REFERENCE_TEMPERATURE
 
     values = arrays.arrays
-    T_h_in = np.array(values["T_h_in"], dtype=np.float64)
-    T_h_out = np.array(values["T_h_out"], dtype=np.float64)
-    T_c_in = np.array(values["T_c_in"], dtype=np.float64)
-    T_c_out = np.array(values["T_c_out"], dtype=np.float64)
-    f_h = np.array(values["f_h"], dtype=np.float64)
-    f_c = np.array(values["f_c"], dtype=np.float64)
-    T_h_cont = np.array(values["T_h_cont"], dtype=np.float64)
-    T_c_cont = np.array(values["T_c_cont"], dtype=np.float64)
+    T_h_in = _copy_state_row(values, "T_h_in_state")
+    T_h_out = _copy_state_row(values, "T_h_out_state")
+    T_c_in = _copy_state_row(values, "T_c_in_state")
+    T_c_out = _copy_state_row(values, "T_c_out_state")
+    f_h = _copy_state_row(values, "f_h_state")
+    f_c = _copy_state_row(values, "f_c_state")
+    T_h_cont = _copy_state_row(values, "T_h_cont_state")
+    T_c_cont = _copy_state_row(values, "T_c_cont_state")
 
     hot_min_star, hot_max_star, hot_cp = _source_hot_stream_table_values(
         T_h_in=T_h_in,
@@ -381,10 +381,11 @@ def _build_decomposition_snapshot(
     if target.shifted_pinch_temperature is None:
         raise ValueError("Cannot build PDM fields without a shifted pinch temperature.")
 
-    T_h_in = _copy_float_array(arrays.arrays["T_h_in"])
-    T_h_out = _copy_float_array(arrays.arrays["T_h_out"])
-    T_c_in = _copy_float_array(arrays.arrays["T_c_in"])
-    T_c_out = _copy_float_array(arrays.arrays["T_c_out"])
+    values = arrays.arrays
+    T_h_in = _copy_state_row(values, "T_h_in_state")
+    T_h_out = _copy_state_row(values, "T_h_out_state")
+    T_c_in = _copy_state_row(values, "T_c_in_state")
+    T_c_out = _copy_state_row(values, "T_c_out_state")
     z_i_active, z_j_active = _clip_stream_temperatures(
         T_h_in=T_h_in,
         T_h_out=T_h_out,
@@ -504,8 +505,12 @@ def _manual_stage_selection(
     return tuple(stage_selection)
 
 
-def _copy_float_array(values: Any) -> np.ndarray:
-    return np.asarray(values, dtype=float).copy()
+def _copy_state_row(
+    values: dict[str, np.ndarray],
+    key: str,
+    state_idx: int = 0,
+) -> np.ndarray:
+    return np.asarray(values[key], dtype=float)[state_idx].copy()
 
 
 __all__ = [

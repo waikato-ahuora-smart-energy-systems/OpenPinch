@@ -20,6 +20,9 @@ from OpenPinch.lib.schemas.synthesis import (
 from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.ranking import (
     network_structure_signature,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.verification import (
+    verify_network_feasibility,
+)
 from OpenPinch.services.network_grid_diagram import (
     build_grid_diagram,
     build_grid_model,
@@ -205,6 +208,103 @@ def test_result_selects_ranked_network() -> None:
     assert result.task_id == "esm-second"
     assert result.method == "network_evolution_method"
     assert len(result.ranked_networks) == 2
+
+
+def test_network_feasibility_checks_cost_and_heat_balance() -> None:
+    feasible = _feasible_balance_network("feasible")
+
+    assert verify_network_feasibility(feasible) == ()
+
+    under_costed = _feasible_balance_network(
+        "under-costed",
+        total_annual_cost=75.0,
+    )
+    heat_balance_failure = _feasible_balance_network(
+        "bad-balance",
+        cold_utility_duty=400.0,
+    )
+
+    assert any(
+        "total annual cost" in reason
+        for reason in verify_network_feasibility(under_costed)
+    )
+    assert any(
+        "hot stream H1 heat removed" in reason
+        for reason in verify_network_feasibility(heat_balance_failure)
+    )
+
+
+def test_network_feasibility_checks_minimum_approach_temperature() -> None:
+    network = _feasible_balance_network(
+        "low-approach",
+        source_metadata={
+            "solver_dTmin": 175.0,
+            "hot_stream_heat_capacity_flowrates": [10.0],
+            "cold_stream_heat_capacity_flowrates": [10.0],
+            "hot_stream_supply_temperatures": [500.0],
+            "hot_stream_target_temperatures": [400.0],
+            "cold_stream_supply_temperatures": [300.0],
+            "cold_stream_target_temperatures": [350.0],
+        },
+    )
+
+    assert any(
+        "minimum approach" in reason for reason in verify_network_feasibility(network)
+    )
+
+
+def test_network_feasibility_checks_installed_area_against_lmtd() -> None:
+    network = _feasible_balance_network("under-area", recovery_area=1.0)
+
+    assert any(
+        "below required area" in reason
+        for reason in verify_network_feasibility(network)
+    )
+
+
+def test_ranked_network_selection_skips_infeasible_low_tac_candidate() -> None:
+    low_tac_infeasible = _feasible_balance_network(
+        "low-tac-infeasible",
+        total_annual_cost=75.0,
+    )
+    feasible = _feasible_balance_network("feasible")
+    low_task = _task(
+        method="network_evolution_method",
+        task_id="low",
+        approach_temperature=14.0,
+    )
+    feasible_task = _task(
+        method="network_evolution_method",
+        task_id="feasible",
+        approach_temperature=14.0,
+    )
+    result = HeatExchangerNetworkSynthesisResult(
+        network=low_tac_infeasible,
+        run_id="result",
+        method="network_evolution_method",
+        ranked_networks=(
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=low_task,
+                status="success",
+                network=low_tac_infeasible,
+                objective_value=75.0,
+            ),
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=feasible_task,
+                status="success",
+                network=feasible,
+                objective_value=150.0,
+            ),
+        ),
+    )
+
+    result.select_network()
+
+    assert result.network.run_id == "feasible"
+    assert result.task_id == "feasible"
+    assert [outcome.network.run_id for outcome in result.ranked_networks] == [
+        "feasible"
+    ]
 
 
 def test_grid_diagram_uses_one_based_ranking_and_reports_missing_rank() -> None:
@@ -680,6 +780,82 @@ def _result_for_network(
         run_id="result",
         method="network_evolution_method",
         ranked_networks=(),
+    )
+
+
+def _feasible_balance_network(
+    run_id: str,
+    *,
+    total_annual_cost: float = 150.0,
+    cold_utility_duty: float = 500.0,
+    recovery_area: float = 50.0,
+    source_metadata: dict[str, object] | None = None,
+) -> HeatExchangerNetwork:
+    recovery_duty = 500.0
+    return HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                exchanger_id="R1",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                duty=recovery_duty,
+                area=recovery_area,
+                source_inlet_temperature=500.0,
+                source_outlet_temperature=450.0,
+                sink_inlet_temperature=300.0,
+                sink_outlet_temperature=350.0,
+            ),
+            HeatExchanger(
+                exchanger_id="CU1",
+                kind=HeatExchangerKind.COLD_UTILITY,
+                source_stream="H1",
+                sink_stream="CU",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.UTILITY,
+                duty=cold_utility_duty,
+                area=25.0,
+                source_inlet_temperature=450.0,
+                source_outlet_temperature=400.0,
+                sink_inlet_temperature=290.0,
+                sink_outlet_temperature=300.0,
+            ),
+        ),
+        run_id=run_id,
+        method="network_evolution_method",
+        stage_count=1,
+        total_annual_cost=total_annual_cost,
+        utility_cost=50.0,
+        capital_cost=100.0,
+        summary_metrics={
+            "total_units": 2,
+            "recovery_units": 1,
+            "hot_utility_units": 0,
+            "cold_utility_units": 1,
+            "recovery_load": recovery_duty,
+            "hot_utility_load": 0.0,
+            "cold_utility_load": cold_utility_duty,
+        },
+        solver_axis_metadata={
+            "axis_maps": {
+                "hot_process_streams": {"H1": 0},
+                "cold_process_streams": {"C1": 0},
+            }
+        },
+        source_metadata=source_metadata
+        or {
+            "hot_stream_heat_capacity_flowrates": [10.0],
+            "cold_stream_heat_capacity_flowrates": [10.0],
+            "hot_stream_heat_transfer_coefficients": [1.0],
+            "cold_stream_heat_transfer_coefficients": [1.0],
+            "hot_stream_supply_temperatures": [500.0],
+            "hot_stream_target_temperatures": [400.0],
+            "cold_stream_supply_temperatures": [300.0],
+            "cold_stream_target_temperatures": [350.0],
+        },
     )
 
 

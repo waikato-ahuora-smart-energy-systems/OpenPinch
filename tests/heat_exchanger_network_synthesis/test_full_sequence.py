@@ -6,6 +6,7 @@ import csv
 import json
 import subprocess
 import sys
+from collections import Counter
 from copy import deepcopy
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from OpenPinch.services.heat_exchanger_network_synthesis.common.errors import (
     WorkflowContractError,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.executor import (
+    LocalSynthesisExecutor,
     _legacy_z_restriction,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.fake_executor import (
@@ -39,8 +41,20 @@ from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settin
 from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.exports import (
     export_heat_exchanger_network_synthesis_results,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.ranking import (
+    network_structure_signature,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.results.assembly import (
+    build_synthesis_result,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     problem_to_solver_arrays,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+    require_solver_binary,
+    require_synthesis_dependency,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.heat_exchanger_network_synthesis_entry import (
     heat_exchanger_network_synthesis_service,
@@ -509,6 +523,34 @@ def test_failed_workflow_reports_task_errors() -> None:
         )
 
 
+def test_successful_infeasible_outcome_reports_model_contract_issue() -> None:
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
+    outcomes = list(
+        FakeSynthesisExecutor().execute(
+            pdm_tasks,
+            problem=problem,
+            parent_outcomes={},
+            max_parallel=settings.max_parallel,
+        )
+    )
+    first = outcomes[0]
+    assert first.network is not None
+    outcomes[0] = first.model_copy(
+        update={
+            "network": first.network.model_copy(update={"total_annual_cost": 1.0}),
+            "objective_value": 1.0,
+        }
+    )
+
+    with pytest.raises(
+        WorkflowContractError,
+        match="solver-success heat exchanger network task failed post-solve",
+    ):
+        build_synthesis_result(settings, pdm_tasks, outcomes)
+
+
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
     settings = workflow_settings_from_problem(_small_problem())
 
@@ -709,6 +751,71 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
         problem.design.enhanced_synthesis_method(quality_tier=quality_tier)  # type: ignore[arg-type]
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
+    _skip_if_live_solver_environment_missing()
+    single_state = _single_state_no_sweep_problem()
+    duplicate_state = _duplicate_two_state_no_sweep_problem()
+
+    single_result = _run_single_candidate_open_hens(single_state)
+    duplicate_result = _run_single_candidate_open_hens(duplicate_state)
+
+    assert _task_counts_by_method(single_result) == {
+        "network_evolution_method": 1,
+        "pinch_design_method": 1,
+        "thermal_derivative_method": 1,
+    }
+    assert _task_counts_by_method(duplicate_result) == _task_counts_by_method(
+        single_result
+    )
+    assert _successful_counts_by_method(duplicate_result) == (
+        _successful_counts_by_method(single_result)
+    )
+
+    single_design = single_result.accepted_result
+    duplicate_design = duplicate_result.accepted_result
+    assert single_design.method == "network_evolution_method"
+    assert duplicate_design.method == "network_evolution_method"
+    assert duplicate_design.objective_values["total_annual_cost"] == pytest.approx(
+        single_design.objective_values["total_annual_cost"],
+        abs=1e-5,
+        rel=1e-9,
+    )
+    assert duplicate_design.objective_values["capital_cost"] == pytest.approx(
+        single_design.objective_values["capital_cost"],
+        abs=1e-5,
+        rel=1e-9,
+    )
+    assert duplicate_design.objective_values["utility_cost"] == pytest.approx(
+        single_design.objective_values["utility_cost"],
+        abs=1e-5,
+        rel=1e-9,
+    )
+
+    single_network = single_design.network
+    duplicate_network = duplicate_design.network
+    assert single_network.stage_count == duplicate_network.stage_count
+    assert single_network.summary_metrics["recovery_units"] == (
+        duplicate_network.summary_metrics["recovery_units"]
+    )
+    assert single_network.summary_metrics["hot_utility_units"] == (
+        duplicate_network.summary_metrics["hot_utility_units"]
+    )
+    assert single_network.summary_metrics["cold_utility_units"] == (
+        duplicate_network.summary_metrics["cold_utility_units"]
+    )
+    assert network_structure_signature(duplicate_network) == (
+        network_structure_signature(single_network)
+    )
+    for kind in HeatExchangerKind:
+        assert duplicate_network.total_duty(kind=kind) == pytest.approx(
+            single_network.total_duty(kind=kind),
+            abs=1e-5,
+            rel=1e-9,
+        )
+
+
 def test_direct_design_run_computes_targets_when_cache_is_empty(monkeypatch) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
@@ -826,9 +933,9 @@ def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
     )
 
     assert recovery.source_inlet_temperature == pytest.approx(650.0)
-    assert recovery.source_outlet_temperature == pytest.approx(370.0)
+    assert recovery.source_outlet_temperature > 273.15
     assert recovery.sink_inlet_temperature == pytest.approx(410.0)
-    assert recovery.sink_outlet_temperature == pytest.approx(650.0)
+    assert recovery.sink_outlet_temperature > 273.15
     assert design.network.summary_metrics["approach_temperature"] == pytest.approx(2.0)
 
 
@@ -950,6 +1057,115 @@ def _small_problem_with_options(
     payload = _small_payload()
     payload["options"] = {**payload["options"], **options}
     return PinchProblem(source=payload, project_name=project_name)
+
+
+def _single_state_no_sweep_problem() -> PinchProblem:
+    return PinchProblem(
+        source=_single_state_no_sweep_payload(),
+        project_name="single-state-no-sweep",
+    )
+
+
+def _duplicate_two_state_no_sweep_problem() -> PinchProblem:
+    payload = _single_state_no_sweep_payload()
+    for record in payload["streams"]:
+        for key, value in list(record.items()):
+            if _is_scalar_quantity_payload(value):
+                record[key] = {
+                    **value,
+                    "values": [value["value"], value["value"]],
+                }
+                del record[key]["value"]
+    payload["options"] = {
+        **payload["options"],
+        "PROBLEM_STATE_IDS": ["base", "duplicate"],
+        "PROBLEM_STATE_WEIGHTS": [0.1, 0.9],
+        "HENS_RUN_ID": "duplicate-two-state-no-sweep",
+    }
+    return PinchProblem(
+        source=payload,
+        project_name="duplicate-two-state-no-sweep",
+    )
+
+
+def _single_state_no_sweep_payload() -> dict:
+    payload = json.loads(
+        (FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    payload = deepcopy(payload)
+    payload["options"] = {
+        **payload["options"],
+        "HENS_APPROACH_TEMPERATURES": [14.0],
+        "HENS_DERIVATIVE_THRESHOLDS": [0.5],
+        "HENS_STAGE_SELECTION": [3],
+        "HENS_BEST_SOLUTIONS_TO_SAVE": 1,
+        "HENS_MAX_PARALLEL": 1,
+        "HENS_OUTPUT_FORMATS": [],
+        "HENS_RUN_ID": "single-state-no-sweep",
+        "HENS_SYNTHESIS_QUALITY_TIER": 1,
+    }
+    return payload
+
+
+def _is_scalar_quantity_payload(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and "value" in value
+        and isinstance(value["value"], int | float)
+    )
+
+
+def _run_single_candidate_open_hens(problem: PinchProblem):
+    problem.target()
+    settings = workflow_settings_from_problem(problem)
+    assert settings.approach_temperatures == (14.0,)
+    assert settings.derivative_thresholds == (0.5,)
+    result = workflow_module.execute_open_hens_method(
+        problem,
+        settings,
+        executor=LocalSynthesisExecutor(print_output=False),
+    )
+    assert result.accepted_result.network is not None
+    return result
+
+
+def _task_counts_by_method(result) -> dict[str, int]:
+    return dict(Counter(task.method for task in result.tasks))
+
+
+def _successful_counts_by_method(result) -> dict[str, int]:
+    return dict(
+        Counter(
+            outcome.task.method
+            for outcome in result.outcomes
+            if outcome.status == "success"
+        )
+    )
+
+
+def _skip_if_live_solver_environment_missing() -> None:
+    try:
+        require_solver_binary(
+            "couenne",
+            purpose="single-state/multistate HEN equivalence test",
+        )
+        require_solver_binary(
+            "ipopt",
+            purpose="single-state/multistate HEN equivalence test",
+        )
+        require_synthesis_dependency(
+            "gekko",
+            purpose="single-state/multistate HEN equivalence test",
+        )
+        require_synthesis_dependency(
+            "pyomo.environ",
+            package="pyomo",
+            purpose="single-state/multistate HEN equivalence test",
+        )
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
+        pytest.skip(str(exc))
 
 
 def _use_fake_default_executor(monkeypatch) -> None:

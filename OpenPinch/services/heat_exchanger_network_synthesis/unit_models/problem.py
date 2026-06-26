@@ -121,7 +121,7 @@ class InternalHeatExchangerNetworkProblem:
             run_id=run_id,
             task_id=self.synthesis_task_id,
             method=self.framework,
-            stage_count=getattr(self.case, "S", self.stages),
+            stage_count=getattr(self.case, "stages", getattr(self.case, "S", self.stages)),
         )
 
     def extract_result(
