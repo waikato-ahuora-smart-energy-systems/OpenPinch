@@ -38,7 +38,8 @@ def test_target_utility(filename):
     r_file_path = filepath + "/r" + filename[1:]
     with open(p_file_path) as json_data:
         input_data = json.load(json_data)
-    data = GetInputOutputData.model_validate(input_data)
+    data = TargetInput.model_validate(input_data)
+    plant_profiles = input_data["plant_profile_data"]
 
     with open(r_file_path) as json_data:
         wkb_res = json.load(json_data)
@@ -48,10 +49,12 @@ def test_target_utility(filename):
         streams=data.streams, utilities=data.utilities, options=data.options
     )
 
-    for plant in data.plant_profile_data:
-        z = site.get_subzone(plant.name)
-        pt = ProblemTable({PT.T: plant.data.T})
-        pt[PT.H_NET] = plant.data.H_net
+    for plant in plant_profiles:
+        plant_name = plant["name"]
+        plant_data = plant["data"]
+        z = site.get_subzone(plant_name)
+        pt = ProblemTable({PT.T: plant_data["T"]})
+        pt[PT.H_NET] = plant_data["H_net"]
         pt.update(
             **get_seperated_gcc_heat_load_profiles(
                 T_col=pt[PT.T],
@@ -71,7 +74,7 @@ def test_target_utility(filename):
         t = None
         i = 0
         for t in wkb_res.targets:
-            if plant.name == t.name.replace("/" + TT.DI.value, ""):
+            if plant_name == t.name.replace("/" + TT.DI.value, ""):
                 break
             i += 1
         assert i < len(wkb_res.targets)

@@ -518,6 +518,57 @@ def test_validate_hpr_required_returns_zero_for_all_nan_load_entries():
     )
 
 
+def test_validate_hpr_required_uses_period_load_for_selected_period_id():
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0],
+            PT.H_NET_HOT: [-20.0, -40.0, 0.0],
+            PT.H_NET_COLD: [100.0, 80.0, 0.0],
+        }
+    )
+    config = Configuration(
+        options={
+            "HPR_LOAD_MODE": "period_values",
+            "HPR_LOAD_PERIOD_VALUES": {"base": 10.0, "peak": 25.0},
+        }
+    )
+
+    assert hp._validate_hpr_required(
+        H_net_cold=pt[PT.H_NET_COLD],
+        H_net_hot=pt[PT.H_NET_HOT],
+        is_heat_pumping=True,
+        config=config,
+        period_id="peak",
+        period_idx=1,
+    ) == pytest.approx(25.0)
+
+
+def test_validate_hpr_required_rejects_missing_period_load():
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0, 60.0],
+            PT.H_NET_HOT: [-20.0, -40.0, 0.0],
+            PT.H_NET_COLD: [100.0, 80.0, 0.0],
+        }
+    )
+    config = Configuration(
+        options={
+            "HPR_LOAD_MODE": "period_values",
+            "HPR_LOAD_PERIOD_VALUES": {"base": 10.0},
+        }
+    )
+
+    with pytest.raises(ValueError, match="does not define a load"):
+        hp._validate_hpr_required(
+            H_net_cold=pt[PT.H_NET_COLD],
+            H_net_hot=pt[PT.H_NET_HOT],
+            is_heat_pumping=True,
+            config=config,
+            period_id="peak",
+            period_idx=1,
+        )
+
+
 def test_hpr_residual_utility_summary_retargets_direct_utilities():
     hot_utilities, cold_utilities = _make_base_utility_collections()
     base_target = SimpleNamespace(

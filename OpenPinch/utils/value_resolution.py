@@ -9,24 +9,10 @@ import numpy as np
 
 from ..classes.value import Value
 
-_OPERATOR_KEYS = (
-    "multiplier",
-    "multiply",
-    "add",
-    "subtract",
-    "divide",
-    "power",
-    "log",
-    "exp",
-    "abs",
-    "min",
-    "max",
-)
 _SCALAR_PAYLOAD_KEYS = {"value", "unit", "weights"}
 _PERIOD_PAYLOAD_KEYS = {"values", "period_ids", "weights", "unit"}
 
 __all__ = [
-    "evaluate_value_spec",
     "get_scalar_value",
     "get_period_value",
     "resolve_value_array",
@@ -71,19 +57,6 @@ def _is_period_value_payload(value: Any) -> bool:
     keys = set(value)
     return keys.issubset(_PERIOD_PAYLOAD_KEYS) and (
         "values" in keys or "period_ids" in keys or "weights" in keys
-    )
-
-
-def _get_operator_keys(value: Mapping[str, Any]) -> list[str]:
-    return [key for key in _OPERATOR_KEYS if key in value]
-
-
-def _is_zone_value_map(value: Any) -> bool:
-    return (
-        isinstance(value, Mapping)
-        and not _is_scalar_value_payload(value)
-        and not _is_period_value_payload(value)
-        and not _get_operator_keys(value)
     )
 
 
@@ -140,11 +113,6 @@ def get_period_value(
         raise TypeError("Boolean values are not supported.")
 
     if isinstance(value, Mapping):
-        if _get_operator_keys(value) or _is_zone_value_map(value):
-            raise TypeError(
-                "Operator payloads and zone-name mappings must be evaluated with "
-                "evaluate_value_spec(...)."
-            )
         if _is_period_value_payload(value):
             if "values" not in value:
                 raise KeyError("values")
@@ -219,187 +187,11 @@ def get_scalar_value(
     if value is None:
         return None
     value = _normalise_input_object(value)
-    if isinstance(value, Mapping):
-        if _get_operator_keys(value):
-            raise TypeError(
-                "Operator payloads must be evaluated with evaluate_value_spec(...)."
-            )
-        if _is_zone_value_map(value):
-            raise TypeError(
-                "Zone-name mappings must be evaluated with evaluate_value_spec(...)."
-            )
     return get_period_value(
         value,
         period_idx=period_idx,
         default_allowed=default_allowed,
     )
-
-
-def _evaluate_nested_spec(
-    spec: Any,
-    *,
-    zone_name: str | None = None,
-    period_idx: int | None = None,
-) -> float | None:
-    spec = _normalise_input_object(spec)
-    if isinstance(spec, Mapping) and not (
-        _is_scalar_value_payload(spec) or _is_period_value_payload(spec)
-    ):
-        return evaluate_value_spec(
-            spec,
-            zone_name=zone_name,
-            period_idx=period_idx,
-        )
-    return get_scalar_value(spec, period_idx=period_idx)
-
-
-def _resolve_math_base(
-    spec: Any,
-    *,
-    zone_name: str | None = None,
-    period_idx: int | None = None,
-) -> float:
-    try:
-        base = _evaluate_nested_spec(
-            spec,
-            zone_name=zone_name,
-            period_idx=period_idx,
-        )
-    except KeyError, TypeError, ValueError:
-        return float(np.e)
-    return float(np.e) if base is None else float(base)
-
-
-def evaluate_value_spec(
-    spec: Any,
-    *,
-    default_value: Any = None,
-    zone_name: str | None = None,
-    period_idx: int | None = None,
-) -> float | None:
-    """Evaluate the legacy value mini-DSL using explicit period resolution."""
-    spec = _normalise_input_object(spec)
-    if spec is None:
-        return (
-            None
-            if default_value is None
-            else get_scalar_value(default_value, period_idx=period_idx)
-        )
-
-    if not isinstance(spec, Mapping):
-        return get_scalar_value(spec, period_idx=period_idx)
-
-    if zone_name is not None and zone_name in spec:
-        return evaluate_value_spec(
-            spec[zone_name],
-            default_value=default_value,
-            zone_name=zone_name,
-            period_idx=period_idx,
-        )
-
-    if _is_scalar_value_payload(spec) or _is_period_value_payload(spec):
-        return get_scalar_value(spec, period_idx=period_idx)
-
-    operator_keys = _get_operator_keys(spec)
-    if len(operator_keys) > 1:
-        raise ValueError(
-            "Invalid payload: more than one operation specified. Payload must "
-            "contain only 'value' and at most one of 'multiplier', 'multiply', "
-            "'add', 'subtract', 'divide', 'power', 'log', 'exp', 'abs', "
-            "'min', or 'max'."
-        )
-
-    if operator_keys:
-        base_spec = spec["value"] if "value" in spec else default_value
-        if base_spec is None:
-            raise KeyError("value")
-
-        value = _evaluate_nested_spec(
-            base_spec,
-            zone_name=zone_name,
-            period_idx=period_idx,
-        )
-        if value is None:
-            return None
-
-        operator = operator_keys[0]
-        if operator in {"multiplier", "multiply"}:
-            return value * _evaluate_nested_spec(
-                spec[operator],
-                zone_name=zone_name,
-                period_idx=period_idx,
-            )
-        if operator == "add":
-            return value + _evaluate_nested_spec(
-                spec[operator],
-                zone_name=zone_name,
-                period_idx=period_idx,
-            )
-        if operator == "subtract":
-            return value - _evaluate_nested_spec(
-                spec[operator],
-                zone_name=zone_name,
-                period_idx=period_idx,
-            )
-        if operator == "divide":
-            denominator = _evaluate_nested_spec(
-                spec[operator],
-                zone_name=zone_name,
-                period_idx=period_idx,
-            )
-            return value / denominator if value != 0 else 0.0
-        if operator == "power":
-            return value ** _evaluate_nested_spec(
-                spec[operator],
-                zone_name=zone_name,
-                period_idx=period_idx,
-            )
-        if operator == "log":
-            base = _resolve_math_base(
-                spec[operator],
-                zone_name=zone_name,
-                period_idx=period_idx,
-            )
-            return np.log(value) / np.log(base) if value > 0 else 0.0
-        if operator == "exp":
-            base = _resolve_math_base(
-                spec[operator],
-                zone_name=zone_name,
-                period_idx=period_idx,
-            )
-            return base**value if value > 0 else 0.0
-        if operator == "abs":
-            return abs(value)
-        if operator == "min":
-            return min(
-                value,
-                _evaluate_nested_spec(
-                    spec[operator],
-                    zone_name=zone_name,
-                    period_idx=period_idx,
-                ),
-            )
-        if operator == "max":
-            return max(
-                value,
-                _evaluate_nested_spec(
-                    spec[operator],
-                    zone_name=zone_name,
-                    period_idx=period_idx,
-                ),
-            )
-
-    if "value" in spec:
-        return _evaluate_nested_spec(
-            spec["value"],
-            zone_name=zone_name,
-            period_idx=period_idx,
-        )
-
-    if default_value is not None:
-        return get_scalar_value(default_value, period_idx=period_idx)
-
-    raise KeyError("value")
 
 
 def resolve_value_array(value: Any) -> np.ndarray:
@@ -411,11 +203,6 @@ def resolve_value_array(value: Any) -> np.ndarray:
         raise TypeError("Boolean values are not supported.")
 
     if isinstance(value, Mapping):
-        if _get_operator_keys(value) or _is_zone_value_map(value):
-            raise TypeError(
-                "Operator payloads and zone-name mappings cannot be converted to "
-                "value arrays."
-            )
         if _is_period_value_payload(value):
             if "values" not in value:
                 raise KeyError("values")

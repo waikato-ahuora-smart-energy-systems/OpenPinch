@@ -103,10 +103,10 @@ def _settings(*, synthesis_quality_tier: int = 1) -> SynthesisWorkflowSettings:
         synthesis_quality_tier=synthesis_quality_tier,
         pdm_solver="couenne",
         tdm_solver="couenne",
-        esm_solver="ipopt-pyomo",
+        evm_solver="ipopt-pyomo",
         pdm_solver_options={},
         tdm_solver_options={},
-        esm_solver_options={},
+        evm_solver_options={},
     )
 
 

@@ -41,10 +41,10 @@ def _settings() -> SynthesisWorkflowSettings:
         max_parallel=1,
         pdm_solver="couenne",
         tdm_solver="couenne",
-        esm_solver="ipopt-pyomo",
+        evm_solver="ipopt-pyomo",
         pdm_solver_options={},
         tdm_solver_options={},
-        esm_solver_options={},
+        evm_solver_options={},
     )
 
 

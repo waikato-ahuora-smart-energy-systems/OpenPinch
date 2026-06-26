@@ -17,7 +17,6 @@ from ...lib.schemas.targets import (
     IndirectHeatPumpTarget,
     IndirectRefrigerationTarget,
 )
-from ...utils.value_resolution import evaluate_value_spec
 from ..common.miscellaneous import get_period_index
 from ..common.problem_table_analysis import create_problem_table_with_t_int
 from .common.postprocessing import _get_hpr_residual_utility_summary
@@ -73,8 +72,8 @@ def compute_direct_heat_pump_or_refrigeration_target(
         H_net_hot=pt[PT.H_NET_HOT],
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
-        zone_name=zone.name,
         config=zone.config,
+        period_id=period_id,
         period_idx=idx,
     )
     if target_load < tol:
@@ -146,8 +145,8 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         H_net_hot=pt_ut_gen[PT.H_NET_HOT],
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
-        zone_name=zone.name,
         config=zone.config,
+        period_id=period_id,
         period_idx=idx,
     )
     if target_load < tol:
@@ -207,9 +206,8 @@ def _validate_hpr_required(
     H_net_hot: np.ndarray,
     is_heat_pumping: bool = False,
     is_refrigeration: bool = False,
-    zone_name: str = None,
     config: Configuration | None = None,
-    r: dict | float | int = None,
+    period_id: str | None = None,
     period_idx: int | None = None,
 ) -> float:
     if config is None:
@@ -223,14 +221,6 @@ def _validate_hpr_required(
         return 0
     Q_max = float(np.nanmax(np.abs(load_values), initial=0.0))
 
-    if r is not None:
-        return _resolve_legacy_hpr_load_override(
-            r,
-            Q_max=Q_max,
-            zone_name=zone_name,
-            period_idx=period_idx,
-        )
-
     hpr = config.hpr
     if hpr.load_mode == "fraction":
         return Q_max * float(hpr.load_fraction)
@@ -238,10 +228,9 @@ def _validate_hpr_required(
         return min(float(hpr.load_duty), Q_max)
     if hpr.load_mode == "period_values":
         return min(
-            evaluate_value_spec(
+            _resolve_hpr_period_load(
                 hpr.load_period_values,
-                default_value=Q_max,
-                zone_name=zone_name,
+                period_id=period_id,
                 period_idx=period_idx,
             ),
             Q_max,
@@ -249,27 +238,22 @@ def _validate_hpr_required(
     raise ValueError(f"Unsupported HPR_LOAD_MODE {hpr.load_mode!r}.")
 
 
-def _resolve_legacy_hpr_load_override(
-    hpr_load: dict | float | int,
+def _resolve_hpr_period_load(
+    load_by_period: dict[str, float],
     *,
-    Q_max: float,
-    zone_name: str | None,
+    period_id: str | None,
     period_idx: int | None,
 ) -> float:
-    """Resolve direct test/helper load overrides without accepting flat config keys."""
-    if isinstance(hpr_load, float | int):
-        return Q_max * float(hpr_load)
-    if isinstance(hpr_load, dict):
-        return min(
-            evaluate_value_spec(
-                hpr_load,
-                default_value=Q_max,
-                zone_name=zone_name,
-                period_idx=period_idx,
-            ),
-            Q_max,
-        )
-    raise ValueError("HPR load override must be a number or period-value mapping.")
+    if period_id is not None and str(period_id) in load_by_period:
+        return float(load_by_period[str(period_id)])
+    if period_idx is not None and str(period_idx) in load_by_period:
+        return float(load_by_period[str(period_idx)])
+    available = ", ".join(sorted(str(key) for key in load_by_period)) or "<none>"
+    raise ValueError(
+        "HPR_LOAD_PERIOD_VALUES does not define a load for the selected period. "
+        f"Expected period_id {period_id!r} or period index {period_idx!r}; "
+        f"available keys: {available}."
+    )
 
 
 def _get_hpr_targets(

@@ -156,15 +156,6 @@ class Stream:
         self._name = value
 
     @property
-    def stream_name(self) -> str:
-        """Alias for the stream identifier used in input schemas."""
-        return self._name
-
-    @stream_name.setter
-    def stream_name(self, value: str):
-        self._name = value
-
-    @property
     def is_process_stream(self) -> bool:
         """Process or utility stream."""
         return self._is_process_stream
@@ -492,11 +483,6 @@ class Stream:
     def utility_cost(self) -> Optional[Value]:
         """Alias for the derived utility cost."""
         return self.ut_cost
-
-    @property
-    def heat_capacity_flow_rate(self) -> Optional[Value]:
-        """Alias for the derived stream heat-capacity flow rate."""
-        return self.CP
 
     @property
     def resistance_capacity_product(self) -> Optional[Value]:

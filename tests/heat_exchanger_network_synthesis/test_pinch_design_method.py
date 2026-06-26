@@ -491,13 +491,13 @@ def test_solver_arrays_represent_single_state_as_one_state_row() -> None:
 
 def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
     arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
-    legacy_arrays = {
+    incomplete_arrays = {
         key: value
         for key, value in arrays.arrays.items()
         if key not in {"period_ids", "period_weights"}
     }
     bad_arrays = PreparedSolverArrays(
-        arrays=legacy_arrays,
+        arrays=incomplete_arrays,
         axis_maps=arrays.axis_maps,
         unit_conventions=arrays.unit_conventions,
         stream_identities=arrays.stream_identities,
@@ -508,7 +508,7 @@ def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
 
     with pytest.raises(ValueError, match="period_ids is required"):
         StageWiseModel(
-            name="legacy-arrays",
+            name="solver-arrays-without-state",
             framework="ESM",
             solver="apopt",
             solver_arrays=bad_arrays,

@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import runpy
 import sys
-import warnings
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import OpenPinch
-from OpenPinch.resources import list_notebooks
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,15 +53,6 @@ class _FakeStreamlit:
 
 def _clear_dummy():
     _DummyPinchProblem.created.clear()
-
-
-def test_root_init_script_executes():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        namespace = runpy.run_path(str(REPO_ROOT / "__init__.py"))
-
-    assert "PinchProblem" in namespace
-    assert any(item.category is DeprecationWarning for item in caught)
 
 
 def test_build_dist_script_help_executes(monkeypatch):
@@ -128,21 +117,6 @@ def test_optional_install_smoke_script_help_executes(monkeypatch):
 
     with pytest.raises(SystemExit, match="0"):
         namespace["main"](["--help"])
-
-
-def test_repo_main_script_executes(monkeypatch, tmp_path: Path):
-    notebook_dir = tmp_path / "notebooks"
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["python", "notebook", "-o", str(notebook_dir)],
-    )
-
-    with pytest.raises(SystemExit, match="0"):
-        runpy.run_path(str(REPO_ROOT / "__main__.py"), run_name="__main__")
-
-    copied = sorted(path.name for path in notebook_dir.glob("*.ipynb"))
-    assert copied == list_notebooks()
 
 
 def test_streamlit_module_helper_functions(monkeypatch):

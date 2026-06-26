@@ -78,7 +78,7 @@ Heat pump integration helper models include:
 
 Specialised helper models also capture lower-level Heat Pump optimisation
 inputs/outputs, integrated Heat Pump screening comparisons, piecewise stream
-linearisation requests, and legacy visualisation data structures.
+linearisation requests, and structured targeting/graph outputs.
 
 .. automodule:: OpenPinch.lib.schemas
    :no-members:

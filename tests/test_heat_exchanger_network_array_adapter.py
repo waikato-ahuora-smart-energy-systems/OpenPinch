@@ -259,7 +259,7 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
                     "t_supply": {"value": 310.0, "unit": "K"},
                     "t_target": {"value": 470.0, "unit": "K"},
                     "heat_flow": {"value": 888.0, "unit": "kW"},
-                    "flow_heat_capacity": 6.1,
+                    "heat_capacity_flowrate": 6.1,
                 },
             ],
             "utilities": [

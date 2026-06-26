@@ -98,7 +98,7 @@ def configure_gekko_solver(
     *,
     solver_options: Mapping[str, Any] | Sequence[str] | None = None,
 ) -> SolverRun:
-    """Apply the legacy GEKKO/Pyomo solver settings without eager imports."""
+    """Apply GEKKO/Pyomo solver settings without eager imports."""
 
     require_solver_backend(solver_name)
 

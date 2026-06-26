@@ -38,7 +38,6 @@ def test_stream_accepts_optional_fluid_metadata():
     )
 
     assert stream.name == "Refrigerant"
-    assert stream.stream_name == "Refrigerant"
     assert stream.fluid_name == "HEOS::R32[0.697615]&R125[0.302385]"
     assert stream.fluid_phase == "vle"
 

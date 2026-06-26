@@ -14,8 +14,6 @@ from .lib.schemas.io import (
     TargetInput,
     TargetOutput,
     UtilitySchema,
-    VisualiseInput,
-    VisualiseOutput,
     ZoneTreeSchema,
 )
 from .lib.schemas.reporting import GraphAvailability, ProblemReport, ReportMetric
@@ -65,8 +63,6 @@ __all__ = [
     "UtilitySchema",
     "ValidationIssue",
     "ValidationReport",
-    "VisualiseInput",
-    "VisualiseOutput",
     "ZoneTreeSchema",
     "ZoneType",
     "config_options",

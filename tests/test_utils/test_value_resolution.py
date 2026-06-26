@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +15,6 @@ from OpenPinch.lib.schemas.common import (
     ValueWithUnit,
 )
 from OpenPinch.utils.value_resolution import (
-    evaluate_value_spec,
     get_period_value,
     get_scalar_value,
     resolve_value_array,
@@ -115,69 +113,8 @@ def test_resolve_scalar_value_rejects_bool():
     ],
 )
 def test_resolve_scalar_value_rejects_specs(payload):
-    with pytest.raises(TypeError, match="evaluate_value_spec"):
+    with pytest.raises(TypeError, match="Unsupported mapping"):
         get_scalar_value(payload)
-
-
-@pytest.mark.parametrize(
-    ("spec", "expected"),
-    [
-        pytest.param({"value": 4.0, "multiplier": 2.5}, 10.0, id="multiplier"),
-        pytest.param({"value": 4.0, "multiply": 2.5}, 10.0, id="multiply"),
-        pytest.param({"value": 4.0, "add": 2.5}, 6.5, id="add"),
-        pytest.param({"value": 4.0, "subtract": 2.5}, 1.5, id="subtract"),
-        pytest.param({"value": 9.0, "divide": 3.0}, 3.0, id="divide"),
-        pytest.param({"value": 0.0, "divide": 3.0}, 0.0, id="divide-zero"),
-        pytest.param({"value": 3.0, "power": 2.0}, 9.0, id="power"),
-        pytest.param({"value": 100.0, "log": 10.0}, 2.0, id="log"),
-        pytest.param({"value": -10.0, "log": 10.0}, 0.0, id="log-negative"),
-        pytest.param({"value": 3.0, "exp": 2.0}, 8.0, id="exp"),
-        pytest.param({"value": -1.0, "exp": 2.0}, 0.0, id="exp-negative"),
-        pytest.param({"value": -4.0, "abs": True}, 4.0, id="abs"),
-        pytest.param({"value": 3.0, "min": 2.0}, 2.0, id="min"),
-        pytest.param({"value": 3.0, "max": 7.0}, 7.0, id="max"),
-    ],
-)
-def test_evaluate_value_spec_supports_operators(spec, expected):
-    assert evaluate_value_spec(spec) == pytest.approx(expected)
-
-
-def test_evaluate_value_spec_handles_zone_name_and_default_value():
-    spec = {
-        "zone-a": {"multiply": 0.5},
-        "zone-b": {"add": 3.0},
-    }
-
-    assert evaluate_value_spec(spec, zone_name="zone-a", default_value=20.0) == 10.0
-    assert evaluate_value_spec(spec, zone_name="zone-b", default_value=20.0) == 23.0
-
-
-def test_evaluate_value_spec_resolves_nested_leaves_with_idx():
-    spec = {
-        "zone-a": {
-            "value": {"values": [5.0, 8.0], "period_ids": ["0", "peak"], "unit": "kW"},
-            "add": {"value": "2.0"},
-        }
-    }
-
-    assert evaluate_value_spec(spec, zone_name="zone-a", period_idx=1) == pytest.approx(
-        10.0
-    )
-
-
-def test_evaluate_value_spec_does_not_mutate_input():
-    spec = {
-        "zone-a": {
-            "value": {"values": [5.0, 8.0], "period_ids": ["0", "peak"], "unit": "kW"},
-            "add": 2.0,
-        }
-    }
-    before = deepcopy(spec)
-
-    assert evaluate_value_spec(spec, zone_name="zone-a", period_idx=1) == pytest.approx(
-        10.0
-    )
-    assert spec == before
 
 
 @pytest.mark.parametrize(

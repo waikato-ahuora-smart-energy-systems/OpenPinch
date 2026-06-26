@@ -9,14 +9,7 @@ from OpenPinch.lib.schemas.common import (
     PeriodValueWithUnit,
     ValueWithUnit,
 )
-from OpenPinch.lib.schemas.io import (
-    GetInputOutputData,
-    ProblemTableDataSchema,
-    StreamSchema,
-    TargetInput,
-    THSchema,
-    UtilitySchema,
-)
+from OpenPinch.lib.schemas.io import StreamSchema, TargetInput, UtilitySchema
 from OpenPinch.lib.schemas.reporting import PinchTemp, TargetResults
 
 
@@ -36,25 +29,6 @@ def test_target_input_utilities_default_is_not_shared():
 
     assert len(first.utilities) == 1
     assert second.utilities == []
-
-
-def test_get_input_output_data_options_default_is_not_shared():
-    profile = ProblemTableDataSchema(name="Plant", data=THSchema(T=[100.0]))
-    stream = StreamSchema(
-        zone="Zone A",
-        name="H1",
-        t_supply=150.0,
-        t_target=60.0,
-        heat_flow=100.0,
-    )
-
-    first = GetInputOutputData(plant_profile_data=[profile], streams=[stream])
-    second = GetInputOutputData(plant_profile_data=[profile], streams=[stream])
-
-    first.options["mode"] = "baseline"
-
-    assert first.options == {"mode": "baseline"}
-    assert second.options == {}
 
 
 def test_target_input_accepts_period_value_payloads():
@@ -130,7 +104,6 @@ def test_target_input_accepts_stream_fluid_pressure_and_enthalpy_fields():
     assert isinstance(stream.p_supply, ValueWithUnit)
     assert isinstance(stream.h_target, ValueWithUnit)
     assert stream.name == "H1"
-    assert stream.stream_name == "H1"
     assert stream.fluid_name == "HEOS::Water"
     assert stream.fluid_phase == "gas"
     assert utility.p_supply == pytest.approx(800.0)
@@ -138,18 +111,26 @@ def test_target_input_accepts_stream_fluid_pressure_and_enthalpy_fields():
     assert utility.fluid_phase == "vapour-liquid equilibrium"
 
 
-def test_stream_schema_accepts_stream_name_alias():
-    stream = StreamSchema(
-        zone="Zone A",
-        stream_name="H1",
-        t_supply=150.0,
-        t_target=60.0,
-        heat_flow=100.0,
-    )
+@pytest.mark.parametrize(
+    "alias_name",
+    ["stream_name", "heat_capacity_flow_rate", "flow_heat_capacity"],
+)
+def test_stream_schema_rejects_retired_aliases(alias_name):
+    payload = {
+        "zone": "Zone A",
+        "name": "H1",
+        "t_supply": 150.0,
+        "t_target": 60.0,
+        "heat_flow": 100.0,
+    }
+    if alias_name == "stream_name":
+        payload.pop("name")
+        payload[alias_name] = "H1"
+    else:
+        payload[alias_name] = 10.0
 
-    assert stream.name == "H1"
-    assert stream.stream_name == "H1"
-    assert stream.model_dump(mode="python")["name"] == "H1"
+    with pytest.raises(ValidationError):
+        StreamSchema.model_validate(payload)
 
 
 def test_target_input_accepts_fluid_phase_enum_instances():
