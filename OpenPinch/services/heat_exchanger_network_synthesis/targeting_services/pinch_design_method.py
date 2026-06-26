@@ -15,12 +15,12 @@ from ..common.execution.pathways import (
 )
 from ..common.execution.settings import SynthesisWorkflowSettings
 from ..common.results.assembly import SynthesisWorkflowResult, build_synthesis_result
-from ..common.solver.pinch_design_snapshot import (
-    PinchDecompositionSnapshot,
+from ..common.solver.pinch_design_decomposition import (
+    PinchDesignDecomposition,
+    PinchDesignTarget,
     PinchLocation,
-    PinchTargetSnapshot,
     StageSelection,
-    build_pinch_design_method_snapshot,
+    build_pinch_design_decomposition,
 )
 
 _PDM_STAGE_PAIR_SWEEP = (
@@ -214,12 +214,12 @@ def _pathway_approach_temperature(
 
 
 __all__ = [
-    "PinchDecompositionSnapshot",
+    "PinchDesignDecomposition",
+    "PinchDesignTarget",
     "PinchLocation",
-    "PinchTargetSnapshot",
     "StageSelection",
     "_execute_pinch_design_method_workflow",
-    "build_pinch_design_method_snapshot",
+    "build_pinch_design_decomposition",
     "build_pinch_design_method_tasks",
     "execute_pinch_design_method_stage",
 ]

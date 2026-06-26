@@ -8,9 +8,10 @@ from typing import Any, Literal
 import numpy as np
 
 from ..common.solver.arrays import PreparedSolverArrays
-from ..common.solver.pinch_design_snapshot import PinchDecompositionSnapshot
+from ..common.solver.pinch_design_decomposition import PinchDesignDecomposition
 from .base import BaseHeatExchangerNetworkModel
-from .stagewise import StageWiseModel, _value as _scalar_value
+from .stagewise import StageWiseModel
+from .stagewise import _value as _scalar_value
 
 
 class PinchDecompModel(BaseHeatExchangerNetworkModel):
@@ -40,12 +41,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         integers: bool,
         tol: float,
         pinch_loc: Literal["above", "below"],
-        pinch_snapshot: PinchDecompositionSnapshot,
+        pinch_decomposition: PinchDesignDecomposition,
         stage_selection: Literal["automated"] | list[int] | tuple[int, int],
         solver_options: Mapping[str, Any] | Sequence[str] | None = None,
     ) -> None:
         self.pinch_loc = pinch_loc
-        self.pinch_snapshot = pinch_snapshot
+        self.pinch_decomposition = pinch_decomposition
         self.stage_selection = stage_selection
         super().__init__(
             name=name,
@@ -79,11 +80,11 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.T_c_out_OG = self.T_c_out.copy()
 
     def calculate_pinch(self) -> None:
-        """Read target values from the HENS-04 private OpenPinch snapshot."""
+        """Read target values from the private OpenPinch decomposition."""
 
-        if self.pinch_snapshot.pinch_location != self.pinch_loc:
-            raise ValueError("pinch snapshot location does not match PDM side.")
-        target = self.pinch_snapshot.target
+        if self.pinch_decomposition.pinch_location != self.pinch_loc:
+            raise ValueError("pinch decomposition location does not match PDM side.")
+        target = self.pinch_decomposition.target
         self.HU_target = target.hot_utility_target
         self.CU_target = target.cold_utility_target
         self.T_pinch = target.shifted_pinch_temperature
@@ -99,7 +100,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.I = self.f_h_state.shape[1]
         self.J = self.f_c_state.shape[1]
 
-        snapshot = self.pinch_snapshot
+        decomposition = self.pinch_decomposition
         shifted_pinch = float(self.T_pinch)
         hot_threshold = shifted_pinch + self.dTmin / 2.0
         cold_threshold = shifted_pinch - self.dTmin / 2.0
@@ -173,10 +174,10 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             (1 if any(self.z_j_active_state[n][j] for n in range(self.N_states)) else 0)
             for j in range(self.J)
         ]
-        if snapshot.manual_stage_selection is None:
+        if decomposition.manual_stage_selection is None:
             self.S = max(sum(self.z_i_active), sum(self.z_j_active))
         else:
-            self.S = snapshot.S
+            self.S = decomposition.S
         self.K = self.S + 1
         self.T_h_in = self.T_h_in_state[0].copy()
         self.T_h_out = self.T_h_out_state[0].copy()

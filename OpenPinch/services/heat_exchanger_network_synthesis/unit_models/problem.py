@@ -12,7 +12,7 @@ from ..common.solver.extraction import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
-from ..common.solver.pinch_design_snapshot import PinchDecompositionSnapshot
+from ..common.solver.pinch_design_decomposition import PinchDesignDecomposition
 from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
@@ -48,7 +48,7 @@ class InternalHeatExchangerNetworkProblem:
     stage_selection: str | list[str] = "automated"
     stages: int | None = None
     synthesis_task_id: str | None = None
-    pinch_snapshots: Mapping[str, PinchDecompositionSnapshot] | None = None
+    pinch_decompositions: Mapping[str, PinchDesignDecomposition] | None = None
 
     def load_model(
         self,
@@ -121,7 +121,9 @@ class InternalHeatExchangerNetworkProblem:
             run_id=run_id,
             task_id=self.synthesis_task_id,
             method=self.framework,
-            stage_count=getattr(self.case, "stages", getattr(self.case, "S", self.stages)),
+            stage_count=getattr(
+                self.case, "stages", getattr(self.case, "S", self.stages)
+            ),
         )
 
     def extract_result(
@@ -152,13 +154,13 @@ class InternalHeatExchangerNetworkProblem:
         *,
         model_factories: Mapping[str, Any] | None,
     ) -> None:
-        """Construct source PDM above/below models with private snapshots."""
+        """Construct source PDM above/below models with private decompositions."""
 
-        snapshots = dict(self.pinch_snapshots or {})
-        if "above" not in snapshots or "below" not in snapshots:
+        decompositions = dict(self.pinch_decompositions or {})
+        if "above" not in decompositions or "below" not in decompositions:
             raise ValueError(
                 "PDM construction requires above and below pinch decomposition "
-                "snapshots from the OpenPinch targeting boundary."
+                "records from the OpenPinch targeting boundary."
             )
         factory = self._model_factory(
             model_factories,
@@ -173,7 +175,7 @@ class InternalHeatExchangerNetworkProblem:
                     "name": f"above pinch {self.dTmin}",
                     "pinch_loc": "above",
                     "minimisation_goal": "hot utility",
-                    "pinch_snapshot": snapshots["above"],
+                    "pinch_decomposition": decompositions["above"],
                     "stage_selection": self.stage_selection,
                 }
             )
@@ -185,7 +187,7 @@ class InternalHeatExchangerNetworkProblem:
                     "name": f"below pinch {self.dTmin}",
                     "pinch_loc": "below",
                     "minimisation_goal": "cold utility",
-                    "pinch_snapshot": snapshots["below"],
+                    "pinch_decomposition": decompositions["below"],
                     "stage_selection": self.stage_selection,
                 }
             )

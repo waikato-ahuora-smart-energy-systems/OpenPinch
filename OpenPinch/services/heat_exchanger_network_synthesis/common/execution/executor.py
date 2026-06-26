@@ -188,20 +188,20 @@ class LocalSynthesisExecutor:
         dTmin = _legacy_task_dTmin(task)
         arrays = problem_to_solver_arrays(problem, dTmin)
         stage_selection = _legacy_pdm_stage_selection(problem, task)
-        snapshots = None
+        decompositions = None
         if task.method == "pinch_design_method":
-            from ..solver.pinch_design_snapshot import (
-                build_pinch_design_method_snapshot,
+            from ..solver.pinch_design_decomposition import (
+                build_pinch_design_decomposition,
             )
 
-            snapshots = {
-                "above": build_pinch_design_method_snapshot(
+            decompositions = {
+                "above": build_pinch_design_decomposition(
                     problem,
                     task.approach_temperature,
                     pinch_location="above",
                     stage_selection=stage_selection,
                 ),
-                "below": build_pinch_design_method_snapshot(
+                "below": build_pinch_design_decomposition(
                     problem,
                     task.approach_temperature,
                     pinch_location="below",
@@ -230,7 +230,7 @@ class LocalSynthesisExecutor:
             stage_selection=stage_selection,
             stages=task.stage_count,
             synthesis_task_id=task.task_id,
-            pinch_snapshots=snapshots,
+            pinch_decompositions=decompositions,
         )
 
     def _parent_problem(

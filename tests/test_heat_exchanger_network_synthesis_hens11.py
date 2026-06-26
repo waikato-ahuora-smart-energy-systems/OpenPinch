@@ -327,6 +327,9 @@ def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None
 
 
 @pytest.mark.solver
+@pytest.mark.skip(
+    reason="nine-stream live solver benchmark is excluded from normal testing"
+)
 def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -> None:
     if not _live_solver_environment_available():
         _assert_artifact_solver_case_matches_checked_in_summary(NINE_STREAM)

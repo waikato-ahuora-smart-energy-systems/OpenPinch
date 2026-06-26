@@ -758,8 +758,14 @@ def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
     single_state = _single_state_no_sweep_problem()
     duplicate_state = _duplicate_two_state_no_sweep_problem()
 
-    single_result = _run_single_candidate_open_hens(single_state)
-    duplicate_result = _run_single_candidate_open_hens(duplicate_state)
+    single_result = _run_single_candidate_open_hens(
+        single_state,
+        approach_temperature=10.0,
+    )
+    duplicate_result = _run_single_candidate_open_hens(
+        duplicate_state,
+        approach_temperature=10.0,
+    )
 
     assert _task_counts_by_method(single_result) == {
         "network_evolution_method": 1,
@@ -796,14 +802,17 @@ def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
     single_network = single_design.network
     duplicate_network = duplicate_design.network
     assert single_network.stage_count == duplicate_network.stage_count
-    assert single_network.summary_metrics["recovery_units"] == (
-        duplicate_network.summary_metrics["recovery_units"]
+    assert (
+        single_network.summary_metrics["recovery_units"]
+        == (duplicate_network.summary_metrics["recovery_units"])
     )
-    assert single_network.summary_metrics["hot_utility_units"] == (
-        duplicate_network.summary_metrics["hot_utility_units"]
+    assert (
+        single_network.summary_metrics["hot_utility_units"]
+        == (duplicate_network.summary_metrics["hot_utility_units"])
     )
-    assert single_network.summary_metrics["cold_utility_units"] == (
-        duplicate_network.summary_metrics["cold_utility_units"]
+    assert (
+        single_network.summary_metrics["cold_utility_units"]
+        == (duplicate_network.summary_metrics["cold_utility_units"])
     )
     assert network_structure_signature(duplicate_network) == (
         network_structure_signature(single_network)
@@ -1089,24 +1098,80 @@ def _duplicate_two_state_no_sweep_problem() -> PinchProblem:
 
 
 def _single_state_no_sweep_payload() -> dict:
-    payload = json.loads(
-        (FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    payload = deepcopy(payload)
-    payload["options"] = {
-        **payload["options"],
-        "HENS_APPROACH_TEMPERATURES": [14.0],
-        "HENS_DERIVATIVE_THRESHOLDS": [0.5],
-        "HENS_STAGE_SELECTION": [3],
-        "HENS_BEST_SOLUTIONS_TO_SAVE": 1,
-        "HENS_MAX_PARALLEL": 1,
-        "HENS_OUTPUT_FORMATS": [],
-        "HENS_RUN_ID": "single-state-no-sweep",
-        "HENS_SYNTHESIS_QUALITY_TIER": 1,
+    return {
+        "streams": [
+            {
+                "heat_capacity_flowrate": {
+                    "unit": "kW/delta_degC",
+                    "value": 10.0,
+                },
+                "heat_flow": {"unit": "kW", "value": 2000.0},
+                "htc": {"unit": "kW/m^2/K", "value": 1.0},
+                "name": "H1",
+                "t_supply": {"unit": "K", "value": 500.0},
+                "t_target": {"unit": "K", "value": 300.0},
+                "zone": "Site/Process A",
+            },
+            {
+                "heat_capacity_flowrate": {
+                    "unit": "kW/delta_degC",
+                    "value": 5.0,
+                },
+                "heat_flow": {"unit": "kW", "value": 1000.0},
+                "htc": {"unit": "kW/m^2/K", "value": 1.0},
+                "name": "C1",
+                "t_supply": {"unit": "K", "value": 450.0},
+                "t_target": {"unit": "K", "value": 650.0},
+                "zone": "Site/Process A",
+            },
+        ],
+        "utilities": [
+            {
+                "heat_flow": None,
+                "htc": {"unit": "kW/m^2/K", "value": 5.0},
+                "name": "HU",
+                "price": {"unit": "$/MWh", "value": 80.0},
+                "t_supply": {"unit": "K", "value": 700.0},
+                "t_target": {"unit": "K", "value": 700.0},
+                "type": "Hot",
+            },
+            {
+                "heat_flow": None,
+                "htc": {"unit": "kW/m^2/K", "value": 1.0},
+                "name": "CU",
+                "price": {"unit": "$/MWh", "value": 15.0},
+                "t_supply": {"unit": "K", "value": 290.0},
+                "t_target": {"unit": "K", "value": 310.0},
+                "type": "Cold",
+            },
+        ],
+        "options": {
+            "COSTING_HX_AREA_COEFF": 150.0,
+            "COSTING_HX_AREA_EXP": 1.0,
+            "COSTING_HX_UNIT_COST": 5500.0,
+            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_BEST_SOLUTIONS_TO_SAVE": 1,
+            "HENS_DERIVATIVE_THRESHOLDS": [0.5],
+            "HENS_LOG_LEVEL": "WARNING",
+            "HENS_MAX_PARALLEL": 1,
+            "HENS_METHOD_SEQUENCE": [
+                "pinch_design_method",
+                "thermal_derivative_method",
+                "network_evolution_method",
+            ],
+            "HENS_OUTPUT_FORMATS": [],
+            "HENS_RUN_ID": "single-state-no-sweep",
+            "HENS_SOLVER_EVM": "ipopt-pyomo",
+            "HENS_SOLVER_OPTIONS_EVM": {},
+            "HENS_SOLVER_OPTIONS_PDM": {},
+            "HENS_SOLVER_OPTIONS_TDM": {},
+            "HENS_SOLVER_PDM": "couenne",
+            "HENS_SOLVER_TDM": "couenne",
+            "HENS_SOLVE_TOLERANCE": 0.001,
+            "HENS_STAGE_SELECTION": [1],
+            "HENS_SYNTHESIS_QUALITY_TIER": 1,
+        },
     }
-    return payload
 
 
 def _is_scalar_quantity_payload(value: object) -> bool:
@@ -1117,10 +1182,14 @@ def _is_scalar_quantity_payload(value: object) -> bool:
     )
 
 
-def _run_single_candidate_open_hens(problem: PinchProblem):
+def _run_single_candidate_open_hens(
+    problem: PinchProblem,
+    *,
+    approach_temperature: float = 14.0,
+):
     problem.target()
     settings = workflow_settings_from_problem(problem)
-    assert settings.approach_temperatures == (14.0,)
+    assert settings.approach_temperatures == (approach_temperature,)
     assert settings.derivative_thresholds == (0.5,)
     result = workflow_module.execute_open_hens_method(
         problem,

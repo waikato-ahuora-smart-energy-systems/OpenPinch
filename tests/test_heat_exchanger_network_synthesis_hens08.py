@@ -126,12 +126,12 @@ def _snapshot_solved_model(
         Q_hu_total=expected["hot_utility_load"],
         Q_cu_total=expected["cold_utility_load"],
         Q_r_total=_recovery_total(solution_arrays["Q_r"]),
-        T_h_out=arrays.arrays["T_h_out"].tolist(),
-        T_c_out=arrays.arrays["T_c_out"].tolist(),
-        T_hu_in=arrays.arrays["T_hu_in"].tolist(),
-        T_hu_out=arrays.arrays["T_hu_out"].tolist(),
-        T_cu_in=arrays.arrays["T_cu_in"].tolist(),
-        T_cu_out=arrays.arrays["T_cu_out"].tolist(),
+        T_h_out=_single_state_array(arrays, "T_h_out").tolist(),
+        T_c_out=_single_state_array(arrays, "T_c_out").tolist(),
+        T_hu_in=_single_state_array(arrays, "T_hu_in").tolist(),
+        T_hu_out=_single_state_array(arrays, "T_hu_out").tolist(),
+        T_cu_in=_single_state_array(arrays, "T_cu_in").tolist(),
+        T_cu_out=_single_state_array(arrays, "T_cu_out").tolist(),
     )
 
 
@@ -173,13 +173,13 @@ def _snapshot_solution_arrays(snapshot: dict, arrays: PreparedSolverArrays) -> d
         "Q_h": q_h,
         "Q_c": q_c,
         "T_h": _stage_temperatures(
-            arrays.arrays["T_h_in"].tolist(),
-            arrays.arrays["T_h_out"].tolist(),
+            _single_state_array(arrays, "T_h_in").tolist(),
+            _single_state_array(arrays, "T_h_out").tolist(),
             stages,
         ),
         "T_c": _stage_temperatures(
-            arrays.arrays["T_c_out"].tolist(),
-            arrays.arrays["T_c_in"].tolist(),
+            _single_state_array(arrays, "T_c_out").tolist(),
+            _single_state_array(arrays, "T_c_in").tolist(),
             stages,
         ),
         "theta": theta,
@@ -209,6 +209,12 @@ def _recovery_total(values: list) -> float:
         for cold_stream in hot_stream
         for duty in cold_stream
     )
+
+
+def _single_state_array(arrays: PreparedSolverArrays, name: str):
+    values = arrays.arrays[f"{name}_state"]
+    assert values.shape[0] == 1
+    return values[0]
 
 
 def _assert_close(

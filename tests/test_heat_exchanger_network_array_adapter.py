@@ -79,6 +79,30 @@ AXIS_ARRAY_NAMES = {
         "hu_cost",
     },
 }
+STATE_ARRAY_NAMES = {
+    "T_c_cont",
+    "T_c_in",
+    "T_c_out",
+    "T_cu_cont",
+    "T_cu_in",
+    "T_cu_out",
+    "T_h_cont",
+    "T_h_in",
+    "T_h_out",
+    "T_hu_cont",
+    "T_hu_in",
+    "T_hu_out",
+    "c_cost",
+    "cu_cost",
+    "f_c",
+    "f_h",
+    "h_cost",
+    "htc_c",
+    "htc_cu",
+    "htc_h",
+    "htc_hu",
+    "hu_cost",
+}
 
 
 def test_openhens_fixture_inventory_matches_converter_case_ids() -> None:
@@ -175,9 +199,7 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     payload = problem_to_solver_arrays(PinchProblem(source=fixture_path), 14.0)
     current = payload.to_json_dict()
 
-    assert {
-        name: current["array_shapes"][name] for name in snapshot["array_shapes"]
-    } == snapshot["array_shapes"]
+    assert _legacy_snapshot_shapes(current, snapshot) == snapshot["array_shapes"]
     _assert_axis_identities_match(current, snapshot)
 
     for name, expected in snapshot["arrays"].items():
@@ -186,8 +208,8 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     for name, expected in snapshot["source_openhens_arrays"].items():
         _assert_array_matches_by_identity(name, current, expected, snapshot)
 
-    np.testing.assert_allclose(current["arrays"]["T_hu_cont"], [7.0])
-    np.testing.assert_allclose(current["arrays"]["T_cu_cont"], [7.0])
+    np.testing.assert_allclose(current["arrays"]["T_hu_cont_state"][0], [7.0])
+    np.testing.assert_allclose(current["arrays"]["T_cu_cont_state"][0], [7.0])
 
 
 def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
@@ -206,10 +228,14 @@ def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
     ]
     assert payload.utility_identities["hot_utilities"] == ["Hot Utility.HPS"]
     np.testing.assert_allclose(
-        payload.arrays["T_c_in"], [373.15, 308.15, 358.15, 333.15, 413.15]
+        _single_state_array(payload, "T_c_in"),
+        [373.15, 308.15, 358.15, 333.15, 413.15],
     )
-    np.testing.assert_allclose(payload.arrays["f_c"], [100.0, 70.0, 350.0, 60.0, 200.0])
-    np.testing.assert_allclose(payload.arrays["hu_cost"], [60.0])
+    np.testing.assert_allclose(
+        _single_state_array(payload, "f_c"),
+        [100.0, 70.0, 350.0, 60.0, 200.0],
+    )
+    np.testing.assert_allclose(_single_state_array(payload, "hu_cost"), [60.0])
 
 
 def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
@@ -270,8 +296,8 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
 
     assert float(problem.hot_streams[0].CP) != pytest.approx(14.8)
     assert float(problem.cold_streams[0].CP) != pytest.approx(6.1)
-    assert payload.arrays["f_h"].tolist() == [14.8]
-    assert payload.arrays["f_c"].tolist() == [6.1]
+    assert _single_state_array(payload, "f_h").tolist() == [14.8]
+    assert _single_state_array(payload, "f_c").tolist() == [6.1]
 
 
 def test_adapter_scales_explicit_dt_cont_by_active_multiplier() -> None:
@@ -327,10 +353,10 @@ def test_adapter_scales_explicit_dt_cont_by_active_multiplier() -> None:
 
     payload = problem_to_solver_arrays(problem, 2.0)
 
-    np.testing.assert_allclose(payload.arrays["T_h_cont"], [6.0])
-    np.testing.assert_allclose(payload.arrays["T_c_cont"], [8.0])
-    np.testing.assert_allclose(payload.arrays["T_hu_cont"], [2.0])
-    np.testing.assert_allclose(payload.arrays["T_cu_cont"], [4.0])
+    np.testing.assert_allclose(_single_state_array(payload, "T_h_cont"), [6.0])
+    np.testing.assert_allclose(_single_state_array(payload, "T_c_cont"), [8.0])
+    np.testing.assert_allclose(_single_state_array(payload, "T_hu_cont"), [2.0])
+    np.testing.assert_allclose(_single_state_array(payload, "T_cu_cont"), [4.0])
 
 
 def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() -> None:
@@ -360,8 +386,8 @@ def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() ->
         "T_hu_out",
     ):
         np.testing.assert_allclose(
-            celsius_arrays.arrays[array_name],
-            kelvin_arrays.arrays[array_name],
+            _single_state_array(celsius_arrays, array_name),
+            _single_state_array(kelvin_arrays, array_name),
         )
 
 
@@ -479,9 +505,10 @@ def _load_converter_module():
 
 
 def _assert_axis_identities_match(current: dict, snapshot: dict) -> None:
-    assert set(current["axis_maps"]) == set(snapshot["axis_maps"])
-    for axis_name, current_axis in current["axis_maps"].items():
-        assert current_axis == snapshot["axis_maps"][axis_name]
+    assert set(current["axis_maps"]) == {*snapshot["axis_maps"], "states"}
+    assert current["axis_maps"]["states"] == {"0": 0}
+    for axis_name, expected_axis in snapshot["axis_maps"].items():
+        assert current["axis_maps"][axis_name] == expected_axis
 
     for identity_group in ("stream_identities", "utility_identities"):
         assert set(current[identity_group]) == set(snapshot[identity_group])
@@ -495,7 +522,7 @@ def _assert_array_matches_by_identity(
     expected: list,
     snapshot: dict,
 ) -> None:
-    actual = current["arrays"][name]
+    actual = _legacy_snapshot_array(current, name)
     expected = _reordered_expected_array(name, current, expected, snapshot)
     if name.endswith("_names"):
         assert _normalised_names(actual) == _normalised_names(expected)
@@ -523,3 +550,39 @@ def _reordered_expected_array(
 
 def _normalised_names(values: list) -> list[str]:
     return [str(value).strip() for value in values]
+
+
+def _legacy_snapshot_shapes(current: dict, snapshot: dict) -> dict[str, list[int]]:
+    return {
+        name: _legacy_snapshot_shape(current, name) for name in snapshot["array_shapes"]
+    }
+
+
+def _legacy_snapshot_shape(current: dict, name: str) -> list[int]:
+    current_name = _current_array_name(name)
+    shape = current["array_shapes"][current_name]
+    if current_name.endswith("_state"):
+        assert shape[0] == 1
+        return shape[1:]
+    return shape
+
+
+def _legacy_snapshot_array(current: dict, name: str) -> list:
+    current_name = _current_array_name(name)
+    values = current["arrays"][current_name]
+    if current_name.endswith("_state"):
+        assert len(current["arrays"]["state_ids"]) == 1
+        return values[0]
+    return values
+
+
+def _current_array_name(name: str) -> str:
+    if name in STATE_ARRAY_NAMES:
+        return f"{name}_state"
+    return name
+
+
+def _single_state_array(payload, name: str) -> np.ndarray:
+    values = payload.arrays[_current_array_name(name)]
+    assert values.shape[0] == 1
+    return values[0]

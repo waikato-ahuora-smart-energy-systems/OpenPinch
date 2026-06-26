@@ -41,7 +41,7 @@ from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.netw
     build_network_evolution_method_tasks,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.pinch_design_method import (
-    build_pinch_design_method_snapshot,
+    build_pinch_design_decomposition,
     build_pinch_design_method_tasks,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.thermal_derivative_method import (
@@ -578,7 +578,7 @@ def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
         framework="PDM",
         solver="apopt",
         dTmin=14.0,
-        pinch_snapshots=_pdm_snapshots(_four_stream_problem(), dTmin=14.0),
+        pinch_decompositions=_pdm_decompositions(_four_stream_problem(), dTmin=14.0),
     )
     parent = InternalHeatExchangerNetworkProblem(
         solver_arrays=_solver_arrays(),
@@ -792,13 +792,13 @@ def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) ->
         )
 
     monkeypatch.setattr(backend, "require_solver_binary", missing_binary)
-    snapshots = _pdm_snapshots(_four_stream_problem(), dTmin=14.0)
+    decompositions = _pdm_decompositions(_four_stream_problem(), dTmin=14.0)
     problem = InternalHeatExchangerNetworkProblem(
         solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 14.0),
         framework="PDM",
         solver="couenne",
         dTmin=14.0,
-        pinch_snapshots=snapshots,
+        pinch_decompositions=decompositions,
     )
 
     with pytest.raises(MissingSynthesisSolverError, match="couenne.*synthesis solves"):
@@ -1002,20 +1002,20 @@ def _two_state_problem(*, options: dict | None = None) -> PinchProblem:
     return PinchProblem(source=payload, project_name="HENS two-state")
 
 
-def _pdm_snapshots(
+def _pdm_decompositions(
     problem: PinchProblem,
     *,
     dTmin: float,
     stage_selection="automated",
 ):
     return {
-        "above": build_pinch_design_method_snapshot(
+        "above": build_pinch_design_decomposition(
             problem,
             dTmin,
             pinch_location="above",
             stage_selection=stage_selection,
         ),
-        "below": build_pinch_design_method_snapshot(
+        "below": build_pinch_design_decomposition(
             problem,
             dTmin,
             pinch_location="below",
@@ -1027,7 +1027,7 @@ def _pdm_snapshots(
 def _moved_pdm_models(stage_selection="automated"):
     problem = _four_stream_problem()
     arrays = problem_to_solver_arrays(problem, 14.0)
-    snapshots = _pdm_snapshots(
+    decompositions = _pdm_decompositions(
         problem,
         dTmin=14.0,
         stage_selection=stage_selection,
@@ -1045,7 +1045,7 @@ def _moved_pdm_models(stage_selection="automated"):
         integers=True,
         tol=1e-3,
         pinch_loc="above",
-        pinch_snapshot=snapshots["above"],
+        pinch_decomposition=decompositions["above"],
         stage_selection=stage_selection,
     )
     below = PinchDecompModel(
@@ -1061,7 +1061,7 @@ def _moved_pdm_models(stage_selection="automated"):
         integers=True,
         tol=1e-3,
         pinch_loc="below",
-        pinch_snapshot=snapshots["below"],
+        pinch_decomposition=decompositions["below"],
         stage_selection=stage_selection,
     )
     return above, below
