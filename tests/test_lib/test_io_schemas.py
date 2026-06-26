@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from OpenPinch.classes.value import Value
 from OpenPinch.lib.enums import FluidPhase
 from OpenPinch.lib.schemas.common import (
-    StatefulValueWithUnit,
+    PeriodValueWithUnit,
     ValueWithUnit,
 )
 from OpenPinch.lib.schemas.io import (
@@ -57,7 +57,7 @@ def test_get_input_output_data_options_default_is_not_shared():
     assert second.options == {}
 
 
-def test_target_input_accepts_stateful_value_payloads():
+def test_target_input_accepts_period_value_payloads():
     payload = {
         "streams": [
             {
@@ -83,10 +83,10 @@ def test_target_input_accepts_stateful_value_payloads():
     t_supply = validated.streams[0].t_supply
     t_target = validated.streams[0].t_target
 
-    assert isinstance(t_supply, StatefulValueWithUnit)
+    assert isinstance(t_supply, PeriodValueWithUnit)
     assert t_supply.values == [150.0, 140.0]
     assert t_supply.unit == "degC"
-    assert isinstance(t_target, StatefulValueWithUnit)
+    assert isinstance(t_target, PeriodValueWithUnit)
     assert t_target.unit == "degC"
 
 
@@ -269,7 +269,7 @@ def test_target_results_accept_unit_aware_hpr_scalar_and_array_metrics():
         Qc=ValueWithUnit(value=50.0, unit="kW"),
         Qr=ValueWithUnit(value=25.0, unit="kW"),
         pinch_temp=PinchTemp(),
-        hpr_utility_total=StatefulValueWithUnit(values=[10.0, 12.0], unit="kW"),
+        hpr_utility_total=PeriodValueWithUnit(values=[10.0, 12.0], unit="kW"),
         hpr_cop=ValueWithUnit(value=3.5, unit="-"),
         num_units=4,
         hpr_success=True,

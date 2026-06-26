@@ -17,21 +17,21 @@ def test_scalar_value_behaves_like_scalar_quantity():
     assert value.to_dict() == {"value": 12.5, "unit": "kW"}
 
 
-def test_stateful_value_stores_only_ordered_magnitudes():
+def test_period_value_stores_only_ordered_magnitudes():
     value = Value(
         {
             "values": [10.0, 4.0],
-            "state_ids": ["base", "peak"],
+            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "kW",
         }
     )
 
-    np.testing.assert_allclose(value.state_values, np.array([10.0, 4.0]))
+    np.testing.assert_allclose(value.period_values, np.array([10.0, 4.0]))
     assert value.to_dict() == {"values": [10.0, 4.0], "unit": "kW"}
 
 
-def test_stateful_value_requires_explicit_summary_for_scalar_face():
+def test_period_value_requires_explicit_summary_for_scalar_face():
     value = Value([10.0, 4.0], unit="kW")
 
     assert value.mean.value == pytest.approx(7.0)
@@ -39,7 +39,7 @@ def test_stateful_value_requires_explicit_summary_for_scalar_face():
         float(value)
 
 
-def test_stateful_value_getitem_is_position_based():
+def test_period_value_getitem_is_position_based():
     value = Value([10.0, 4.0], unit="kW")
 
     assert value["0"].value == pytest.approx(10.0)
@@ -71,30 +71,30 @@ def test_currency_values_round_trip_through_pint_pickle():
     assert round_tripped.unit == "$/y"
 
 
-def test_stateful_arithmetic_requires_matching_state_count():
+def test_period_arithmetic_requires_matching_period_count():
     left = Value([10.0, 4.0], unit="kW")
     right = Value([1.0, 2.0], unit="kW")
 
     result = left + right
 
-    np.testing.assert_allclose(result.state_values, np.array([11.0, 6.0]))
-    with pytest.raises(ValueError, match="identical state counts"):
+    np.testing.assert_allclose(result.period_values, np.array([11.0, 6.0]))
+    with pytest.raises(ValueError, match="identical period counts"):
         _ = left + Value([1.0, 2.0, 3.0], unit="kW")
 
 
-def test_stateful_value_slice_preserves_magnitudes():
+def test_period_value_slice_preserves_magnitudes():
     value = Value([10.0, 4.0, 2.0], unit="kW")
 
     subset = value[1:]
-    np.testing.assert_allclose(subset.state_values, np.array([4.0, 2.0]))
+    np.testing.assert_allclose(subset.period_values, np.array([4.0, 2.0]))
 
 
 def test_value_array_protocol_accepts_copy_keyword():
     scalar = Value(12.5, "kW")
-    stateful = Value([10.0, 4.0], unit="kW")
+    period_valued = Value([10.0, 4.0], unit="kW")
 
     scalar_array = np.array(scalar, copy=True)
-    stateful_array = np.array(stateful, copy=True)
+    period_array = np.array(period_valued, copy=True)
 
     assert scalar_array == pytest.approx(12.5)
-    np.testing.assert_allclose(stateful_array, np.array([10.0, 4.0]))
+    np.testing.assert_allclose(period_array, np.array([10.0, 4.0]))

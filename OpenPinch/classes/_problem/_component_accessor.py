@@ -24,7 +24,7 @@ class _ComponentAccessor:
         mvr_stage_pressure_ratio: Optional[float] = None,
         max_stage_t_sat_lift: Optional[float] = None,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> "ProcessMVRComponent":
         """Add a direct process MVR component to selected hot gas stream(s)."""
         from ...services.components.process_mvr import (
@@ -41,7 +41,7 @@ class _ComponentAccessor:
             mvr_stage_pressure_ratio=mvr_stage_pressure_ratio,
             max_stage_t_sat_lift=max_stage_t_sat_lift,
             options=options,
-            state_id=state_id,
+            period_id=period_id,
         )
 
 

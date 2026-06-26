@@ -12,30 +12,30 @@ from ..zone import Zone
 __all__ = ["extract_results"]
 
 
-def extract_results(zone: Zone, state_id: str | None = None) -> dict:
+def extract_results(zone: Zone, period_id: str | None = None) -> dict:
     """Serialise solved targets, generated utilities, and graph payloads."""
     return {
         "name": zone.name,
-        "state_id": state_id,
-        "targets": _get_report(zone, state_id=state_id),
+        "period_id": period_id,
+        "targets": _get_report(zone, period_id=period_id),
         "utilities": _get_utilities(zone),
         "graphs": get_output_graph_data(zone),
     }
 
 
-def _get_report(zone: Zone, state_id: str | None = None) -> dict:
+def _get_report(zone: Zone, period_id: str | None = None) -> dict:
     """Create the report payload from one zone and all nested subzones."""
     targets: List[dict] = []
 
     for target in zone.targets.values():
         target_payload = target.serialize_json()
-        if state_id is not None:
-            target_payload["state_id"] = state_id
+        if period_id is not None:
+            target_payload["period_id"] = period_id
         targets.append(target_payload)
 
     if len(zone.subzones) > 0:
         for subzone in zone.subzones.values():
-            targets.extend(_get_report(subzone, state_id=state_id))
+            targets.extend(_get_report(subzone, period_id=period_id))
 
     return targets
 

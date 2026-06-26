@@ -43,7 +43,7 @@ class GraphSet(BaseModel):
 
     name: str = "GraphSet"
     target_type: Optional[str] = None
-    state_id: Optional[str] = None
+    period_id: Optional[str] = None
     zone_name: Optional[str] = None
     zone_address: Optional[str] = None
     graphs: List[Graph] = Field(default_factory=list)

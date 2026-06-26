@@ -34,7 +34,7 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
     stage_count: int | None = None
     problem_id: str | None = None
     workspace_variant: str | None = None
-    state_id: str | None = None
+    period_id: str | None = None
     settings: dict[str, Any] = Field(default_factory=dict)
     seed_network: HeatExchangerNetwork | None = None
     seed_network_index: int | None = None
@@ -53,7 +53,7 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
         "task_id",
         "problem_id",
         "workspace_variant",
-        "state_id",
+        "period_id",
         "parent_task_id",
     )
     @classmethod
@@ -98,7 +98,7 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
             "run_id": self.run_id,
             "stage_count": self.stage_count,
             "settings": self.settings,
-            "state_id": self.state_id,
+            "period_id": self.period_id,
             "topology_restrictions": [
                 restriction.model_dump(mode="json")
                 for restriction in self.topology_restrictions
@@ -195,7 +195,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     task_ids: tuple[str, ...] = Field(default_factory=tuple)
     problem_id: str | None = None
     workspace_variant: str | None = None
-    state_id: str | None = None
+    period_id: str | None = None
     design_method: SynthesisDesignMethod | None = None
     selected_pathway_id: str | None = None
     selected_pathway_kind: str | None = None
@@ -276,7 +276,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
         "task_ids",
         "problem_id",
         "workspace_variant",
-        "state_id",
+        "period_id",
         "selected_pathway_id",
         "selected_pathway_kind",
         "selected_pdm_mode",
@@ -372,7 +372,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
     task_id: str | None = None
     problem_id: str | None = None
     workspace_variant: str | None = None
-    state_id: str | None = None
+    period_id: str | None = None
     solver_name: str | None = None
     solver_status: str | None = None
     design_method: SynthesisDesignMethod | None = None
@@ -394,7 +394,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
         "task_id",
         "problem_id",
         "workspace_variant",
-        "state_id",
+        "period_id",
         "solver_name",
         "solver_status",
     )

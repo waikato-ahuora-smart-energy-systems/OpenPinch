@@ -457,11 +457,11 @@ def test_prepare_problem_applies_configured_input_unit_defaults():
     assert float(cold_utility.htc) == pytest.approx(0.5)
 
 
-def test_prepare_problem_preserves_stateful_dt_cont_and_htc_values():
+def test_prepare_problem_preserves_period_dt_cont_and_htc_values():
     streams = [
         StreamSchema.model_validate(
             {
-                "name": "H_stateful",
+                "name": "H_period",
                 "zone": "Z1",
                 "t_supply": {"values": [250.0, 260.0]},
                 "t_target": {"values": [100.0, 120.0]},
@@ -474,7 +474,7 @@ def test_prepare_problem_preserves_stateful_dt_cont_and_htc_values():
     utilities = [
         UtilitySchema.model_validate(
             {
-                "name": "HU_stateful",
+                "name": "HU_period",
                 "type": "Hot",
                 "t_supply": {"values": [300.0, 310.0]},
                 "t_target": {"values": [250.0, 255.0]},
@@ -486,13 +486,13 @@ def test_prepare_problem_preserves_stateful_dt_cont_and_htc_values():
     ]
 
     site = prepare_problem(streams=streams, utilities=utilities)
-    stream = next(s for s in site.subzones["Z1"].hot_streams if s.name == "H_stateful")
-    utility = next(u for u in site.hot_utilities if u.name == "HU_stateful")
+    stream = next(s for s in site.subzones["Z1"].hot_streams if s.name == "H_period")
+    utility = next(u for u in site.hot_utilities if u.name == "HU_period")
 
-    assert stream.dt_cont.state_values.tolist() == pytest.approx([2.0, 3.0])
-    assert stream.htc.state_values.tolist() == pytest.approx([0.4, 0.5])
-    assert utility.dt_cont.state_values.tolist() == pytest.approx([4.0, 5.0])
-    assert utility.htc.state_values.tolist() == pytest.approx([0.6, 0.7])
+    assert stream.dt_cont.period_values.tolist() == pytest.approx([2.0, 3.0])
+    assert stream.htc.period_values.tolist() == pytest.approx([0.4, 0.5])
+    assert utility.dt_cont.period_values.tolist() == pytest.approx([4.0, 5.0])
+    assert utility.htc.period_values.tolist() == pytest.approx([0.6, 0.7])
 
 
 # ---------------- Invalid Input Tests ---------------- #
@@ -1239,7 +1239,7 @@ def test_process_stream_with_null_dt_cont_defaults_to_zero():
     assert float(hot_a.dt_cont_act[0]) == pytest.approx(0.0)
 
 
-def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
+def test_period_process_extrema_use_all_periods_for_default_hot_utility():
     streams = [
         StreamSchema.model_validate(
             {
@@ -1274,8 +1274,8 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
         ),
     ]
     options = {
-        "PROBLEM_STATE_IDS": ["one", "two"],
-        "PROBLEM_STATE_WEIGHTS": [1, 1],
+        "PROBLEM_PERIOD_IDS": ["one", "two"],
+        "PROBLEM_PERIOD_WEIGHTS": [1, 1],
     }
 
     site = prepare_problem(streams=streams, options=options)
@@ -1285,7 +1285,7 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
     assert float(hu.t_max_star[1]) == pytest.approx(210.0)
 
 
-def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
+def test_period_process_extrema_use_selected_period_for_default_hot_utility():
     streams = [
         StreamSchema.model_validate(
             {
@@ -1327,7 +1327,7 @@ def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
     assert float(hu.t_max_star[1]) == pytest.approx(210.0)
 
 
-def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
+def test_period_hot_utility_sorting_uses_all_period_envelope(dummy_streams):
     utilities = [
         UtilitySchema.model_validate(
             {
@@ -1373,7 +1373,7 @@ def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
     assert hot_names[:2] == ["HU_swing", "HU_flat"]
 
 
-def test_stateful_hot_utility_sorting_uses_selected_state(dummy_streams):
+def test_period_hot_utility_sorting_uses_selected_period(dummy_streams):
     utilities = [
         UtilitySchema.model_validate(
             {

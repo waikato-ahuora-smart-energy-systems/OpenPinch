@@ -116,32 +116,36 @@ class Configuration:
         """Fail fast on unsupported keys and invalid option values."""
         return validate_configuration_options(options)
 
-    def for_state(self, state_id: str | None = None, idx: int | None = None):
-        """Return a lightweight state context for this configuration."""
-        state_ids = list(self.problem.state_ids)
-        state_lookup = {state: index for index, state in enumerate(state_ids)}
-        if state_id is not None:
-            if state_id not in state_lookup:
-                raise ValueError(f"Unknown state_id {state_id!r}.")
-            resolved_idx = state_lookup[state_id]
-            resolved_state = state_id
-        elif idx is not None:
-            resolved_idx = int(idx)
+    def for_period(
+        self,
+        period_id: str | None = None,
+        period_idx: int | None = None,
+    ):
+        """Return a lightweight period context for this configuration."""
+        period_ids = list(self.problem.period_ids)
+        period_lookup = {period: index for index, period in enumerate(period_ids)}
+        if period_id is not None:
+            if period_id not in period_lookup:
+                raise ValueError(f"Unknown period_id {period_id!r}.")
+            resolved_idx = period_lookup[period_id]
+            resolved_period = period_id
+        elif period_idx is not None:
+            resolved_idx = int(period_idx)
             try:
-                resolved_state = state_ids[resolved_idx]
+                resolved_period = period_ids[resolved_idx]
             except IndexError as exc:
-                raise ValueError(f"Unknown state index {idx!r}.") from exc
+                raise ValueError(f"Unknown period index {period_idx!r}.") from exc
         else:
             resolved_idx = 0
-            resolved_state = state_ids[0] if state_ids else None
+            resolved_period = period_ids[0] if period_ids else None
         weight = (
-            self.problem.state_weights[resolved_idx]
-            if resolved_idx < len(self.problem.state_weights)
+            self.problem.period_weights[resolved_idx]
+            if resolved_idx < len(self.problem.period_weights)
             else 1.0
         )
         return SimpleNamespace(
-            state_id=resolved_state,
-            idx=resolved_idx,
+            period_id=resolved_period,
+            period_idx=resolved_idx,
             weight=weight,
         )
 

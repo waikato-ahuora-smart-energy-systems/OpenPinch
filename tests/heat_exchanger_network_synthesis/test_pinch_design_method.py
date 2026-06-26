@@ -465,26 +465,26 @@ def test_solver_arrays_include_evm_branch_options() -> None:
     assert arrays.configuration["HENS_EVM_N_RM_BRANCHES"] == 3
 
 
-def test_solver_arrays_expand_stateful_stream_data_and_weights() -> None:
+def test_solver_arrays_expand_period_stream_data_and_weights() -> None:
     arrays = problem_to_solver_arrays(_two_state_problem(), 14.0)
 
-    assert arrays.axis_maps["states"] == {"base": 0, "peak": 1}
-    assert arrays.arrays["state_weights"].tolist() == [1.0, 3.0]
-    assert arrays.arrays["f_h_state"].shape[0] == 2
+    assert arrays.axis_maps["periods"] == {"base": 0, "peak": 1}
+    assert arrays.arrays["period_weights"].tolist() == [1.0, 3.0]
+    assert arrays.arrays["f_h_period"].shape[0] == 2
     assert "f_h" not in arrays.arrays
-    assert arrays.arrays["f_h_state"][0][0] == pytest.approx(10.0)
-    assert arrays.arrays["f_h_state"][1][0] == pytest.approx(20.0)
-    assert arrays.arrays["T_h_in_state"][1][0] == pytest.approx(660.0)
+    assert arrays.arrays["f_h_period"][0][0] == pytest.approx(10.0)
+    assert arrays.arrays["f_h_period"][1][0] == pytest.approx(20.0)
+    assert arrays.arrays["T_h_in_period"][1][0] == pytest.approx(660.0)
 
 
 def test_solver_arrays_represent_single_state_as_one_state_row() -> None:
     arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
 
-    assert arrays.axis_maps["states"] == {"0": 0}
-    assert arrays.arrays["state_ids"].tolist() == ["0"]
-    assert arrays.arrays["state_weights"].tolist() == [1.0]
-    assert arrays.arrays["T_h_in_state"].shape[0] == 1
-    assert arrays.arrays["T_c_in_state"].shape[0] == 1
+    assert arrays.axis_maps["periods"] == {"0": 0}
+    assert arrays.arrays["period_ids"].tolist() == ["0"]
+    assert arrays.arrays["period_weights"].tolist() == [1.0]
+    assert arrays.arrays["T_h_in_period"].shape[0] == 1
+    assert arrays.arrays["T_c_in_period"].shape[0] == 1
     assert "T_h_in" not in arrays.arrays
     assert "T_c_in" not in arrays.arrays
 
@@ -494,7 +494,7 @@ def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
     legacy_arrays = {
         key: value
         for key, value in arrays.arrays.items()
-        if key not in {"state_ids", "state_weights"}
+        if key not in {"period_ids", "period_weights"}
     }
     bad_arrays = PreparedSolverArrays(
         arrays=legacy_arrays,
@@ -506,7 +506,7 @@ def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
         preparation=arrays.preparation,
     )
 
-    with pytest.raises(ValueError, match="state_ids is required"):
+    with pytest.raises(ValueError, match="period_ids is required"):
         StageWiseModel(
             name="legacy-arrays",
             framework="ESM",
@@ -523,17 +523,17 @@ def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
         )
 
 
-def test_solver_arrays_reject_zero_total_state_weight() -> None:
-    with pytest.raises(ValueError, match="positive finite state-weight sum"):
+def test_solver_arrays_reject_zero_total_period_weight() -> None:
+    with pytest.raises(ValueError, match="positive finite period-weight sum"):
         problem_to_solver_arrays(
             _two_state_problem(
-                options={"PROBLEM_STATE_WEIGHTS": [0.0, 0.0]},
+                options={"PROBLEM_PERIOD_WEIGHTS": [0.0, 0.0]},
             ),
             14.0,
         )
 
 
-def test_stagewise_multistate_cost_objective_uses_shared_topology_and_area() -> None:
+def test_stagewise_multiperiod_cost_objective_uses_shared_topology_and_area() -> None:
     arrays = problem_to_solver_arrays(
         _two_state_problem(
             options={
@@ -560,9 +560,9 @@ def test_stagewise_multistate_cost_objective_uses_shared_topology_and_area() -> 
         tol=1e-3,
     )
 
-    assert model.N_states == 2
-    assert len(model.Q_r_by_state) == 2
-    assert model.Q_r_by_state[0][0][0][0] is not model.Q_r_by_state[1][0][0][0]
+    assert model.N_periods == 2
+    assert len(model.Q_r_by_period) == 2
+    assert model.Q_r_by_period[0][0][0][0] is not model.Q_r_by_period[1][0][0][0]
     assert len(model.z) == model.I
     assert not isinstance(model.z[0][0][0], list)
     assert hasattr(model, "area_r_shared")
@@ -978,8 +978,8 @@ def _two_state_problem(*, options: dict | None = None) -> PinchProblem:
     payload = json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8"))
     payload["options"] = {
         **payload["options"],
-        "PROBLEM_STATE_IDS": ["base", "peak"],
-        "PROBLEM_STATE_WEIGHTS": [1.0, 3.0],
+        "PROBLEM_PERIOD_IDS": ["base", "peak"],
+        "PROBLEM_PERIOD_WEIGHTS": [1.0, 3.0],
         **(options or {}),
     }
     first_hot = payload["streams"][0]
@@ -1073,9 +1073,9 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.I = 1
     model.J = 1
     model.S = 2
-    model.N_states = 1
-    model.state_weights = [1.0]
-    model.state_weight_sum = 1.0
+    model.N_periods = 1
+    model.period_weights = [1.0]
+    model.period_weight_sum = 1.0
     model.tol = 1e-3
     model.dTmin = 20.0
     model.minimisation_goal = "variable total cost"
@@ -1098,26 +1098,26 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.T_hu_out = [620.0]
     model.T_cu_in = [300.0]
     model.T_cu_out = [320.0]
-    model.Q_r_by_state = [model.Q_r]
-    model.Q_h_by_state = [model.Q_h]
-    model.Q_c_by_state = [model.Q_c]
-    model.T_h_by_state = [model.T_h]
-    model.T_c_by_state = [model.T_c]
-    model.theta_1_by_state = [model.theta_1]
-    model.theta_2_by_state = [model.theta_2]
-    model.U_r_state = [model.U_r]
-    model.U_hu_state = [model.U_hu]
-    model.U_cu_state = [model.U_cu]
-    model.T_h_out_state = [model.T_h_out]
-    model.T_c_out_state = [model.T_c_out]
-    model.T_hu_in_state = [model.T_hu_in]
-    model.T_hu_out_state = [model.T_hu_out]
-    model.T_cu_in_state = [model.T_cu_in]
-    model.T_cu_out_state = [model.T_cu_out]
+    model.Q_r_by_period = [model.Q_r]
+    model.Q_h_by_period = [model.Q_h]
+    model.Q_c_by_period = [model.Q_c]
+    model.T_h_by_period = [model.T_h]
+    model.T_c_by_period = [model.T_c]
+    model.theta_1_by_period = [model.theta_1]
+    model.theta_2_by_period = [model.theta_2]
+    model.U_r_period = [model.U_r]
+    model.U_hu_period = [model.U_hu]
+    model.U_cu_period = [model.U_cu]
+    model.T_h_out_period = [model.T_h_out]
+    model.T_c_out_period = [model.T_c_out]
+    model.T_hu_in_period = [model.T_hu_in]
+    model.T_hu_out_period = [model.T_hu_out]
+    model.T_cu_in_period = [model.T_cu_in]
+    model.T_cu_out_period = [model.T_cu_out]
     model.hu_cost = [2.0]
     model.cu_cost = [3.0]
-    model.hu_cost_state = [model.hu_cost]
-    model.cu_cost_state = [model.cu_cost]
+    model.hu_cost_period = [model.hu_cost]
+    model.cu_cost_period = [model.cu_cost]
     model.unit_cost = [7.0]
     model.A_coeff = [11.0]
     model.A_exp = [0.6]

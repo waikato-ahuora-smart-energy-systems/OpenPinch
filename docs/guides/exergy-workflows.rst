@@ -49,16 +49,16 @@ To pin one exact family and disable fallback, pass
 ``options={"base_target_type": "..."}``.
 
 Unlike the main thermal targeting accessors, the exergy workflow expects that
-the requested target family already exists for the selected zone and state.
+the requested target family already exists for the selected zone and period.
 If it does not, run the corresponding base targeting accessor first.
 
 Typical explicit pattern:
 
 .. code-block:: python
 
-   problem.target.indirect_heat_integration(state_id="peak")
+   problem.target.indirect_heat_integration(period_id="peak")
    ts_exergy = problem.target.exergy(
-       state_id="peak",
+       period_id="peak",
        options={"base_target_type": "Total Site Target"},
    )
 
@@ -100,7 +100,7 @@ The same high-level targeting controls are available here:
 
 - ``zone_name=...`` for one zone in the hierarchy
 - ``include_subzones=True`` to enrich a selected subtree
-- ``state_id=...`` for one canonical state
+- ``period_id=...`` for one canonical period
 
 When ``include_subzones=True`` is used, exergy targeting is applied in
 post-order so child zones are solved before any site-level exergy enrichment

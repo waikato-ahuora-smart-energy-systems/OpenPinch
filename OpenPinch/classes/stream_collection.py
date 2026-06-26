@@ -42,7 +42,7 @@ class StreamCollection:
     def __init__(self, streams: List["Stream"] | None = None):
         """Initialise an empty collection sorted by descending supply temperature."""
         self._streams: dict[str, object] = {}
-        self._state_ids: dict[str, int] | None = {"0": 0}
+        self._period_ids: dict[str, int] | None = {"0": 0}
         self._weights: np.ndarray | None = np.array([1.0])
         self._sort_spec: Tuple[str, Any] = ("attr", "t_supply")
         self._sort_key: Callable = partial(_sort_by_attr, "t_supply")
@@ -53,24 +53,24 @@ class StreamCollection:
             tuple[int | None, tuple[tuple[int, int], ...]],
             StreamCollectionNumericView,
         ] = {}
-        self._num_states: int | None = 1
+        self._num_periods: int | None = 1
         if streams is not None:
             self.add_many(streams)
 
     @property
-    def state_ids(self) -> dict[str, int] | None:
-        """Return the canonical state identifiers for this collection."""
-        return self._state_ids
+    def period_ids(self) -> dict[str, int] | None:
+        """Return the canonical period identifiers for this collection."""
+        return self._period_ids
 
     @property
     def weights(self) -> np.ndarray | None:
-        """Return the canonical state weights for this collection."""
+        """Return the canonical period weights for this collection."""
         return self._weights
 
     @property
-    def num_states(self) -> int | None:
-        """Return the number of states for this collection."""
-        return self._num_states
+    def num_periods(self) -> int | None:
+        """Return the number of periods for this collection."""
+        return self._num_periods
 
     def _rebuild_sort_key(self):
         mode, payload = self._sort_spec
@@ -85,8 +85,8 @@ class StreamCollection:
         self, stream: "Stream", key: str = None, prevent_overwrite: bool = True
     ) -> str:
         """Insert a stream, optionally renaming the key to avoid collisions."""
-        self._validate_stream_state_context(stream)
-        self._adopt_appropriate_state_context(stream, stream)
+        self._validate_stream_period_context(stream)
+        self._adopt_appropriate_period_context(stream, stream)
         base_name = new_name = stream.name
         if key is None:
             key = base_name
@@ -100,10 +100,10 @@ class StreamCollection:
         stream.name = new_name
         self._streams[key] = stream
 
-        stream.set_state_context(
+        stream.set_period_context(
             weights=self._weights,
-            state_ids=self._state_ids,
-            num_states=self._num_states,
+            period_ids=self._period_ids,
+            num_periods=self._num_periods,
         )
         self._needs_sort = True
         self._invalidate_numeric_cache()
@@ -211,29 +211,29 @@ class StreamCollection:
         """Return a copy of the collection, optionally deep-copying streams."""
         return deepcopy(self) if deep else copy(self)
 
-    def set_state_context(
+    def set_period_context(
         self,
-        state_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
+        period_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
         weights: np.ndarray | list[float] | tuple[float, ...] | None,
-        num_states: int | None = None,
+        num_periods: int | None = None,
     ) -> None:
-        """Persist the canonical shared state model for this collection."""
-        self._state_ids = state_ids
+        """Persist the canonical shared period model for this collection."""
+        self._period_ids = period_ids
         self._weights = weights
-        self._num_states = num_states
+        self._num_periods = num_periods
         for stream in self._streams.values():
-            stream.set_state_context(
+            stream.set_period_context(
                 weights=self._weights,
-                state_ids=self._state_ids,
-                num_states=self._num_states,
+                period_ids=self._period_ids,
+                num_periods=self._num_periods,
             )
         self._invalidate_numeric_cache()
 
-    def _validate_stream_state_context(self, stream: "Stream") -> None:
+    def _validate_stream_period_context(self, stream: "Stream") -> None:
         if (
-            stream.num_states == self._num_states
-            or stream.num_states == 1
-            or self._num_states == 1
+            stream.num_periods == self._num_periods
+            or stream.num_periods == 1
+            or self._num_periods == 1
         ):
             return
         raise ValueError(
@@ -241,41 +241,41 @@ class StreamCollection:
             "the collection to be added."
         )
 
-    def _adopt_appropriate_state_context(
+    def _adopt_appropriate_period_context(
         self, other: "Stream", obj: "StreamCollection" | "Stream"
     ) -> None:
-        if self._num_states >= other._num_states:
-            obj.set_state_context(
-                state_ids=self._state_ids,
+        if self._num_periods >= other._num_periods:
+            obj.set_period_context(
+                period_ids=self._period_ids,
                 weights=self._weights,
-                num_states=self._num_states,
+                num_periods=self._num_periods,
             )
         else:
             if obj is not other and obj is not None:
-                obj.set_state_context(
-                    state_ids=other._state_ids,
+                obj.set_period_context(
+                    period_ids=other._period_ids,
                     weights=other._weights,
-                    num_states=other._num_states,
+                    num_periods=other._num_periods,
                 )
-            self.set_state_context(
-                state_ids=other._state_ids,
+            self.set_period_context(
+                period_ids=other._period_ids,
                 weights=other._weights,
-                num_states=other._num_states,
+                num_periods=other._num_periods,
             )
 
     def numeric_view(self, idx: int | None = None) -> StreamCollectionNumericView:
         """Return a cached dense numeric view for stream-analysis kernels."""
-        state_idx = None if idx is None else int(idx)
+        period_idx = None if idx is None else int(idx)
         signature = tuple(
             (id(stream), int(getattr(stream, "_numeric_revision", 0)))
             for stream in self._streams.values()
         )
-        cache_key = (state_idx, signature)
+        cache_key = (period_idx, signature)
         cached = self._numeric_cache.get(cache_key)
         if cached is not None:
             return cached
 
-        view = self._build_numeric_view(state_idx)
+        view = self._build_numeric_view(period_idx)
         self._numeric_cache.clear()
         self._numeric_cache[cache_key] = view
         return view
@@ -322,24 +322,26 @@ class StreamCollection:
         if not isinstance(other, StreamCollection):
             return NotImplemented
         combined = StreamCollection()
-        if self._state_ids is not None:
-            combined.set_state_context(self._state_ids, self._weights, self._num_states)
-        elif other._state_ids is not None:
-            combined.set_state_context(
-                other._state_ids, other._weights, other._num_states
+        if self._period_ids is not None:
+            combined.set_period_context(
+                self._period_ids, self._weights, self._num_periods
+            )
+        elif other._period_ids is not None:
+            combined.set_period_context(
+                other._period_ids, other._weights, other._num_periods
             )
         if (
-            self._state_ids is not None
-            and other._state_ids is not None
-            and self._state_ids != other._state_ids
-            and self._num_states > 1
-            and other._num_states > 1
+            self._period_ids is not None
+            and other._period_ids is not None
+            and self._period_ids != other._period_ids
+            and self._num_periods > 1
+            and other._num_periods > 1
         ):
             raise ValueError(
-                "Cannot combine StreamCollections with different state_ids."
+                "Cannot combine StreamCollections with different period_ids."
             )
         else:
-            self._adopt_appropriate_state_context(other, combined)
+            self._adopt_appropriate_period_context(other, combined)
 
         # Add all streams from self
         for key, stream in self._streams.items():
@@ -513,7 +515,7 @@ class StreamCollection:
             include_utility_streams = True
 
         subset = StreamCollection()
-        subset._state_ids = self._state_ids
+        subset._period_ids = self._period_ids
         subset._weights = self._weights
         subset._sort_spec = self._sort_spec
         subset._rebuild_sort_key()

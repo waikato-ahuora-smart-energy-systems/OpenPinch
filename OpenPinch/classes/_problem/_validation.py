@@ -522,12 +522,12 @@ def _validate_stream_record_states(
         ST.Neutral.value: [],
     }
 
-    num_states = 1
+    num_periods = 1
     for value in values.values():
         if isinstance(value, Value):
-            num_states = max(num_states, len(value))
+            num_periods = max(num_periods, len(value))
 
-    for idx in range(num_states):
+    for idx in range(num_periods):
         t_supply_value = t_supply[idx]
         t_target_value = t_target[idx]
         if t_supply_value is None or t_target_value is None:
@@ -549,7 +549,7 @@ def _validate_stream_record_states(
                     record_label=record_label,
                     path_field="t_supply",
                     field="t_supply/t_target",
-                    message=_with_state_suffix(
+                    message=_with_period_suffix(
                         "Supply and target temperatures must differ.",
                         idx,
                     ),
@@ -561,9 +561,9 @@ def _validate_stream_record_states(
             classifications[ST.Cold.value].append(str(idx))
 
     active_classes = {
-        stream_type: state_group
-        for stream_type, state_group in classifications.items()
-        if state_group
+        stream_type: period_group
+        for stream_type, period_group in classifications.items()
+        if period_group
     }
     if len(active_classes) > 1:
         issues.append(
@@ -650,7 +650,7 @@ def _validate_value_finiteness(
     if value is None:
         return issues
 
-    for idx in range(len(value.state_values) - 1):
+    for idx in range(len(value.period_values) - 1):
         magnitude = value[idx]
         if magnitude is None:
             continue
@@ -664,7 +664,7 @@ def _validate_value_finiteness(
                 record_label=record_label,
                 path_field=field_name,
                 field=field_name,
-                message=_with_state_suffix("Value must be finite.", idx),
+                message=_with_period_suffix("Value must be finite.", idx),
             )
         )
     return issues
@@ -684,7 +684,7 @@ def _validate_non_negative_states(
     if value is None:
         return issues
 
-    for idx in range(len(value.state_values) - 1):
+    for idx in range(len(value.period_values) - 1):
         magnitude = value[idx]
         if magnitude is None or not math.isfinite(magnitude) or magnitude >= 0.0:
             continue
@@ -696,7 +696,7 @@ def _validate_non_negative_states(
                 record_label=record_label,
                 path_field=field_name,
                 field=field_name,
-                message=_with_state_suffix(message, idx),
+                message=_with_period_suffix(message, idx),
             )
         )
 
@@ -724,14 +724,14 @@ def _build_issue(
     )
 
 
-def _state_suffix(state_id: str | None) -> str:
-    if state_id is None:
+def _period_suffix(period_id: str | None) -> str:
+    if period_id is None:
         return ""
-    return f" for state_id '{state_id}'"
+    return f" for period_id '{period_id}'"
 
 
-def _with_state_suffix(message: str, idx: int | None) -> str:
+def _with_period_suffix(message: str, idx: int | None) -> str:
     if idx is None:
         return message
     trimmed = message[:-1] if message.endswith(".") else message
-    return trimmed + _state_suffix(idx) + "."
+    return trimmed + _period_suffix(idx) + "."

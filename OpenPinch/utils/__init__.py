@@ -36,8 +36,8 @@ from .input_validation import (
 from .plots import graph_simple_cc_plot
 from .value_resolution import (
     evaluate_value_spec,
+    get_period_value,
     get_scalar_value,
-    get_state_value,
     resolve_value_array,
 )
 from .water_properties import (
@@ -84,7 +84,7 @@ __all__ = [
     "validate_utility_data",
     "graph_simple_cc_plot",
     "get_scalar_value",
-    "get_state_value",
+    "get_period_value",
     "evaluate_value_spec",
     "resolve_value_array",
     "multiminima",

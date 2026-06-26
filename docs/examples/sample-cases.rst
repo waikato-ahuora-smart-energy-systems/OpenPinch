@@ -16,16 +16,16 @@ Included Cases
    Process-only case that is useful for direct integration and ``dt_cont``
    sensitivity studies.
 
-``crude_preheat_train_multistate.json``
-   Named-state derivative of the crude preheat train for real multistate direct
-   targeting and cross-state comparison.
+``crude_preheat_train_multiperiod.json``
+   Named-period derivative of the crude preheat train for real multiperiod direct
+   targeting and cross-period comparison.
 
 ``zonal_site.json``
    Hierarchical site-style case for multi-zone and aggregated Total Site
    workflows.
 
-``zonal_site_multistate.json``
-   Seasonal named-state derivative of the site-style case for multistate Total
+``zonal_site_multiperiod.json``
+   Seasonal named-period derivative of the site-style case for multiperiod Total
    Site and indirect integration workflows.
 
 ``pulp_mill.json``
@@ -75,12 +75,12 @@ Choosing The Right Case
 
 - Use ``basic_pinch.json`` for first-run validation and graph reading.
 - Use ``crude_preheat_train.json`` for process-only sensitivity studies.
-- Use ``crude_preheat_train_multistate.json`` when the same process needs named
-  operating states such as turndown, base, and peak.
+- Use ``crude_preheat_train_multiperiod.json`` when the same process needs named
+  operating periods such as turndown, base, and peak.
 - Use ``zonal_site.json`` or ``pulp_mill.json`` when you need a real site-style
   indirect integration example.
-- Use ``zonal_site_multistate.json`` when the site answer needs seasonal or
-  named-state comparison.
+- Use ``zonal_site_multiperiod.json`` when the site answer needs seasonal or
+  named-period comparison.
 - Use ``heat_pump_targeting.json`` when you want a smaller direct HPR
   screening input data set.
 - Use ``chocolate_factory.json`` when you want to study the advanced

@@ -49,11 +49,11 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
         description="Single-state refinery preheat example for integration targets.",
         topics=("pinch", "refinery"),
     ),
-    "crude_preheat_train_multistate.json": SampleCaseMetadata(
-        name="crude_preheat_train_multistate.json",
-        title="Crude Preheat Train Multistate",
-        description="Multistate refinery case for state-specific targeting.",
-        topics=("multistate", "refinery"),
+    "crude_preheat_train_multiperiod.json": SampleCaseMetadata(
+        name="crude_preheat_train_multiperiod.json",
+        title="Crude Preheat Train Multiperiod",
+        description="Multiperiod refinery case for period-specific targeting.",
+        topics=("multiperiod", "refinery"),
     ),
     "heat_pump_targeting.json": SampleCaseMetadata(
         name="heat_pump_targeting.json",
@@ -73,11 +73,11 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
         description="Multi-zone site model for total-site targeting examples.",
         topics=("zonal", "total site"),
     ),
-    "zonal_site_multistate.json": SampleCaseMetadata(
-        name="zonal_site_multistate.json",
-        title="Zonal Site Multistate",
-        description="Multi-zone, multistate site model for scenario comparisons.",
-        topics=("zonal", "multistate"),
+    "zonal_site_multiperiod.json": SampleCaseMetadata(
+        name="zonal_site_multiperiod.json",
+        title="Zonal Site Multiperiod",
+        description="Multi-zone, multiperiod site model for scenario comparisons.",
+        topics=("zonal", "multiperiod"),
     ),
     "Four-stream-Yee-and-Grossmann-1990-1.json": SampleCaseMetadata(
         name="Four-stream-Yee-and-Grossmann-1990-1.json",
@@ -109,11 +109,11 @@ _NOTEBOOK_METADATA: dict[str, NotebookMetadata] = {
         ),
         topics=("heat pump", "comparison"),
     ),
-    "04_multistate_targeting_and_state_comparison.ipynb": NotebookMetadata(
-        name="04_multistate_targeting_and_state_comparison.ipynb",
-        title="Multistate Targeting and State Comparison",
-        description="State-specific solves and multistate result comparison.",
-        topics=("multistate",),
+    "04_multiperiod_targeting_and_period_comparison.ipynb": NotebookMetadata(
+        name="04_multiperiod_targeting_and_period_comparison.ipynb",
+        title="Multiperiod Targeting and Period Comparison",
+        description="Period-specific solves and multiperiod result comparison.",
+        topics=("multiperiod",),
     ),
     "05_schema_service_and_output_workflows.ipynb": NotebookMetadata(
         name="05_schema_service_and_output_workflows.ipynb",

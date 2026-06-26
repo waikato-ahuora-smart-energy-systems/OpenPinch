@@ -71,8 +71,8 @@ class TargetResults(BaseModel):
     model_config = _REPORT_MODEL_CONFIG
 
     name: str
-    idx: Optional[int] = None
-    state_id: Optional[str] = None
+    period_idx: Optional[int] = None
+    period_id: Optional[str] = None
     degree_of_integration: Value | None = None
     Qh: Value
     Qc: Value
@@ -157,7 +157,7 @@ class ReportMetric(BaseModel):
     label: str
     value: Any = None
     unit: Optional[str] = None
-    state_id: Optional[str] = None
+    period_id: Optional[str] = None
 
 
 class GraphAvailability(BaseModel):

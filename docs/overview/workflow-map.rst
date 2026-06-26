@@ -20,7 +20,7 @@ Packaged resource workflow
 ``PinchProblem`` workflow
    Use this for notebooks and scripts when you want one object that owns the
    problem definition, validation, prepared zone tree, solved result, graph
-   accessors, summaries, state selection, process-component mutation, and
+   accessors, summaries, period selection, process-component mutation, and
    exports.
 
 ``PinchWorkspace`` workflow
@@ -59,8 +59,8 @@ Use ``PinchProblem`` when:
 - you want validation, summaries, graphs, exports, and advanced targeting on
   one object
 - you want access to ``problem.plot.*``, ``problem.target.*``,
-  ``problem.add_component.*``, ``problem.state_ids``, or
-  ``problem.target_all_states()``
+  ``problem.add_component.*``, ``problem.period_ids``, or
+  ``problem.target_all_periods()``
 - you want heat exchanger network design through
   ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
   ``problem.design.open_hens_method(...)``, or the explicit HEN ``*_method``
@@ -78,7 +78,7 @@ Use ``pinch_analysis_service`` when:
 
 - you are integrating OpenPinch into another codebase
 - you want a typed `TargetInput -> TargetOutput` boundary
-- you do not need the convenience wrapper state model
+- you do not need the convenience wrapper period model
 
 Use the lower-level service stack when:
 
@@ -127,9 +127,9 @@ Single-case script
    ``PinchProblem("basic_pinch.json") -> validate -> target -> summary_frame ->
    plot.grand_composite_curve()``
 
-Stateful study
-   ``problem.state_ids -> problem.target.direct_heat_integration(state_id="peak")
-   -> problem.target_all_states()``
+Period-valued study
+   ``problem.period_ids -> problem.target.direct_heat_integration(period_id="peak")
+   -> problem.target_all_periods()``
 
 Advanced HPR study
    ``base case -> problem.target.direct_heat_pump(...) -> compare summary rows

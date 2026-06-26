@@ -18,7 +18,7 @@ from ...lib.schemas.targets import (
     IndirectRefrigerationTarget,
 )
 from ...utils.value_resolution import evaluate_value_spec
-from ..common.miscellaneous import get_state_index
+from ..common.miscellaneous import get_period_index
 from ..common.problem_table_analysis import create_problem_table_with_t_int
 from .common.postprocessing import _get_hpr_residual_utility_summary
 from .common.preprocessing import (
@@ -64,7 +64,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
     args: dict | None = None,
 ) -> DirectHeatPumpTarget | DirectRefrigerationTarget | None:
     """Solve an explicit direct Heat Pump or refrigeration target for one zone."""
-    idx, state_id = get_state_index(state_ids=zone.state_ids, args=args)
+    idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
     base_target = zone.targets[TT.DI.value]
     pt = deepcopy(base_target.pt)
@@ -75,7 +75,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
         config=zone.config,
-        idx=idx,
+        period_idx=idx,
     )
     if target_load < tol:
         return None
@@ -87,14 +87,14 @@ def compute_direct_heat_pump_or_refrigeration_target(
         H_cold=pt[PT.H_NET_COLD],
         config=zone.config,
         is_heat_pumping=is_heat_pumping,
-        idx=idx,
+        period_idx=idx,
     )
     pt = _calc_hpr_cascade(
         pt=pt,
         res=res,
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
-        idx=idx,
+        period_idx=idx,
     )
     general_results = {
         "zone_name": zone.name,
@@ -107,14 +107,14 @@ def compute_direct_heat_pump_or_refrigeration_target(
             is_direct=True,
             is_heat_pumping=is_heat_pumping,
         ),
-        "state_id": state_id,
-        "state_idx": idx,
+        "period_id": period_id,
+        "period_idx": idx,
     }
     hpr_results = _get_hpr_target_summary(res, zone)
     util_results = _get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
-        idx=idx,
+        period_idx=idx,
         is_direct=True,
         is_heat_pumping=is_heat_pumping,
     )
@@ -128,7 +128,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     args: dict | None = None,
 ) -> IndirectHeatPumpTarget | IndirectRefrigerationTarget | None:
     """Solve an indirect / utility system Heat Pump or refrigeration target."""
-    idx, state_id = get_state_index(state_ids=zone.state_ids, args=args)
+    idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
     base_target = zone.targets[TT.TS.value]
     pt = deepcopy(base_target.pt)
@@ -138,7 +138,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
         is_shifted=True,
         is_full_analysis=True,
-        idx=idx,
+        period_idx=idx,
     )
     # Perform heat pump and/or refrigeration targeting on the correct cascades
     target_load = _validate_hpr_required(
@@ -148,7 +148,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_refrigeration=is_refrigeration,
         zone_name=zone.name,
         config=zone.config,
-        idx=idx,
+        period_idx=idx,
     )
     if target_load < tol:
         return None
@@ -160,14 +160,14 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         H_cold=pt_ut_gen[PT.H_NET_COLD],
         config=zone.config,
         is_heat_pumping=is_heat_pumping,
-        idx=idx,
+        period_idx=idx,
     )
     pt = _calc_hpr_cascade(
         pt=pt,
         res=res,
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
-        idx=idx,
+        period_idx=idx,
     )
     general_results = {
         "zone_name": zone.name,
@@ -180,14 +180,14 @@ def compute_indirect_heat_pump_or_refrigeration_target(
             is_direct=False,
             is_heat_pumping=is_heat_pumping,
         ),
-        "state_id": state_id,
-        "state_idx": idx,
+        "period_id": period_id,
+        "period_idx": idx,
     }
     hpr_results = _get_hpr_target_summary(res, zone)
     util_results = _get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
-        idx=idx,
+        period_idx=idx,
         is_direct=False,
         is_heat_pumping=is_heat_pumping,
     )
@@ -210,7 +210,7 @@ def _validate_hpr_required(
     zone_name: str = None,
     config: Configuration | None = None,
     r: dict | float | int = None,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> float:
     if config is None:
         raise ValueError("config must be provided for HPR targeting.")
@@ -228,7 +228,7 @@ def _validate_hpr_required(
             r,
             Q_max=Q_max,
             zone_name=zone_name,
-            idx=idx,
+            period_idx=period_idx,
         )
 
     hpr = config.hpr
@@ -236,13 +236,13 @@ def _validate_hpr_required(
         return Q_max * float(hpr.load_fraction)
     if hpr.load_mode == "duty":
         return min(float(hpr.load_duty), Q_max)
-    if hpr.load_mode == "state_values":
+    if hpr.load_mode == "period_values":
         return min(
             evaluate_value_spec(
-                hpr.load_state_values,
+                hpr.load_period_values,
                 default_value=Q_max,
                 zone_name=zone_name,
-                idx=idx,
+                period_idx=period_idx,
             ),
             Q_max,
         )
@@ -254,7 +254,7 @@ def _resolve_legacy_hpr_load_override(
     *,
     Q_max: float,
     zone_name: str | None,
-    idx: int | None,
+    period_idx: int | None,
 ) -> float:
     """Resolve direct test/helper load overrides without accepting flat config keys."""
     if isinstance(hpr_load, float | int):
@@ -265,11 +265,11 @@ def _resolve_legacy_hpr_load_override(
                 hpr_load,
                 default_value=Q_max,
                 zone_name=zone_name,
-                idx=idx,
+                period_idx=period_idx,
             ),
             Q_max,
         )
-    raise ValueError("HPR load override must be a number or state-value mapping.")
+    raise ValueError("HPR load override must be a number or period-value mapping.")
 
 
 def _get_hpr_targets(
@@ -279,7 +279,7 @@ def _get_hpr_targets(
     H_cold: np.ndarray,
     config: Configuration,
     is_heat_pumping: bool,
-    idx: int = 0,
+    period_idx: int = 0,
 ) -> HeatPumpTargetOutputs:
     args = construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
@@ -288,7 +288,7 @@ def _get_hpr_targets(
         H_cold=np.abs(H_cold),
         is_heat_pumping=is_heat_pumping,
         config=config,
-        idx=idx,
+        period_idx=period_idx,
         debug=False,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(args.hpr_type)
@@ -369,7 +369,7 @@ def _calc_hpr_cascade(
     res: HeatPumpTargetOutputs,
     is_T_vals_shifted: bool = True,
     is_heat_pumping: bool = True,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
     pt_grid_kwargs = {
@@ -381,12 +381,12 @@ def _calc_hpr_cascade(
         ),
         "is_shifted": is_T_vals_shifted,
     }
-    if idx is not None:
-        pt_grid_kwargs["idx"] = idx
+    if period_idx is not None:
+        pt_grid_kwargs["period_idx"] = period_idx
     try:
         pt_hpr_grid = create_problem_table_with_t_int(**pt_grid_kwargs)
     except TypeError:
-        pt_grid_kwargs.pop("idx", None)
+        pt_grid_kwargs.pop("period_idx", None)
         pt_hpr_grid = create_problem_table_with_t_int(**pt_grid_kwargs)
     pt.share_temperature_intervals(pt_hpr_grid)
 
@@ -399,12 +399,12 @@ def _calc_hpr_cascade(
             "is_shifted": is_T_vals_shifted,
             "is_full_analysis": True,
         }
-        if idx is not None:
-            pt_air_kwargs["idx"] = idx
+        if period_idx is not None:
+            pt_air_kwargs["period_idx"] = period_idx
         try:
             pt_air = get_process_heat_cascade(**pt_air_kwargs)
         except TypeError:
-            pt_air_kwargs.pop("idx", None)
+            pt_air_kwargs.pop("period_idx", None)
             pt_air = get_process_heat_cascade(**pt_air_kwargs)
         pt.share_temperature_intervals(pt_air)
         pt[PT.H_NET_W_AIR] += pt_air[PT.H_NET]
@@ -418,12 +418,12 @@ def _calc_hpr_cascade(
         "cold_utilities": res.hpr_cold_streams,
         "is_shifted": is_T_vals_shifted,
     }
-    if idx is not None:
-        hpr_cascade_kwargs["idx"] = idx
+    if period_idx is not None:
+        hpr_cascade_kwargs["period_idx"] = period_idx
     try:
         hpr_profile = get_utility_heat_cascade(**hpr_cascade_kwargs)
     except TypeError:
-        hpr_cascade_kwargs.pop("idx", None)
+        hpr_cascade_kwargs.pop("period_idx", None)
         hpr_profile = get_utility_heat_cascade(**hpr_cascade_kwargs)
     hpr_updates = hpr_profile["updates"]
     if is_heat_pumping:

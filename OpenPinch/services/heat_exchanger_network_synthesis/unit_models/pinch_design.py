@@ -94,84 +94,94 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
     def set_preprocessing(self) -> None:
         """Pre-process PDM superstructure parameters."""
 
-        self._set_multistate_preprocessing()
+        self._set_multiperiod_preprocessing()
 
-    def _set_multistate_preprocessing(self) -> None:
-        self.I = self.f_h_state.shape[1]
-        self.J = self.f_c_state.shape[1]
+    def _set_multiperiod_preprocessing(self) -> None:
+        self.I = self.f_h_period.shape[1]
+        self.J = self.f_c_period.shape[1]
 
         decomposition = self.pinch_decomposition
         shifted_pinch = float(self.T_pinch)
         hot_threshold = shifted_pinch + self.dTmin / 2.0
         cold_threshold = shifted_pinch - self.dTmin / 2.0
 
-        self.T_h_in_state = self.T_h_in_state.copy()
-        self.T_h_out_state = self.T_h_out_state.copy()
-        self.T_c_in_state = self.T_c_in_state.copy()
-        self.T_c_out_state = self.T_c_out_state.copy()
-        self.z_i_active_state = []
-        self.z_j_active_state = []
-        for n in range(self.N_states):
+        self.T_h_in_period = self.T_h_in_period.copy()
+        self.T_h_out_period = self.T_h_out_period.copy()
+        self.T_c_in_period = self.T_c_in_period.copy()
+        self.T_c_out_period = self.T_c_out_period.copy()
+        self.z_i_active_period = []
+        self.z_j_active_period = []
+        for n in range(self.N_periods):
             if self.pinch_loc == "above":
                 z_i_active = [
-                    1 if value > hot_threshold else 0 for value in self.T_h_in_state[n]
+                    1 if value > hot_threshold else 0 for value in self.T_h_in_period[n]
                 ]
                 z_j_active = [
                     1 if value > cold_threshold else 0
-                    for value in self.T_c_out_state[n]
+                    for value in self.T_c_out_period[n]
                 ]
                 for i, is_active in enumerate(z_i_active):
                     if is_active:
-                        self.T_h_out_state[n][i] = max(
-                            self.T_h_out_state[n][i],
+                        self.T_h_out_period[n][i] = max(
+                            self.T_h_out_period[n][i],
                             hot_threshold,
                         )
                     else:
-                        self.T_h_in_state[n][i] = 0.0
-                        self.T_h_out_state[n][i] = 0.0
+                        self.T_h_in_period[n][i] = 0.0
+                        self.T_h_out_period[n][i] = 0.0
                 for j, is_active in enumerate(z_j_active):
                     if is_active:
-                        self.T_c_in_state[n][j] = max(
-                            self.T_c_in_state[n][j],
+                        self.T_c_in_period[n][j] = max(
+                            self.T_c_in_period[n][j],
                             cold_threshold,
                         )
                     else:
-                        self.T_c_in_state[n][j] = 0.0
-                        self.T_c_out_state[n][j] = 0.0
+                        self.T_c_in_period[n][j] = 0.0
+                        self.T_c_out_period[n][j] = 0.0
             else:
                 z_i_active = [
-                    1 if value < hot_threshold else 0 for value in self.T_h_out_state[n]
+                    1 if value < hot_threshold else 0
+                    for value in self.T_h_out_period[n]
                 ]
                 z_j_active = [
-                    1 if value < cold_threshold else 0 for value in self.T_c_in_state[n]
+                    1 if value < cold_threshold else 0
+                    for value in self.T_c_in_period[n]
                 ]
                 for i, is_active in enumerate(z_i_active):
                     if is_active:
-                        self.T_h_in_state[n][i] = min(
-                            self.T_h_in_state[n][i],
+                        self.T_h_in_period[n][i] = min(
+                            self.T_h_in_period[n][i],
                             hot_threshold,
                         )
                     else:
-                        self.T_h_in_state[n][i] = 0.0
-                        self.T_h_out_state[n][i] = 0.0
+                        self.T_h_in_period[n][i] = 0.0
+                        self.T_h_out_period[n][i] = 0.0
                 for j, is_active in enumerate(z_j_active):
                     if is_active:
-                        self.T_c_out_state[n][j] = min(
-                            self.T_c_out_state[n][j],
+                        self.T_c_out_period[n][j] = min(
+                            self.T_c_out_period[n][j],
                             cold_threshold,
                         )
                     else:
-                        self.T_c_in_state[n][j] = 0.0
-                        self.T_c_out_state[n][j] = 0.0
-            self.z_i_active_state.append(z_i_active)
-            self.z_j_active_state.append(z_j_active)
+                        self.T_c_in_period[n][j] = 0.0
+                        self.T_c_out_period[n][j] = 0.0
+            self.z_i_active_period.append(z_i_active)
+            self.z_j_active_period.append(z_j_active)
 
         self.z_i_active = [
-            (1 if any(self.z_i_active_state[n][i] for n in range(self.N_states)) else 0)
+            (
+                1
+                if any(self.z_i_active_period[n][i] for n in range(self.N_periods))
+                else 0
+            )
             for i in range(self.I)
         ]
         self.z_j_active = [
-            (1 if any(self.z_j_active_state[n][j] for n in range(self.N_states)) else 0)
+            (
+                1
+                if any(self.z_j_active_period[n][j] for n in range(self.N_periods))
+                else 0
+            )
             for j in range(self.J)
         ]
         if decomposition.manual_stage_selection is None:
@@ -179,102 +189,104 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         else:
             self.S = decomposition.S
         self.K = self.S + 1
-        self.T_h_in = self.T_h_in_state[0].copy()
-        self.T_h_out = self.T_h_out_state[0].copy()
-        self.T_c_in = self.T_c_in_state[0].copy()
-        self.T_c_out = self.T_c_out_state[0].copy()
+        self.T_h_in = self.T_h_in_period[0].copy()
+        self.T_h_out = self.T_h_out_period[0].copy()
+        self.T_c_in = self.T_c_in_period[0].copy()
+        self.T_c_out = self.T_c_out_period[0].copy()
 
-        self.Qtot_sh_state = np.array(
+        self.Qtot_sh_period = np.array(
             [
                 [
-                    (self.T_h_in_state[n][i] - self.T_h_out_state[n][i])
-                    * self.f_h_state[n][i]
-                    * self.z_i_active_state[n][i]
+                    (self.T_h_in_period[n][i] - self.T_h_out_period[n][i])
+                    * self.f_h_period[n][i]
+                    * self.z_i_active_period[n][i]
                     for i in range(self.I)
                 ]
-                for n in range(self.N_states)
+                for n in range(self.N_periods)
             ],
             dtype=float,
         )
-        self.Qtot_sc_state = np.array(
+        self.Qtot_sc_period = np.array(
             [
                 [
-                    self.f_c_state[n][j]
-                    * (self.T_c_out_state[n][j] - self.T_c_in_state[n][j])
-                    * self.z_j_active_state[n][j]
+                    self.f_c_period[n][j]
+                    * (self.T_c_out_period[n][j] - self.T_c_in_period[n][j])
+                    * self.z_j_active_period[n][j]
                     for j in range(self.J)
                 ]
-                for n in range(self.N_states)
+                for n in range(self.N_periods)
             ],
             dtype=float,
         )
-        self.Qtot_sh = np.max(self.Qtot_sh_state, axis=0)
-        self.Qtot_sc = np.max(self.Qtot_sc_state, axis=0)
-        self.U_r_state = np.array(
+        self.Qtot_sh = np.max(self.Qtot_sh_period, axis=0)
+        self.Qtot_sc = np.max(self.Qtot_sc_period, axis=0)
+        self.U_r_period = np.array(
             [
                 [
                     [
-                        1 / (1 / self.htc_h_state[n][i] + 1 / self.htc_c_state[n][j])
+                        1 / (1 / self.htc_h_period[n][i] + 1 / self.htc_c_period[n][j])
                         for j in range(self.J)
                     ]
                     for i in range(self.I)
                 ]
-                for n in range(self.N_states)
+                for n in range(self.N_periods)
             ],
             dtype=float,
         )
-        self.U_hu_state = np.array(
+        self.U_hu_period = np.array(
             [
                 [
-                    1 / (1 / self.htc_hu_state[n][0] + 1 / self.htc_c_state[n][j])
+                    1 / (1 / self.htc_hu_period[n][0] + 1 / self.htc_c_period[n][j])
                     for j in range(self.J)
                 ]
-                for n in range(self.N_states)
+                for n in range(self.N_periods)
             ],
             dtype=float,
         )
-        self.U_cu_state = np.array(
+        self.U_cu_period = np.array(
             [
                 [
-                    1 / (1 / self.htc_h_state[n][i] + 1 / self.htc_cu_state[n][0])
+                    1 / (1 / self.htc_h_period[n][i] + 1 / self.htc_cu_period[n][0])
                     for i in range(self.I)
                 ]
-                for n in range(self.N_states)
+                for n in range(self.N_periods)
             ],
             dtype=float,
         )
-        self.U_r = self.U_r_state[0].copy()
-        self.U_hu = self.U_hu_state[0].copy()
-        self.U_cu = self.U_cu_state[0].copy()
-        self.Q_max_state = np.array(
+        self.U_r = self.U_r_period[0].copy()
+        self.U_hu = self.U_hu_period[0].copy()
+        self.U_cu = self.U_cu_period[0].copy()
+        self.Q_max_period = np.array(
             [
                 [
                     [
                         max(
-                            self.T_h_in_state[n][i]
-                            - self.T_c_in_state[n][j]
+                            self.T_h_in_period[n][i]
+                            - self.T_c_in_period[n][j]
                             - self._recovery_approach_temperature(i, j, n),
                             0.0,
                         )
                         * min(
-                            self.f_h_state[n][i] * self.z_i_active_state[n][i],
-                            self.f_c_state[n][j] * self.z_j_active_state[n][j],
+                            self.f_h_period[n][i] * self.z_i_active_period[n][i],
+                            self.f_c_period[n][j] * self.z_j_active_period[n][j],
                         )
                         for j in range(self.J)
                     ]
                     for i in range(self.I)
                 ]
-                for n in range(self.N_states)
+                for n in range(self.N_periods)
             ],
             dtype=float,
         )
-        self.Q_max = np.max(self.Q_max_state, axis=0)
+        self.Q_max = np.max(self.Q_max_period, axis=0)
         self.z_feasible = [
             [
                 [
                     (
                         1
-                        if max(self.Q_max_state[n][i][j] for n in range(self.N_states))
+                        if max(
+                            self.Q_max_period[n][i][j] for n in range(self.N_periods)
+                        )
                         > self.tol
                         else 0
                     )
@@ -296,24 +308,24 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
     def set_stage_wise_superstructure(self) -> None:
         """Create PDM variables, constraints, and binaries."""
 
-        self._set_multistate_stage_wise_superstructure()
+        self._set_multiperiod_stage_wise_superstructure()
 
-    def _set_multistate_stage_wise_superstructure(self) -> None:
-        self.Q_r_by_state = [
+    def _set_multiperiod_stage_wise_superstructure(self) -> None:
+        self.Q_r_by_period = [
             [
                 [
                     [
                         (
                             self.m.Var(
-                                value=self.Q_max_state[n][i][j] / 3,
-                                ub=self.Q_max_state[n][i][j],
+                                value=self.Q_max_period[n][i][j] / 3,
+                                ub=self.Q_max_period[n][i][j],
                                 lb=0.0,
-                                name=f"Q_H{i}_to_C{j}_at_S{k}_state{n}",
+                                name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
                             )
                             if self.z_allowed[i][j][k] > 0
                             else self.m.Param(
                                 value=0.0,
-                                name=f"Q_H{i}_to_C{j}_at_S{k}_state{n}",
+                                name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
                             )
                         )
                         for k in range(self.S)
@@ -322,104 +334,104 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.Q_c_by_state = [
+        self.Q_c_by_period = [
             [
                 (
                     self.m.Var(
                         value=0,
-                        ub=self.Qtot_sh_state[n][i],
+                        ub=self.Qtot_sh_period[n][i],
                         lb=0.0,
-                        name=f"Q_H{i}_to_CU_state{n}",
+                        name=f"Q_H{i}_to_CU_period{n}",
                     )
                     if self.z_cu_allowed[i] > 0
-                    else self.m.Param(value=0, name=f"Q_H{i}_to_CU_state{n}")
+                    else self.m.Param(value=0, name=f"Q_H{i}_to_CU_period{n}")
                 )
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.Q_h_by_state = [
+        self.Q_h_by_period = [
             [
                 (
                     self.m.Var(
                         value=0,
-                        ub=self.Qtot_sc_state[n][j],
+                        ub=self.Qtot_sc_period[n][j],
                         lb=0.0,
-                        name=f"Q_HU_to_C{j}_state{n}",
+                        name=f"Q_HU_to_C{j}_period{n}",
                     )
                     if self.z_hu_allowed[j] > 0
-                    else self.m.Param(value=0, name=f"Q_HU_to_C{j}_state{n}")
+                    else self.m.Param(value=0, name=f"Q_HU_to_C{j}_period{n}")
                 )
                 for j in range(self.J)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.T_h_by_state = [
+        self.T_h_by_period = [
             [
                 [
                     (
                         self.m.Var(
-                            value=self.T_h_in_state[n][i],
-                            ub=self.T_h_in_state[n][i],
-                            lb=self.T_h_out_state[n][i],
-                            name=f"T_H{i}_at_B{k}_state{n}",
+                            value=self.T_h_in_period[n][i],
+                            ub=self.T_h_in_period[n][i],
+                            lb=self.T_h_out_period[n][i],
+                            name=f"T_H{i}_at_B{k}_period{n}",
                         )
                         if k > 0 and self.z_i_active[i] > 0
                         else self.m.Param(
-                            value=self.T_h_in_state[n][i],
-                            name=f"T_H{i}_at_B{k}_state{n}",
+                            value=self.T_h_in_period[n][i],
+                            name=f"T_H{i}_at_B{k}_period{n}",
                         )
                     )
                     for k in range(self.K)
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.T_c_by_state = [
+        self.T_c_by_period = [
             [
                 [
                     (
                         self.m.Var(
-                            value=self.T_c_in_state[n][j],
-                            ub=self.T_c_out_state[n][j],
-                            lb=self.T_c_in_state[n][j],
-                            name=f"T_C{j}_at_B{k}_state{n}",
+                            value=self.T_c_in_period[n][j],
+                            ub=self.T_c_out_period[n][j],
+                            lb=self.T_c_in_period[n][j],
+                            name=f"T_C{j}_at_B{k}_period{n}",
                         )
                         if k < self.S and self.z_j_active[j] > 0
                         else self.m.Param(
-                            value=self.T_c_in_state[n][j],
-                            name=f"T_C{j}_at_B{k}_state{n}",
+                            value=self.T_c_in_period[n][j],
+                            name=f"T_C{j}_at_B{k}_period{n}",
                         )
                     )
                     for k in range(self.K)
                 ]
                 for j in range(self.J)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.Q_r = self.Q_r_by_state[0]
-        self.Q_c = self.Q_c_by_state[0]
-        self.Q_h = self.Q_h_by_state[0]
-        self.T_h = self.T_h_by_state[0]
-        self.T_c = self.T_c_by_state[0]
+        self.Q_r = self.Q_r_by_period[0]
+        self.Q_c = self.Q_c_by_period[0]
+        self.Q_h = self.Q_h_by_period[0]
+        self.T_h = self.T_h_by_period[0]
+        self.T_c = self.T_c_by_period[0]
 
-        for n in range(self.N_states):
+        for n in range(self.N_periods):
             _ = [
                 (
                     self.m.Equation(
-                        self.Qtot_sh_state[n][i]
+                        self.Qtot_sh_period[n][i]
                         - sum(
-                            self.Q_r_by_state[n][i][j][k]
+                            self.Q_r_by_period[n][i][j][k]
                             for k in range(self.S)
                             for j in range(self.J)
                         )
-                        - self.Q_c_by_state[n][i]
+                        - self.Q_c_by_period[n][i]
                         == 0.0
                     )
-                    if self.z_i_active_state[n][i] > 0
+                    if self.z_i_active_period[n][i] > 0
                     else None
                 )
                 for i in range(self.I)
@@ -427,16 +439,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.Qtot_sc_state[n][j]
+                        self.Qtot_sc_period[n][j]
                         - sum(
-                            self.Q_r_by_state[n][i][j][k]
+                            self.Q_r_by_period[n][i][j][k]
                             for k in range(self.S)
                             for i in range(self.I)
                         )
-                        - self.Q_h_by_state[n][j]
+                        - self.Q_h_by_period[n][j]
                         == 0.0
                     )
-                    if self.z_j_active_state[n][j] > 0
+                    if self.z_j_active_period[n][j] > 0
                     else None
                 )
                 for j in range(self.J)
@@ -444,12 +456,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        (self.T_h_by_state[n][i][k + 1] - self.T_h_by_state[n][i][k])
-                        * self.f_h_state[n][i]
-                        + sum(self.Q_r_by_state[n][i][j][k] for j in range(self.J))
+                        (self.T_h_by_period[n][i][k + 1] - self.T_h_by_period[n][i][k])
+                        * self.f_h_period[n][i]
+                        + sum(self.Q_r_by_period[n][i][j][k] for j in range(self.J))
                         == 0
                     )
-                    if self.z_i_active_state[n][i] > 0
+                    if self.z_i_active_period[n][i] > 0
                     else None
                 )
                 for k in range(self.S)
@@ -458,12 +470,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        (self.T_c_by_state[n][j][k + 1] - self.T_c_by_state[n][j][k])
-                        * self.f_c_state[n][j]
-                        + sum(self.Q_r_by_state[n][i][j][k] for i in range(self.I))
+                        (self.T_c_by_period[n][j][k + 1] - self.T_c_by_period[n][j][k])
+                        * self.f_c_period[n][j]
+                        + sum(self.Q_r_by_period[n][i][j][k] for i in range(self.I))
                         == 0
                     )
-                    if self.z_j_active_state[n][j] > 0
+                    if self.z_j_active_period[n][j] > 0
                     else None
                 )
                 for k in range(self.S)
@@ -519,11 +531,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 )
                 for j in range(self.J)
             ]
-            for n in range(self.N_states):
+            for n in range(self.N_periods):
                 _ = [
                     (
                         self.m.Equation(
-                            self.Q_r_by_state[n][i][j][k] * (1 - self.z[i][j][k]) == 0.0
+                            self.Q_r_by_period[n][i][j][k] * (1 - self.z[i][j][k])
+                            == 0.0
                         )
                         if self.z_allowed[i][j][k] > 0
                         else None
@@ -535,7 +548,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 _ = [
                     (
                         self.m.Equation(
-                            self.Q_c_by_state[n][i] * (1 - self.z_cu[i]) == 0.0
+                            self.Q_c_by_period[n][i] * (1 - self.z_cu[i]) == 0.0
                         )
                         if self.z_cu_allowed[i] > 0
                         else None
@@ -545,7 +558,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 _ = [
                     (
                         self.m.Equation(
-                            self.Q_h_by_state[n][j] * (1 - self.z_hu[j]) == 0.0
+                            self.Q_h_by_period[n][j] * (1 - self.z_hu[j]) == 0.0
                         )
                         if self.z_hu_allowed[j] > 0
                         else None
@@ -584,29 +597,29 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
 
-        M_ij_state = [
+        M_ij_period = [
             [
                 [
                     max(
-                        abs(self.T_h_in_state[n][i] - self.T_c_in_state[n][j]),
-                        abs(self.T_h_in_state[n][i] - self.T_c_out_state[n][j]),
-                        abs(self.T_h_out_state[n][i] - self.T_c_in_state[n][j]),
-                        abs(self.T_h_out_state[n][i] - self.T_c_out_state[n][j]),
+                        abs(self.T_h_in_period[n][i] - self.T_c_in_period[n][j]),
+                        abs(self.T_h_in_period[n][i] - self.T_c_out_period[n][j]),
+                        abs(self.T_h_out_period[n][i] - self.T_c_in_period[n][j]),
+                        abs(self.T_h_out_period[n][i] - self.T_c_out_period[n][j]),
                     )
                     + self._recovery_approach_temperature(i, j, n)
                     for j in range(self.J)
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        for n in range(self.N_states):
+        for n in range(self.N_periods):
             _ = [
                 (
                     self.m.Equation(
-                        (self.T_h_by_state[n][i][k] - self.T_c_by_state[n][j][k])
+                        (self.T_h_by_period[n][i][k] - self.T_c_by_period[n][j][k])
                         >= self._recovery_approach_temperature(i, j, n)
-                        - M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                        - M_ij_period[n][i][j] * (1 - self.z[i][j][k])
                     )
                     if self.z_allowed[i][j][k] > 0
                     else None
@@ -619,11 +632,11 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 (
                     self.m.Equation(
                         (
-                            self.T_h_by_state[n][i][k + 1]
-                            - self.T_c_by_state[n][j][k + 1]
+                            self.T_h_by_period[n][i][k + 1]
+                            - self.T_c_by_period[n][j][k + 1]
                         )
                         >= self._recovery_approach_temperature(i, j, n)
-                        - M_ij_state[n][i][j] * (1 - self.z[i][j][k])
+                        - M_ij_period[n][i][j] * (1 - self.z[i][j][k])
                     )
                     if self.z_allowed[i][j][k] > 0
                     else None
@@ -640,27 +653,27 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         """Attach PDM objective expressions."""
 
         if self.minimisation_goal == "hot utility":
-            for n in range(self.N_states):
-                self.m.Equation(sum(self.Q_h_by_state[n]) - self.HU_target >= 0.0)
+            for n in range(self.N_periods):
+                self.m.Equation(sum(self.Q_h_by_period[n]) - self.HU_target >= 0.0)
             self.m.Minimize(
                 self._weighted_state_average(
-                    [sum(self.Q_h_by_state[n]) for n in range(self.N_states)]
+                    [sum(self.Q_h_by_period[n]) for n in range(self.N_periods)]
                 )
             )
         elif self.minimisation_goal == "cold utility":
-            for n in range(self.N_states):
-                self.m.Equation(sum(self.Q_c_by_state[n]) - self.CU_target >= 0.0)
+            for n in range(self.N_periods):
+                self.m.Equation(sum(self.Q_c_by_period[n]) - self.CU_target >= 0.0)
             self.m.Minimize(
                 self._weighted_state_average(
-                    [sum(self.Q_c_by_state[n]) for n in range(self.N_states)]
+                    [sum(self.Q_c_by_period[n]) for n in range(self.N_periods)]
                 )
             )
         elif self.minimisation_goal == "total utility":
             self.m.Minimize(
                 self._weighted_state_average(
                     [
-                        sum(self.Q_h_by_state[n]) + sum(self.Q_c_by_state[n])
-                        for n in range(self.N_states)
+                        sum(self.Q_h_by_period[n]) + sum(self.Q_c_by_period[n])
+                        for n in range(self.N_periods)
                     ]
                 )
             )
@@ -670,13 +683,13 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                     [
                         self.m.sum(
                             [
-                                self.Q_r_by_state[n][i][j][k]
+                                self.Q_r_by_period[n][i][j][k]
                                 for i in range(self.I)
                                 for j in range(self.J)
                                 for k in range(self.S)
                             ]
                         )
-                        for n in range(self.N_states)
+                        for n in range(self.N_periods)
                     ]
                 )
             )
@@ -697,29 +710,29 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         if self.mSuccess != 1:
             return
-        self._get_multistate_post_process()
+        self._get_multiperiod_post_process()
 
-    def _get_multistate_post_process(self) -> None:
+    def _get_multiperiod_post_process(self) -> None:
         q_r = [
             [
                 [
                     [
-                        self._active_binary_value(self.Q_r_by_state[n][i][j][k])
+                        self._active_binary_value(self.Q_r_by_period[n][i][j][k])
                         for k in range(self.S)
                     ]
                     for j in range(self.J)
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
         q_h = [
-            [self._active_binary_value(self.Q_h_by_state[n][j]) for j in range(self.J)]
-            for n in range(self.N_states)
+            [self._active_binary_value(self.Q_h_by_period[n][j]) for j in range(self.J)]
+            for n in range(self.N_periods)
         ]
         q_c = [
-            [self._active_binary_value(self.Q_c_by_state[n][i]) for i in range(self.I)]
-            for n in range(self.N_states)
+            [self._active_binary_value(self.Q_c_by_period[n][i]) for i in range(self.I)]
+            for n in range(self.N_periods)
         ]
         self.z = [
             [
@@ -727,7 +740,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                     [
                         (
                             1
-                            if max(q_r[n][i][j][k] for n in range(self.N_states))
+                            if max(q_r[n][i][j][k] for n in range(self.N_periods))
                             > self.tol
                             else 0
                         )
@@ -739,11 +752,11 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             for i in range(self.I)
         ]
         self.z_hu = [
-            [1 if max(q_h[n][j] for n in range(self.N_states)) > self.tol else 0]
+            [1 if max(q_h[n][j] for n in range(self.N_periods)) > self.tol else 0]
             for j in range(self.J)
         ]
         self.z_cu = [
-            [1 if max(q_c[n][i] for n in range(self.N_states)) > self.tol else 0]
+            [1 if max(q_c[n][i] for n in range(self.N_periods)) > self.tol else 0]
             for i in range(self.I)
         ]
         self.n_recovery_units = sum(
@@ -756,14 +769,14 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.n_cu_units = sum(self.z_cu[i][0] for i in range(self.I))
         self.n_units = self.n_recovery_units + self.n_hu_units + self.n_cu_units
 
-        self.theta_1_by_state = [
+        self.theta_1_by_period = [
             [
                 [
                     [
                         (
                             [
-                                self._active_binary_value(self.T_h_by_state[n][i][k])
-                                - self._active_binary_value(self.T_c_by_state[n][j][k])
+                                self._active_binary_value(self.T_h_by_period[n][i][k])
+                                - self._active_binary_value(self.T_c_by_period[n][j][k])
                             ]
                             if self.z[i][j][k][0] > 0
                             else [self._recovery_approach_temperature(i, j, n)]
@@ -774,19 +787,19 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.theta_2_by_state = [
+        self.theta_2_by_period = [
             [
                 [
                     [
                         (
                             [
                                 self._active_binary_value(
-                                    self.T_h_by_state[n][i][k + 1]
+                                    self.T_h_by_period[n][i][k + 1]
                                 )
                                 - self._active_binary_value(
-                                    self.T_c_by_state[n][j][k + 1]
+                                    self.T_c_by_period[n][j][k + 1]
                                 )
                             ]
                             if self.z[i][j][k][0] > 0
@@ -798,32 +811,32 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.theta_1 = self.theta_1_by_state[0]
-        self.theta_2 = self.theta_2_by_state[0]
+        self.theta_1 = self.theta_1_by_period[0]
+        self.theta_2 = self.theta_2_by_period[0]
 
-        self.LMTD_r_by_state = [
+        self.LMTD_r_by_period = [
             [
                 [
                     [
                         self._post_process_lmtd(
-                            self.theta_1_by_state[n][i][j][k][0],
-                            self.theta_2_by_state[n][i][j][k][0],
+                            self.theta_1_by_period[n][i][j][k][0],
+                            self.theta_2_by_period[n][i][j][k][0],
                             self.z[i][j][k][0],
                             formula_allowed=(
                                 abs(
-                                    self.theta_1_by_state[n][i][j][k][0]
-                                    - self.theta_2_by_state[n][i][j][k][0]
+                                    self.theta_1_by_period[n][i][j][k][0]
+                                    - self.theta_2_by_period[n][i][j][k][0]
                                 )
                                 > self.tol
                                 and abs(
-                                    self.theta_1_by_state[n][i][j][k][0]
+                                    self.theta_1_by_period[n][i][j][k][0]
                                     - self._recovery_approach_temperature(i, j, n)
                                 )
                                 >= self.tol
                                 and abs(
-                                    self.theta_2_by_state[n][i][j][k][0]
+                                    self.theta_2_by_period[n][i][j][k][0]
                                     - self._recovery_approach_temperature(i, j, n)
                                 )
                                 >= self.tol
@@ -835,17 +848,17 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.area_r_by_state = [
+        self.area_r_by_period = [
             [
                 [
                     [
                         (
                             q_r[n][i][j][k]
-                            / self.U_r_state[n][i][j]
-                            / self.LMTD_r_by_state[n][i][j][k]
-                            if self.LMTD_r_by_state[n][i][j][k] > self.tol
+                            / self.U_r_period[n][i][j]
+                            / self.LMTD_r_by_period[n][i][j][k]
+                            if self.LMTD_r_by_period[n][i][j][k] > self.tol
                             and q_r[n][i][j][k] > self.tol
                             else 0.0
                         )
@@ -855,137 +868,139 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 ]
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.LMTD_r = self.LMTD_r_by_state[0]
+        self.LMTD_r = self.LMTD_r_by_period[0]
         self.area_r = [
             [
                 [
-                    max(self.area_r_by_state[n][i][j][k] for n in range(self.N_states))
+                    max(
+                        self.area_r_by_period[n][i][j][k] for n in range(self.N_periods)
+                    )
                     for k in range(self.S)
                 ]
                 for j in range(self.J)
             ]
             for i in range(self.I)
         ]
-        self.LMTD_hu_by_state = [
+        self.LMTD_hu_by_period = [
             [
                 self._post_process_lmtd(
-                    self.T_hu_in_state[n][0] - self.T_c_out_state[n][j],
-                    self.T_hu_out_state[n][0]
-                    - self._active_binary_value(self.T_c_by_state[n][j][0]),
+                    self.T_hu_in_period[n][0] - self.T_c_out_period[n][j],
+                    self.T_hu_out_period[n][0]
+                    - self._active_binary_value(self.T_c_by_period[n][j][0]),
                     self.z_hu[j][0],
                     formula_allowed=(
                         abs(
-                            (self.T_hu_in_state[n][0] - self.T_c_out_state[n][j])
+                            (self.T_hu_in_period[n][0] - self.T_c_out_period[n][j])
                             - (
-                                self.T_hu_out_state[n][0]
-                                - self._active_binary_value(self.T_c_by_state[n][j][0])
+                                self.T_hu_out_period[n][0]
+                                - self._active_binary_value(self.T_c_by_period[n][j][0])
                             )
                         )
                         > self.tol
-                        and self.T_hu_in_state[n][0]
-                        - self.T_c_out_state[n][j]
+                        and self.T_hu_in_period[n][0]
+                        - self.T_c_out_period[n][j]
                         - self._hot_utility_approach_temperature(j, n)
                         >= self.tol
-                        and self.T_hu_out_state[n][0]
-                        - self._active_binary_value(self.T_c_by_state[n][j][0])
+                        and self.T_hu_out_period[n][0]
+                        - self._active_binary_value(self.T_c_by_period[n][j][0])
                         - self._hot_utility_approach_temperature(j, n)
                         >= self.tol
                     ),
                 )
                 for j in range(self.J)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.area_hu_by_state = [
+        self.area_hu_by_period = [
             [
                 (
-                    q_h[n][j] / self.U_hu_state[n][j] / self.LMTD_hu_by_state[n][j]
-                    if self.LMTD_hu_by_state[n][j] > self.tol and q_h[n][j] > self.tol
+                    q_h[n][j] / self.U_hu_period[n][j] / self.LMTD_hu_by_period[n][j]
+                    if self.LMTD_hu_by_period[n][j] > self.tol and q_h[n][j] > self.tol
                     else 0.0
                 )
                 for j in range(self.J)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.LMTD_cu_by_state = [
+        self.LMTD_cu_by_period = [
             [
                 self._post_process_lmtd(
-                    self._active_binary_value(self.T_h_by_state[n][i][self.S])
-                    - self.T_cu_out_state[n][0],
-                    self.T_h_out_state[n][i] - self.T_cu_in_state[n][0],
+                    self._active_binary_value(self.T_h_by_period[n][i][self.S])
+                    - self.T_cu_out_period[n][0],
+                    self.T_h_out_period[n][i] - self.T_cu_in_period[n][0],
                     self.z_cu[i][0],
                     formula_allowed=(
                         abs(
                             (
                                 self._active_binary_value(
-                                    self.T_h_by_state[n][i][self.S]
+                                    self.T_h_by_period[n][i][self.S]
                                 )
-                                - self.T_cu_out_state[n][0]
+                                - self.T_cu_out_period[n][0]
                             )
-                            - (self.T_h_out_state[n][i] - self.T_cu_in_state[n][0])
+                            - (self.T_h_out_period[n][i] - self.T_cu_in_period[n][0])
                         )
                         > self.tol
-                        and self._active_binary_value(self.T_h_by_state[n][i][self.S])
-                        - self.T_cu_out_state[n][0]
+                        and self._active_binary_value(self.T_h_by_period[n][i][self.S])
+                        - self.T_cu_out_period[n][0]
                         - self._cold_utility_approach_temperature(i, n)
                         >= self.tol
-                        and self.T_h_out_state[n][i]
-                        - self.T_cu_in_state[n][0]
+                        and self.T_h_out_period[n][i]
+                        - self.T_cu_in_period[n][0]
                         - self._cold_utility_approach_temperature(i, n)
                         >= self.tol
                     ),
                     fallback_delta=(
-                        self.T_h_out_state[n][i] - self.T_cu_in_state[n][0]
+                        self.T_h_out_period[n][i] - self.T_cu_in_period[n][0]
                     ),
                 )
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.area_cu_by_state = [
+        self.area_cu_by_period = [
             [
                 (
-                    q_c[n][i] / self.U_cu_state[n][i] / self.LMTD_cu_by_state[n][i]
-                    if self.LMTD_cu_by_state[n][i] > self.tol and q_c[n][i] > self.tol
+                    q_c[n][i] / self.U_cu_period[n][i] / self.LMTD_cu_by_period[n][i]
+                    if self.LMTD_cu_by_period[n][i] > self.tol and q_c[n][i] > self.tol
                     else 0.0
                 )
                 for i in range(self.I)
             ]
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.LMTD_hu = self.LMTD_hu_by_state[0]
-        self.LMTD_cu = self.LMTD_cu_by_state[0]
+        self.LMTD_hu = self.LMTD_hu_by_period[0]
+        self.LMTD_cu = self.LMTD_cu_by_period[0]
         self.area_hu = [
-            max(self.area_hu_by_state[n][j] for n in range(self.N_states))
+            max(self.area_hu_by_period[n][j] for n in range(self.N_periods))
             for j in range(self.J)
         ]
         self.area_cu = [
-            max(self.area_cu_by_state[n][i] for n in range(self.N_states))
+            max(self.area_cu_by_period[n][i] for n in range(self.N_periods))
             for i in range(self.I)
         ]
-        self.Q_hu_total_by_state = [sum(q_h[n]) for n in range(self.N_states)]
-        self.Q_cu_total_by_state = [sum(q_c[n]) for n in range(self.N_states)]
-        self.Q_r_total_by_state = [
+        self.Q_hu_total_by_period = [sum(q_h[n]) for n in range(self.N_periods)]
+        self.Q_cu_total_by_period = [sum(q_c[n]) for n in range(self.N_periods)]
+        self.Q_r_total_by_period = [
             sum(
                 q_r[n][i][j][k]
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
             )
-            for n in range(self.N_states)
+            for n in range(self.N_periods)
         ]
-        self.Q_hu_total = self._weighted_numeric_average(self.Q_hu_total_by_state)
-        self.Q_cu_total = self._weighted_numeric_average(self.Q_cu_total_by_state)
-        self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_state)
-        self.operating_cost_by_state = [
-            self.hu_cost_state[n][0] * self.Q_hu_total_by_state[n]
-            + self.cu_cost_state[n][0] * self.Q_cu_total_by_state[n]
-            for n in range(self.N_states)
+        self.Q_hu_total = self._weighted_numeric_average(self.Q_hu_total_by_period)
+        self.Q_cu_total = self._weighted_numeric_average(self.Q_cu_total_by_period)
+        self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_period)
+        self.operating_cost_by_period = [
+            self.hu_cost_period[n][0] * self.Q_hu_total_by_period[n]
+            + self.cu_cost_period[n][0] * self.Q_cu_total_by_period[n]
+            for n in range(self.N_periods)
         ]
         self.weighted_operating_cost_value = self._weighted_numeric_average(
-            self.operating_cost_by_state
+            self.operating_cost_by_period
         )
         self.capital_cost_value = (
             self.unit_cost[0] * self.n_units
@@ -1003,14 +1018,14 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         )
         self.hu_cost_total = self._weighted_numeric_average(
             [
-                self.hu_cost_state[n][0] * self.Q_hu_total_by_state[n]
-                for n in range(self.N_states)
+                self.hu_cost_period[n][0] * self.Q_hu_total_by_period[n]
+                for n in range(self.N_periods)
             ]
         )
         self.cu_cost_total = self._weighted_numeric_average(
             [
-                self.cu_cost_state[n][0] * self.Q_cu_total_by_state[n]
-                for n in range(self.N_states)
+                self.cu_cost_period[n][0] * self.Q_cu_total_by_period[n]
+                for n in range(self.N_periods)
             ]
         )
         self.recovery_area_cost_total = self.A_coeff[0] * sum(
@@ -1034,10 +1049,10 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
     def _weighted_numeric_average(self, values: Sequence[float]) -> float:
         return float(
             sum(
-                float(self.state_weights[n]) * float(values[n])
-                for n in range(self.N_states)
+                float(self.period_weights[n]) * float(values[n])
+                for n in range(self.N_periods)
             )
-            / self.state_weight_sum
+            / self.period_weight_sum
         )
 
     def amalgamate_networks(
@@ -1174,10 +1189,10 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         1
                         if (
                             max(
-                                amalgamated.Q_r_by_state[n][i][j][k][0]
-                                for n in range(amalgamated.N_states)
+                                amalgamated.Q_r_by_period[n][i][j][k][0]
+                                for n in range(amalgamated.N_periods)
                             )
-                            if hasattr(amalgamated, "Q_r_by_state")
+                            if hasattr(amalgamated, "Q_r_by_period")
                             else amalgamated.Q_r[i][j][k][0]
                         )
                         > self.tol
@@ -1201,17 +1216,17 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         target_stage: int,
     ) -> None:
         target.z[i][j][target_stage].VALUE.value = [source.z[i][j][source_stage][0]]
-        if hasattr(target, "Q_r_by_state") and hasattr(source, "Q_r_by_state"):
-            for n in range(target.N_states):
-                source_state_idx = min(n, source.N_states - 1)
-                target.Q_r_by_state[n][i][j][target_stage].VALUE.value = [
-                    source.Q_r_by_state[source_state_idx][i][j][source_stage][0]
+        if hasattr(target, "Q_r_by_period") and hasattr(source, "Q_r_by_period"):
+            for n in range(target.N_periods):
+                source_period_idx = min(n, source.N_periods - 1)
+                target.Q_r_by_period[n][i][j][target_stage].VALUE.value = [
+                    source.Q_r_by_period[source_period_idx][i][j][source_stage][0]
                 ]
-                target.theta_1_by_state[n][i][j][target_stage].VALUE.value = [
-                    source.theta_1_by_state[source_state_idx][i][j][source_stage][0]
+                target.theta_1_by_period[n][i][j][target_stage].VALUE.value = [
+                    source.theta_1_by_period[source_period_idx][i][j][source_stage][0]
                 ]
-                target.theta_2_by_state[n][i][j][target_stage].VALUE.value = [
-                    source.theta_2_by_state[source_state_idx][i][j][source_stage][0]
+                target.theta_2_by_period[n][i][j][target_stage].VALUE.value = [
+                    source.theta_2_by_period[source_period_idx][i][j][source_stage][0]
                 ]
             return
         target.Q_r[i][j][target_stage].VALUE.value = [source.Q_r[i][j][source_stage][0]]

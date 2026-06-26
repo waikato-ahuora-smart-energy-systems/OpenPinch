@@ -49,26 +49,26 @@ class Zone:
         self._lock_dt_cont_multiplier = False
         self._active = True
         if parent_zone is not None:
-            self._state_ids = parent_zone._state_ids
-            self._num_states = (
-                len(self._state_ids) if self._state_ids is not None else 1
+            self._period_ids = parent_zone._period_ids
+            self._num_periods = (
+                len(self._period_ids) if self._period_ids is not None else 1
             )
             self._weights = parent_zone._weights
         else:
-            self._state_ids = (
+            self._period_ids = (
                 {
-                    state_id: idx
-                    for idx, state_id in enumerate(self._config.problem.state_ids)
+                    period_id: idx
+                    for idx, period_id in enumerate(self._config.problem.period_ids)
                 }
-                if isinstance(self._config.problem.state_ids, list | tuple)
+                if isinstance(self._config.problem.period_ids, list | tuple)
                 else {"0": 0}
             )
-            self._num_states = len(self._state_ids)
-            if isinstance(self._config.problem.state_weights, np.ndarray | list):
-                if len(self._config.problem.state_weights) == self._num_states:
-                    self._weights = self._config.problem.state_weights
+            self._num_periods = len(self._period_ids)
+            if isinstance(self._config.problem.period_weights, np.ndarray | list):
+                if len(self._config.problem.period_weights) == self._num_periods:
+                    self._weights = self._config.problem.period_weights
                 else:
-                    self._weights = np.ones(len(self._state_ids), dtype=float)
+                    self._weights = np.ones(len(self._period_ids), dtype=float)
 
         self._subzones = {}
         self._targets = {}
@@ -135,19 +135,19 @@ class Zone:
         self._active = bool(value)
 
     @property
-    def state_ids(self) -> dict[str, int] | None:
-        """Canonical ``state_id -> idx`` lookup for this zone."""
-        return self._state_ids
+    def period_ids(self) -> dict[str, int] | None:
+        """Canonical ``period_id -> idx`` lookup for this zone."""
+        return self._period_ids
 
     @property
     def weights(self):
-        """Canonical state weights for this zone."""
+        """Canonical period weights for this zone."""
         return self._weights
 
     @property
-    def num_states(self):
+    def num_periods(self):
         """Number of distinct states for this zone."""
-        return self._num_states
+        return self._num_periods
 
     @property
     def address(self) -> str:
@@ -273,7 +273,9 @@ class Zone:
 
     def _new_stream_collection(self) -> StreamCollection:
         collection = StreamCollection()
-        collection.set_state_context(self._state_ids, self._weights, self._num_states)
+        collection.set_period_context(
+            self._period_ids, self._weights, self._num_periods
+        )
         return collection
 
     def _attach_stream_collection(
@@ -284,13 +286,13 @@ class Zone:
                 "Zone stream containers must be StreamCollection instances."
             )
 
-        if self._state_ids is not None:
-            collection.set_state_context(
-                self._state_ids, self._weights, self._num_states
+        if self._period_ids is not None:
+            collection.set_period_context(
+                self._period_ids, self._weights, self._num_periods
             )
         return collection
 
-    def _propagate_state_context(self) -> None:
+    def _propagate_period_context(self) -> None:
         for collection in (
             self._hot_streams,
             self._cold_streams,
@@ -299,28 +301,30 @@ class Zone:
             self._hot_utilities,
             self._cold_utilities,
         ):
-            collection.set_state_context(
-                self._state_ids, self._weights, self._num_states
+            collection.set_period_context(
+                self._period_ids, self._weights, self._num_periods
             )
         for subzone in self._subzones.values():
-            subzone.set_state_context(self._state_ids, self._weights, self._num_states)
+            subzone.set_period_context(
+                self._period_ids, self._weights, self._num_periods
+            )
 
-    def set_state_context(
+    def set_period_context(
         self,
-        state_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
+        period_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
         weights,
-        num_states: int | None,
+        num_periods: int | None,
     ) -> None:
-        """Set the canonical state lookup owned by this zone and propagate refs."""
-        if state_ids is None:
-            self._state_ids = None
+        """Set the canonical period lookup owned by this zone and propagate refs."""
+        if period_ids is None:
+            self._period_ids = None
             self._weights = None
-            self._num_states = None
+            self._num_periods = None
         else:
-            self._state_ids = (
-                state_ids
-                if isinstance(state_ids, dict)
-                else {str(state_id): idx for idx, state_id in enumerate(state_ids)}
+            self._period_ids = (
+                period_ids
+                if isinstance(period_ids, dict)
+                else {str(period_id): idx for idx, period_id in enumerate(period_ids)}
             )
             if weights is None:
                 self._weights = None
@@ -328,8 +332,8 @@ class Zone:
                 self._weights = weights
             else:
                 self._weights = np.asarray(weights, dtype=float).reshape(-1)
-            self._num_states = num_states
-        self._propagate_state_context()
+            self._num_periods = num_periods
+        self._propagate_period_context()
 
     # === Methods ===
     def add_graph(self, name: str, result):

@@ -43,10 +43,10 @@ internal model. It validates configuration choices, builds the zone tree,
 applies ``dt_cont`` multipliers, instantiates process and utility streams, and
 produces the ``Zone`` object consumed by the solver stack.
 
-Stateful inputs remain state-aware after preparation, but state selection does
-not happen inside ``prepare_problem(...)``. Instead, the selected state is
+Period-valued inputs remain period-aware after preparation, but period selection does
+not happen inside ``prepare_problem(...)``. Instead, the selected period is
 applied later through the targeting-service ``args`` dictionaries or the higher
-level ``problem.target.*(..., state_id=...)`` wrappers.
+level ``problem.target.*(..., period_id=...)`` wrappers.
 
 .. autofunction:: OpenPinch.services.input_data_processing.data_preparation.prepare_problem
    :no-index:
@@ -151,16 +151,16 @@ Typical Preparation and Solve Pattern
    input_data = TargetInput.model_validate(payload)
    zone = data_preprocessing_service(input_data, project_name="Example")
 
-   direct_heat_integration_service(zone, {"state_id": "peak"})
-   indirect_heat_integration_service(zone, {"state_id": "peak"})
+   direct_heat_integration_service(zone, {"period_id": "peak"})
+   indirect_heat_integration_service(zone, {"period_id": "peak"})
 
 Each targeting service mutates the prepared zone in place, records the
-requested state metadata on the zone, and adds or refreshes the corresponding
+requested period metadata on the zone, and adds or refreshes the corresponding
 target model.
 
 The exergy service follows a slightly different contract from the base thermal
 targeting services: it enriches an already existing compatible target for the
-requested state instead of re-solving direct or indirect targeting internally.
+requested period instead of re-solving direct or indirect targeting internally.
 
 Direct High-Level Orchestration
 -------------------------------

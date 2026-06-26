@@ -163,7 +163,7 @@ def _fake_network(
         exchangers=exchangers,
         run_id=task.run_id,
         task_id=task.task_id,
-        state_id=task.state_id,
+        period_id=task.period_id,
         method=task.method,
         stage_count=stage_count,
         objective_value=total_annual_cost,

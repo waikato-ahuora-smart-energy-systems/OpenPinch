@@ -674,7 +674,7 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
     monkeypatch.setattr(
         hp_plotting,
         "create_problem_table_with_t_int",
-        lambda streams, is_shifted, idx: ProblemTable(
+        lambda streams, is_shifted, period_idx: ProblemTable(
             {
                 PT.T: [120.0, 80.0],
                 PT.H_HOT_UT: [0.0, 0.0],

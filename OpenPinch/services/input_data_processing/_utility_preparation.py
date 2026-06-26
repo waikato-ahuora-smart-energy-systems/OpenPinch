@@ -83,7 +83,7 @@ def _set_utilities_for_zone_and_subzones(
 def _value_is_missing(value: Value | None) -> bool:
     if value is None:
         return True
-    return bool(np.all(np.isnan(value.state_values.astype(float))))
+    return bool(np.all(np.isnan(value.period_values.astype(float))))
 
 
 def _shift_temperature_value(value: Value, delta: float) -> Value:
@@ -117,8 +117,8 @@ def _orient_utility_temperatures(
     config: Configuration,
 ) -> tuple[Value, Value, bool]:
     t_supply, t_target = _utility_temperature_arrays(utility, config)
-    t_supply_arr = t_supply.state_values
-    t_target_arr = t_target.state_values
+    t_supply_arr = t_supply.period_values
+    t_target_arr = t_target.period_values
 
     if utility_type == ST.Hot.value:
         if np.all(t_supply_arr >= t_target_arr - _TEMPERATURE_EQUAL_TOL):
@@ -174,8 +174,8 @@ def _complete_utility_data(
             )
         else:
             if np.allclose(
-                t_supply.state_values,
-                t_target.state_values,
+                t_supply.period_values,
+                t_target.period_values,
                 atol=_TEMPERATURE_EQUAL_TOL,
                 rtol=0.0,
             ):
@@ -223,9 +223,9 @@ def _complete_utility_data(
         if _value_is_missing(htc_value):
             utility.htc = thermal.htc
 
-        t_supply_arr = t_supply.state_values
-        t_target_arr = t_target.state_values
-        dt_cont_arr = dt_cont.state_values
+        t_supply_arr = t_supply.period_values
+        t_target_arr = t_target.period_values
+        dt_cont_arr = dt_cont.period_values
 
         effective_dt_cont_arr = dt_cont_arr * float(dt_cont_multiplier)
 

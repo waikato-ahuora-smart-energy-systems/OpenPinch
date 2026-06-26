@@ -214,7 +214,7 @@ def _value_like_payload(value: Any) -> Any:
 def _value_magnitudes(value: Any) -> Any:
     payload = _value_like_payload(value)
     if isinstance(payload, Value):
-        return payload.state_values if payload.num_states > 1 else payload.value
+        return payload.period_values if payload.num_periods > 1 else payload.value
     if isinstance(payload, Mapping):
         if "values" in payload:
             return payload.get("values")

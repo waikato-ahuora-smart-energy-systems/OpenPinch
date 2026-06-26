@@ -1,4 +1,4 @@
-"""Regression tests for stream state handling with collection-owned metadata."""
+"""Regression tests for stream period handling with collection-owned metadata."""
 
 import numpy as np
 import pytest
@@ -98,37 +98,37 @@ def test_derived_stream_fields_are_read_only():
     assert float(stream.CP) == pytest.approx(50.0)
 
 
-def test_stateful_stream_resolves_named_states_from_context():
+def test_period_stream_resolves_named_periods_from_context():
     stream = Stream(
-        name="Stateful",
+        name="Period-valued",
         t_supply={
             "values": [300.0, 280.0],
-            "state_ids": ["base", "peak"],
+            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "degC",
         },
         t_target={
             "values": [200.0, 180.0],
-            "state_ids": ["base", "peak"],
+            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "degC",
         },
         heat_flow={
             "values": [5000.0, 4000.0],
-            "state_ids": ["base", "peak"],
+            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "kW",
         },
         dt_cont=10.0,
         htc=2.0,
     )
-    stream.set_state_context(
-        state_ids={"base": "0", "peak": "1"},
+    stream.set_period_context(
+        period_ids={"base": "0", "peak": "1"},
         weights={"base": 0.25, "peak": 0.75},
-        num_states=2,
+        num_periods=2,
     )
 
-    assert stream.resolve_attr("t_supply", state_id="peak") == pytest.approx(280.0)
+    assert stream.resolve_attr("t_supply", period_id="peak") == pytest.approx(280.0)
     assert stream.t_supply[1].value == pytest.approx(280.0)
     np.testing.assert_allclose(stream.t_supply[None].value, [300.0, 280.0])
     with pytest.raises(TypeError):
@@ -138,10 +138,10 @@ def test_stateful_stream_resolves_named_states_from_context():
 
 def test_stream_broadcasts_scalar_updates_over_existing_state_context():
     stream = Stream(
-        name="Stateful",
-        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        name="Period-valued",
+        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
         dt_cont=10.0,
         htc=2.0,
     )
@@ -149,34 +149,34 @@ def test_stream_broadcasts_scalar_updates_over_existing_state_context():
     stream.heat_flow = 1000.0
 
     np.testing.assert_allclose(
-        stream.heat_flow.state_values, np.array([1000.0, 1000.0])
+        stream.heat_flow.period_values, np.array([1000.0, 1000.0])
     )
-    assert stream.resolve_attr("heat_flow", state_id="1") == pytest.approx(1000.0)
+    assert stream.resolve_attr("heat_flow", period_id="1") == pytest.approx(1000.0)
 
 
 def test_stream_set_attr_for_state_updates_selected_position():
     stream = Stream(
-        name="Stateful",
-        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        name="Period-valued",
+        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
         dt_cont=10.0,
         htc=2.0,
     )
 
-    stream.set_attr_for_state("heat_flow", 3500.0, state_id="1")
+    stream.set_attr_for_period("heat_flow", 3500.0, period_id="1")
 
     np.testing.assert_allclose(
-        stream.heat_flow.state_values, np.array([5000.0, 3500.0])
+        stream.heat_flow.period_values, np.array([5000.0, 3500.0])
     )
 
 
 def test_stream_accessor_assignment_updates_selected_position():
     stream = Stream(
-        name="Stateful",
-        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        name="Period-valued",
+        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
         dt_cont=10.0,
         htc=2.0,
     )
@@ -184,16 +184,16 @@ def test_stream_accessor_assignment_updates_selected_position():
     stream.heat_flow["1"] = 3500.0
 
     np.testing.assert_allclose(
-        stream.heat_flow.state_values, np.array([5000.0, 3500.0])
+        stream.heat_flow.period_values, np.array([5000.0, 3500.0])
     )
 
 
-def test_stream_accessor_assignment_with_none_updates_default_state():
+def test_stream_accessor_assignment_with_none_updates_default_period():
     stream = Stream(
-        name="Stateful",
-        t_supply={"values": [300.0, 280.0], "state_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "state_ids": ["0", "1"], "unit": "degC"},
-        heat_flow={"values": [5000.0, 4000.0], "state_ids": ["0", "1"], "unit": "kW"},
+        name="Period-valued",
+        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
+        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
         dt_cont=10.0,
         htc=2.0,
     )
@@ -201,7 +201,7 @@ def test_stream_accessor_assignment_with_none_updates_default_state():
     stream.heat_flow[None] = 3500.0
 
     np.testing.assert_allclose(
-        stream.heat_flow.state_values, np.array([3500.0, 4000.0])
+        stream.heat_flow.period_values, np.array([3500.0, 4000.0])
     )
 
 

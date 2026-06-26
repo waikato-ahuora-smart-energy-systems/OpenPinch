@@ -83,7 +83,7 @@ class _DesignAccessor:
             "HeatExchangerNetwork | Sequence[HeatExchangerNetwork] | None"
         ) = None,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run a selected HEN design method and cache the design result."""
@@ -95,7 +95,7 @@ class _DesignAccessor:
             self._problem,
             method=method,
             initial_networks=initial_networks,
-            options=self._runtime_options(options, state_id),
+            options=self._runtime_options(options, period_id),
             workspace_variant=workspace_variant,
         )
 
@@ -104,7 +104,7 @@ class _DesignAccessor:
         *,
         quality_tier: int = 2,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run OpenHENS synthesis with an explicit quality tier."""
@@ -115,7 +115,7 @@ class _DesignAccessor:
         return hens_entry._heat_exchanger_network_enhanced_synthesis_method_service(
             self._problem,
             quality_tier=quality_tier,
-            options=self._runtime_options(options, state_id),
+            options=self._runtime_options(options, period_id),
             workspace_variant=workspace_variant,
         )
 
@@ -123,7 +123,7 @@ class _DesignAccessor:
         self,
         *,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run the original tier-1 OpenHENS PDM -> TDM -> EVM method."""
@@ -133,7 +133,7 @@ class _DesignAccessor:
 
         return hens_entry.heat_exchanger_network_open_hens_method_service(
             self._problem,
-            options=self._runtime_options(options, state_id),
+            options=self._runtime_options(options, period_id),
             workspace_variant=workspace_variant,
         )
 
@@ -141,7 +141,7 @@ class _DesignAccessor:
         self,
         *,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only the PDM method and cache the design result."""
@@ -151,7 +151,7 @@ class _DesignAccessor:
 
         return hens_entry.heat_exchanger_network_pinch_design_method_service(
             self._problem,
-            options=self._runtime_options(options, state_id),
+            options=self._runtime_options(options, period_id),
             workspace_variant=workspace_variant,
         )
 
@@ -162,7 +162,7 @@ class _DesignAccessor:
         ) = None,
         *,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only seeded TDM and cache the design result."""
@@ -173,7 +173,7 @@ class _DesignAccessor:
         return hens_entry.heat_exchanger_network_thermal_derivative_method_service(
             self._problem,
             initial_networks=initial_networks,
-            options=self._runtime_options(options, state_id),
+            options=self._runtime_options(options, period_id),
             workspace_variant=workspace_variant,
         )
 
@@ -184,7 +184,7 @@ class _DesignAccessor:
         ) = None,
         *,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only seeded network evolution and cache the design result."""
@@ -195,22 +195,22 @@ class _DesignAccessor:
         return hens_entry.heat_exchanger_network_evolution_method_service(
             self._problem,
             initial_networks=initial_networks,
-            options=self._runtime_options(options, state_id),
+            options=self._runtime_options(options, period_id),
             workspace_variant=workspace_variant,
         )
 
     def _runtime_options(
         self,
         options: Optional[dict[str, Any]],
-        state_id: Optional[str],
+        period_id: Optional[str],
     ) -> dict[str, Any]:
         from ...services.heat_exchanger_network_synthesis.common import (
             service_context,
         )
 
         runtime_options = service_context.normalise_runtime_options(options)
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return runtime_options
 
 

@@ -11,59 +11,59 @@ import pytest
 
 from OpenPinch.classes import Value
 from OpenPinch.lib.schemas.common import (
-    StatefulValueWithUnit,
-    StatefulValueWithUnitAndWeights,
+    PeriodValueWithUnit,
+    PeriodValueWithUnitAndWeights,
     ValueWithUnit,
 )
 from OpenPinch.utils.value_resolution import (
     evaluate_value_spec,
+    get_period_value,
     get_scalar_value,
-    get_state_value,
     resolve_value_array,
 )
 
 
-def test_resolve_state_value_scalar_passthrough():
-    assert get_state_value(3.14) == pytest.approx(3.14)
+def test_resolve_period_value_scalar_passthrough():
+    assert get_period_value(3.14) == pytest.approx(3.14)
 
 
-def test_resolve_state_value_single_state_value_like():
-    payload = StatefulValueWithUnit(values=[7.5], unit="kW")
+def test_resolve_period_value_single_period_value_like():
+    payload = PeriodValueWithUnit(values=[7.5], unit="kW")
 
-    assert get_state_value(payload) == pytest.approx(7.5)
-
-
-def test_resolve_state_value_defaults_to_state_zero():
-    payload = {"values": [99.9, 88.8], "state_ids": ["0", "peak"], "unit": "kW"}
-
-    assert get_state_value(payload) == pytest.approx(99.9)
+    assert get_period_value(payload) == pytest.approx(7.5)
 
 
-def test_resolve_state_value_uses_explicit_idx():
-    payload = {"values": [99.9, 88.8], "state_ids": ["0", "peak"], "unit": "kW"}
+def test_resolve_period_value_defaults_to_period_zero():
+    payload = {"values": [99.9, 88.8], "period_ids": ["0", "peak"], "unit": "kW"}
 
-    assert get_state_value(payload, idx=1) == pytest.approx(88.8)
+    assert get_period_value(payload) == pytest.approx(99.9)
 
 
-def test_resolve_state_value_rejects_missing_idx_when_default_disallowed():
-    payload = {"values": [99.9, 88.8], "state_ids": ["0", "peak"], "unit": "kW"}
+def test_resolve_period_value_uses_explicit_idx():
+    payload = {"values": [99.9, 88.8], "period_ids": ["0", "peak"], "unit": "kW"}
+
+    assert get_period_value(payload, period_idx=1) == pytest.approx(88.8)
+
+
+def test_resolve_period_value_rejects_missing_idx_when_default_disallowed():
+    payload = {"values": [99.9, 88.8], "period_ids": ["0", "peak"], "unit": "kW"}
 
     with pytest.raises(ValueError, match="idx is required"):
-        get_state_value(payload, default_allowed=False)
+        get_period_value(payload, default_allowed=False)
 
 
-def test_resolve_state_value_rejects_negative_idx():
-    payload = {"values": [99.9, 88.8], "state_ids": ["0", "peak"], "unit": "kW"}
+def test_resolve_period_value_rejects_negative_idx():
+    payload = {"values": [99.9, 88.8], "period_ids": ["0", "peak"], "unit": "kW"}
 
     with pytest.raises(ValueError, match="non-negative"):
-        get_state_value(payload, idx=-1)
+        get_period_value(payload, period_idx=-1)
 
 
-def test_resolve_state_value_rejects_out_of_range_idx():
-    payload = {"values": [99.9, 88.8], "state_ids": ["0", "peak"], "unit": "kW"}
+def test_resolve_period_value_rejects_out_of_range_idx():
+    payload = {"values": [99.9, 88.8], "period_ids": ["0", "peak"], "unit": "kW"}
 
     with pytest.raises(ValueError, match="out of range"):
-        get_state_value(payload, idx=2)
+        get_period_value(payload, period_idx=2)
 
 
 @pytest.mark.parametrize(
@@ -86,10 +86,10 @@ def test_resolve_state_value_rejects_out_of_range_idx():
             id="nested-scalar-payload",
         ),
         pytest.param(
-            {"values": [99.9, 88.8], "state_ids": ["0", "peak"], "unit": "kW"},
-            {"idx": 1},
+            {"values": [99.9, 88.8], "period_ids": ["0", "peak"], "unit": "kW"},
+            {"period_idx": 1},
             88.8,
-            id="stateful-payload",
+            id="period_valued-payload",
         ),
         pytest.param(None, {}, None, id="none"),
     ],
@@ -155,24 +155,28 @@ def test_evaluate_value_spec_handles_zone_name_and_default_value():
 def test_evaluate_value_spec_resolves_nested_leaves_with_idx():
     spec = {
         "zone-a": {
-            "value": {"values": [5.0, 8.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            "value": {"values": [5.0, 8.0], "period_ids": ["0", "peak"], "unit": "kW"},
             "add": {"value": "2.0"},
         }
     }
 
-    assert evaluate_value_spec(spec, zone_name="zone-a", idx=1) == pytest.approx(10.0)
+    assert evaluate_value_spec(spec, zone_name="zone-a", period_idx=1) == pytest.approx(
+        10.0
+    )
 
 
 def test_evaluate_value_spec_does_not_mutate_input():
     spec = {
         "zone-a": {
-            "value": {"values": [5.0, 8.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            "value": {"values": [5.0, 8.0], "period_ids": ["0", "peak"], "unit": "kW"},
             "add": 2.0,
         }
     }
     before = deepcopy(spec)
 
-    assert evaluate_value_spec(spec, zone_name="zone-a", idx=1) == pytest.approx(10.0)
+    assert evaluate_value_spec(spec, zone_name="zone-a", period_idx=1) == pytest.approx(
+        10.0
+    )
     assert spec == before
 
 
@@ -186,18 +190,18 @@ def test_evaluate_value_spec_does_not_mutate_input():
             id="value-with-unit",
         ),
         pytest.param(
-            StatefulValueWithUnit(values=[1.0, 2.0], unit="kW"),
+            PeriodValueWithUnit(values=[1.0, 2.0], unit="kW"),
             np.array([1.0, 2.0]),
-            id="stateful",
+            id="period_valued",
         ),
         pytest.param(
-            StatefulValueWithUnitAndWeights(
+            PeriodValueWithUnitAndWeights(
                 values=[1.0, 2.0],
                 weights=[0.4, 0.6],
                 unit="kW",
             ),
             np.array([1.0, 2.0]),
-            id="stateful-with-weights",
+            id="period_valued-with-weights",
         ),
         pytest.param(None, np.array([]), id="none"),
     ],

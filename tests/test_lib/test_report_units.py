@@ -2,7 +2,7 @@
 
 from OpenPinch.classes.value import Value
 from OpenPinch.lib.schemas.common import (
-    StatefulValueWithUnit,
+    PeriodValueWithUnit,
 )
 from OpenPinch.lib.schemas.common import (
     ValueWithUnit as VU,
@@ -22,10 +22,10 @@ def test_split_vu_non_numeric_unparsable():
     assert split_report_value("not-a-number") == (None, None)
 
 
-def test_split_vu_uses_idx_for_stateful_values():
-    payload = StatefulValueWithUnit(values=[5.0, 8.5], unit="kW")
+def test_split_vu_uses_period_idx_for_period_values():
+    payload = PeriodValueWithUnit(values=[5.0, 8.5], unit="kW")
 
-    assert split_report_value(payload, idx=1) == (8.5, "kW")
+    assert split_report_value(payload, period_idx=1) == (8.5, "kW")
 
 
 def test_split_vu_preserves_array_payloads():
@@ -34,7 +34,7 @@ def test_split_vu_preserves_array_payloads():
     assert split_report_value(payload) == ([5.0, 8.5], "kW")
 
 
-def test_split_vu_resolves_stateful_value_idx():
+def test_split_vu_resolves_period_value_period_idx():
     payload = Value([5.0, 8.5], unit="kW")
 
-    assert split_report_value(payload, idx=1) == (8.5, "kW")
+    assert split_report_value(payload, period_idx=1) == (8.5, "kW")

@@ -3,8 +3,8 @@
 from .common import (
     HPRMetric,
     MaybeVU,
+    PeriodValueWithUnit,
     ScalarOrVU,
-    StatefulValueWithUnit,
     ValueWithUnit,
 )
 from .graphs import DataPoint, Graph, GraphSet, Segment
@@ -92,7 +92,7 @@ __all__ = [
     "HPRMetric",
     "MaybeVU",
     "ScalarOrVU",
-    "StatefulValueWithUnit",
+    "PeriodValueWithUnit",
     "ValueWithUnit",
     "DataPoint",
     "Graph",

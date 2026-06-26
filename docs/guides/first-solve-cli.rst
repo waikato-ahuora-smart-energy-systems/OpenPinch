@@ -31,7 +31,7 @@ The current packaged notebooks are:
 - ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
 - ``02_total_site_targets_and_sugcc.ipynb``
 - ``03_carnot_hpr_comparison.ipynb``
-- ``04_multistate_targeting_and_state_comparison.ipynb``
+- ``04_multiperiod_targeting_and_period_comparison.ipynb``
 - ``05_schema_service_and_output_workflows.ipynb``
 - ``06_energy_transfer_analysis.ipynb``
 - ``07_vapour_compression_mvr_cascade_hpr.ipynb``

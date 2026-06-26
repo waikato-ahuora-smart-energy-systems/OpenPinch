@@ -345,7 +345,7 @@ def test_cascade_carnot_optimiser_success_and_failure(monkeypatch):
 
 
 def test_cascade_carnot_objective_debug_branch(monkeypatch):
-    args = _base_args(n_cond=1, n_evap=1, idx=0)
+    args = _base_args(n_cond=1, n_evap=1, period_idx=0)
     called = {"plot": 0}
     monkeypatch.setattr(
         hp_shared,

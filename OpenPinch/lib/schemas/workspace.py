@@ -141,7 +141,7 @@ class ScenarioVariantView(BaseModel):
     """Serializable solved-or-invalid variant result for frontend consumption."""
 
     variant_name: str
-    state_id: Optional[str] = None
+    period_id: Optional[str] = None
     workflow: str
     workflow_options: Dict[str, Any] = Field(default_factory=dict)
     status: str

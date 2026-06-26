@@ -12,44 +12,44 @@ __all__ = [
     "delta_vals",
     "delta_with_zero_at_start",
     "g_ineq_penalty",
-    "get_state_index",
+    "get_period_index",
     "interp_with_plateaus",
     "linear_interpolation",
     "make_monotonic",
 ]
 
 
-def get_state_index(
-    state_ids: dict[str, int] | None,
+def get_period_index(
+    period_ids: dict[str, int] | None,
     args: dict | None,
 ) -> Tuple[int, str | None]:
-    sid = None if not isinstance(args, dict) else args.get("state_id")
+    sid = None if not isinstance(args, dict) else args.get("period_id")
     sid = None if sid is None else str(sid)
-    raw_idx = None if not isinstance(args, dict) else args.get("idx")
+    raw_idx = None if not isinstance(args, dict) else args.get("period_idx")
     explicit_idx = None if raw_idx is None else int(raw_idx)
 
-    lookup = {} if state_ids is None else state_ids
+    lookup = {} if period_ids is None else period_ids
 
     if sid is not None:
         if lookup and sid not in lookup:
             raise ValueError(
-                f"state_id {sid!r} was not found on this collection. "
-                f"Available states: {', '.join(lookup)}."
+                f"period_id {sid!r} was not found on this collection. "
+                f"Available periods: {', '.join(lookup)}."
             )
         resolved_idx = lookup.get(sid, 0)
         if explicit_idx is not None and explicit_idx != resolved_idx:
             raise ValueError(
-                f"state_id {sid!r} resolves to idx {resolved_idx}, "
-                f"but idx {explicit_idx} was also provided."
+                f"period_id {sid!r} resolves to period_idx {resolved_idx}, "
+                f"but period_idx {explicit_idx} was also provided."
             )
         return resolved_idx, sid
 
     if explicit_idx is not None:
         if explicit_idx < 0:
-            raise ValueError("idx must be a non-negative integer.")
+            raise ValueError("period_idx must be a non-negative integer.")
         if lookup and explicit_idx not in set(lookup.values()):
             raise ValueError(
-                f"idx {explicit_idx} was not found on this collection. "
+                f"period_idx {explicit_idx} was not found on this collection. "
                 f"Available indices: {', '.join(str(idx) for idx in lookup.values())}."
             )
         return explicit_idx, None

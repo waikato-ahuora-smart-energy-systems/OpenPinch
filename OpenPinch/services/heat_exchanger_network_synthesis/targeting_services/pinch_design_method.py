@@ -112,7 +112,7 @@ def _build_pathway_pinch_design_method_tasks(
                         approach_temperature=approach_temperature,
                         problem_id=settings.problem_id,
                         workspace_variant=settings.workspace_variant,
-                        state_id=settings.state_id,
+                        period_id=settings.period_id,
                         metadata=pathway_metadata((pathway,)),
                     )
                 )
@@ -132,7 +132,7 @@ def _build_pathway_pinch_design_method_tasks(
                 approach_temperature=approach_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 settings=settings_payload,
                 metadata=pathway_metadata(grouped_pathways),
             )
@@ -168,7 +168,7 @@ def _with_quality_pdm_tasks(
                 approach_temperature=approach_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 metadata={"quality_candidate": "dt_cont_multiplier"},
             )
         )
@@ -194,7 +194,7 @@ def _with_quality_pdm_tasks(
                 approach_temperature=stage_pair_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 settings={"stage_selection": [above_stages, below_stages]},
                 metadata={"quality_candidate": "stage_pair"},
             )

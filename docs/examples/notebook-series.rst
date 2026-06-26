@@ -4,7 +4,7 @@ Notebook Series
 OpenPinch ships with a packaged notebook series that is treated as part of the
 supported learning and regression surface. Each notebook is built around one
 decision question rather than a generic feature tour. The series now spans the
-main single-case API, named multi-case studies, multistate targeting, the
+main single-case API, named multi-case studies, multiperiod targeting, the
 typed/service boundary, the energy-transfer analysis view, and the
 vapour-compression plus MVR cascade HPR backend. It also covers direct
 gas/vapour stream MVR as a process-component workflow on live workspace cases
@@ -31,10 +31,10 @@ Included Notebooks
    ``HPRcycle.CascadeCarnot`` enum value for broad screening and calls out
    ``HPRcycle.ParallelCarnot`` as the staged Carnot alternative.
 
-``04_multistate_targeting_and_state_comparison.ipynb``
-   Real named-state targeting on ``crude_preheat_train_multistate.json`` and
-   ``zonal_site_multistate.json``, including ``state_ids``,
-   ``target_all_states()``, and cross-state utility tables.
+``04_multiperiod_targeting_and_period_comparison.ipynb``
+   Real named-period targeting on ``crude_preheat_train_multiperiod.json`` and
+   ``zonal_site_multiperiod.json``, including ``period_ids``,
+   ``target_all_periods()``, and cross-period utility tables.
 
 ``05_schema_service_and_output_workflows.ipynb``
    ``copy_sample_case(...)``, local-file ``PinchProblem``, typed
@@ -95,7 +95,7 @@ Recommended Learning Order
    indirect integration concepts.
 3. Use the Carnot HPR notebook after you understand how to read the base
    utility and graph outputs.
-4. Move to the multistate notebook when your case has named operating states or
+4. Move to the multiperiod notebook when your case has named operating periods or
    seasonal variation.
 5. Use the schema/service notebook when you need typed validation, serialized
    workspace views, or repeatable export workflows.
@@ -113,7 +113,7 @@ Why These Matter
 
 The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
-hierarchical targeting, graph-based interpretation, real multistate studies,
+hierarchical targeting, graph-based interpretation, real multiperiod studies,
 advanced HPR cycle targeting, process-component MVR mutation, heat exchanger
 network synthesis, and stable programmatic boundaries built on the same packaged
 assets. The distributed copies are also kept output-free so they do not ship

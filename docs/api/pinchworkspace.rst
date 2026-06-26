@@ -117,7 +117,7 @@ Relationship To PinchProblem
 
 ``PinchWorkspace`` is not a second solver. It orchestrates multiple named
 case inputs and live ``PinchProblem`` cases on top of the same validation,
-preparation, targeting, graph, export, and stateful workflow surfaces
+preparation, targeting, graph, export, and period workflow surfaces
 documented for ``PinchProblem``.
 
 Use :doc:`pinchproblem` when you only need one case at a time. Use

@@ -292,12 +292,12 @@
     }
   ],
   "options": {
-    "PROBLEM_STATE_IDS": [
+    "PROBLEM_PERIOD_IDS": [
       "turndown",
       "base",
       "peak"
     ],
-    "PROBLEM_STATE_WEIGHTS": [
+    "PROBLEM_PERIOD_WEIGHTS": [
       0.2,
       0.6,
       0.2

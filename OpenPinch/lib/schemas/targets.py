@@ -98,8 +98,8 @@ class BaseTargetModel(BaseModel):
     )
 
     zone_name: Optional[str] = Field(default=None, exclude=True, repr=False)
-    state_id: Optional[str] = None
-    state_idx: Optional[int] = Field(default=None, exclude=True, repr=False)
+    period_id: Optional[str] = None
+    period_idx: Optional[int] = Field(default=None, exclude=True, repr=False)
     name: str
     type: str
     parent_zone: Any = None
@@ -180,8 +180,8 @@ class UtilitySummaryTarget(BaseTargetModel):
 
         return TargetResults(
             name=self.name,
-            idx=self.state_idx,
-            state_id=self.state_id,
+            period_idx=self.period_idx,
+            period_id=self.period_id,
             degree_of_integration=degree_of_integration,
             Qh=coerce_output_value(
                 self.hot_utility_target,

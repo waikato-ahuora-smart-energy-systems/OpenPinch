@@ -189,7 +189,7 @@ def test_get_power_cogeneration_above_pinch_accepts_heat_pump_targets(monkeypatc
         hpr_details={},
     )
 
-    out = pca.get_power_cogeneration_above_pinch(target, args={"idx": 0})
+    out = pca.get_power_cogeneration_above_pinch(target, args={"period_idx": 0})
 
     assert out is target
     assert out.work_target > 0.0

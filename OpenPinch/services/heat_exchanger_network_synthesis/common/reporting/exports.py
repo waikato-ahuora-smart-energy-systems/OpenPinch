@@ -129,14 +129,14 @@ def _manifest_with_export_records(
             ),
             problem_id=problem_id,
             workspace_variant=workspace_variant,
-            state_id=design.state_id,
+            period_id=design.period_id,
             export_records=records,
         )
     return base.model_copy(
         update={
             "problem_id": problem_id,
             "workspace_variant": workspace_variant,
-            "state_id": design.state_id,
+            "period_id": design.period_id,
             "export_records": records,
         }
     )

@@ -151,7 +151,7 @@ class TargetOutput(BaseModel):
     """Top-level response data returned by :func:`OpenPinch.pinch_analysis_service`."""
 
     name: str = "Site"
-    state_id: Optional[str] = None
+    period_id: Optional[str] = None
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
     design: Optional[HeatExchangerNetworkSynthesisResult] = None

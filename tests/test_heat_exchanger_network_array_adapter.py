@@ -208,8 +208,8 @@ def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     for name, expected in snapshot["source_openhens_arrays"].items():
         _assert_array_matches_by_identity(name, current, expected, snapshot)
 
-    np.testing.assert_allclose(current["arrays"]["T_hu_cont_state"][0], [7.0])
-    np.testing.assert_allclose(current["arrays"]["T_cu_cont_state"][0], [7.0])
+    np.testing.assert_allclose(current["arrays"]["T_hu_cont_period"][0], [7.0])
+    np.testing.assert_allclose(current["arrays"]["T_cu_cont_period"][0], [7.0])
 
 
 def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
@@ -505,8 +505,8 @@ def _load_converter_module():
 
 
 def _assert_axis_identities_match(current: dict, snapshot: dict) -> None:
-    assert set(current["axis_maps"]) == {*snapshot["axis_maps"], "states"}
-    assert current["axis_maps"]["states"] == {"0": 0}
+    assert set(current["axis_maps"]) == {*snapshot["axis_maps"], "periods"}
+    assert current["axis_maps"]["periods"] == {"0": 0}
     for axis_name, expected_axis in snapshot["axis_maps"].items():
         assert current["axis_maps"][axis_name] == expected_axis
 
@@ -561,7 +561,7 @@ def _legacy_snapshot_shapes(current: dict, snapshot: dict) -> dict[str, list[int
 def _legacy_snapshot_shape(current: dict, name: str) -> list[int]:
     current_name = _current_array_name(name)
     shape = current["array_shapes"][current_name]
-    if current_name.endswith("_state"):
+    if current_name.endswith("_period"):
         assert shape[0] == 1
         return shape[1:]
     return shape
@@ -570,15 +570,15 @@ def _legacy_snapshot_shape(current: dict, name: str) -> list[int]:
 def _legacy_snapshot_array(current: dict, name: str) -> list:
     current_name = _current_array_name(name)
     values = current["arrays"][current_name]
-    if current_name.endswith("_state"):
-        assert len(current["arrays"]["state_ids"]) == 1
+    if current_name.endswith("_period"):
+        assert len(current["arrays"]["period_ids"]) == 1
         return values[0]
     return values
 
 
 def _current_array_name(name: str) -> str:
     if name in STATE_ARRAY_NAMES:
-        return f"{name}_state"
+        return f"{name}_period"
     return name
 
 

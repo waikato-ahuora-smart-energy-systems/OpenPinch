@@ -213,9 +213,9 @@ def _stream_dt_cont_with_minimum(
         return {"value": minimum_dt_cont, "unit": "delta_degC"}
 
     converted = current.to("delta_degC")
-    if converted.num_states > 1:
+    if converted.num_periods > 1:
         return {
-            "values": np.maximum(converted.state_values, minimum_dt_cont).tolist(),
+            "values": np.maximum(converted.period_values, minimum_dt_cont).tolist(),
             "unit": "delta_degC",
         }
     return {
@@ -254,10 +254,10 @@ def _build_decomposition(
         raise ValueError("Cannot build PDM fields without a shifted pinch temperature.")
 
     values = arrays.arrays
-    T_h_in = _copy_state_row(values, "T_h_in_state")
-    T_h_out = _copy_state_row(values, "T_h_out_state")
-    T_c_in = _copy_state_row(values, "T_c_in_state")
-    T_c_out = _copy_state_row(values, "T_c_out_state")
+    T_h_in = _copy_state_row(values, "T_h_in_period")
+    T_h_out = _copy_state_row(values, "T_h_out_period")
+    T_c_in = _copy_state_row(values, "T_c_in_period")
+    T_c_out = _copy_state_row(values, "T_c_out_period")
     z_i_active, z_j_active = _clip_stream_temperatures(
         T_h_in=T_h_in,
         T_h_out=T_h_out,
@@ -380,9 +380,9 @@ def _manual_stage_selection(
 def _copy_state_row(
     values: dict[str, np.ndarray],
     key: str,
-    state_idx: int = 0,
+    period_idx: int = 0,
 ) -> np.ndarray:
-    return np.asarray(values[key], dtype=float)[state_idx].copy()
+    return np.asarray(values[key], dtype=float)[period_idx].copy()
 
 
 __all__ = [

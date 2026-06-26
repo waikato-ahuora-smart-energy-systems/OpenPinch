@@ -20,36 +20,36 @@ class ValueWithUnit(BaseModel):
     )
 
 
-class StatefulValueWithUnit(BaseModel):
-    """Container storing multi-state magnitudes, weights, and a shared unit."""
+class PeriodValueWithUnit(BaseModel):
+    """Container storing multi-period magnitudes, weights, and a shared unit."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    values: list[float] = Field(..., description="Per-state magnitudes.")
+    values: list[float] = Field(..., description="Per-period magnitudes.")
     unit: Optional[str] = Field(
         default=None, description="Shared unit string, e.g. 'degC' or 'kW'."
     )
 
 
-class StatefulValueWithUnitAndWeights(BaseModel):
-    """Container storing multi-state magnitudes, weights, and a shared unit."""
+class PeriodValueWithUnitAndWeights(BaseModel):
+    """Container storing multi-period magnitudes, weights, and a shared unit."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    values: list[float] = Field(..., description="Per-state magnitudes.")
+    values: list[float] = Field(..., description="Per-period magnitudes.")
     unit: Optional[str] = Field(
         default=None, description="Shared unit string, e.g. 'degC' or 'kW'."
     )
     weights: Optional[list[float]] = Field(
-        default=None, description="Optional ordered state weights."
+        default=None, description="Optional ordered period weights."
     )
 
 
 ScalarOrVU = Union[
-    float, ValueWithUnit, StatefulValueWithUnit, StatefulValueWithUnitAndWeights
+    float, ValueWithUnit, PeriodValueWithUnit, PeriodValueWithUnitAndWeights
 ]
 MaybeVU = Union[
-    float, ValueWithUnit, StatefulValueWithUnit, StatefulValueWithUnitAndWeights, None
+    float, ValueWithUnit, PeriodValueWithUnit, PeriodValueWithUnitAndWeights, None
 ]
 HPRMetric = Union[ValueWithUnit, None]
 
@@ -58,7 +58,7 @@ __all__ = [
     "HPRMetric",
     "MaybeVU",
     "ScalarOrVU",
-    "StatefulValueWithUnit",
-    "StatefulValueWithUnitAndWeights",
+    "PeriodValueWithUnit",
+    "PeriodValueWithUnitAndWeights",
     "ValueWithUnit",
 ]

@@ -71,11 +71,11 @@ def build_numeric_view(streams: list[object], idx: int | None = None):
 
 
 def value_at_idx(value: Value | None, idx: int | None = None) -> float:
-    """Return one canonical numeric magnitude from a scalar or stateful value."""
+    """Return one canonical numeric magnitude from a scalar or period-valued value."""
     if value is None:
         return np.nan
     magnitudes = value._quantity.magnitude
     if magnitudes.size == 1:
         return float(magnitudes[0])
-    state_idx = 0 if idx is None else int(idx)
-    return float(magnitudes[state_idx])
+    period_idx = 0 if idx is None else int(idx)
+    return float(magnitudes[period_idx])

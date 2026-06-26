@@ -29,7 +29,7 @@ def construct_HPRTargetInputs(
     *,
     is_heat_pumping: bool = True,
     config: Configuration,
-    idx: int = 0,
+    period_idx: int = 0,
     debug: bool = False,
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
@@ -75,7 +75,7 @@ def construct_HPRTargetInputs(
         bckgrd_cold_streams=s_cold,
         is_heat_pumping=bool(is_heat_pumping),
         debug=debug,
-        idx=idx,
+        period_idx=period_idx,
         # Direct config pass-through.
         hpr_type=hpr.type,
         hpr_comp_fixed_cost=costing.hpr_comp_fixed_cost,

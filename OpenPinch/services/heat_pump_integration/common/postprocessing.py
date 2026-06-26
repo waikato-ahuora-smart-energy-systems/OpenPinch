@@ -17,7 +17,7 @@ def _get_hpr_residual_utility_summary(
     *,
     pt: ProblemTable,
     base_target,
-    idx: int,
+    period_idx: int,
     is_direct: bool,
     is_heat_pumping: bool,
 ) -> dict:
@@ -45,11 +45,13 @@ def _get_hpr_residual_utility_summary(
         hot_utilities=base_target.hot_utilities.copy(deep=True),
         cold_utilities=base_target.cold_utilities.copy(deep=True),
         is_real_temperatures=not is_direct,
-        idx=idx,
+        period_idx=period_idx,
     )
-    hot_utility_target = float(hot_utilities.sum_stream_attribute("heat_flow", idx=idx))
+    hot_utility_target = float(
+        hot_utilities.sum_stream_attribute("heat_flow", idx=period_idx)
+    )
     cold_utility_target = float(
-        cold_utilities.sum_stream_attribute("heat_flow", idx=idx)
+        cold_utilities.sum_stream_attribute("heat_flow", idx=period_idx)
     )
     base_heat_recovery = float(getattr(base_target, "heat_recovery_target", 0.0) or 0.0)
     base_hot_utility_target = float(
@@ -83,7 +85,9 @@ def _get_hpr_residual_utility_summary(
             if isinstance(heat_recovery_limit, float | int) and heat_recovery_limit > 0
             else (1.0 if heat_recovery_limit == 0 else None)
         ),
-        "utility_cost": _compute_utility_cost(hot_utilities, cold_utilities, idx=idx),
+        "utility_cost": _compute_utility_cost(
+            hot_utilities, cold_utilities, period_idx=period_idx
+        ),
         "hot_pinch": hot_pinch,
         "cold_pinch": cold_pinch,
     }
@@ -186,10 +190,10 @@ def _retarget_hpr_residual_utilities(
     hot_utilities,
     cold_utilities,
     is_real_temperatures: bool,
-    idx: int,
+    period_idx: int,
 ):
-    hot_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=idx)
-    cold_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=idx)
+    hot_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=period_idx)
+    cold_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=period_idx)
     pinch_idx = ProblemTable({PT.T: T_vals, PT.H_NET: residual_net}).pinch_idx(PT.H_NET)
     return target_utilities_for_load_profiles(
         hot_utilities=hot_utilities,
@@ -199,14 +203,14 @@ def _retarget_hpr_residual_utilities(
         H_net_hot=cold_profile,
         pinch_idx=pinch_idx,
         is_real_temperatures=is_real_temperatures,
-        idx=idx,
+        idx=period_idx,
     )
 
 
-def _compute_utility_cost(hot_utilities, cold_utilities, *, idx: int) -> float:
+def _compute_utility_cost(hot_utilities, cold_utilities, *, period_idx: int) -> float:
     utility_cost = 0.0
     for utility in hot_utilities + cold_utilities:
         if utility.utility_cost is None:
             continue
-        utility_cost += float(utility.utility_cost[idx])
+        utility_cost += float(utility.utility_cost[period_idx])
     return utility_cost

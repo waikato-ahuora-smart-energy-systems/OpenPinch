@@ -19,8 +19,8 @@ def _sort_by_attrs(attrs: Tuple[str, ...], stream: object):
 def _stream_attr_value(stream: object, attr_name: str, idx: int | None = None):
     value = getattr(stream, attr_name)
     if isinstance(value, Value):
-        state_idx = 0 if idx is None else int(idx)
-        return float(value[state_idx])
+        period_idx = 0 if idx is None else int(idx)
+        return float(value[period_idx])
     return value
 
 

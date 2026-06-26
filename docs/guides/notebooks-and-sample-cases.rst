@@ -22,9 +22,9 @@ OpenPinch currently ships with sample cases such as:
 
 - ``basic_pinch.json``
 - ``crude_preheat_train.json``
-- ``crude_preheat_train_multistate.json``
+- ``crude_preheat_train_multiperiod.json``
 - ``zonal_site.json``
-- ``zonal_site_multistate.json``
+- ``zonal_site_multiperiod.json``
 - ``pulp_mill.json``
 - ``heat_pump_targeting.json``
 - ``chocolate_factory.json``
@@ -57,7 +57,7 @@ Packaged Notebook Series
 The current packaged notebooks stay on the stable public surfaces while using
 real packaged cases or real derivatives of those cases. Notebook 01 starts from
 ``PinchProblem``, notebooks 01 to 03 use ``PinchWorkspace`` where named study
-cases matter, notebook 04 covers named-state targeting, and notebook 05 covers
+cases matter, notebook 04 covers named-period targeting, and notebook 05 covers
 the typed and serialized boundaries. Notebook 06 covers energy-transfer
 analysis outputs. Notebook 07 covers the vapour-compression plus MVR cascade
 HPR backend and its split-fraction source/process routing. Notebook 08 covers
@@ -91,16 +91,16 @@ Current packaged notebooks:
 1. ``01_basic_pinch_and_dtcont_sensitivity.ipynb``
 2. ``02_total_site_targets_and_sugcc.ipynb``
 3. ``03_carnot_hpr_comparison.ipynb``
-4. ``04_multistate_targeting_and_state_comparison.ipynb``
+4. ``04_multiperiod_targeting_and_period_comparison.ipynb``
 5. ``05_schema_service_and_output_workflows.ipynb``
 6. ``06_energy_transfer_analysis.ipynb``
 7. ``07_vapour_compression_mvr_cascade_hpr.ipynb``
 8. ``08_direct_gas_stream_mvr.ipynb``
 9. ``09_hen_design_service_four_stream.ipynb``
 
-Notebook 04 shows the named-state workflow directly through
-``problem.target.direct_heat_integration(state_id="peak")`` and
-``problem.target.indirect_heat_integration(state_id="winter")``. Notebook 05
+Notebook 04 shows the named-period workflow directly through
+``problem.target.direct_heat_integration(period_id="peak")`` and
+``problem.target.indirect_heat_integration(period_id="winter")``. Notebook 05
 shows the typed ``TargetInput`` boundary and the serialized
 ``PinchWorkspace`` view layer. Notebook 06 shows
 ``target.energy_transfer(...)`` with the heat-surplus/deficit table and
@@ -111,7 +111,7 @@ configuration fields. Notebook 03 uses
 ``HPR_TYPE = "Cascade Carnot cycles"`` for broad direct/indirect
 screening and notes ``"Parallel Carnot cycles"`` as the explicit staged
 Carnot option. Notebook 08 shows ``add_component.process_mvr(...)``,
-``stage_results_by_state``, replacement stream inspection, component
+``stage_results_by_period``, replacement stream inspection, component
 activation/deactivation, and baseline-versus-MVR comparison through
 ``workspace.compare_cases(...)``. Notebook 09 shows
 ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
@@ -130,8 +130,8 @@ Recommended Learning Path
    and SUGCC workflows.
 3. ``chocolate_factory.json`` and notebook 03 for
    direct-versus-indirect HPR and refrigeration comparison.
-4. ``crude_preheat_train_multistate.json`` and
-   ``zonal_site_multistate.json`` with notebook 04 for real named-state
+4. ``crude_preheat_train_multiperiod.json`` and
+   ``zonal_site_multiperiod.json`` with notebook 04 for real named-period
    comparison.
 5. ``basic_pinch.json`` and notebook 05 when you need typed validation,
    exports, or serialized workspace views.

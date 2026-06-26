@@ -86,7 +86,7 @@ class DirectGasMVRStageResult:
 
 @dataclass
 class DirectGasMVRStreamSolveResult:
-    """Solved direct gas MVR streams for one source stream at one state index."""
+    """Solved direct gas MVR streams for one source stream at one period index."""
 
     replacement_streams: StreamCollection
     stage_results: list[DirectGasMVRStageResult] = field(default_factory=list)
@@ -98,7 +98,7 @@ def solve_direct_gas_mvr_stream(
     settings: DirectGasMVRSettings,
     idx: int = 0,
 ) -> DirectGasMVRStreamSolveResult:
-    """Solve direct gas MVR replacement streams for one source stream and state."""
+    """Solve direct gas MVR replacement streams for one source stream and period."""
     fluid = str(stream.fluid_name)
     t_supply = _value(stream.t_supply, idx, unit="degC")
     t_target = _value(stream.t_target, idx, unit="degC")

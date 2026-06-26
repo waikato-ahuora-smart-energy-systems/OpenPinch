@@ -307,7 +307,7 @@ def calc_simulated_hpr_annualized_costs(
     hpr_hot_streams = hpr_streams.get_hot_utility_streams()
     hpr_cold_streams = hpr_streams.get_cold_utility_streams()
     hx_duty = sum(
-        max(float(streams.sum_stream_attribute("heat_flow", idx=args.idx)), 0.0)
+        max(float(streams.sum_stream_attribute("heat_flow", idx=args.period_idx)), 0.0)
         for streams in (hpr_hot_streams, hpr_cold_streams)
         if len(streams) > 0
     )
@@ -396,7 +396,7 @@ def evaluate_carnot_hpr_result(
                 f"{(Q_ext_cold / args.Q_hpr_target):.5f} + "
                 f"{(penalty / args.Q_hpr_target):.5f}"
             ),
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
 
     return HPRBackendResult(
@@ -458,7 +458,7 @@ def evaluate_vapour_hpr_result(
             hot_streams=cond_hot_streams,
             cold_streams=cond_cold_streams,
             is_shifted=True,
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
         Q_ext_heat = float(pt_cond[PT.H_NET][0])
         cond_wrong_side = float(pt_cond[PT.H_NET][-1])
@@ -474,7 +474,7 @@ def evaluate_vapour_hpr_result(
             hot_streams=evap_hot_streams,
             cold_streams=evap_cold_streams,
             is_shifted=True,
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
         Q_ext_cold = float(pt_evap[PT.H_NET][-1])
         evap_wrong_side = float(pt_evap[PT.H_NET][0])
@@ -519,7 +519,7 @@ def evaluate_vapour_hpr_result(
                 f"{cost_accounting.hpr_total_annualized_cost.value:.5f} $/y + "
                 f"{penalty:.5f} $/y"
             ),
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
 
     return HPRBackendResult(

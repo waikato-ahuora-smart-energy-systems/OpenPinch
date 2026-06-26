@@ -109,7 +109,7 @@ def extract_heat_exchanger_network(
                 getattr(solved_model, "non_isothermal_model", False)
             ),
             "solver_dTmin": _optional_float(getattr(solved_model, "dTmin", None)),
-            "operating_states": _operating_state_metadata(solved_model),
+            "operating_periods": _operating_state_metadata(solved_model),
             "hot_stream_heat_capacity_flowrates": _float_list(
                 getattr(solved_model, "f_h", None)
             ),
@@ -162,7 +162,7 @@ def extract_network_synthesis_result(
     task_id: str | None = None,
     problem_id: str | None = None,
     workspace_variant: str | None = None,
-    state_id: str | None = None,
+    period_id: str | None = None,
     solver_name: str | None = None,
     solver_status: str | None = None,
     method: str | None = None,
@@ -192,7 +192,7 @@ def extract_network_synthesis_result(
         task_id=task_id,
         problem_id=problem_id,
         workspace_variant=workspace_variant,
-        state_id=state_id,
+        period_id=period_id,
         solver_name=solver_name,
         solver_status=solver_status,
         method=result_method,
@@ -529,27 +529,27 @@ def _summary_metrics(solved_model: Any) -> dict[str, float | int | str | bool | 
 
 
 def _operating_state_metadata(solved_model: Any) -> dict[str, Any]:
-    state_count = _optional_int(getattr(solved_model, "N_states", None)) or 1
-    if state_count <= 1:
+    period_count = _optional_int(getattr(solved_model, "N_periods", None)) or 1
+    if period_count <= 1:
         return {}
-    state_ids = [str(item) for item in list(getattr(solved_model, "state_ids", ()))]
-    state_weights = [
-        float(item) for item in list(getattr(solved_model, "state_weights", ()))
+    period_ids = [str(item) for item in list(getattr(solved_model, "period_ids", ()))]
+    period_weights = [
+        float(item) for item in list(getattr(solved_model, "period_weights", ()))
     ]
     return {
-        "state_ids": state_ids,
-        "state_weights": state_weights,
-        "hot_utility_load_by_state": _float_list(
-            getattr(solved_model, "Q_hu_total_by_state", None)
+        "period_ids": period_ids,
+        "period_weights": period_weights,
+        "hot_utility_load_by_period": _float_list(
+            getattr(solved_model, "Q_hu_total_by_period", None)
         ),
-        "cold_utility_load_by_state": _float_list(
-            getattr(solved_model, "Q_cu_total_by_state", None)
+        "cold_utility_load_by_period": _float_list(
+            getattr(solved_model, "Q_cu_total_by_period", None)
         ),
-        "recovery_load_by_state": _float_list(
-            getattr(solved_model, "Q_r_total_by_state", None)
+        "recovery_load_by_period": _float_list(
+            getattr(solved_model, "Q_r_total_by_period", None)
         ),
-        "operating_cost_by_state": _float_list(
-            getattr(solved_model, "operating_cost_by_state", None)
+        "operating_cost_by_period": _float_list(
+            getattr(solved_model, "operating_cost_by_period", None)
         ),
         "weighted_operating_cost": _optional_float(
             getattr(solved_model, "weighted_operating_cost_value", None)

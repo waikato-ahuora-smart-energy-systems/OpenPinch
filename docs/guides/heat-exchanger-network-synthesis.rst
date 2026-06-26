@@ -175,7 +175,7 @@ map to ``StreamSchema`` records, utilities and utility prices map to
    design = problem.design.open_hens_method()
 
 Do not pass heat exchanger network design-space or solver controls as a separate object to the
-design call. The call may receive non-design runtime state options, but
+design call. The call may receive non-design runtime context options, but
 persistent heat exchanger network controls belong in the loaded problem payload.
 
 Quality Tiers

@@ -479,7 +479,7 @@ def test_target_accessor_supports_named_workflow(monkeypatch):
     assert called["include_subzones"] is False
 
 
-def test_target_accessor_supports_named_workflow_with_state_id(monkeypatch):
+def test_target_accessor_supports_named_workflow_with_period_id(monkeypatch):
     called = {}
 
     def fake_execute_targeting(
@@ -508,13 +508,13 @@ def test_target_accessor_supports_named_workflow_with_state_id(monkeypatch):
     out = obj.target.direct_heat_integration(
         zone_name="Plant/DI",
         options={"dt_min": 15},
-        state_id="peak",
+        period_id="peak",
     )
 
     assert out == {"target": "di"}
     assert called["target_id"] == "Direct Integration"
     assert called["application_zone"] == "Plant/DI"
-    assert called["options"] == {"dt_min": 15, "state_id": "peak"}
+    assert called["options"] == {"dt_min": 15, "period_id": "peak"}
 
 
 def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch):
@@ -545,14 +545,14 @@ def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch)
     out = obj.target.cogeneration(
         zone_name="Plant/TS",
         options={"base_target_type": "Total Site Target"},
-        state_id="peak",
+        period_id="peak",
     )
 
     assert out == {"target": "ts"}
     assert called["application_zone"] == "Plant/TS"
     assert called["options"] == {
         "base_target_type": "Total Site Target",
-        "state_id": "peak",
+        "period_id": "peak",
     }
     assert called["include_subzones"] is False
     assert called["service_func"] is not None
@@ -586,14 +586,14 @@ def test_target_accessor_exergy_uses_dedicated_execution_path(monkeypatch):
     out = obj.target.exergy(
         zone_name="Plant",
         options={"base_target_type": "Direct Integration"},
-        state_id="peak",
+        period_id="peak",
     )
 
     assert out == {"target": "x"}
     assert called["application_zone"] == "Plant"
     assert called["options"] == {
         "base_target_type": "Direct Integration",
-        "state_id": "peak",
+        "period_id": "peak",
     }
     assert called["include_subzones"] is False
     assert called["service_func"] is not None
@@ -794,7 +794,7 @@ def test_run_exergy_targeting_for_zone_and_subzones_is_post_order():
     problem._run_exergy_targeting_for_zone_and_subzones(
         zone=root,
         service_func=lambda zone, args=None: order.append(zone.name),
-        options={"state_id": "peak"},
+        options={"period_id": "peak"},
     )
 
     assert order == ["Child", "Root"]
@@ -812,13 +812,13 @@ def test_run_exergy_targeting_for_zone_and_subzones_drops_base_target_type_for_c
         service_func=lambda zone, args=None: calls.append(
             (zone.name, dict(args or {}))
         ),
-        options={"base_target_type": "Total Site Target", "state_id": "peak"},
+        options={"base_target_type": "Total Site Target", "period_id": "peak"},
     )
 
-    assert calls[0] == ("Child", {"state_id": "peak"})
+    assert calls[0] == ("Child", {"period_id": "peak"})
     assert calls[1] == (
         "Root",
-        {"base_target_type": "Total Site Target", "state_id": "peak"},
+        {"base_target_type": "Total Site Target", "period_id": "peak"},
     )
 
 
@@ -861,7 +861,7 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
     assert payload.streams == ["s"]
 
 
-def test_validate_rejects_stateful_streams_with_mixed_hot_cold_classification():
+def test_validate_rejects_period_streams_with_mixed_hot_cold_classification():
     payload = {
         "streams": [
             {
@@ -923,7 +923,7 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
 
     assert list(compact.columns[:7]) == [
         "Target",
-        "State ID",
+        "Period ID",
         "Hot Utility Target",
         "Cold Utility Target",
         "Heat Recovery",
@@ -1008,7 +1008,7 @@ def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
     assert summary.iloc[0]["Cold Pinch"] == "120.00 degC"
 
 
-def test_summary_frame_uses_selected_state_for_stateful_results():
+def test_summary_frame_uses_selected_period_for_period_results():
     class _Utility:
         def __init__(self, name, heat_flow):
             self.name = name
@@ -1019,23 +1019,23 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
         (),
         {
             "name": "Plant/DI",
-            "idx": 1,
-            "state_id": "peak",
-            "Qh": {"values": [10.0, 25.0], "state_ids": ["0", "peak"], "unit": "kW"},
-            "Qc": {"values": [20.0, 15.0], "state_ids": ["0", "peak"], "unit": "kW"},
-            "Qr": {"values": [30.0, 35.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            "period_idx": 1,
+            "period_id": "peak",
+            "Qh": {"values": [10.0, 25.0], "period_ids": ["0", "peak"], "unit": "kW"},
+            "Qc": {"values": [20.0, 15.0], "period_ids": ["0", "peak"], "unit": "kW"},
+            "Qr": {"values": [30.0, 35.0], "period_ids": ["0", "peak"], "unit": "kW"},
             "pinch_temp": type(
                 "PinchTemp",
                 (),
                 {
                     "hot_temp": {
                         "values": [120.0, 140.0],
-                        "state_ids": ["0", "peak"],
+                        "period_ids": ["0", "peak"],
                         "unit": "degC",
                     },
                     "cold_temp": {
                         "values": [100.0, 115.0],
-                        "state_ids": ["0", "peak"],
+                        "period_ids": ["0", "peak"],
                         "unit": "degC",
                     },
                 },
@@ -1045,7 +1045,7 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
                     "Steam",
                     {
                         "values": [10.0, 25.0],
-                        "state_ids": ["0", "peak"],
+                        "period_ids": ["0", "peak"],
                         "unit": "kW",
                     },
                 )
@@ -1058,7 +1058,7 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
 
     summary = obj.summary_frame()
 
-    assert summary.iloc[0]["State ID"] == "peak"
+    assert summary.iloc[0]["Period ID"] == "peak"
     assert summary.iloc[0]["Hot Utility Target"] == "25.00 kW"
     assert summary.iloc[0]["Hot Pinch"] == "140.00 degC"
     assert summary.iloc[0]["Hot Utilities"] == "Steam: 25.00 kW"
@@ -1650,7 +1650,7 @@ def test_load_allows_missing_optional_utility_and_stream_fields():
     assert validated.utilities[0].t_target is None
 
 
-def test_load_preserves_stateful_stream_values_on_runtime_streams():
+def test_load_preserves_period_stream_values_on_runtime_streams():
     payload = {
         "streams": [
             {
@@ -1686,7 +1686,7 @@ def test_load_preserves_stateful_stream_values_on_runtime_streams():
     assert stream.supply_temperature[1].unit == "degC"
 
 
-def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Path):
+def test_validate_rejects_period_equal_temperatures_with_period_id(tmp_path: Path):
     payload = {
         "streams": [
             {
@@ -1710,17 +1710,17 @@ def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Pa
         ],
         "utilities": [],
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
-    path = tmp_path / "stateful_equal_t.json"
+    path = tmp_path / "period_equal_t.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError) as exc_info:
         PinchProblem().load(source=path)
 
     message = str(exc_info.value)
-    assert "Supply and target temperatures must differ for state_id '1'" in message
+    assert "Supply and target temperatures must differ for period_id '1'" in message
     assert "Stream 1 'H1'" in message
 
 
@@ -1909,7 +1909,7 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
     )
 
 
-def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_results():
+def test_direct_heat_integration_accepts_period_id_and_returns_period_specific_results():
     payload = {
         "streams": [
             {
@@ -1955,25 +1955,25 @@ def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_res
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.direct_heat_integration(state_id="0")
-    peak = problem.target.direct_heat_integration(state_id="peak")
+    offpeak = problem.target.direct_heat_integration(period_id="0")
+    peak = problem.target.direct_heat_integration(period_id="peak")
 
-    assert offpeak.state_id == "0"
-    assert peak.state_id == "peak"
+    assert offpeak.period_id == "0"
+    assert peak.period_id == "peak"
     assert peak.cold_utility_target != offpeak.cold_utility_target
     assert peak.heat_recovery_target != offpeak.heat_recovery_target
 
     summary = problem.summary_frame()
-    assert summary.iloc[0]["State ID"] == "peak"
+    assert summary.iloc[0]["Period ID"] == "peak"
 
 
-def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
+def test_direct_heat_pump_accepts_period_id_and_returns_period_specific_results(
     monkeypatch,
 ):
     from OpenPinch.classes.problem_table import ProblemTable
@@ -2008,16 +2008,16 @@ def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     def fake_direct_hpr(target_zone, is_heat_pumping, args=None):
-        idx = args["idx"]
-        sid = args.get("state_id")
+        idx = args["period_idx"]
+        sid = args.get("period_id")
         return DirectHeatPumpTarget(
             zone_name=target_zone.name,
-            state_id=sid,
-            state_idx=idx,
+            period_id=sid,
+            period_idx=idx,
             type=TT.DHP.value,
             parent_zone=target_zone.parent_zone,
             config=target_zone.config,
@@ -2033,7 +2033,7 @@ def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
             hpr_success=True,
             hpr_hot_streams=StreamCollection(),
             hpr_cold_streams=StreamCollection(),
-            hpr_details={"idx": idx},
+            hpr_details={"period_idx": idx},
         )
 
     monkeypatch.setattr(
@@ -2044,16 +2044,16 @@ def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.direct_heat_pump(state_id="0")
-    peak = problem.target.direct_heat_pump(state_id="peak")
+    offpeak = problem.target.direct_heat_pump(period_id="0")
+    peak = problem.target.direct_heat_pump(period_id="peak")
 
-    assert offpeak.state_id == "0"
-    assert peak.state_id == "peak"
+    assert offpeak.period_id == "0"
+    assert peak.period_id == "peak"
     assert peak.hpr_utility_total != offpeak.hpr_utility_total
-    assert problem.master_zone.targets[TT.DI.value].state_idx == 1
+    assert problem.master_zone.targets[TT.DI.value].period_idx == 1
 
 
-def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
+def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_results(
     monkeypatch,
 ):
     from OpenPinch.classes.problem_table import ProblemTable
@@ -2088,16 +2088,16 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     def fake_indirect_hpr(target_zone, is_heat_pumping, args=None):
-        idx = args["idx"]
-        sid = args.get("state_id")
+        idx = args["period_idx"]
+        sid = args.get("period_id")
         return IndirectHeatPumpTarget(
             zone_name=target_zone.name,
-            state_id=sid,
-            state_idx=idx,
+            period_id=sid,
+            period_idx=idx,
             type=TT.IHP.value,
             parent_zone=target_zone.parent_zone,
             config=target_zone.config,
@@ -2113,7 +2113,7 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
             hpr_success=True,
             hpr_hot_streams=StreamCollection(),
             hpr_cold_streams=StreamCollection(),
-            hpr_details={"idx": idx},
+            hpr_details={"period_idx": idx},
         )
 
     monkeypatch.setattr(
@@ -2128,17 +2128,17 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
             target_zone.add_target(
                 TotalSiteTarget(
                     zone_name=target_zone.name,
-                    state_id=args.get("state_id"),
-                    state_idx=args["idx"],
+                    period_id=args.get("period_id"),
+                    period_idx=args["period_idx"],
                     type=TT.TS.value,
                     parent_zone=target_zone.parent_zone,
                     config=target_zone.config,
                     pt=ProblemTable({PT.T: [120.0, 60.0]}),
                     hot_utilities=StreamCollection(),
                     cold_utilities=StreamCollection(),
-                    hot_utility_target=10.0 + args["idx"],
-                    cold_utility_target=5.0 + args["idx"],
-                    heat_recovery_target=15.0 + args["idx"],
+                    hot_utility_target=10.0 + args["period_idx"],
+                    cold_utility_target=5.0 + args["period_idx"],
+                    heat_recovery_target=15.0 + args["period_idx"],
                 )
             )
             or target_zone
@@ -2147,16 +2147,16 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.indirect_heat_pump(state_id="0")
-    peak = problem.target.indirect_heat_pump(state_id="peak")
+    offpeak = problem.target.indirect_heat_pump(period_id="0")
+    peak = problem.target.indirect_heat_pump(period_id="peak")
 
-    assert offpeak.state_id == "0"
-    assert peak.state_id == "peak"
+    assert offpeak.period_id == "0"
+    assert peak.period_id == "peak"
     assert peak.hpr_utility_total != offpeak.hpr_utility_total
-    assert problem.master_zone.targets[TT.TS.value].state_idx == 1
+    assert problem.master_zone.targets[TT.TS.value].period_idx == 1
 
 
-def test_direct_heat_integration_rejects_unknown_state_id():
+def test_direct_heat_integration_rejects_unknown_period_id():
     payload = {
         "streams": [
             {
@@ -2184,7 +2184,7 @@ def test_direct_heat_integration_rejects_unknown_state_id():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
@@ -2192,12 +2192,12 @@ def test_direct_heat_integration_rejects_unknown_state_id():
 
     with pytest.raises(
         ValueError,
-        match="state_id 'summer' was not found on this collection",
+        match="period_id 'summer' was not found on this collection",
     ):
-        problem.target.direct_heat_integration(state_id="summer")
+        problem.target.direct_heat_integration(period_id="summer")
 
 
-def test_problem_exposes_canonical_state_ids():
+def test_problem_exposes_canonical_period_ids():
     payload = {
         "streams": [
             {
@@ -2225,15 +2225,15 @@ def test_problem_exposes_canonical_state_ids():
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    assert list(problem.state_ids.keys()) == ["0", "peak"]
+    assert list(problem.period_ids.keys()) == ["0", "peak"]
 
 
-def test_target_all_states_runs_each_state_and_preserves_call_order():
+def test_target_all_periods_runs_each_period_and_preserves_call_order():
     payload = {
         "streams": [
             {
@@ -2280,21 +2280,21 @@ def test_target_all_states_runs_each_state_and_preserves_call_order():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    results = problem.target_all_states()
+    results = problem.target_all_periods()
 
     assert list(results) == ["0", "peak"]
-    assert results["0"].targets[0].state_id == "0"
-    assert results["peak"].targets[0].state_id == "peak"
+    assert results["0"].targets[0].period_id == "0"
+    assert results["peak"].targets[0].period_id == "peak"
     assert results["0"].targets[0].Qc != results["peak"].targets[0].Qc
 
 
-def test_target_all_states_uses_validated_output_state_id_for_serial_keys(
+def test_target_all_periods_uses_validated_output_period_id_for_serial_keys(
     monkeypatch,
 ):
     from OpenPinch.lib.schemas.io import TargetOutput
@@ -2317,26 +2317,26 @@ def test_target_all_states_uses_validated_output_state_id_for_serial_keys(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     monkeypatch.setattr(
         PinchProblem,
-        "_solve_target_for_state",
-        lambda self, state_id: TargetOutput(
+        "_solve_target_for_period",
+        lambda self, period_id: TargetOutput(
             name="Site",
-            state_id=f"{state_id}-resolved",
+            period_id=f"{period_id}-resolved",
             targets=[],
         ),
     )
 
     problem = PinchProblem(source=payload, project_name="Site")
-    results = problem.target_all_states()
+    results = problem.target_all_periods()
 
     assert list(results) == ["0-resolved", "peak-resolved"]
 
 
-def test_target_all_states_supports_thread_parallel_execution():
+def test_target_all_periods_supports_thread_parallel_execution():
     payload = {
         "streams": [
             {
@@ -2383,19 +2383,19 @@ def test_target_all_states_supports_thread_parallel_execution():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    results = problem.target_all_states(parallel="thread", max_workers=2)
+    results = problem.target_all_periods(parallel="thread", max_workers=2)
 
     assert list(results) == ["0", "peak"]
-    assert {result.targets[0].state_id for result in results.values()} == {"0", "peak"}
+    assert {result.targets[0].period_id for result in results.values()} == {"0", "peak"}
 
 
-def test_target_all_states_uses_validated_output_state_id_for_parallel_keys(
+def test_target_all_periods_uses_validated_output_period_id_for_parallel_keys(
     monkeypatch,
 ):
     mod = sys.modules[PinchProblem.__module__]
@@ -2418,26 +2418,26 @@ def test_target_all_states_uses_validated_output_state_id_for_parallel_keys(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     monkeypatch.setattr(
         mod,
-        "_solve_default_target_for_state",
-        lambda problem_inputs, project_name, state_id: {
+        "_solve_default_target_for_period",
+        lambda problem_inputs, project_name, period_id: {
             "name": project_name,
-            "state_id": f"{state_id}-resolved",
+            "period_id": f"{period_id}-resolved",
             "targets": [],
         },
     )
 
     problem = PinchProblem(source=payload, project_name="Site")
-    results = problem.target_all_states(parallel="thread", max_workers=2)
+    results = problem.target_all_periods(parallel="thread", max_workers=2)
 
     assert list(results) == ["0-resolved", "peak-resolved"]
 
 
-def test_target_all_states_rejects_scalar_only_problems(sample_problem):
+def test_target_all_periods_rejects_scalar_only_problems(sample_problem):
     problem = PinchProblem(source=sample_problem, project_name="Site")
-    results = problem.target_all_states()
+    results = problem.target_all_periods()
     assert list(results) == ["0"]

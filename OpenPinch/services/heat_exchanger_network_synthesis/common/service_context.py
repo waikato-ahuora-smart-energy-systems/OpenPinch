@@ -29,11 +29,11 @@ def prepare_service_context(
         )
 
     runtime_options = normalise_runtime_options(options)
-    state_id = optional_text(runtime_options.get("state_id"))
-    target_output = ensure_target_results(problem, runtime_options, state_id)
+    period_id = optional_text(runtime_options.get("period_id"))
+    target_output = ensure_target_results(problem, runtime_options, period_id)
     settings = workflow_settings_from_problem(
         problem,
-        state_id=state_id,
+        period_id=period_id,
         workspace_variant=workspace_variant,
     )
     return target_output, settings
@@ -70,7 +70,7 @@ def finalise_design_result(
 def ensure_target_results(
     problem: PinchProblem,
     runtime_options: dict[str, Any],
-    state_id: str | None,
+    period_id: str | None,
 ) -> TargetOutput:
     """Return cached target results or compute them for the active problem."""
 
@@ -78,7 +78,7 @@ def ensure_target_results(
     if (
         cached is not None
         and cached.targets
-        and (state_id is None or cached.state_id == state_id)
+        and (period_id is None or cached.period_id == period_id)
     ):
         return cached
     return TargetOutput.model_validate(problem.target(options=runtime_options))

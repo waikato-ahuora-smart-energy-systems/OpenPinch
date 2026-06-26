@@ -132,7 +132,7 @@ class InternalHeatExchangerNetworkProblem:
         run_id: str,
         problem_id: str | None = None,
         workspace_variant: str | None = None,
-        state_id: str | None = None,
+        period_id: str | None = None,
     ) -> HeatExchangerNetworkSynthesisResult:
         """Return the serializable result payload for the service boundary."""
 
@@ -143,7 +143,7 @@ class InternalHeatExchangerNetworkProblem:
             task_id=self.synthesis_task_id,
             problem_id=problem_id,
             workspace_variant=workspace_variant,
-            state_id=state_id,
+            period_id=period_id,
             solver_name=self.solver,
             method=self.framework,
             stage_count=getattr(self.case, "S", self.stages),

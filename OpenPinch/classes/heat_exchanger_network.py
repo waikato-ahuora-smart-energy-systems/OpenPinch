@@ -31,7 +31,7 @@ class HeatExchangerNetwork(BaseModel):
     exchangers: tuple[HeatExchanger, ...] = Field(default_factory=tuple)
     run_id: str | None = None
     task_id: str | None = None
-    state_id: str | None = None
+    period_id: str | None = None
     method: str | None = None
     stage_count: int | None = None
     objective_value: float | None = None
@@ -52,7 +52,7 @@ class HeatExchangerNetwork(BaseModel):
         repr=False,
     )
 
-    @field_validator("run_id", "task_id", "state_id", "method")
+    @field_validator("run_id", "task_id", "period_id", "method")
     @classmethod
     def _validate_optional_identity(cls, value: str | None) -> str | None:
         if value is None:

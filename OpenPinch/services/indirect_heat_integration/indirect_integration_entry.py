@@ -19,7 +19,7 @@ from ...lib.config import tol
 from ...lib.enums import GT, PT, TT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
-from ..common.miscellaneous import get_state_index
+from ..common.miscellaneous import get_period_index
 from ..common.problem_table_analysis import (
     get_process_heat_cascade,
 )
@@ -41,7 +41,7 @@ def compute_total_subzone_utility_targets(
 ) -> TotalProcessTarget:
     """Sums and records zonal targets."""
     # Sum targets from subzones
-    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
+    idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = num_units = area = 0.0
 
@@ -97,8 +97,8 @@ def compute_total_subzone_utility_targets(
             else 1.0
         ),
         "utility_cost": utility_cost,
-        "state_id": sid,
-        "state_idx": idx,
+        "period_id": sid,
+        "period_idx": idx,
     }
     return TotalProcessTarget.model_validate(output)
 
@@ -114,7 +114,7 @@ def compute_indirect_integration_targets(
     stream cascades, performs utility-to-utility balancing, and records the
     resulting Total Site target on ``zone`` before returning it.
     """
-    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
+    idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
     s_tzt = zone.targets[TT.TZ.value]
     if len(zone.net_hot_streams) == 0 and len(zone.net_cold_streams) == 0:
         return None
@@ -124,7 +124,7 @@ def compute_indirect_integration_targets(
         hot_streams=zone.net_hot_streams,
         cold_streams=zone.net_cold_streams,
         is_shifted=True,  # Align a second shift with the real utility scale.
-        idx=idx,
+        period_idx=idx,
     )
     pt.update(
         **_shift_site_process_profiles(
@@ -155,7 +155,7 @@ def compute_indirect_integration_targets(
     hot_utilities, cold_utilities = _match_utility_gen_and_use_at_same_level(
         hot_utilities=deepcopy(s_tzt.hot_utilities),
         cold_utilities=deepcopy(s_tzt.cold_utilities),
-        idx=idx,
+        period_idx=idx,
     )
 
     output = {
@@ -182,8 +182,8 @@ def compute_indirect_integration_targets(
             hot_utilities + cold_utilities,
             idx=idx,
         ),
-        "state_id": sid,
-        "state_idx": idx,
+        "period_id": sid,
+        "period_idx": idx,
     }
     return TotalSiteTarget.model_validate(output)
 

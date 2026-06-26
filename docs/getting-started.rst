@@ -24,8 +24,8 @@ include ``validation_report()``, ``target()``, ``summary_frame()``, ``report()``
 ``metrics()``, ``export_excel()``, ``plot.grand_composite_curve()``,
 ``plot.export_gallery(...)``, ``show_dashboard()``,
 ``problem.target.direct_heat_pump(...)``, ``workspace.scenario(...)``, and
-``workspace.compare_cases(...)``. When a case definition carries stateful
-values, named ``problem.target.*`` workflows also accept ``state_id=...``.
+``workspace.compare_cases(...)``. When a case definition carries period-valued
+values, named ``problem.target.*`` workflows also accept ``period_id=...``.
 
 Use these pages instead:
 

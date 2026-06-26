@@ -76,7 +76,7 @@ The packaged notebook series currently includes:
 - `01_basic_pinch_and_dtcont_sensitivity.ipynb`
 - `02_total_site_targets_and_sugcc.ipynb`
 - `03_carnot_hpr_comparison.ipynb`
-- `04_multistate_targeting_and_state_comparison.ipynb`
+- `04_multiperiod_targeting_and_period_comparison.ipynb`
 - `05_schema_service_and_output_workflows.ipynb`
 - `06_energy_transfer_analysis.ipynb`
 - `07_vapour_compression_mvr_cascade_hpr.ipynb`
@@ -85,7 +85,7 @@ The packaged notebook series currently includes:
 
 These notebooks are intended to be the main learning path for new users. The
 series now spans the single-case `PinchProblem` front door, named
-`PinchWorkspace` studies, real multistate targeting, the typed/service plus
+`PinchWorkspace` studies, real multiperiod targeting, the typed/service plus
 serialized-workspace boundaries, energy-transfer analysis, and the simulated
 heat pump targeting backend, direct gas/vapour process-component MVR, and the
 heat exchanger network design service on a compact four-stream problem.
@@ -113,19 +113,19 @@ problem.plot.export("graphs", graph_type="gcc")
 problem.plot.export_gallery("graph_gallery")
 ```
 
-When the PinchProblem data contains stateful values, the named
-`problem.target.*` entry points also accept `state_id=...` so one cached solve
-can be refreshed for a selected operating state without flattening the
+When the PinchProblem data contains period-valued values, the named
+`problem.target.*` entry points also accept `period_id=...` so one cached solve
+can be refreshed for a selected operating period without flattening the
 in-memory model first:
 
 ```python
-multi_state_problem = PinchProblem(
-    "crude_preheat_train_multistate.json",
-    project_name="crude_multistate",
+multiperiod_problem = PinchProblem(
+    "crude_preheat_train_multiperiod.json",
+    project_name="crude_multiperiod",
 )
-selected_state = multi_state_problem.target.direct_heat_integration(state_id="peak")
-state_summary = multi_state_problem.summary_frame()
-print(state_summary[["Target", "State ID", "Hot Utility Target", "Cold Utility Target"]])
+selected_period = multiperiod_problem.target.direct_heat_integration(period_id="peak")
+period_summary = multiperiod_problem.summary_frame()
+print(period_summary[["Target", "Period ID", "Hot Utility Target", "Cold Utility Target"]])
 ```
 
 For named study cases and bundle save/load, use `PinchWorkspace`:

@@ -93,8 +93,8 @@ def problem_to_solver_arrays(
     config = zone.config
     costing = config.costing
     hens = config.hens
-    state_ids, state_weights = _state_ids_and_weights(zone)
-    num_states = len(state_ids)
+    period_ids, period_weights = _period_ids_and_weights(zone)
+    num_periods = len(period_ids)
     arrays = _solver_array_mapping(
         cold_items=cold_items,
         cold_utility_items=cold_utility_items,
@@ -102,9 +102,9 @@ def problem_to_solver_arrays(
         dTmin=dTmin,
         hot_items=hot_items,
         hot_utility_items=hot_utility_items,
-        num_states=num_states,
-        state_ids=state_ids,
-        state_weights=state_weights,
+        num_periods=num_periods,
+        period_ids=period_ids,
+        period_weights=period_weights,
         zone=zone,
     )
 
@@ -124,7 +124,7 @@ def problem_to_solver_arrays(
         "stages": {
             str(stage): index for index, stage in enumerate(hens.stage_selection)
         },
-        "states": {state_id: index for index, state_id in enumerate(state_ids)},
+        "periods": {period_id: index for index, period_id in enumerate(period_ids)},
     }
 
     return PreparedSolverArrays(
@@ -161,8 +161,8 @@ def problem_to_solver_arrays(
             "HENS_STAGE_SELECTION": list(hens.stage_selection),
             "active_dTmin": float(dTmin),
             "active_dt_cont_multiplier": float(dTmin),
-            "state_ids": list(state_ids),
-            "state_weights": [float(weight) for weight in state_weights],
+            "period_ids": list(period_ids),
+            "period_weights": [float(weight) for weight in period_weights],
             "costing": {
                 "COSTING_HX_AREA_COEFF": costing.hx_area_coeff,
                 "COSTING_HX_AREA_EXP": costing.hx_area_exp,
@@ -214,36 +214,36 @@ def _solver_array_mapping(
     dTmin: float,
     hot_items: list[_PreparedItem],
     hot_utility_items: list[_PreparedItem],
-    num_states: int,
-    state_ids: tuple[str, ...],
-    state_weights: tuple[float, ...],
+    num_periods: int,
+    period_ids: tuple[str, ...],
+    period_weights: tuple[float, ...],
     zone: Zone,
 ) -> dict[str, np.ndarray]:
     temp_unit = "K"
     price_unit = "$/MW/h"
     htc_unit = "kW/m^2/delta_degC"
-    states = range(num_states)
+    periods = range(num_periods)
 
-    def state_values(items: list[_PreparedItem], getter) -> np.ndarray:
+    def period_values(items: list[_PreparedItem], getter) -> np.ndarray:
         return _state_float_matrix(
             (getter(stream, record, n) for _, stream, record in items)
-            for n in states
+            for n in periods
         )
 
     def stream_attr(attr: str, unit: str):
         def getter(stream: Stream, _record, n: int) -> float:
-            return _value(getattr(stream, attr), unit, state_idx=n)
+            return _value(getattr(stream, attr), unit, period_idx=n)
 
         return getter
 
     def temperature_contribution(stream: Stream, _record, n: int) -> float:
-        return _temperature_contribution(stream, dTmin, state_idx=n)
+        return _temperature_contribution(stream, dTmin, period_idx=n)
 
     def utility_solver_target(stream: Stream, _record, n: int) -> float:
-        return _utility_solver_target(stream, zone, state_idx=n)
+        return _utility_solver_target(stream, zone, period_idx=n)
 
     def heat_capacity_flowrate(stream: Stream, record, n: int) -> float:
-        return _stream_heat_capacity_flowrate(stream, record, state_idx=n)
+        return _stream_heat_capacity_flowrate(stream, record, period_idx=n)
 
     cu = cold_utility_items
     hu = hot_utility_items
@@ -251,36 +251,36 @@ def _solver_array_mapping(
     return {
         "A_coeff": _float_array([costing.hx_area_coeff]),
         "A_exp": _float_array([costing.hx_area_exp]),
-        "state_ids": _str_array(state_ids),
-        "state_weights": _float_array(state_weights),
-        "T_c_cont_state": state_values(cold_items, temperature_contribution),
-        "T_c_in_state": state_values(cold_items, stream_attr("t_supply", temp_unit)),
-        "T_c_out_state": state_values(cold_items, stream_attr("t_target", temp_unit)),
-        "T_cu_in_state": state_values(cu, stream_attr("t_supply", temp_unit)),
-        "T_cu_out_state": state_values(cold_utility_items, utility_solver_target),
-        "T_cu_cont_state": state_values(cold_utility_items, temperature_contribution),
-        "T_h_cont_state": state_values(hot_items, temperature_contribution),
-        "T_h_in_state": state_values(hot_items, stream_attr("t_supply", temp_unit)),
-        "T_h_out_state": state_values(hot_items, stream_attr("t_target", temp_unit)),
-        "T_hu_in_state": state_values(hu, stream_attr("t_supply", temp_unit)),
-        "T_hu_out_state": state_values(hot_utility_items, utility_solver_target),
-        "T_hu_cont_state": state_values(hot_utility_items, temperature_contribution),
-        "c_cost_state": state_values(cold_items, stream_attr("price", price_unit)),
+        "period_ids": _str_array(period_ids),
+        "period_weights": _float_array(period_weights),
+        "T_c_cont_period": period_values(cold_items, temperature_contribution),
+        "T_c_in_period": period_values(cold_items, stream_attr("t_supply", temp_unit)),
+        "T_c_out_period": period_values(cold_items, stream_attr("t_target", temp_unit)),
+        "T_cu_in_period": period_values(cu, stream_attr("t_supply", temp_unit)),
+        "T_cu_out_period": period_values(cold_utility_items, utility_solver_target),
+        "T_cu_cont_period": period_values(cold_utility_items, temperature_contribution),
+        "T_h_cont_period": period_values(hot_items, temperature_contribution),
+        "T_h_in_period": period_values(hot_items, stream_attr("t_supply", temp_unit)),
+        "T_h_out_period": period_values(hot_items, stream_attr("t_target", temp_unit)),
+        "T_hu_in_period": period_values(hu, stream_attr("t_supply", temp_unit)),
+        "T_hu_out_period": period_values(hot_utility_items, utility_solver_target),
+        "T_hu_cont_period": period_values(hot_utility_items, temperature_contribution),
+        "c_cost_period": period_values(cold_items, stream_attr("price", price_unit)),
         "cold_names": _str_array(stream.name for _, stream, _ in cold_items),
         "cu_coeff": _float_array([costing.hx_area_coeff]),
-        "cu_cost_state": state_values(cu, stream_attr("price", price_unit)),
+        "cu_cost_period": period_values(cu, stream_attr("price", price_unit)),
         "cu_exp": _float_array([costing.hx_area_exp]),
         "cu_unit_cost": _float_array([costing.hx_unit_cost]),
-        "f_c_state": state_values(cold_items, heat_capacity_flowrate),
-        "f_h_state": state_values(hot_items, heat_capacity_flowrate),
-        "h_cost_state": state_values(hot_items, stream_attr("price", price_unit)),
+        "f_c_period": period_values(cold_items, heat_capacity_flowrate),
+        "f_h_period": period_values(hot_items, heat_capacity_flowrate),
+        "h_cost_period": period_values(hot_items, stream_attr("price", price_unit)),
         "hot_names": _str_array(stream.name for _, stream, _ in hot_items),
-        "htc_c_state": state_values(cold_items, stream_attr("htc", htc_unit)),
-        "htc_cu_state": state_values(cold_utility_items, stream_attr("htc", htc_unit)),
-        "htc_h_state": state_values(hot_items, stream_attr("htc", htc_unit)),
-        "htc_hu_state": state_values(hot_utility_items, stream_attr("htc", htc_unit)),
+        "htc_c_period": period_values(cold_items, stream_attr("htc", htc_unit)),
+        "htc_cu_period": period_values(cold_utility_items, stream_attr("htc", htc_unit)),
+        "htc_h_period": period_values(hot_items, stream_attr("htc", htc_unit)),
+        "htc_hu_period": period_values(hot_utility_items, stream_attr("htc", htc_unit)),
         "hu_coeff": _float_array([costing.hx_area_coeff]),
-        "hu_cost_state": state_values(hu, stream_attr("price", price_unit)),
+        "hu_cost_period": period_values(hu, stream_attr("price", price_unit)),
         "hu_exp": _float_array([costing.hx_area_exp]),
         "hu_unit_cost": _float_array([costing.hx_unit_cost]),
         "unit_cost": _float_array([costing.hx_unit_cost]),
@@ -288,35 +288,35 @@ def _solver_array_mapping(
 # fmt: on
 
 
-def _state_ids_and_weights(zone: Zone) -> tuple[tuple[str, ...], tuple[float, ...]]:
-    state_lookup = zone.state_ids or {"0": 0}
-    ordered_state_ids = tuple(
-        state_id
-        for state_id, _ in sorted(state_lookup.items(), key=lambda item: item[1])
+def _period_ids_and_weights(zone: Zone) -> tuple[tuple[str, ...], tuple[float, ...]]:
+    period_lookup = zone.period_ids or {"0": 0}
+    ordered_period_ids = tuple(
+        period_id
+        for period_id, _ in sorted(period_lookup.items(), key=lambda item: item[1])
     )
     weights = getattr(zone, "weights", None)
     if weights is None:
-        state_weights = tuple(1.0 for _ in ordered_state_ids)
+        period_weights = tuple(1.0 for _ in ordered_period_ids)
     else:
-        state_weights = tuple(
+        period_weights = tuple(
             float(weight) for weight in np.asarray(weights, dtype=float)
         )
-    if len(state_weights) != len(ordered_state_ids):
-        raise ValueError("HEN state weight count must match state_id count.")
-    if not ordered_state_ids:
-        raise ValueError("HEN synthesis requires at least one operating state.")
-    if not np.isfinite(state_weights).all() or sum(state_weights) <= 0.0:
-        raise ValueError("HEN synthesis requires a positive finite state-weight sum.")
-    return ordered_state_ids, state_weights
+    if len(period_weights) != len(ordered_period_ids):
+        raise ValueError("HEN period weight count must match period_id count.")
+    if not ordered_period_ids:
+        raise ValueError("HEN synthesis requires at least one operating period.")
+    if not np.isfinite(period_weights).all() or sum(period_weights) <= 0.0:
+        raise ValueError("HEN synthesis requires a positive finite period-weight sum.")
+    return ordered_period_ids, period_weights
 
 
 def _temperature_contribution(
     stream: Stream,
     dTmin: float,
     *,
-    state_idx: int = 0,
+    period_idx: int = 0,
 ) -> float:
-    contribution = _value(stream.dt_cont, "delta_degC", state_idx=state_idx)
+    contribution = _value(stream.dt_cont, "delta_degC", period_idx=period_idx)
     if contribution > tol:
         return contribution * float(dTmin)
     return float(dTmin) / 2.0
@@ -326,10 +326,10 @@ def _utility_solver_target(
     stream: Stream,
     zone: Zone,
     *,
-    state_idx: int = 0,
+    period_idx: int = 0,
 ) -> float:
-    supply = _value(stream.t_supply, "K", state_idx=state_idx)
-    target = _value(stream.t_target, "K", state_idx=state_idx)
+    supply = _value(stream.t_supply, "K", period_idx=period_idx)
+    target = _value(stream.t_target, "K", period_idx=period_idx)
     if abs(supply - target) <= zone.config.thermal.dt_phase_change + tol:
         return supply
     return target
@@ -339,18 +339,18 @@ def _stream_heat_capacity_flowrate(
     stream: Stream,
     record,
     *,
-    state_idx: int = 0,
+    period_idx: int = 0,
 ) -> float:
     raw_flowrate = getattr(record, "heat_capacity_flowrate", None)
     if raw_flowrate is not None:
         parsed = _optional_value(
             raw_flowrate,
             "kW/delta_degC",
-            state_idx=state_idx,
+            period_idx=period_idx,
         )
         if parsed is not None:
             return parsed
-    return _value(stream.CP, "kW/delta_degC", state_idx=state_idx)
+    return _value(stream.CP, "kW/delta_degC", period_idx=period_idx)
 
 
 def _ordered_stream_items(problem: PinchProblem, items) -> list[_PreparedItem]:
@@ -412,26 +412,26 @@ def _matching_item_index(
     return None
 
 
-def _value(value: Any, unit: str, *, state_idx: int = 0) -> float:
-    parsed = _optional_value(value, unit, state_idx=state_idx)
+def _value(value: Any, unit: str, *, period_idx: int = 0) -> float:
+    parsed = _optional_value(value, unit, period_idx=period_idx)
     if parsed is None:
         return 0.0
     return parsed
 
 
-def _optional_value(value: Any, unit: str, *, state_idx: int = 0) -> float | None:
+def _optional_value(value: Any, unit: str, *, period_idx: int = 0) -> float | None:
     if value is None:
         return None
     if hasattr(value, "to"):
         converted = value.to(unit)
-        if getattr(converted, "num_states", 1) > 1:
-            return float(converted[state_idx].value)
+        if getattr(converted, "num_periods", 1) > 1:
+            return float(converted[period_idx].value)
         return float(converted.value)
     if hasattr(value, "values"):
         raw_values = getattr(value, "values")
         if raw_values is None:
             return None
-        raw_value = raw_values[state_idx] if len(raw_values) > 1 else raw_values[0]
+        raw_value = raw_values[period_idx] if len(raw_values) > 1 else raw_values[0]
         raw_unit = getattr(value, "unit", None)
         if raw_unit:
             return float(Value(raw_value, raw_unit).to(unit).value)
@@ -441,13 +441,13 @@ def _optional_value(value: Any, unit: str, *, state_idx: int = 0) -> float | Non
         if raw_value is None:
             return None
         if isinstance(raw_value, (list, tuple, np.ndarray)):
-            raw_value = raw_value[state_idx]
+            raw_value = raw_value[period_idx]
         raw_unit = getattr(value, "unit", None)
         if raw_unit:
             return float(Value(raw_value, raw_unit).to(unit).value)
         return float(raw_value)
     if isinstance(value, (list, tuple, np.ndarray)):
-        return float(value[state_idx])
+        return float(value[period_idx])
     return float(value)
 
 

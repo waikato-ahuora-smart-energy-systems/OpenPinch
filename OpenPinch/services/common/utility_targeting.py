@@ -68,7 +68,7 @@ def get_utility_targets(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             is_shifted=True,
-            idx=idx,
+            period_idx=idx,
         )
     )
     pt.update(
@@ -86,7 +86,7 @@ def get_utility_targets(
                 hot_utilities=hot_utilities,
                 cold_utilities=cold_utilities,
                 is_shifted=False,
-                idx=idx,
+                period_idx=idx,
             )
         )
         pt_real.update(

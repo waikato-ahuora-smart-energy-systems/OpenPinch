@@ -136,7 +136,7 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
         res,
         is_T_vals_shifted=True,
         is_heat_pumping=True,
-        idx=0,
+        period_idx=0,
     )
     assert isinstance(out, ProblemTable)
     np.testing.assert_allclose(out[PT.H_NET_HOT], expected_hot)
@@ -224,7 +224,7 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         hp,
         "create_problem_table_with_t_int",
         lambda **kwargs: (
-            calls.__setitem__("grid_idx", kwargs.get("idx"))
+            calls.__setitem__("grid_idx", kwargs.get("period_idx"))
             or ProblemTable({PT.T: [120.0, 60.0]})
         ),
     )
@@ -232,7 +232,7 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         hp,
         "get_process_heat_cascade",
         lambda **kwargs: (
-            calls.__setitem__("air_idx", kwargs.get("idx"))
+            calls.__setitem__("air_idx", kwargs.get("period_idx"))
             or ProblemTable(
                 {
                     PT.T: [120.0, 60.0],
@@ -247,7 +247,7 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         hp,
         "get_utility_heat_cascade",
         lambda **kwargs: (
-            calls.__setitem__("utility_idx", kwargs.get("idx"))
+            calls.__setitem__("utility_idx", kwargs.get("period_idx"))
             or {
                 "T_col": np.array(kwargs["T_int_vals"], dtype=float),
                 "updates": {
@@ -272,7 +272,7 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         res,
         is_T_vals_shifted=True,
         is_heat_pumping=True,
-        idx=3,
+        period_idx=3,
     )
 
     assert calls == {"grid_idx": 3, "air_idx": 3, "utility_idx": 3}
@@ -285,14 +285,17 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
     monkeypatch.setattr(
         hp,
         "construct_HPRTargetInputs",
-        lambda *args, idx=0, **kwargs: (
-            captured.__setitem__("idx", idx) or _base_args(idx=idx)
+        lambda *args, period_idx=0, **kwargs: (
+            captured.__setitem__("period_idx", period_idx)
+            or _base_args(period_idx=period_idx)
         ),
     )
     monkeypatch.setitem(
         hp._HP_PLACEMENT_HANDLERS,
         HPRcycle.CascadeCarnot.value,
-        lambda args: SimpleNamespace(to_output_fields=lambda: {"idx": args.idx}),
+        lambda args: SimpleNamespace(
+            to_output_fields=lambda: {"period_idx": args.period_idx}
+        ),
     )
 
     out = hp._get_hpr_targets(
@@ -302,16 +305,16 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
         H_cold=np.array([10.0, 0.0]),
         config=SimpleNamespace(HPR_TYPE=HPRcycle.CascadeCarnot.value),
         is_heat_pumping=True,
-        idx=2,
+        period_idx=2,
     )
 
-    assert captured["idx"] == 2
-    assert out["idx"] == 2
+    assert captured["period_idx"] == 2
+    assert out["period_idx"] == 2
 
 
-def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypatch):
+def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeypatch):
     zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
-    zone.set_state_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
     zone.targets[TT.TS.value] = SimpleNamespace(pt=ProblemTable({PT.T: [120.0, 60.0]}))
     calls = {}
 
@@ -380,13 +383,13 @@ def test_compute_indirect_hpr_uses_idx_not_state_id_for_utility_profile(monkeypa
     target_result = hp.compute_indirect_heat_pump_or_refrigeration_target(
         zone,
         is_heat_pumping=True,
-        args={"state_id": "peak", "idx": 1},
+        args={"period_id": "peak", "period_idx": 1},
     )
 
-    assert calls["profile_kwargs"]["idx"] == 1
-    assert "state_id" not in calls["profile_kwargs"]
-    assert target_result["state_id"] == "peak"
-    assert target_result["state_idx"] == 1
+    assert calls["profile_kwargs"]["period_idx"] == 1
+    assert "period_id" not in calls["profile_kwargs"]
+    assert target_result["period_id"] == "peak"
+    assert target_result["period_idx"] == 1
 
 
 def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans(
@@ -536,7 +539,7 @@ def test_hpr_residual_utility_summary_retargets_direct_utilities():
     summary = hp._get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
-        idx=0,
+        period_idx=0,
         is_direct=True,
         is_heat_pumping=True,
     )
@@ -578,7 +581,7 @@ def test_hpr_residual_utility_summary_removes_direct_hpr_pockets():
     summary = hp._get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
-        idx=0,
+        period_idx=0,
         is_direct=True,
         is_heat_pumping=True,
     )
@@ -611,7 +614,7 @@ def test_hpr_residual_utility_summary_retargets_indirect_utilities():
     summary = hp._get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
-        idx=0,
+        period_idx=0,
         is_direct=False,
         is_heat_pumping=True,
     )
@@ -654,7 +657,7 @@ def test_plot_multi_hp_profiles_from_results_returns_plotly_figure(monkeypatch):
         H_cold=np.array([0.0, 15.0]),
         hpr_hot_streams=hot_streams,
         hpr_cold_streams=cold_streams,
-        idx=0,
+        period_idx=0,
         title="HP Profile",
     )
 

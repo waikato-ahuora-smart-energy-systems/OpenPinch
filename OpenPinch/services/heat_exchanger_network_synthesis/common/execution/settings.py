@@ -44,7 +44,7 @@ class SynthesisWorkflowSettings:
     evm_solver_options: dict[str, Any]
     problem_id: str | None = None
     workspace_variant: str | None = None
-    state_id: str | None = None
+    period_id: str | None = None
     design_method: HeatExchangerNetworkDesignMethod = HENDesignMethod.OpenHENS
 
     def __init__(
@@ -77,7 +77,7 @@ class SynthesisWorkflowSettings:
         evm_n_rm_branches: int | None = None,
         problem_id: str | None = None,
         workspace_variant: str | None = None,
-        state_id: str | None = None,
+        period_id: str | None = None,
         design_method: HeatExchangerNetworkDesignMethod = HENDesignMethod.OpenHENS,
     ) -> None:
         resolved_evm_solver = evm_solver if evm_solver is not None else esm_solver
@@ -112,7 +112,7 @@ class SynthesisWorkflowSettings:
             "evm_solver_options": dict(resolved_evm_solver_options or {}),
             "problem_id": problem_id,
             "workspace_variant": workspace_variant,
-            "state_id": state_id,
+            "period_id": period_id,
             "design_method": design_method,
         }.items():
             object.__setattr__(self, name, value)
@@ -235,7 +235,7 @@ class SynthesisWorkflowSettings:
 def workflow_settings_from_problem(
     problem,
     *,
-    state_id: str | None = None,
+    period_id: str | None = None,
     workspace_variant: str | None = None,
 ) -> SynthesisWorkflowSettings:
     """Read persistent synthesis controls from a prepared problem configuration."""
@@ -293,7 +293,7 @@ def workflow_settings_from_problem(
         evm_solver_options=dict(hens.solver_options_evm),
         problem_id=problem.project_name,
         workspace_variant=workspace_variant,
-        state_id=state_id,
+        period_id=period_id,
         design_method=HENDesignMethod.OpenHENS,
     )
 

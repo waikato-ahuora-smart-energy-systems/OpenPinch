@@ -12,9 +12,9 @@ from ...lib.enums import GT, PT, TT
 from ...lib.schemas.targets import EnergyTransferTarget, UtilitySummaryTarget
 from ..common.service_orchestration import (
     apply_zone_config_overrides,
-    format_selected_state_suffix,
-    record_selected_state,
-    target_matches_requested_state,
+    format_selected_period_suffix,
+    record_selected_period,
+    target_matches_requested_period,
 )
 
 __all__ = [
@@ -58,8 +58,8 @@ def compute_energy_transfer_target(
             "utility_cost": base_target.utility_cost,
             "hot_pinch": base_target.hot_pinch,
             "cold_pinch": base_target.cold_pinch,
-            "state_id": base_target.state_id,
-            "state_idx": base_target.state_idx,
+            "period_id": base_target.period_id,
+            "period_idx": base_target.period_idx,
             "base_target_type": base_target.type,
             "base_target_name": base_target.name,
             "heat_surplus_deficit_table": table,
@@ -189,10 +189,10 @@ def run_energy_transfer_analysis_service(
     explicit_target_type = _normalize_energy_transfer_base_target_type(
         runtime_args.get("base_target_type")
     )
-    idx, sid = record_selected_state(zone, runtime_args)
-    runtime_args["idx"] = idx
+    idx, sid = record_selected_period(zone, runtime_args)
+    runtime_args["period_idx"] = idx
     if sid is not None:
-        runtime_args["state_id"] = sid
+        runtime_args["period_id"] = sid
     compare_args = dict(args or {}) if isinstance(args, dict) else {}
     zone._selected_energy_transfer_base_target_type = None
 
@@ -212,7 +212,7 @@ def run_energy_transfer_analysis_service(
                 raise RuntimeError(
                     "Energy transfer analysis could not produce base target "
                     f"{target_type!r} for zone {zone.name!r}"
-                    f"{format_selected_state_suffix(runtime_args)}."
+                    f"{format_selected_period_suffix(runtime_args)}."
                 )
             continue
 
@@ -227,7 +227,7 @@ def run_energy_transfer_analysis_service(
 
     raise RuntimeError(
         "Energy transfer analysis could not find a compatible target for zone "
-        f"{zone.name!r}{format_selected_state_suffix(runtime_args)} "
+        f"{zone.name!r}{format_selected_period_suffix(runtime_args)} "
         f"using implicit order {' -> '.join(_ENERGY_TRANSFER_TARGET_ORDER)}."
     )
 
@@ -271,10 +271,10 @@ def _ensure_energy_transfer_base_target(
 ):
     """Ensure an energy-transfer-compatible target exists for this state."""
     target = zone.targets.get(target_type)
-    if target_matches_requested_state(
+    if target_matches_requested_period(
         target,
         args=compare_args,
-        state_ids=getattr(zone, "state_ids", None),
+        period_ids=getattr(zone, "period_ids", None),
     ):
         return target
 
@@ -286,27 +286,27 @@ def _ensure_energy_transfer_base_target(
         if len(zone.subzones) == 0:
             return None
         direct_target = zone.targets.get(TT.DI.value)
-        if not target_matches_requested_state(
+        if not target_matches_requested_period(
             direct_target,
             args=compare_args,
-            state_ids=getattr(zone, "state_ids", None),
+            period_ids=getattr(zone, "period_ids", None),
         ):
             refresh_services[TT.DI.value](zone, refresh_args)
         for subzone in zone.subzones.values():
             subtarget = subzone.targets.get(TT.DI.value)
-            if not target_matches_requested_state(
+            if not target_matches_requested_period(
                 subtarget,
                 args=compare_args,
-                state_ids=getattr(subzone, "state_ids", None),
+                period_ids=getattr(subzone, "period_ids", None),
             ):
                 refresh_services[TT.DI.value](subzone, refresh_args)
 
     refresh_service(zone, refresh_args)
     refreshed_target = zone.targets.get(target_type)
-    if target_matches_requested_state(
+    if target_matches_requested_period(
         refreshed_target,
         args=compare_args,
-        state_ids=getattr(zone, "state_ids", None),
+        period_ids=getattr(zone, "period_ids", None),
     ):
         return refreshed_target
     return None

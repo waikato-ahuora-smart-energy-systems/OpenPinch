@@ -102,10 +102,10 @@ class Stream:
         self._dt_cont_multiplier = float(dt_cont_multiplier or 1.0)
         self._numeric_revision = 0
 
-        self._state_ids: dict[str, int] | None = None
+        self._period_ids: dict[str, int] | None = None
         self._weights: np.ndarray | None = None
 
-        self._num_states: int | None = None
+        self._num_periods: int | None = None
         self._type: str | None = None
 
         self._t_supply: Value | None = None
@@ -139,7 +139,7 @@ class Stream:
         self.set_value_attr("_heat_flow", heat_flow, update_derived=False)
         self.set_value_attr("_htc", htc, update_derived=False)
         self.set_value_attr("_price", price, update_derived=False)
-        self._validate_num_states()
+        self._validate_num_periods()
         self._calculate_missing_properties()
         self.update_derived_properties()
 
@@ -198,13 +198,13 @@ class Stream:
         return self._type
 
     @property
-    def num_states(self) -> Optional[int]:
-        """Number of states."""
-        return self._num_states
+    def num_periods(self) -> Optional[int]:
+        """Number of periods."""
+        return self._num_periods
 
     @property
-    def state_ids(self) -> dict[str, int] | None:
-        return self._state_ids
+    def period_ids(self) -> dict[str, int] | None:
+        return self._period_ids
 
     @property
     def weights(self) -> np.ndarray | None:
@@ -308,7 +308,7 @@ class Stream:
 
     @property
     def heat_flow(self) -> Value:
-        """Stream heat flow view over a scalar or stateful duty value."""
+        """Stream heat flow view over a scalar or period-valued duty value."""
         return self._heat_flow
 
     @heat_flow.setter
@@ -527,24 +527,24 @@ class Stream:
                 self.update_derived_properties()
             return
 
-        if parsed.num_states == 1 and self._num_states not in (None, 0, 1):
+        if parsed.num_periods == 1 and self._num_periods not in (None, 0, 1):
             parsed = Value(
-                np.full(int(self._num_states), float(parsed.value), dtype=float),
+                np.full(int(self._num_periods), float(parsed.value), dtype=float),
                 unit=parsed.unit,
             )
         if self._weights is None or (
-            len(self._weights) == 1 and len(self._weights) != parsed.num_states
+            len(self._weights) == 1 and len(self._weights) != parsed.num_periods
         ):
-            self._num_states = parsed.num_states
-            self._state_ids = {str(i): i for i in range(self._num_states)}
-            self._weights = np.ones(self._num_states, dtype=float)
+            self._num_periods = parsed.num_periods
+            self._period_ids = {str(i): i for i in range(self._num_periods)}
+            self._weights = np.ones(self._num_periods, dtype=float)
 
-        if len(self._weights) > 1 and len(self._weights) != parsed.num_states:
-            raise ValueError("Weights length must match the number of states.")
+        if len(self._weights) > 1 and len(self._weights) != parsed.num_periods:
+            raise ValueError("Weights length must match the number of periods.")
 
         setattr(self, internal_name, parsed.to(self._VALUE_UNITS[internal_name]))
         self._bump_numeric_revision()
-        self._validate_num_states()
+        self._validate_num_periods()
         if update_derived:
             self.update_derived_properties()
 
@@ -589,17 +589,17 @@ class Stream:
             current = Value(0.0, unit=self._VALUE_UNITS[internal_name])
             setattr(self, internal_name, current)
 
-        target_size = self._state_vector_size()
-        if current.num_states == 1 and target_size > 1:
+        target_size = self._period_vector_size()
+        if current.num_periods == 1 and target_size > 1:
             current = Value(
                 np.full(target_size, float(current.value), dtype=float),
                 unit=current.unit,
             )
             setattr(self, internal_name, current)
 
-        current[idx if current.num_states > 1 else 0] = value
+        current[idx if current.num_periods > 1 else 0] = value
         self._bump_numeric_revision()
-        self._validate_num_states()
+        self._validate_num_periods()
         if update_derived:
             self.update_derived_properties()
 
@@ -613,9 +613,7 @@ class Stream:
         if hasattr(raw_value, "model_dump") and not isinstance(raw_value, Mapping):
             raw_value = raw_value.model_dump(mode="python")
 
-        if isinstance(raw_value, Mapping) and self._is_stateful_value_payload(
-            raw_value
-        ):
+        if isinstance(raw_value, Mapping) and self._is_period_value_payload(raw_value):
             raw_value = {
                 "values": raw_value.get("values"),
                 "unit": raw_value.get("unit"),
@@ -649,7 +647,7 @@ class Stream:
         if self._price is None:
             self._price = Value(0.0, unit=self._VALUE_UNITS["_price"])
 
-        state_size = self._state_vector_size()
+        state_size = self._period_vector_size()
         if self._heat_flow is None:
             zeros = np.zeros(state_size, dtype=float)
             self._heat_flow = Value(
@@ -679,7 +677,7 @@ class Stream:
             ).to(self._VALUE_UNITS["_t_target"])
 
     def update_derived_properties(self) -> None:
-        state_size = self._state_vector_size()
+        state_size = self._period_vector_size()
         t_supply = self._value_array(self._t_supply, size=state_size)
         t_target = self._value_array(self._t_target, size=state_size)
         heat_flow = self._value_array(self._heat_flow, size=state_size)
@@ -761,24 +759,24 @@ class Stream:
         self._cost = cost
         self._bump_numeric_revision()
 
-    def _validate_num_states(self):
+    def _validate_num_periods(self):
         counts = np.asarray(
             [
-                getattr(self, attr).num_states
+                getattr(self, attr).num_periods
                 for attr in self._CORE_VALUE_ATTRS
                 if isinstance(getattr(self, attr), Value)
             ],
             dtype=int,
         )
-        stateful_counts = counts[counts > 1]
-        if stateful_counts.size == 0:
-            self._num_states = 1
+        period_value_counts = counts[counts > 1]
+        if period_value_counts.size == 0:
+            self._num_periods = 1
             return
-        if int(stateful_counts.max()) != int(stateful_counts.min()):
+        if int(period_value_counts.max()) != int(period_value_counts.min()):
             raise ValueError(
-                f"Stream inputs for {self._name} have unequal state counts."
+                f"Stream inputs for {self._name} have unequal period counts."
             )
-        self._num_states = int(stateful_counts.max())
+        self._num_periods = int(period_value_counts.max())
 
     def invert(self) -> None:
         """Flip a utility stream into its generating process-stream analogue."""
@@ -794,60 +792,60 @@ class Stream:
         self._bump_numeric_revision()
         self.update_derived_properties()
 
-    def get_state_index(self, state_id: str | None = None) -> int:
-        if self._state_ids is None or state_id is None:
+    def get_period_index(self, period_id: str | None = None) -> int:
+        if self._period_ids is None or period_id is None:
             return 0
-        resolved_state_id = str(state_id)
-        if resolved_state_id not in self._state_ids:
+        resolved_period_id = str(period_id)
+        if resolved_period_id not in self._period_ids:
             raise ValueError(
-                f"Unknown state_id {resolved_state_id!r}. "
-                f"Available states: {', '.join(self._state_ids.keys())}."
+                f"Unknown period_id {resolved_period_id!r}. "
+                f"Available periods: {', '.join(self._period_ids.keys())}."
             )
-        return int(self._state_ids[resolved_state_id])
+        return int(self._period_ids[resolved_period_id])
 
-    def resolve_attr(self, attr_name: str, state_id: str | None = None):
+    def resolve_attr(self, attr_name: str, period_id: str | None = None):
         value = getattr(self, self._resolve_attr_name(attr_name))
         if isinstance(value, Value):
-            return float(value[self.get_state_index(state_id)].value)
+            return float(value[self.get_period_index(period_id)].value)
         return value
 
-    def set_attr_for_state(
+    def set_attr_for_period(
         self,
         attr_name: str,
         value,
         *,
-        state_id: str | None = None,
+        period_id: str | None = None,
     ) -> None:
         self.set_value_attr_at_idx(
             attr_name,
             value,
-            idx=self.get_state_index(state_id),
+            idx=self.get_period_index(period_id),
         )
 
-    def _get_state_context(self) -> tuple[dict[str, int] | None, np.ndarray | None]:
-        return self._state_ids, self._weights
+    def _get_period_context(self) -> tuple[dict[str, int] | None, np.ndarray | None]:
+        return self._period_ids, self._weights
 
-    def set_state_context(
+    def set_period_context(
         self,
-        state_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
+        period_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
         weights: np.ndarray | list[float] | tuple[float, ...] | None,
-        num_states: int | None,
+        num_periods: int | None,
     ) -> None:
-        self._state_ids = state_ids
+        self._period_ids = period_ids
         self._weights = weights
-        self._num_states = num_states
-        if len(self._state_ids) != len(self._weights):
+        self._num_periods = num_periods
+        if len(self._period_ids) != len(self._weights):
             raise ValueError(
-                "Length of state_ids and weights must match eachother in length."
+                "Length of period_ids and weights must match eachother in length."
             )
         self._bump_numeric_revision()
 
     def _bump_numeric_revision(self) -> None:
         self._numeric_revision = getattr(self, "_numeric_revision", 0) + 1
 
-    def _state_vector_size(self) -> int:
+    def _period_vector_size(self) -> int:
         counts = [
-            value.num_states
+            value.num_periods
             for attr in self._CORE_VALUE_ATTRS
             if isinstance((value := getattr(self, attr)), Value)
         ]
@@ -856,12 +854,12 @@ class Stream:
     def _value_array(self, value: Value | None, *, size: int) -> np.ndarray:
         if value is None:
             return np.zeros(size, dtype=float)
-        if value.num_states == 1:
+        if value.num_periods == 1:
             return np.full(size, float(value.value), dtype=float)
-        arr = value.state_values.astype(float)
+        arr = value.period_values.astype(float)
         if arr.size != size:
             raise ValueError(
-                f"State count for stream '{self._name}' is inconsistent "
+                f"Period count for stream '{self._name}' is inconsistent "
                 f"with its values."
             )
         return arr
@@ -887,21 +885,21 @@ class Stream:
         raise AttributeError(f"Stream has no attribute {attr_name!r}.")
 
     @staticmethod
-    def _is_stateful_value_payload(value: Mapping) -> bool:
+    def _is_period_value_payload(value: Mapping) -> bool:
         keys = set(value)
-        return keys.issubset({"values", "state_ids", "weights", "unit"}) and (
-            "values" in keys or "state_ids" in keys or "weights" in keys
+        return keys.issubset({"values", "period_ids", "weights", "unit"}) and (
+            "values" in keys or "period_ids" in keys or "weights" in keys
         )
 
     @staticmethod
-    def _normalise_state_ids(
-        state_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
+    def _normalise_period_ids(
+        period_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
     ) -> dict[str, int] | None:
-        if state_ids is None:
+        if period_ids is None:
             return None
-        if isinstance(state_ids, dict):
-            return {str(key): int(val) for key, val in state_ids.items()}
-        return {str(state_id): idx for idx, state_id in enumerate(state_ids)}
+        if isinstance(period_ids, dict):
+            return {str(key): int(val) for key, val in period_ids.items()}
+        return {str(period_id): idx for idx, period_id in enumerate(period_ids)}
 
     @staticmethod
     def _normalise_weights(
@@ -913,7 +911,7 @@ class Stream:
             return None
         arr = np.asarray(weights, dtype=float).reshape(-1)
         if arr.size != expected_len:
-            raise ValueError("weights length must match the number of states.")
+            raise ValueError("weights length must match the number of periods.")
         total = float(arr.sum())
         if total > 0.0:
             arr = arr / total

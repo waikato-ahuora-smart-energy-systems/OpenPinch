@@ -121,7 +121,7 @@ def test_pinch_workspace_exposes_frontend_views_and_comparison_payloads():
 def test_workspace_metric_deltas_require_matching_units():
     base_view = ScenarioVariantView(
         variant_name="baseline",
-        state_id=None,
+        period_id=None,
         workflow="target",
         workflow_options={},
         status="solved",
@@ -140,7 +140,7 @@ def test_workspace_metric_deltas_require_matching_units():
     )
     variant_view = ScenarioVariantView(
         variant_name="scenario",
-        state_id=None,
+        period_id=None,
         workflow="target",
         workflow_options={},
         status="solved",

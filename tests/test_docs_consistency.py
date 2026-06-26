@@ -67,7 +67,7 @@ def test_docs_highlight_current_pinchproblem_methods():
     assert "plot.grand_composite_curve" in combined
     assert "problem.target.direct_heat_pump" in combined
     assert "workspace.scenario" in combined
-    assert 'state_id="peak"' in combined or 'state_id="winter"' in combined
+    assert 'period_id="peak"' in combined or 'period_id="winter"' in combined
 
 
 def test_docs_do_not_reference_stale_workflow_names():
@@ -150,14 +150,14 @@ def test_docs_reference_the_current_notebook_series():
     assert "01_basic_pinch_and_dtcont_sensitivity.ipynb" in combined
     assert "02_total_site_targets_and_sugcc.ipynb" in combined
     assert "03_carnot_hpr_comparison.ipynb" in combined
-    assert "04_multistate_targeting_and_state_comparison.ipynb" in combined
+    assert "04_multiperiod_targeting_and_period_comparison.ipynb" in combined
     assert "05_schema_service_and_output_workflows.ipynb" in combined
     assert "06_energy_transfer_analysis.ipynb" in combined
     assert "07_vapour_compression_mvr_cascade_hpr.ipynb" in combined
     assert "08_direct_gas_stream_mvr.ipynb" in combined
     for notebook_name in list_notebooks():
         assert notebook_name in combined
-    assert "multistate" in combined or 'state_id="' in combined
+    assert "multiperiod" in combined or 'period_id="' in combined
     assert "direct gas/vapour" in combined
     assert "add_component.process_mvr" in combined
 
@@ -312,7 +312,7 @@ def test_reference_docs_match_current_heat_pump_and_schema_surface():
     assert "OpenPinch.classes.cascade_heat_pump" not in api_classes
     assert "OpenPinch.classes.brayton_heat_pump" not in api_classes
     assert "OpenPinch.classes.multi_stage_steam_turbine" not in api_classes
-    assert "state_ids" in api_classes
+    assert "period_ids" in api_classes
     assert "weights" in api_classes
     assert "OpenPinch.classes.heat_exchanger" in api_classes
     assert "OpenPinch.classes.heat_exchanger_network" in api_classes

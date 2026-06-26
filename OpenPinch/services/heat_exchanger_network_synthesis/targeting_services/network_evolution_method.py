@@ -228,7 +228,7 @@ def build_seeded_network_evolution_method_tasks(
                 stage_count=stage_count,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 seed_network_index=seed_index,
                 topology_restrictions=restrictions,
             )
@@ -284,7 +284,7 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
                 stage_count=stage_count,
                 problem_id=outcome.task.problem_id,
                 workspace_variant=outcome.task.workspace_variant,
-                state_id=outcome.task.state_id,
+                period_id=outcome.task.period_id,
                 parent_task_id=outcome.task.task_id,
                 topology_restrictions=restrictions,
             )
@@ -309,7 +309,7 @@ def _standard_evolution_task(
         stage_count=stage_count,
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
-        state_id=settings.state_id,
+        period_id=settings.period_id,
         parent_task_id=parent_outcome.task.task_id,
         topology_restrictions=topology_restrictions,
     )
@@ -350,7 +350,7 @@ def _evolution_tasks_for_pathways(
                 stage_count=stage_count,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 parent_task_id=parent_outcome.task.task_id,
                 settings=task_settings,
                 topology_restrictions=topology_restrictions,
@@ -404,7 +404,7 @@ def _build_seeded_quality_network_evolution_method_tasks(
                 stage_count=canonical_stage_count(restrictions),
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 seed_network_index=seed_index,
                 topology_restrictions=restrictions,
             )
@@ -425,7 +425,7 @@ def build_direct_network_evolution_method_tasks(
             stage_count=stage_count,
             problem_id=settings.problem_id,
             workspace_variant=settings.workspace_variant,
-            state_id=settings.state_id,
+            period_id=settings.period_id,
         )
         for approach_temperature in settings.approach_temperatures
         for stage_count in settings.stage_selection

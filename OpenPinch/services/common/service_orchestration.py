@@ -3,39 +3,39 @@
 from __future__ import annotations
 
 from ...classes.zone import Zone
-from .miscellaneous import get_state_index
+from .miscellaneous import get_period_index
 
 
-def record_selected_state(zone: Zone, args: dict | None) -> tuple[int, str | None]:
-    """Persist the selected state metadata on a prepared zone."""
-    idx, sid = get_state_index(state_ids=getattr(zone, "state_ids", None), args=args)
-    zone._selected_state_id = sid
-    zone._selected_state_idx = idx
+def record_selected_period(zone: Zone, args: dict | None) -> tuple[int, str | None]:
+    """Persist the selected period metadata on a prepared zone."""
+    idx, sid = get_period_index(period_ids=getattr(zone, "period_ids", None), args=args)
+    zone._selected_period_id = sid
+    zone._selected_period_idx = idx
     return idx, sid
 
 
-def target_matches_requested_state(
+def target_matches_requested_period(
     target,
     *,
     args: dict | None,
-    state_ids,
+    period_ids,
 ) -> bool:
-    """Return ``True`` when an existing target was solved for the requested state."""
+    """Return ``True`` when an existing target was solved for the requested period."""
     if target is None:
         return False
 
-    idx, sid = get_state_index(state_ids=state_ids, args=args)
-    target_idx = getattr(target, "state_idx", None)
+    idx, sid = get_period_index(period_ids=period_ids, args=args)
+    target_idx = getattr(target, "period_idx", None)
     if target_idx is not None:
         return int(target_idx) == idx
 
-    target_sid = getattr(target, "state_id", None)
+    target_sid = getattr(target, "period_id", None)
     if target_sid is not None or sid is not None:
         return target_sid == sid
 
     if not isinstance(args, dict):
         return True
-    return "idx" not in args and "state_id" not in args
+    return "period_idx" not in args and "period_id" not in args
 
 
 def apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
@@ -43,7 +43,7 @@ def apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
     if not isinstance(args, dict):
         return
 
-    allowed_runtime_keys = {"idx", "state_id", "base_target_type"}
+    allowed_runtime_keys = {"period_idx", "period_id", "base_target_type"}
     invalid_keys = sorted(
         str(key) for key in args if str(key) not in allowed_runtime_keys
     )
@@ -61,12 +61,12 @@ def apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
             continue
 
 
-def format_selected_state_suffix(args: dict | None) -> str:
-    """Render the selected state into service error messages."""
+def format_selected_period_suffix(args: dict | None) -> str:
+    """Render the selected period into service error messages."""
     if not isinstance(args, dict):
         return ""
-    if args.get("state_id") is not None:
-        return f" for state_id {str(args['state_id'])!r}"
-    if args.get("idx") is not None:
-        return f" for idx {int(args['idx'])}"
+    if args.get("period_id") is not None:
+        return f" for period_id {str(args['period_id'])!r}"
+    if args.get("period_idx") is not None:
+        return f" for period_idx {int(args['period_idx'])}"
     return ""

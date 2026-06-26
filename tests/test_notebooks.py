@@ -18,7 +18,7 @@ EXPECTED_NOTEBOOKS = [
     "01_basic_pinch_and_dtcont_sensitivity.ipynb",
     "02_total_site_targets_and_sugcc.ipynb",
     "03_carnot_hpr_comparison.ipynb",
-    "04_multistate_targeting_and_state_comparison.ipynb",
+    "04_multiperiod_targeting_and_period_comparison.ipynb",
     "05_schema_service_and_output_workflows.ipynb",
     "06_energy_transfer_analysis.ipynb",
     "07_vapour_compression_mvr_cascade_hpr.ipynb",
@@ -103,7 +103,7 @@ def test_notebook_1_covers_single_case_and_workspace_sensitivity(tmp_path: Path)
     assert "copy_case(" in combined_source
     assert "set_dt_cont_multiplier(" in combined_source
     assert "compare_cases(" in combined_source
-    assert 'state_id="0"' not in combined_source
+    assert 'period_id="0"' not in combined_source
 
 
 def test_notebook_2_uses_only_packaged_pulp_mill_assets_and_real_zones(
@@ -125,7 +125,7 @@ def test_notebook_2_uses_only_packaged_pulp_mill_assets_and_real_zones(
     assert '"base_target_type": "Total Site Target"' in combined_source
     assert '"base_target_type": "Direct Integration"' in combined_source
     assert "Power Cogeneration Target" in combined_source
-    assert 'state_id="0"' not in combined_source
+    assert 'period_id="0"' not in combined_source
 
 
 def test_notebook_3_compares_direct_indirect_and_carnot_backends(
@@ -153,19 +153,19 @@ def test_notebook_3_compares_direct_indirect_and_carnot_backends(
     assert "compare_cases(" in combined_source
 
 
-def test_notebook_4_covers_real_multistate_targeting(tmp_path: Path):
+def test_notebook_4_covers_real_multiperiod_targeting(tmp_path: Path):
     notebook = _copied_notebook(
         tmp_path,
-        "04_multistate_targeting_and_state_comparison.ipynb",
+        "04_multiperiod_targeting_and_period_comparison.ipynb",
     )
     combined_source = _combined_source(notebook)
 
-    assert "crude_preheat_train_multistate.json" in combined_source
-    assert "zonal_site_multistate.json" in combined_source
-    assert "state_ids" in combined_source
-    assert "target_all_states(" in combined_source
-    assert "direct_heat_integration(state_id=" in combined_source
-    assert "indirect_heat_integration(state_id=" in combined_source
+    assert "crude_preheat_train_multiperiod.json" in combined_source
+    assert "zonal_site_multiperiod.json" in combined_source
+    assert "period_ids" in combined_source
+    assert "target_all_periods(" in combined_source
+    assert "direct_heat_integration(period_id=" in combined_source
+    assert "indirect_heat_integration(period_id=" in combined_source
     assert "turndown" in combined_source
     assert "summer" in combined_source
 
@@ -242,7 +242,7 @@ def test_notebook_8_covers_direct_gas_stream_mvr(tmp_path: Path):
     assert "mvr.activate()" in combined_source
     assert "Evaporator vapour" in combined_source
     assert "mvr.replacement_streams" in combined_source
-    assert "stage_results_by_state" in combined_source
+    assert "stage_results_by_period" in combined_source
     assert "target.direct_heat_integration(" in combined_source
     assert "target.indirect_heat_integration(" in combined_source
     assert "summary_frame(case_name=" in combined_source

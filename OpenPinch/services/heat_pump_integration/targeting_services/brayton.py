@@ -134,13 +134,13 @@ def _compute_brayton_hp_system_obj(
         hot_streams=hpr_hot_streams,
         cold_streams=args.bckgrd_cold_streams,
         is_shifted=True,
-        idx=args.idx,
+        period_idx=args.period_idx,
     )
     pt_gas_heater = get_process_heat_cascade(
         hot_streams=args.bckgrd_hot_streams,
         cold_streams=hpr_cold_streams,
         is_shifted=True,
-        idx=args.idx,
+        period_idx=args.period_idx,
     )
 
     w_hpr = sum([hp.work_net for hp in hp_list])

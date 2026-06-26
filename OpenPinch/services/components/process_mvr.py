@@ -13,7 +13,7 @@ from ...classes.value import Value
 from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import ST
-from ..common.miscellaneous import get_state_index
+from ..common.miscellaneous import get_period_index
 from .direct_mvr import (
     DirectGasMVRSettings,
     DirectGasMVRStageResult,
@@ -42,8 +42,8 @@ class ProcessMVRStreamRecord:
     original_memberships: list[StreamMembership]
     replacement_streams: list[Stream]
     replacement_memberships: list[StreamMembership]
-    stage_results_by_state: dict[str, list[DirectGasMVRStageResult]]
-    state_label_by_index: dict[int, str] = field(default_factory=dict)
+    stage_results_by_period: dict[str, list[DirectGasMVRStageResult]]
+    period_label_by_index: dict[int, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -84,11 +84,11 @@ class ProcessMVRComponent(ProcessComponent):
         ]
 
     @property
-    def stage_results_by_state(self) -> dict[str, list[DirectGasMVRStageResult]]:
+    def stage_results_by_period(self) -> dict[str, list[DirectGasMVRStageResult]]:
         combined: dict[str, list[DirectGasMVRStageResult]] = {}
         for record in self.stream_records:
-            for state_id, stages in record.stage_results_by_state.items():
-                combined.setdefault(state_id, []).extend(stages)
+            for period_id, stages in record.stage_results_by_period.items():
+                combined.setdefault(period_id, []).extend(stages)
         return combined
 
     @property
@@ -104,8 +104,8 @@ class ProcessMVRComponent(ProcessComponent):
         self,
         zone: Zone,
         *,
-        state_id: str | None = None,
-        state_idx: int | None = None,
+        period_id: str | None = None,
+        period_idx: int | None = None,
     ) -> float:
         """Return active compressor work assigned to streams inside ``zone``."""
         if not self.active:
@@ -114,10 +114,10 @@ class ProcessMVRComponent(ProcessComponent):
         for record in self.stream_records:
             if not _record_affects_zone(record, zone):
                 continue
-            stages = _record_stage_results_for_state(
+            stages = _record_stage_results_for_period(
                 record,
-                state_id=state_id,
-                state_idx=state_idx,
+                period_id=period_id,
+                period_idx=period_idx,
             )
             total += sum(stage.work for stage in stages)
         return float(total)
@@ -136,20 +136,20 @@ def create_process_mvr_component(
     eta_mvr_comp: float | None = None,
     eta_motor: float | None = None,
     options: dict | None = None,
-    state_id: str | None = None,
+    period_id: str | None = None,
 ) -> ProcessMVRComponent:
     """Create, activate, and register a direct process MVR component."""
     root = problem._require_prepared_root_zone()
     runtime_options = dict(options or {})
-    if state_id is not None:
-        option_state_id = runtime_options.get("state_id")
-        if option_state_id is not None and str(option_state_id) != str(state_id):
+    if period_id is not None:
+        option_period_id = runtime_options.get("period_id")
+        if option_period_id is not None and str(option_period_id) != str(period_id):
             raise ValueError(
-                "Specify only one process MVR state context; state_id and "
-                "options['state_id'] conflict."
+                "Specify only one process MVR period context; period_id and "
+                "options['period_id'] conflict."
             )
-        runtime_options["state_id"] = state_id
-    get_state_index(root.state_ids, runtime_options)
+        runtime_options["period_id"] = period_id
+    get_period_index(root.period_ids, runtime_options)
     resolved_stage_t_lift = _resolve_stage_t_lift_alias(
         mvr_stage_t_lift=mvr_stage_t_lift,
         max_stage_t_sat_lift=max_stage_t_sat_lift,
@@ -180,8 +180,8 @@ def create_process_mvr_component(
             source_stream=stream,
             memberships=_find_hot_stream_memberships(root, stream),
             settings=settings,
-            state_ids=root.state_ids,
-            num_states=root.num_states,
+            period_ids=root.period_ids,
+            num_periods=root.num_periods,
         )
         for stream in matched_streams
     ]
@@ -224,34 +224,34 @@ def _build_process_mvr_stream_record(
     source_stream: Stream,
     memberships: list[StreamMembership],
     settings: DirectGasMVRSettings,
-    state_ids: dict[str, int] | None,
-    num_states: int | None,
+    period_ids: dict[str, int] | None,
+    num_periods: int | None,
 ) -> ProcessMVRStreamRecord:
     if not memberships:
         raise ValueError(f"MVR source stream {source_stream.name!r} is not in a zone.")
-    state_lookup = state_ids or {"0": 0}
-    n_states = int(num_states or max(state_lookup.values(), default=0) + 1 or 1)
-    state_labels = _state_labels_by_index(state_lookup, n_states)
+    period_lookup = period_ids or {"0": 0}
+    n_periods = int(num_periods or max(period_lookup.values(), default=0) + 1 or 1)
+    period_labels = _period_labels_by_index(period_lookup, n_periods)
     solves = [
         solve_direct_gas_mvr_stream(source_stream, settings=settings, idx=idx)
-        for idx in range(n_states)
+        for idx in range(n_periods)
     ]
-    replacement_streams = _build_multistate_stage_streams(
+    replacement_streams = _build_multiperiod_stage_streams(
         source_stream=source_stream,
         solves=solves,
-        n_states=n_states,
+        n_periods=n_periods,
         n_stages=settings.n_stages,
     )
-    stage_results_by_state = {
-        state_labels[idx]: solves[idx].stage_results for idx in range(n_states)
+    stage_results_by_period = {
+        period_labels[idx]: solves[idx].stage_results for idx in range(n_periods)
     }
     return ProcessMVRStreamRecord(
         original_stream=source_stream,
         original_memberships=memberships,
         replacement_streams=replacement_streams,
         replacement_memberships=[],
-        stage_results_by_state=stage_results_by_state,
-        state_label_by_index=state_labels,
+        stage_results_by_period=stage_results_by_period,
+        period_label_by_index=period_labels,
     )
 
 
@@ -268,11 +268,11 @@ def _add_replacement_streams_to_memberships(
             )
 
 
-def _build_multistate_stage_streams(
+def _build_multiperiod_stage_streams(
     *,
     source_stream: Stream,
     solves,
-    n_states: int,
+    n_periods: int,
     n_stages: int,
 ) -> list[Stream]:
     streams: list[Stream] = []
@@ -320,11 +320,11 @@ def _build_multistate_stage_streams(
                 ),
                 dt_cont=[
                     _value_at_idx(source_stream.dt_cont, idx) or 0.0
-                    for idx in range(n_states)
+                    for idx in range(n_periods)
                 ],
                 htc=[
                     _value_at_idx(source_stream.htc, idx) or 1.0
-                    for idx in range(n_states)
+                    for idx in range(n_periods)
                 ],
                 is_process_stream=True,
                 fluid_name=source_stream.fluid_name,
@@ -456,12 +456,12 @@ def _validate_process_mvr_source(stream: Stream, selector) -> None:
 
 
 def _validate_process_mvr_source_phase(stream: Stream, selector) -> None:
-    n_states = int(stream.num_states or 1)
+    n_periods = int(stream.num_periods or 1)
     p_supply_values: list[float] = []
     p_target_values: list[float] = []
-    for idx in range(n_states):
-        t_supply = _required_state_value(stream.t_supply, idx, "t_supply", selector)
-        t_target = _required_state_value(stream.t_target, idx, "t_target", selector)
+    for idx in range(n_periods):
+        t_supply = _required_period_value(stream.t_supply, idx, "t_supply", selector)
+        t_target = _required_period_value(stream.t_target, idx, "t_target", selector)
         p_supply = _value_at_idx(stream.p_supply, idx, unit="kPa")
         p_target = _value_at_idx(stream.p_target, idx, unit="kPa")
         t_crit = _to_deg_c(_coolprop_value("TCRIT", str(stream.fluid_name)))
@@ -509,9 +509,9 @@ def _validate_process_mvr_source_phase(stream: Stream, selector) -> None:
         p_target_values.append(float(p_target))
 
     if stream.p_supply is None:
-        stream.p_supply = _stateful_or_scalar(p_supply_values)
+        stream.p_supply = _period_values_or_scalar(p_supply_values)
     if stream.p_target is None:
-        stream.p_target = _stateful_or_scalar(p_target_values)
+        stream.p_target = _period_values_or_scalar(p_target_values)
 
 
 def _validate_vapour_state(
@@ -575,7 +575,7 @@ def _coolprop_value(output: str, fluid: str) -> float:
         ) from exc
 
 
-def _required_state_value(value, idx: int, name: str, selector) -> float:
+def _required_period_value(value, idx: int, name: str, selector) -> float:
     unit = "degC" if name.startswith("t_") else None
     selected = _value_at_idx(value, idx, unit=unit)
     if selected is None:
@@ -583,7 +583,7 @@ def _required_state_value(value, idx: int, name: str, selector) -> float:
     return selected
 
 
-def _stateful_or_scalar(values: list[float]):
+def _period_values_or_scalar(values: list[float]):
     return values[0] if len(values) == 1 else values
 
 
@@ -598,19 +598,19 @@ def _record_affects_zone(record: ProcessMVRStreamRecord, zone: Zone) -> bool:
     return False
 
 
-def _record_stage_results_for_state(
+def _record_stage_results_for_period(
     record: ProcessMVRStreamRecord,
     *,
-    state_id: str | None,
-    state_idx: int | None,
+    period_id: str | None,
+    period_idx: int | None,
 ) -> list[DirectGasMVRStageResult]:
-    if state_id is not None and state_id in record.stage_results_by_state:
-        return record.stage_results_by_state[state_id]
-    if state_idx is not None:
-        idx_label = record.state_label_by_index.get(int(state_idx), str(state_idx))
-        if idx_label in record.stage_results_by_state:
-            return record.stage_results_by_state[idx_label]
-    return next(iter(record.stage_results_by_state.values()), [])
+    if period_id is not None and period_id in record.stage_results_by_period:
+        return record.stage_results_by_period[period_id]
+    if period_idx is not None:
+        idx_label = record.period_label_by_index.get(int(period_idx), str(period_idx))
+        if idx_label in record.stage_results_by_period:
+            return record.stage_results_by_period[idx_label]
+    return next(iter(record.stage_results_by_period.values()), [])
 
 
 def _find_hot_stream_memberships(root: Zone, stream: Stream) -> list[StreamMembership]:
@@ -640,13 +640,13 @@ def _resolve_component_id(problem: "PinchProblem", requested_id: str | None) -> 
     return f"mvr_{counter}"
 
 
-def _state_labels_by_index(
-    state_ids: dict[str, int] | None,
-    n_states: int,
+def _period_labels_by_index(
+    period_ids: dict[str, int] | None,
+    n_periods: int,
 ) -> dict[int, str]:
-    labels = {idx: str(idx) for idx in range(n_states)}
-    for state_id, idx in (state_ids or {}).items():
-        labels[int(idx)] = str(state_id)
+    labels = {idx: str(idx) for idx in range(n_periods)}
+    for period_id, idx in (period_ids or {}).items():
+        labels[int(idx)] = str(period_id)
     return labels
 
 

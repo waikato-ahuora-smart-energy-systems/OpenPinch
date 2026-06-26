@@ -107,7 +107,7 @@ HEN_SNAPSHOT_NAMES = set().union(*HEN_PUBLIC_NAME_SNAPSHOT.values())
 
 class _IterableDesignOptions:
     def __iter__(self):
-        return iter((("state_id", "0"),))
+        return iter((("period_id", "0"),))
 
 
 def test_hen_public_exports_match_intended_snapshot() -> None:

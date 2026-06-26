@@ -11,9 +11,9 @@ from ...lib.config import C_to_K, tol
 from ...lib.enums import GT, PT, TT
 from ..common.service_orchestration import (
     apply_zone_config_overrides,
-    format_selected_state_suffix,
-    record_selected_state,
-    target_matches_requested_state,
+    format_selected_period_suffix,
+    record_selected_period,
+    target_matches_requested_period,
 )
 
 __all__ = [
@@ -292,25 +292,25 @@ def run_exergy_targeting_service(
     explicit_target_type = _normalize_exergy_base_target_type(
         runtime_args.get("base_target_type")
     )
-    idx, sid = record_selected_state(zone, runtime_args)
-    runtime_args["idx"] = idx
+    idx, sid = record_selected_period(zone, runtime_args)
+    runtime_args["period_idx"] = idx
     if sid is not None:
-        runtime_args["state_id"] = sid
+        runtime_args["period_id"] = sid
     compare_args = dict(args or {}) if isinstance(args, dict) else {}
     zone._selected_exergy_target_type = None
 
     for target_type in _get_exergy_candidate_order(explicit_target_type):
         target = zone.targets.get(target_type)
-        if not target_matches_requested_state(
+        if not target_matches_requested_period(
             target,
             args=compare_args,
-            state_ids=getattr(zone, "state_ids", None),
+            period_ids=getattr(zone, "period_ids", None),
         ):
             if explicit_target_type is not None:
                 raise RuntimeError(
                     "Exergy targeting requires an existing target "
                     f"{target_type!r} on zone {zone.name!r}"
-                    f"{format_selected_state_suffix(runtime_args)}. "
+                    f"{format_selected_period_suffix(runtime_args)}. "
                     "Run the corresponding base targeting accessor first."
                 )
             continue
@@ -321,7 +321,7 @@ def run_exergy_targeting_service(
 
     raise RuntimeError(
         "Exergy targeting could not find a compatible existing target for zone "
-        f"{zone.name!r}{format_selected_state_suffix(runtime_args)} "
+        f"{zone.name!r}{format_selected_period_suffix(runtime_args)} "
         f"using implicit order {' -> '.join(_EXERGY_TARGET_ORDER)}. "
         "Run a compatible thermal target accessor first."
     )

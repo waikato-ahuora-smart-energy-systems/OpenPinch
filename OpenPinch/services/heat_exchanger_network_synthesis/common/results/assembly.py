@@ -51,7 +51,7 @@ def build_synthesis_result(
         update={
             "run_id": settings.run_id,
             "task_id": accepted.task.task_id,
-            "state_id": settings.state_id,
+            "period_id": settings.period_id,
             "method": accepted.task.method,
             "stage_count": accepted.network.stage_count or accepted.task.stage_count,
         }
@@ -84,7 +84,7 @@ def build_synthesis_result(
         task_ids=tuple(task.task_id for task in tasks if task.task_id is not None),
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
-        state_id=settings.state_id,
+        period_id=settings.period_id,
         design_method=settings.design_method,
         selected_pathway_id=selected_pathway.get("pathway_id"),
         selected_pathway_kind=selected_pathway.get("pathway_kind"),
@@ -99,7 +99,7 @@ def build_synthesis_result(
         task_id=accepted.task.task_id,
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
-        state_id=settings.state_id,
+        period_id=settings.period_id,
         solver_name=settings.solver_for(accepted.task.method),
         solver_status=accepted.solver_status,
         design_method=settings.design_method,

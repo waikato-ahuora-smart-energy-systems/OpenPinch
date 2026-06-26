@@ -20,7 +20,7 @@ from ..common.capital_cost_and_area_targeting import (
     get_min_number_hx,
 )
 from ..common.gcc_manipulation import get_additional_GCCs
-from ..common.miscellaneous import delta_vals, get_state_index
+from ..common.miscellaneous import delta_vals, get_period_index
 from ..common.problem_table_analysis import (
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
@@ -45,14 +45,14 @@ def compute_direct_integration_targets(
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
-    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
+    idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
     all_streams = zone.all_streams
     pt = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
         all_streams=all_streams,
         is_shifted=True,
-        idx=idx,
+        period_idx=idx,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
@@ -60,7 +60,7 @@ def compute_direct_integration_targets(
         all_streams=all_streams,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
-        idx=idx,
+        period_idx=idx,
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     direct = zone.config.direct
@@ -165,8 +165,8 @@ def compute_direct_integration_targets(
             "cold_utilities": zone.cold_utilities,
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
-            "state_id": sid,
-            "state_idx": idx,
+            "period_id": sid,
+            "period_idx": idx,
         }
         | area_payload
     )
@@ -216,7 +216,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     k = 1
     for i, dh in enumerate(dh_vals):
         if dh > tol and hu_idx >= 0:
-            hu_idx, k = _add_net_segment_stateful(
+            hu_idx, k = _add_net_segment_period(
                 T_ub=T_vals[i],
                 T_lb=T_vals[i + 1],
                 curr_idx=hu_idx,
@@ -228,7 +228,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
                 idx=idx,
             )
         elif -dh > tol and cu_idx >= 0:
-            cu_idx, k = _add_net_segment_stateful(
+            cu_idx, k = _add_net_segment_period(
                 T_ub=T_vals[i],
                 T_lb=T_vals[i + 1],
                 curr_idx=cu_idx,
@@ -243,7 +243,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     return net_hot_streams, net_cold_streams
 
 
-def _add_net_segment_stateful(
+def _add_net_segment_period(
     T_ub: float,
     T_lb: float,
     curr_idx: int,

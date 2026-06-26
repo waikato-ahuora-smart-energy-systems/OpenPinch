@@ -104,7 +104,7 @@ default of tier 1 for prepared-problem workflows. User code should prefer
 ``problem.design.enhanced_synthesis_method(quality_tier=...)`` for method-level
 tier selection because it applies a call-local override without mutating the
 loaded problem configuration. Runtime ``options`` passed to design accessors are
-reserved for runtime state and do not accept persistent ``HENS_*`` overrides.
+reserved for runtime context and do not accept persistent ``HENS_*`` overrides.
 
 Method-level inputs and outputs are also Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,

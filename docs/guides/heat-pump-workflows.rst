@@ -66,7 +66,7 @@ The packaged notebook:
    openpinch notebook --name 08_direct_gas_stream_mvr.ipynb -o notebooks
 
 This notebook compares baseline, dry MVR, and liquid-injection MVR cases in a
-``PinchWorkspace``. It also shows ``stage_results_by_state``, replacement
+``PinchWorkspace``. It also shows ``stage_results_by_period``, replacement
 stream inspection, and component ``activate()`` / ``deactivate()`` behavior.
 
 Current Recommendation

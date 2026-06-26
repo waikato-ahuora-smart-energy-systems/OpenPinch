@@ -24,10 +24,10 @@ Which Workflow Should I Use?
    :doc:`../guides/zonal-and-total-site-workflows` and
    ``02_total_site_targets_and_sugcc.ipynb``.
 
-``How do named operating states change the answer across one process or site?``
-   Use ``crude_preheat_train_multistate.json`` or
-   ``zonal_site_multistate.json`` together with
-   ``04_multistate_targeting_and_state_comparison.ipynb``.
+``How do named operating periods change the answer across one process or site?``
+   Use ``crude_preheat_train_multiperiod.json`` or
+   ``zonal_site_multiperiod.json`` together with
+   ``04_multiperiod_targeting_and_period_comparison.ipynb``.
 
 ``Would an integrated heat pump improve the utility picture of my plant?``
    Use ``heat_pump_targeting.json`` with

@@ -7,23 +7,25 @@ from OpenPinch.services.components.process_mvr import ProcessMVRComponent
 
 
 def _problem_payload(
-    *, duplicate_display_names: bool = False, multistate: bool = False
+    *, duplicate_display_names: bool = False, multiperiod: bool = False
 ):
-    def stateful(values, unit=None):
+    def period_valued(values, unit=None):
         payload = {"values": values}
         if unit is not None:
             payload["unit"] = unit
         return payload
 
-    vapour_heat = stateful([100.0, 130.0], "kW") if multistate else 100.0
-    cold_heat = stateful([120.0, 150.0], "kW") if multistate else 120.0
+    vapour_heat = period_valued([100.0, 130.0], "kW") if multiperiod else 100.0
+    cold_heat = period_valued([120.0, 150.0], "kW") if multiperiod else 120.0
     streams = [
         {
             "zone": "Site/Evaporation Train",
             "name": "Evaporator vapour",
-            "t_supply": stateful([120.0, 125.0], "degC") if multistate else 120.0,
-            "t_target": stateful([80.0, 82.0], "degC") if multistate else 80.0,
-            "p_supply": stateful([101.325, 101.325], "kPa") if multistate else 101.325,
+            "t_supply": period_valued([120.0, 125.0], "degC") if multiperiod else 120.0,
+            "t_target": period_valued([80.0, 82.0], "degC") if multiperiod else 80.0,
+            "p_supply": period_valued([101.325, 101.325], "kPa")
+            if multiperiod
+            else 101.325,
             "heat_flow": vapour_heat,
             "dt_cont": 0.0,
             "htc": 1.0,
@@ -72,7 +74,7 @@ def _problem_payload(
         "streams": streams,
         "utilities": [],
         "zone_tree": {"name": "Site", "type": "Site", "children": children},
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]} if multistate else {},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]} if multiperiod else {},
     }
 
 
@@ -136,7 +138,7 @@ def test_process_mvr_can_use_pressure_ratio_target():
         mvr_stage_pressure_ratio=1.2,
     )
 
-    stage = component.stage_results_by_state["0"][0]
+    stage = component.stage_results_by_period["0"][0]
     assert stage.p_out / stage.p_in == pytest.approx(1.2)
 
 
@@ -184,13 +186,13 @@ def test_process_mvr_rejects_empty_source_selector_list():
 
 
 def test_process_mvr_rejects_conflicting_state_contexts():
-    problem = _problem(multistate=True)
+    problem = _problem(multiperiod=True)
 
-    with pytest.raises(ValueError, match="state_id and options\\['state_id'\\]"):
+    with pytest.raises(ValueError, match="period_id and options\\['period_id'\\]"):
         problem.add_component.process_mvr(
             "Evaporator vapour",
-            state_id="peak",
-            options={"state_id": "0"},
+            period_id="peak",
+            options={"period_id": "0"},
             liquid_injection=False,
         )
 
@@ -220,7 +222,7 @@ def test_process_mvr_activate_deactivate_toggles_recorded_streams_and_invalidate
     first_target = problem.target.direct_heat_integration(zone_name="Evaporation Train")
     assert first_target.heat_recovery_target == pytest.approx(120.0)
     assert first_target.process_component_work_target == pytest.approx(
-        component.work_for_zone(zone, state_id="0", state_idx=0)
+        component.work_for_zone(zone, period_id="0", period_idx=0)
     )
     assert first_target.work_target == pytest.approx(
         first_target.process_component_work_target
@@ -298,7 +300,7 @@ def test_process_mvr_accepts_vapour_stream_and_derives_saturation_pressure():
     source = component.original_streams[0]
     assert float(source.p_supply) == pytest.approx(101.4, rel=0.02)
     assert float(source.p_target) == pytest.approx(float(source.p_supply))
-    assert component.stage_results_by_state["0"][0].work > 0.0
+    assert component.stage_results_by_period["0"][0].work > 0.0
 
 
 def test_process_mvr_rejects_vapour_stream_away_from_saturation_pressure():
@@ -361,17 +363,17 @@ def test_process_mvr_rejects_cold_stream_selection():
         problem.add_component.process_mvr("Product heating")
 
 
-def test_process_mvr_solves_all_states_for_multistate_streams():
+def test_process_mvr_solves_all_periods_for_multiperiod_streams():
     pytest.importorskip("CoolProp")
-    problem = _problem(multistate=True)
+    problem = _problem(multiperiod=True)
 
     component = problem.add_component.process_mvr(
         "Evaporator vapour",
         liquid_injection=False,
-        state_id="peak",
+        period_id="peak",
     )
 
-    assert set(component.stage_results_by_state) == {"0", "peak"}
+    assert set(component.stage_results_by_period) == {"0", "peak"}
     replacement = component.replacement_streams[0]
     assert float(replacement.heat_flow[0]) > 0.0
     assert float(replacement.heat_flow[1]) > 0.0
@@ -384,30 +386,30 @@ def test_process_mvr_solves_all_states_for_multistate_streams():
 
     normal_target = problem.target.direct_heat_integration(
         zone_name="Evaporation Train",
-        state_id="0",
+        period_id="0",
     )
     peak_target = problem.target.direct_heat_integration(
         zone_name="Evaporation Train",
-        state_id="peak",
+        period_id="peak",
     )
     peak_target_by_idx = problem.target.direct_heat_integration(
         zone_name="Evaporation Train",
-        options={"idx": 1},
+        options={"period_idx": 1},
     )
 
     assert normal_target.heat_recovery_target != peak_target.heat_recovery_target
     assert normal_target.process_component_work_target == pytest.approx(
         component.work_for_zone(
             problem.master_zone.get_subzone("Evaporation Train"),
-            state_id="0",
-            state_idx=0,
+            period_id="0",
+            period_idx=0,
         )
     )
     assert peak_target.process_component_work_target == pytest.approx(
         component.work_for_zone(
             problem.master_zone.get_subzone("Evaporation Train"),
-            state_id="peak",
-            state_idx=1,
+            period_id="peak",
+            period_idx=1,
         )
     )
     assert normal_target.process_component_work_target != pytest.approx(

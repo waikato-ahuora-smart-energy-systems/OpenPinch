@@ -755,15 +755,15 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
 @pytest.mark.solver
 def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
     _skip_if_live_solver_environment_missing()
-    single_state = _single_state_no_sweep_problem()
-    duplicate_state = _duplicate_two_state_no_sweep_problem()
+    single_period = _single_state_no_sweep_problem()
+    duplicate_period = _duplicate_two_state_no_sweep_problem()
 
     single_result = _run_single_candidate_open_hens(
-        single_state,
+        single_period,
         approach_temperature=10.0,
     )
     duplicate_result = _run_single_candidate_open_hens(
-        duplicate_state,
+        duplicate_period,
         approach_temperature=10.0,
     )
 
@@ -1087,8 +1087,8 @@ def _duplicate_two_state_no_sweep_problem() -> PinchProblem:
                 del record[key]["value"]
     payload["options"] = {
         **payload["options"],
-        "PROBLEM_STATE_IDS": ["base", "duplicate"],
-        "PROBLEM_STATE_WEIGHTS": [0.1, 0.9],
+        "PROBLEM_PERIOD_IDS": ["base", "duplicate"],
+        "PROBLEM_PERIOD_WEIGHTS": [0.1, 0.9],
         "HENS_RUN_ID": "duplicate-two-state-no-sweep",
     }
     return PinchProblem(
@@ -1218,20 +1218,20 @@ def _skip_if_live_solver_environment_missing() -> None:
     try:
         require_solver_binary(
             "couenne",
-            purpose="single-state/multistate HEN equivalence test",
+            purpose="single-period/multiperiod HEN equivalence test",
         )
         require_solver_binary(
             "ipopt",
-            purpose="single-state/multistate HEN equivalence test",
+            purpose="single-period/multiperiod HEN equivalence test",
         )
         require_synthesis_dependency(
             "gekko",
-            purpose="single-state/multistate HEN equivalence test",
+            purpose="single-period/multiperiod HEN equivalence test",
         )
         require_synthesis_dependency(
             "pyomo.environ",
             package="pyomo",
-            purpose="single-state/multistate HEN equivalence test",
+            purpose="single-period/multiperiod HEN equivalence test",
         )
     except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
         pytest.skip(str(exc))

@@ -540,7 +540,7 @@ def test_to_dict_exports_streams_in_standard_reporting_order():
     assert frame.loc[0, "t_target"] == pytest.approx(90.0)
 
 
-def test_to_dict_uses_requested_state_index_for_stateful_stream_values():
+def test_to_dict_uses_requested_period_index_for_period_stream_values():
     sc = StreamCollection()
     sc.add(
         Stream(
@@ -559,12 +559,12 @@ def test_to_dict_uses_requested_state_index_for_stateful_stream_values():
     assert frame.loc[0, "heat_flow"] == pytest.approx(80.0)
 
 
-def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
+def test_validate_period_alignment_uses_first_period_stream_as_canonical():
     sc = StreamCollection()
-    sc.set_state_context(
-        state_ids={"0": 0, "1": 1},
+    sc.set_period_context(
+        period_ids={"0": 0, "1": 1},
         weights=[0.25, 0.75],
-        num_states=2,
+        num_periods=2,
     )
     sc.add(
         Stream(
@@ -577,7 +577,7 @@ def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
                 "values": [120.0, 100.0],
                 "unit": "degC",
             },
-            heat_flow={"values": [100.0, 80.0], "state_ids": ["0", "1"], "unit": "kW"},
+            heat_flow={"values": [100.0, 80.0], "period_ids": ["0", "1"], "unit": "kW"},
             htc=1.0,
         ),
         key="AreaA.H1",
@@ -592,18 +592,18 @@ def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
         )
     )
 
-    assert list(sc[0].state_ids.keys()) == ["0", "1"]
+    assert list(sc[0].period_ids.keys()) == ["0", "1"]
     np.testing.assert_allclose(sc[0].weights, np.array([0.25, 0.75]))
-    assert sc.state_ids == {"0": 0, "1": 1}
+    assert sc.period_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(sc.weights, np.array([0.25, 0.75]))
 
 
 def test_state_context_is_preserved_on_copy_and_subset():
     sc = StreamCollection()
-    sc.set_state_context(
-        state_ids={"0": 0, "1": 1},
+    sc.set_period_context(
+        period_ids={"0": 0, "1": 1},
         weights=[0.25, 0.75],
-        num_states=2,
+        num_periods=2,
     )
     sc.add(
         Stream(
@@ -636,9 +636,9 @@ def test_state_context_is_preserved_on_copy_and_subset():
     copied = sc.copy()
     hot_streams = sc.get_hot_streams()
 
-    assert copied.state_ids == {"0": 0, "1": 1}
+    assert copied.period_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(copied.weights, np.array([0.25, 0.75]))
-    assert hot_streams.state_ids == {"0": 0, "1": 1}
+    assert hot_streams.period_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(hot_streams.weights, np.array([0.25, 0.75]))
 
 

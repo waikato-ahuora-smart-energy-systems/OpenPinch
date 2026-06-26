@@ -58,7 +58,7 @@ def invalid_variant_view(
     """Build a deterministic invalid-variant response view."""
     return ScenarioVariantView(
         variant_name=variant_name,
-        state_id=workflow_options.get("state_id"),
+        period_id=workflow_options.get("period_id"),
         workflow=workflow,
         workflow_options=workflow_options,
         status="invalid",
@@ -82,7 +82,7 @@ def error_variant_view(
     """Build a deterministic workflow-error response view."""
     return ScenarioVariantView(
         variant_name=variant_name,
-        state_id=workflow_options.get("state_id"),
+        period_id=workflow_options.get("period_id"),
         workflow=workflow,
         workflow_options=workflow_options,
         status="error",
@@ -113,8 +113,8 @@ def problem_to_variant_view(
 
     return ScenarioVariantView(
         variant_name=variant_name,
-        state_id=workflow_options.get("state_id")
-        or getattr(problem._results, "state_id", None),
+        period_id=workflow_options.get("period_id")
+        or getattr(problem._results, "period_id", None),
         workflow=workflow,
         workflow_options=workflow_options,
         status="solved",

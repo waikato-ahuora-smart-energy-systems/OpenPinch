@@ -150,12 +150,12 @@ Simulated-cycle targets also expose annualized cost fields:
 ``hpr_annualized_capital_cost``, ``hpr_total_annualized_cost``,
 ``hpr_compressor_capital_cost``, and
 ``hpr_heat_exchanger_capital_cost``.
-For stateful input data, the same named entry points also accept
-``state_id=...`` and the refreshed summaries, exports, and graph metadata carry
-that selected state context forward.
+For period-valued input data, the same named entry points also accept
+``period_id=...`` and the refreshed summaries, exports, and graph metadata carry
+that selected period context forward.
 
 The ``problem.add_component.*`` accessor is different: it mutates the prepared
 stream model before targeting. The direct process MVR component deactivates
 selected source streams, activates generated compressed-vapour replacement
-streams, stores per-state stage results, and contributes process-component
+streams, stores per-period stage results, and contributes process-component
 work to later target summaries.

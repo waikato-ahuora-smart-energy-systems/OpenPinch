@@ -30,11 +30,11 @@ class _TargetAccessor:
         self,
         *,
         options: Optional[dict[str, Any]] = None,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ):
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         execution_master_zone = self._problem._build_execution_master_zone()
         plan = build_targeting_plan(execution_master_zone.config)
         return self._problem._run_targeting_for_zone_and_subzones(
@@ -50,12 +50,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run direct integration targeting for one zone or sub-tree."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.DI.value,
             application_zone=zone_name,
@@ -70,12 +70,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run indirect / Total Site targeting for one zone or sub-tree."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.TS.value,
             application_zone=zone_name,
@@ -90,12 +90,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run direct Heat Pump targeting for one zone or sub-tree."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.DHP.value,
             application_zone=zone_name,
@@ -110,12 +110,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run indirect Heat Pump targeting for one zone or sub-tree."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.IHP.value,
             application_zone=zone_name,
@@ -130,12 +130,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run direct refrigeration targeting for one zone or sub-tree."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.DR.value,
             application_zone=zone_name,
@@ -150,12 +150,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run indirect refrigeration targeting for one zone or sub-tree."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.IR.value,
             application_zone=zone_name,
@@ -170,15 +170,15 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """
         Run cogeneration on `TS -> IHP -> IR -> DHP -> DR -> DI`
         unless overridden.
         """
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_cogeneration_targeting(
             application_zone=zone_name,
             options=runtime_options,
@@ -192,12 +192,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run area and capital-cost targeting for one zone or sub-tree."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.DI.value,
             application_zone=zone_name,
@@ -212,12 +212,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Run exergy targeting on the first compatible base target family."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_exergy_targeting(
             application_zone=zone_name,
             options=runtime_options,
@@ -231,12 +231,12 @@ class _TargetAccessor:
         zone_name: Optional[str] = None,
         options: Optional[dict[str, Any]] = None,
         include_subzones: bool = False,
-        state_id: Optional[str] = None,
+        period_id: Optional[str] = None,
     ) -> BaseTargetModel:
         """Create energy-transfer diagram and heat-surplus/deficit outputs."""
         runtime_options = dict(options or {})
-        if state_id is not None:
-            runtime_options["state_id"] = state_id
+        if period_id is not None:
+            runtime_options["period_id"] = period_id
         return self._problem._execute_targeting(
             target_id=TT.ET.value,
             application_zone=zone_name,

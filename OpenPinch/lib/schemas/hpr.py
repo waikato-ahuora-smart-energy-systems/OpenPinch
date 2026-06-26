@@ -66,7 +66,7 @@ class HeatPumpTargetInputs(BaseModel):
     bb_minimiser: str
     eta_penalty: float
     rho_penalty: float
-    idx: int = 0
+    period_idx: int = 0
     debug: bool
 
 

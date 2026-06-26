@@ -68,25 +68,25 @@ Use the GCC first when utility placement or Heat Pump opportunity is the main
 question. These rendered Plotly figures require the ``openpinch[notebook]`` or
 ``openpinch[dashboard]`` extra.
 
-Step 5. Work With Selected States
----------------------------------
+Step 5. Work With Selected Periods
+----------------------------------
 
-When a case carries stateful values, the wrapper exposes both the canonical
-state lookup and state-specific reruns:
+When a case carries period-valued values, the wrapper exposes both the canonical
+period lookup and period-specific reruns:
 
 .. code-block:: python
 
-   print(problem.state_ids)
+   print(problem.period_ids)
 
-   peak_target = problem.target.direct_heat_integration(state_id="peak")
+   peak_target = problem.target.direct_heat_integration(period_id="peak")
    peak_summary = problem.summary_frame()
-   print(peak_summary[["Target", "State ID", "Hot Utility Target"]])
+   print(peak_summary[["Target", "Period ID", "Hot Utility Target"]])
 
-   all_state_results = problem.target_all_states(parallel="thread")
+   all_state_results = problem.target_all_periods(parallel="thread")
    print(all_state_results.keys())
 
-The named ``problem.target.*`` entry points accept ``state_id=...``. The
-returned summary, export, and graph surfaces then reflect that selected state.
+The named ``problem.target.*`` entry points accept ``period_id=...``. The
+returned summary, export, and graph surfaces then reflect that selected period.
 
 Step 6. Export Artifacts
 ------------------------
@@ -146,7 +146,7 @@ Stay on ``PinchProblem`` when you only need one case at a time.
 Schema-First Alternative
 ------------------------
 
-When you do not want a stateful wrapper object, use the service boundary:
+When you do not want a period-valued wrapper object, use the service boundary:
 
 .. code-block:: python
 

@@ -36,22 +36,22 @@ def build_problem_summary_frame(
 
     rows = []
     for target in results.targets:
-        idx = getattr(target, "idx", None)
-        qh_value, qh_unit = split_report_value(target.Qh, idx=idx)
-        qc_value, qc_unit = split_report_value(target.Qc, idx=idx)
-        qr_value, qr_unit = split_report_value(target.Qr, idx=idx)
+        period_idx = getattr(target, "period_idx", None)
+        qh_value, qh_unit = split_report_value(target.Qh, period_idx=period_idx)
+        qc_value, qc_unit = split_report_value(target.Qc, period_idx=period_idx)
+        qr_value, qr_unit = split_report_value(target.Qr, period_idx=period_idx)
         hot_pinch_value, hot_pinch_unit = split_report_value(
             target.pinch_temp.hot_temp,
-            idx=idx,
+            period_idx=period_idx,
         )
         cold_pinch_value, cold_pinch_unit = split_report_value(
             target.pinch_temp.cold_temp,
-            idx=idx,
+            period_idx=period_idx,
         )
         rows.append(
             {
                 "Target": target.name,
-                "State ID": getattr(target, "state_id", None),
+                "Period ID": getattr(target, "period_id", None),
                 "Hot Utility Target": format_res(
                     value=qh_value,
                     unit=qh_unit,
@@ -76,7 +76,7 @@ def build_problem_summary_frame(
                     format_res(
                         name=utility.name,
                         value=utility.heat_flow,
-                        idx=idx,
+                        period_idx=period_idx,
                     )
                     for utility in target.hot_utilities
                 ),
@@ -84,7 +84,7 @@ def build_problem_summary_frame(
                     format_res(
                         name=utility.name,
                         value=utility.heat_flow,
-                        idx=idx,
+                        period_idx=period_idx,
                     )
                     for utility in target.cold_utilities
                 ),
@@ -99,12 +99,12 @@ def build_plain_summary_frame(results: Any) -> pd.DataFrame:
     for target in results.targets:
         row = {
             "Target": target.name,
-            "State ID": getattr(target, "state_id", None),
+            "Period ID": getattr(target, "period_id", None),
         }
         for label, attr_path in _SUMMARY_METRICS.items():
             value, unit = split_report_value(
                 _target_attr(target, attr_path),
-                idx=getattr(target, "idx", None),
+                period_idx=getattr(target, "period_idx", None),
             )
             row[label] = value
             row[f"{label} (unit)"] = unit
@@ -112,7 +112,7 @@ def build_plain_summary_frame(results: Any) -> pd.DataFrame:
             format_res(
                 name=utility.name,
                 value=utility.heat_flow,
-                idx=getattr(target, "idx", None),
+                period_idx=getattr(target, "period_idx", None),
             )
             for utility in target.hot_utilities
         )
@@ -120,7 +120,7 @@ def build_plain_summary_frame(results: Any) -> pd.DataFrame:
             format_res(
                 name=utility.name,
                 value=utility.heat_flow,
-                idx=getattr(target, "idx", None),
+                period_idx=getattr(target, "period_idx", None),
             )
             for utility in target.cold_utilities
         )
@@ -132,11 +132,11 @@ def build_report_metrics(results: Any) -> list[ReportMetric]:
     """Return stable typed metrics for all summary target rows."""
     metrics = []
     for target in results.targets:
-        state_id = getattr(target, "state_id", None)
+        period_id = getattr(target, "period_id", None)
         for label, attr_path in _SUMMARY_METRICS.items():
             value, unit = split_report_value(
                 _target_attr(target, attr_path),
-                idx=getattr(target, "idx", None),
+                period_idx=getattr(target, "period_idx", None),
             )
             metrics.append(
                 ReportMetric(
@@ -145,7 +145,7 @@ def build_report_metrics(results: Any) -> list[ReportMetric]:
                     label=label,
                     value=value,
                     unit=unit,
-                    state_id=state_id,
+                    period_id=period_id,
                 )
             )
     return metrics
@@ -245,11 +245,11 @@ def build_graph_payload(results: Any) -> Optional[dict[str, Any]]:
 def format_res(
     name: str | None = None,
     value: Any | None = None,
-    idx: int | None = None,
+    period_idx: int | None = None,
     unit: str | None = None,
 ) -> str:
     """Render one utility summary item."""
-    val, unt = split_report_value(value, idx=idx)
+    val, unt = split_report_value(value, period_idx=period_idx)
     if unt is None:
         unt = unit
     if val is None:

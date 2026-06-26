@@ -3,7 +3,7 @@
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.services.direct_heat_integration.direct_integration_entry import (
-    _add_net_segment_stateful,
+    _add_net_segment_period,
     _initialise_utility_index,
 )
 
@@ -15,12 +15,12 @@ def test_initialise_utility_index_returns_first_available():
     assert idx == 1
 
 
-def test_add_net_segment_stateful_consumes_residuals():
+def test_add_net_segment_period_consumes_residuals():
     u1 = Stream("U1", 200, 250, heat_flow=120.0)
     u2 = Stream("U2", 200, 250, heat_flow=80.0)
     residuals = [u1.heat_flow[0], u2.heat_flow[0]]
     net_streams = StreamCollection()
-    next_idx, next_k = _add_net_segment_stateful(
+    next_idx, next_k = _add_net_segment_period(
         400,
         300,
         0,

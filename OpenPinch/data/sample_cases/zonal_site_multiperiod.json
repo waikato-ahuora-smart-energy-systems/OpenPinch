@@ -940,12 +940,12 @@
     }
   ],
   "options": {
-    "PROBLEM_STATE_IDS": [
+    "PROBLEM_PERIOD_IDS": [
       "summer",
       "shoulder",
       "winter"
     ],
-    "PROBLEM_STATE_WEIGHTS": [
+    "PROBLEM_PERIOD_WEIGHTS": [
       0.25,
       0.5,
       0.25

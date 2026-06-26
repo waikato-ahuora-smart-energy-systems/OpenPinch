@@ -63,7 +63,7 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     monkeypatch.setattr(
         indirect,
         "_match_utility_gen_and_use_at_same_level",
-        lambda hot_utilities, cold_utilities, idx=0: (
+        lambda hot_utilities, cold_utilities, period_idx=0: (
             hot_utilities,
             cold_utilities,
         ),

@@ -21,7 +21,7 @@ class CogenerationTarget(Protocol):
     hot_utilities: StreamCollection
     work_target: float | None
     turbine_efficiency_target: float | None
-    state_ids: dict[str, int] | None
+    period_ids: dict[str, int] | None
 
 
 class ZoneType(Enum):
