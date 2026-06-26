@@ -3,7 +3,7 @@ PinchProblem
 
 :class:`OpenPinch.classes.pinch_problem.PinchProblem` is the primary
 single-case interface in the package. It owns the source inputs, validated
-problem data, prepared zone tree, solved targets, graph exports, period-valued
+problem data, prepared zone tree, solved targets, graph exports, multiperiod
 reruns, and several advanced post-processing helpers.
 
 When To Use It
@@ -89,7 +89,7 @@ Two descriptor families make ``PinchProblem`` broader than a simple wrapper:
    Re-runs targeted advanced routines such as direct and indirect heat pump,
    refrigeration, exergy enrichment, cogeneration, or area/cost targeting
    against the prepared zone hierarchy. Named target workflows also accept
-   ``period_id=...`` when input data carries period-valued values, and the
+   ``period_id=...`` when input data carries multiperiod values, and the
    refreshed summary/export surfaces then expose that selected period on the
    result rows.
 

@@ -308,7 +308,7 @@ class Stream:
 
     @property
     def heat_flow(self) -> Value:
-        """Stream heat flow view over a scalar or period-valued duty value."""
+        """Stream heat flow view over a scalar or multiperiod duty value."""
         return self._heat_flow
 
     @heat_flow.setter

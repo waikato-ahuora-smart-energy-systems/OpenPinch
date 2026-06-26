@@ -150,7 +150,7 @@ Simulated-cycle targets also expose annualized cost fields:
 ``hpr_annualized_capital_cost``, ``hpr_total_annualized_cost``,
 ``hpr_compressor_capital_cost``, and
 ``hpr_heat_exchanger_capital_cost``.
-For period-valued input data, the same named entry points also accept
+For multiperiod input data, the same named entry points also accept
 ``period_id=...`` and the refreshed summaries, exports, and graph metadata carry
 that selected period context forward.
 

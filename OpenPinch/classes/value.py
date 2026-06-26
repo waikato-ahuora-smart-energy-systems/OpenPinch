@@ -1,4 +1,4 @@
-"""Unit-aware scalar and discrete-period value wrapper powered by Pint quantities."""
+"""Unit-aware scalar and multiperiod value wrapper powered by Pint quantities."""
 
 from __future__ import annotations
 
@@ -67,14 +67,14 @@ class Value:
     """Thin wrapper around a Pint ``Quantity`` with serialization helpers."""
 
     def __init__(self, data=None, unit: str = None):
-        """Create a scalar or period-valued value from ``data`` and an optional ``unit``."""
+        """Create a scalar or multiperiod value from ``data`` and an optional ``unit``."""
         quantity, weights = self._coerce_input(data, unit)
         self._set_storage(quantity)
         self._weights = weights
 
     @property
     def value(self):
-        """Return the scalar magnitude or per-period magnitudes for period-valued values."""
+        """Return the scalar magnitude or per-period magnitudes for multiperiod values."""
         if not self._is_period_valued():
             return self._quantity.magnitude[0]
         return self._quantity.magnitude.copy()
@@ -214,17 +214,17 @@ class Value:
 
     def __float__(self):
         if self._is_period_valued():
-            raise TypeError("Cannot convert period-valued Value to float.")
+            raise TypeError("Cannot convert multiperiod Value to float.")
         return float(self._quantity.magnitude[0])
 
     def __int__(self):
         if self._is_period_valued():
-            raise TypeError("Cannot convert period-valued Value to int.")
+            raise TypeError("Cannot convert multiperiod Value to int.")
         return int(self._quantity.magnitude[0])
 
     def __round__(self, ndigits=None):
         if self._is_period_valued():
-            raise TypeError("Cannot round period-valued Value.")
+            raise TypeError("Cannot round multiperiod Value.")
         return round(self._quantity.magnitude[0], ndigits)
 
     def __array__(self, dtype=None, copy=None):
@@ -664,7 +664,7 @@ class Value:
 
     @classmethod
     def from_dict(cls, data):
-        """Instantiate from a scalar or period-valued serialized mapping."""
+        """Instantiate from a scalar or multiperiod serialized mapping."""
         if not isinstance(data, Mapping):
             raise TypeError("data must be a mapping.")
         if cls._is_serialized_period_payload(data):

@@ -71,7 +71,7 @@ question. These rendered Plotly figures require the ``openpinch[notebook]`` or
 Step 5. Work With Selected Periods
 ----------------------------------
 
-When a case carries period-valued values, the wrapper exposes both the canonical
+When a case carries multiperiod values, the wrapper exposes both the canonical
 period lookup and period-specific reruns:
 
 .. code-block:: python
@@ -82,8 +82,8 @@ period lookup and period-specific reruns:
    peak_summary = problem.summary_frame()
    print(peak_summary[["Target", "Period ID", "Hot Utility Target"]])
 
-   all_state_results = problem.target_all_periods(parallel="thread")
-   print(all_state_results.keys())
+   all_period_results = problem.target_all_periods(parallel="thread")
+   print(all_period_results.keys())
 
 The named ``problem.target.*`` entry points accept ``period_id=...``. The
 returned summary, export, and graph surfaces then reflect that selected period.
@@ -146,7 +146,7 @@ Stay on ``PinchProblem`` when you only need one case at a time.
 Schema-First Alternative
 ------------------------
 
-When you do not want a period-valued wrapper object, use the service boundary:
+When you do not want a multiperiod wrapper object, use the service boundary:
 
 .. code-block:: python
 

@@ -1,4 +1,4 @@
-"""Helpers for resolving scalar and period-valued value payloads."""
+"""Helpers for resolving scalar and multiperiod value payloads."""
 
 from __future__ import annotations
 
@@ -403,7 +403,7 @@ def evaluate_value_spec(
 
 
 def resolve_value_array(value: Any) -> np.ndarray:
-    """Resolve scalar or period-valued value-like payloads into a 1-D float array."""
+    """Resolve scalar or multiperiod value-like payloads into a 1-D float array."""
     value = _normalise_input_object(value)
     if value is None:
         return np.array([], dtype=float)
@@ -454,5 +454,5 @@ def resolve_value_array(value: Any) -> np.ndarray:
 
     raise TypeError(
         "Unsupported type: expected numeric scalar, Value, ValueWithUnit, "
-        "or serialized scalar/period-valued value payload."
+        "or serialized scalar or multiperiod value payload."
     )

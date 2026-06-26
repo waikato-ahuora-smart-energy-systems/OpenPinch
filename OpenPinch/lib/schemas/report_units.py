@@ -139,7 +139,7 @@ def split_report_value(
     *,
     period_idx: int | None = None,
 ) -> tuple[Any, Optional[str]]:
-    """Return ``(value, unit)`` for scalar, period-valued, or array report payloads."""
+    """Return ``(value, unit)`` for scalar, multiperiod, or array report payloads."""
     value = _normalise_input_object(value)
     if value is None:
         return None, None

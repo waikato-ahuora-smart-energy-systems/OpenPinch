@@ -17,7 +17,7 @@ surface is still:
   ``problem.target.direct_heat_pump(...)``
 - use ``problem.target.direct_heat_integration(period_id="peak")`` or
   ``problem.target.indirect_heat_integration(period_id="winter")`` when the
-  payload is period-valued
+  payload is multiperiod
 - use ``show_dashboard()`` for the Streamlit dashboard
 - use ``PinchWorkspace`` for named baseline-versus-variant studies
 

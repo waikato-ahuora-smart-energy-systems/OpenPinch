@@ -113,7 +113,7 @@ problem.plot.export("graphs", graph_type="gcc")
 problem.plot.export_gallery("graph_gallery")
 ```
 
-When the PinchProblem data contains period-valued values, the named
+When the PinchProblem data contains multiperiod values, the named
 `problem.target.*` entry points also accept `period_id=...` so one cached solve
 can be refreshed for a selected operating period without flattening the
 in-memory model first:
