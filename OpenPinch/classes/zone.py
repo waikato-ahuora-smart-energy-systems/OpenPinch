@@ -483,7 +483,7 @@ class Zone:
         resolved = resolved.split("/", 1)
         if resolved[0] == self.name:
             resolved.pop(0)
-        return self.get_subzone(resolved)
+        return self.get_subzone("/".join(resolved))
 
     def lock_dt_cont_multiplier(self):
         """Lock the dt_cont_multiplier to prevent further changes."""

@@ -128,6 +128,122 @@ def _make_target(
     )
 
 
+def test_data_preprocessing_service_delegates_target_input_payload(monkeypatch):
+    expected_zone = _make_zone()
+    captured = {}
+    input_data = type(
+        "StaticTargetInput",
+        (),
+        {
+            "streams": [{"name": "H1"}],
+            "utilities": [{"name": "Steam"}],
+            "options": {"THERMAL_DT_CONT": 10.0},
+            "zone_tree": {"Site": ["Area"]},
+        },
+    )()
+
+    def fake_prepare_problem(**kwargs):
+        captured.update(kwargs)
+        return expected_zone
+
+    monkeypatch.setattr(svc, "prepare_problem", fake_prepare_problem)
+
+    zone = svc.data_preprocessing_service(input_data, project_name="Static Site")
+
+    assert zone is expected_zone
+    assert captured == {
+        "project_name": "Static Site",
+        "streams": input_data.streams,
+        "utilities": input_data.utilities,
+        "options": input_data.options,
+        "zone_tree": input_data.zone_tree,
+    }
+
+
+def test_indirect_heat_integration_service_records_total_process_and_site_targets(
+    monkeypatch,
+):
+    zone = _make_zone()
+    calls = []
+
+    def fake_compute_total(target_zone: Zone, args: dict | None = None):
+        calls.append(("total_process", args))
+        return _make_target(target_zone, TT.TZ.value)
+
+    def fake_compute_indirect(target_zone: Zone, args: dict | None = None):
+        calls.append(("total_site", args))
+        return _make_target(target_zone, TT.TS.value)
+
+    monkeypatch.setattr(
+        svc, "compute_total_subzone_utility_targets", fake_compute_total
+    )
+    monkeypatch.setattr(
+        svc, "compute_indirect_integration_targets", fake_compute_indirect
+    )
+    monkeypatch.setattr(
+        svc,
+        "apply_exergy_if_enabled",
+        lambda target, target_zone, apply_func: target,
+    )
+
+    out = svc.indirect_heat_integration_service(zone, args={"period_idx": 0})
+
+    assert out is zone
+    assert calls == [
+        ("total_process", {"period_idx": 0}),
+        ("total_site", {"period_idx": 0}),
+    ]
+    assert TT.TZ.value in zone.targets
+    assert TT.TS.value in zone.targets
+
+
+@pytest.mark.parametrize(
+    ("service_name", "stale_target_type", "base_target_type", "compute_attr"),
+    [
+        (
+            "direct_heat_pump_service",
+            TT.DHP.value,
+            TT.DI.value,
+            "compute_direct_heat_pump_or_refrigeration_target",
+        ),
+        (
+            "direct_refrigeration_service",
+            TT.DR.value,
+            TT.DI.value,
+            "compute_direct_heat_pump_or_refrigeration_target",
+        ),
+        (
+            "indirect_heat_pump_service",
+            TT.IHP.value,
+            TT.TS.value,
+            "compute_indirect_heat_pump_or_refrigeration_target",
+        ),
+    ],
+)
+def test_hpr_services_remove_stale_target_when_solver_returns_none(
+    monkeypatch,
+    service_name: str,
+    stale_target_type: str,
+    base_target_type: str,
+    compute_attr: str,
+):
+    zone = _make_zone()
+    zone.add_target(_make_target(zone, base_target_type))
+    zone.add_target(_make_target(zone, stale_target_type))
+
+    monkeypatch.setattr(
+        svc,
+        compute_attr,
+        lambda target_zone, is_heat_pumping, args=None: None,
+    )
+
+    out = getattr(svc, service_name)(zone)
+
+    assert out is zone
+    assert base_target_type in zone.targets
+    assert stale_target_type not in zone.targets
+
+
 @pytest.mark.parametrize(
     ("service_name", "target_id", "expected_is_heat_pumping"),
     [

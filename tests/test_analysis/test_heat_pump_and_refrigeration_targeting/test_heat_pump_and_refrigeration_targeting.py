@@ -569,6 +569,186 @@ def test_validate_hpr_required_rejects_missing_period_load():
         )
 
 
+def test_validate_hpr_required_covers_load_modes_and_invalid_inputs():
+    H_net_cold = np.array([0.0, 100.0, 0.0])
+    H_net_hot = np.array([0.0, -60.0, 0.0])
+
+    with pytest.raises(ValueError, match="config"):
+        hp._validate_hpr_required(
+            H_net_cold=H_net_cold,
+            H_net_hot=H_net_hot,
+            is_heat_pumping=True,
+            config=None,
+        )
+
+    assert (
+        hp._validate_hpr_required(
+            H_net_cold=H_net_cold,
+            H_net_hot=H_net_hot,
+            config=Configuration(),
+        )
+        == 0
+    )
+    assert hp._validate_hpr_required(
+        H_net_cold=H_net_cold,
+        H_net_hot=H_net_hot,
+        is_refrigeration=True,
+        config=Configuration(options={"HPR_LOAD_MODE": "duty", "HPR_LOAD_DUTY": 80.0}),
+    ) == pytest.approx(60.0)
+    assert hp._resolve_hpr_period_load(
+        {"1": 12.0},
+        period_id="missing",
+        period_idx=1,
+    ) == pytest.approx(12.0)
+
+    with pytest.raises(ValueError, match="Unsupported HPR_LOAD_MODE"):
+        hp._validate_hpr_required(
+            H_net_cold=H_net_cold,
+            H_net_hot=H_net_hot,
+            is_heat_pumping=True,
+            config=SimpleNamespace(
+                hpr=SimpleNamespace(load_mode="unsupported"),
+            ),
+        )
+
+
+def test_compute_direct_heat_pump_target_orchestrates_target_summary(
+    monkeypatch,
+):
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
+    zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
+    zone.targets[TT.DI.value] = SimpleNamespace(
+        pt=ProblemTable(
+            {
+                PT.T: [120.0, 60.0],
+                PT.H_NET_HOT: [0.0, -40.0],
+                PT.H_NET_COLD: [100.0, 0.0],
+            }
+        )
+    )
+    captured = {}
+    hpr_result = SimpleNamespace(
+        utility_tot=11.0,
+        w_net=2.0,
+        Q_ext=3.0,
+        Q_amb_hot=4.0,
+        Q_amb_cold=5.0,
+        cop_h=6.0,
+        eta_he=7.0,
+        hpr_operating_cost=8.0,
+        hpr_capital_cost=9.0,
+        hpr_annualized_capital_cost=10.0,
+        hpr_total_annualized_cost=11.0,
+        hpr_compressor_capital_cost=12.0,
+        hpr_heat_exchanger_capital_cost=13.0,
+        success=True,
+        hpr_hot_streams=StreamCollection(),
+        hpr_cold_streams=StreamCollection(),
+    )
+
+    def fake_get_hpr_targets(**kwargs):
+        captured["targets"] = kwargs
+        return hpr_result
+
+    def fake_calc_hpr_cascade(**kwargs):
+        captured["cascade"] = kwargs
+        return ProblemTable(
+            {
+                PT.T: [120.0, 60.0],
+                PT.H_NET_HOT: [0.0, -40.0],
+                PT.H_NET_COLD: [100.0, 0.0],
+                PT.H_HOT_HP: [0.0, 5.0],
+                PT.H_COLD_HP: [3.0, 0.0],
+                PT.H_NET_W_AIR: [4.0, 1.0],
+                PT.H_NET_HP: [2.0, -2.0],
+            }
+        )
+
+    monkeypatch.setattr(hp, "_get_hpr_targets", fake_get_hpr_targets)
+    monkeypatch.setattr(hp, "_calc_hpr_cascade", fake_calc_hpr_cascade)
+    monkeypatch.setattr(
+        hp,
+        "_get_hpr_residual_utility_summary",
+        lambda **_kwargs: {
+            "hot_utilities": StreamCollection(),
+            "cold_utilities": StreamCollection(),
+            "hot_utility_target": 0.0,
+            "cold_utility_target": 0.0,
+            "heat_recovery_target": 0.0,
+            "heat_recovery_limit": None,
+            "degree_of_int": None,
+            "utility_cost": 0.0,
+            "hot_pinch": None,
+            "cold_pinch": None,
+        },
+    )
+    monkeypatch.setattr(
+        hp.DirectHeatPumpTarget,
+        "model_validate",
+        classmethod(lambda cls, value: value),
+    )
+
+    target_result = hp.compute_direct_heat_pump_or_refrigeration_target(
+        zone,
+        is_heat_pumping=True,
+        args={"period_id": "peak", "period_idx": 1},
+    )
+
+    assert captured["targets"]["Q_hpr_target"] == pytest.approx(100.0)
+    assert captured["targets"]["period_idx"] == 1
+    assert captured["cascade"]["period_idx"] == 1
+    assert target_result["type"] == TT.DHP.value
+    assert target_result["period_id"] == "peak"
+    assert target_result["hpr_total_annualized_cost"] == pytest.approx(11.0)
+
+
+def test_compute_direct_hpr_returns_none_when_direct_profile_has_no_load():
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
+    zone.targets[TT.DI.value] = SimpleNamespace(
+        pt=ProblemTable(
+            {
+                PT.T: [120.0, 60.0],
+                PT.H_NET_HOT: [0.0, 0.0],
+                PT.H_NET_COLD: [0.0, 0.0],
+            }
+        )
+    )
+
+    assert (
+        hp.compute_direct_heat_pump_or_refrigeration_target(
+            zone,
+            is_heat_pumping=True,
+        )
+        is None
+    )
+
+
+def test_compute_indirect_hpr_returns_none_when_utility_profile_has_no_load(
+    monkeypatch,
+):
+    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
+    zone.targets[TT.TS.value] = SimpleNamespace(pt=ProblemTable({PT.T: [120.0, 60.0]}))
+    monkeypatch.setattr(
+        hp,
+        "get_process_heat_cascade",
+        lambda **_kwargs: ProblemTable(
+            {
+                PT.T: [120.0, 60.0],
+                PT.H_NET_HOT: [0.0, 0.0],
+                PT.H_NET_COLD: [0.0, 0.0],
+            }
+        ),
+    )
+
+    assert (
+        hp.compute_indirect_heat_pump_or_refrigeration_target(
+            zone,
+            is_heat_pumping=True,
+        )
+        is None
+    )
+
+
 def test_hpr_residual_utility_summary_retargets_direct_utilities():
     hot_utilities, cold_utilities = _make_base_utility_collections()
     base_target = SimpleNamespace(
@@ -726,6 +906,34 @@ def test_public_heat_pump_service_package_does_not_export_profile_helper():
     assert not hasattr(hp_pkg, "plot_multi_hp_profiles_from_results")
 
 
+def test_get_hpr_graphs_covers_refrigeration_and_indirect_heat_pump_outputs():
+    refrigeration_graphs = hp._get_hpr_graphs(
+        ProblemTable({PT.T: [120.0, 80.0]}),
+        is_direct=True,
+        is_heat_pumping=False,
+    )
+    indirect_pt = ProblemTable(
+        {
+            PT.T: [120.0, 80.0],
+            PT.H_NET_UT: [4.0, 0.0],
+            PT.H_NET_HP: [2.0, -2.0],
+        }
+    )
+    indirect_graphs = hp._get_hpr_graphs(
+        indirect_pt,
+        is_direct=False,
+        is_heat_pumping=True,
+    )
+
+    assert refrigeration_graphs == {}
+    assert set(indirect_graphs) == {GT.SUGCC.value}
+    assert list(indirect_graphs[GT.SUGCC.value].columns) == [
+        PT.T.value,
+        PT.H_NET_UT.value,
+        PT.H_NET_HP.value,
+    ]
+
+
 def test_direct_heat_pump_graphs_include_nlp_and_hpr_overlay():
     pt = ProblemTable(
         {
@@ -812,6 +1020,100 @@ def test_get_hpr_targets_validates_supported_non_brayton_backend_results(
     assert isinstance(out, hp.HeatPumpTargetOutputs)
     assert out.success is True
     assert out.Q_ext == pytest.approx(0.5)
+
+
+def test_get_hpr_targets_rejects_unknown_backend(monkeypatch):
+    monkeypatch.setattr(
+        hp,
+        "construct_HPRTargetInputs",
+        lambda **_kwargs: SimpleNamespace(hpr_type="not-a-backend"),
+    )
+
+    with pytest.raises(ValueError, match="No valid heat pump targeting type"):
+        hp._get_hpr_targets(
+            Q_hpr_target=10.0,
+            T_vals=np.array([120.0, 80.0]),
+            H_hot=np.array([0.0, -10.0]),
+            H_cold=np.array([10.0, 0.0]),
+            config=Configuration(),
+            is_heat_pumping=True,
+        )
+
+
+def test_calc_hpr_cascade_falls_back_for_helpers_without_period_idx(monkeypatch):
+    calls = {"grid": [], "air": [], "utility": []}
+
+    def fake_problem_table_grid(**kwargs):
+        calls["grid"].append(kwargs)
+        if "period_idx" in kwargs:
+            raise TypeError("legacy helper")
+        return ProblemTable({PT.T: [120.0, 60.0]})
+
+    def fake_process_heat_cascade(**kwargs):
+        calls["air"].append(kwargs)
+        if "period_idx" in kwargs:
+            raise TypeError("legacy helper")
+        return ProblemTable(
+            {
+                PT.T: [120.0, 60.0],
+                PT.H_NET: [1.0, 1.0],
+                PT.H_NET_HOT: [0.0, 0.0],
+                PT.H_NET_COLD: [1.0, 1.0],
+            }
+        )
+
+    def fake_utility_heat_cascade(**kwargs):
+        calls["utility"].append(kwargs)
+        if "period_idx" in kwargs:
+            raise TypeError("legacy helper")
+        return {
+            "T_col": np.array(kwargs["T_int_vals"], dtype=float),
+            "updates": {
+                PT.H_NET_UT: np.array([3.0, -3.0]),
+                PT.H_HOT_UT: np.array([0.0, -3.0]),
+                PT.H_COLD_UT: np.array([3.0, 0.0]),
+            },
+        }
+
+    monkeypatch.setattr(hp, "create_problem_table_with_t_int", fake_problem_table_grid)
+    monkeypatch.setattr(hp, "get_process_heat_cascade", fake_process_heat_cascade)
+    monkeypatch.setattr(hp, "get_utility_heat_cascade", fake_utility_heat_cascade)
+
+    ambient_streams = StreamCollection()
+    ambient_streams.add(
+        Stream(name="Air", t_supply=50.0, t_target=80.0, heat_flow=10.0)
+    )
+    pt = ProblemTable(
+        {
+            PT.T: [120.0, 60.0],
+            PT.H_NET_A: [2.0, 2.0],
+            PT.H_NET_HOT: [1.0, 1.0],
+            PT.H_NET_COLD: [2.0, 2.0],
+        }
+    )
+    res = SimpleNamespace(
+        hpr_hot_streams=StreamCollection(),
+        hpr_cold_streams=StreamCollection(),
+        amb_streams=ambient_streams,
+    )
+
+    out = hp._calc_hpr_cascade(
+        pt,
+        res,
+        is_T_vals_shifted=True,
+        is_heat_pumping=False,
+        period_idx=5,
+    )
+
+    assert "period_idx" in calls["grid"][0]
+    assert "period_idx" not in calls["grid"][1]
+    assert "period_idx" in calls["air"][0]
+    assert "period_idx" not in calls["air"][1]
+    assert "period_idx" in calls["utility"][0]
+    assert "period_idx" not in calls["utility"][1]
+    np.testing.assert_allclose(out[PT.H_NET_RFRG], np.array([3.0, -3.0]))
+    np.testing.assert_allclose(out[PT.H_HOT_RFRG], np.array([0.0, -3.0]))
+    np.testing.assert_allclose(out[PT.H_COLD_RFRG], np.array([3.0, 0.0]))
 
 
 def test_hpr_handler_registry_includes_brayton():

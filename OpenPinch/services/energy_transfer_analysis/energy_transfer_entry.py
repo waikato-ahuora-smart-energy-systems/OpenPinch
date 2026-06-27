@@ -381,9 +381,10 @@ def _compile_temperature_intervals(
     arrays = [_as_float_array(record["pt"][PT.T]) for record in source_records]
     if base_pt is not None:
         arrays.append(_as_float_array(base_pt[PT.T]))
-    temperatures = np.concatenate([array for array in arrays if array.size > 0])
-    if temperatures.size == 0:
+    non_empty_temperature_arrays = [array for array in arrays if array.size > 0]
+    if not non_empty_temperature_arrays:
         return np.array([], dtype=float)
+    temperatures = np.concatenate(non_empty_temperature_arrays)
     rounded = np.round(temperatures, _decimal_places())
     unique = np.unique(rounded)
     return np.sort(unique)[::-1]

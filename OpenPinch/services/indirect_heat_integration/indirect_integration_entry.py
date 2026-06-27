@@ -15,7 +15,6 @@ import numpy as np
 from ...classes.problem_table import ProblemTable
 from ...classes.stream_collection import StreamCollection
 from ...classes.zone import Zone
-from ...lib.config import tol
 from ...lib.enums import GT, PT, TT
 from ...lib.problem_table_types import ProblemTableUpdateKwargs
 from ...lib.schemas.targets import TotalProcessTarget, TotalSiteTarget
@@ -43,7 +42,7 @@ def compute_total_subzone_utility_targets(
     # Sum targets from subzones
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
-    utility_cost = num_units = area = 0.0
+    utility_cost = 0.0
 
     hot_utilities = deepcopy(zone.hot_utilities).set_common_stream_attribute(
         attr_name="heat_flow", value=0.0, idx=idx
@@ -74,11 +73,6 @@ def compute_total_subzone_utility_targets(
                 idx=idx,
             )
 
-        if area > tol:
-            num_units += t.num_units
-            area += t.area
-            # capital_cost = t.capital_cost
-
     heat_recovery_limit = zone.targets[TT.DI.value].heat_recovery_limit
     output = {
         "zone_name": zone.name,
@@ -106,7 +100,7 @@ def compute_total_subzone_utility_targets(
 def compute_indirect_integration_targets(
     zone: Zone,
     args: dict | None = None,
-) -> TotalSiteTarget:
+) -> TotalSiteTarget | None:
     """Compute indirect integration targets for an aggregated zone.
 
     The routine assumes the relevant child zones have already been solved for
@@ -196,17 +190,17 @@ def compute_indirect_integration_targets(
 def _match_utility_gen_and_use_at_same_level(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> Tuple[StreamCollection, StreamCollection]:
     for u_h in hot_utilities:
         for u_c in cold_utilities:
             if (
-                abs((u_h.t_supply[idx] - u_c.t_target[idx])) < 1
-                and abs((u_h.t_target[idx] - u_c.t_supply[idx])) < 1
+                abs((u_h.t_supply[period_idx] - u_c.t_target[period_idx])) < 1
+                and abs((u_h.t_target[period_idx] - u_c.t_supply[period_idx])) < 1
             ):
-                Q = min(u_h.heat_flow[idx], u_c.heat_flow[idx])
-                u_h.heat_flow[idx] -= Q
-                u_c.heat_flow[idx] -= Q
+                Q = min(u_h.heat_flow[period_idx], u_c.heat_flow[period_idx])
+                u_h.heat_flow[period_idx] -= Q
+                u_c.heat_flow[period_idx] -= Q
     return hot_utilities, cold_utilities
 
 

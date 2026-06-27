@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
@@ -15,17 +16,45 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from OpenPinch import PinchProblem
 from OpenPinch.classes.heat_exchanger import HeatExchangerKind
+from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib.config import tol
+from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisTask
+from OpenPinch.services.heat_exchanger_network_synthesis.common.errors import (
+    WorkflowContractError,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution import (
+    executor as executor_module,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.executor import (
     LocalSynthesisExecutor,
+    _branch_breadth,
+    _build_and_solve_root_task,
+    _failed_task_outcome,
+    _legacy_pdm_stage_selection,
+    _optional_int,
+    _pathway_evolution_options,
+    _process_pool,
+    _solve_built_task,
+    _solver_options_for_task,
+    _solver_status,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
     workflow_settings_from_problem,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
+    arrays as arrays_module,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import backend
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
+    extraction as extraction_module,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
+    pinch_design_decomposition as pdm_decomposition,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     PreparedSolverArrays,
     problem_to_solver_arrays,
@@ -136,6 +165,32 @@ def test_pyomo_solver_configuration_reports_missing_binary_before_factory_import
         backend.require_solver_backend("couenne")
 
 
+def test_solver_backend_rejects_unsupported_solver_name() -> None:
+    with pytest.raises(MissingSynthesisSolverError, match="Unsupported.*not-real"):
+        backend.require_solver_backend("not-real")
+
+
+def test_default_process_pool_uses_interpreter_start_method(monkeypatch) -> None:
+    captured_kwargs = {}
+    fake_pool = object()
+
+    def fake_process_pool_executor(**kwargs):
+        captured_kwargs.update(kwargs)
+        return fake_pool
+
+    monkeypatch.setattr(
+        "OpenPinch.services.heat_exchanger_network_synthesis.common.execution."
+        "executor.ProcessPoolExecutor",
+        fake_process_pool_executor,
+    )
+
+    pool = _process_pool(3)
+
+    assert pool is fake_pool
+    assert captured_kwargs == {"max_workers": 3}
+    assert "mp_context" not in captured_kwargs
+
+
 def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> None:
     calls = []
 
@@ -156,6 +211,72 @@ def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> No
     assert model.options.RTOL == 1e-2
     assert model.options.OTOL == 1e-2
     assert calls == ["gekko"]
+
+
+def test_gekko_solver_configuration_merges_ipopt_and_apopt_options(monkeypatch):
+    monkeypatch.setattr(
+        backend,
+        "require_synthesis_dependency",
+        lambda *_args, **_kwargs: object(),
+    )
+
+    ipopt_model = _FakeGekkoModel()
+    ipopt_run = backend.configure_gekko_solver(
+        ipopt_model,
+        "ipopt-GEKKO",
+        solver_options=["max_iter 20", "# ignored", "warm_start"],
+    )
+
+    assert ipopt_run.extension == 0
+    assert ipopt_run.solver_options["max_iter"] == "20"
+    assert ipopt_run.solver_options["warm_start"] == ""
+    assert "tol 1e-3" in ipopt_model.solver_options
+    assert "max_iter 20" in ipopt_model.solver_options
+    assert "warm_start" in ipopt_model.solver_options
+
+    apopt_model = _FakeGekkoModel()
+    apopt_run = backend.configure_gekko_solver(
+        apopt_model,
+        "apopt",
+        solver_options={
+            "minlp_maximum_iterations": 4,
+            "skip_none": None,
+            "use_warm_start": True,
+        },
+    )
+
+    assert apopt_run.solver_options == {
+        "minlp_maximum_iterations": 4,
+        "use_warm_start": True,
+    }
+    assert "use_warm_start yes" in apopt_model.solver_options
+
+
+def test_gekko_solve_suppresses_known_numpy_array_copy_warning_only() -> None:
+    class WarningGekkoModel(_FakeGekkoModel):
+        def solve(self, *, disp: bool = False, debug: int = 0) -> None:
+            warnings.warn_explicit(
+                "__array__ implementation doesn't accept a copy keyword, so "
+                "passing copy=False failed. __array__ must implement 'dtype' "
+                "and 'copy' keyword arguments.",
+                DeprecationWarning,
+                filename="/site-packages/gekko/gk_write_files.py",
+                lineno=159,
+                module="gekko.gk_write_files",
+            )
+            warnings.warn("unrelated solver warning", RuntimeWarning, stacklevel=2)
+            super().solve(disp=disp, debug=debug)
+
+    model = WarningGekkoModel()
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        run = backend.solve_gekko_model(model, solver_name="apopt")
+
+    assert run.failure_reason is None
+    assert [(warning.category, str(warning.message)) for warning in caught] == [
+        (RuntimeWarning, "unrelated solver warning")
+    ]
 
 
 def test_user_couenne_options_are_written_to_model_run_directory(
@@ -253,6 +374,121 @@ def test_couenne_without_user_options_matches_source_no_option_file(
     assert model.cwd_during_solve == original_cwd
     assert solve_run.option_file is None
     assert solve_run.solver_options is None
+
+
+def test_ipopt_pyomo_option_file_uses_factory_availability_fallback(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def present_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        del purpose
+        return f"/usr/local/bin/{binary_name}"
+
+    class _FallbackSolverFactory:
+        def available(self, *args, **kwargs) -> bool:
+            if kwargs:
+                raise TypeError("keyword form unsupported")
+            assert args == (False,)
+            return True
+
+    def present_dependency(import_name: str, **_kwargs):
+        if import_name == "pyomo.environ":
+            return SimpleNamespace(SolverFactory=lambda _name: _FallbackSolverFactory())
+        return object()
+
+    monkeypatch.setattr(backend, "require_solver_binary", present_binary)
+    monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
+    model = _FakeGekkoModel(tmp_path / "gekko-run")
+
+    run = backend.configure_gekko_solver(
+        model,
+        "ipopt-pyomo",
+        solver_options=["tol 1e-6"],
+    )
+
+    option_file = tmp_path / "gekko-run" / "ipopt.opt"
+    assert run.option_file == str(option_file)
+    assert run.solver_options == {"tol": "1e-6"}
+    assert option_file.read_text(encoding="utf-8") == "tol 1e-6\n"
+
+
+def test_pyomo_solver_configuration_reports_unavailable_factory(monkeypatch) -> None:
+    def present_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        del purpose
+        return f"/usr/local/bin/{binary_name}"
+
+    class _UnavailableSolverFactory:
+        def available(self, exception_flag: bool = False) -> bool:
+            del exception_flag
+            return False
+
+    def present_dependency(import_name: str, **_kwargs):
+        if import_name == "pyomo.environ":
+            return SimpleNamespace(
+                SolverFactory=lambda _name: _UnavailableSolverFactory()
+            )
+        return object()
+
+    monkeypatch.setattr(backend, "require_solver_binary", present_binary)
+    monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
+
+    with pytest.raises(MissingSynthesisSolverError, match="not available"):
+        backend.configure_gekko_solver(_FakeGekkoModel(), "ipopt-pyomo")
+
+
+def test_solver_backend_solve_reports_exceptions_and_non_success_status():
+    class FailingModel(_FakeGekkoModel):
+        def solve(self, *, disp: bool = False, debug: int = 0) -> None:
+            del disp, debug
+            self.options.SOLVESTATUS = None
+            self.options.objfcnval = "not-a-number"
+            raise RuntimeError("solver exploded")
+
+    failed_run = backend.solve_gekko_model(FailingModel(), solver_name="apopt")
+
+    assert failed_run.failure_reason == "solver exploded"
+    assert failed_run.objective_value is None
+
+    class StatusOnlyFailureModel(_FakeGekkoModel):
+        def solve(self, *, disp: bool = False, debug: int = 0) -> None:
+            del disp, debug
+            self.options.SOLVESTATUS = 2
+            self.options.objfcnval = 9.5
+
+    status_run = backend.solve_gekko_model(
+        StatusOnlyFailureModel(),
+        solver_name="apopt",
+    )
+
+    assert status_run.failure_reason == "solver status 2"
+    assert status_run.objective_value == 9.5
+
+
+def test_solver_backend_low_level_option_helpers_cover_edge_cases(monkeypatch):
+    assert backend._as_float_or_none(None) is None
+    assert backend._as_float_or_none("bad") is None
+    assert backend._normalise_solver_options(["", "# comment", "plain"]) == {
+        "plain": ""
+    }
+
+    with pytest.raises(ValueError, match="mapping or a list"):
+        backend._normalise_solver_options("tol 1e-6")
+
+    with pytest.raises(RuntimeError, match="does not expose a run path"):
+        backend._write_solver_option_file(
+            _FakeGekkoModel(),
+            "missing.opt",
+            {"tol": "1e-6"},
+        )
+
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _solver_name: None)
+    model = _FakeGekkoModel()
+    model.options.SOLVER_EXTENSION = "legacy"
+
+    run = backend.configure_gekko_solver(model, "custom")
+
+    assert run.extension == "legacy"
+    assert model.options.SOLVER == "custom"
 
 
 def test_internal_problem_runs_stage_reduction_before_evolution(monkeypatch) -> None:
@@ -487,6 +723,112 @@ def test_solver_arrays_represent_single_state_as_one_state_row() -> None:
     assert arrays.arrays["T_c_in_period"].shape[0] == 1
     assert "T_h_in" not in arrays.arrays
     assert "T_c_in" not in arrays.arrays
+
+
+def test_solver_arrays_serialise_shapes_and_reject_invalid_entry_points() -> None:
+    arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
+
+    assert arrays.array_shapes["T_h_in_period"] == [1, 2]
+    payload = arrays.to_json_dict()
+    assert payload["array_shapes"]["T_h_in_period"] == [1, 2]
+    assert payload["arrays"]["period_ids"] == ["0"]
+
+    with pytest.raises(TypeError, match="prepared PinchProblem"):
+        problem_to_solver_arrays({"raw": "payload"}, 14.0)
+
+    unprepared = PinchProblem.__new__(PinchProblem)
+    unprepared._master_zone = None
+    with pytest.raises(RuntimeError, match="prepare_problem"):
+        problem_to_solver_arrays(unprepared, 14.0)
+
+    with pytest.raises(ValueError, match="finite and positive"):
+        problem_to_solver_arrays(_four_stream_problem(), 0.0)
+
+
+def test_solver_arrays_reject_missing_stream_and_utility_collections() -> None:
+    missing_hot = _four_stream_problem()
+    missing_hot.master_zone.hot_streams._streams = {}
+    with pytest.raises(ValueError, match="hot and cold streams"):
+        problem_to_solver_arrays(missing_hot, 14.0)
+
+    missing_hot_utility = _four_stream_problem()
+    missing_hot_utility.master_zone.hot_utilities._streams = {}
+    with pytest.raises(ValueError, match="hot and cold utilities"):
+        problem_to_solver_arrays(missing_hot_utility, 14.0)
+
+
+def test_solver_array_private_helpers_cover_period_and_value_edges() -> None:
+    assert arrays_module._period_ids_and_weights(
+        SimpleNamespace(period_ids={"base": 0}, weights=None)
+    ) == (("base",), (1.0,))
+    with pytest.raises(ValueError, match="weight count"):
+        arrays_module._period_ids_and_weights(
+            SimpleNamespace(period_ids={"base": 0, "peak": 1}, weights=[1.0])
+        )
+    with pytest.raises(ValueError, match="at least one operating period"):
+        arrays_module._period_ids_and_weights(
+            SimpleNamespace(period_ids=_TruthyEmptyMapping(), weights=[])
+        )
+
+    assert (
+        arrays_module._temperature_contribution(
+            SimpleNamespace(dt_cont=_SinglePeriodValue(0.25)),
+            20.0,
+        )
+        == 5.0
+    )
+    assert (
+        arrays_module._stream_heat_capacity_flowrate(
+            SimpleNamespace(CP=_SinglePeriodValue(8.0)),
+            SimpleNamespace(),
+        )
+        == 8.0
+    )
+
+    synthetic_utilities = arrays_module._ordered_utility_items(
+        SimpleNamespace(_validated_data=SimpleNamespace(utilities=())),
+        [
+            ("zone.HU", SimpleNamespace(name="HU")),
+            ("steam", SimpleNamespace(name="steam")),
+        ],
+    )
+    assert [key for key, _stream, _record in synthetic_utilities] == ["steam"]
+    assert arrays_module._items_in_input_order(
+        [("stream-1", SimpleNamespace(name="A"))],
+        (),
+    ) == [("stream-1", SimpleNamespace(name="A"), None)]
+    assert (
+        arrays_module._matching_item_index(
+            [("zone-a.hot-1", SimpleNamespace(name="hot-1"))],
+            SimpleNamespace(name="hot-1", zone="zone-b"),
+        )
+        == 0
+    )
+
+
+def test_solver_array_optional_value_helper_accepts_supported_shapes() -> None:
+    assert arrays_module._value(None, "K") == 0.0
+    assert arrays_module._optional_value(None, "K") is None
+    assert arrays_module._optional_value(SimpleNamespace(values=None), "K") is None
+    assert arrays_module._optional_value(SimpleNamespace(values=[3.5]), "K") == 3.5
+    assert (
+        arrays_module._optional_value(
+            SimpleNamespace(values=[4.0], unit="kW/delta_degC"),
+            "kW/delta_degC",
+        )
+        == 4.0
+    )
+    assert arrays_module._optional_value(SimpleNamespace(value=None), "K") is None
+    assert arrays_module._optional_value(SimpleNamespace(value=[5.0]), "K") == 5.0
+    assert (
+        arrays_module._optional_value(
+            SimpleNamespace(value=[6.0], unit="K"),
+            "K",
+        )
+        == 6.0
+    )
+    assert arrays_module._optional_value([7.0], "K") == 7.0
+    assert arrays_module._optional_value(8.0, "K") == 8.0
 
 
 def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
@@ -783,6 +1125,316 @@ def test_local_executor_merges_task_solver_options_into_internal_problem() -> No
         "node_limit": 25,
         "time_limit": 60,
     }
+
+
+def test_local_executor_collects_missing_worker_result_and_parent_errors() -> None:
+    problem = _four_stream_problem()
+    settings = workflow_settings_from_problem(problem)
+    task = build_pinch_design_method_tasks(settings)[0]
+    executor = LocalSynthesisExecutor()
+
+    outcomes = executor._collect_outcomes((task,), (), {})
+
+    assert outcomes[0].status == "failed"
+    assert "worker did not return" in outcomes[0].error
+
+    child = task.model_copy(update={"parent_task_id": "parent-task"})
+    with pytest.raises(WorkflowContractError, match="Missing parent outcome"):
+        executor._parent_problem(child, {})
+
+    failed_parent = SimpleNamespace(status="failed")
+    with pytest.raises(WorkflowContractError, match="failed parent"):
+        executor._parent_problem(child, {"parent-task": failed_parent})
+
+    successful_parent = SimpleNamespace(status="success")
+    with pytest.raises(WorkflowContractError, match="no private solver problem"):
+        executor._parent_problem(child, {"parent-task": successful_parent})
+
+
+def test_local_executor_execute_records_build_failures(monkeypatch) -> None:
+    problem = _four_stream_problem()
+    settings = workflow_settings_from_problem(problem)
+    task = build_pinch_design_method_tasks(settings)[0]
+    executor = LocalSynthesisExecutor()
+
+    monkeypatch.setattr(
+        executor,
+        "_build_problem",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("cannot build")),
+    )
+
+    outcomes = executor.execute(
+        (task,),
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=1,
+    )
+
+    assert outcomes[0].status == "failed"
+    assert outcomes[0].error == "cannot build"
+
+
+def test_local_executor_uses_worker_pool_for_prebuilt_tasks(monkeypatch) -> None:
+    problem = _four_stream_problem()
+    settings = workflow_settings_from_problem(problem)
+    tasks = build_pinch_design_method_tasks(settings)
+    tasks = (tasks[0], tasks[0].model_copy(update={"run_id": "second-worker-task"}))
+    pool_calls = []
+
+    class FakePool:
+        def __init__(self, worker_count):
+            self.worker_count = worker_count
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def map(self, func, iterable):
+            args = tuple(iterable)
+            pool_calls.append((self.worker_count, len(args)))
+            return tuple(func(item) for item in args)
+
+    class SuccessfulInternalProblem:
+        case = SimpleNamespace(solver_run=SimpleNamespace(status="ok"))
+
+        def get_solution(self, **kwargs):
+            return SimpleNamespace(mSuccess=1)
+
+        def extract_network(self, *, run_id):
+            return HeatExchangerNetwork(run_id=run_id, total_annual_cost=1.0)
+
+    executor = LocalSynthesisExecutor(worker_pool_factory=FakePool)
+    monkeypatch.setattr(
+        executor,
+        "_build_problem",
+        lambda *args, **kwargs: SuccessfulInternalProblem(),
+    )
+
+    outcomes = executor.execute(
+        tasks,
+        problem=problem,
+        parent_outcomes={"force-local-build": SimpleNamespace(status="success")},
+        max_parallel=2,
+    )
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
+    assert pool_calls == [(2, 2)]
+
+
+def test_solve_built_task_legacy_args_failures_and_verification_paths() -> None:
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="executor-helper",
+        method="pinch_design_method",
+        approach_temperature=14.0,
+    )
+
+    class FailedInternalProblem:
+        solution_failure_reason = "solver stopped"
+
+        def get_solution(self, **kwargs):
+            self.kwargs = kwargs
+            return None
+
+    task_out, outcome, internal_problem = _solve_built_task(
+        (task, FailedInternalProblem(), False, None)
+    )
+
+    assert task_out is task
+    assert outcome.status == "failed"
+    assert outcome.error == "solver stopped"
+    assert internal_problem is None
+
+    network_task = task.model_copy(
+        update={
+            "method": "network_evolution_method",
+            "stage_count": 2,
+            "derivative_threshold": 0.5,
+        }
+    )
+
+    class InvalidSolvedCase:
+        mSuccess = 1
+
+        def verify(self):
+            return False, ["temperature"]
+
+    class InvalidInternalProblem:
+        def get_solution(self, **kwargs):
+            self.kwargs = kwargs
+            return InvalidSolvedCase()
+
+    invalid_problem = InvalidInternalProblem()
+    _task, invalid_outcome, returned_problem = _solve_built_task(
+        (
+            network_task,
+            invalid_problem,
+            False,
+            None,
+            {
+                "n_ad_branches": 2,
+                "n_rm_branches": 3,
+                "max_parallel": 4,
+                "no_improvement_patience": 5,
+            },
+        )
+    )
+
+    assert invalid_outcome.status == "failed"
+    assert invalid_outcome.error == "verification failed: temperature"
+    assert returned_problem is invalid_problem
+    assert invalid_problem.solution_failure_reason == invalid_outcome.error
+    assert invalid_problem.kwargs["evolution_n_ad_branches"] == 2
+
+
+def test_solve_built_task_success_exception_and_root_build_failure(monkeypatch) -> None:
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="executor-success",
+        method="pinch_design_method",
+        approach_temperature=14.0,
+    )
+
+    class SuccessfulInternalProblem:
+        case = SimpleNamespace(solver_run=SimpleNamespace(status="ok"))
+
+        def get_solution(self, **kwargs):
+            return SimpleNamespace(mSuccess=1)
+
+        def extract_network(self, *, run_id):
+            return HeatExchangerNetwork(run_id=run_id, total_annual_cost=42.0)
+
+    _task, outcome, internal_problem = _solve_built_task(
+        (task, SuccessfulInternalProblem(), False, None)
+    )
+
+    assert outcome.status == "success"
+    assert outcome.objective_value == pytest.approx(42.0)
+    assert outcome.solver_status == "ok"
+    assert internal_problem is not None
+
+    class BrokenInternalProblem:
+        def get_solution(self, **kwargs):
+            raise RuntimeError("solver crashed")
+
+    _task, failed_outcome, _problem = _solve_built_task(
+        (task, BrokenInternalProblem(), False, None)
+    )
+    assert failed_outcome.status == "failed"
+    assert failed_outcome.error == "solver crashed"
+
+    monkeypatch.setattr(
+        executor_module.LocalSynthesisExecutor,
+        "_build_problem",
+        lambda self, *args, **kwargs: (_ for _ in ()).throw(RuntimeError("bad build")),
+    )
+
+    _task, root_outcome, _problem = _build_and_solve_root_task(
+        (
+            task,
+            _four_stream_problem(),
+            False,
+            None,
+            {
+                "n_ad_branches": 1,
+                "n_rm_branches": 1,
+                "max_parallel": 1,
+                "no_improvement_patience": None,
+            },
+        )
+    )
+    assert root_outcome.status == "failed"
+    assert root_outcome.error == "bad build"
+
+
+def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
+    problem = _four_stream_problem(
+        options={
+            "HENS_STAGE_SELECTION": [1, 2, 3],
+            "HENS_SYNTHESIS_QUALITY_TIER": 3,
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+    task = build_pinch_design_method_tasks(settings)[0].model_copy(
+        update={"settings": {"solver_options": ["bad"]}}
+    )
+
+    with pytest.raises(WorkflowContractError, match="solver_options"):
+        _solver_options_for_task(problem, task)
+
+    assert _branch_breadth(4, tier=1) == 4
+    assert (
+        _pathway_evolution_options(
+            HeatExchangerNetworkSynthesisTask(
+                run_id="no-pathway",
+                method="network_evolution_method",
+                approach_temperature=14.0,
+                derivative_threshold=0.5,
+                stage_count=2,
+                metadata={},
+            )
+        )
+        == {}
+    )
+    assert _optional_int(None) is None
+    assert _optional_int("7") == 7
+    assert _legacy_pdm_stage_selection(problem) == "automated"
+    two_stage_problem = _four_stream_problem(options={"HENS_STAGE_SELECTION": [2, 3]})
+    assert _legacy_pdm_stage_selection(two_stage_problem) == [2, 3]
+    assert _legacy_pdm_stage_selection(
+        problem,
+        task.model_copy(update={"settings": {"stage_selection": [2, 4]}}),
+    ) == [2, 4]
+    assert _solver_status(SimpleNamespace(case=SimpleNamespace(solver_run=None))) == (
+        "success"
+    )
+    assert (
+        _solver_status(
+            SimpleNamespace(
+                case=SimpleNamespace(
+                    solver_run=SimpleNamespace(failure_reason="infeasible", status="ok")
+                )
+            )
+        )
+        == "infeasible"
+    )
+    assert _failed_task_outcome(task, "").error == (
+        "heat exchanger network synthesis task failed"
+    )
+
+
+def test_executor_stage_packing_scope_and_factory_helpers() -> None:
+    pdm_problem = _four_stream_problem(options={"HENS_STAGE_PACKING": "pdm"})
+    tdm_problem = _four_stream_problem(options={"HENS_STAGE_PACKING": "tdm"})
+    auto_problem = _four_stream_problem(options={"HENS_STAGE_PACKING": "auto"})
+    settings = workflow_settings_from_problem(pdm_problem)
+    pdm_task = build_pinch_design_method_tasks(settings)[0]
+    tdm_task = HeatExchangerNetworkSynthesisTask(
+        run_id="tdm-stage-packed",
+        method="thermal_derivative_method",
+        approach_temperature=14.0,
+        derivative_threshold=0.5,
+        stage_count=2,
+    )
+
+    pdm_factories = LocalSynthesisExecutor()._model_factories_for_task(
+        pdm_task,
+        pdm_problem,
+    )
+    tdm_factories = LocalSynthesisExecutor()._model_factories_for_task(
+        tdm_task,
+        tdm_problem,
+    )
+
+    assert "pinch_design_method" in pdm_factories
+    assert "stagewise" in tdm_factories
+    assert executor_module._stage_packing_scope(auto_problem) == "none"
+    assert executor_module._stage_packed_pdm_factory().__name__ == (
+        "StagePackedPinchDecompModel"
+    )
+    assert executor_module._stage_packed_stagewise_factory().__name__ == (
+        "StagePackedStageWiseModel"
+    )
 
 
 def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) -> None:
@@ -1168,6 +1820,179 @@ def _solver_arrays() -> PreparedSolverArrays:
     )
 
 
+def _pdm_target(**updates):
+    values = {
+        "hot_utility_target": 1.0,
+        "cold_utility_target": 0.0,
+        "heat_recovery_target": 10.0,
+        "hot_pinch": 100.0,
+        "cold_pinch": 90.0,
+        "shifted_pinch_temperature": 373.15,
+    }
+    values.update(updates)
+    return pdm_decomposition.PinchDesignTarget(**values)
+
+
+def _pdm_decomposition_kwargs(updates: dict | None = None) -> dict:
+    values = {
+        "pinch_location": "above",
+        "target": _pdm_target(),
+        "z_i_active": (1,),
+        "z_j_active": (1,),
+        "clipped_hot_supply_temperatures": (420.0,),
+        "clipped_hot_target_temperatures": (380.0,),
+        "clipped_cold_supply_temperatures": (300.0,),
+        "clipped_cold_target_temperatures": (360.0,),
+        "S": 1,
+        "K": 2,
+        "manual_stage_selection": None,
+        "hot_stream_identities": ("hot-1",),
+        "cold_stream_identities": ("cold-1",),
+        "unit_conventions": {"temperature": "K"},
+        "dt_cont_convention": "test",
+    }
+    values.update(updates or {})
+    return values
+
+
+class _MultiPeriodDtCont:
+    def __init__(self, period_values: list[float]) -> None:
+        self.period_values = np.asarray(period_values, dtype=float)
+        self.num_periods = len(period_values)
+
+    def to(self, unit: str) -> "_MultiPeriodDtCont":
+        assert unit == "delta_degC"
+        return self
+
+
+class _SinglePeriodValue:
+    num_periods = 1
+
+    def __init__(self, value: float) -> None:
+        self.value = value
+
+    def to(self, unit: str) -> "_SinglePeriodValue":
+        assert unit
+        return self
+
+
+class _TruthyEmptyMapping(dict):
+    def __bool__(self) -> bool:
+        return True
+
+
+class _AlgebraModel:
+    def __init__(self) -> None:
+        self.equations = []
+        self.actions = []
+
+    def Var(self, *, value=0.0, **kwargs):
+        del kwargs
+        return float(value)
+
+    def Param(self, *, value=0.0, **kwargs):
+        del kwargs
+        return float(value)
+
+    def Equation(self, expression):
+        self.equations.append(expression)
+        return expression
+
+    def Minimize(self, expression):
+        self.actions.append(("minimize", expression))
+        return expression
+
+    def Maximize(self, expression):
+        self.actions.append(("maximize", expression))
+        return expression
+
+    def sum(self, values):
+        return sum(values)
+
+
+class _ValueCell:
+    def __init__(self, value: float) -> None:
+        self.VALUE = SimpleNamespace(value=[value])
+
+    def __getitem__(self, index: int) -> float:
+        return self.VALUE.value[index]
+
+
+def _pdm_amalgamation_driver() -> PinchDecompModel:
+    driver = PinchDecompModel.__new__(PinchDecompModel)
+    driver.framework = "PDM"
+    driver.solver = "apopt"
+    driver.solver_arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
+    driver.dTmin = 14.0
+    driver.z_restriction = None
+    driver.min_dqda = 0.0
+    driver.non_isothermal_model = False
+    driver.solver_options = []
+    driver.I = 2
+    driver.J = 2
+    driver.tol = 1e-3
+    return driver
+
+
+def _pdm_side_result(
+    *,
+    hot_utility_target: float = 0.0,
+    cold_utility_target: float = 0.0,
+    m_success: int = 1,
+    tac: float = 11.0,
+    solve_time: float = 1.0,
+    stages: int = 1,
+    active: bool = True,
+) -> SimpleNamespace:
+    stream_count = 2
+    boundary_count = stages + 1
+    active_flags = [1 if active else 0] * stream_count
+
+    return SimpleNamespace(
+        HU_target=hot_utility_target,
+        CU_target=cold_utility_target,
+        mSuccess=m_success,
+        S=stages,
+        K=boundary_count,
+        TAC=tac,
+        solve_time=solve_time,
+        z_i_active=active_flags,
+        z_j_active=active_flags,
+        N_periods=1,
+        z=_value_cell_grid(1.0, stream_count, stream_count, stages),
+        Q_r_by_period=[_value_cell_grid(12.0, stream_count, stream_count, stages)],
+        theta_1_by_period=[_value_cell_grid(30.0, stream_count, stream_count, stages)],
+        theta_2_by_period=[_value_cell_grid(20.0, stream_count, stream_count, stages)],
+        T_h=[
+            [_ValueCell(500.0 - 10.0 * i - 20.0 * k) for k in range(boundary_count)]
+            for i in range(stream_count)
+        ],
+        T_c=[
+            [_ValueCell(300.0 + 10.0 * j + 20.0 * k) for k in range(boundary_count)]
+            for j in range(stream_count)
+        ],
+        Q_h=[_ValueCell(5.0 + j) for j in range(stream_count)],
+        z_hu=[_ValueCell(1.0) for _ in range(stream_count)],
+        Q_c=[_ValueCell(7.0 + i) for i in range(stream_count)],
+        z_cu=[_ValueCell(1.0) for _ in range(stream_count)],
+    )
+
+
+def _value_cell_grid(
+    base_value: float,
+    rows: int,
+    columns: int,
+    depth: int,
+) -> list[list[list[_ValueCell]]]:
+    return [
+        [
+            [_ValueCell(base_value + row + column + item) for item in range(depth)]
+            for column in range(columns)
+        ]
+        for row in range(rows)
+    ]
+
+
 class _FakeOptions:
     SOLVER_EXTENSION = None
     SOLVER = None
@@ -1410,3 +2235,507 @@ def test_extraction_uses_tolerance_for_binary_and_duty_activity() -> None:
         )
         is None
     )
+
+
+def test_extraction_handles_absent_solver_arrays_as_empty_network() -> None:
+    network = extract_heat_exchanger_network(
+        SimpleNamespace(),
+        _solver_arrays(),
+        run_id="empty",
+        method="PDM",
+    )
+
+    assert network.exchangers == ()
+    assert network.method == "PDM"
+    assert network.total_annual_cost is None
+    assert network.utility_cost is None
+    assert network.capital_cost is None
+    assert network.source_metadata["hot_stage_boundary_temperatures"] == []
+    assert network.source_metadata["cold_stage_boundary_temperatures"] == []
+
+
+def test_extraction_uses_identity_fallbacks_and_requires_utilities() -> None:
+    arrays_without_axis_maps = PreparedSolverArrays(
+        arrays={},
+        axis_maps={},
+        unit_conventions={},
+        stream_identities={
+            "hot_process_streams": ["hot-1"],
+            "cold_process_streams": ["cold-1"],
+        },
+        utility_identities={
+            "hot_utilities": ["steam"],
+            "cold_utilities": ["cooling-water"],
+        },
+        configuration={},
+        preparation={},
+    )
+
+    assert extraction_module._identities_by_axis(
+        arrays_without_axis_maps,
+        "hot_process_streams",
+    ) == ("hot-1",)
+    assert extraction_module._identities_by_axis(
+        arrays_without_axis_maps,
+        "hot_utilities",
+    ) == ("steam",)
+
+    missing_hot_utility = PreparedSolverArrays(
+        arrays={},
+        axis_maps={
+            "hot_process_streams": {"hot-1": 0},
+            "cold_process_streams": {"cold-1": 0},
+        },
+        unit_conventions={},
+        stream_identities={
+            "hot_process_streams": ["hot-1"],
+            "cold_process_streams": ["cold-1"],
+        },
+        utility_identities={"hot_utilities": [], "cold_utilities": ["cooling-water"]},
+        configuration={},
+        preparation={},
+    )
+    with pytest.raises(ValueError, match="hot utility"):
+        extract_heat_exchanger_network(
+            SimpleNamespace(),
+            missing_hot_utility,
+            run_id="missing-utility",
+        )
+
+
+def test_extraction_private_helpers_cover_temperature_and_metadata_edges() -> None:
+    calculated_hot = extraction_module._hot_recovery_outlet(
+        SimpleNamespace(T_h=[[650.0, 620.0]], f_h=[2.0]),
+        0,
+        0,
+        0,
+        10.0,
+    )
+    fallback_hot = extraction_module._hot_recovery_outlet(
+        SimpleNamespace(T_h=[[650.0, 620.0]]),
+        0,
+        0,
+        0,
+        10.0,
+    )
+    calculated_cold = extraction_module._cold_recovery_outlet(
+        SimpleNamespace(T_c=[[400.0, 450.0]], f_c=[5.0]),
+        0,
+        0,
+        0,
+        25.0,
+    )
+    fallback_cold = extraction_module._cold_recovery_outlet(
+        SimpleNamespace(T_c=[[400.0, 450.0]]),
+        0,
+        0,
+        0,
+        25.0,
+    )
+
+    assert calculated_hot == 645.0
+    assert fallback_hot == 620.0
+    assert calculated_cold == 455.0
+    assert fallback_cold == 400.0
+    assert (
+        extraction_module._capital_cost(SimpleNamespace(capital_cost_value=22.0))
+        == 22.0
+    )
+    assert extraction_module._allowed(None) is True
+    assert extraction_module._third_dimension(1.0) == 0
+    assert extraction_module._index([[1.0]], None) is None
+
+
+def test_extraction_operating_state_metadata_and_optional_float_edges() -> None:
+    solved = SimpleNamespace(
+        N_periods=2,
+        period_ids=["base", "peak"],
+        period_weights=[1.0, 3.0],
+        Q_hu_total_by_period=[1.0, 2.0],
+        Q_cu_total_by_period=[3.0, 4.0],
+        Q_r_total_by_period=[5.0, 6.0],
+        operating_cost_by_period=[7.0, 8.0],
+        weighted_operating_cost_value=9.0,
+        capital_cost_value=10.0,
+    )
+
+    network = extract_heat_exchanger_network(solved, _solver_arrays(), run_id="periods")
+
+    assert network.source_metadata["operating_periods"] == {
+        "period_ids": ["base", "peak"],
+        "period_weights": [1.0, 3.0],
+        "hot_utility_load_by_period": [1.0, 2.0],
+        "cold_utility_load_by_period": [3.0, 4.0],
+        "recovery_load_by_period": [5.0, 6.0],
+        "operating_cost_by_period": [7.0, 8.0],
+        "weighted_operating_cost": 9.0,
+        "shared_capital_cost": 10.0,
+    }
+    assert extraction_module._optional_float(object()) is None
+    assert extraction_module._optional_float({}) is None
+    assert extraction_module._optional_float(SimpleNamespace(value=["4.5"])) == 4.5
+    assert extraction_module._optional_float(SimpleNamespace(VALUE=["6.5"])) == 6.5
+
+
+def test_pdm_target_and_decomposition_validators_reject_bad_inputs() -> None:
+    with pytest.raises(ValidationError, match="pinch target values must be finite"):
+        pdm_decomposition.PinchDesignTarget(
+            hot_utility_target=np.inf,
+            cold_utility_target=0.0,
+            heat_recovery_target=10.0,
+            hot_pinch=100.0,
+            cold_pinch=None,
+            shifted_pinch_temperature=373.15,
+        )
+    with pytest.raises(ValidationError, match="pinch temperatures must be finite"):
+        pdm_decomposition.PinchDesignTarget(
+            hot_utility_target=1.0,
+            cold_utility_target=0.0,
+            heat_recovery_target=10.0,
+            hot_pinch=np.inf,
+            cold_pinch=None,
+            shifted_pinch_temperature=373.15,
+        )
+
+    target = _pdm_target(cold_pinch=None)
+    assert target.cold_pinch is None
+
+    invalid_cases = [
+        ({"z_i_active": (2,)}, "active-stream flags"),
+        ({"clipped_hot_supply_temperatures": (np.nan,)}, "clipped stream temperatures"),
+        ({"S": 0}, "stage count S"),
+        ({"K": 4}, "boundary count K"),
+        ({"z_i_active": (1, 1)}, "hot active flags"),
+        ({"z_j_active": (1, 1)}, "cold active flags"),
+    ]
+    for update, message in invalid_cases:
+        with pytest.raises(ValidationError, match=message):
+            pdm_decomposition.PinchDesignDecomposition(
+                **_pdm_decomposition_kwargs(update)
+            )
+
+
+def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None:
+    with pytest.raises(ValueError, match="pinch_location"):
+        pdm_decomposition.build_pinch_design_decomposition(
+            _four_stream_problem(),
+            14.0,
+            pinch_location="sideways",
+        )
+    with pytest.raises(ValueError, match="prepared PinchProblem"):
+        pdm_decomposition._zone_with_hen_dt_contribution(
+            SimpleNamespace(master_zone=None),
+            dTmin=14.0,
+        )
+
+    assert pdm_decomposition._stream_dt_cont_with_minimum(
+        SimpleNamespace(),
+        minimum_dt_cont=7.0,
+    ) == {"value": 7.0, "unit": "delta_degC"}
+    assert pdm_decomposition._stream_dt_cont_with_minimum(
+        SimpleNamespace(_dt_cont=_MultiPeriodDtCont([1.0, 9.0])),
+        minimum_dt_cont=7.0,
+    ) == {"values": [7.0, 9.0], "unit": "delta_degC"}
+
+    assert (
+        pdm_decomposition._shifted_pinch_temperature(
+            hot_utility_target=0.0,
+            cold_utility_target=1.0,
+            hot_pinch=80.0,
+            cold_pinch=40.0,
+        )
+        == 313.15
+    )
+    assert (
+        pdm_decomposition._shifted_pinch_temperature(
+            hot_utility_target=1.0,
+            cold_utility_target=0.0,
+            hot_pinch=80.0,
+            cold_pinch=40.0,
+        )
+        == 353.15
+    )
+    assert (
+        pdm_decomposition._shifted_pinch_temperature(
+            hot_utility_target=0.0,
+            cold_utility_target=1.0,
+            hot_pinch=80.0,
+            cold_pinch=None,
+        )
+        is None
+    )
+
+    with pytest.raises(ValueError, match="shifted pinch"):
+        pdm_decomposition._build_decomposition(
+            arrays=_solver_arrays(),
+            target=_pdm_target(shifted_pinch_temperature=None),
+            dTmin=10.0,
+            pinch_location="above",
+            stage_selection="automated",
+        )
+
+    T_h_in = np.array([410.0, 500.0])
+    T_h_out = np.array([390.0, 500.0])
+    T_c_in = np.array([390.0, 410.0])
+    T_c_out = np.array([420.0, 430.0])
+    z_i_active, z_j_active = pdm_decomposition._clip_stream_temperatures(
+        T_h_in=T_h_in,
+        T_h_out=T_h_out,
+        T_c_in=T_c_in,
+        T_c_out=T_c_out,
+        shifted_pinch_temperature=400.0,
+        dTmin=10.0,
+        pinch_location="below",
+    )
+
+    assert z_i_active == (1, 0)
+    assert z_j_active == (1, 0)
+    np.testing.assert_allclose(T_h_in, [405.0, 0.0])
+    np.testing.assert_allclose(T_h_out, [390.0, 0.0])
+    np.testing.assert_allclose(T_c_in, [390.0, 0.0])
+    np.testing.assert_allclose(T_c_out, [395.0, 0.0])
+    assert (
+        pdm_decomposition._stage_count(
+            pinch_location="below",
+            stage_selection=(2, 3),
+            z_i_active=(1,),
+            z_j_active=(1,),
+        )
+        == 3
+    )
+
+    with pytest.raises(ValueError, match="exactly two"):
+        pdm_decomposition._manual_stage_selection((1,))
+    with pytest.raises(ValueError, match="positive integers"):
+        pdm_decomposition._manual_stage_selection((1, 0))
+
+
+def test_pinch_decomp_model_calculate_pinch_rejects_mismatched_or_missing_pinch() -> (
+    None
+):
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.pinch_loc = "above"
+    model.pinch_decomposition = SimpleNamespace(
+        pinch_location="below",
+        target=_pdm_target(),
+    )
+    with pytest.raises(ValueError, match="location"):
+        model.calculate_pinch()
+
+    model.pinch_decomposition = SimpleNamespace(
+        pinch_location="above",
+        target=_pdm_target(shifted_pinch_temperature=None),
+    )
+    with pytest.raises(ValueError, match="shifted pinch"):
+        model.calculate_pinch()
+
+
+def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_stages() -> (
+    None
+):
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.pinch_loc = "below"
+    model.pinch_decomposition = SimpleNamespace(manual_stage_selection=(2, 3), S=3)
+    model.T_pinch = 400.0
+    model.dTmin = 10.0
+    model.N_periods = 1
+    model.f_h_period = np.array([[2.0, 3.0]])
+    model.f_c_period = np.array([[4.0, 5.0]])
+    model.T_h_in_period = np.array([[410.0, 500.0]])
+    model.T_h_out_period = np.array([[390.0, 500.0]])
+    model.T_c_in_period = np.array([[390.0, 410.0]])
+    model.T_c_out_period = np.array([[420.0, 430.0]])
+    model.htc_h_period = np.array([[1.0, 2.0]])
+    model.htc_c_period = np.array([[3.0, 4.0]])
+    model.htc_hu_period = np.array([[5.0]])
+    model.htc_cu_period = np.array([[6.0]])
+    model.tol = 1e-6
+    model._recovery_approach_temperature = lambda i, j, n: 10.0
+
+    model._set_multiperiod_preprocessing()
+
+    assert model.S == 3
+    assert model.K == 4
+    assert model.z_i_active == [1, 0]
+    assert model.z_j_active == [1, 0]
+    np.testing.assert_allclose(model.T_h_in_period[0], [405.0, 0.0])
+    np.testing.assert_allclose(model.T_h_out_period[0], [390.0, 0.0])
+    np.testing.assert_allclose(model.T_c_in_period[0], [390.0, 0.0])
+    np.testing.assert_allclose(model.T_c_out_period[0], [395.0, 0.0])
+    assert model.z_hu_feasible == [0, 0]
+    assert model.z_cu_feasible == [1, 0]
+
+
+def test_pinch_decomp_non_integer_superstructure_builds_param_binaries() -> None:
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.m = _AlgebraModel()
+    model.N_periods = 1
+    model.I = 1
+    model.J = 1
+    model.S = 2
+    model.K = 3
+    model.integers = False
+    model.Q_max_period = np.array([[[100.0]]])
+    model.Qtot_sh_period = np.array([[20.0]])
+    model.Qtot_sc_period = np.array([[15.0]])
+    model.z_allowed = [[[1, 0]]]
+    model.z_cu_allowed = [0]
+    model.z_hu_allowed = [1]
+    model.z_i_active = [1]
+    model.z_j_active = [1]
+    model.z_i_active_period = [[1]]
+    model.z_j_active_period = [[1]]
+    model.T_h_in_period = np.array([[500.0]])
+    model.T_h_out_period = np.array([[450.0]])
+    model.T_c_in_period = np.array([[300.0]])
+    model.T_c_out_period = np.array([[350.0]])
+    model.f_h_period = np.array([[2.0]])
+    model.f_c_period = np.array([[3.0]])
+    model._recovery_approach_temperature = lambda i, j, n: 10.0
+
+    model._set_multiperiod_stage_wise_superstructure()
+
+    assert model.z == [[[1.0, 0.0]]]
+    assert model.z_hu == [1.0]
+    assert model.z_cu == [0.0]
+    assert model.dqda == []
+    assert model.alpha == []
+    assert model.m.equations
+
+
+@pytest.mark.parametrize(
+    "goal, expected_action",
+    [
+        ("total utility", "minimize"),
+        ("heat recovery", "maximize"),
+        ("min units", "minimize"),
+    ],
+)
+def test_pinch_decomp_set_obj_covers_remaining_objective_modes(
+    goal: str,
+    expected_action: str,
+) -> None:
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.m = _AlgebraModel()
+    model.minimisation_goal = goal
+    model.N_periods = 1
+    model.I = 1
+    model.J = 1
+    model.S = 1
+    model.Q_h_by_period = [[2.0]]
+    model.Q_c_by_period = [[3.0]]
+    model.Q_r_by_period = [[[[4.0]]]]
+    model.z = [[[1.0]]]
+    model._weighted_state_average = lambda values: sum(values) / len(values)
+
+    model.set_obj()
+
+    assert model.m.actions[-1][0] == expected_action
+
+
+def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_shapes() -> (
+    None
+):
+    failed = PinchDecompModel.__new__(PinchDecompModel)
+    failed.mSuccess = 0
+
+    assert failed.get_post_process() is None
+
+    source = SimpleNamespace(
+        N_periods=1,
+        z=[[[_ValueCell(1.0)]]],
+        Q_r_by_period=[[[[_ValueCell(12.0)]]]],
+        theta_1_by_period=[[[[_ValueCell(30.0)]]]],
+        theta_2_by_period=[[[[_ValueCell(20.0)]]]],
+    )
+    target = SimpleNamespace(
+        N_periods=1,
+        z=[[[_ValueCell(0.0)]]],
+        Q_r_by_period=[[[[_ValueCell(0.0)]]]],
+        theta_1_by_period=[[[[_ValueCell(0.0)]]]],
+        theta_2_by_period=[[[[_ValueCell(0.0)]]]],
+    )
+    copier = PinchDecompModel.__new__(PinchDecompModel)
+
+    copier._copy_recovery_match(target, source, 0, 0, 0, 0)
+
+    assert target.z[0][0][0][0] == 1.0
+    assert target.Q_r_by_period[0][0][0][0][0] == 12.0
+    assert target.theta_1_by_period[0][0][0][0][0] == 30.0
+    assert target.theta_2_by_period[0][0][0][0][0] == 20.0
+
+    non_iso_source = SimpleNamespace(
+        non_isothermal_model=True,
+        z=[[[_ValueCell(1.0)]]],
+        Q_r=[[[_ValueCell(10.0)]]],
+        theta_1=[[[_ValueCell(9.0)]]],
+        theta_2=[[[_ValueCell(8.0)]]],
+        X=[[[_ValueCell(1.0)]]],
+        Y=[[[_ValueCell(0.0)]]],
+        T_h_out_x=[[[_ValueCell(470.0)]]],
+        T_c_out_y=[[[_ValueCell(330.0)]]],
+    )
+    non_iso_target = SimpleNamespace(
+        z=[[[_ValueCell(0.0)]]],
+        Q_r=[[[_ValueCell(0.0)]]],
+        theta_1=[[[_ValueCell(0.0)]]],
+        theta_2=[[[_ValueCell(0.0)]]],
+        X=[[[_ValueCell(0.0)]]],
+        Y=[[[_ValueCell(0.0)]]],
+        T_h_out_x=[[[_ValueCell(0.0)]]],
+        T_c_out_y=[[[_ValueCell(0.0)]]],
+    )
+
+    copier._copy_recovery_match(non_iso_target, non_iso_source, 0, 0, 0, 0)
+
+    assert non_iso_target.Q_r[0][0][0][0] == 10.0
+    assert non_iso_target.X[0][0][0][0] == 1.0
+    assert non_iso_target.Y[0][0][0][0] == 0.0
+    assert non_iso_target.T_h_out_x[0][0][0][0] == 470.0
+    assert non_iso_target.T_c_out_y[0][0][0][0] == 330.0
+
+
+def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> None:
+    driver = _pdm_amalgamation_driver()
+
+    with pytest.raises(ValueError, match="Pinch Decomposition failed"):
+        driver.amalgamate_networks(
+            above_case=_pdm_side_result(hot_utility_target=1.0, m_success=0),
+            below_case=_pdm_side_result(),
+        )
+
+    above_only = driver.amalgamate_networks(
+        above_case=_pdm_side_result(hot_utility_target=1.0, active=False),
+        below_case=_pdm_side_result(),
+    )
+    assert above_only.S == 1
+    assert above_only.K == 2
+    assert above_only.mSuccess == 1
+    assert above_only.minimisation_goal == "hot utility"
+    assert above_only.z_allowed[0][0] == [1]
+
+    below_only = driver.amalgamate_networks(
+        above_case=_pdm_side_result(),
+        below_case=_pdm_side_result(cold_utility_target=1.0, active=False),
+    )
+    assert below_only.S == 1
+    assert below_only.K == 2
+    assert below_only.mSuccess == 1
+    assert below_only.minimisation_goal == "cold utility"
+    assert below_only.z_allowed[0][0] == [1]
+
+
+def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() -> None:
+    driver = _pdm_amalgamation_driver()
+
+    amalgamated = driver.amalgamate_networks(
+        above_case=_pdm_side_result(hot_utility_target=1.0, tac=11.0, solve_time=2.0),
+        below_case=_pdm_side_result(cold_utility_target=1.0, tac=13.0, solve_time=3.0),
+    )
+
+    assert amalgamated.S == 2
+    assert amalgamated.K == 3
+    assert amalgamated.mSuccess == 1
+    assert amalgamated.TAC == 24.0
+    assert amalgamated.solve_time == 5.0
+    assert amalgamated.z_allowed[0][0] == [1, 1]

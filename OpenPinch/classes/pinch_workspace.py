@@ -20,12 +20,6 @@ from ..lib.schemas.workspace import (
     VariantInputView,
 )
 from ._problem._validation import build_validation_report
-from ._workspace.execution import (
-    WorkspaceExecutionError,
-    run_problem_workflow,
-    workflow_support_level,
-    workflow_warnings,
-)
 from ._workspace.case_inputs import (
     JsonDict,
     PathLike,
@@ -33,6 +27,12 @@ from ._workspace.case_inputs import (
     merge_case_inputs,
     normalise_case_input,
     project_name_from_case_input,
+)
+from ._workspace.execution import (
+    WorkspaceExecutionError,
+    run_problem_workflow,
+    workflow_support_level,
+    workflow_warnings,
 )
 from ._workspace.views import (
     configuration_field_metadata as _configuration_field_metadata,
@@ -336,7 +336,9 @@ class PinchWorkspace:
             return cached
 
         case_input = deepcopy(self._variant_inputs[resolved_name])
-        project_name = self.project_name or project_name_from_case_input(case_input) or "Site"
+        project_name = (
+            self.project_name or project_name_from_case_input(case_input) or "Site"
+        )
         problem = PinchProblem(source=case_input, project_name=project_name)
         if self.project_name:
             problem.project_name = self.project_name

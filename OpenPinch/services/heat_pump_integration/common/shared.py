@@ -139,14 +139,12 @@ def _merge_candidate_points(
 ) -> tuple[np.ndarray, np.ndarray]:
     candidate_blocks = []
     objective_blocks = []
-    local_minima_arr = np.asarray(local_minima_x, dtype=float)
-    if local_minima_arr.size:
-        if local_minima_arr.ndim == 1:
-            local_minima_arr = local_minima_arr.reshape(1, -1)
+    local_minima_arr = _normalise_candidate_block(local_minima_x)
+    if local_minima_arr is not None:
         candidate_blocks.append(local_minima_arr)
         objective_blocks.append(np.asarray(local_minima_f, dtype=float))
-    if x0_arr is not None and x0_arr.size:
-        x0_block = x0_arr.reshape(x0_arr.shape[0], -1)
+    x0_block = _normalise_candidate_block(x0_arr)
+    if x0_block is not None:
         candidate_blocks.append(x0_block)
         objective_blocks.append(
             np.asarray(
@@ -156,11 +154,7 @@ def _merge_candidate_points(
         )
     if not candidate_blocks:
         return np.asarray([]), np.asarray([])
-    n_cols = (
-        x0_arr.shape[1]
-        if x0_arr is not None and x0_arr.size
-        else candidate_blocks[0].shape[1]
-    )
+    n_cols = x0_block.shape[1] if x0_block is not None else candidate_blocks[0].shape[1]
     filtered_blocks = []
     filtered_objectives = []
     for block, objectives in zip(candidate_blocks, objective_blocks):
@@ -168,14 +162,26 @@ def _merge_candidate_points(
             continue
         filtered_blocks.append(block)
         filtered_objectives.append(objectives)
-    if not filtered_blocks:
-        return np.asarray([]), np.asarray([])
 
     candidate_x = np.vstack(filtered_blocks)
     candidate_f = np.concatenate(filtered_objectives)
     _, unique_idx = np.unique(candidate_x, axis=0, return_index=True)
     unique_idx = np.sort(unique_idx)
     return candidate_x[unique_idx], candidate_f[unique_idx]
+
+
+def _normalise_candidate_block(values: list | np.ndarray | None) -> np.ndarray | None:
+    if values is None:
+        return None
+
+    block = np.asarray(values, dtype=float)
+    if block.size == 0:
+        return None
+    if block.ndim == 0:
+        return block.reshape(1, 1)
+    if block.ndim == 1:
+        return block.reshape(1, -1)
+    return block.reshape(block.shape[0], -1)
 
 
 def _score_hpr_candidate_objective(

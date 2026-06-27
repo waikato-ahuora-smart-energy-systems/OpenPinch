@@ -1,0 +1,48 @@
+{
+  "hot_utility": {
+    "name": "Steam",
+    "t_supply": 200.0,
+    "t_target": 180.0,
+    "heat_flow": 1000.0,
+    "price": 100.0
+  },
+  "cold_utility": {
+    "name": "Cooling water",
+    "t_supply": 25.0,
+    "t_target": 35.0,
+    "heat_flow": 500.0,
+    "price": 20.0
+  },
+  "direct_target": {
+    "hot_utility_target": 1000.0,
+    "cold_utility_target": 500.0,
+    "heat_recovery_target": 2500.0,
+    "utility_cost": 110.0,
+    "degree_of_int": 0.5,
+    "hot_pinch": 120.0,
+    "cold_pinch": 110.0,
+    "work_target": 20.0,
+    "turbine_efficiency_target": 0.4,
+    "area": 42.0,
+    "num_units": 3,
+    "capital_cost": 10000.0,
+    "total_cost": 12000.0
+  },
+  "hpr_target": {
+    "hpr_cycle": "fixture-cycle",
+    "hpr_utility_total": 120.0,
+    "hpr_work": 30.0,
+    "hpr_external_utility": 40.0,
+    "hpr_ambient_hot": 10.0,
+    "hpr_ambient_cold": 5.0,
+    "hpr_cop": 4.0,
+    "hpr_eta_he": 0.5,
+    "hpr_operating_cost": 100.0,
+    "hpr_capital_cost": 200.0,
+    "hpr_annualized_capital_cost": 20.0,
+    "hpr_total_annualized_cost": 120.0,
+    "hpr_compressor_capital_cost": 80.0,
+    "hpr_heat_exchanger_capital_cost": 120.0,
+    "hpr_success": true
+  }
+}

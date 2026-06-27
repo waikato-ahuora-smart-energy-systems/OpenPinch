@@ -1,0 +1,67 @@
+{
+  "base_utilities": {
+    "hot": [
+      {
+        "name": "Steam",
+        "t_supply": 210.0,
+        "t_target": 190.0,
+        "heat_flow": 0.0,
+        "price": 90.0
+      }
+    ],
+    "cold": [
+      {
+        "name": "Cooling water",
+        "t_supply": 25.0,
+        "t_target": 35.0,
+        "heat_flow": 0.0,
+        "price": 15.0
+      }
+    ]
+  },
+  "subzone_targets": [
+    {
+      "name": "Process A",
+      "hot_utility_target": 12.0,
+      "cold_utility_target": 3.0,
+      "heat_recovery_target": 20.0,
+      "heat_recovery_limit": 40.0,
+      "utility_cost": 1.2,
+      "hot_utility_heat_flow": 12.0,
+      "cold_utility_heat_flow": 3.0
+    },
+    {
+      "name": "Process B",
+      "hot_utility_target": 8.0,
+      "cold_utility_target": 7.0,
+      "heat_recovery_target": 15.0,
+      "heat_recovery_limit": 30.0,
+      "utility_cost": 1.8,
+      "hot_utility_heat_flow": 8.0,
+      "cold_utility_heat_flow": 7.0
+    }
+  ],
+  "matching_utilities": {
+    "hot": {
+      "name": "Generated hot utility",
+      "t_supply": 150.2,
+      "t_target": 100.4,
+      "heat_flow": 5.0,
+      "price": 100.0
+    },
+    "cold": {
+      "name": "Used cold utility",
+      "t_supply": 100.0,
+      "t_target": 150.0,
+      "heat_flow": 3.0,
+      "price": 20.0
+    },
+    "unmatched_cold": {
+      "name": "Different level cold utility",
+      "t_supply": 60.0,
+      "t_target": 90.0,
+      "heat_flow": 2.0,
+      "price": 20.0
+    }
+  }
+}

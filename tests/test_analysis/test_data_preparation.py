@@ -54,6 +54,12 @@ from pydantic import ValidationError
 
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.services.input_data_processing._canonicalization import (
+    _apply_zone_dt_cont_multiplier,
+    _build_zone_config,
+    _resolve_zone_dt_cont_multiplier,
+    _rewrite_stream_zones_from_tree,
+)
 from OpenPinch.services.input_data_processing.data_preparation import (
     _assign_process_streams_to_subzones,
     _build_prepared_stream_collection,
@@ -1727,6 +1733,98 @@ def test_generic_zone_tree_defaults_by_depth():
     assert normalised.type == ZT.S.value
     assert normalised.children[0].type == ZT.P.value
     assert normalised.children[0].children[0].type == ZT.O.value
+
+
+def test_canonical_zone_helpers_reject_invalid_config_and_multiplier_edges():
+    with pytest.raises(TypeError, match="options must be"):
+        _build_zone_config(
+            options=object(),
+            top_zone_name="Site",
+            top_zone_identifier="Site",
+        )
+    with pytest.raises(ValueError, match="dt_cont_multiplier"):
+        _resolve_zone_dt_cont_multiplier(
+            ZoneTreeSchema.model_construct(
+                name="Bad",
+                type="Zone",
+                dt_cont_multiplier=-1.0,
+                children=None,
+            ),
+            inherited_multiplier=None,
+        )
+
+    blank_type_name, blank_type = _get_validated_zone_info(
+        ZoneTreeSchema(name="Blank", type=" "),
+        project_name="Project",
+        depth=0,
+    )
+    assert blank_type_name == "Blank"
+    assert blank_type == ZT.S.value
+
+
+def test_apply_zone_dt_cont_multiplier_uses_parent_when_child_zone_missing():
+    parent_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    zone_tree = ZoneTreeSchema(
+        name="Site",
+        type="Zone",
+        children=[
+            ZoneTreeSchema(
+                name="MissingChild",
+                type="Zone",
+                dt_cont_multiplier=2.0,
+            )
+        ],
+    )
+
+    out = _apply_zone_dt_cont_multiplier(parent_zone, zone_tree)
+
+    assert out is parent_zone
+    assert parent_zone.dt_cont_multiplier == pytest.approx(2.0)
+
+
+def test_rewrite_stream_zones_handles_empty_labels_and_root_name_collisions():
+    tree_without_children = ZoneTreeSchema(name="Site", type="Zone", children=None)
+    missing_zone = make_stream(zone="Area")
+    missing_zone.zone = None
+    blank_zone = make_stream(zone=" / ")
+
+    _rewrite_stream_zones_from_tree(
+        tree_without_children,
+        [missing_zone, blank_zone],
+    )
+
+    assert tree_without_children.children == []
+    assert missing_zone.zone is None
+    assert blank_zone.zone == " / "
+
+    collision_tree = ZoneTreeSchema(
+        name="Site",
+        type="Zone",
+        children=[ZoneTreeSchema(name="TestStream", type=ZT.P.value)],
+    )
+    site_stream = make_stream(zone="Site")
+    site_stream.name = "TestStream"
+
+    _rewrite_stream_zones_from_tree(collision_tree, [site_stream])
+
+    assert site_stream.zone == "Site/TestStream_2"
+    assert {child.name for child in collision_tree.children} == {
+        "TestStream",
+        "TestStream_2",
+    }
+
+
+def test_generated_zone_tree_handles_non_string_root_and_empty_zone_path():
+    stream = make_stream(zone="/")
+
+    normalised = _validate_zone_tree_structure(
+        None,
+        [stream],
+        top_zone_name=object(),
+    )
+
+    assert normalised.name == ZT.S.value
+    assert stream.zone == f"{ZT.S.value}/O1"
 
 
 def test_site_level_streams_get_individual_process_zones():

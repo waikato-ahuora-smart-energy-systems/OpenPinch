@@ -209,6 +209,17 @@ def test_public_design_accessor_rejects_separate_options_objects(
         problem.design.heat_exchanger_network_synthesis(options=options)  # type: ignore[arg-type]
 
 
+def test_public_design_accessor_runtime_options_include_period_id() -> None:
+    problem = _public_example_problem()
+
+    runtime_options = problem.design._runtime_options(
+        {"existing": True},
+        period_id="peak",
+    )
+
+    assert runtime_options == {"existing": True, "period_id": "peak"}
+
+
 def test_openhens_field_aliases_are_rejected_by_public_schemas() -> None:
     with pytest.raises(ValidationError):
         HeatExchangerNetworkSynthesisManifest(

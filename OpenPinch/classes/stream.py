@@ -506,13 +506,6 @@ class Stream:
             return
 
         parsed = self._coerce_to_value(value, internal_name)
-        if parsed is None:
-            setattr(self, internal_name, None)
-            self._bump_numeric_revision()
-            if update_derived:
-                self.update_derived_properties()
-            return
-
         if parsed.num_periods == 1 and self._num_periods not in (None, 0, 1):
             parsed = Value(
                 np.full(int(self._num_periods), float(parsed.value), dtype=float),
@@ -589,11 +582,9 @@ class Stream:
         if update_derived:
             self.update_derived_properties()
 
-    def _coerce_to_value(
-        self, value, attr_name: str
-    ) -> tuple[Value | None, dict[str, int] | None, np.ndarray | None]:
+    def _coerce_to_value(self, value, attr_name: str) -> Value | None:
         if value is None:
-            return None, None, None
+            return None
 
         raw_value = value
         if hasattr(raw_value, "model_dump") and not isinstance(raw_value, Mapping):
@@ -634,12 +625,6 @@ class Stream:
             self._price = Value(0.0, unit=self._VALUE_UNITS["_price"])
 
         state_size = self._period_vector_size()
-        if self._heat_flow is None:
-            zeros = np.zeros(state_size, dtype=float)
-            self._heat_flow = Value(
-                zeros if state_size > 1 else float(zeros[0]),
-                unit=self._VALUE_UNITS["_heat_flow"],
-            )
 
         t_supply_arr = self._value_array(self._t_supply, size=state_size)
         t_target_arr = self._value_array(self._t_target, size=state_size)

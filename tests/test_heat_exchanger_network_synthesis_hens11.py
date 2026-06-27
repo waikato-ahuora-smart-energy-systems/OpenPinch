@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import csv
-import importlib.util
 import json
 from dataclasses import replace
 from pathlib import Path
-from shutil import which
 from types import SimpleNamespace
 from typing import Any
 
@@ -25,6 +23,12 @@ from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settin
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     PreparedSolverArrays,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+    require_solver_binary,
+    require_synthesis_dependency,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.extraction import (
     extract_heat_exchanger_network,
@@ -1046,11 +1050,27 @@ def _assert_network_cost_recomputes(
 
 
 def _live_solver_environment_available() -> bool:
-    return (
-        all(which(binary) is not None for binary in ("couenne", "ipopt"))
-        and importlib.util.find_spec("gekko") is not None
-        and importlib.util.find_spec("pyomo.environ") is not None
-    )
+    try:
+        require_solver_binary(
+            "couenne",
+            purpose="HENS-11 live solver regression coverage",
+        )
+        require_solver_binary(
+            "ipopt",
+            purpose="HENS-11 live solver regression coverage",
+        )
+        require_synthesis_dependency(
+            "gekko",
+            purpose="HENS-11 live solver regression coverage",
+        )
+        require_synthesis_dependency(
+            "pyomo.environ",
+            package="pyomo",
+            purpose="HENS-11 live solver regression coverage",
+        )
+    except MissingSynthesisDependencyError, MissingSynthesisSolverError:
+        return False
+    return True
 
 
 def _stream_identity(stream: dict[str, Any]) -> str:

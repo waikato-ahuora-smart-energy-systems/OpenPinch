@@ -244,7 +244,9 @@ class StreamCollection:
     def _adopt_appropriate_period_context(
         self, other: "Stream", obj: "StreamCollection" | "Stream"
     ) -> None:
-        if self._num_periods >= other._num_periods:
+        self_num_periods = self._num_periods or 0
+        other_num_periods = other._num_periods or 0
+        if self_num_periods >= other_num_periods:
             obj.set_period_context(
                 period_ids=self._period_ids,
                 weights=self._weights,

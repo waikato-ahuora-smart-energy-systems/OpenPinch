@@ -214,7 +214,9 @@ def _value_like_data(value: Any) -> Any:
 def _value_magnitudes(value: Any) -> Any:
     value_data = _value_like_data(value)
     if isinstance(value_data, Value):
-        return value_data.period_values if value_data.num_periods > 1 else value_data.value
+        return (
+            value_data.period_values if value_data.num_periods > 1 else value_data.value
+        )
     if isinstance(value_data, Mapping):
         if "values" in value_data:
             return value_data.get("values")
@@ -232,7 +234,7 @@ def _ensure_value(value: Any, *, user_unit: str | None) -> Value:
     if isinstance(value_data, Value):
         if _has_explicit_unit(value_data):
             return Value(value_data)
-        return Value(value_data.to_dict(), unit=user_unit)
+        return Value(_value_magnitudes(value_data), unit=user_unit)
     if _has_explicit_unit(value_data):
         return Value(value_data)
     return Value(value_data, unit=user_unit)

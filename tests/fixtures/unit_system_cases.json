@@ -1,0 +1,30 @@
+{
+  "input_overrides": {
+    "temperature": "K",
+    "heat_flow": "MW"
+  },
+  "output_overrides": {
+    "heat_flow": "MW",
+    "percent": "%"
+  },
+  "temperature_value": {
+    "value": 298.15,
+    "unit": "K"
+  },
+  "delta_temperature_value": {
+    "value": 5.0,
+    "unit": "degC"
+  },
+  "period_value": {
+    "values": [1.0, 2.0],
+    "unit": "kW"
+  },
+  "scalar_object": {
+    "value": 12.0,
+    "unit": "kW"
+  },
+  "period_object": {
+    "values": [3.0, 6.0],
+    "unit": "kW"
+  }
+}

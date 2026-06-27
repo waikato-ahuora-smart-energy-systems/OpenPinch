@@ -277,7 +277,9 @@ class HeatExchangerNetwork(BaseModel):
             return exchanger.active
         if normalised_label is HeatExchangerNetworkLabel.MATCH_ALLOWED:
             return exchanger.match_allowed
-        raise ValueError(f"unsupported heat exchanger network label: {label!r}")
+        raise ValueError(  # pragma: no cover - all current enum labels are handled.
+            f"unsupported heat exchanger network label: {label!r}"
+        )
 
     def _sum_numeric(
         self,

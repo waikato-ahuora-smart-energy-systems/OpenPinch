@@ -1,0 +1,49 @@
+{
+  "backend_result": {
+    "obj": 1.5,
+    "utility_tot": 20.0,
+    "w_net": [1.0, 2.0],
+    "w_hpr": 1.0,
+    "w_he": 0.5,
+    "heat_recovery": 4.0,
+    "Q_ext_heat": 3.0,
+    "Q_ext_cold": 4.0,
+    "hpr_operating_cost": 100.0,
+    "hpr_capital_cost": 200.0,
+    "hpr_annualized_capital_cost": 20.0,
+    "hpr_total_annualized_cost": 120.0,
+    "hpr_compressor_capital_cost": 80.0,
+    "hpr_heat_exchanger_capital_cost": 120.0,
+    "Q_amb_hot": 5.0,
+    "Q_amb_cold": 6.0,
+    "cop_h": 3.0,
+    "eta_he": 0.5,
+    "T_cond": [90.0],
+    "T_evap": [40.0],
+    "Q_cond": [7.0],
+    "Q_evap": [8.0],
+    "Q_cond_he": [1.0],
+    "Q_evap_he": [2.0],
+    "dT_subcool": [3.0],
+    "dT_superheat": [4.0],
+    "T_comp_out": [100.0],
+    "dT_gc": [5.0],
+    "dT_comp": [6.0],
+    "Q_heat": [9.0],
+    "Q_cool": [10.0]
+  },
+  "hpr_streams": [
+    {
+      "name": "HPR hot utility",
+      "t_supply": 120.0,
+      "t_target": 80.0,
+      "heat_flow": 10.0
+    },
+    {
+      "name": "HPR cold utility",
+      "t_supply": 30.0,
+      "t_target": 60.0,
+      "heat_flow": 8.0
+    }
+  ]
+}

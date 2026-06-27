@@ -14,11 +14,11 @@ from pint.errors import DimensionalityError
 ureg = UnitRegistry()
 try:
     ureg.define("USD = [currency]")
-except Exception:
+except Exception:  # pragma: no cover - Pint may already know this unit.
     pass
 try:
     ureg.define("NZD = [currency]")
-except Exception:
+except Exception:  # pragma: no cover - Pint may already know this unit.
     pass
 set_application_registry(ureg)
 Q_ = ureg.Quantity  # type: ignore
@@ -67,14 +67,14 @@ class Value:
     """Thin wrapper around a Pint ``Quantity`` with serialization helpers."""
 
     def __init__(self, data=None, unit: str = None):
-        """Create a scalar or multiperiod value from ``data`` and an optional ``unit``."""
+        """Create a scalar or multiperiod value from data and optional unit."""
         quantity, weights = self._coerce_input(data, unit)
         self._set_storage(quantity)
         self._weights = weights
 
     @property
     def value(self):
-        """Return the scalar magnitude or per-period magnitudes for multiperiod values."""
+        """Return scalar or per-period magnitudes for multiperiod values."""
         if not self._is_period_valued():
             return self._quantity.magnitude[0]
         return self._quantity.magnitude.copy()
@@ -381,8 +381,6 @@ class Value:
         idx = int(idx)
         if idx < 0 or idx >= self.num_periods:
             raise IndexError(idx)
-        if idx >= self.num_periods:
-            idx = 0
         return idx
 
     def _is_period_valued(self) -> bool:
@@ -644,6 +642,18 @@ class Value:
             return quantity.dimensionality == Q_(1.0, _unit_object(unit)).dimensionality
         except Exception:
             return False
+
+    @staticmethod
+    def _normalise_weights(weights, *, expected_len: int) -> np.ndarray | None:
+        if weights is None:
+            return None
+        arr = np.asarray(weights, dtype=float).reshape(-1)
+        if arr.size != expected_len:
+            raise ValueError("weights length must match the number of periods.")
+        total = float(arr.sum())
+        if total > 0.0:
+            arr = arr / total
+        return arr
 
     def to_dict(self):
         """Serialise the value into a JSON-friendly dictionary."""

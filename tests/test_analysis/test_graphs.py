@@ -1,24 +1,48 @@
 """Regression tests for graphs analysis routines."""
 
+import json
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
 from OpenPinch.classes import Zone
+from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.lib import *
 from OpenPinch.services.common.graph_data import (
     _build_gcc_segments,
     _classify_segment,
+    _column_to_list,
     _create_curve,
     _create_graph_set,
     _graph_cc,
+    _make_composite_graph,
+    _make_energy_transfer_diagram_graph,
+    _make_gcc_graph,
+    _normalise_gcc_flags,
+    _normalise_graph_fields,
+    _normalise_graph_values,
+    _segment_streamloc,
+    _series_meta_from_key,
+    _should_plot_series,
+    _streamloc_colour,
     clean_composite_curve,
     clean_composite_curve_ends,
     get_output_graph_data,
 )
 from OpenPinch.services.common.graph_series_meta import GraphSeriesMeta
+
+GRAPH_FIXTURE = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "graph_data_cases.json"
+)
+
+
+def _graph_fixture(name: str):
+    return json.loads(GRAPH_FIXTURE.read_text())[name]
+
 
 # ----------------------------------------------------------------------------------------------------
 # Unit Tests for Helper Functions
@@ -46,6 +70,26 @@ def test_graph_cc_hot_curve():
 def test_graph_cc_invalid_type():
     with pytest.raises(ValueError):
         _graph_cc("CC", "Invalid", [1, 2], [3, 4])
+
+
+def test_graph_cc_uses_total_site_arrow_direction_and_aliases():
+    [segment] = _graph_cc(
+        GT.TSP.value,
+        "Hot",
+        [220.0, 180.0, 140.0],
+        [0.0, -30.0, -60.0],
+        include_arrows=True,
+    )
+
+    assert segment["title"] == "Hot CC"
+    assert segment["arrow"] == ArrowHead.START.value
+
+
+def test_graph_cc_rejects_unmapped_stream_location_enum():
+    with pytest.raises(
+        ValueError, match="Unrecognised composite curve stream location"
+    ):
+        _graph_cc("CC", StreamLoc.Unassigned, [1, 2], [3, 4])
 
 
 def test_graph_gcc_creates_segments():
@@ -90,6 +134,70 @@ def test_classify_segment_utility_profile_colours():
     assert _classify_segment(-5, is_utility_profile=True) == StreamLoc.ColdU
     assert _classify_segment(0, is_utility_profile=True) == StreamLoc.Unassigned
     assert _classify_segment(0, is_utility_profile=True) == StreamLoc.Unassigned
+
+
+def test_graph_helper_normalisation_and_series_meta_edges():
+    assert _normalise_graph_fields("H(net)") == ["H(net)"]
+    assert _normalise_graph_fields(("H(hot)", "H(cold)")) == ["H(hot)", "H(cold)"]
+    assert _normalise_graph_values("Hot", 2, "bad") == ["Hot", "Hot"]
+
+    with pytest.raises(ValueError, match="bad"):
+        _normalise_graph_values(["Hot"], 2, "bad")
+
+    class BadBool:
+        def __bool__(self):
+            raise TypeError("no bool")
+
+    with pytest.raises(ValueError, match="coercible to bool"):
+        _normalise_gcc_flags([BadBool()], 1)
+
+    meta = _series_meta_from_key("unregistered-series")
+    assert meta.label == "unregistered-series"
+    assert meta.description == "unregistered-series"
+
+
+def test_graph_column_extraction_supports_table_column_and_index_protocols():
+    table = ProblemTable({PT.T: [100.0, 80.0], PT.H_NET: [0.0, 20.0]})
+    assert _column_to_list(table, PT.H_NET) == [0.0, 20.0]
+
+    class ColumnBacked:
+        columns = ["heat"]
+        col = {"heat": np.array([1.0, 2.0])}
+
+    assert _column_to_list(ColumnBacked(), "heat") == [1.0, 2.0]
+
+    class IndexBacked:
+        def __getitem__(self, key):
+            if key != "heat":
+                raise KeyError(key)
+            return (3.0, 4.0)
+
+    assert _column_to_list(IndexBacked(), "heat") == [3.0, 4.0]
+
+    with pytest.raises(KeyError, match="Column 'missing'"):
+        _column_to_list(object(), "missing")
+
+
+def test_graph_series_and_segment_low_level_edges():
+    class FallbackValues:
+        def __array__(self, dtype=None):
+            raise TypeError("container conversion failed")
+
+        def __iter__(self):
+            return iter([None, "2.5"])
+
+    assert _should_plot_series(FallbackValues()) is True
+    assert _should_plot_series([np.nan, np.inf]) is False
+
+    assert _classify_segment(np.nan, is_utility_profile=False) == StreamLoc.Unassigned
+    assert _segment_streamloc(StreamLoc.HotU) == StreamLoc.HotU
+    assert _segment_streamloc(StreamLoc.ColdS.value) == StreamLoc.ColdS
+    assert _segment_streamloc(StreamLoc.HotS.value) == StreamLoc.HotS
+    assert _segment_streamloc(StreamLoc.HotU.value) == StreamLoc.HotU
+    assert _segment_streamloc(StreamLoc.ColdU.value) == StreamLoc.ColdU
+    assert _segment_streamloc("unknown") == StreamLoc.Unassigned
+    assert _streamloc_colour(StreamLoc.Unassigned) == LineColour.Black.value
+    assert _streamloc_colour("custom") == LineColour.Other.value
 
 
 # ----------------------------------------------------------------------------------------------------
@@ -229,6 +337,78 @@ def test_create_graph_set_includes_exergy_graphs():
     }
 
 
+def test_create_graph_set_includes_remaining_graph_families_from_static_fixture():
+    table = _graph_fixture("base_table")
+    target = SimpleNamespace(
+        name="Site/Total Site",
+        type=TT.TS.value,
+        period_id="annual",
+        zone_name="TargetZone",
+        graphs={
+            GT.SCC.value: table,
+            GT.BCC.value: table,
+            GT.GCC.value: table,
+            GT.NLP_HP.value: table,
+            GT.TSP.value: table,
+            GT.SUGCC.value: table,
+            GT.GCC_HP.value: table,
+        },
+    )
+    zone = SimpleNamespace(name="ZoneFromContext", address="Site/ZoneFromContext")
+
+    graph_set = _create_graph_set(target, zone=zone)
+
+    assert graph_set["period_id"] == "annual"
+    assert graph_set["zone_name"] == "ZoneFromContext"
+    assert graph_set["zone_address"] == "Site/ZoneFromContext"
+    assert {graph["type"] for graph in graph_set["graphs"]} == {
+        GT.SCC.value,
+        GT.BCC.value,
+        GT.GCC.value,
+        GT.NLP_HP.value,
+        GT.TSP.value,
+        GT.SUGCC.value,
+        GT.GCC_HP.value,
+    }
+    assert all(graph["segments"] for graph in graph_set["graphs"])
+
+
+def test_make_energy_transfer_diagram_uses_operation_fixture():
+    graph = _make_energy_transfer_diagram_graph(
+        "Site/Energy Transfer",
+        {GT.ETD.value: _graph_fixture("energy_transfer_diagram")},
+    )
+
+    assert graph["type"] == GT.ETD.value
+    assert len(graph["segments"]) == 2
+    assert graph["segments"][0]["series_id"] == f"{GT.ETD.value}:Reactor"
+    assert graph["segments"][1]["series_description"] == "C cascade"
+
+
+def test_make_graph_helpers_validate_mismatched_metadata_lengths():
+    table = _graph_fixture("base_table")
+
+    with pytest.raises(ValueError, match="stream_type"):
+        _make_composite_graph(
+            "Bad",
+            GT.CC.value,
+            table,
+            "Composite",
+            value_field=[PT.H_HOT, PT.H_COLD],
+            stream_type=[StreamLoc.HotS],
+        )
+
+    with pytest.raises(ValueError, match="is_utility_profile"):
+        _make_gcc_graph(
+            "Bad",
+            GT.GCC.value,
+            table,
+            "Grand",
+            value_field=[PT.H_NET, PT.H_NET_UT],
+            is_utility_profile=[False],
+        )
+
+
 # ----------------------------------------------------------------------------------------------------
 # Tests for get_output_graph_data
 # ----------------------------------------------------------------------------------------------------
@@ -305,6 +485,16 @@ def test_clean_composite_removes_redundant_points():
     y_clean, x_clean = clean_composite_curve(y_vals, x_vals)
     assert np.allclose(x_clean, [0, 30])
     assert np.allclose(y_clean, [0, 15])
+
+
+def test_clean_composite_keeps_non_linear_middle_point_when_x_values_repeat():
+    y_clean, x_clean = clean_composite_curve(
+        y_array=[100.0, 90.0, 80.0],
+        x_array=[0.0, 5.0, 0.0],
+    )
+
+    assert np.allclose(x_clean, [0.0, 5.0, 0.0])
+    assert np.allclose(y_clean, [100.0, 90.0, 80.0])
 
 
 def test_clean_composite_curve_ends_0():

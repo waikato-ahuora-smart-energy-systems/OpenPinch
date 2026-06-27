@@ -1,0 +1,103 @@
+{
+  "source_temperature_valid": {
+    "I": 1,
+    "J": 1,
+    "S": 1,
+    "non_isothermal_model": false,
+    "Q_r": [[[[10.0]]]],
+    "T_h": [[[100.0], [80.0]]],
+    "T_c": [[[40.0], [60.0]]]
+  },
+  "source_temperature_crossed": {
+    "I": 1,
+    "J": 1,
+    "S": 1,
+    "non_isothermal_model": false,
+    "Q_r": [[[[10.0]]]],
+    "T_h": [[[100.0], [50.0]]],
+    "T_c": [[[40.0], [60.0]]]
+  },
+  "source_non_isothermal_valid": {
+    "I": 1,
+    "J": 1,
+    "S": 1,
+    "non_isothermal_model": true,
+    "Q_r": [[[[10.0]]]],
+    "T_h": [[[100.0], [80.0]]],
+    "T_c": [[[40.0], [60.0]]],
+    "T_c_out_y": [[[[85.0]]]],
+    "theta_1": [[[[15.0]]]],
+    "T_h_out_x": [[[[70.0]]]],
+    "theta_2": [[[[10.0]]]]
+  },
+  "source_non_isothermal_inconsistent": {
+    "I": 1,
+    "J": 1,
+    "S": 1,
+    "non_isothermal_model": true,
+    "Q_r": [[[[10.0]]]],
+    "T_h": [[[100.0], [80.0]]],
+    "T_c": [[[40.0], [60.0]]],
+    "T_c_out_y": [[[[90.0]]]],
+    "theta_1": [[[[15.0]]]],
+    "T_h_out_x": [[[[55.0]]]],
+    "theta_2": [[[[10.0]]]]
+  },
+  "state_temperature_valid": {
+    "I": 1,
+    "J": 1,
+    "S": 1,
+    "N_periods": 1,
+    "non_isothermal_model": false,
+    "Q_r_by_period": [[[[[10.0]]]]],
+    "T_h_by_period": [[[[100.0], [80.0]]]],
+    "T_c_by_period": [[[[40.0], [60.0]]]]
+  },
+  "state_temperature_crossed": {
+    "I": 1,
+    "J": 1,
+    "S": 1,
+    "N_periods": 1,
+    "non_isothermal_model": false,
+    "Q_r_by_period": [[[[[10.0]]]]],
+    "T_h_by_period": [[[[100.0], [50.0]]]],
+    "T_c_by_period": [[[[40.0], [60.0]]]]
+  },
+  "state_non_isothermal_valid": {
+    "I": 1,
+    "J": 1,
+    "S": 1,
+    "N_periods": 1,
+    "non_isothermal_model": true,
+    "Q_r_by_period": [[[[[10.0]]]]],
+    "T_h_by_period": [[[[100.0], [80.0]]]],
+    "T_c_by_period": [[[[40.0], [60.0]]]],
+    "T_c_out_y_by_period": [[[[[85.0]]]]],
+    "theta_1_by_period": [[[[[15.0]]]]],
+    "T_h_out_x_by_period": [[[[[70.0]]]]],
+    "theta_2_by_period": [[[[[10.0]]]]]
+  },
+  "utility_cost_source": {
+    "I": 1,
+    "J": 1,
+    "hu_cost": [2.0],
+    "cu_cost": [3.0],
+    "Q_h": [[10.0]],
+    "Q_c": [[5.0]],
+    "hu_cost_total": 20.0,
+    "cu_cost_total": 15.0
+  },
+  "utility_cost_state": {
+    "I": 1,
+    "J": 1,
+    "N_periods": 2,
+    "period_weights": [1.0, 3.0],
+    "period_weight_sum": 4.0,
+    "hu_cost_period": [[2.0], [4.0]],
+    "cu_cost_period": [[3.0], [6.0]],
+    "Q_h_by_period": [[[10.0]], [[20.0]]],
+    "Q_c_by_period": [[[5.0]], [[15.0]]],
+    "hu_cost_total": 65.0,
+    "cu_cost_total": 71.25
+  }
+}

@@ -579,6 +579,85 @@ def test_cascade_normalize_q_cool_and_numeric_conversion_errors():
         hp._as_1d_numeric_array("bad")
 
 
+def test_cascade_normalize_q_heat_edge_cases_and_numeric_errors():
+    hp = CascadeVapourCompressionCycle()
+
+    assert hp._normalize_Q_heat(None, n_heat=2, n_cool=2).tolist() == [
+        0.0,
+        None,
+        0.0,
+    ]
+    assert hp._normalize_Q_heat([None], n_heat=2, n_cool=2).tolist() == [
+        0.0,
+        None,
+        0.0,
+    ]
+    assert hp._normalize_Q_heat([0.0, None, 5.0], n_heat=2, n_cool=2).tolist() == [
+        0.0,
+        None,
+        5.0,
+    ]
+
+    with pytest.raises(ValueError, match="Incompatible Q_heat input"):
+        hp._normalize_Q_heat(np.array([[1.0, 2.0]]), n_heat=2, n_cool=2)
+    with pytest.raises(ValueError, match="Only the last Q_heat value"):
+        hp._normalize_Q_heat([None, 1.0, 0.0], n_heat=2, n_cool=2)
+    with pytest.raises(ValueError, match="Q_heat values must be numeric"):
+        hp._normalize_Q_heat([0.0, object(), 0.0], n_heat=2, n_cool=2)
+
+
+def test_cascade_allocate_process_duties_covers_heat_pump_and_refrigeration_modes():
+    hp = CascadeVapourCompressionCycle()
+
+    Q_heat, Q_cool = hp._allocate_process_duties(
+        Q_heat=None,
+        Q_cool=np.array([2.0]),
+        Q_heat_base=100.0,
+        x_heat_split=np.array([0.6, 1.0]),
+        Q_heat_available=np.array([50.0, 30.0]),
+        Q_cool_base=20.0,
+        x_cool_split=np.array([1.0]),
+        Q_cool_available=np.array([10.0]),
+        is_heat_pump=True,
+    )
+
+    np.testing.assert_allclose(Q_heat, [50.0, 30.0])
+    np.testing.assert_allclose(Q_cool, [10.0, np.nan])
+    np.testing.assert_allclose(hp._allocation_penalty, [10.0, 10.0, 10.0])
+
+    Q_heat, Q_cool = hp._allocate_process_duties(
+        Q_heat=np.array([1.0]),
+        Q_cool=None,
+        Q_heat_base=30.0,
+        x_heat_split=np.array([1.0]),
+        Q_heat_available=np.array([20.0]),
+        Q_cool_base=80.0,
+        x_cool_split=np.array([0.5, 1.0]),
+        Q_cool_available=np.array([30.0, 30.0]),
+        is_heat_pump=False,
+    )
+
+    np.testing.assert_allclose(Q_heat, [20.0, np.nan])
+    np.testing.assert_allclose(Q_cool, [30.0, 30.0])
+    np.testing.assert_allclose(hp._allocation_penalty, [10.0, 10.0, 10.0])
+
+
+def test_cascade_solve_invalid_temperature_with_nonnumeric_duty_uses_default_work():
+    hp = CascadeVapourCompressionCycle()
+
+    work = hp.solve(
+        T_evap=np.array([60.0]),
+        T_cond=np.array([50.0]),
+        dtcont=0.0,
+        Q_heat=object(),
+        Q_cool=1.0,
+        is_heat_pump=False,
+    )
+
+    assert hp.solved is False
+    assert work == pytest.approx(10.0)
+
+
 def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):
     hp = CascadeVapourCompressionCycle()
     monkeypatch.setattr(hp, "_validate_T_cond_and_evap", lambda T_cond, T_evap: 0.0)

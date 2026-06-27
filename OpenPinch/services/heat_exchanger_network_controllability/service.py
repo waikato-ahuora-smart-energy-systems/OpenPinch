@@ -406,8 +406,6 @@ def _composite_score(
             continue
         weighted_sum += float(value) * weight
         total_weight += weight
-    if total_weight == 0.0:
-        return 0.0
     return float(np.clip(weighted_sum / total_weight, 0.0, 1.0))
 
 

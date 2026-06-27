@@ -180,10 +180,6 @@ def build_exergy_nlp_curves(
         t_upper = float(t_grid[i - 1])
         t_lower = float(t_grid[i])
         delta_t = t_upper - t_lower
-        if abs(delta_t) <= tol:
-            source_increments.append(0.0)
-            sink_increments.append(0.0)
-            continue
 
         tex_upper = float(tex_grid[i - 1])
         tex_lower = float(tex_grid[i])

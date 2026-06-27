@@ -3,12 +3,27 @@
 from __future__ import annotations
 
 import json
+import sys
+from enum import Enum
 from pathlib import Path
+from types import SimpleNamespace
+from typing import List
+
+import pytest
 
 from OpenPinch import PinchProblem, PinchWorkspace, config_options
+from OpenPinch.classes._workspace import views as workspace_views
+from OpenPinch.classes._workspace.execution import (
+    WorkspaceExecutionError,
+    normalise_workflow_name,
+    run_problem_workflow,
+    workflow_support_level,
+    workflow_warnings,
+)
 from OpenPinch.classes._workspace.views import summary_metric_deltas
 from OpenPinch.lib.enums import HPRcycle
 from OpenPinch.lib.schemas.workspace import (
+    ProblemTableView,
     ScenarioVariantView,
     TableView,
     ValidationReport,
@@ -217,9 +232,7 @@ def test_pinch_workspace_supports_advanced_workflows_on_real_cases():
 
     assert target.name.endswith("Direct Heat Pump")
     assert (
-        workspace.get_case_input("direct_hp_full_load")["options"][
-            "HPR_LOAD_FRACTION"
-        ]
+        workspace.get_case_input("direct_hp_full_load")["options"]["HPR_LOAD_FRACTION"]
         == 1.0
     )
     assert not case.plot.catalog().empty
@@ -248,3 +261,474 @@ def test_pinch_workspace_accepts_packaged_sample_case_name_as_source():
     assert case.project_name == "crude_preheat_train"
     assert payload["zone_tree"] is not None
     assert not summary.empty
+
+
+def test_workspace_view_helpers_handle_empty_and_mixed_inputs():
+    assert workspace_views.problem_table_views(SimpleNamespace(master_zone=None)) == []
+    assert workspace_views.summary_rows_by_target(None) == {}
+    assert workspace_views.count_changed_cells(None, None, []) is None
+    assert workspace_views.zone_tree_view("not-a-tree") == []
+    assert workspace_views.record_views({"name": "not-a-list"}, section="streams") == []
+
+    records = workspace_views.record_views(
+        ["skip-me", {"name": "Feed", "zone": ""}],
+        section="streams",
+    )
+
+    assert len(records) == 1
+    assert records[0].record_id == "streams[1]"
+    assert records[0].name == "Feed"
+    assert records[0].zone is None
+
+
+def test_workspace_problem_table_views_skip_empty_generated_tables(monkeypatch):
+    target = SimpleNamespace(pt=object(), pt_real=object())
+
+    monkeypatch.setattr(
+        workspace_views,
+        "collect_targets",
+        lambda _zone: {"Target": target},
+    )
+    monkeypatch.setattr(
+        workspace_views,
+        "problem_table_to_dataframe",
+        lambda *_args, **_kwargs: workspace_views.pd.DataFrame(),
+    )
+
+    assert (
+        workspace_views.problem_table_views(SimpleNamespace(master_zone=object())) == []
+    )
+
+
+def test_workspace_diff_helpers_count_cell_changes_and_missing_tables():
+    base_table = ProblemTableView(
+        table_id="target::shifted",
+        target_id="target",
+        target_name="Target",
+        table_kind="shifted",
+        table=TableView(
+            columns=["temperature", "duty"],
+            rows=[{"temperature": 100.0, "duty": 10.0}],
+        ),
+    )
+    variant_table = ProblemTableView(
+        table_id="target::shifted",
+        target_id="target",
+        target_name="Target",
+        table_kind="shifted",
+        table=TableView(
+            columns=["temperature", "duty"],
+            rows=[{"temperature": 105.0, "duty": 10.0}],
+        ),
+    )
+
+    assert (
+        workspace_views.count_changed_cells(
+            base_table,
+            variant_table,
+            ["temperature", "duty"],
+        )
+        == 1
+    )
+
+    base_view = ScenarioVariantView(
+        variant_name="baseline",
+        period_id=None,
+        workflow="target",
+        workflow_options={},
+        status="solved",
+        support_level="supported",
+        validation=ValidationReport(valid=True),
+        problem_tables=[base_table],
+    )
+    variant_view = ScenarioVariantView(
+        variant_name="variant",
+        period_id=None,
+        workflow="target",
+        workflow_options={},
+        status="solved",
+        support_level="supported",
+        validation=ValidationReport(valid=True),
+        problem_tables=[variant_table],
+    )
+    missing_view = ScenarioVariantView(
+        variant_name="missing",
+        period_id=None,
+        workflow="target",
+        workflow_options={},
+        status="solved",
+        support_level="supported",
+        validation=ValidationReport(valid=True),
+        problem_tables=[],
+    )
+
+    changed = workspace_views.problem_table_diffs(
+        "baseline",
+        base_view,
+        "variant",
+        variant_view,
+    )
+    missing = workspace_views.problem_table_diffs(
+        "baseline",
+        base_view,
+        "missing",
+        missing_view,
+    )
+
+    assert changed[0].changed_cells == 1
+    assert changed[0].shape_changed is False
+    assert missing[0].changed_cells is None
+    assert missing[0].shape_changed is True
+
+
+def test_workspace_scalar_metadata_helpers_cover_annotation_and_numeric_edges():
+    class Color(Enum):
+        RED = "red"
+
+    assert workspace_views.annotation_metadata(str, enum_cls=Color) == ("enum", False)
+    assert workspace_views.annotation_metadata(List[str], enum_cls=None) == (
+        "string_list",
+        True,
+    )
+    assert workspace_views.annotation_metadata(list[str], enum_cls=None) == (
+        "string_list",
+        True,
+    )
+    assert workspace_views.annotation_metadata("bool option", enum_cls=None) == (
+        "boolean",
+        False,
+    )
+    assert workspace_views.annotation_metadata("dict option", enum_cls=None) == (
+        "object",
+        False,
+    )
+    assert workspace_views.annotation_metadata(object(), enum_cls=None) == (
+        "string",
+        False,
+    )
+    assert workspace_views.numeric_delta(True, 1) is None
+    assert workspace_views.numeric_delta(2.5, 5) == 2.5
+    assert workspace_views.maybe_float(None) is None
+    assert workspace_views.maybe_float("3.5") == 3.5
+    assert workspace_views.maybe_float("not-a-number") is None
+    assert workspace_views.maybe_float(float("inf")) is None
+
+
+def test_workspace_json_safe_handles_enum_paths_and_model_like_objects():
+    class Color(Enum):
+        RED = "red"
+
+    class ItemValue:
+        def item(self):
+            return 12
+
+    class FailingItem:
+        def item(self):
+            raise RuntimeError("cannot unwrap")
+
+        def __str__(self):
+            return "failing-item"
+
+    class DumpValue:
+        def model_dump(self, *, mode):
+            return {"mode": mode, "path": Path("artifact.json")}
+
+    class DictValue:
+        def to_dict(self):
+            return {"value": 3}
+
+    class FailingDictValue:
+        def to_dict(self):
+            raise RuntimeError("cannot convert")
+
+        def __str__(self):
+            return "failing-dict"
+
+    assert workspace_views.json_safe(Color.RED) == "red"
+    assert workspace_views.json_safe(Path("data.json")) == "data.json"
+    assert workspace_views.json_safe(ItemValue()) == 12
+    assert workspace_views.json_safe(FailingItem()) == "failing-item"
+    assert workspace_views.json_safe(workspace_views.pd.Timestamp("2024-01-02")) == (
+        "2024-01-02T00:00:00"
+    )
+    assert workspace_views.json_safe(workspace_views.pd.NA) is None
+    assert workspace_views.json_safe(DumpValue()) == {
+        "mode": "python",
+        "path": "artifact.json",
+    }
+    assert workspace_views.json_safe(DictValue()) == {"value": 3}
+    assert workspace_views.json_safe(FailingDictValue()) == "failing-dict"
+
+
+def test_workspace_json_safe_ignores_isna_errors(monkeypatch):
+    class IsnaError:
+        def __str__(self):
+            return "isna-error"
+
+    def raise_isna(_value):
+        raise RuntimeError("cannot inspect")
+
+    monkeypatch.setattr(workspace_views.pd, "isna", raise_isna)
+
+    assert workspace_views.json_safe(IsnaError()) == "isna-error"
+
+
+def test_workspace_from_json_repr_and_load_none_delegation():
+    workspace = PinchWorkspace.from_json(
+        _basic_payload(),
+        baseline_name="base",
+        project_name="Demo",
+    )
+
+    loaded_case = workspace.load(None)
+    representation = repr(workspace)
+
+    assert loaded_case is workspace.case("base")
+    assert "PinchWorkspace" in representation
+    assert "active_case='base'" in representation
+    assert workspace.to_problem_json(case_name="base") == workspace.get_case_input(
+        "base"
+    )
+
+
+def test_workspace_set_variant_input_sets_active_case_when_empty():
+    workspace = PinchWorkspace()
+
+    stored = workspace.set_variant_input("scenario", _basic_payload())
+
+    assert workspace.active_case_name == "scenario"
+    assert stored["streams"]
+
+
+def test_workspace_solve_variant_reports_unexpected_errors(monkeypatch):
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    mod = sys.modules[PinchWorkspace.__module__]
+
+    monkeypatch.setattr(
+        mod,
+        "run_problem_workflow",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    view = workspace.solve_variant("baseline")
+
+    assert view.status == "error"
+    assert view.error_category == "unexpected_error"
+    assert "boom" in view.error_message
+
+
+def test_workspace_compare_variants_empty_and_base_insertion(monkeypatch):
+    workspace = PinchWorkspace()
+    with pytest.raises(ValueError, match="At least one variant"):
+        workspace.compare_variants([])
+
+    workspace._variant_inputs = {
+        "baseline": _basic_payload(),
+        "scenario": _basic_payload(),
+    }
+    solved_view = ScenarioVariantView(
+        variant_name="baseline",
+        period_id=None,
+        workflow="target",
+        workflow_options={},
+        status="solved",
+        support_level="supported",
+        validation=ValidationReport(valid=True),
+        graph_catalog=[],
+        problem_tables=[],
+    )
+    monkeypatch.setattr(workspace, "_ensure_solved_view", lambda name: solved_view)
+
+    comparison = workspace.compare_variants(["scenario"])
+
+    assert comparison.variant_names == ["baseline", "scenario"]
+
+
+def test_workspace_active_case_delegates_and_compare_to(monkeypatch, tmp_path: Path):
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    other_workspace = PinchWorkspace(_basic_payload(), project_name="Other")
+    case = workspace.case()
+    captured = {}
+
+    monkeypatch.setattr(case, "export_excel", lambda results_dir: Path(results_dir))
+    monkeypatch.setattr(
+        case,
+        "show_dashboard",
+        lambda **kwargs: captured.setdefault("dashboard", kwargs),
+    )
+
+    def fake_compare_to(other, **kwargs):
+        captured["compare"] = (other, kwargs)
+
+    monkeypatch.setattr(case, "compare_to", fake_compare_to)
+
+    assert workspace.target is not None
+    assert workspace.plot is not None
+    assert workspace.problem_data is not None
+    assert workspace.problem_filepath is None
+    assert workspace.results is None
+    assert workspace.master_zone is case.master_zone
+    assert workspace.validate().streams
+    assert workspace.export_excel(tmp_path) == tmp_path
+
+    workspace.show_dashboard(page_title="Dash")
+    assert captured["dashboard"]["page_title"] == "Dash"
+
+    workspace.compare_to(other_workspace, other_case_name="baseline")
+    assert captured["compare"][0] is other_workspace.case("baseline")
+
+    other_problem = PinchProblem(source=_basic_payload(), project_name="Other")
+    workspace.compare_to(other_problem)
+    assert captured["compare"][0] is other_problem
+
+
+def test_workspace_case_resolution_and_default_fallback_guards():
+    empty = PinchWorkspace()
+    with pytest.raises(KeyError, match="No cases"):
+        empty.case()
+
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    with pytest.raises(KeyError, match="Unknown case"):
+        workspace.case("missing")
+    with pytest.raises(KeyError, match="Unknown variant"):
+        workspace._get_variant_input("missing")
+
+    fallback = PinchWorkspace(baseline_name="baseline")
+    fallback._variant_inputs = {"scenario": _basic_payload()}
+
+    assert fallback._default_case_name() == "scenario"
+    assert fallback.active_case_name == "scenario"
+
+
+def test_workspace_ensure_solved_view_and_sync_cache_paths(monkeypatch):
+    workspace = PinchWorkspace()
+    workspace._variant_inputs = {"baseline": _basic_payload()}
+    invalid_view = ScenarioVariantView(
+        variant_name="baseline",
+        period_id=None,
+        workflow="target",
+        workflow_options={},
+        status="invalid",
+        support_level="supported",
+        validation=ValidationReport(valid=False),
+    )
+    monkeypatch.setattr(
+        workspace, "solve_variant", lambda *args, **kwargs: invalid_view
+    )
+
+    with pytest.raises(ValueError, match="not solved"):
+        workspace._ensure_solved_view("baseline")
+
+    workspace._case_cache["baseline"] = SimpleNamespace(
+        canonical_problem_json=lambda: {"changed": True}
+    )
+    workspace._cached_views["baseline"] = invalid_view
+
+    workspace._sync_case_input("baseline")
+
+    assert workspace.get_case_input("baseline", canonical=False) == {"changed": True}
+    assert "baseline" not in workspace._cached_views
+
+
+def test_workspace_execution_helpers_normalise_and_warn_for_support_levels():
+    assert normalise_workflow_name(" Direct Heat-Pump ") == "direct_heat_pump"
+    assert workflow_support_level("target") == "stable"
+    assert workflow_support_level("Pinch Design Method") == "advanced"
+    assert workflow_support_level("not real") == "unsupported"
+    assert workflow_warnings("target", "stable") == []
+    assert "advanced" in workflow_warnings("pinch_design_method", "advanced")[0]
+    assert "not a supported" in workflow_warnings("custom", "unsupported")[0]
+    assert (
+        str(
+            WorkspaceExecutionError(
+                category="workflow_runtime",
+                message="boom",
+            )
+        )
+        == "boom"
+    )
+
+
+def test_run_problem_workflow_covers_target_design_and_error_paths():
+    calls = []
+
+    class TargetAccessor:
+        def __call__(self):
+            calls.append(("target", None))
+
+        def direct_heat_integration(self, **kwargs):
+            calls.append(("direct_heat_integration", kwargs))
+
+        def failing_target(self, **_kwargs):
+            raise RuntimeError("target failure")
+
+        def raises_structured(self, **_kwargs):
+            raise WorkspaceExecutionError(
+                category="structured",
+                message="structured failure",
+            )
+
+    class DesignAccessor:
+        def pinch_design_method(self, **kwargs):
+            calls.append(("pinch_design_method", kwargs))
+
+    problem = SimpleNamespace(target=TargetAccessor(), design=DesignAccessor())
+
+    run_problem_workflow(problem, "target", {})
+    run_problem_workflow(problem, "direct_heat_integration", {"period_id": "0"})
+    run_problem_workflow(
+        problem,
+        "pinch_design_method",
+        {"solver": "fake"},
+        workspace_variant="variant_a",
+    )
+
+    assert calls == [
+        ("target", None),
+        ("target", None),
+        ("direct_heat_integration", {"period_id": "0"}),
+        (
+            "pinch_design_method",
+            {"solver": "fake", "workspace_variant": "variant_a"},
+        ),
+    ]
+
+    with pytest.raises(WorkspaceExecutionError, match="Unknown design workflow") as exc:
+        run_problem_workflow(problem, "open_hens_method", {})
+    assert exc.value.category == "unsupported_workflow"
+
+    problem.design = SimpleNamespace(
+        open_hens_method=lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("design failure")
+        )
+    )
+    with pytest.raises(WorkspaceExecutionError, match="design failure") as exc:
+        run_problem_workflow(problem, "open_hens_method", {})
+    assert exc.value.category == "workflow_runtime"
+
+    problem.design = SimpleNamespace(
+        open_hens_method=lambda **_kwargs: (_ for _ in ()).throw(
+            WorkspaceExecutionError(
+                category="structured_design",
+                message="structured design failure",
+            )
+        )
+    )
+    with pytest.raises(
+        WorkspaceExecutionError,
+        match="structured design failure",
+    ) as exc:
+        run_problem_workflow(problem, "open_hens_method", {})
+    assert exc.value.category == "structured_design"
+
+    with pytest.raises(WorkspaceExecutionError, match="Unknown workflow") as exc:
+        run_problem_workflow(problem, "not_real", {})
+    assert exc.value.category == "unsupported_workflow"
+
+    with pytest.raises(WorkspaceExecutionError, match="target failure") as exc:
+        run_problem_workflow(problem, "failing_target", {})
+    assert exc.value.category == "workflow_runtime"
+
+    with pytest.raises(WorkspaceExecutionError, match="structured failure") as exc:
+        run_problem_workflow(problem, "raises_structured", {})
+    assert exc.value.category == "structured"

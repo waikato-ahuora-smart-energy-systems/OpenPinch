@@ -76,8 +76,8 @@ from .workspace import (
     TableView,
     ValidationIssue,
     ValidationReport,
-    VariantMetricDelta,
     VariantInputView,
+    VariantMetricDelta,
     ZoneNodeView,
 )
 

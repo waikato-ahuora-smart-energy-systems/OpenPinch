@@ -114,6 +114,7 @@ dev = [
     "pylint>=4.0.5",
     "graphviz>=0.21",
     "idaes-pse>=2.11.0",
+    "coverage>=7.14.3",
 ]
 
 [tool.black]

@@ -69,6 +69,9 @@ def test_index_views_and_iloc_paths():
     _ = pt.iloc[(0, 0)]
     pt.iloc[(1, 0)] = 150.0
     assert pt.iloc[(1, 0)] == pytest.approx(150.0)
+    assert pt.iloc[(0, PT.T)] == pytest.approx(300.0)
+    pt.iloc[(1, PT.T)] = 125.0
+    assert pt.iloc[(1, PT.T)] == pytest.approx(125.0)
 
 
 def test_uninitialised_column_setters_and_len_zero():
@@ -84,6 +87,10 @@ def test_uninitialised_column_setters_and_len_zero():
 
 def test_cols_view_get_and_set_on_initialised_table():
     pt = _default_table()
+    assert pt.col[PT.T][0] == pytest.approx(200.0)
+    pt.col[PT.T] = [210.0, 110.0]
+    assert pt.col[PT.T].tolist() == [210.0, 110.0]
+
     values = pt.cols[[PT.T, PT.H_NET]]
     assert values.shape == (2, 2)
     mixed_values = pt.cols[[PT.T, PT.H_NET.value]]
@@ -114,6 +121,8 @@ def test_problem_table_getitem_setitem_and_slice_enum_paths():
 
     with pytest.raises(TypeError, match="pt\\.slice"):
         _ = pt[[PT.T, PT.H_NET]]
+    with pytest.raises(TypeError, match="single-column assignment"):
+        pt[[PT.T, PT.H_NET]] = [[1.0, 2.0], [3.0, 4.0]]
 
 
 def test_loc_accepts_enum_column_keys():
@@ -199,12 +208,31 @@ def test_equals_fallback_numeric_pair_continue_path():
 def test_to_list_and_shift_heat_cascade_branches():
     pt = _default_table()
     _ = pt.to_list(col=PT.T)
+    pt.round(0)
+    assert pt[PT.T][0] == pytest.approx(200.0)
     shifted_enum = pt.shift_heat_cascade(5.0, PT.H_NET)
     assert shifted_enum[PT.H_NET][0] == pytest.approx(15.0)
 
     idx = pt.col_index[PT.H_NET.value]
     shifted_idx = pt.shift_heat_cascade(-2.0, idx)
     assert shifted_idx[PT.H_NET][0] == pytest.approx(13.0)
+    assert pt.pinch_idx(idx) == pt.pinch_idx(PT.H_NET)
+
+
+def test_problem_table_column_label_validation_edges():
+    table = ProblemTable(
+        {"empty": np.array([np.nan]), "filled": np.array([1.0])},
+        add_default_labels=False,
+    )
+
+    assert table.columns == ["empty", "filled"]
+    assert np.isnan(table["empty"]).all()
+    with pytest.raises(TypeError, match="Column labels"):
+        ProblemTable._validate_column_name(object())
+    with pytest.raises(TypeError, match="sequences"):
+        ProblemTable._validate_column_names(object())
+    with pytest.raises(ValueError, match="Duplicate column label"):
+        ProblemTable._validate_column_mapping({PT.T: [1.0], PT.T.value: [2.0]})
 
 
 def test_insert_temperature_interval_helper_guard_paths():
@@ -338,6 +366,11 @@ def test_update_requires_T_col_for_non_empty_updates():
 
     with pytest.raises(TypeError, match="T_col"):
         pt.update({PT.H_NET: np.array([1.0, 2.0])})
+    with pytest.raises(TypeError, match="updates"):
+        pt.update(
+            ["not", "a", "dict"],
+            T_col=np.array([200.0, 100.0]),
+        )
 
 
 @pytest.mark.parametrize(
@@ -354,6 +387,16 @@ def test_update_rejects_invalid_T_col(T_col, exc_type):
         pt.update(
             {PT.H_NET: np.array([1.0, 2.0])},
             T_col=T_col,
+        )
+
+
+def test_update_rejects_non_numeric_T_col_values():
+    pt = _default_table()
+
+    with pytest.raises(ValueError, match="numeric temperature"):
+        pt.update(
+            {PT.H_NET: np.array([1.0, 2.0])},
+            T_col=np.array(["hot", "cold"], dtype=object),
         )
 
 

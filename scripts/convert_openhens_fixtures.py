@@ -372,9 +372,7 @@ def _write_adapter_snapshot(
     )
 
 
-def _stream_record(
-    row: ProcessStreamRow, parsed: ParsedOpenHENSCase
-) -> dict[str, Any]:
+def _stream_record(row: ProcessStreamRow, parsed: ParsedOpenHENSCase) -> dict[str, Any]:
     name = _unique_process_stream_name(row, parsed)
     delta_t = abs(row.supply_temperature - row.target_temperature)
     stream_record = {

@@ -43,6 +43,22 @@ def test_compute_entropic_average_temperature_in_K_zero_net_duty_uses_arithmetic
     np.testing.assert_allclose(result, 60.0 + 273.15)
 
 
+def test_carnot_helpers_return_scalars_and_arrays_for_feasible_and_infeasible_lifts():
+    assert hp_shared.calc_carnot_heat_pump_cop(350.0, 300.0, 0.5) == pytest.approx(4.0)
+    cop = hp_shared.calc_carnot_heat_pump_cop(
+        np.array([350.0, 300.0]), np.array([300.0, 300.0]), 0.5
+    )
+    np.testing.assert_allclose(cop, np.array([4.0, np.inf]))
+
+    assert hp_shared.calc_carnot_heat_engine_eta(350.0, 300.0, 0.5) == pytest.approx(
+        (1.0 - 300.0 / 350.0) * 0.5
+    )
+    eta = hp_shared.calc_carnot_heat_engine_eta(
+        np.array([350.0, 300.0]), np.array([300.0, 300.0]), 0.5
+    )
+    np.testing.assert_allclose(eta, np.array([(1.0 - 300.0 / 350.0) * 0.5, 0.0]))
+
+
 def test_prepare_latent_hp_profile_merges_hot_segments_and_sums_duty():
     T_out, Q_out = hp_streams._get_carnot_hpr_cycle_cascade_profile(
         [150.0, 149.7, 130.0], [10.0, 5.0, 20.0], dT_phase_change=1.0, is_hot=True
@@ -601,6 +617,53 @@ def test_solve_hpr_placement_reraises_optimizer_failure_without_warm_start(
         )
 
 
+@pytest.mark.parametrize(
+    ("x0_ls", "expected_shape"),
+    [
+        (1.5, (1, 1)),
+        (np.array(1.5), (1, 1)),
+        ([1.0, 2.0], (1, 2)),
+        (np.array([[1.0], [2.0]]), (2, 1)),
+    ],
+)
+def test_verify_x0_ls_normalises_candidate_shapes(x0_ls, expected_shape):
+    x0_arr = hp_shared._verify_x0_ls(x0_ls)
+
+    assert x0_arr.shape == expected_shape
+
+
+def test_solve_hpr_placement_reports_empty_optimizer_results(monkeypatch):
+    monkeypatch.setattr(
+        hp_shared,
+        "multiminima",
+        lambda **kwargs: (np.asarray([]), np.asarray([])),
+    )
+
+    with pytest.raises(ValueError, match="failed to return any local minima"):
+        hp_shared.solve_hpr_placement(
+            f_obj=lambda x, args, debug=False: HPRBackendResult.failure(),
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_base_args(),
+        )
+
+
+def test_solve_hpr_placement_reports_candidates_without_success(monkeypatch):
+    monkeypatch.setattr(
+        hp_shared,
+        "multiminima",
+        lambda **kwargs: (np.array([[0.25]]), np.array([0.0])),
+    )
+
+    with pytest.raises(ValueError, match="failed to return an optimal result"):
+        hp_shared.solve_hpr_placement(
+            f_obj=lambda x, args, debug=False: HPRBackendResult.failure(),
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_base_args(),
+        )
+
+
 def test_merge_candidate_points_scores_failed_warm_start_as_finite():
     args = _base_args()
 
@@ -627,6 +690,131 @@ def test_merge_candidate_points_scores_failed_warm_start_as_finite():
 
     assert candidate_x.shape == (2, 1)
     np.testing.assert_allclose(candidate_f, np.array([1e30, 1e30]))
+
+
+def test_merge_candidate_points_normalises_scalar_and_vector_candidates():
+    args = _base_args()
+
+    candidate_x, candidate_f = hp_shared._merge_candidate_points(
+        local_minima_x=np.array([0.2, 0.4]),
+        local_minima_f=np.array([3.0]),
+        x0_arr=None,
+        f_obj=lambda x, args, debug=False: HPRBackendResult(obj=0.0),
+        args=args,
+    )
+    np.testing.assert_allclose(candidate_x, np.array([[0.2, 0.4]]))
+    np.testing.assert_allclose(candidate_f, np.array([3.0]))
+
+    scalar_x, scalar_f = hp_shared._merge_candidate_points(
+        local_minima_x=np.array(0.5),
+        local_minima_f=np.array([2.0]),
+        x0_arr=None,
+        f_obj=lambda x, args, debug=False: HPRBackendResult(obj=0.0),
+        args=args,
+    )
+    np.testing.assert_allclose(scalar_x, np.array([[0.5]]))
+    np.testing.assert_allclose(scalar_f, np.array([2.0]))
+
+
+def test_merge_candidate_points_drops_optimizer_points_with_wrong_dimension():
+    args = _base_args()
+
+    candidate_x, candidate_f = hp_shared._merge_candidate_points(
+        local_minima_x=np.array([[0.2, 0.4]]),
+        local_minima_f=np.array([3.0]),
+        x0_arr=np.array([[0.5]]),
+        f_obj=lambda x, args, debug=False: HPRBackendResult(
+            obj=float(x[0]),
+            utility_tot=0.0,
+            w_net=0.0,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+        ),
+        args=args,
+    )
+
+    np.testing.assert_allclose(candidate_x, np.array([[0.5]]))
+    np.testing.assert_allclose(candidate_f, np.array([0.5]))
+
+
+def test_merge_candidate_points_returns_empty_when_no_candidates_exist():
+    candidate_x, candidate_f = hp_shared._merge_candidate_points(
+        local_minima_x=np.asarray([]),
+        local_minima_f=np.asarray([]),
+        x0_arr=None,
+        f_obj=lambda x, args, debug=False: HPRBackendResult(obj=0.0),
+        args=_base_args(),
+    )
+
+    assert candidate_x.size == 0
+    assert candidate_f.size == 0
+
+
+def test_evaluate_hpr_candidate_requires_backend_result():
+    with pytest.raises(TypeError, match="must return HPRBackendResult"):
+        hp_shared._evaluate_hpr_candidate(
+            lambda x, args, debug=False: {"obj": 1.0},
+            np.array([0.5]),
+            _base_args(debug=True),
+        )
+
+
+def test_build_hpr_accounting_penalises_refrigeration_external_cold():
+    Q_ext_heat, Q_ext_cold, penalty, obj = hp_shared._build_hpr_accounting(
+        work=10.0,
+        Q_ext_heat=0.0,
+        Q_ext_cold=5.0,
+        args=_base_args(
+            is_heat_pumping=False,
+            heat_to_power_ratio=0.0,
+            cold_to_power_ratio=0.0,
+            eta_penalty=0.0,
+            rho_penalty=2.0,
+        ),
+        penalise_external_cold_when_refrigerating=True,
+    )
+
+    assert Q_ext_heat == pytest.approx(0.0)
+    assert Q_ext_cold == pytest.approx(5.0)
+    assert penalty == pytest.approx(50.0)
+    assert obj == pytest.approx((10.0 + 50.0) / 200.0)
+
+
+def test_vapour_evaluator_handles_empty_evaporator_side():
+    args = _base_args(
+        T_hot=np.array([100.0, 50.0]),
+        H_hot=np.array([0.0, 0.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([100.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        bckgrd_hot_streams=StreamCollection(),
+        bckgrd_cold_streams=_sc(
+            _stream("sink", 45.0, 95.0, 100.0, is_process_stream=False)
+        ),
+        Q_heat_max=100.0,
+        Q_cool_max=0.0,
+    )
+
+    result = hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+        ),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=StreamCollection(),
+    )
+
+    assert result.Q_ext_heat == pytest.approx(100.0)
+    assert result.Q_ext_cold == pytest.approx(0.0)
+    assert result.feasibility_penalty == pytest.approx(0.0)
 
 
 def test_solve_hpr_placement_resolves_candidates_lazily(monkeypatch):

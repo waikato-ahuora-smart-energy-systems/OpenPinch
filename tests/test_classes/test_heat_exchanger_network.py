@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+import OpenPinch.services.heat_exchanger_network_controllability as controllability
+import OpenPinch.services.network_grid_diagram as grid_diagram
 from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
@@ -148,6 +150,85 @@ def test_heat_exchanger_direction_semantics_are_enforced():
         )
 
 
+def test_heat_exchanger_validators_reject_invalid_edge_values():
+    assert HeatExchanger._validate_identity(None) is None
+    assert HeatExchanger._validate_finite_temperature(None) is None
+
+    with pytest.raises(ValidationError, match="non-empty strings"):
+        _recovery_exchanger(source=" ")
+    with pytest.raises(ValidationError, match="positive integer"):
+        _recovery_exchanger(stage=0)
+    with pytest.raises(ValidationError, match="finite and non-negative"):
+        _recovery_exchanger(duty=-1.0)
+    with pytest.raises(ValidationError, match="temperatures must be finite"):
+        HeatExchanger(
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="Steam",
+            sink_stream="C1",
+            source_stream_role=HeatExchangerStreamRole.UTILITY,
+            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            duty=10.0,
+            source_inlet_temperature=float("inf"),
+        )
+    with pytest.raises(ValidationError, match="approach temperatures"):
+        HeatExchanger(
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="Steam",
+            sink_stream="C1",
+            source_stream_role=HeatExchangerStreamRole.UTILITY,
+            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            duty=10.0,
+            approach_temperatures=(-1.0,),
+        )
+    with pytest.raises(ValidationError, match="must be distinct"):
+        _recovery_exchanger(source="H1", sink="H1")
+
+
+def test_heat_exchanger_network_validators_reject_invalid_metadata():
+    with pytest.raises(ValidationError, match="non-empty strings"):
+        HeatExchangerNetwork(run_id=" ")
+    with pytest.raises(ValidationError, match="positive integer"):
+        HeatExchangerNetwork(stage_count=0)
+    with pytest.raises(ValidationError, match="finite and non-negative"):
+        HeatExchangerNetwork(objective_value=float("inf"))
+    with pytest.raises(ValidationError, match="summary metric names"):
+        HeatExchangerNetwork(summary_metrics={"": 1.0})
+    with pytest.raises(ValidationError, match="summary metric values"):
+        HeatExchangerNetwork(summary_metrics={"cost": float("inf")})
+
+
+def test_heat_exchanger_network_delegates_grid_and_controllability(monkeypatch):
+    network = HeatExchangerNetwork(exchangers=(_recovery_exchanger(),))
+    calls = {}
+
+    def fake_build_grid_diagram(target_network, **kwargs):
+        calls["grid_network"] = target_network
+        calls["grid_kwargs"] = kwargs
+        return {"grid": "ok"}
+
+    def fake_quantify(target_network, **kwargs):
+        calls["controllability_network"] = target_network
+        calls["controllability_kwargs"] = kwargs
+        return {"rank": 1}
+
+    monkeypatch.setattr(grid_diagram, "build_grid_diagram", fake_build_grid_diagram)
+    monkeypatch.setattr(
+        controllability,
+        "quantify_heat_exchanger_network_controllability",
+        fake_quantify,
+    )
+
+    assert network.build_grid_diagram(stream_line_width=7.0) == {"grid": "ok"}
+    assert network.quantify_controllability(mode="steady") == {"rank": 1}
+    assert calls["grid_network"] is network
+    assert calls["grid_kwargs"] == {
+        "stream_line_width": 7.0,
+        "temperature_scaled": False,
+    }
+    assert calls["controllability_network"] is network
+    assert calls["controllability_kwargs"] == {"mode": "steady"}
+
+
 def test_heat_exchanger_network_labelled_access_and_totals():
     network = HeatExchangerNetwork(
         exchangers=(
@@ -194,8 +275,78 @@ def test_heat_exchanger_network_labelled_access_and_totals():
     assert network.total_duty(kind=HeatExchangerKind.RECOVERY) == pytest.approx(100.0)
     assert network.total_duty(stream="H1") == pytest.approx(120.0)
     assert network.total(HEN.HOT_UTILITY_DUTY, stream="C1") == pytest.approx(30.0)
+    assert network.total(HEN.RECOVERY_AREA) == pytest.approx(25.0)
+    assert network.total_area(kind="cold_utility") == pytest.approx(5.0)
+    assert network.labelled_value(
+        HEN.RECOVERY_AREA,
+        source_stream="H1",
+        sink_stream="C1",
+        stage=1,
+    ) == pytest.approx(25.0)
+    assert network.labelled_value(
+        HEN.COLD_RECOVERY_OUTLET_TEMPERATURE,
+        source_stream="H1",
+        sink_stream="C1",
+        stage=1,
+    ) == pytest.approx(110.0)
+    assert network.labelled_value(
+        HEN.MATCH_ALLOWED,
+        source_stream="H1",
+        sink_stream="C1",
+        stage=1,
+    )
+    assert (
+        network.labelled_value(
+            HEN.RECOVERY_DUTY,
+            source_stream="missing",
+            sink_stream="C1",
+        )
+        is None
+    )
     assert len(network.exchangers_involving_stream("C1")) == 2
+    assert len(network.exchangers_involving_stream("missing")) == 0
+    assert network.exchanger_between(source_stream="missing", sink_stream="C1") is None
     assert "solver_axis_metadata" not in network.model_dump()
+
+
+def test_heat_exchanger_network_rejects_ambiguous_or_incompatible_labels():
+    duplicate_network = HeatExchangerNetwork(
+        exchangers=(
+            _recovery_exchanger("H1", "C1", stage=1, duty=100.0),
+            _recovery_exchanger("H1", "C1", stage=1, duty=80.0),
+        )
+    )
+    with pytest.raises(ValueError, match="multiple exchangers"):
+        duplicate_network.exchanger_between(source_stream="H1", sink_stream="C1")
+
+    network = HeatExchangerNetwork(exchangers=(_hot_utility_exchanger(),))
+    with pytest.raises(ValueError, match="label cannot be used"):
+        network.total(HEN.RECOVERY_DUTY, kind=HeatExchangerKind.HOT_UTILITY)
+    with pytest.raises(ValueError, match="only valid for recovery"):
+        network.labelled_value(
+            HEN.HOT_RECOVERY_OUTLET_TEMPERATURE,
+            source_stream="Steam",
+            sink_stream="C1",
+            kind=HeatExchangerKind.HOT_UTILITY,
+        )
+    with pytest.raises(ValueError, match="not a numeric total label"):
+        network.total(HEN.MATCH_ACTIVE)
+
+
+def test_heat_exchanger_network_totals_honour_active_stream_stage_and_none_values():
+    inactive = _recovery_exchanger("H2", "C2", stage=2, duty=80.0)
+    inactive.active = False
+    no_area = _recovery_exchanger("H3", "C3", stage=3, duty=10.0)
+    no_area.area = None
+    network = HeatExchangerNetwork(
+        exchangers=(_recovery_exchanger("H1", "C1"), inactive, no_area)
+    )
+
+    assert network.total_duty(active_only=True) == pytest.approx(110.0)
+    assert network.total_duty(active_only=False) == pytest.approx(190.0)
+    assert network.total_duty(stage=2, active_only=False) == pytest.approx(80.0)
+    assert network.total_duty(stream="H2", active_only=True) == pytest.approx(0.0)
+    assert network.total_area(active_only=False) == pytest.approx(50.0)
 
 
 def test_network_serialization_round_trip_preserves_public_result_fields():

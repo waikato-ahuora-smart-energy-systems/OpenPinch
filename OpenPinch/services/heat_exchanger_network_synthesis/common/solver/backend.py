@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+import warnings
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -34,6 +35,9 @@ DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
     "max_iter": 1000,
     "print_level": 5,
 }
+GEKKO_NUMPY_ARRAY_COPY_DEPRECATION = (
+    r"__array__ implementation doesn't accept a copy keyword.*"
+)
 
 
 @dataclass(frozen=True)
@@ -185,7 +189,8 @@ def solve_gekko_model(
     failure_reason = None
     try:
         with _solver_working_directory(model, extension):
-            model.solve(disp=disp, debug=debug)
+            with suppress_gekko_numpy_array_copy_deprecation():
+                model.solve(disp=disp, debug=debug)
     except Exception as exc:  # GEKKO/Pyomo exceptions become task metadata.
         failure_reason = str(exc) or exc.__class__.__name__
     solve_time = time.time() - start
@@ -205,6 +210,19 @@ def solve_gekko_model(
         solver_options=getattr(model, "_openpinch_solver_options", None),
         option_file=getattr(model, "_openpinch_solver_option_file", None),
     )
+
+
+@contextmanager
+def suppress_gekko_numpy_array_copy_deprecation():
+    """Suppress GEKKO's NumPy 2 array-copy deprecation during solver writes."""
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=GEKKO_NUMPY_ARRAY_COPY_DEPRECATION,
+            category=DeprecationWarning,
+        )
+        yield
 
 
 def _as_float_or_none(value: Any) -> float | None:

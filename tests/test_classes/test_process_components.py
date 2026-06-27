@@ -1,9 +1,42 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
 import pytest
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.services.components.process_mvr import ProcessMVRComponent
+from OpenPinch.classes.stream import Stream
+from OpenPinch.classes.value import Value
+from OpenPinch.classes.zone import Zone
+from OpenPinch.services.components import process_mvr as process_mvr_helpers
+from OpenPinch.services.components.direct_mvr import DirectGasMVRStageResult
+from OpenPinch.services.components.process_mvr import (
+    ProcessMVRComponent,
+    ProcessMVRStreamRecord,
+    StreamMembership,
+)
+
+PROCESS_MVR_EDGE_CASES = (
+    Path(__file__).parents[1] / "fixtures" / "process_mvr_edge_cases.json"
+)
+
+
+def _process_mvr_edge_cases():
+    return json.loads(PROCESS_MVR_EDGE_CASES.read_text())
+
+
+def _stage_result_from_fixture(name: str) -> DirectGasMVRStageResult:
+    payload = _process_mvr_edge_cases()
+    stage_payload = dict(payload[name])
+    profile = np.asarray(payload["stage_profile"], dtype=float)
+    return DirectGasMVRStageResult(
+        **stage_payload,
+        th_curve=profile.copy(),
+        linearised_profile=profile.copy(),
+    )
 
 
 def _problem_payload(
@@ -421,3 +454,332 @@ def test_process_mvr_solves_all_periods_for_multiperiod_streams():
     assert peak_target_by_idx.process_component_work_target == pytest.approx(
         peak_target.process_component_work_target
     )
+
+
+def test_process_mvr_work_for_zone_uses_active_state_membership_and_period_context():
+    root = Zone("Site")
+    child = Zone("Area", parent_zone=root)
+    root.add_zone(child)
+    other = Zone("Other", parent_zone=root)
+    root.add_zone(other)
+    source = Stream(
+        name="HotGas",
+        t_supply=120.0,
+        t_target=80.0,
+        p_supply=101.325,
+        heat_flow=100.0,
+        fluid_name="Air",
+        fluid_phase="gas",
+    )
+    record = ProcessMVRStreamRecord(
+        original_stream=source,
+        original_memberships=[StreamMembership(zone=child, key="Area.HotGas")],
+        replacement_streams=[],
+        replacement_memberships=[],
+        stage_results_by_period={
+            "base": [SimpleNamespace(work=3.0), SimpleNamespace(work=4.0)],
+            "peak": [SimpleNamespace(work=11.0)],
+        },
+        period_label_by_index={0: "base", 1: "peak"},
+    )
+    problem = SimpleNamespace(master_zone=root, _results="cached")
+    component = ProcessMVRComponent(
+        id="mvr_1",
+        problem=problem,
+        stream_records=[record],
+    )
+
+    assert component.work_for_zone(other, period_id="base") == 0.0
+    assert component.work_for_zone(root, period_id="base") == pytest.approx(7.0)
+    assert component.work_for_zone(child, period_idx=1) == pytest.approx(11.0)
+    assert component.work_for_zone(child, period_id="missing") == pytest.approx(7.0)
+
+    component.active = False
+
+    assert component.work_for_zone(child, period_id="base") == 0.0
+
+
+def test_process_mvr_helper_guards_and_period_value_edges():
+    source = Stream(
+        name="HotGas",
+        t_supply=120.0,
+        t_target=80.0,
+        p_supply=101.325,
+        heat_flow=100.0,
+        fluid_name="Air",
+        fluid_phase="gas",
+    )
+
+    with pytest.raises(ValueError, match="mvr_stage_t_lift or max_stage_t_sat_lift"):
+        process_mvr_helpers._resolve_stage_t_lift_alias(
+            mvr_stage_t_lift=10.0,
+            max_stage_t_sat_lift=12.0,
+            mvr_stage_pressure_ratio=None,
+        )
+    with pytest.raises(ValueError, match="source_streams is required"):
+        process_mvr_helpers._normalise_source_selectors(None)
+    with pytest.raises(ValueError, match="is not in a zone"):
+        process_mvr_helpers._build_process_mvr_stream_record(
+            source_stream=source,
+            memberships=[],
+            settings=SimpleNamespace(n_stages=1),
+            period_ids=None,
+            num_periods=None,
+        )
+
+    assert process_mvr_helpers._resolve_stage_t_lift_alias(
+        mvr_stage_t_lift=None,
+        max_stage_t_sat_lift=8.0,
+        mvr_stage_pressure_ratio=None,
+    ) == pytest.approx(8.0)
+    assert process_mvr_helpers._normalise_source_selectors(source) == [source]
+    assert process_mvr_helpers._normalise_source_selectors(("H1", "H2")) == [
+        "H1",
+        "H2",
+    ]
+    assert process_mvr_helpers._period_values_or_scalar([4.0]) == 4.0
+    assert process_mvr_helpers._period_values_or_scalar([4.0, 5.0]) == [4.0, 5.0]
+    assert process_mvr_helpers._required_period_value(
+        Value([293.15], "K"),
+        0,
+        "t_supply",
+        "HotGas",
+    ) == pytest.approx(20.0)
+    with pytest.raises(ValueError, match="requires heat_flow"):
+        process_mvr_helpers._required_period_value(None, 0, "heat_flow", "HotGas")
+    assert process_mvr_helpers._value_at_idx(12.5, 3) == pytest.approx(12.5)
+    assert process_mvr_helpers._value_at_idx(Value(12.0, "kW"), 3) == pytest.approx(
+        12.0
+    )
+    assert process_mvr_helpers._value_at_idx(None, 0) is None
+
+
+def test_process_mvr_stream_matching_and_source_validation_errors():
+    root = Zone("Site")
+    hot = Stream(
+        name="HotGas",
+        t_supply=120.0,
+        t_target=80.0,
+        p_supply=101.325,
+        heat_flow=100.0,
+        fluid_name="Air",
+        fluid_phase="gas",
+    )
+    cold = Stream(
+        name="ColdLoad",
+        t_supply=20.0,
+        t_target=80.0,
+        heat_flow=100.0,
+    )
+    root.hot_streams.add(hot, key="H1")
+    root.cold_streams.add(cold, key="C1")
+
+    with pytest.raises(ValueError, match="No active hot gas"):
+        process_mvr_helpers._match_source_streams(root, [])
+    with pytest.raises(ValueError, match="must be a hot stream"):
+        process_mvr_helpers._match_one_selector(root, "ColdLoad")
+    with pytest.raises(ValueError, match="was not found"):
+        process_mvr_helpers._match_one_selector(root, "Missing")
+
+    inactive = Stream(
+        name="InactiveGas",
+        t_supply=120.0,
+        t_target=80.0,
+        p_supply=101.325,
+        heat_flow=100.0,
+        fluid_name="Air",
+        fluid_phase="gas",
+    )
+    inactive.active = False
+    utility = Stream(
+        name="UtilityGas",
+        t_supply=120.0,
+        t_target=80.0,
+        p_supply=101.325,
+        heat_flow=100.0,
+        is_process_stream=False,
+        fluid_name="Air",
+        fluid_phase="gas",
+    )
+    no_fluid = Stream(
+        name="NoFluid",
+        t_supply=120.0,
+        t_target=80.0,
+        p_supply=101.325,
+        heat_flow=100.0,
+        fluid_phase="gas",
+    )
+
+    with pytest.raises(ValueError, match="is not active"):
+        process_mvr_helpers._validate_process_mvr_source(inactive, "InactiveGas")
+    with pytest.raises(ValueError, match="must be a process stream"):
+        process_mvr_helpers._validate_process_mvr_source(utility, "UtilityGas")
+    with pytest.raises(ValueError, match="must be a hot stream"):
+        process_mvr_helpers._validate_process_mvr_source(cold, "ColdLoad")
+    with pytest.raises(ValueError, match="requires fluid_name"):
+        process_mvr_helpers._validate_process_mvr_source(no_fluid, "NoFluid")
+
+
+def test_process_mvr_profile_stage_and_component_id_helpers():
+    payload = _process_mvr_edge_cases()
+    profile = np.asarray(payload["stage_profile"], dtype=float)
+    coarse_profile = np.asarray(payload["coarse_profile"], dtype=float)
+    positive_stage = _stage_result_from_fixture("positive_stage")
+    zero_delta_stage = _stage_result_from_fixture("zero_delta_stage")
+
+    unchanged = process_mvr_helpers._resample_profile_to_segment_count(profile, 2)
+    resampled = process_mvr_helpers._resample_profile_to_segment_count(
+        coarse_profile, 2
+    )
+
+    assert unchanged is profile
+    np.testing.assert_allclose(unchanged, profile)
+    np.testing.assert_allclose(resampled, profile)
+    assert process_mvr_helpers._segment_target_temperature(
+        [300.0, 100.0],
+        [299.0, 99.995],
+    ) == pytest.approx(99.99)
+    assert process_mvr_helpers._segment_target_temperature(
+        [300.0, 100.0],
+        [299.0, 90.0],
+    ) == pytest.approx(90.0)
+    assert process_mvr_helpers._stage_mass_flow(zero_delta_stage) == 0.0
+    assert process_mvr_helpers._stage_mass_flow(positive_stage) == pytest.approx(0.5)
+    assert process_mvr_helpers._stage_segment_heat_flow(
+        positive_stage,
+        300.0,
+        200.0,
+    ).value == pytest.approx(50.0)
+
+    problem = SimpleNamespace(process_components={"mvr_1": object()})
+
+    assert process_mvr_helpers._resolve_component_id(problem, None) == "mvr_2"
+    assert process_mvr_helpers._resolve_component_id(problem, "custom") == "custom"
+    with pytest.raises(ValueError, match="already exists"):
+        process_mvr_helpers._resolve_component_id(problem, "mvr_1")
+
+
+def test_process_mvr_phase_validation_edges_use_real_fluid_data():
+    pytest.importorskip("CoolProp")
+    heating_stream = Stream(
+        name="HeatingGas",
+        t_supply=80.0,
+        t_target=120.0,
+        p_supply=101.325,
+        heat_flow=100.0,
+        fluid_name="Air",
+        fluid_phase="gas",
+    )
+    gas_without_pressure = Stream(
+        name="NoPressureGas",
+        t_supply=120.0,
+        t_target=80.0,
+        p_supply=None,
+        heat_flow=100.0,
+        fluid_name="Air",
+        fluid_phase="gas",
+    )
+    vapour_without_pressure = Stream(
+        name="WaterVapour",
+        t_supply=[100.0, 99.0],
+        t_target=[99.5, 98.5],
+        p_supply=None,
+        p_target=None,
+        heat_flow=[100.0, 90.0],
+        fluid_name="Water",
+        fluid_phase="vapour",
+    )
+
+    with pytest.raises(ValueError, match="must cool from supply to target"):
+        process_mvr_helpers._validate_process_mvr_source_phase(
+            heating_stream,
+            "HeatingGas",
+        )
+    with pytest.raises(ValueError, match="requires p_supply"):
+        process_mvr_helpers._validate_process_mvr_source_phase(
+            gas_without_pressure,
+            "NoPressureGas",
+        )
+
+    process_mvr_helpers._validate_process_mvr_source_phase(
+        vapour_without_pressure,
+        "WaterVapour",
+    )
+
+    assert list(vapour_without_pressure.p_supply.value) == pytest.approx(
+        list(vapour_without_pressure.p_target.value)
+    )
+    assert len(vapour_without_pressure.p_supply.value) == 2
+
+    with pytest.raises(ValueError, match="critical temperature"):
+        process_mvr_helpers._validate_vapour_state(
+            selector="WaterVapour",
+            fluid="Water",
+            t_supply=400.0,
+            p_supply=None,
+            t_crit=373.0,
+        )
+    saturated_pressure = process_mvr_helpers._validate_vapour_state(
+        selector="WaterVapour",
+        fluid="Water",
+        t_supply=100.0,
+        p_supply=None,
+        t_crit=373.0,
+    )
+    assert saturated_pressure == pytest.approx(101.4, rel=0.02)
+    assert process_mvr_helpers._validate_vapour_state(
+        selector="WaterVapour",
+        fluid="Water",
+        t_supply=100.0,
+        p_supply=saturated_pressure,
+        t_crit=373.0,
+    ) == pytest.approx(saturated_pressure)
+    with pytest.raises(ValueError, match="saturation pressure"):
+        process_mvr_helpers._validate_vapour_state(
+            selector="WaterVapour",
+            fluid="Water",
+            t_supply=100.0,
+            p_supply=80.0,
+            t_crit=373.0,
+        )
+
+    with pytest.raises(ValueError, match="above critical pressure"):
+        process_mvr_helpers._validate_gas_or_supercritical_state(
+            selector="WaterGas",
+            fluid="Water",
+            t_c=100.0,
+            p_kpa=30000.0,
+            t_crit=373.0,
+            p_crit=22064.0,
+            state_label="supply",
+        )
+    process_mvr_helpers._validate_gas_or_supercritical_state(
+        selector="WaterGas",
+        fluid="Water",
+        t_c=400.0,
+        p_kpa=30000.0,
+        t_crit=373.0,
+        p_crit=22064.0,
+        state_label="supply",
+    )
+    process_mvr_helpers._validate_gas_or_supercritical_state(
+        selector="WaterGas",
+        fluid="Water",
+        t_c=400.0,
+        p_kpa=100.0,
+        t_crit=373.0,
+        p_crit=22064.0,
+        state_label="target",
+    )
+    with pytest.raises(ValueError, match="above saturation pressure"):
+        process_mvr_helpers._validate_gas_or_supercritical_state(
+            selector="WaterGas",
+            fluid="Water",
+            t_c=100.0,
+            p_kpa=150.0,
+            t_crit=373.0,
+            p_crit=22064.0,
+            state_label="target",
+        )
+    with pytest.raises(ValueError, match="not available in CoolProp"):
+        process_mvr_helpers._coolprop_value("TCRIT", "NotAFluid")

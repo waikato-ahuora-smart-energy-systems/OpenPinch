@@ -142,8 +142,6 @@ class HPRoptVectorLayout:
             self._coerce_block("x_ihx", x_ihx, self.n_ihx),
             self._coerce_block("x_misc", x_misc, self.n_misc),
         ]
-        if not blocks:
-            return np.empty(0, dtype=np.float64)
         return np.concatenate(blocks).astype(np.float64, copy=False)
 
     def unpack(self, x: np.ndarray | Sequence[float]) -> dict[str, Any]:

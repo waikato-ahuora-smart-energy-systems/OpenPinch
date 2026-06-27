@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from OpenPinch.classes.problem_table import ProblemTable
@@ -20,7 +21,19 @@ from OpenPinch.services.exergy_analysis import (
     apply_exergy_if_enabled,
     apply_exergy_targeting,
     build_exergy_gcc_curve,
+    build_exergy_nlp_curves,
     compute_exergetic_temperature,
+)
+from OpenPinch.services.exergy_analysis.exergy_targeting_entry import (
+    _first_available_column,
+    _insert_breaks,
+    _make_target_spec,
+    _normalize_exergy_base_target_type,
+    _optional_column,
+    _resolve_target_exergy_spec,
+    _should_use_series,
+    _strictly_between,
+    _validate_curve_lengths,
 )
 
 
@@ -186,6 +199,53 @@ def test_build_exergy_gcc_curve_splits_segments_that_cross_ambient():
     assert min(payload[PT.X_GCC.value]) >= 0.0
 
 
+def test_build_exergy_gcc_curve_handles_zero_negative_and_single_point_segments():
+    duplicate_temperature = build_exergy_gcc_curve(
+        temperatures=[100.0, 100.0, 50.0],
+        heat_loads=[0.0, 0.0, 10.0],
+        t_env=15.0,
+    )
+    assert len(duplicate_temperature[PT.T.value]) == 2
+
+    sign_change = build_exergy_gcc_curve(
+        temperatures=[100.0, 60.0, 20.0, -20.0],
+        heat_loads=[0.0, 20.0, 5.0, 5.0],
+        t_env=15.0,
+        dt_cont_half=5.0,
+    )
+    assert len(sign_change[PT.T.value]) > 4
+    assert min(sign_change[PT.X_GCC.value]) == pytest.approx(0.0)
+
+    one_point = build_exergy_gcc_curve(
+        temperatures=[15.0],
+        heat_loads=[0.0],
+        t_env=15.0,
+    )
+    assert one_point == {PT.T.value: [0.0], PT.X_GCC.value: [0.0]}
+
+
+def test_build_exergy_nlp_curves_handles_empty_constant_and_cross_ambient_branches():
+    empty = build_exergy_nlp_curves(
+        temperatures=[60.0, 20.0, -20.0],
+        branches=[("hot", [0.0, 0.0, 0.0]), ("cold", [np.nan, np.nan, np.nan])],
+        t_env=15.0,
+    )
+    assert empty["source_total"] == 0.0
+    assert empty["sink_total"] == 0.0
+
+    mixed = build_exergy_nlp_curves(
+        temperatures=[60.0, 20.0, -20.0],
+        branches=[
+            ("hot", [10.0, 10.0, 10.0]),
+            ("hot", [0.0, 12.0, 24.0]),
+            ("cold", [0.0, 8.0, 18.0]),
+        ],
+        t_env=15.0,
+    )
+    assert mixed["source_total"] > 0.0
+    assert mixed["sink_total"] > 0.0
+
+
 @pytest.mark.parametrize(
     "factory",
     [
@@ -210,6 +270,12 @@ def test_apply_exergy_targeting_populates_graphs_and_scalar_targets(factory):
     assert target.ETE is not None
     assert target.exergy_req_min is not None
     assert target.exergy_des_min is not None
+
+
+def test_apply_exergy_targeting_returns_unsupported_targets_unchanged():
+    target = SimpleNamespace(type="unsupported", graphs={})
+
+    assert apply_exergy_targeting(target) is target
 
 
 def test_apply_exergy_if_enabled_uses_grouped_targeting_config_only():
@@ -243,3 +309,45 @@ def test_total_site_serialization_includes_exergy_fields_after_enrichment():
     assert payload["ETE"] == {"value": target.ETE * 100, "unit": "%"}
     assert payload["exergy_req_min"] == {"value": target.exergy_req_min, "unit": "kW"}
     assert payload["exergy_des_min"] == {"value": target.exergy_des_min, "unit": "kW"}
+
+
+def test_exergy_target_selection_and_column_helpers_cover_edge_cases():
+    with pytest.raises(ValueError, match="Unsupported exergy base_target_type"):
+        _normalize_exergy_base_target_type("unsupported")
+
+    for target_type in (TT.DI.value, TT.TS.value, TT.DHP.value, TT.IHP.value):
+        assert (
+            _resolve_target_exergy_spec(SimpleNamespace(type=target_type, pt=None))
+            is None
+        )
+    assert _resolve_target_exergy_spec(SimpleNamespace(type="unsupported")) is None
+
+    assert (
+        _make_target_spec(
+            temperatures=[100.0, 50.0],
+            gcc_series=None,
+            branches=[],
+            t_env=15.0,
+            dt_cont_half=0.0,
+        )
+        is None
+    )
+
+    class MissingColumnTable:
+        def __getitem__(self, column):
+            raise KeyError(column)
+
+    assert _optional_column(MissingColumnTable(), PT.H_NET) is None
+    assert _optional_column({PT.H_NET: [np.nan, np.nan]}, PT.H_NET) is None
+    assert _first_available_column(MissingColumnTable(), [PT.H_NET, PT.H_NET_A]) is None
+    assert _should_use_series([np.nan, np.inf]) is False
+
+    with pytest.raises(ValueError, match="matching lengths"):
+        _validate_curve_lengths(np.array([1.0, 2.0]), np.array([1.0]))
+
+
+def test_exergy_breakpoint_helpers_cover_short_and_ascending_profiles():
+    assert _insert_breaks([25.0], [15.0]) == [25.0]
+    assert _insert_breaks([0.0, 100.0], [50.0]) == [0.0, 50.0, 100.0]
+    assert _strictly_between(50.0, 0.0, 100.0, descending=False) is True
+    assert _strictly_between(50.0, 100.0, 0.0, descending=True) is True

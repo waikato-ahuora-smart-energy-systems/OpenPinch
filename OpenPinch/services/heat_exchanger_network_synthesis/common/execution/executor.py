@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Callable, Protocol, Sequence
 
@@ -18,12 +17,9 @@ from .pathways import pathways_from_metadata, tier_evm_branch_breadth
 
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
-    """Create solver workers with inherited local-package import state."""
+    """Create solver workers with the interpreter's default process context."""
 
-    return ProcessPoolExecutor(
-        max_workers=max_workers,
-        mp_context=multiprocessing.get_context("fork"),
-    )
+    return ProcessPoolExecutor(max_workers=max_workers)
 
 
 class SynthesisExecutor(Protocol):

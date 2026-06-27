@@ -446,8 +446,6 @@ class _PlotlyGridRenderer:
                 max([self.hot_branch_count[-1 - i][k] for k in range(self.S)] or [1]),
                 1,
             )
-            if branches == 0:
-                branches = 1
             y_cursor += self.stream_spacing * branches
             x_tail, x_head = self._hot_stream_x_bounds(stream)
             self.ax.arrow(
@@ -1127,8 +1125,6 @@ class _PlotlyGridRenderer:
             if self._same_split_group(stream, current[0], next_match[0]):
                 continue
             temperature = next_match[3]
-            if temperature is None:
-                continue
             node_y = current[1] if current[1] == next_match[1] else y
             x_start, x_end = self._split_adjusted_temperature_segment(
                 stream,

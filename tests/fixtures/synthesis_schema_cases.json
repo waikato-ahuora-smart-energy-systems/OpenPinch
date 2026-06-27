@@ -1,0 +1,64 @@
+{
+  "task": {
+    "run_id": "schema-run-1",
+    "method": "pinch_design_method",
+    "approach_temperature": 10.0,
+    "derivative_threshold": 0.5,
+    "stage_count": 2,
+    "problem_id": " problem-a ",
+    "workspace_variant": " variant-a ",
+    "period_id": " peak ",
+    "settings": {
+      "solver": "fake"
+    },
+    "seed_network_index": 0,
+    "parent_task_id": " parent-1 ",
+    "metadata": {
+      "source": "fixture"
+    },
+    "topology_restrictions": [
+      {
+        "source_stream": "H1",
+        "sink_stream": "C1",
+        "stage": 1,
+        "duty": 12.5
+      }
+    ]
+  },
+  "manifest": {
+    "run_id": "schema-run-1",
+    "approach_temperatures": [5.0, 10.0],
+    "derivative_thresholds": [0.25],
+    "stage_selection": [1, 2],
+    "export_formats": ["json", "csv"],
+    "solve_tolerance": 0.001,
+    "best_solutions_to_save": 2,
+    "synthesis_quality_tier": 3,
+    "pdm_stage_pair_limit": 4,
+    "tdm_parent_limit": 2,
+    "stage_packing": "pdm",
+    "evm_n_ad_branches": 2,
+    "evm_n_rm_branches": 3,
+    "task_ids": [" task-a ", "task-b"],
+    "problem_id": " problem-a ",
+    "workspace_variant": " variant-a ",
+    "period_id": " peak ",
+    "selected_pathway_id": " path-1 ",
+    "selected_pathway_kind": " protected ",
+    "selected_pdm_mode": " packed ",
+    "selected_tier_origin": 2,
+    "selected_protected_pathway": true,
+    "task_count_by_method": {
+      " pinch_design_method ": 2
+    },
+    "export_records": [
+      {
+        "run_id": "schema-run-1",
+        "format": "json",
+        "path": "outputs/manifest.json",
+        "record_id": " record-1 ",
+        "content_type": " application/json "
+      }
+    ]
+  }
+}

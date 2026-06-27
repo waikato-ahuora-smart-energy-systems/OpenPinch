@@ -1,5 +1,7 @@
 """Regression tests for the simple heat pump cycle classes."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -613,3 +615,96 @@ def test_simple_heat_pump_cop_zero_division_and_misc_helpers(monkeypatch):
     hp._save_cycle_state(state, 0)
 
     assert hp._cycle_states[0]["H"] == pytest.approx(112653.67968857559)
+
+
+def test_simple_heat_pump_celsius_temperature_properties_handle_values_and_none():
+    hp = VapourCompressionCycle()
+    hp.temperature_unit = "C"
+    hp._T_evap = None
+    hp._T_evap_sat_vap = None
+    hp._T_cond = 363.15
+    hp._T_cond_sat_liq = None
+
+    assert hp.T_evap is None
+    assert hp.T_evap_sat_vap is None
+    assert hp.T_cond == pytest.approx(90.0)
+    assert hp.T_cond_sat_liq is None
+
+    hp._T_evap = 283.15
+    hp._T_evap_sat_vap = 282.15
+    hp._T_cond_sat_liq = 360.15
+
+    assert hp.T_evap == pytest.approx(10.0)
+    assert hp.T_evap_sat_vap == pytest.approx(9.0)
+    assert hp.T_cond_sat_liq == pytest.approx(87.0)
+
+
+def test_simple_heat_pump_single_phase_solver_brackets_and_reports_failure():
+    low_hit = _LinearSinglePhaseCycle()._solve_single_phase_state_from_pressure_target(
+        P=1.0,
+        target=10.0,
+        property_name="hmass",
+        T_low=10.0,
+        T_high=20.0,
+    )
+    high_hit = _LinearSinglePhaseCycle()._solve_single_phase_state_from_pressure_target(
+        P=1.0,
+        target=20.0,
+        property_name="hmass",
+        T_low=10.0,
+        T_high=20.0,
+    )
+    expanded_low = (
+        _LinearSinglePhaseCycle()._solve_single_phase_state_from_pressure_target(
+            P=1.0,
+            target=5.0,
+            property_name="hmass",
+            T_low=20.0,
+            T_high=30.0,
+            expand="low",
+        )
+    )
+
+    assert low_hit.T() == pytest.approx(10.0)
+    assert high_hit.T() == pytest.approx(20.0)
+    assert expanded_low.T() == pytest.approx(5.0)
+
+    with pytest.raises(ValueError, match="Could not bracket"):
+        _LinearSinglePhaseCycle(
+            constant_property=1.0
+        )._solve_single_phase_state_from_pressure_target(
+            P=1.0,
+            target=0.0,
+            property_name="hmass",
+            T_low=10.0,
+            T_high=20.0,
+        )
+
+
+class _LinearSinglePhaseState:
+    def __init__(self, constant_property: float | None = None) -> None:
+        self._temperature = 0.0
+        self._constant_property = constant_property
+
+    def update(self, _input_pair, _pressure, temperature):
+        self._temperature = float(temperature)
+
+    def hmass(self):
+        if self._constant_property is not None:
+            return self._constant_property
+        return self._temperature
+
+
+class _LinearSinglePhaseCycle(VapourCompressionCycle):
+    def __init__(self, constant_property: float | None = None) -> None:
+        super().__init__()
+        self._refrigerant = "linear"
+        self._constant_property = constant_property
+
+    def _get_fluid_state(self, value):
+        del value
+        return _LinearSinglePhaseState(self._constant_property)
+
+    def _compute_state_from_pressure_temperature(self, P, T, *, phase=1.0):
+        del P, phase
+        return SimpleNamespace(T=lambda: float(T))

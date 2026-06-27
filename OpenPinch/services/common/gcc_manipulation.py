@@ -212,8 +212,6 @@ def get_GCC_with_partial_pockets(
             pocket_pt.insert_temperature_interval(cut_temps)
             h_pockets = pocket_pt[PT.H_NET_PK]
             run_bounds = _next_positive_run(h_pockets, start_idx=max(i_upper, 0))
-            if run_bounds is None:
-                break
             run_start, run_stop = run_bounds
 
         _apply_h_cut_to_positive_run(

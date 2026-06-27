@@ -327,9 +327,6 @@ def _validate_zone_tree_structure(
         zone_counters[zone_key] += 1
 
         operation_zone_name = f"O{zone_counters[zone_key]}"
-        while operation_zone_name in current["children"]:
-            zone_counters[zone_key] += 1
-            operation_zone_name = f"O{zone_counters[zone_key]}"
 
         current["children"][operation_zone_name] = {
             "name": operation_zone_name,

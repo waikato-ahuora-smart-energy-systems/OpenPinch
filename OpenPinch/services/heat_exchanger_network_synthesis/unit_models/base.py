@@ -154,7 +154,8 @@ class BaseHeatExchangerNetworkModel(ABC):
         model.options.SOLVER = 1
         self.set_alpha_dqda_equations(m=model, postoptimisation=True)
         try:
-            model.solve(disp=False)
+            with backend.suppress_gekko_numpy_array_copy_deprecation():
+                model.solve(disp=False)
         except Exception:
             pass
         return self.alpha

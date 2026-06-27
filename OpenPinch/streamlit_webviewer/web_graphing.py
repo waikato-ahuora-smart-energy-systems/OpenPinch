@@ -100,7 +100,9 @@ class StreamlitGraphSet:
     graphs: List[MutableMapping]
 
     @classmethod
-    def from_graph_data(cls, graph_set_data: Mapping[str, object]) -> "StreamlitGraphSet":
+    def from_graph_data(
+        cls, graph_set_data: Mapping[str, object]
+    ) -> "StreamlitGraphSet":
         """Build a graph-set wrapper from JSON-style graph data."""
         return cls(
             name=str(graph_set_data.get("name", "Graph Set")),

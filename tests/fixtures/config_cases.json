@@ -1,0 +1,12 @@
+{
+  "period_config": {
+    "PROBLEM_PERIOD_IDS": ["base", "peak"],
+    "PROBLEM_PERIOD_WEIGHTS": [0.25, 0.75],
+    "INPUT_UNIT_TEMPERATURE": "K",
+    "OUTPUT_UNIT_HEAT_FLOW": "MW"
+  },
+  "missing_weight_config": {
+    "PROBLEM_PERIOD_IDS": ["base", "peak"],
+    "PROBLEM_PERIOD_WEIGHTS": [0.25]
+  }
+}

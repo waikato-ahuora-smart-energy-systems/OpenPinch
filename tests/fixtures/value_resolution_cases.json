@@ -1,0 +1,30 @@
+{
+  "period_payload": {
+    "values": [3.0, 6.0, 9.0],
+    "period_ids": ["base", "shoulder", "peak"],
+    "unit": "kW"
+  },
+  "missing_values_payload": {
+    "period_ids": ["base"],
+    "unit": "kW"
+  },
+  "none_values_payload": {
+    "values": null,
+    "unit": "kW"
+  },
+  "empty_values_payload": {
+    "values": [],
+    "unit": "kW"
+  },
+  "scalar_none_payload": {
+    "value": null,
+    "unit": "kW"
+  },
+  "period_object": {
+    "values": [5.0, 10.0]
+  },
+  "scalar_object": {
+    "value": "12.5",
+    "unit": "kW"
+  }
+}

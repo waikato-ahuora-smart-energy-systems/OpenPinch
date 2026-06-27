@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from OpenPinch.classes import (
     HeatExchanger,
@@ -11,8 +13,14 @@ from OpenPinch.classes import (
     HeatExchangerStreamRole,
 )
 from OpenPinch.services.heat_exchanger_network_controllability import (
+    HeatExchangerNetworkControllabilityActuator,
+    HeatExchangerNetworkControllabilityEndpoint,
+    HeatExchangerNetworkControllabilityPairing,
     HeatExchangerNetworkControllabilityResult,
     quantify_heat_exchanger_network_controllability,
+)
+from OpenPinch.services.heat_exchanger_network_controllability import (
+    service as controllability_service,
 )
 
 
@@ -301,3 +309,231 @@ def test_ill_conditioned_partial_gramian_proxy_is_reported() -> None:
     assert result.condition_number > 10.0
     assert result.components.conditioning < 0.1
     assert any("poorly conditioned" in item for item in result.diagnostics)
+
+
+def test_controllability_model_validators_reject_invalid_fields() -> None:
+    with pytest.raises(ValidationError, match="endpoint identities"):
+        HeatExchangerNetworkControllabilityEndpoint(
+            output_id=" ",
+            stream_id="H1",
+            side="source",
+            exchanger_count=1,
+            total_duty=1.0,
+        )
+    with pytest.raises(ValidationError, match="exchanger_count"):
+        HeatExchangerNetworkControllabilityEndpoint(
+            output_id="source:H1",
+            stream_id="H1",
+            side="source",
+            exchanger_count=-1,
+            total_duty=1.0,
+        )
+
+    actuator = HeatExchangerNetworkControllabilityActuator(
+        actuator_id=" trim ",
+        exchanger_id=None,
+        kind=HeatExchangerKind.RECOVERY,
+        source_stream=" H1 ",
+        sink_stream=" C1 ",
+        manipulated_variable="recovery_bypass_fraction",
+        duty=1.0,
+    )
+    assert actuator.actuator_id == "trim"
+    assert actuator.exchanger_id is None
+    assert actuator.source_stream == "H1"
+    assert actuator.sink_stream == "C1"
+
+    with pytest.raises(ValidationError, match="actuator identities"):
+        HeatExchangerNetworkControllabilityActuator(
+            actuator_id="",
+            kind=HeatExchangerKind.RECOVERY,
+            source_stream="H1",
+            sink_stream="C1",
+            manipulated_variable="recovery_bypass_fraction",
+            duty=1.0,
+        )
+    with pytest.raises(ValidationError, match="exchanger_id"):
+        HeatExchangerNetworkControllabilityActuator(
+            actuator_id="a",
+            exchanger_id=" ",
+            kind=HeatExchangerKind.RECOVERY,
+            source_stream="H1",
+            sink_stream="C1",
+            manipulated_variable="recovery_bypass_fraction",
+            duty=1.0,
+        )
+    with pytest.raises(ValidationError, match="stage"):
+        HeatExchangerNetworkControllabilityActuator(
+            actuator_id="a",
+            kind=HeatExchangerKind.RECOVERY,
+            source_stream="H1",
+            sink_stream="C1",
+            stage=0,
+            manipulated_variable="recovery_bypass_fraction",
+            duty=1.0,
+        )
+    with pytest.raises(ValidationError, match="pairing identities"):
+        HeatExchangerNetworkControllabilityPairing(
+            output_id="",
+            actuator_id="a",
+            interaction=0.5,
+        )
+
+    result_kwargs = {
+        "score": 0.5,
+        "rating": "moderate",
+        "components": {
+            "rank": 1.0,
+            "pairing": 1.0,
+            "authority": 1.0,
+            "conditioning": 1.0,
+            "redundancy": 1.0,
+        },
+    }
+    with pytest.raises(ValidationError, match="equal width"):
+        HeatExchangerNetworkControllabilityResult(
+            **result_kwargs,
+            interaction_matrix=((0.5,), (0.5, 0.2)),
+        )
+    with pytest.raises(ValidationError, match="matrix_rank"):
+        HeatExchangerNetworkControllabilityResult(**result_kwargs, matrix_rank=-1)
+    with pytest.raises(ValidationError, match="condition_number"):
+        HeatExchangerNetworkControllabilityResult(
+            **result_kwargs,
+            condition_number=float("inf"),
+        )
+    with pytest.raises(ValidationError, match="between 0 and 1"):
+        HeatExchangerNetworkControllabilityResult(**{**result_kwargs, "score": 1.5})
+    with pytest.raises(ValidationError, match="singular value"):
+        HeatExchangerNetworkControllabilityResult(
+            **result_kwargs,
+            singular_values=(-1.0,),
+        )
+
+
+def test_controllability_service_option_validation_and_helper_edges() -> None:
+    with pytest.raises(ValueError, match="minimum_approach_temperature"):
+        quantify_heat_exchanger_network_controllability(
+            _screening_network(),
+            minimum_approach_temperature=-1.0,
+        )
+    with pytest.raises(ValueError, match="rank_tolerance"):
+        quantify_heat_exchanger_network_controllability(
+            _screening_network(),
+            rank_tolerance=-1.0,
+        )
+    with pytest.raises(ValueError, match="condition_warning_threshold"):
+        quantify_heat_exchanger_network_controllability(
+            _screening_network(),
+            condition_warning_threshold=0.0,
+        )
+
+    zero_duty = _recovery_exchanger("zero", "H0", "C0", duty=0.0)
+    assert controllability_service._build_outputs((zero_duty,)) == ()
+    assert (
+        controllability_service._build_actuators(
+            (zero_duty,),
+            include_utility_actuators=True,
+        )
+        == ()
+    )
+
+    duplicate_actuators = controllability_service._build_actuators(
+        (
+            _recovery_exchanger("dup", "H1", "C1", duty=1.0),
+            _recovery_exchanger("dup", "H1", "C2", duty=1.0),
+        ),
+        include_utility_actuators=True,
+    )
+    assert [actuator.actuator_id for actuator in duplicate_actuators] == [
+        "dup",
+        "dup#2",
+    ]
+
+    zero_duty_output = HeatExchangerNetworkControllabilityEndpoint(
+        output_id="source:H0",
+        stream_id="H0",
+        side="source",
+        exchanger_count=1,
+        total_duty=0.0,
+    )
+    process_actuator = HeatExchangerNetworkControllabilityActuator(
+        actuator_id="a",
+        kind=HeatExchangerKind.RECOVERY,
+        source_stream="H0",
+        sink_stream="C0",
+        manipulated_variable="recovery_bypass_fraction",
+        duty=1.0,
+    )
+    np.testing.assert_allclose(
+        controllability_service._build_interaction_matrix(
+            (zero_duty_output,),
+            (process_actuator,),
+        ),
+        [[0.0]],
+    )
+
+    rank, singular_values, condition_number, conditioning_score = (
+        controllability_service._matrix_diagnostics(np.zeros((1, 1)), None)
+    )
+    assert rank == 0
+    assert singular_values == (0.0,)
+    assert condition_number is None
+    assert conditioning_score == 0.0
+
+    assert controllability_service._matrix_diagnostics(
+        np.eye(1),
+        rank_tolerance=2.0,
+    ) == (0, (1.0,), None, 0.0)
+    assert (
+        controllability_service._redundancy_score(
+            np.array([[1.0]]),
+            desired_redundancy=1,
+            minimum_interaction=0.1,
+        )
+        == 1.0
+    )
+    assert controllability_service._thermal_margin_score(
+        (_recovery_exchanger("margin", "H1", "C1", duty=1.0),),
+        minimum_approach_temperature=0.0,
+    ) == (1.0, 8.0)
+    assert controllability_service._rating(0.3) == "weak"
+
+
+def test_controllability_diagnostics_reports_zero_conditioning_direction() -> None:
+    outputs = (
+        HeatExchangerNetworkControllabilityEndpoint(
+            output_id="source:H1",
+            stream_id="H1",
+            side="source",
+            exchanger_count=1,
+            total_duty=1.0,
+        ),
+    )
+    actuators = (
+        HeatExchangerNetworkControllabilityActuator(
+            actuator_id="a",
+            kind=HeatExchangerKind.RECOVERY,
+            source_stream="H1",
+            sink_stream="C1",
+            manipulated_variable="recovery_bypass_fraction",
+            duty=1.0,
+        ),
+    )
+
+    diagnostics = controllability_service._diagnostics(
+        outputs=outputs,
+        actuators=actuators,
+        matrix=np.zeros((1, 1)),
+        matrix_rank=1,
+        condition_number=None,
+        condition_warning_threshold=10.0,
+        conditioning_score=0.0,
+        include_utility_actuators=True,
+        minimum_approach_temperature=0.0,
+        minimum_observed_approach=8.0,
+        thermal_margin_score=1.0,
+        minimum_interaction=0.1,
+    )
+
+    assert "interaction matrix has no usable singular direction" in diagnostics
