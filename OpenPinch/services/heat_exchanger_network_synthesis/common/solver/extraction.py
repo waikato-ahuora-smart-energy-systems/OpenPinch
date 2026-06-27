@@ -13,6 +13,7 @@ from .....classes.heat_exchanger import (
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
 from .....lib.config import tol
 from .....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from ..indexing import ordered_mapping_keys
 from .arrays import PreparedSolverArrays
 
 
@@ -386,9 +387,7 @@ def _identities_by_axis(
 ) -> tuple[str, ...]:
     axis_map = solver_arrays.axis_maps.get(axis_name, {})
     if axis_map:
-        return tuple(
-            key for key, _ in sorted(axis_map.items(), key=lambda item: item[1])
-        )
+        return ordered_mapping_keys(axis_map)
     return tuple(solver_arrays.stream_identities.get(axis_name, ())) or tuple(
         solver_arrays.utility_identities.get(axis_name, ())
     )

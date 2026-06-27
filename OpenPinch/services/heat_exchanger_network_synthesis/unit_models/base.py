@@ -11,6 +11,7 @@ from typing import Any, Literal
 import numpy as np
 
 from ....utils.heat_exchanger import compute_LMTD_from_dts
+from ..common.indexing import build_index_grid
 from ..common.solver import backend
 from ..common.solver.arrays import PreparedSolverArrays
 
@@ -171,310 +172,196 @@ class BaseHeatExchangerNetworkModel(ABC):
         if postoptimisation:
             if m is None:
                 raise ValueError("postoptimisation alpha equations require a model.")
-            if self.non_isothermal_model:
-                self.P_h = [
-                    [
-                        [
-                            (
-                                (self.T_h[i][k][0] - self.T_h_out_x[i][j][k][0])
-                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                                else 0.0
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-                self.P_c = [
-                    [
-                        [
-                            (
-                                (self.T_c_out_y[j][i][k][0] - self.T_c[j][k + 1][0])
-                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                                else 0.0
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-            else:
-                self.P_h = [
-                    [
-                        [
-                            (
-                                (self.T_h[i][k][0] - self.T_h[i][k + 1][0])
-                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                                else 0.0
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-                self.P_c = [
-                    [
-                        [
-                            (
-                                (self.T_c[j][k][0] - self.T_c[j][k + 1][0])
-                                / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                                if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
-                                else 0.0
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-
-            self.Sum_Qr_is = [
-                [
-                    [sum(self.Q_r[i][j][k][0] for j in range(self.J))]
-                    for k in range(self.S)
-                ]
-                for i in range(self.I)
-            ]
-            self.Sum_Qr_js = [
-                [
-                    [sum(self.Q_r[i][j][k][0] for i in range(self.I))]
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            self.beta_h = [
-                [
-                    [
-                        (
-                            self.Q_r[i][j][k][0] / self.Sum_Qr_is[i][k][0]
-                            if self.Sum_Qr_is[i][k][0] > 0.0
-                            else 0.0
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            self.beta_c = [
-                [
-                    [
-                        (
-                            self.Q_r[i][j][k][0] / self.Sum_Qr_js[j][k][0]
-                            if self.Sum_Qr_js[j][k][0] > 0.0
-                            else 0.0
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            self.z_i = [
-                [
-                    sum(self.z[i][j][k][0] for i in range(self.I))
-                    / (sum(self.z[i][j][k][0] for i in range(self.I)) + 1e-9)
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            self.z_j = [
-                [
-                    sum(self.z[i][j][k][0] for j in range(self.J))
-                    / (sum(self.z[i][j][k][0] for j in range(self.J)) + 1e-9)
-                    for k in range(self.S)
-                ]
-                for i in range(self.I)
-            ]
         else:
             m = self.m
+        recovery_grid_shape = (self.I, self.J, self.S)
+
+        def postoptimisation_denominator(i: int, j: int, k: int) -> float:
+            return self.T_h[i][k][0] - self.T_c[j][k + 1][0]
+
+        def model_denominator(i: int, j: int, k: int) -> Any:
+            return (self.T_h[i][k] - self.T_c[j][k + 1] - 1) * self.z[i][j][k] + 1
+
+        if postoptimisation:
             if self.non_isothermal_model:
-                self.P_h = [
-                    [
-                        [
-                            m.Intermediate(
-                                (self.T_h[i][k] - self.T_h_out_x[i][j][k])
-                                * self.z[i][j][k]
-                                / (
-                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
-                                    * self.z[i][j][k]
-                                    + 1
-                                )
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-                self.P_c = [
-                    [
-                        [
-                            m.Intermediate(
-                                (self.T_c_out_y[j][i][k] - self.T_c[j][k + 1])
-                                * self.z[i][j][k]
-                                / (
-                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
-                                    * self.z[i][j][k]
-                                    + 1
-                                )
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
+                self.P_h = build_index_grid(
+                    lambda i, j, k: (
+                        (self.T_h[i][k][0] - self.T_h_out_x[i][j][k][0])
+                        / postoptimisation_denominator(i, j, k)
+                        if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                        else 0.0
+                    ),
+                    recovery_grid_shape,
+                )
+                self.P_c = build_index_grid(
+                    lambda i, j, k: (
+                        (self.T_c_out_y[j][i][k][0] - self.T_c[j][k + 1][0])
+                        / postoptimisation_denominator(i, j, k)
+                        if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                        else 0.0
+                    ),
+                    recovery_grid_shape,
+                )
             else:
-                self.P_h = [
-                    [
-                        [
-                            m.Intermediate(
-                                (self.T_h[i][k] - self.T_h[i][k + 1])
-                                * self.z[i][j][k]
-                                / (
-                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
-                                    * self.z[i][j][k]
-                                    + 1
-                                )
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-                self.P_c = [
-                    [
-                        [
-                            m.Intermediate(
-                                (self.T_c[j][k] - self.T_c[j][k + 1])
-                                * self.z[i][j][k]
-                                / (
-                                    (self.T_h[i][k] - self.T_c[j][k + 1] - 1)
-                                    * self.z[i][j][k]
-                                    + 1
-                                )
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
+                self.P_h = build_index_grid(
+                    lambda i, j, k: (
+                        (self.T_h[i][k][0] - self.T_h[i][k + 1][0])
+                        / postoptimisation_denominator(i, j, k)
+                        if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                        else 0.0
+                    ),
+                    recovery_grid_shape,
+                )
+                self.P_c = build_index_grid(
+                    lambda i, j, k: (
+                        (self.T_c[j][k][0] - self.T_c[j][k + 1][0])
+                        / postoptimisation_denominator(i, j, k)
+                        if self.T_h[i][k][0] > self.T_c[j][k + 1][0]
+                        else 0.0
+                    ),
+                    recovery_grid_shape,
+                )
 
-            self.Sum_Qr_j = [
-                [
-                    m.Intermediate(sum(self.Q_r[i][j][k] for j in range(self.J)))
-                    for k in range(self.S)
-                ]
-                for i in range(self.I)
-            ]
-            self.Sum_Qr_i = [
-                [
-                    m.Intermediate(sum(self.Q_r[i][j][k] for i in range(self.I)))
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            self.beta_h = [
-                [
-                    [
-                        m.Intermediate(
-                            self.Q_r[i][j][k]
-                            / (self.Sum_Qr_j[i][k] + 1 - self.z[i][j][k])
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            self.beta_c = [
-                [
-                    [
-                        m.Intermediate(
-                            self.Q_r[i][j][k]
-                            / (self.Sum_Qr_i[j][k] + 1 - self.z[i][j][k])
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            self.z_i = [
-                [
-                    m.Intermediate(
-                        sum(self.z[i][j][k] for i in range(self.I))
-                        / (sum(self.z[i][j][k] for i in range(self.I)) + 1e-9)
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            self.z_j = [
-                [
-                    m.Intermediate(
-                        sum(self.z[i][j][k] for j in range(self.J))
-                        / (sum(self.z[i][j][k] for j in range(self.J)) + 1e-9)
-                    )
-                    for k in range(self.S)
-                ]
-                for i in range(self.I)
-            ]
+            self.Sum_Qr_is = build_index_grid(
+                lambda i, k: [sum(self.Q_r[i][j][k][0] for j in range(self.J))],
+                (self.I, self.S),
+            )
+            self.Sum_Qr_js = build_index_grid(
+                lambda j, k: [sum(self.Q_r[i][j][k][0] for i in range(self.I))],
+                (self.J, self.S),
+            )
+            self.beta_h = build_index_grid(
+                lambda i, j, k: (
+                    self.Q_r[i][j][k][0] / self.Sum_Qr_is[i][k][0]
+                    if self.Sum_Qr_is[i][k][0] > 0
+                    else 0.0
+                ),
+                recovery_grid_shape,
+            )
+            self.beta_c = build_index_grid(
+                lambda i, j, k: (
+                    self.Q_r[i][j][k][0] / self.Sum_Qr_js[j][k][0]
+                    if self.Sum_Qr_js[j][k][0] > 0
+                    else 0.0
+                ),
+                recovery_grid_shape,
+            )
+            self.z_i = build_index_grid(
+                lambda j, k: (
+                    sum(self.z[i][j][k][0] for i in range(self.I))
+                    / (sum(self.z[i][j][k][0] for i in range(self.I)) + 1e-9)
+                ),
+                (self.J, self.S),
+            )
+            self.z_j = build_index_grid(
+                lambda i, k: (
+                    sum(self.z[i][j][k][0] for j in range(self.J))
+                    / (sum(self.z[i][j][k][0] for j in range(self.J)) + 1e-9)
+                ),
+                (self.I, self.S),
+            )
+        else:
+            if self.non_isothermal_model:
+                self.P_h = build_index_grid(
+                    lambda i, j, k: m.Intermediate(
+                        (self.T_h[i][k] - self.T_h_out_x[i][j][k])
+                        * self.z[i][j][k]
+                        / model_denominator(i, j, k)
+                    ),
+                    recovery_grid_shape,
+                )
+                self.P_c = build_index_grid(
+                    lambda i, j, k: m.Intermediate(
+                        (self.T_c_out_y[j][i][k] - self.T_c[j][k + 1])
+                        * self.z[i][j][k]
+                        / model_denominator(i, j, k)
+                    ),
+                    recovery_grid_shape,
+                )
+            else:
+                self.P_h = build_index_grid(
+                    lambda i, j, k: m.Intermediate(
+                        (self.T_h[i][k] - self.T_h[i][k + 1])
+                        * self.z[i][j][k]
+                        / model_denominator(i, j, k)
+                    ),
+                    recovery_grid_shape,
+                )
+                self.P_c = build_index_grid(
+                    lambda i, j, k: m.Intermediate(
+                        (self.T_c[j][k] - self.T_c[j][k + 1])
+                        * self.z[i][j][k]
+                        / model_denominator(i, j, k)
+                    ),
+                    recovery_grid_shape,
+                )
 
-        self.alpha = [
-            [
-                [
-                    m.Var(
-                        value=0.0,
-                        ub=1.0,
-                        lb=-1.0,
-                        name=f"alpha_H{i}_to_C{j}_at_S{k}",
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
-        self.gamma_h = [
-            [
-                [
-                    m.Var(
-                        value=0.5,
-                        ub=1.0,
-                        lb=-1.0,
-                        name=f"gamma_h_H{i}_to_C{j}_at_S{k}",
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
-        self.gamma_c = [
-            [
-                [
-                    m.Var(
-                        value=0.5,
-                        ub=1.0,
-                        lb=-1.0,
-                        name=f"gamma_c_H{i}_to_C{j}_at_S{k}",
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
+            self.Sum_Qr_j = build_index_grid(
+                lambda i, k: m.Intermediate(
+                    sum(self.Q_r[i][j][k] for j in range(self.J))
+                ),
+                (self.I, self.S),
+            )
+            self.Sum_Qr_i = build_index_grid(
+                lambda j, k: m.Intermediate(
+                    sum(self.Q_r[i][j][k] for i in range(self.I))
+                ),
+                (self.J, self.S),
+            )
+            self.beta_h = build_index_grid(
+                lambda i, j, k: m.Intermediate(
+                    self.Q_r[i][j][k] / (self.Sum_Qr_j[i][k] + 1 - self.z[i][j][k])
+                ),
+                recovery_grid_shape,
+            )
+            self.beta_c = build_index_grid(
+                lambda i, j, k: m.Intermediate(
+                    self.Q_r[i][j][k] / (self.Sum_Qr_i[j][k] + 1 - self.z[i][j][k])
+                ),
+                recovery_grid_shape,
+            )
+            self.z_i = build_index_grid(
+                lambda j, k: m.Intermediate(
+                    sum(self.z[i][j][k] for i in range(self.I))
+                    / (sum(self.z[i][j][k] for i in range(self.I)) + 1e-9)
+                ),
+                (self.J, self.S),
+            )
+            self.z_j = build_index_grid(
+                lambda i, k: m.Intermediate(
+                    sum(self.z[i][j][k] for j in range(self.J))
+                    / (sum(self.z[i][j][k] for j in range(self.J)) + 1e-9)
+                ),
+                (self.I, self.S),
+            )
+
+        self.alpha = build_index_grid(
+            lambda i, j, k: m.Var(
+                value=0.0,
+                ub=1.0,
+                lb=-1.0,
+                name=f"alpha_H{i}_to_C{j}_at_S{k}",
+            ),
+            recovery_grid_shape,
+        )
+        self.gamma_h = build_index_grid(
+            lambda i, j, k: m.Var(
+                value=0.5,
+                ub=1.0,
+                lb=-1.0,
+                name=f"gamma_h_H{i}_to_C{j}_at_S{k}",
+            ),
+            recovery_grid_shape,
+        )
+        self.gamma_c = build_index_grid(
+            lambda i, j, k: m.Var(
+                value=0.5,
+                ub=1.0,
+                lb=-1.0,
+                name=f"gamma_c_H{i}_to_C{j}_at_S{k}",
+            ),
+            recovery_grid_shape,
+        )
 
         self.gamma_h_eqn = []
         self.gamma_c_eqn = []

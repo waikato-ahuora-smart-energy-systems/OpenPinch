@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from .....classes.heat_exchanger import HeatExchanger, HeatExchangerKind
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
 from .....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from ..indexing import ordered_mapping_keys
 
 _DUTY_ABS_TOL = 1.0
 _DUTY_REL_TOL = 1e-4
@@ -478,7 +479,7 @@ def _stream_order(
     axis_map = network.solver_axis_metadata.get("axis_maps", {}).get(axis_name, {})
     if not axis_map:
         return ()
-    return tuple(key for key, _ in sorted(axis_map.items(), key=lambda item: item[1]))
+    return ordered_mapping_keys(axis_map)
 
 
 def _uses_isothermal_stage_boundaries(metadata: dict) -> bool:

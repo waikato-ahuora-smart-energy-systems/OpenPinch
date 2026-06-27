@@ -12,6 +12,7 @@ from .....classes.stream import Stream
 from .....classes.value import Value
 from .....classes.zone import Zone
 from .....lib.config import tol
+from ..indexing import ordered_mapping_keys
 
 _PreparedItem = tuple[str, Stream, Any | None]
 
@@ -37,10 +38,7 @@ class PreparedSolverArrays:
         """Return a deterministic JSON-compatible representation."""
         return {
             "arrays": {
-                name: values.tolist()
-                for name, values in sorted(
-                    self.arrays.items(), key=lambda item: item[0]
-                )
+                name: self.arrays[name].tolist() for name in sorted(self.arrays)
             },
             "array_shapes": {
                 name: self.array_shapes[name] for name in sorted(self.array_shapes)
@@ -276,9 +274,13 @@ def _solver_array_mapping(
         "h_cost_period": period_values(hot_items, stream_attr("price", price_unit)),
         "hot_names": _str_array(stream.name for _, stream, _ in hot_items),
         "htc_c_period": period_values(cold_items, stream_attr("htc", htc_unit)),
-        "htc_cu_period": period_values(cold_utility_items, stream_attr("htc", htc_unit)),
+        "htc_cu_period": period_values(
+            cold_utility_items, stream_attr("htc", htc_unit)
+        ),
         "htc_h_period": period_values(hot_items, stream_attr("htc", htc_unit)),
-        "htc_hu_period": period_values(hot_utility_items, stream_attr("htc", htc_unit)),
+        "htc_hu_period": period_values(
+            hot_utility_items, stream_attr("htc", htc_unit)
+        ),
         "hu_coeff": _float_array([costing.hx_area_coeff]),
         "hu_cost_period": period_values(hu, stream_attr("price", price_unit)),
         "hu_exp": _float_array([costing.hx_area_exp]),
@@ -290,10 +292,7 @@ def _solver_array_mapping(
 
 def _period_ids_and_weights(zone: Zone) -> tuple[tuple[str, ...], tuple[float, ...]]:
     period_lookup = zone.period_ids or {"0": 0}
-    ordered_period_ids = tuple(
-        period_id
-        for period_id, _ in sorted(period_lookup.items(), key=lambda item: item[1])
-    )
+    ordered_period_ids = ordered_mapping_keys(period_lookup)
     weights = getattr(zone, "weights", None)
     if weights is None:
         period_weights = tuple(1.0 for _ in ordered_period_ids)

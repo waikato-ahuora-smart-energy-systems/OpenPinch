@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 import numpy as np
 
+from ..common.indexing import build_index_grid
 from ..common.solver.arrays import PreparedSolverArrays
 from .base import BaseHeatExchangerNetworkModel
 
@@ -885,33 +886,24 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Apply the source TDM minimum dQ/dA restriction."""
 
         if getattr(self, "N_periods", 1) > 1:
-            self.min_dqda_int = [
-                [
-                    [
-                        [
-                            (
-                                self.m.Intermediate(
-                                    self.min_dqda
-                                    * (
-                                        self.T_h_by_period[n][i][k]
-                                        - self.T_c_by_period[n][j][k + 1]
-                                    )
-                                    - self.theta_1_by_period[n][i][j][k]
-                                    * self.theta_2_by_period[n][i][j][k]
-                                    * self.U_r_period[n][i][j],
-                                    name=(f"dqda_calc_H{i}_to_C{j}_at_S{k}_period{n}"),
-                                )
-                                if self.z_allowed[i][j][k] > 0
-                                else None
-                            )
-                            for k in range(self.S)
-                        ]
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-                for n in range(self.N_periods)
-            ]
+            self.min_dqda_int = build_index_grid(
+                lambda n, i, j, k: (
+                    self.m.Intermediate(
+                        self.min_dqda
+                        * (
+                            self.T_h_by_period[n][i][k]
+                            - self.T_c_by_period[n][j][k + 1]
+                        )
+                        - self.theta_1_by_period[n][i][j][k]
+                        * self.theta_2_by_period[n][i][j][k]
+                        * self.U_r_period[n][i][j],
+                        name=f"dqda_calc_H{i}_to_C{j}_at_S{k}_period{n}",
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                ),
+                (self.N_periods, self.I, self.J, self.S),
+            )
             self.min_dQ_dA_eqn = [
                 (
                     self.m.Equation(
@@ -930,26 +922,18 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             ]
             return
 
-        self.min_dqda_int = [
-            [
-                [
-                    (
-                        self.m.Intermediate(
-                            self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
-                            - self.theta_1[i][j][k]
-                            * self.theta_2[i][j][k]
-                            * self.U_r[i][j],
-                            name=f"dqda_calc_H{i}_to_C{j}_at_S{k}",
-                        )
-                        if self.z_allowed[i][j][k] > 0
-                        else None
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
+        self.min_dqda_int = build_index_grid(
+            lambda i, j, k: (
+                self.m.Intermediate(
+                    self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
+                    - self.theta_1[i][j][k] * self.theta_2[i][j][k] * self.U_r[i][j],
+                    name=f"dqda_calc_H{i}_to_C{j}_at_S{k}",
+                )
+                if self.z_allowed[i][j][k] > 0
+                else None
+            ),
+            (self.I, self.J, self.S),
+        )
         self.min_dQ_dA_eqn = [
             (
                 self.m.Equation(
@@ -1723,17 +1707,14 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Adopt the selected evolved topology while retaining this model object."""
 
         best_model.verify()
-        self.alpha = [
-            [[best_model.alpha[i][j][k] for k in range(self.S)] for j in range(self.J)]
-            for i in range(self.I)
-        ]
-        self.z_allowed = [
-            [
-                [best_model.z_allowed[i][j][k] for k in range(self.S)]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
+        self.alpha = build_index_grid(
+            lambda i, j, k: best_model.alpha[i][j][k],
+            (self.I, self.J, self.S),
+        )
+        self.z_allowed = build_index_grid(
+            lambda i, j, k: best_model.z_allowed[i][j][k],
+            (self.I, self.J, self.S),
+        )
         self.set_initial_values_for_variables(best_model, brackets=True)
 
         self.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)

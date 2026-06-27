@@ -24,6 +24,7 @@ class _ObjectiveModel:
         self.minimised = []
         self.maximised = []
         self.intermediates = []
+        self.equations = []
 
     def sum(self, values):
         return sum(values)
@@ -36,6 +37,10 @@ class _ObjectiveModel:
 
     def Intermediate(self, expression, *, name: str | None = None):
         self.intermediates.append((name, expression))
+        return expression
+
+    def Equation(self, expression):
+        self.equations.append(expression)
         return expression
 
 
@@ -400,6 +405,62 @@ def test_stagewise_single_state_total_cost_objective_records_minimisation():
     assert len(model.m.minimised) == 1
     assert model.utility_unit_cost_total == pytest.approx(5.0)
     assert model.recovery_unit_cost[0][0] == pytest.approx(4.0)
+
+
+def test_stagewise_single_period_dqda_equations_use_recovery_stage_grid():
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.I = 1
+    model.J = 1
+    model.S = 2
+    model.N_periods = 1
+    model.m = _ObjectiveModel()
+    model.min_dqda = 0.1
+    model.T_h = [[100.0, 90.0, 80.0]]
+    model.T_c = [[30.0, 40.0, 50.0]]
+    model.theta_1 = [[[2.0, 3.0]]]
+    model.theta_2 = [[[4.0, 5.0]]]
+    model.U_r = [[0.5]]
+    model.z_allowed = [[[1, 0]]]
+    model.M_ij = [[10.0]]
+    model.z = [[[1.0, 0.0]]]
+
+    model.set_dqda_equations()
+
+    assert model.min_dqda_int[0][0][0] == pytest.approx(2.0)
+    assert model.min_dqda_int[0][0][1] is None
+    assert model.min_dQ_dA_eqn[1] is None
+    assert model.m.intermediates[0][0] == "dqda_calc_H0_to_C0_at_S0"
+
+
+def test_stagewise_multiperiod_dqda_equations_use_period_recovery_stage_grid():
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.I = 1
+    model.J = 1
+    model.S = 2
+    model.N_periods = 2
+    model.m = _ObjectiveModel()
+    model.min_dqda = 0.1
+    model.T_h_by_period = [[[100.0, 90.0, 80.0]], [[120.0, 100.0, 80.0]]]
+    model.T_c_by_period = [[[30.0, 40.0, 50.0]], [[35.0, 45.0, 55.0]]]
+    model.theta_1_by_period = [[[[2.0, 3.0]]], [[[4.0, 5.0]]]]
+    model.theta_2_by_period = [[[[4.0, 5.0]]], [[[6.0, 7.0]]]]
+    model.U_r_period = [[[0.5]], [[0.25]]]
+    model.z_allowed = [[[1, 0]]]
+    model.M_ij_period = [[[10.0]], [[20.0]]]
+    model.z = [[[1.0, 0.0]]]
+
+    model.set_dqda_equations()
+
+    assert model.min_dqda_int[0][0][0][0] == pytest.approx(2.0)
+    assert model.min_dqda_int[0][0][0][1] is None
+    assert model.min_dqda_int[1][0][0][0] == pytest.approx(1.5)
+    assert model.min_dqda_int[1][0][0][1] is None
+    assert model.min_dQ_dA_eqn[1] is None
+    assert model.min_dQ_dA_eqn[3] is None
+    assert [name for name, _ in model.m.intermediates] == [
+        "dqda_calc_H0_to_C0_at_S0_period0",
+        "dqda_calc_H0_to_C0_at_S0_period1",
+    ]
 
 
 def test_stagewise_single_period_initial_values_cover_inactive_utilities_and_noniso():

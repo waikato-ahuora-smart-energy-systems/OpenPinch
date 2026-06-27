@@ -2,16 +2,49 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal
 
 import numpy as np
 
+from ..common.indexing import build_index_grid
 from ..common.solver.arrays import PreparedSolverArrays
 from ..common.solver.pinch_design_decomposition import PinchDesignDecomposition
 from .base import BaseHeatExchangerNetworkModel
 from .stagewise import StageWiseModel
 from .stagewise import _value as _scalar_value
+
+
+def _overall_heat_transfer_coefficient(left_htc: float, right_htc: float) -> float:
+    return 1 / (1 / left_htc + 1 / right_htc)
+
+
+def _active_period_flag(values: Iterable[float], tolerance: float) -> list[int]:
+    return [1 if max(values) > tolerance else 0]
+
+
+def _lmtd_formula_allowed(
+    delta_1: float,
+    delta_2: float,
+    approach_temperature: float,
+    tolerance: float,
+) -> bool:
+    return (
+        abs(delta_1 - delta_2) > tolerance
+        and delta_1 - approach_temperature >= tolerance
+        and delta_2 - approach_temperature >= tolerance
+    )
+
+
+def _area_from_heat_load(
+    heat_load: float,
+    overall_heat_transfer_coefficient: float,
+    lmtd: float,
+    tolerance: float,
+) -> float:
+    if lmtd <= tolerance or heat_load <= tolerance:
+        return 0.0
+    return heat_load / overall_heat_transfer_coefficient / lmtd
 
 
 class PinchDecompModel(BaseHeatExchangerNetworkModel):
@@ -195,107 +228,90 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.T_c_out = self.T_c_out_period[0].copy()
 
         self.Qtot_sh_period = np.array(
-            [
-                [
+            build_index_grid(
+                lambda n, i: (
                     (self.T_h_in_period[n][i] - self.T_h_out_period[n][i])
                     * self.f_h_period[n][i]
                     * self.z_i_active_period[n][i]
-                    for i in range(self.I)
-                ]
-                for n in range(self.N_periods)
-            ],
+                ),
+                (self.N_periods, self.I),
+            ),
             dtype=float,
         )
         self.Qtot_sc_period = np.array(
-            [
-                [
+            build_index_grid(
+                lambda n, j: (
                     self.f_c_period[n][j]
                     * (self.T_c_out_period[n][j] - self.T_c_in_period[n][j])
                     * self.z_j_active_period[n][j]
-                    for j in range(self.J)
-                ]
-                for n in range(self.N_periods)
-            ],
+                ),
+                (self.N_periods, self.J),
+            ),
             dtype=float,
         )
         self.Qtot_sh = np.max(self.Qtot_sh_period, axis=0)
         self.Qtot_sc = np.max(self.Qtot_sc_period, axis=0)
         self.U_r_period = np.array(
-            [
-                [
-                    [
-                        1 / (1 / self.htc_h_period[n][i] + 1 / self.htc_c_period[n][j])
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-                for n in range(self.N_periods)
-            ],
+            build_index_grid(
+                lambda n, i, j: _overall_heat_transfer_coefficient(
+                    self.htc_h_period[n][i],
+                    self.htc_c_period[n][j],
+                ),
+                (self.N_periods, self.I, self.J),
+            ),
             dtype=float,
         )
         self.U_hu_period = np.array(
-            [
-                [
-                    1 / (1 / self.htc_hu_period[n][0] + 1 / self.htc_c_period[n][j])
-                    for j in range(self.J)
-                ]
-                for n in range(self.N_periods)
-            ],
+            build_index_grid(
+                lambda n, j: _overall_heat_transfer_coefficient(
+                    self.htc_hu_period[n][0],
+                    self.htc_c_period[n][j],
+                ),
+                (self.N_periods, self.J),
+            ),
             dtype=float,
         )
         self.U_cu_period = np.array(
-            [
-                [
-                    1 / (1 / self.htc_h_period[n][i] + 1 / self.htc_cu_period[n][0])
-                    for i in range(self.I)
-                ]
-                for n in range(self.N_periods)
-            ],
+            build_index_grid(
+                lambda n, i: _overall_heat_transfer_coefficient(
+                    self.htc_h_period[n][i],
+                    self.htc_cu_period[n][0],
+                ),
+                (self.N_periods, self.I),
+            ),
             dtype=float,
         )
         self.U_r = self.U_r_period[0].copy()
         self.U_hu = self.U_hu_period[0].copy()
         self.U_cu = self.U_cu_period[0].copy()
         self.Q_max_period = np.array(
-            [
-                [
-                    [
-                        max(
-                            self.T_h_in_period[n][i]
-                            - self.T_c_in_period[n][j]
-                            - self._recovery_approach_temperature(i, j, n),
-                            0.0,
-                        )
-                        * min(
-                            self.f_h_period[n][i] * self.z_i_active_period[n][i],
-                            self.f_c_period[n][j] * self.z_j_active_period[n][j],
-                        )
-                        for j in range(self.J)
-                    ]
-                    for i in range(self.I)
-                ]
-                for n in range(self.N_periods)
-            ],
+            build_index_grid(
+                lambda n, i, j: (
+                    max(
+                        self.T_h_in_period[n][i]
+                        - self.T_c_in_period[n][j]
+                        - self._recovery_approach_temperature(i, j, n),
+                        0.0,
+                    )
+                    * min(
+                        self.f_h_period[n][i] * self.z_i_active_period[n][i],
+                        self.f_c_period[n][j] * self.z_j_active_period[n][j],
+                    )
+                ),
+                (self.N_periods, self.I, self.J),
+            ),
             dtype=float,
         )
         self.Q_max = np.max(self.Q_max_period, axis=0)
-        self.z_feasible = [
-            [
-                [
-                    (
-                        1
-                        if max(
-                            self.Q_max_period[n][i][j] for n in range(self.N_periods)
-                        )
-                        > self.tol
-                        else 0
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
+        self.z_feasible = build_index_grid(
+            lambda i, j, _k: (
+                1
+                if max(self.Q_max_period[n][i][j] for n in range(self.N_periods))
+                > self.tol
+                else 0
+            ),
+            (self.I, self.J, self.S),
+        )
         self.z_hu_feasible = [
             1 if self.pinch_loc == "above" and self.z_j_active[j] > 0 else 0
             for j in range(self.J)
@@ -311,107 +327,80 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self._set_multiperiod_stage_wise_superstructure()
 
     def _set_multiperiod_stage_wise_superstructure(self) -> None:
-        self.Q_r_by_period = [
-            [
-                [
-                    [
-                        (
-                            self.m.Var(
-                                value=self.Q_max_period[n][i][j] / 3,
-                                ub=self.Q_max_period[n][i][j],
-                                lb=0.0,
-                                name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
-                            )
-                            if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(
-                                value=0.0,
-                                name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
-                            )
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.Q_c_by_period = [
-            [
-                (
-                    self.m.Var(
-                        value=0,
-                        ub=self.Qtot_sh_period[n][i],
-                        lb=0.0,
-                        name=f"Q_H{i}_to_CU_period{n}",
-                    )
-                    if self.z_cu_allowed[i] > 0
-                    else self.m.Param(value=0, name=f"Q_H{i}_to_CU_period{n}")
+        self.Q_r_by_period = build_index_grid(
+            lambda n, i, j, k: (
+                self.m.Var(
+                    value=self.Q_max_period[n][i][j] / 3,
+                    ub=self.Q_max_period[n][i][j],
+                    lb=0.0,
+                    name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
                 )
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.Q_h_by_period = [
-            [
-                (
-                    self.m.Var(
-                        value=0,
-                        ub=self.Qtot_sc_period[n][j],
-                        lb=0.0,
-                        name=f"Q_HU_to_C{j}_period{n}",
-                    )
-                    if self.z_hu_allowed[j] > 0
-                    else self.m.Param(value=0, name=f"Q_HU_to_C{j}_period{n}")
+                if self.z_allowed[i][j][k] > 0
+                else self.m.Param(
+                    value=0.0,
+                    name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
                 )
-                for j in range(self.J)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.T_h_by_period = [
-            [
-                [
-                    (
-                        self.m.Var(
-                            value=self.T_h_in_period[n][i],
-                            ub=self.T_h_in_period[n][i],
-                            lb=self.T_h_out_period[n][i],
-                            name=f"T_H{i}_at_B{k}_period{n}",
-                        )
-                        if k > 0 and self.z_i_active[i] > 0
-                        else self.m.Param(
-                            value=self.T_h_in_period[n][i],
-                            name=f"T_H{i}_at_B{k}_period{n}",
-                        )
-                    )
-                    for k in range(self.K)
-                ]
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.T_c_by_period = [
-            [
-                [
-                    (
-                        self.m.Var(
-                            value=self.T_c_in_period[n][j],
-                            ub=self.T_c_out_period[n][j],
-                            lb=self.T_c_in_period[n][j],
-                            name=f"T_C{j}_at_B{k}_period{n}",
-                        )
-                        if k < self.S and self.z_j_active[j] > 0
-                        else self.m.Param(
-                            value=self.T_c_in_period[n][j],
-                            name=f"T_C{j}_at_B{k}_period{n}",
-                        )
-                    )
-                    for k in range(self.K)
-                ]
-                for j in range(self.J)
-            ]
-            for n in range(self.N_periods)
-        ]
+            ),
+            (self.N_periods, self.I, self.J, self.S),
+        )
+        self.Q_c_by_period = build_index_grid(
+            lambda n, i: (
+                self.m.Var(
+                    value=0,
+                    ub=self.Qtot_sh_period[n][i],
+                    lb=0.0,
+                    name=f"Q_H{i}_to_CU_period{n}",
+                )
+                if self.z_cu_allowed[i] > 0
+                else self.m.Param(value=0, name=f"Q_H{i}_to_CU_period{n}")
+            ),
+            (self.N_periods, self.I),
+        )
+        self.Q_h_by_period = build_index_grid(
+            lambda n, j: (
+                self.m.Var(
+                    value=0,
+                    ub=self.Qtot_sc_period[n][j],
+                    lb=0.0,
+                    name=f"Q_HU_to_C{j}_period{n}",
+                )
+                if self.z_hu_allowed[j] > 0
+                else self.m.Param(value=0, name=f"Q_HU_to_C{j}_period{n}")
+            ),
+            (self.N_periods, self.J),
+        )
+        self.T_h_by_period = build_index_grid(
+            lambda n, i, k: (
+                self.m.Var(
+                    value=self.T_h_in_period[n][i],
+                    ub=self.T_h_in_period[n][i],
+                    lb=self.T_h_out_period[n][i],
+                    name=f"T_H{i}_at_B{k}_period{n}",
+                )
+                if k > 0 and self.z_i_active[i] > 0
+                else self.m.Param(
+                    value=self.T_h_in_period[n][i],
+                    name=f"T_H{i}_at_B{k}_period{n}",
+                )
+            ),
+            (self.N_periods, self.I, self.K),
+        )
+        self.T_c_by_period = build_index_grid(
+            lambda n, j, k: (
+                self.m.Var(
+                    value=self.T_c_in_period[n][j],
+                    ub=self.T_c_out_period[n][j],
+                    lb=self.T_c_in_period[n][j],
+                    name=f"T_C{j}_at_B{k}_period{n}",
+                )
+                if k < self.S and self.z_j_active[j] > 0
+                else self.m.Param(
+                    value=self.T_c_in_period[n][j],
+                    name=f"T_C{j}_at_B{k}_period{n}",
+                )
+            ),
+            (self.N_periods, self.J, self.K),
+        )
         self.Q_r = self.Q_r_by_period[0]
         self.Q_c = self.Q_c_by_period[0]
         self.Q_h = self.Q_h_by_period[0]
@@ -713,52 +702,42 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self._get_multiperiod_post_process()
 
     def _get_multiperiod_post_process(self) -> None:
-        q_r = [
-            [
-                [
-                    [
-                        self._active_binary_value(self.Q_r_by_period[n][i][j][k])
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
-        q_h = [
-            [self._active_binary_value(self.Q_h_by_period[n][j]) for j in range(self.J)]
-            for n in range(self.N_periods)
-        ]
-        q_c = [
-            [self._active_binary_value(self.Q_c_by_period[n][i]) for i in range(self.I)]
-            for n in range(self.N_periods)
-        ]
-        self.z = [
-            [
-                [
-                    [
-                        (
-                            1
-                            if max(q_r[n][i][j][k] for n in range(self.N_periods))
-                            > self.tol
-                            else 0
-                        )
-                    ]
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
-        self.z_hu = [
-            [1 if max(q_h[n][j] for n in range(self.N_periods)) > self.tol else 0]
-            for j in range(self.J)
-        ]
-        self.z_cu = [
-            [1 if max(q_c[n][i] for n in range(self.N_periods)) > self.tol else 0]
-            for i in range(self.I)
-        ]
+        q_r = build_index_grid(
+            lambda n, i, j, k: self._active_binary_value(
+                self.Q_r_by_period[n][i][j][k]
+            ),
+            (self.N_periods, self.I, self.J, self.S),
+        )
+        q_h = build_index_grid(
+            lambda n, j: self._active_binary_value(self.Q_h_by_period[n][j]),
+            (self.N_periods, self.J),
+        )
+        q_c = build_index_grid(
+            lambda n, i: self._active_binary_value(self.Q_c_by_period[n][i]),
+            (self.N_periods, self.I),
+        )
+
+        self.z = build_index_grid(
+            lambda i, j, k: _active_period_flag(
+                (q_r[n][i][j][k] for n in range(self.N_periods)),
+                self.tol,
+            ),
+            (self.I, self.J, self.S),
+        )
+        self.z_hu = build_index_grid(
+            lambda j: _active_period_flag(
+                (q_h[n][j] for n in range(self.N_periods)),
+                self.tol,
+            ),
+            (self.J,),
+        )
+        self.z_cu = build_index_grid(
+            lambda i: _active_period_flag(
+                (q_c[n][i] for n in range(self.N_periods)),
+                self.tol,
+            ),
+            (self.I,),
+        )
         self.n_recovery_units = sum(
             self.z[i][j][k][0]
             for k in range(self.S)
@@ -769,228 +748,138 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.n_cu_units = sum(self.z_cu[i][0] for i in range(self.I))
         self.n_units = self.n_recovery_units + self.n_hu_units + self.n_cu_units
 
-        self.theta_1_by_period = [
-            [
-                [
-                    [
-                        (
-                            [
-                                self._active_binary_value(self.T_h_by_period[n][i][k])
-                                - self._active_binary_value(self.T_c_by_period[n][j][k])
-                            ]
-                            if self.z[i][j][k][0] > 0
-                            else [self._recovery_approach_temperature(i, j, n)]
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
+        def recovery_temperature_difference(
+            n: int, i: int, j: int, hot_stage: int, cold_stage: int
+        ) -> list[float]:
+            if self.z[i][j][cold_stage][0] <= 0:
+                return [self._recovery_approach_temperature(i, j, n)]
+            return [
+                self._active_binary_value(self.T_h_by_period[n][i][hot_stage])
+                - self._active_binary_value(self.T_c_by_period[n][j][hot_stage])
             ]
-            for n in range(self.N_periods)
-        ]
-        self.theta_2_by_period = [
-            [
-                [
-                    [
-                        (
-                            [
-                                self._active_binary_value(
-                                    self.T_h_by_period[n][i][k + 1]
-                                )
-                                - self._active_binary_value(
-                                    self.T_c_by_period[n][j][k + 1]
-                                )
-                            ]
-                            if self.z[i][j][k][0] > 0
-                            else [self._recovery_approach_temperature(i, j, n)]
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
+
+        self.theta_1_by_period = build_index_grid(
+            lambda n, i, j, k: recovery_temperature_difference(n, i, j, k, k),
+            (self.N_periods, self.I, self.J, self.S),
+        )
+        self.theta_2_by_period = build_index_grid(
+            lambda n, i, j, k: recovery_temperature_difference(n, i, j, k + 1, k),
+            (self.N_periods, self.I, self.J, self.S),
+        )
         self.theta_1 = self.theta_1_by_period[0]
         self.theta_2 = self.theta_2_by_period[0]
 
-        self.LMTD_r_by_period = [
-            [
-                [
-                    [
-                        self._post_process_lmtd(
-                            self.theta_1_by_period[n][i][j][k][0],
-                            self.theta_2_by_period[n][i][j][k][0],
-                            self.z[i][j][k][0],
-                            formula_allowed=(
-                                abs(
-                                    self.theta_1_by_period[n][i][j][k][0]
-                                    - self.theta_2_by_period[n][i][j][k][0]
-                                )
-                                > self.tol
-                                and abs(
-                                    self.theta_1_by_period[n][i][j][k][0]
-                                    - self._recovery_approach_temperature(i, j, n)
-                                )
-                                >= self.tol
-                                and abs(
-                                    self.theta_2_by_period[n][i][j][k][0]
-                                    - self._recovery_approach_temperature(i, j, n)
-                                )
-                                >= self.tol
-                            ),
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.area_r_by_period = [
-            [
-                [
-                    [
-                        (
-                            q_r[n][i][j][k]
-                            / self.U_r_period[n][i][j]
-                            / self.LMTD_r_by_period[n][i][j][k]
-                            if self.LMTD_r_by_period[n][i][j][k] > self.tol
-                            and q_r[n][i][j][k] > self.tol
-                            else 0.0
-                        )
-                        for k in range(self.S)
-                    ]
-                    for j in range(self.J)
-                ]
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
+        self.LMTD_r_by_period = build_index_grid(
+            lambda n, i, j, k: self._post_process_lmtd(
+                self.theta_1_by_period[n][i][j][k][0],
+                self.theta_2_by_period[n][i][j][k][0],
+                self.z[i][j][k][0],
+                formula_allowed=_lmtd_formula_allowed(
+                    self.theta_1_by_period[n][i][j][k][0],
+                    self.theta_2_by_period[n][i][j][k][0],
+                    self._recovery_approach_temperature(i, j, n),
+                    self.tol,
+                ),
+            ),
+            (self.N_periods, self.I, self.J, self.S),
+        )
+        self.area_r_by_period = build_index_grid(
+            lambda n, i, j, k: _area_from_heat_load(
+                q_r[n][i][j][k],
+                self.U_r_period[n][i][j],
+                self.LMTD_r_by_period[n][i][j][k],
+                self.tol,
+            ),
+            (self.N_periods, self.I, self.J, self.S),
+        )
         self.LMTD_r = self.LMTD_r_by_period[0]
-        self.area_r = [
-            [
-                [
-                    max(
-                        self.area_r_by_period[n][i][j][k] for n in range(self.N_periods)
-                    )
-                    for k in range(self.S)
-                ]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
-        self.LMTD_hu_by_period = [
-            [
-                self._post_process_lmtd(
+        self.area_r = build_index_grid(
+            lambda i, j, k: max(
+                self.area_r_by_period[n][i][j][k] for n in range(self.N_periods)
+            ),
+            (self.I, self.J, self.S),
+        )
+
+        self.LMTD_hu_by_period = build_index_grid(
+            lambda n, j: self._post_process_lmtd(
+                self.T_hu_in_period[n][0] - self.T_c_out_period[n][j],
+                self.T_hu_out_period[n][0]
+                - self._active_binary_value(self.T_c_by_period[n][j][0]),
+                self.z_hu[j][0],
+                formula_allowed=_lmtd_formula_allowed(
                     self.T_hu_in_period[n][0] - self.T_c_out_period[n][j],
                     self.T_hu_out_period[n][0]
                     - self._active_binary_value(self.T_c_by_period[n][j][0]),
-                    self.z_hu[j][0],
-                    formula_allowed=(
-                        abs(
-                            (self.T_hu_in_period[n][0] - self.T_c_out_period[n][j])
-                            - (
-                                self.T_hu_out_period[n][0]
-                                - self._active_binary_value(self.T_c_by_period[n][j][0])
-                            )
-                        )
-                        > self.tol
-                        and self.T_hu_in_period[n][0]
-                        - self.T_c_out_period[n][j]
-                        - self._hot_utility_approach_temperature(j, n)
-                        >= self.tol
-                        and self.T_hu_out_period[n][0]
-                        - self._active_binary_value(self.T_c_by_period[n][j][0])
-                        - self._hot_utility_approach_temperature(j, n)
-                        >= self.tol
-                    ),
-                )
-                for j in range(self.J)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.area_hu_by_period = [
-            [
-                (
-                    q_h[n][j] / self.U_hu_period[n][j] / self.LMTD_hu_by_period[n][j]
-                    if self.LMTD_hu_by_period[n][j] > self.tol and q_h[n][j] > self.tol
-                    else 0.0
-                )
-                for j in range(self.J)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.LMTD_cu_by_period = [
-            [
-                self._post_process_lmtd(
+                    self._hot_utility_approach_temperature(j, n),
+                    self.tol,
+                ),
+            ),
+            (self.N_periods, self.J),
+        )
+        self.area_hu_by_period = build_index_grid(
+            lambda n, j: _area_from_heat_load(
+                q_h[n][j],
+                self.U_hu_period[n][j],
+                self.LMTD_hu_by_period[n][j],
+                self.tol,
+            ),
+            (self.N_periods, self.J),
+        )
+
+        self.LMTD_cu_by_period = build_index_grid(
+            lambda n, i: self._post_process_lmtd(
+                self._active_binary_value(self.T_h_by_period[n][i][self.S])
+                - self.T_cu_out_period[n][0],
+                self.T_h_out_period[n][i] - self.T_cu_in_period[n][0],
+                self.z_cu[i][0],
+                formula_allowed=_lmtd_formula_allowed(
                     self._active_binary_value(self.T_h_by_period[n][i][self.S])
                     - self.T_cu_out_period[n][0],
                     self.T_h_out_period[n][i] - self.T_cu_in_period[n][0],
-                    self.z_cu[i][0],
-                    formula_allowed=(
-                        abs(
-                            (
-                                self._active_binary_value(
-                                    self.T_h_by_period[n][i][self.S]
-                                )
-                                - self.T_cu_out_period[n][0]
-                            )
-                            - (self.T_h_out_period[n][i] - self.T_cu_in_period[n][0])
-                        )
-                        > self.tol
-                        and self._active_binary_value(self.T_h_by_period[n][i][self.S])
-                        - self.T_cu_out_period[n][0]
-                        - self._cold_utility_approach_temperature(i, n)
-                        >= self.tol
-                        and self.T_h_out_period[n][i]
-                        - self.T_cu_in_period[n][0]
-                        - self._cold_utility_approach_temperature(i, n)
-                        >= self.tol
-                    ),
-                    fallback_delta=(
-                        self.T_h_out_period[n][i] - self.T_cu_in_period[n][0]
-                    ),
-                )
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
-        self.area_cu_by_period = [
-            [
-                (
-                    q_c[n][i] / self.U_cu_period[n][i] / self.LMTD_cu_by_period[n][i]
-                    if self.LMTD_cu_by_period[n][i] > self.tol and q_c[n][i] > self.tol
-                    else 0.0
-                )
-                for i in range(self.I)
-            ]
-            for n in range(self.N_periods)
-        ]
+                    self._cold_utility_approach_temperature(i, n),
+                    self.tol,
+                ),
+                fallback_delta=(self.T_h_out_period[n][i] - self.T_cu_in_period[n][0]),
+            ),
+            (self.N_periods, self.I),
+        )
+        self.area_cu_by_period = build_index_grid(
+            lambda n, i: _area_from_heat_load(
+                q_c[n][i],
+                self.U_cu_period[n][i],
+                self.LMTD_cu_by_period[n][i],
+                self.tol,
+            ),
+            (self.N_periods, self.I),
+        )
         self.LMTD_hu = self.LMTD_hu_by_period[0]
         self.LMTD_cu = self.LMTD_cu_by_period[0]
-        self.area_hu = [
-            max(self.area_hu_by_period[n][j] for n in range(self.N_periods))
-            for j in range(self.J)
-        ]
-        self.area_cu = [
-            max(self.area_cu_by_period[n][i] for n in range(self.N_periods))
-            for i in range(self.I)
-        ]
-        self.Q_hu_total_by_period = [sum(q_h[n]) for n in range(self.N_periods)]
-        self.Q_cu_total_by_period = [sum(q_c[n]) for n in range(self.N_periods)]
-        self.Q_r_total_by_period = [
-            sum(
+
+        self.area_hu = build_index_grid(
+            lambda j: max(self.area_hu_by_period[n][j] for n in range(self.N_periods)),
+            (self.J,),
+        )
+        self.area_cu = build_index_grid(
+            lambda i: max(self.area_cu_by_period[n][i] for n in range(self.N_periods)),
+            (self.I,),
+        )
+        self.Q_hu_total_by_period = build_index_grid(
+            lambda n: sum(q_h[n]),
+            (self.N_periods,),
+        )
+        self.Q_cu_total_by_period = build_index_grid(
+            lambda n: sum(q_c[n]),
+            (self.N_periods,),
+        )
+        self.Q_r_total_by_period = build_index_grid(
+            lambda n: sum(
                 q_r[n][i][j][k]
                 for k in range(self.S)
                 for j in range(self.J)
                 for i in range(self.I)
-            )
-            for n in range(self.N_periods)
-        ]
+            ),
+            (self.N_periods,),
+        )
         self.Q_hu_total = self._weighted_numeric_average(self.Q_hu_total_by_period)
         self.Q_cu_total = self._weighted_numeric_average(self.Q_cu_total_by_period)
         self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_period)
