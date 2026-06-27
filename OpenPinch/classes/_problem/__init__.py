@@ -10,6 +10,13 @@ from ._loading import (
     load_problem_source,
     prepare_in_memory_problem_source,
 )
+from ._multiperiod import (
+    SUMMARY_PERIOD_MODES,
+    WEIGHTED_AVERAGE_PERIOD_ID,
+    combine_period_outputs,
+    output_for_period_mode,
+    weighted_average_output,
+)
 from ._output import (
     build_graph_data,
     build_problem_report,
@@ -37,7 +44,10 @@ __all__ = [
     "_PlotAccessorDescriptor",
     "_TargetAccessorDescriptor",
     "_validate_problem_semantics",
+    "SUMMARY_PERIOD_MODES",
+    "WEIGHTED_AVERAGE_PERIOD_ID",
     "build_validation_report",
+    "combine_period_outputs",
     "build_graph_data",
     "build_problem_report",
     "build_problem_summary_frame",
@@ -46,6 +56,8 @@ __all__ = [
     "format_schema_validation_error",
     "load_problem_source",
     "locate_summary_row",
+    "output_for_period_mode",
     "prepare_in_memory_problem_source",
     "run_targeting_for_zone_and_subzones",
+    "weighted_average_output",
 ]

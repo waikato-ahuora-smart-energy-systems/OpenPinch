@@ -177,7 +177,7 @@ def _apply_zone_dt_cont_multiplier(
     for child_schema in zone_tree.children:
         child_zone = parent_zone.get_subzone(loc=child_schema.name)
         if child_zone is None:
-            child_zone = parent_zone
+            continue
         _apply_zone_dt_cont_multiplier(
             parent_zone=child_zone,
             zone_tree=child_schema,

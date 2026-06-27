@@ -1507,8 +1507,9 @@ def test_build_prepared_stream_collection_rejects_unresolved_stream_zone():
         }
     )
 
-    with pytest.raises(ValueError, match="could not resolve zone"):
-        _build_prepared_stream_collection(master_zone, [stream], [])
+    with pytest.warns(UserWarning, match="Subzone 'Site/Missing' not found."):
+        with pytest.raises(ValueError, match="could not resolve zone"):
+            _build_prepared_stream_collection(master_zone, [stream], [])
 
 
 def test_prepare_problem_process_streams_are_referenced_in_parent_imports():
@@ -1817,7 +1818,7 @@ def test_canonical_zone_helpers_reject_invalid_config_and_multiplier_edges():
     assert blank_type == ZT.S.value
 
 
-def test_apply_zone_dt_cont_multiplier_uses_parent_when_child_zone_missing():
+def test_apply_zone_dt_cont_multiplier_skips_missing_child_zone():
     parent_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
     zone_tree = ZoneTreeSchema(
         name="Site",
@@ -1831,10 +1832,43 @@ def test_apply_zone_dt_cont_multiplier_uses_parent_when_child_zone_missing():
         ],
     )
 
-    out = _apply_zone_dt_cont_multiplier(parent_zone, zone_tree)
+    with pytest.warns(UserWarning) as caught:
+        out = _apply_zone_dt_cont_multiplier(parent_zone, zone_tree)
+
+    messages = [str(warning.message) for warning in caught]
+    assert any("Subzone 'MissingChild' not found." in message for message in messages)
+    assert any("empty stream collection" in message for message in messages)
+    assert out is parent_zone
+    assert parent_zone.dt_cont_multiplier == pytest.approx(1.0)
+
+
+def test_apply_zone_dt_cont_multiplier_applies_existing_child_zone():
+    parent_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    child_zone = Zone(
+        name="AreaA",
+        type=ZT.P.value,
+        config=parent_zone.config,
+        parent_zone=parent_zone,
+    )
+    parent_zone.add_zone(child_zone)
+    zone_tree = ZoneTreeSchema(
+        name="Site",
+        type="Zone",
+        children=[
+            ZoneTreeSchema(
+                name="AreaA",
+                type="Zone",
+                dt_cont_multiplier=2.0,
+            )
+        ],
+    )
+
+    with pytest.warns(UserWarning, match="empty stream collection"):
+        out = _apply_zone_dt_cont_multiplier(parent_zone, zone_tree)
 
     assert out is parent_zone
-    assert parent_zone.dt_cont_multiplier == pytest.approx(2.0)
+    assert parent_zone.dt_cont_multiplier == pytest.approx(1.0)
+    assert child_zone.dt_cont_multiplier == pytest.approx(2.0)
 
 
 def test_rewrite_stream_zones_handles_empty_labels_and_root_name_collisions():
@@ -2213,12 +2247,13 @@ def test_assign_process_streams_to_subzones_rejects_unresolved_and_neutral_strea
     )
     process_streams.add(hot_stream, key="Site.Hot Stream.H1")
 
-    with pytest.raises(ValueError, match="could not resolve zone"):
-        _assign_process_streams_to_subzones(
-            master_zone=master_zone,
-            process_streams=process_streams,
-            process_zone_paths={"Site.Hot Stream.H1": "Site/Missing"},
-        )
+    with pytest.warns(UserWarning, match="Subzone 'Site/Missing' not found."):
+        with pytest.raises(ValueError, match="could not resolve zone"):
+            _assign_process_streams_to_subzones(
+                master_zone=master_zone,
+                process_streams=process_streams,
+                process_zone_paths={"Site.Hot Stream.H1": "Site/Missing"},
+            )
 
     area = Zone(
         name="AreaA",

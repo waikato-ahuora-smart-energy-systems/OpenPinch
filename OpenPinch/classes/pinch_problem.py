@@ -6,6 +6,7 @@ import math
 import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -31,6 +32,7 @@ from ..utils.export import (
 )
 from ..utils.wkbook_to_json import get_problem_from_excel
 from ._problem import (
+    SUMMARY_PERIOD_MODES,
     JsonDict,
     PathLike,
     _ComponentAccessorDescriptor,
@@ -47,6 +49,7 @@ from ._problem import (
     build_validation_report,
     extract_results,
     load_problem_source,
+    output_for_period_mode,
     prepare_in_memory_problem_source,
     run_targeting_for_zone_and_subzones,
 )
@@ -63,6 +66,16 @@ from .zone import Zone
 ZoneService = Callable[["Zone", Optional[dict[str, Any]]], "Zone"]
 
 
+@dataclass(frozen=True)
+class _TargetRunSpec:
+    """A public targeting surface that can be replayed for another period."""
+
+    surface: str
+    options: dict[str, Any]
+    zone_name: Optional[str] = None
+    include_subzones: bool = False
+
+
 class PinchProblem:
     """Typed orchestrator for loading input data and running targeting."""
 
@@ -76,6 +89,8 @@ class PinchProblem:
     _process_components: dict[str, Any]
     _input_source_kind: str
     _validation_context: Optional[dict[str, list[dict[str, Any]]]]
+    _last_target_run_spec: Optional[_TargetRunSpec]
+    _suspend_target_run_recording: bool
     add_component = _ComponentAccessorDescriptor()
     design = _DesignAccessorDescriptor()
     plot = _PlotAccessorDescriptor()
@@ -98,6 +113,8 @@ class PinchProblem:
         self._validated_data = None
         self._master_zone = None
         self._process_components = {}
+        self._last_target_run_spec = None
+        self._suspend_target_run_recording = False
         self.results_dir = None
 
         if source is not None:
@@ -420,7 +437,9 @@ class PinchProblem:
             raise ValueError("This problem has no canonical period_ids to target.")
 
         previous_results = self._results
+        previous_recording_state = self._suspend_target_run_recording
         try:
+            self._suspend_target_run_recording = True
             if parallel in (False, None):
                 results_by_requested_period = {
                     period_id: self._solve_target_for_period(period_id)
@@ -436,12 +455,127 @@ class PinchProblem:
                 max_workers=max_workers,
             )
         finally:
+            self._suspend_target_run_recording = previous_recording_state
             if preserve_cached_results:
                 self._results = previous_results
 
     def _solve_target_for_period(self, period_id: str) -> TargetOutput:
         result = self.target(period_id=period_id)
         return TargetOutput.model_validate(result.model_dump(mode="python"))
+
+    def _record_target_run(
+        self,
+        surface: str,
+        *,
+        options: Optional[dict[str, Any]] = None,
+        zone_name: Optional[str] = None,
+        include_subzones: bool = False,
+    ) -> None:
+        """Remember the public target accessor that produced the current result."""
+        if self._suspend_target_run_recording:
+            return
+        self._last_target_run_spec = _TargetRunSpec(
+            surface=surface,
+            options=deepcopy(dict(options or {})),
+            zone_name=zone_name,
+            include_subzones=bool(include_subzones),
+        )
+
+    def _target_run_spec_for_summary(self) -> _TargetRunSpec:
+        return self._last_target_run_spec or _TargetRunSpec(
+            surface="default",
+            options={},
+        )
+
+    def _period_options_for_replay(
+        self,
+        spec: _TargetRunSpec,
+        *,
+        period_id: str,
+    ) -> dict[str, Any]:
+        runtime_options = deepcopy(dict(spec.options or {}))
+        runtime_options.pop("period_id", None)
+        runtime_options.pop("period_idx", None)
+        runtime_options["period_id"] = period_id
+        return runtime_options
+
+    def _target_outputs_for_recorded_periods(self) -> list[TargetOutput]:
+        period_ids = list(self.period_ids.keys())
+        if not period_ids:
+            raise ValueError("This problem has no canonical period_ids to target.")
+
+        spec = self._target_run_spec_for_summary()
+        previous_results = self._results
+        previous_recording_state = self._suspend_target_run_recording
+        previous_spec = self._last_target_run_spec
+        outputs: list[TargetOutput] = []
+        try:
+            self._suspend_target_run_recording = True
+            for period_id in period_ids:
+                outputs.append(self._target_output_for_recorded_period(spec, period_id))
+        finally:
+            self._suspend_target_run_recording = previous_recording_state
+            self._last_target_run_spec = previous_spec
+            self._results = previous_results
+        return outputs
+
+    def _target_output_for_recorded_period(
+        self,
+        spec: _TargetRunSpec,
+        period_id: str,
+    ) -> TargetOutput:
+        runtime_options = self._period_options_for_replay(spec, period_id=period_id)
+        if spec.surface == "default":
+            result = self.target(options=runtime_options)
+            return TargetOutput.model_validate(result.model_dump(mode="python"))
+
+        target_accessor = self.target
+        target_method = getattr(target_accessor, spec.surface)
+        target_method(
+            zone_name=spec.zone_name,
+            options=runtime_options,
+            include_subzones=spec.include_subzones,
+        )
+        if self._results is None:
+            raise RuntimeError(
+                f"Target accessor {spec.surface!r} did not produce report results."
+            )
+        return TargetOutput.model_validate(self._results.model_dump(mode="python"))
+
+    def _period_weights_for_summary(self) -> list[float]:
+        master_zone = self._require_prepared_root_zone()
+        period_ids = list(master_zone.period_ids.keys())
+        weights = getattr(master_zone, "weights", None)
+        if weights is None or len(weights) != len(period_ids):
+            return [1.0 for _ in period_ids]
+        return [
+            float(weights[int(master_zone.period_ids[period_id])])
+            for period_id in period_ids
+        ]
+
+    def _summary_results(
+        self,
+        *,
+        periods: str,
+        solve: bool = True,
+    ) -> TargetOutput | None:
+        if periods not in SUMMARY_PERIOD_MODES:
+            raise ValueError(
+                "periods must be one of: "
+                + ", ".join(sorted(SUMMARY_PERIOD_MODES))
+                + "."
+            )
+        if periods == "selected":
+            results = self._results
+            if results is None and solve:
+                results = self.target()
+            return results
+        if not solve:
+            return None
+
+        outputs = self._target_outputs_for_recorded_periods()
+        weights = self._period_weights_for_summary()
+        return output_for_period_mode(outputs, weights, periods=periods)
 
     def _resolve_runtime_period_options(
         self,
@@ -553,9 +687,10 @@ class PinchProblem:
         *,
         detailed: bool = False,
         format: str | None = None,
+        periods: str = "selected",
     ) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
-        results = self._results if self._results is not None else self.target()
+        results = self._summary_results(periods=periods)
         if format is None:
             format = "detailed" if detailed else "compact"
         elif detailed and format != "detailed":
@@ -564,20 +699,26 @@ class PinchProblem:
             return build_summary_dataframe(results.targets)
         return build_problem_summary_frame(results, format=format)
 
-    def metrics(self, *, solve: bool = True) -> list[ReportMetric]:
+    def metrics(
+        self,
+        *,
+        solve: bool = True,
+        periods: str = "selected",
+    ) -> list[ReportMetric]:
         """Return typed summary metrics for the current solved result."""
-        results = self._results
-        if results is None and solve:
-            results = self.target()
+        results = self._summary_results(periods=periods, solve=solve)
         if results is None:
             return []
         return build_report_metrics(results)
 
-    def report(self, *, solve: bool = True) -> ProblemReport:
+    def report(
+        self,
+        *,
+        solve: bool = True,
+        periods: str = "selected",
+    ) -> ProblemReport:
         """Return a typed report without writing any files."""
-        results = self._results
-        if results is None and solve:
-            results = self.target()
+        results = self._summary_results(periods=periods, solve=solve)
         graph_data = build_graph_data(results) if results is not None else None
         return build_problem_report(
             project_name=self.project_name,
@@ -586,17 +727,21 @@ class PinchProblem:
             graph_data=graph_data,
         )
 
-    def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
+    def export_excel(
+        self,
+        results_dir: Optional[PathLike] = None,
+        *,
+        periods: str = "selected",
+    ) -> Path:
         """Export the solved target summary and problem tables to an Excel file."""
         if results_dir is not None:
             self.results_dir = Path(results_dir)
         if self.results_dir is None:
             raise ValueError("No results_dir set. Provide a path to export results.")
-        if self._results is None:
-            self.target()
+        results = self._summary_results(periods=periods)
 
         output_path = export_target_summary_to_excel_with_units(
-            target_response=self._results,
+            target_response=results,
             master_zone=self._master_zone,
             out_dir=self.results_dir,
         )
@@ -772,6 +917,7 @@ class PinchProblem:
             resolved_value = 1.0
         self._master_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
         self._results = None  # Clear cached results since multipliers have changed
+        self._last_target_run_spec = None
         return self._master_zone
 
     def update_options(
@@ -874,6 +1020,7 @@ class PinchProblem:
         self._master_zone = self._data_preprocessing()
         self._process_components = {}
         self._results = None
+        self._last_target_run_spec = None
         return self._master_zone
 
     def _replace_problem_inputs(self, problem_inputs: JsonDict) -> Zone:

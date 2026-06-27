@@ -55,12 +55,14 @@ class PinchWorkspace:
 
     def __init__(
         self,
-        source: TargetInput
-        | JsonDict
-        | PathLike
-        | tuple[PathLike, PathLike]
-        | PinchProblem
-        | None = None,
+        source: (
+            TargetInput
+            | JsonDict
+            | PathLike
+            | tuple[PathLike, PathLike]
+            | PinchProblem
+            | None
+        ) = None,
         *,
         project_name: Optional[str] = "Site",
         baseline_name: str = "baseline",
@@ -124,12 +126,14 @@ class PinchWorkspace:
 
     def load(
         self,
-        source: TargetInput
-        | JsonDict
-        | PathLike
-        | tuple[PathLike, PathLike]
-        | PinchProblem
-        | None,
+        source: (
+            TargetInput
+            | JsonDict
+            | PathLike
+            | tuple[PathLike, PathLike]
+            | PinchProblem
+            | None
+        ),
         *,
         case_name: Optional[str] = None,
         activate: bool = True,
@@ -460,26 +464,47 @@ class PinchWorkspace:
         case_name: Optional[str] = None,
         detailed: bool = False,
         format: str | None = None,
+        periods: str = "selected",
     ) -> pd.DataFrame:
         """Return the solved summary for one case."""
-        return self.case(case_name).summary_frame(detailed=detailed, format=format)
+        return self.case(case_name).summary_frame(
+            detailed=detailed,
+            format=format,
+            periods=periods,
+        )
 
-    def metrics(self, *, case_name: Optional[str] = None, solve: bool = True):
+    def metrics(
+        self,
+        *,
+        case_name: Optional[str] = None,
+        solve: bool = True,
+        periods: str = "selected",
+    ):
         """Return typed metrics for one case."""
-        return self.case(case_name).metrics(solve=solve)
+        return self.case(case_name).metrics(solve=solve, periods=periods)
 
-    def report(self, *, case_name: Optional[str] = None, solve: bool = True):
+    def report(
+        self,
+        *,
+        case_name: Optional[str] = None,
+        solve: bool = True,
+        periods: str = "selected",
+    ):
         """Return a typed report for one case."""
-        return self.case(case_name).report(solve=solve)
+        return self.case(case_name).report(solve=solve, periods=periods)
 
     def export_excel(
         self,
         results_dir: Optional[PathLike] = None,
         *,
         case_name: Optional[str] = None,
+        periods: str = "selected",
     ) -> Path:
         """Export one case to an Excel workbook."""
-        return self.case(case_name).export_excel(results_dir)
+        case = self.case(case_name)
+        if periods == "selected":
+            return case.export_excel(results_dir)
+        return case.export_excel(results_dir, periods=periods)
 
     def set_dt_cont_multiplier(
         self,
