@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import sys
 from types import SimpleNamespace
 
@@ -414,6 +415,21 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     assert any("No graphs available" in msg for msg in st.infos)
     assert any("No shifted problem table data" in msg for msg in st.infos)
     assert any("No real temperature Problem Table data" in msg for msg in st.infos)
+
+
+def test_require_streamlit_imports_when_not_cached(monkeypatch):
+    st = _StreamlitStub()
+    sys.modules.pop("streamlit", None)
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "streamlit":
+            return st
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    assert wg._require_streamlit() is st
 
 
 def test_render_streamlit_dashboard_handles_energy_transfer_target(monkeypatch):

@@ -3,6 +3,7 @@
 import json
 import os
 
+import numpy as np
 import pytest
 
 from OpenPinch.classes import *
@@ -12,12 +13,63 @@ from OpenPinch.services.common.gcc_manipulation import (
 )
 from OpenPinch.services.common.miscellaneous import *
 from OpenPinch.services.common.utility_targeting import (
+    _assign_utility,
+    _maximise_utility_duty,
     target_utilities_for_load_profiles,
 )
 from OpenPinch.services.input_data_processing.data_preparation import prepare_problem
 from OpenPinch.utils import get_scalar_value
 
 """Tests for target_utilities_for_load_profiles."""
+
+
+def test_target_utilities_for_load_profiles_rejects_missing_required_utilities():
+    with pytest.raises(ValueError, match="No hot utilities provided"):
+        target_utilities_for_load_profiles(
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
+            T_vals=np.array([200.0, 100.0]),
+            H_net_cold=np.array([10.0, 0.0]),
+            H_net_hot=np.array([0.0, 0.0]),
+            pinch_idx=(0, 1),
+        )
+
+    with pytest.raises(ValueError, match="No cold utilities provided"):
+        target_utilities_for_load_profiles(
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
+            T_vals=np.array([200.0, 100.0]),
+            H_net_cold=np.array([0.0, 0.0]),
+            H_net_hot=np.array([0.0, 10.0]),
+            pinch_idx=(0, 1),
+        )
+
+
+def test_assign_utility_rejects_non_vector_heat_segment():
+    with pytest.raises(ValueError, match="Error in utility targeting"):
+        _assign_utility(
+            T_vals=np.array([200.0, 100.0]),
+            H_vals=np.array([[0.0, 10.0], [20.0, 30.0]]),
+            u_ls=StreamCollection(),
+            pinch_row=1,
+            is_hot_ut=True,
+            is_real_temperatures=False,
+            idx=None,
+        )
+
+
+def test_maximise_utility_duty_returns_zero_for_single_point_segment():
+    assert (
+        _maximise_utility_duty(
+            T_segment=np.array([200.0]),
+            H_segment=np.array([0.0]),
+            Ts=210.0,
+            Tt=190.0,
+            is_hot_ut=True,
+            Q_assigned=0.0,
+        )
+        == 0.0
+    )
 
 
 def get_test_filenames():

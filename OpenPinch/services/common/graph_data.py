@@ -1,6 +1,7 @@
 """Graph construction helpers for composite curves and related plots."""
 
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
 import numpy as np
@@ -14,6 +15,158 @@ from .graph_series_meta import GRAPH_SERIES_META, GraphSeriesMeta
 
 DECIMAL_PLACES = 2
 GCC_VERTICAL_TOL = 1e-3
+
+
+@dataclass(frozen=True)
+class GraphBuildSpec:
+    """Declarative instructions for building one target graph payload."""
+
+    graph_type: GT
+    label: str
+    builder: str
+    value_fields: tuple = ()
+    stream_types: tuple = ()
+    utility_profile_flags: tuple = ()
+    include_arrows: bool = True
+
+
+COMPOSITE_GRAPH_SPECS = (
+    GraphBuildSpec(
+        graph_type=GT.CC,
+        label="Composite Curve",
+        builder="composite",
+        value_fields=(PT.H_HOT, PT.H_COLD),
+        stream_types=(StreamLoc.HotS, StreamLoc.ColdS),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.SCC,
+        label="Shifted Composite Curve",
+        builder="composite",
+        value_fields=(PT.H_HOT, PT.H_COLD),
+        stream_types=(StreamLoc.HotS, StreamLoc.ColdS),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.BCC,
+        label="Balanced Composite Curve",
+        builder="composite",
+        value_fields=(PT.H_HOT_BAL, PT.H_COLD_BAL),
+        stream_types=(StreamLoc.HotS, StreamLoc.ColdS),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.NLP,
+        label="Net Load Curves",
+        builder="composite",
+        value_fields=(
+            PT.H_NET_HOT,
+            PT.H_NET_COLD,
+            PT.H_HOT_UT,
+            PT.H_COLD_UT,
+            PT.H_HOT_HP,
+            PT.H_COLD_HP,
+        ),
+        stream_types=(
+            StreamLoc.HotS,
+            StreamLoc.ColdS,
+            StreamLoc.HotU,
+            StreamLoc.ColdU,
+            StreamLoc.HotU,
+            StreamLoc.ColdU,
+        ),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.NLP_HP,
+        label="Net Load Profiles with Heat Pump",
+        builder="composite",
+        value_fields=(PT.H_NET_HOT, PT.H_NET_COLD, PT.H_HOT_HP, PT.H_COLD_HP),
+        stream_types=(
+            StreamLoc.HotS,
+            StreamLoc.ColdS,
+            StreamLoc.HotU,
+            StreamLoc.ColdU,
+        ),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.NLP_X,
+        label="Exergetic Net Load Profiles",
+        builder="composite",
+        value_fields=(PT.X_SUR, PT.X_DEF),
+        stream_types=(StreamLoc.HotS, StreamLoc.ColdS),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.TSP,
+        label="Total Site Profiles",
+        builder="composite",
+        value_fields=(PT.H_HOT, PT.H_COLD, PT.H_HOT_UT, PT.H_COLD_UT),
+        stream_types=(
+            StreamLoc.HotS,
+            StreamLoc.ColdS,
+            StreamLoc.HotU,
+            StreamLoc.ColdU,
+        ),
+    ),
+)
+
+GCC_GRAPH_SPECS = (
+    GraphBuildSpec(
+        graph_type=GT.GCC,
+        label="Grand Composite Curve",
+        builder="gcc",
+        value_fields=(PT.H_NET, PT.H_NET_NP, PT.H_NET_V, PT.H_NET_A, PT.H_NET_UT),
+        utility_profile_flags=(False, False, False, False, True),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.GCC_R,
+        label="Grand Composite Curve (Real)",
+        builder="gcc",
+        value_fields=(PT.H_NET, PT.H_NET_UT),
+        utility_profile_flags=(False, True),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.GCC_X,
+        label="Exergetic Grand Composite Curve",
+        builder="gcc",
+        value_fields=(PT.X_GCC,),
+        utility_profile_flags=(False,),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.SUGCC,
+        label="Site Utility Grand Composite Curve",
+        builder="gcc",
+        value_fields=(PT.H_NET_UT,),
+        utility_profile_flags=(True,),
+    ),
+    GraphBuildSpec(
+        graph_type=GT.GCC_HP,
+        label="Grand Composite Curve with Heat Pump",
+        builder="gcc",
+        value_fields=(PT.H_NET_W_AIR, PT.H_NET_HP),
+        utility_profile_flags=(False, True),
+    ),
+)
+
+ENERGY_TRANSFER_GRAPH_SPECS = (
+    GraphBuildSpec(
+        graph_type=GT.ETD,
+        label="Energy Transfer Diagram",
+        builder="energy_transfer",
+    ),
+)
+
+GRAPH_BUILD_SPECS = (
+    COMPOSITE_GRAPH_SPECS[0],
+    COMPOSITE_GRAPH_SPECS[1],
+    COMPOSITE_GRAPH_SPECS[2],
+    GCC_GRAPH_SPECS[0],
+    GCC_GRAPH_SPECS[1],
+    GCC_GRAPH_SPECS[2],
+    COMPOSITE_GRAPH_SPECS[3],
+    COMPOSITE_GRAPH_SPECS[4],
+    COMPOSITE_GRAPH_SPECS[5],
+    COMPOSITE_GRAPH_SPECS[6],
+    GCC_GRAPH_SPECS[3],
+    GCC_GRAPH_SPECS[4],
+    ENERGY_TRANSFER_GRAPH_SPECS[0],
+)
 
 
 __all__ = [
@@ -115,241 +268,82 @@ def clean_composite_curve(
 def _create_graph_set(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
     """Creates Pinch Analysis and total site analysis graphs for a specifc zone."""
 
-    graphs: List[dict] = []
+    context = resolve_graph_context(t, zone)
     target_graphs = getattr(t, "graphs", {})
-    graph_title = t.name
-    zone_name = getattr(zone, "name", None) or getattr(t, "zone_name", None)
-    zone_address = getattr(zone, "address", None)
+    graphs = build_available_graphs(context["graph_title"], target_graphs)
+    return build_graph_set_payload(t, context, graphs)
 
-    if GT.CC.value in target_graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graph_title,
-                key=GT.CC.value,
-                data=target_graphs[GT.CC.value],
-                label="Composite Curve",
-                value_field=[
-                    PT.H_HOT,
-                    PT.H_COLD,
-                ],
-                stream_type=[
-                    StreamLoc.HotS,
-                    StreamLoc.ColdS,
-                ],
-            )
-        )
 
-    if GT.SCC.value in target_graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graph_title,
-                key=GT.SCC.value,
-                data=target_graphs[GT.SCC.value],
-                label="Shifted Composite Curve",
-                value_field=[
-                    PT.H_HOT,
-                    PT.H_COLD,
-                ],
-                stream_type=[
-                    StreamLoc.HotS,
-                    StreamLoc.ColdS,
-                ],
-            )
-        )
-
-    if GT.BCC.value in target_graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graph_title,
-                key=GT.BCC.value,
-                data=target_graphs[GT.BCC.value],
-                label="Balanced Composite Curve",
-                value_field=[PT.H_HOT_BAL, PT.H_COLD_BAL],
-                stream_type=[StreamLoc.HotS, StreamLoc.ColdS],
-                include_arrows=True,
-            )
-        )
-
-    if GT.GCC.value in target_graphs:
-        graphs.append(
-            _make_gcc_graph(
-                graph_title=graph_title,
-                key=GT.GCC.value,
-                data=target_graphs[GT.GCC.value],
-                label="Grand Composite Curve",
-                value_field=[
-                    PT.H_NET,
-                    PT.H_NET_NP,
-                    PT.H_NET_V,
-                    PT.H_NET_A,
-                    PT.H_NET_UT,
-                ],
-                is_utility_profile=[False, False, False, False, True],
-            )
-        )
-
-    if GT.GCC_R.value in target_graphs:
-        graphs.append(
-            _make_gcc_graph(
-                graph_title=graph_title,
-                key=GT.GCC_R.value,
-                data=target_graphs[GT.GCC_R.value],
-                label="Grand Composite Curve (Real)",
-                value_field=[
-                    PT.H_NET,
-                    PT.H_NET_UT,
-                ],
-                is_utility_profile=[False, True],
-            )
-        )
-
-    if GT.GCC_X.value in target_graphs:
-        graphs.append(
-            _make_gcc_graph(
-                graph_title=graph_title,
-                key=GT.GCC_X.value,
-                data=target_graphs[GT.GCC_X.value],
-                label="Exergetic Grand Composite Curve",
-                value_field=[
-                    PT.X_GCC.value,
-                ],
-                is_utility_profile=[False],
-            )
-        )
-
-    if GT.NLP.value in target_graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graph_title,
-                key=GT.NLP.value,
-                data=target_graphs[GT.NLP.value],
-                label="Net Load Curves",
-                value_field=[
-                    PT.H_NET_HOT,
-                    PT.H_NET_COLD,
-                    PT.H_HOT_UT,
-                    PT.H_COLD_UT,
-                    PT.H_HOT_HP,
-                    PT.H_COLD_HP,
-                ],
-                stream_type=[
-                    StreamLoc.HotS,
-                    StreamLoc.ColdS,
-                    StreamLoc.HotU,
-                    StreamLoc.ColdU,
-                    StreamLoc.HotU,
-                    StreamLoc.ColdU,
-                ],
-                include_arrows=True,
-            )
-        )
-
-    if GT.NLP_HP.value in target_graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graph_title,
-                key=GT.NLP_HP.value,
-                data=target_graphs[GT.NLP_HP.value],
-                label="Net Load Profiles with Heat Pump",
-                value_field=[
-                    PT.H_NET_HOT,
-                    PT.H_NET_COLD,
-                    PT.H_HOT_HP,
-                    PT.H_COLD_HP,
-                ],
-                stream_type=[
-                    StreamLoc.HotS,
-                    StreamLoc.ColdS,
-                    StreamLoc.HotU,
-                    StreamLoc.ColdU,
-                ],
-                include_arrows=True,
-            )
-        )
-
-    if GT.NLP_X.value in target_graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graph_title,
-                key=GT.NLP_X.value,
-                data=target_graphs[GT.NLP_X.value],
-                label="Exergetic Net Load Profiles",
-                value_field=[
-                    PT.X_SUR,
-                    PT.X_DEF,
-                ],
-                stream_type=[
-                    StreamLoc.HotS,
-                    StreamLoc.ColdS,
-                ],
-                include_arrows=True,
-            )
-        )
-
-    if GT.TSP.value in target_graphs:
-        graphs.append(
-            _make_composite_graph(
-                graph_title=graph_title,
-                key=GT.TSP.value,
-                data=target_graphs[GT.TSP.value],
-                value_field=[
-                    PT.H_HOT,
-                    PT.H_COLD,
-                    PT.H_HOT_UT,
-                    PT.H_COLD_UT,
-                ],
-                stream_type=[
-                    StreamLoc.HotS,
-                    StreamLoc.ColdS,
-                    StreamLoc.HotU,
-                    StreamLoc.ColdU,
-                ],
-                label="Total Site Profiles",
-                include_arrows=True,
-            )
-        )
-
-    if GT.SUGCC.value in target_graphs:
-        graphs.append(
-            _make_gcc_graph(
-                graph_title=graph_title,
-                key=GT.SUGCC.value,
-                data=target_graphs[GT.SUGCC.value],
-                label="Site Utility Grand Composite Curve",
-                value_field=[PT.H_NET_UT],
-                is_utility_profile=[True],
-            )
-        )
-
-    if GT.GCC_HP.value in target_graphs:
-        graphs.append(
-            _make_gcc_graph(
-                graph_title=graph_title,
-                key=GT.GCC_HP.value,
-                data=target_graphs[GT.GCC_HP.value],
-                label="Grand Composite Curve with Heat Pump",
-                value_field=[
-                    PT.H_NET_W_AIR,
-                    PT.H_NET_HP,
-                ],
-                is_utility_profile=[False, True],
-            )
-        )
-
-    if GT.ETD.value in target_graphs:
-        graphs.append(
-            _make_energy_transfer_diagram_graph(
-                graph_title=graph_title,
-                target_graphs=target_graphs,
-            )
-        )
-
+def resolve_graph_context(t: BaseTargetModel, zone: Optional[Zone] = None) -> dict:
+    """Return target and zone metadata shared by every graph-set payload."""
     return {
-        "name": graph_title,
+        "graph_title": t.name,
+        "zone_name": getattr(zone, "name", None) or getattr(t, "zone_name", None),
+        "zone_address": getattr(zone, "address", None),
+    }
+
+
+def iter_available_graph_specs(target_graphs: dict) -> Iterable[GraphBuildSpec]:
+    """Yield build specs whose graph payload is available on the target."""
+    for spec in GRAPH_BUILD_SPECS:
+        if spec.graph_type.value in target_graphs:
+            yield spec
+
+
+def build_available_graphs(graph_title: str, target_graphs: dict) -> list[dict]:
+    """Build graph payloads for every available spec in canonical order."""
+    return [
+        build_graph_from_spec(graph_title, target_graphs, spec)
+        for spec in iter_available_graph_specs(target_graphs)
+    ]
+
+
+def build_graph_from_spec(
+    graph_title: str,
+    target_graphs: dict,
+    spec: GraphBuildSpec,
+) -> dict:
+    """Build one graph payload using its declarative graph specification."""
+    graph_key = spec.graph_type.value
+    if spec.builder == "composite":
+        return _make_composite_graph(
+            graph_title=graph_title,
+            key=graph_key,
+            data=target_graphs[graph_key],
+            label=spec.label,
+            value_field=spec.value_fields,
+            stream_type=spec.stream_types,
+            include_arrows=spec.include_arrows,
+        )
+    if spec.builder == "gcc":
+        return _make_gcc_graph(
+            graph_title=graph_title,
+            key=graph_key,
+            data=target_graphs[graph_key],
+            label=spec.label,
+            value_field=spec.value_fields,
+            is_utility_profile=spec.utility_profile_flags,
+        )
+    if spec.builder == "energy_transfer":
+        return _make_energy_transfer_diagram_graph(
+            graph_title=graph_title,
+            target_graphs=target_graphs,
+        )
+    raise ValueError(f"Unsupported graph builder: {spec.builder!r}.")
+
+
+def build_graph_set_payload(
+    t: BaseTargetModel,
+    context: dict,
+    graphs: list[dict],
+) -> dict:
+    """Assemble the graph-set envelope around already-built graph payloads."""
+    return {
+        "name": context["graph_title"],
         "target_type": getattr(t, "type", None),
         "period_id": getattr(t, "period_id", None),
-        "zone_name": zone_name,
-        "zone_address": zone_address,
+        "zone_name": context["zone_name"],
+        "zone_address": context["zone_address"],
         "graphs": graphs,
     }
 

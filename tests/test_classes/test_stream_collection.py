@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from OpenPinch.classes import *
+from OpenPinch.classes._stream_collection._numeric_view import value_at_idx
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib import *
@@ -202,6 +203,22 @@ def test_numeric_view_updates_after_collection_mutation(sample_streams):
     sc.add(s2)
 
     assert sc.numeric_view().cp.shape == (2,)
+
+
+def test_numeric_view_none_values_and_legacy_pickle_state_rebuild_cache():
+    assert np.isnan(value_at_idx(None))
+
+    stream = Stream(name="H1", t_supply=200, t_target=120, heat_flow=80.0)
+    sc = StreamCollection([stream])
+    state = sc.__getstate__()
+    state.pop("_numeric_cache", None)
+
+    restored = StreamCollection()
+    del restored.__dict__["_numeric_cache"]
+    restored.__setstate__(state)
+
+    assert restored._numeric_cache == {}
+    assert restored[0].name == "H1"
 
 
 def test_get_hot_streams_filters_and_preserves_sort_settings():

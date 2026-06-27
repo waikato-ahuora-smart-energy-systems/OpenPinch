@@ -97,6 +97,13 @@ def test_brayton_cycle_requires_solution_before_property_access():
         _ = hp.Ss
 
 
+def test_brayton_cycle_reports_missing_tespy_dependency(monkeypatch):
+    monkeypatch.setattr(br, "_TESPY_IMPORT_ERROR", ImportError("missing tespy"))
+
+    with pytest.raises(ImportError, match="TESPy"):
+        br._require_tespy()
+
+
 def test_brayton_cycle_solve_profiles_and_stream_build(monkeypatch):
     _patch_tespy(monkeypatch)
     hp = br.SimpleBraytonHeatPumpCycle()

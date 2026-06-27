@@ -247,9 +247,6 @@ def _maximise_utility_duty(
 
     def _candidate_limit(q_pot_values: np.ndarray) -> tuple[float, float, float]:
         q_pot_valid = q_pot_values[valid_mask]
-        if q_pot_valid.size == 0:
-            return 0.0, 0.0, np.inf
-
         q_ts_max = q_pot_valid.max()
         q_tt = np.full_like(q_pot_valid, np.inf, dtype=float)
         slope_mask = (-dt_tar_valid) > tol

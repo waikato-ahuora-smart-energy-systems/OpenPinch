@@ -15,6 +15,9 @@ import pandas as pd
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
 from ..lib.problem_table_types import ProblemTableColumnUpdates
+from ._problem_table._equality import (
+    problem_tables_equal,
+)
 from ._problem_table._problem_table_constants import (
     HEAT_CAPACITY_PAIRS,
     INTERPOLATION_KEYS,
@@ -277,65 +280,13 @@ class ProblemTable:
 
     def _equals(self, other: "ProblemTable", *, atol: float | None = None) -> bool:
         """Return True when two tables match within ``atol`` absolute tolerance."""
-        if not isinstance(other, ProblemTable):
-            return False
-
-        if self.columns != other.columns:
-            return False
-
-        if self.data is None or other.data is None:
-            return self.data is None and other.data is None
-
-        if self.data.shape != other.data.shape:
-            return False
-
-        atol = self._DEFAULT_ATOL if atol is None else atol
-        left = self.data
-        right = other.data
-
-        if left.size == 0:
-            return True
-
-        if left.dtype != object and right.dtype != object:
-            return np.allclose(left, right, atol=atol, rtol=0.0, equal_nan=True)
-
-        numeric_types = (numbers.Real, np.number)
-        for col_idx in range(left.shape[1]):
-            col_left = left[:, col_idx]
-            col_right = right[:, col_idx]
-
-            if col_left.dtype != object and col_right.dtype != object:
-                if not np.allclose(
-                    col_left, col_right, atol=atol, rtol=0.0, equal_nan=True
-                ):
-                    return False
-                continue
-
-            try:
-                cast_left = col_left.astype(float)
-                cast_right = col_right.astype(float)
-            except ValueError, TypeError:
-                pass
-            else:
-                if not np.allclose(
-                    cast_left, cast_right, atol=atol, rtol=0.0, equal_nan=True
-                ):
-                    return False
-                continue
-
-            for value_left, value_right in zip(col_left, col_right):
-                if pd.isna(value_left) and pd.isna(value_right):
-                    continue
-                if isinstance(value_left, numeric_types) and isinstance(
-                    value_right, numeric_types
-                ):
-                    if not np.isclose(value_left, value_right, atol=atol):
-                        return False
-                    continue
-                if value_left != value_right:
-                    return False
-
-        return True
+        return problem_tables_equal(
+            self,
+            other,
+            table_type=ProblemTable,
+            default_atol=self._DEFAULT_ATOL,
+            atol=atol,
+        )
 
     def __eq__(self, other):
         """Return ``True`` when two tables hold identical values."""

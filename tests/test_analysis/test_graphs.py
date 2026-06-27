@@ -13,6 +13,10 @@ from OpenPinch.classes import Zone
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.lib import *
 from OpenPinch.services.common.graph_data import (
+    COMPOSITE_GRAPH_SPECS,
+    GCC_GRAPH_SPECS,
+    GRAPH_BUILD_SPECS,
+    GraphBuildSpec,
     _build_gcc_segments,
     _classify_segment,
     _column_to_list,
@@ -29,9 +33,11 @@ from OpenPinch.services.common.graph_data import (
     _series_meta_from_key,
     _should_plot_series,
     _streamloc_colour,
+    build_graph_from_spec,
     clean_composite_curve,
     clean_composite_curve_ends,
     get_output_graph_data,
+    iter_available_graph_specs,
 )
 from OpenPinch.services.common.graph_series_meta import GraphSeriesMeta
 
@@ -203,6 +209,48 @@ def test_graph_series_and_segment_low_level_edges():
 # ----------------------------------------------------------------------------------------------------
 # Integration Tests for Graph Set Creation
 # ----------------------------------------------------------------------------------------------------
+
+
+def test_graph_build_specs_reference_valid_labels_and_metadata_lengths():
+    assert all(isinstance(spec.graph_type, GT) for spec in GRAPH_BUILD_SPECS)
+    assert all(field in PT for spec in GRAPH_BUILD_SPECS for field in spec.value_fields)
+
+    for spec in COMPOSITE_GRAPH_SPECS:
+        assert spec.builder == "composite"
+        assert len(spec.value_fields) == len(spec.stream_types)
+        assert all(stream_type in StreamLoc for stream_type in spec.stream_types)
+
+    for spec in GCC_GRAPH_SPECS:
+        assert spec.builder == "gcc"
+        assert len(spec.value_fields) == len(spec.utility_profile_flags)
+        assert all(isinstance(flag, bool) for flag in spec.utility_profile_flags)
+
+
+def test_iter_available_graph_specs_uses_canonical_order():
+    target_graphs = {
+        GT.ETD.value: {},
+        GT.GCC.value: {},
+        GT.CC.value: {},
+        GT.NLP.value: {},
+    }
+
+    assert [spec.graph_type for spec in iter_available_graph_specs(target_graphs)] == [
+        GT.CC,
+        GT.GCC,
+        GT.NLP,
+        GT.ETD,
+    ]
+
+
+def test_build_graph_from_spec_rejects_unknown_builder():
+    spec = GraphBuildSpec(
+        graph_type=GT.CC,
+        label="Bad",
+        builder="unknown",
+    )
+
+    with pytest.raises(ValueError, match="Unsupported graph builder"):
+        build_graph_from_spec("Target", {GT.CC.value: {}}, spec)
 
 
 def test_create_graph_set_with_mock_zone():

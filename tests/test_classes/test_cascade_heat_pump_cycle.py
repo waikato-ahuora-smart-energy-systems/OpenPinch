@@ -63,6 +63,30 @@ def test_cascade_rejects_invalid_temperature_order():
     assert not cycle.solved
 
 
+def test_cascade_returns_penalty_when_aggregate_work_is_invalid(monkeypatch):
+    class NegativeWorkCycle:
+        solved = True
+        work = -4.0
+        Q_cas_cool = 0.0
+        Q_cas_heat = 0.0
+
+        def solve(self, **_kwargs):
+            return None
+
+    monkeypatch.setattr(cascade_mod, "VapourCompressionCycle", NegativeWorkCycle)
+    cycle = CascadeVapourCompressionCycle()
+
+    work = cycle.solve(
+        T_evap=np.array([0.0]),
+        T_cond=np.array([60.0]),
+        dtcont=0.0,
+        refrigerant="R134a",
+    )
+
+    assert work == pytest.approx(4.0)
+    assert not cycle.solved
+
+
 def test_cascade_num_cycles_matches_network_definition():
     cycle = CascadeVapourCompressionCycle()
     T_cond = np.array([85.0, 60.0, 45.0])

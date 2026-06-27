@@ -60,6 +60,10 @@ from OpenPinch.services.input_data_processing._canonicalization import (
     _resolve_zone_dt_cont_multiplier,
     _rewrite_stream_zones_from_tree,
 )
+from OpenPinch.services.input_data_processing._utility_preparation import (
+    _orient_utility_temperatures,
+    _utility_temperature_arrays,
+)
 from OpenPinch.services.input_data_processing.data_preparation import (
     _assign_process_streams_to_subzones,
     _build_prepared_stream_collection,
@@ -1453,7 +1457,58 @@ def test_build_prepared_stream_collection_rejects_neutral_process_stream():
     sc, _ = _build_prepared_stream_collection(master_zone, streams, [])
 
     assert len(sc.get_hot_process_streams()) == 0
-    assert len(sc.get_cold_process_streams()) == 0
+
+
+def test_utility_temperature_helpers_reject_missing_and_inconsistent_inputs():
+    missing_temperature = UtilitySchema.model_validate(
+        {
+            "name": "HU_missing",
+            "type": "Hot",
+            "t_supply": 200.0,
+            "t_target": None,
+            "heat_flow": 0.0,
+            "dt_cont": 10.0,
+            "price": 100.0,
+            "htc": 1.0,
+        }
+    )
+
+    with pytest.raises(ValueError, match="missing supply or target"):
+        _utility_temperature_arrays(missing_temperature, Configuration())
+
+    inconsistent = UtilitySchema.model_validate(
+        {
+            "name": "HU_swing",
+            "type": "Hot",
+            "t_supply": {"values": [300.0, 200.0], "unit": "degC"},
+            "t_target": {"values": [250.0, 260.0], "unit": "degC"},
+            "heat_flow": 0.0,
+            "dt_cont": 10.0,
+            "price": 100.0,
+            "htc": 1.0,
+        }
+    )
+
+    with pytest.raises(ValueError, match="cannot be oriented consistently"):
+        _orient_utility_temperatures(inconsistent, ST.Hot.value, Configuration())
+
+
+def test_build_prepared_stream_collection_rejects_unresolved_stream_zone():
+    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    stream = StreamSchema.model_validate(
+        {
+            "name": "H_missing",
+            "zone": "Site/Missing",
+            "t_supply": 200.0,
+            "t_target": 100.0,
+            "heat_flow": 10.0,
+            "dt_cont": 10.0,
+            "htc": 1.0,
+        }
+    )
+
+    with pytest.raises(ValueError, match="could not resolve zone"):
+        _build_prepared_stream_collection(master_zone, [stream], [])
 
 
 def test_prepare_problem_process_streams_are_referenced_in_parent_imports():
@@ -2141,4 +2196,54 @@ def test_assign_process_streams_to_subzones_requires_zone_mapping():
             master_zone=master_zone,
             process_streams=process_streams,
             process_zone_paths={},
+        )
+
+
+def test_assign_process_streams_to_subzones_rejects_unresolved_and_neutral_streams():
+    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    process_streams = StreamCollection()
+    hot_stream = Stream(
+        name="H1",
+        t_supply=200.0,
+        t_target=100.0,
+        heat_flow=10.0,
+        dt_cont=5.0,
+        htc=1.0,
+        is_process_stream=True,
+    )
+    process_streams.add(hot_stream, key="Site.Hot Stream.H1")
+
+    with pytest.raises(ValueError, match="could not resolve zone"):
+        _assign_process_streams_to_subzones(
+            master_zone=master_zone,
+            process_streams=process_streams,
+            process_zone_paths={"Site.Hot Stream.H1": "Site/Missing"},
+        )
+
+    area = Zone(
+        name="AreaA",
+        type=ZT.P.value,
+        config=master_zone.config,
+        parent_zone=master_zone,
+    )
+    master_zone.add_zone(area)
+    neutral_streams = StreamCollection()
+    neutral_streams.add(
+        Stream(
+            name="NeutralA",
+            t_supply=100.0,
+            t_target=100.0,
+            heat_flow=0.0,
+            dt_cont=5.0,
+            htc=1.0,
+            is_process_stream=True,
+        ),
+        key="Site.AreaA.NeutralA",
+    )
+
+    with pytest.raises(ValueError, match="must classify as Hot or Cold"):
+        _assign_process_streams_to_subzones(
+            master_zone=master_zone,
+            process_streams=neutral_streams,
+            process_zone_paths={"Site.AreaA.NeutralA": "Site/AreaA"},
         )

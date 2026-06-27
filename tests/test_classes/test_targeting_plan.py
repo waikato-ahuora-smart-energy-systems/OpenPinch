@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from OpenPinch.classes._problem import _target_dispatch as td
 from OpenPinch.classes._problem._target_plan import (
     TARGETING_METHOD_SPECS,
@@ -56,6 +58,33 @@ def test_targeting_plan_default_runs_direct_site_targeting():
     assert [spec.selector for spec in plan.specs] == ["TARGETING_DIRECT_SITE_ENABLED"]
     assert plan.composite_direct_service() is not None
     assert plan.composite_indirect_service() is None
+
+
+def test_targeting_dispatch_rejects_unknown_zone_type_and_ignores_noncallable_service():
+    zone = Zone(name="Unknown", type="Unknown")
+
+    with pytest.raises(ValueError, match="No valid zone"):
+        td.run_targeting_for_zone_and_subzones(zone)
+
+    assert td._invoke_service(None, zone) is None
+
+
+def test_targeting_dispatch_invokes_direct_service_for_nested_operation():
+    calls = []
+    config = Configuration(
+        options=_targeting_false_options()
+        | {"TARGETING_DIRECT_OPERATION_ENABLED": True}
+    )
+    parent = Zone(name="ParentOperation", type=ZT.O.value, config=config)
+    child = Zone(name="ChildOperation", type=ZT.O.value, config=config)
+    parent.add_zone(child)
+
+    td.run_targeting_for_zone_and_subzones(
+        parent,
+        direct_service_func=lambda zone, args=None: calls.append(zone.name),
+    )
+
+    assert calls == ["ChildOperation", "ParentOperation"]
 
 
 def test_targeting_plan_direct_operation_composite_skips_site_and_process_zones():
@@ -129,3 +158,39 @@ def test_targeting_plan_utility_composite_runs_on_process_without_ts_selector():
     )
 
     assert calls == ["Process"]
+
+
+def test_targeting_plan_deduplicates_repeated_services():
+    calls = []
+
+    def direct_service(zone, args=None):
+        calls.append(zone.name)
+        return zone
+
+    specs = (
+        TargetingMethodSpec(
+            selector="FIRST",
+            service=direct_service,
+            target_type=TT.DI.value,
+            slot="direct",
+            prerequisites=(),
+            zone_applicability=(ZT.S.value,),
+            execution_order=10,
+        ),
+        TargetingMethodSpec(
+            selector="SECOND",
+            service=direct_service,
+            target_type=TT.DI.value,
+            slot="direct",
+            prerequisites=(),
+            zone_applicability=(ZT.S.value,),
+            execution_order=20,
+        ),
+    )
+    plan = TargetingPlan(specs=specs)
+    site = Zone(name="Site", type=ZT.S.value)
+
+    assert plan.direct_services == (direct_service,)
+    plan.composite_direct_service()(site)
+
+    assert calls == ["Site"]

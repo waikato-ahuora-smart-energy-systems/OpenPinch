@@ -225,6 +225,25 @@ def test_get_results_from_excel_writes_json_when_path_given(tmp_path: Path, caps
     assert capsys.readouterr().out == ""
 
 
+def test_workbook_problem_and_summary_wrappers_report_file_errors(tmp_path: Path):
+    with pytest.raises(FileNotFoundError, match="Workbook file not found"):
+        wkbook_to_json.get_problem_from_excel(tmp_path / "missing.xlsx")
+
+    with pytest.raises(FileNotFoundError, match="Workbook file not found"):
+        wkbook_to_json.get_results_from_excel(tmp_path / "missing.xlsx", None, "Proj")
+
+
+def test_workbook_summary_wrapper_reports_value_errors(monkeypatch):
+    monkeypatch.setattr(
+        wkbook_to_json,
+        "_parse_sheet_with_units",
+        lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("bad summary")),
+    )
+
+    with pytest.raises(ValueError, match="Failed to read workbook summary inputs"):
+        wkbook_to_json.get_results_from_excel("dummy.xlsx", None, "Proj")
+
+
 def test_validate_stream_data_inherits_missing_zone_from_previous_stream():
     streams = [
         {"zone": "Zone A", "name": "H1"},
@@ -533,3 +552,24 @@ def test_parse_sheet_with_units_reports_short_sheet(tmp_path: Path):
 
     with pytest.raises(ValueError, match="must include at least 3 rows"):
         wkbook_to_json._parse_sheet_with_units(xlsx, sheet_name="Stream Data")
+
+
+def test_parse_sheet_with_units_rejects_empty_dataframe(monkeypatch):
+    class FakeExcel:
+        sheet_names = ["Stream Data"]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(wkbook_to_json.pd, "ExcelFile", lambda _path: FakeExcel())
+    monkeypatch.setattr(
+        wkbook_to_json.pd,
+        "read_excel",
+        lambda *args, **kwargs: pd.DataFrame(),
+    )
+
+    with pytest.raises(ValueError, match="Worksheet 'Stream Data' is empty"):
+        wkbook_to_json._parse_sheet_with_units("dummy.xlsx", sheet_name="Stream Data")

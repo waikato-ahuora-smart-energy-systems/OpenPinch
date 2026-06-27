@@ -3,6 +3,18 @@
 import numpy as np
 import pytest
 
+from OpenPinch.classes._problem_table._equality import (
+    arrays_are_empty,
+    numeric_arrays_equal,
+    object_columns_equal,
+    problem_tables_equal,
+    scalar_values_equal,
+    table_arrays_equal,
+    table_data_presence_matches,
+    tables_have_matching_columns,
+    tables_have_matching_shapes,
+    try_cast_object_column_to_float,
+)
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.lib.enums import ProblemTableLabel as PT
 
@@ -22,6 +34,72 @@ def test_equals_uses_numeric_allclose_fast_path():
     left = ProblemTable({"a": [1.0, 2.0], "b": [3.0, 4.0]}, add_default_labels=False)
     right = ProblemTable({"a": [1.0, 2.0], "b": [3.0, 4.0]}, add_default_labels=False)
     assert left._equals(right) is True
+
+
+def test_equals_helper_functions_cover_numeric_and_shape_paths():
+    left = ProblemTable({"a": [1.0, np.nan]}, add_default_labels=False)
+    right = ProblemTable({"a": [1.0 + 1e-8, np.nan]}, add_default_labels=False)
+    other_cols = ProblemTable({"b": [1.0]}, add_default_labels=False)
+    other_shape = ProblemTable({"a": [1.0]}, add_default_labels=False)
+
+    assert tables_have_matching_columns(left, right) is True
+    assert tables_have_matching_columns(left, other_cols) is False
+    assert tables_have_matching_shapes(left, right) is True
+    assert tables_have_matching_shapes(left, other_shape) is False
+    assert numeric_arrays_equal(left.data, right.data, atol=1e-6) is True
+    assert table_arrays_equal(left, right, atol=1e-6) is True
+
+
+def test_equals_orchestration_helpers_cover_data_presence_and_type_paths():
+    left = ProblemTable({"a": [0.0]}, add_default_labels=False)
+    right = ProblemTable({"a": [0.0]}, add_default_labels=False)
+    left.data = np.empty((0, 1))
+    right.data = np.empty((0, 1))
+    assert arrays_are_empty(left.data) is True
+    assert problem_tables_equal(
+        left,
+        right,
+        table_type=ProblemTable,
+        default_atol=1e-6,
+    )
+
+    left.data = None
+    right.data = None
+    assert table_data_presence_matches(left, right) is True
+    assert problem_tables_equal(
+        left,
+        right,
+        table_type=ProblemTable,
+        default_atol=1e-6,
+    )
+    assert (
+        problem_tables_equal(
+            left,
+            object(),
+            table_type=ProblemTable,
+            default_atol=1e-6,
+        )
+        is False
+    )
+
+
+def test_equals_helper_functions_cover_object_cast_and_scalar_paths():
+    numeric_like = np.array(["1.0", np.nan], dtype=object)
+    assert np.allclose(
+        try_cast_object_column_to_float(numeric_like),
+        np.array([1.0, np.nan]),
+        equal_nan=True,
+    )
+    assert try_cast_object_column_to_float(np.array(["text"], dtype=object)) is None
+
+    assert object_columns_equal(
+        np.array(["1.0", np.nan], dtype=object),
+        np.array([1.0, np.nan], dtype=object),
+        atol=1e-6,
+    )
+    assert scalar_values_equal(np.nan, np.nan, atol=1e-6) is True
+    assert scalar_values_equal(1.0, 1.0 + 1e-9, atol=1e-6) is True
+    assert scalar_values_equal("left", "right", atol=1e-6) is False
 
 
 def test_equals_columnwise_allclose_branch_with_fake_object_dtype():

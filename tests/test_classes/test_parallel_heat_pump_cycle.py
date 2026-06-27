@@ -50,6 +50,27 @@ def test_parallel_rejects_mismatched_temperature_lengths():
         )
 
 
+def test_parallel_refrigeration_mode_allocates_cooling_base_duty():
+    cycle = ParallelVapourCompressionCycles()
+
+    q_heat, q_cool = cycle._allocate_process_duties(
+        n_cycles=1,
+        Q_heat=np.array([5.0]),
+        Q_cool=None,
+        Q_heat_base=None,
+        x_heat_split=None,
+        Q_heat_available=None,
+        Q_cool_base=20.0,
+        x_cool_split=np.array([1.0]),
+        Q_cool_available=np.array([15.0]),
+        is_heat_pump=False,
+    )
+
+    np.testing.assert_allclose(q_heat, np.array([5.0]))
+    np.testing.assert_allclose(q_cool, np.array([15.0]))
+    np.testing.assert_allclose(cycle._allocation_penalty, np.array([5.0]))
+
+
 def test_parallel_solve_with_defaults_should_work_for_multiple_units():
     cycle = ParallelVapourCompressionCycles()
     cycle.solve(

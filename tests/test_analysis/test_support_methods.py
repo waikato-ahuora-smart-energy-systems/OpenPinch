@@ -3,7 +3,12 @@
 import pytest
 
 from OpenPinch.lib import ValueWithUnit
-from OpenPinch.services.common.miscellaneous import get_period_index
+from OpenPinch.services.common import miscellaneous
+from OpenPinch.services.common.miscellaneous import g_ineq_penalty, get_period_index
+from OpenPinch.services.common.service_orchestration import (
+    apply_zone_config_overrides,
+    format_selected_period_suffix,
+)
 from OpenPinch.utils.value_resolution import (
     get_period_value,
     get_scalar_value,
@@ -64,6 +69,14 @@ def test_get_period_index_accepts_explicit_idx():
     assert sid is None
 
 
+def test_get_period_index_rejects_negative_and_unknown_explicit_idx():
+    with pytest.raises(ValueError, match="non-negative"):
+        get_period_index({"0": 0}, {"period_idx": -1})
+
+    with pytest.raises(ValueError, match="period_idx 2 was not found"):
+        get_period_index({"0": 0, "peak": 1}, {"period_idx": 2})
+
+
 def test_get_period_index_rejects_conflicting_period_id_and_idx():
     with pytest.raises(ValueError, match="period_id 'peak' resolves to period_idx 1"):
         get_period_index({"0": 0, "peak": 1}, {"period_id": "peak", "period_idx": 0})
@@ -75,3 +88,28 @@ def test_resolve_scalar_value_with_int():
 
 def test_resolve_scalar_value_with_string():
     assert get_scalar_value("100") == 100.0
+
+
+def test_service_orchestration_rejects_non_runtime_overrides_and_formats_suffixes():
+    with pytest.raises(ValueError, match="Invalid key"):
+        apply_zone_config_overrides(object(), {"THERMAL_DT_CONT": 20})
+
+    assert format_selected_period_suffix(None) == ""
+    assert format_selected_period_suffix({}) == ""
+    assert format_selected_period_suffix({"period_idx": 2}) == " for period_idx 2"
+
+
+def test_g_ineq_penalty_rejects_unrecognised_internal_penalty_type(monkeypatch):
+    class FakeArray:
+        def __pow__(self, exponent):
+            return self
+
+        def __rmul__(self, other):
+            return self
+
+    monkeypatch.setattr(
+        miscellaneous.np, "asarray", lambda value, dtype=None: FakeArray()
+    )
+
+    with pytest.raises(ValueError, match="Return of the penalty function failed"):
+        g_ineq_penalty(1.0)

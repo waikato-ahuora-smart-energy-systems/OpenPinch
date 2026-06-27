@@ -89,7 +89,7 @@ def compute_direct_integration_targets(
             idx=idx,
         )
     )
-    if direct.balanced_cc_enabled or targeting.area_cost_enabled:
+    if should_update_balanced_composite_curves(direct, targeting):
         pt.update(
             **get_balanced_CC(
                 T_col=pt[PT.T],
@@ -113,38 +113,7 @@ def compute_direct_integration_targets(
                 RCP_cold_ut=pt_real[PT.RCP_COLD_UT],
             )
         )
-        # Target capital cost, area, and exchanger count from the balanced CC.
-        if targeting.area_cost_enabled:
-            num_units = get_min_number_hx(
-                T_vals=pt[PT.T],
-                H_hot_bal=pt[PT.H_HOT_BAL],
-                H_cold_bal=pt[PT.H_COLD_BAL],
-                hot_streams=zone.hot_streams,
-                cold_streams=zone.cold_streams,
-                hot_utilities=zone.hot_utilities,
-                cold_utilities=zone.cold_utilities,
-                idx=idx,
-            )
-            area = get_area_targets(
-                T_vals=pt_real[PT.T],
-                H_hot_bal=pt_real[PT.H_HOT_BAL],
-                H_cold_bal=pt_real[PT.H_COLD_BAL],
-                R_hot_bal=pt_real[PT.R_HOT_BAL],
-                R_cold_bal=pt_real[PT.R_COLD_BAL],
-            )
-            capital_cost, annual_capital_cost = get_capital_cost_targets(
-                area=area,
-                num_units=num_units,
-                config=zone.config,
-            )
-            area_data = {
-                "area": area,
-                "num_units": num_units,
-                "capital_cost": capital_cost,
-                "total_cost": annual_capital_cost,
-            }
-        else:
-            area_data = {}
+        area_data = build_area_cost_target_data(pt, pt_real, zone, idx)
     else:
         area_data = {}
 
@@ -176,6 +145,51 @@ def compute_direct_integration_targets(
 ################################################################################
 # Helper functions
 ################################################################################
+
+
+def should_update_balanced_composite_curves(direct_config, targeting_config) -> bool:
+    """Return True when balanced composite curves are needed downstream."""
+    return bool(direct_config.balanced_cc_enabled or targeting_config.area_cost_enabled)
+
+
+def build_area_cost_target_data(
+    pt: ProblemTable,
+    pt_real: ProblemTable,
+    zone: Zone,
+    idx: int | None,
+) -> dict:
+    """Calculate direct-integration area and capital-cost target fields."""
+    if not zone.config.targeting.area_cost_enabled:
+        return {}
+
+    num_units = get_min_number_hx(
+        T_vals=pt[PT.T],
+        H_hot_bal=pt[PT.H_HOT_BAL],
+        H_cold_bal=pt[PT.H_COLD_BAL],
+        hot_streams=zone.hot_streams,
+        cold_streams=zone.cold_streams,
+        hot_utilities=zone.hot_utilities,
+        cold_utilities=zone.cold_utilities,
+        idx=idx,
+    )
+    area = get_area_targets(
+        T_vals=pt_real[PT.T],
+        H_hot_bal=pt_real[PT.H_HOT_BAL],
+        H_cold_bal=pt_real[PT.H_COLD_BAL],
+        R_hot_bal=pt_real[PT.R_HOT_BAL],
+        R_cold_bal=pt_real[PT.R_COLD_BAL],
+    )
+    capital_cost, annual_capital_cost = get_capital_cost_targets(
+        area=area,
+        num_units=num_units,
+        config=zone.config,
+    )
+    return {
+        "area": area,
+        "num_units": num_units,
+        "capital_cost": capital_cost,
+        "total_cost": annual_capital_cost,
+    }
 
 
 def _create_net_hot_and_cold_stream_collections_for_site_analysis(

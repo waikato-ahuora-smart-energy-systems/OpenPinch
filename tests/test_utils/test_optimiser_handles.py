@@ -476,6 +476,61 @@ def test_get_bo_multiminima_empty_paths(monkeypatch):
     assert fs1.size == 0
 
 
+def test_run_bo_single_uses_random_fallback_when_gp_fit_fails(monkeypatch):
+    monkeypatch.setattr(
+        bb_bo,
+        "_fit_bo_gp_model",
+        lambda **kwargs: (_ for _ in ()).throw(ValueError("bad covariance")),
+    )
+
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        x0_ls=np.asarray([[0.25]], dtype=float),
+        args=(),
+        seed=0,
+        maxiter=1,
+        maxfevals=3,
+        n_init=1,
+        acq_candidates=4,
+        lengthscale=None,
+        noise=1e-6,
+        xi=0.01,
+    )
+
+    assert len(xs) >= 1
+    assert len(fs) >= 1
+
+
+def test_run_bo_single_jitters_duplicate_proposals(monkeypatch):
+    monkeypatch.setattr(bb_bo, "_fit_bo_gp_model", lambda **kwargs: object())
+    monkeypatch.setattr(
+        bb_bo,
+        "_propose_bo_candidate",
+        lambda **kwargs: np.asarray([0.25], dtype=float),
+    )
+
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=lambda x, *_args: -float(x[0]),
+        bounds=((0.0, 1.0),),
+        x0_ls=np.asarray([[0.25]], dtype=float),
+        args=(),
+        seed=0,
+        maxiter=1,
+        maxfevals=3,
+        n_init=1,
+        acq_candidates=4,
+        lengthscale=None,
+        noise=1e-6,
+        xi=0.01,
+    )
+
+    assert len(xs) >= 1
+    assert len(fs) >= 1
+
+
 def test_collect_bo_candidates_reshape_and_pool_path(monkeypatch):
     monkeypatch.setattr(bb_bo, "ProcessPoolExecutor", _FakePool)
     monkeypatch.setattr(
@@ -834,6 +889,26 @@ def test_propose_rbf_candidate_model_none_returns_farthest():
     assert out.shape == (1,)
 
 
+def test_propose_rbf_candidate_uses_farthest_point_when_merit_pick_is_too_close():
+    class FakeRng:
+        def uniform(self, _low, _high, *, size):
+            assert size == (2, 1)
+            return np.asarray([[0.0], [0.9]], dtype=float)
+
+    out = bb_rbf._propose_rbf_surrogate_candidate(
+        model=lambda U: np.asarray([0.0, 100.0]),
+        X_obs=np.asarray([[0.0]], dtype=float),
+        rng=FakeRng(),
+        n_candidates=2,
+        n_dim=1,
+        best_u=None,
+        merit_weight=1.0,
+        distance_tol=1e-6,
+    )
+
+    np.testing.assert_allclose(out, np.asarray([0.9]))
+
+
 def test_collect_da_candidates_pool_success(monkeypatch):
     monkeypatch.setattr(bb_da, "ProcessPoolExecutor", _FakePool)
     monkeypatch.setattr(
@@ -940,6 +1015,78 @@ def test_polish_single_candidate_keeps_seed_when_polish_is_worse(monkeypatch):
 
     np.testing.assert_allclose(x, np.asarray([0.2]))
     assert f == pytest.approx(0.04)
+
+
+def test_polish_single_candidate_keeps_seed_when_minimize_raises(monkeypatch):
+    monkeypatch.setattr(
+        bb_common,
+        "minimize",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("solver failed")),
+    )
+
+    x, f = bb_common._polish_single_candidate(
+        idx=0,
+        all_x=np.asarray([[0.2]], dtype=float),
+        all_f=np.asarray([0.04], dtype=float),
+        func=_quadratic,
+        args=(),
+        local_method="SLSQP",
+        bounds_arg=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+
+    np.testing.assert_allclose(x, np.asarray([0.2]))
+    assert f == pytest.approx(0.04)
+
+
+def test_polish_candidates_falls_back_when_pool_is_unavailable(monkeypatch):
+    class RaisingPool:
+        def __init__(self, max_workers):
+            self.max_workers = max_workers
+
+        def __enter__(self):
+            raise RuntimeError("pool unavailable")
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(bb_common.os, "cpu_count", lambda: 2)
+    monkeypatch.setattr(bb_common, "ProcessPoolExecutor", RaisingPool)
+
+    x, f = bb_common._polish_candidates(
+        func=_quadratic,
+        args=(),
+        all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
+        basin_reps_idx=[0, 1],
+        local_method="SLSQP",
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+
+    assert x.shape == (2, 1)
+    assert f.shape == (2,)
+
+
+def test_collect_candidates_in_parallel_falls_back_when_pool_raises():
+    class RaisingPool:
+        def __init__(self, max_workers):
+            self.max_workers = max_workers
+
+        def __enter__(self):
+            raise RuntimeError("pool unavailable")
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    xs, fs = bb_common._collect_candidates_in_parallel(
+        lambda run: ([np.asarray([float(run)])], [float(run)]),
+        n_runs=2,
+        pool_executor_cls=RaisingPool,
+    )
+
+    assert xs.shape == (2, 1)
+    assert fs.tolist() == [0.0, 1.0]
 
 
 """Regression tests for optimiser benchmarks utility helpers."""

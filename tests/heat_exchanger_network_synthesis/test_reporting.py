@@ -36,6 +36,10 @@ from OpenPinch.services.network_grid_diagram import (
     build_grid_diagram,
     build_grid_model,
 )
+from OpenPinch.services.network_grid_diagram._dependencies import (
+    MissingNetworkGridDiagramDependencyError,
+    require_network_grid_diagram_dependency,
+)
 from OpenPinch.services.network_grid_diagram.constants import (
     _COLD_STREAM_COLOR,
     _COLD_UTILITY_COLOR,
@@ -44,7 +48,10 @@ from OpenPinch.services.network_grid_diagram.constants import (
     _LABEL_BACKGROUND_COLOR,
     _RECOVERY_MATCH_COLOR,
 )
-from OpenPinch.services.network_grid_diagram.models import HeatExchangerNetworkGridModel
+from OpenPinch.services.network_grid_diagram.models import (
+    HeatExchangerNetworkGridDiagram,
+    HeatExchangerNetworkGridModel,
+)
 from OpenPinch.services.network_grid_diagram.renderer import (
     _midpoint_temperature,
     _PlotlyAxes,
@@ -70,6 +77,30 @@ def test_grid_model_recovers_process_topology_and_branches() -> None:
     assert len(grid_model.cold_utility_matches) == 1
     assert grid_model.branch_counts[("H1", 3)] == 2
     assert grid_model.branch_counts[("C1", 3)] == 2
+
+
+def test_grid_model_skips_unstaged_recovery_and_accumulates_duplicate_utilities() -> (
+    None
+):
+    unstaged_recovery = _recovery("unstaged", "H1", "C1", 1, 50.0).model_copy(
+        update={"stage": None}
+    )
+    network = HeatExchangerNetwork.model_construct(
+        exchangers=(
+            unstaged_recovery,
+            _hot_utility("HU1", "C1", 100.0),
+            _hot_utility("HU2", "C1", 25.0),
+        ),
+        run_id="unstaged",
+        method="network_evolution_method",
+        stage_count=None,
+    )
+
+    grid_model = build_grid_model(network)
+
+    assert grid_model.stages == (1,)
+    assert grid_model.recovery_matches == ()
+    assert grid_model.hot_utility_matches[0].duty == pytest.approx(125.0)
 
 
 def test_grid_diagram_service_accepts_one_network() -> None:
@@ -118,6 +149,8 @@ def test_grid_diagram_service_reports_invalid_network_inputs() -> None:
 
     with pytest.raises(ValueError, match="at least one HeatExchangerNetwork"):
         build_grid_diagram(())
+    with pytest.raises(IndexError, match="must be 0"):
+        build_grid_diagram(_network("single"), index=1)
     with pytest.raises(IndexError, match="0-based"):
         build_grid_diagram((_network("first"),), index=-1)
     with pytest.raises(IndexError, match="index 2 is unavailable"):
@@ -131,6 +164,49 @@ def test_grid_diagram_service_reports_wrong_input_types() -> None:
         build_grid_diagram(  # type: ignore[list-item]
             [_network("first"), "not-a-network"],
         )
+
+
+def test_grid_diagram_dependency_error_names_extra() -> None:
+    with pytest.raises(
+        MissingNetworkGridDiagramDependencyError, match="openpinch\\[synthesis\\]"
+    ):
+        require_network_grid_diagram_dependency(
+            "definitely_missing_grid_dependency",
+            package="Plotly",
+            purpose="grid rendering",
+        )
+
+
+def test_grid_diagram_save_uses_html_writer_for_html_paths(tmp_path: Path) -> None:
+    class FakeFigure:
+        def __init__(self):
+            self.html_path = None
+            self.image_path = None
+
+        def show(self):
+            self.shown = True
+
+        def write_html(self, path):
+            self.html_path = path
+
+        def write_image(self, path):
+            self.image_path = path
+
+    fig = FakeFigure()
+    network = _network("save-html")
+    diagram = HeatExchangerNetworkGridDiagram(
+        fig=fig,
+        ax=object(),
+        network=network,
+        grid_model=build_grid_model(network),
+    )
+
+    diagram.show()
+    diagram.save(tmp_path / "grid.html")
+
+    assert fig.shown is True
+    assert fig.html_path == tmp_path / "grid.html"
+    assert fig.image_path is None
 
 
 def test_grid_diagram_ranks_successful_networks_by_accepted_method() -> None:

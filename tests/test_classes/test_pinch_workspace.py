@@ -12,7 +12,13 @@ from typing import List
 import pytest
 
 from OpenPinch import PinchProblem, PinchWorkspace, config_options
+from OpenPinch.classes._workspace import case_inputs
 from OpenPinch.classes._workspace import views as workspace_views
+from OpenPinch.classes._workspace.case_inputs import (
+    canonical_case_input_from_source,
+    normalise_case_input,
+    project_name_from_case_input,
+)
 from OpenPinch.classes._workspace.execution import (
     WorkspaceExecutionError,
     normalise_workflow_name,
@@ -22,6 +28,7 @@ from OpenPinch.classes._workspace.execution import (
 )
 from OpenPinch.classes._workspace.views import summary_metric_deltas
 from OpenPinch.lib.enums import HPRcycle
+from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.workspace import (
     ProblemTableView,
     ScenarioVariantView,
@@ -245,6 +252,40 @@ def test_pinch_workspace_accepts_existing_problem_as_constructor_source():
     assert workspace.active_case_name == "baseline"
     assert workspace.case("baseline").project_name == "Demo"
     assert workspace.get_case_input("baseline")["zone_tree"] is not None
+
+
+def test_workspace_case_input_helpers_accept_target_input_and_missing_project_names(
+    monkeypatch,
+):
+    target_input = TargetInput(streams=[])
+    case_input = normalise_case_input(target_input)
+
+    assert case_input["streams"] == []
+    with pytest.raises(TypeError, match="dict or TargetInput"):
+        normalise_case_input(["not", "a", "case"])
+    assert project_name_from_case_input({}) is None
+    assert project_name_from_case_input({"zone_tree": {"name": ""}}) is None
+
+    normalized, project_name = canonical_case_input_from_source(
+        target_input,
+        project_name=None,
+        workspace_project_name="WorkspaceSite",
+    )
+
+    assert normalized["streams"] == []
+    assert project_name == "WorkspaceSite"
+
+    class RaisingProblem:
+        def __init__(self, source, project_name):
+            raise ValueError("invalid source")
+
+    monkeypatch.setattr(case_inputs, "PinchProblem", RaisingProblem)
+    with pytest.raises(ValueError, match="invalid source"):
+        canonical_case_input_from_source(
+            "not-a-case-source",
+            project_name=None,
+            workspace_project_name=None,
+        )
 
 
 def test_pinch_workspace_accepts_packaged_sample_case_name_as_source():

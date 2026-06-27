@@ -18,10 +18,16 @@ from OpenPinch.services.heat_pump_integration.common import (
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.services.heat_pump_integration.common._shared import (
+    ambient_preallocation as hp_ambient,
+)
+from OpenPinch.services.heat_pump_integration.common._shared import (
     plotting as hp_plotting,
 )
 from OpenPinch.services.heat_pump_integration.common._shared import (
     streams as hp_streams,
+)
+from OpenPinch.services.heat_pump_integration.common.postprocessing import (
+    _compute_utility_cost,
 )
 
 from ..helpers import _base_args, _sc, _stream
@@ -196,6 +202,65 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     assert hp_shared.calc_hpr_obj(
         10.0, 5.0, 0.0, 100.0, heat_to_power_ratio=2.0, penalty=1.0
     ) == pytest.approx(0.21)
+
+
+def test_ambient_preallocation_helpers_cover_zero_and_out_of_range_edges():
+    T_hot = np.array([120.0, 80.0, 40.0])
+    H_hot = np.array([0.0, -20.0, -40.0])
+    np.testing.assert_allclose(
+        hp_ambient._remove_direct_ambient_sink_from_hot_profile(
+            T_hot,
+            H_hot,
+            duty=0.0,
+            T_amb=80.0,
+        ),
+        (T_hot, H_hot),
+    )
+    np.testing.assert_allclose(
+        hp_ambient._remove_direct_ambient_sink_from_hot_profile(
+            T_hot,
+            np.array([40.0, 20.0, 0.0]),
+            duty=5.0,
+            T_amb=80.0,
+        ),
+        (T_hot, np.array([40.0, 20.0, 0.0])),
+    )
+
+    T_cold = np.array([120.0, 80.0, 40.0])
+    H_cold = np.array([0.0, -5.0, -10.0])
+    np.testing.assert_allclose(
+        hp_ambient._remove_direct_ambient_source_from_cold_profile(
+            T_cold,
+            H_cold,
+            duty=5.0,
+            T_amb=80.0,
+        ),
+        (T_cold, H_cold),
+    )
+
+    T_inserted, H_inserted = hp_ambient._insert_profile_temperatures(
+        T_hot,
+        H_hot,
+        200.0,
+        80.0,
+    )
+    np.testing.assert_allclose(T_inserted, T_hot)
+    np.testing.assert_allclose(H_inserted, H_hot)
+
+
+def test_compute_utility_cost_skips_utilities_without_cost_data():
+    no_cost = _stream("free", 120.0, 80.0, 10.0, is_process_stream=False)
+    priced = _stream("priced", 120.0, 80.0, 10.0, is_process_stream=False)
+    priced.set_value_attr("_cost", [3.5], update_derived=False)
+
+    assert _compute_utility_cost(
+        _sc(no_cost), _sc(priced), period_idx=0
+    ) == pytest.approx(3.5)
+    assert _compute_utility_cost(_sc(no_cost), _sc(), period_idx=0) == 0.0
+    assert (
+        _compute_utility_cost([SimpleNamespace(utility_cost=None)], [], period_idx=0)
+        == 0.0
+    )
 
 
 def test_simulated_hpr_annualized_costs_use_value_units_and_duty_based_hx_cost():

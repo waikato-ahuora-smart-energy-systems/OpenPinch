@@ -14,6 +14,31 @@ from OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cyc
 pytest.importorskip("CoolProp")
 
 
+class _FakeFluid:
+    def keyed_output(self, _key):
+        return 500.0
+
+
+class _FakeState:
+    def __init__(self, *, h=0.0, s=1.0, p=1.0, T=300.0):
+        self._h = h
+        self._s = s
+        self._p = p
+        self._T = T
+
+    def hmass(self):
+        return self._h
+
+    def smass(self):
+        return self._s
+
+    def p(self):
+        return self._p
+
+    def T(self):
+        return self._T
+
+
 def _validate_results(
     cycle: VapourCompressionCycle,
     T_evap,
@@ -76,6 +101,95 @@ def test_heat_pump_cycle_requires_dtcont():
 
     with pytest.raises(TypeError, match="dtcont"):
         cycle.solve(T_evap=-15.0, T_cond=35.0, refrigerant="R134a")
+
+
+def test_heat_pump_cycle_exposes_kelvin_saturation_temperature_properties():
+    cycle = VapourCompressionCycle()
+    cycle.temperature_unit = "K"
+    cycle._T_evap_sat_vap = 280.0
+    cycle._T_cond_sat_liq = 330.0
+
+    assert cycle.T_evap_sat_vap == pytest.approx(280.0)
+    assert cycle.T_cond_sat_liq == pytest.approx(330.0)
+
+
+def test_heat_pump_cycle_rejects_evaporator_pressure_above_condenser(monkeypatch):
+    monkeypatch.setattr(
+        VapourCompressionCycle,
+        "_get_fluid_state",
+        staticmethod(lambda _value: _FakeFluid()),
+    )
+    cycle = VapourCompressionCycle()
+    pressures = iter([2.0, 1.0])
+    monkeypatch.setattr(
+        cycle, "_get_P_sat_from_T", lambda *_args, **_kwargs: next(pressures)
+    )
+
+    with pytest.raises(ValueError, match="Evaporator pressure"):
+        cycle.solve(
+            T_evap=20.0,
+            T_cond=60.0,
+            dtcont=0.0,
+            refrigerant="R134a",
+        )
+
+
+def test_heat_pump_cycle_penalties_precede_condenser_enthalpy_guard(monkeypatch):
+    monkeypatch.setattr(
+        VapourCompressionCycle,
+        "_get_fluid_state",
+        staticmethod(lambda _value: _FakeFluid()),
+    )
+    cycle = VapourCompressionCycle()
+    monkeypatch.setattr(cycle, "_get_P_sat_from_T", lambda *_args, **_kwargs: 1.0)
+
+    quality_states = iter(
+        [
+            _FakeState(T=280.0),
+            _FakeState(h=110.0),
+            _FakeState(T=330.0),
+        ]
+    )
+    temperature_states = iter(
+        [
+            _FakeState(h=100.0, T=285.0),
+            _FakeState(h=150.0, T=380.0),
+            _FakeState(h=120.0, T=340.0),
+            _FakeState(h=90.0, T=320.0),
+        ]
+    )
+
+    monkeypatch.setattr(
+        cycle,
+        "_compute_state_from_pressure_quality",
+        lambda *_args, **_kwargs: next(quality_states),
+    )
+    monkeypatch.setattr(
+        cycle,
+        "_compute_state_from_pressure_temperature",
+        lambda *_args, **_kwargs: next(temperature_states),
+    )
+    monkeypatch.setattr(
+        cycle,
+        "_compute_compressor_outlet_state",
+        lambda **_kwargs: _FakeState(h=100.0, T=360.0),
+    )
+    monkeypatch.setattr(
+        cycle,
+        "_compute_state_from_pressure_enthalpy",
+        lambda **kwargs: _FakeState(h=kwargs["h"], T=310.0),
+    )
+
+    with pytest.raises(ValueError, match="Condenser cannot"):
+        cycle.solve(
+            T_evap=20.0,
+            T_cond=80.0,
+            dtcont=0.0,
+            refrigerant="R134a",
+            dT_ihx_gas_side=100.0,
+        )
+
+    assert len(cycle._penalty) == 2
 
 
 def test_heat_pump_cycle_case_2():

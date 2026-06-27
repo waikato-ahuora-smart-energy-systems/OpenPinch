@@ -125,6 +125,21 @@ def test_preprocess_utilities_returns_none_when_no_viable_hot_utility(monkeypatc
     assert out is None
 
 
+def test_preprocess_utilities_skips_stage_above_inlet_pressure(monkeypatch):
+    _patch_steam_properties(monkeypatch)
+
+    cfg = _make_zone_config()
+    utilities = StreamCollection()
+    utilities.add(
+        _steam_utility("HU_high_pressure", t_supply=180.0, t_target=140.0, q=120.0)
+    )
+    zone = _make_zone(cfg, utilities)
+
+    out = pca._preprocess_utilities(zone, {"P_in": 1.0, "T_in": 300.0})
+
+    assert out is None
+
+
 def test_preprocess_utilities_builds_stage_arrays(monkeypatch):
     _patch_steam_properties(monkeypatch)
 
@@ -225,6 +240,29 @@ def test_get_power_cogeneration_below_pinch_uses_environment_default(monkeypatch
     assert len(details["stages"]) == 2
 
 
+def test_cogeneration_service_and_target_refresh_edge_paths():
+    zone = SimpleNamespace(
+        name="Area",
+        config=_make_zone_config(),
+        targets={},
+        period_ids=None,
+    )
+
+    assert (
+        pca._ensure_cogeneration_target(
+            zone,
+            target_type=TT.TS.value,
+            refresh_args={},
+            compare_args={},
+            refresh_services={},
+        )
+        is None
+    )
+
+    with pytest.raises(RuntimeError, match="could not find a compatible target"):
+        pca.run_power_cogeneration_service(zone, refresh_services={})
+
+
 def test_work_models_and_coeff_setter(monkeypatch):
     _patch_steam_properties(monkeypatch)
 
@@ -242,6 +280,35 @@ def test_work_models_and_coeff_setter(monkeypatch):
         t_type=1,
     )
     assert np.isfinite(w_sun)
+
+    predicted_sun_work = (
+        turbine_mod._predict_stage_work(
+            model="Sun & Smith (2015)",
+            pressure_in=10.0,
+            enthalpy_in=3_000.0,
+            pressure_out=5.0,
+            saturation_enthalpy=2_000.0,
+            mass_flow=2.0,
+            mass_flow_max=0.0,
+            dh_isentropic=120.0,
+            mech_eff=0.9,
+            min_eff=0.5,
+        )
+        == 0.0
+    )
+    assert turbine_mod._predict_stage_work(
+        model="Sun & Smith (2015)",
+        pressure_in=10.0,
+        enthalpy_in=3_000.0,
+        pressure_out=5.0,
+        saturation_enthalpy=2_000.0,
+        mass_flow=2.0,
+        mass_flow_max=3.0,
+        dh_isentropic=120.0,
+        mech_eff=0.9,
+        min_eff=0.5,
+    )
+    assert np.isfinite(predicted_sun_work)
 
     w_thm = turbine_mod._work_THM(
         P_in=30.0,
