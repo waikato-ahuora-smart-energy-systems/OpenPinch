@@ -1,5 +1,11 @@
 # OpenPinch
 
+[![CI Develop](https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/workflows/ci-develop.yml/badge.svg?branch=develop)](https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/workflows/ci-develop.yml)
+[![Documentation Status](https://readthedocs.org/projects/openpinch/badge/?version=latest)](https://openpinch.readthedocs.io/en/latest/)
+[![PyPI version](https://img.shields.io/pypi/v/openpinch.svg)](https://pypi.org/project/OpenPinch/)
+[![Python versions](https://img.shields.io/pypi/pyversions/openpinch.svg)](https://pypi.org/project/OpenPinch/)
+[![License: MIT](https://img.shields.io/github/license/waikato-ahuora-smart-energy-systems/OpenPinch.svg)](LICENSE)
+
 OpenPinch is an open-source Python toolkit for advanced Pinch Analysis and
 Total Site Integration. It supports direct and indirect heat integration
 targeting, graph interpretation, Heat Pump and refrigeration screening, exergy
