@@ -29,6 +29,7 @@ from .shared import (
     get_carnot_hpr_cycle_streams,
     get_Q_vals_at_T_hpr_from_bckgrd_profile,
     plot_multi_hp_profiles_from_results,
+    solve_hpr_multiperiod_placement,
     solve_hpr_placement,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -66,5 +67,6 @@ __all__ = [
     "require_stage_duty_allocation",
     "shared",
     "solve_hpr_placement",
+    "solve_hpr_multiperiod_placement",
     "validate_vapour_hp_refrigerant_ls",
 ]

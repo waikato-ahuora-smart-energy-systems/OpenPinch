@@ -62,6 +62,12 @@ Included Notebooks
    ``pinch_analysis_service(...)``, Excel/graph export, workspace variant
    views, and bundle persistence.
 
+``10_multiperiod_hpr_shared_design.ipynb``
+   Focused notebook for opt-in weighted multiperiod HPR design on
+   ``crude_preheat_train_multiperiod.json``. It contrasts period-specific HPR
+   optima with one shared Cascade Carnot design, inspects ``hpr_details``, and
+   uses weighted summary modes.
+
 How To Use Them
 ---------------
 
@@ -81,9 +87,10 @@ Recommended Paths
 -----------------
 
 I want to solve a case with advanced methods
-   Work through notebooks 01, 03, 04, 05, and 07. This path starts with the
-   single-case solve and summary workflow, then moves into named periods,
-   Heat Pump screening, process MVR case mutation, and HEN synthesis.
+   Work through notebooks 01, 03, 04, 05, 07, and 10. This path starts with
+   the single-case solve and summary workflow, then moves into named periods,
+   Heat Pump screening, process MVR case mutation, HEN synthesis, and shared
+   multiperiod HPR design.
 
 I need to understand the method
    Work through notebooks 02, 06, and 08. This path explains Total Site and
@@ -101,7 +108,8 @@ Why These Matter
 The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
 hierarchical targeting, graph-based interpretation, real multiperiod studies,
-advanced HPR cycle targeting, process-component MVR mutation, heat exchanger
-network synthesis, and stable programmatic boundaries built on the same
-packaged assets. The distributed copies are kept output-free so they do not
-ship stale plots, tracebacks, or machine-specific execution state.
+advanced HPR cycle targeting, weighted shared HPR design, process-component
+MVR mutation, heat exchanger network synthesis, and stable programmatic
+boundaries built on the same packaged assets. The distributed copies are kept
+output-free so they do not ship stale plots, tracebacks, or machine-specific
+execution state.

@@ -170,6 +170,15 @@ _NOTEBOOK_METADATA: dict[str, NotebookMetadata] = {
         ),
         topics=("integrator", "schemas", "exports", "workspace"),
     ),
+    "10_multiperiod_hpr_shared_design.ipynb": NotebookMetadata(
+        name="10_multiperiod_hpr_shared_design.ipynb",
+        title="Multiperiod HPR Shared Design",
+        description=(
+            "Focused notebook for opt-in weighted multi-period HPR design, "
+            "HPR detail inspection, and weighted summary modes."
+        ),
+        topics=("multiperiod", "heat pump", "hpr", "weighted summary"),
+    ),
 }
 
 

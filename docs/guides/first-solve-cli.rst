@@ -53,6 +53,7 @@ The packaged notebook series is:
 - ``07_heat_exchanger_network_synthesis.ipynb``
 - ``08_energy_transfer_analysis.ipynb``
 - ``09_schema_service_exports_and_bundles.ipynb``
+- ``10_multiperiod_hpr_shared_design.ipynb``
 
 Expected Output
 ---------------

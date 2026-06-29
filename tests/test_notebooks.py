@@ -24,6 +24,7 @@ EXPECTED_NOTEBOOKS = [
     "07_heat_exchanger_network_synthesis.ipynb",
     "08_energy_transfer_analysis.ipynb",
     "09_schema_service_exports_and_bundles.ipynb",
+    "10_multiperiod_hpr_shared_design.ipynb",
 ]
 
 
@@ -311,3 +312,22 @@ def test_notebook_9_covers_service_boundary_and_output_workflows(tmp_path: Path)
     assert "compare_variants(" in combined_source
     assert "save_bundle(" in combined_source
     assert "load_bundle(" in combined_source
+
+
+def test_notebook_10_covers_multiperiod_hpr_shared_design(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "10_multiperiod_hpr_shared_design.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "crude_preheat_train_multiperiod.json" in combined_source
+    assert "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED" in combined_source
+    assert "HPR_BB_MINIMISER" in combined_source
+    assert "HPRcycle.CascadeCarnot" in combined_source
+    assert "target.direct_heat_pump(period_id=" in combined_source
+    assert 'summary_frame(periods="weighted_average"' in combined_source
+    assert 'summary_frame(periods="all_with_weighted_average"' in combined_source
+    assert "hpr_details" in combined_source
+    assert "period_outputs" in combined_source
+    assert "weighted_output" in combined_source

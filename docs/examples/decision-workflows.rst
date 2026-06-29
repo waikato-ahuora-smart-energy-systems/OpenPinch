@@ -42,6 +42,13 @@ Which Workflow Should I Use?
    ``problem.target.*`` and ``problem.plot.*`` surfaces rather than lower-level
    cycle internals.
 
+``How do I size one HPR design across several weighted operating periods?``
+   Use ``crude_preheat_train_multiperiod.json`` and
+   ``10_multiperiod_hpr_shared_design.ipynb``. It turns on
+   ``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED`` so the HPR optimiser chooses one
+   shared design vector and reports the weighted summary row from that shared
+   design.
+
 ``How do I model process vapour recompression as a case mutation?``
    Use ``05_direct_gas_stream_mvr_scenarios.ipynb``. It treats MVR as a
    process component added to named workspace cases, then compares the

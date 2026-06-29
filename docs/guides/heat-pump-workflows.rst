@@ -19,7 +19,9 @@ Sample Case
 
 Use ``chocolate_factory.json`` for direct-versus-indirect HPR comparison and
 ``heat_pump_targeting.json`` for a compact direct screening input. Use
-notebook 08 when the question is direct process gas/vapour recompression.
+``crude_preheat_train_multiperiod.json`` when one HPR design must serve
+several weighted operating periods. Use notebook 05 when the question is
+direct process gas/vapour recompression.
 
 Runnable Workflow
 -----------------
@@ -37,6 +39,20 @@ Direct or indirect HPR targeting:
    hpr = problem.target.direct_heat_pump()
    site_hpr = problem.target.indirect_heat_pump()
    summary = problem.summary_frame()
+
+Opt in to one shared HPR design across named operating periods:
+
+.. code-block:: python
+
+   multiperiod = PinchProblem("crude_preheat_train_multiperiod.json")
+   multiperiod.update_options(
+       {
+           "HPR_TYPE": HPRcycle.CascadeCarnot.value,
+           "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True,
+       }
+   )
+   shared_hpr = multiperiod.target.direct_heat_pump(period_id="base")
+   weighted_summary = multiperiod.summary_frame(periods="weighted_average")
 
 Refrigeration uses the companion accessors:
 
@@ -57,7 +73,9 @@ Expected Output
 
 HPR and refrigeration targeting add target rows with HPR cost, duty, COP, and
 graph effects. Direct gas/vapour MVR adds replacement hot streams and includes
-component work in later target summaries.
+component work in later target summaries. Multiperiod HPR shared-design mode
+keeps the requested period target row and stores all-period evaluations on
+``hpr_details`` for weighted summary reporting.
 
 Interpretation
 --------------
@@ -83,6 +101,8 @@ Recommended Learning Assets
 - ``05_direct_gas_stream_mvr_scenarios.ipynb`` for process-component MVR scenarios.
 - ``06_vapour_compression_mvr_cascade_hpr.ipynb`` for the VC+MVR cascade
   backend.
+- ``10_multiperiod_hpr_shared_design.ipynb`` for shared HPR design across
+  weighted operating periods.
 
 Copy them with:
 

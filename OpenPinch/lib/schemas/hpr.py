@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...classes.stream_collection import StreamCollection
 from ...classes.value import Value
@@ -70,6 +70,46 @@ class HeatPumpTargetInputs(BaseModel):
     debug: bool
 
 
+class HPRPeriodCase(BaseModel):
+    """Prepared single-period case evaluated by a shared HPR design vector."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    period_id: str
+    period_idx: int
+    weight: float
+    args: HeatPumpTargetInputs
+    base_target: Any = None
+    optimizer_pt: Any = None
+
+
+class MultiPeriodHPRTargetInputs(BaseModel):
+    """Prepared all-period HPR optimisation inputs."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    period_cases: List[HPRPeriodCase]
+    selected_period_id: str
+    selected_period_idx: int
+    hpr_type: str
+    max_multi_start: int
+    bb_minimiser: str
+    debug: bool = False
+
+
+class MultiPeriodHPRTargetOutputs(BaseModel):
+    """Internal all-period HPR optimisation result bundle."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    selected_output: Any
+    weighted_output: Any
+    period_outputs: dict[str, Any]
+    design_vector: Optional[np.ndarray] = None
+    period_ids: List[str] = Field(default_factory=list)
+    period_weights: List[float] = Field(default_factory=list)
+
+
 class HeatPumpTargetOutputs(BaseModel):
     """Normalized output contract for HPR targeting routines."""
 
@@ -110,6 +150,11 @@ class HeatPumpTargetOutputs(BaseModel):
     Q_heat: Optional[np.ndarray] = None
     Q_cool: Optional[np.ndarray] = None
     model: Optional[Any] = None
+    period_outputs: Optional[dict[str, Any]] = None
+    weighted_output: Optional[Any] = None
+    design_vector: Optional[np.ndarray] = None
+    period_ids: Optional[List[str]] = None
+    period_weights: Optional[List[float]] = None
 
 
 class SimulatedHPRAnnualizedCostAccounting(BaseModel):
@@ -217,6 +262,11 @@ class HPRBackendResult(BaseModel):
     Q_cool: np.ndarray | None = None
     failure_reason: str | None = None
     artifacts: HPRThermoArtifacts | None = None
+    period_outputs: dict[str, Any] | None = None
+    weighted_output: Any = None
+    design_vector: np.ndarray | None = None
+    period_ids: list[str] | None = None
+    period_weights: list[float] | None = None
 
     @property
     def Q_ext(self) -> float:
@@ -316,6 +366,11 @@ class HPRBackendResult(BaseModel):
             "Q_heat": self.Q_heat,
             "Q_cool": self.Q_cool,
             "model": self.model,
+            "period_outputs": self.period_outputs,
+            "weighted_output": self.weighted_output,
+            "design_vector": self.design_vector,
+            "period_ids": self.period_ids,
+            "period_weights": self.period_weights,
         }
         return {key: value for key, value in output_values.items() if value is not None}
 
@@ -341,8 +396,11 @@ class HPRBackendResult(BaseModel):
 
 
 __all__ = [
+    "HPRPeriodCase",
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",
+    "MultiPeriodHPRTargetInputs",
+    "MultiPeriodHPRTargetOutputs",
     "SimulatedHPRAnnualizedCostAccounting",
     "HPRParsedState",
     "HPRThermoArtifacts",
@@ -351,6 +409,9 @@ __all__ = [
 
 
 HeatPumpTargetInputs.model_rebuild()
+HPRPeriodCase.model_rebuild()
+MultiPeriodHPRTargetInputs.model_rebuild()
+MultiPeriodHPRTargetOutputs.model_rebuild()
 HeatPumpTargetOutputs.model_rebuild()
 SimulatedHPRAnnualizedCostAccounting.model_rebuild()
 HPRParsedState.model_rebuild()

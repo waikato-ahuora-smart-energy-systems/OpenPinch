@@ -92,6 +92,7 @@ The current notebook series is:
 7. ``07_heat_exchanger_network_synthesis.ipynb``
 8. ``08_energy_transfer_analysis.ipynb``
 9. ``09_schema_service_exports_and_bundles.ipynb``
+10. ``10_multiperiod_hpr_shared_design.ipynb``
 
 Interpretation
 --------------
@@ -106,7 +107,9 @@ I want to solve a case with advanced methods
    Use ``04_carnot_heat_pump_screening.ipynb`` for direct/indirect heat-pump
    screening, ``05_direct_gas_stream_mvr_scenarios.ipynb`` for process MVR
    case mutation, and ``07_heat_exchanger_network_synthesis.ipynb`` for HEN
-   synthesis and ranked network inspection.
+   synthesis and ranked network inspection. Use
+   ``10_multiperiod_hpr_shared_design.ipynb`` when one HPR design must be
+   optimised across several weighted periods.
 
 I need to understand the method
    Use ``02_total_site_sugcc_interpretation.ipynb`` to connect local targets,
