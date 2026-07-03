@@ -1,7 +1,7 @@
 """Common helpers shared across heat pump targeting models."""
 
 from ....lib.schemas.hpr import HPRBackendResult, HPRParsedState, HPRThermoArtifacts
-from . import encoding, layout, preprocessing, shared
+from . import encoding, layout, load_selection, preprocessing, shared
 from .encoding import (
     AMBIENT_X_BOUNDS,
     DutyAllocation,
@@ -20,6 +20,7 @@ from .encoding import (
     require_stage_duty_allocation,
 )
 from .layout import HPRoptVectorLayout
+from .load_selection import resolve_hpr_target_load
 from .preprocessing import construct_HPRTargetInputs
 from .shared import (
     calc_carnot_heat_engine_eta,
@@ -54,6 +55,7 @@ __all__ = [
     "HPRThermoArtifacts",
     "HPRoptVectorLayout",
     "layout",
+    "load_selection",
     "map_DT_arr_to_x_arr",
     "map_Q_amb_to_x",
     "map_Q_arr_to_x_arr",
@@ -65,6 +67,7 @@ __all__ = [
     "plot_multi_hp_profiles_from_results",
     "preprocessing",
     "require_stage_duty_allocation",
+    "resolve_hpr_target_load",
     "shared",
     "solve_hpr_placement",
     "solve_hpr_multiperiod_placement",

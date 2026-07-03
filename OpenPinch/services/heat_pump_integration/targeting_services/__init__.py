@@ -4,6 +4,7 @@ from . import (
     brayton,
     cascade_carnot,
     cascade_vapour_compression,
+    multiperiod,
     parallel_carnot,
     parallel_vapour_compression,
 )
@@ -18,6 +19,7 @@ from .parallel_vapour_compression import optimise_parallel_heat_pump_placement
 __all__ = [
     "brayton",
     "cascade_vapour_compression",
+    "multiperiod",
     "parallel_carnot",
     "parallel_vapour_compression",
     "cascade_carnot",

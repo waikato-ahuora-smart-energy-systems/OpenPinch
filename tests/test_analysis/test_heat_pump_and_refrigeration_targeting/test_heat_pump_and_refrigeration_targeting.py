@@ -22,6 +22,9 @@ from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.services.heat_pump_integration.common._shared import (
     plotting as hp_plotting,
 )
+from OpenPinch.services.heat_pump_integration.common.load_selection import (
+    resolve_hpr_target_load,
+)
 
 from .helpers import _base_args, _patch_output_model_validate, _pt_with_hnet
 
@@ -318,7 +321,7 @@ def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeyp
     zone.targets[TT.TS.value] = SimpleNamespace(pt=ProblemTable({PT.T: [120.0, 60.0]}))
     calls = {}
 
-    monkeypatch.setattr(hp, "_validate_hpr_required", lambda *args, **kwargs: 25.0)
+    monkeypatch.setattr(hp, "resolve_hpr_target_load", lambda *args, **kwargs: 25.0)
     monkeypatch.setattr(
         hp,
         "get_process_heat_cascade",
@@ -478,7 +481,7 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
     assert captured["target_load"] == pytest.approx(100.0)
 
 
-def test_validate_hpr_required_ignores_nan_load_entries():
+def test_resolve_hpr_target_load_ignores_nan_load_entries():
     pt = ProblemTable(
         {
             PT.T: [120.0, 80.0, 60.0],
@@ -490,7 +493,7 @@ def test_validate_hpr_required_ignores_nan_load_entries():
         options={"HPR_LOAD_MODE": "fraction", "HPR_LOAD_FRACTION": 0.25}
     )
 
-    assert hp._validate_hpr_required(
+    assert resolve_hpr_target_load(
         H_net_cold=pt[PT.H_NET_COLD],
         H_net_hot=pt[PT.H_NET_HOT],
         is_heat_pumping=True,
@@ -498,7 +501,7 @@ def test_validate_hpr_required_ignores_nan_load_entries():
     ) == pytest.approx(25.0)
 
 
-def test_validate_hpr_required_returns_zero_for_all_nan_load_entries():
+def test_resolve_hpr_target_load_returns_zero_for_all_nan_load_entries():
     pt = ProblemTable(
         {
             PT.T: [120.0, 80.0],
@@ -508,7 +511,7 @@ def test_validate_hpr_required_returns_zero_for_all_nan_load_entries():
     )
 
     assert (
-        hp._validate_hpr_required(
+        resolve_hpr_target_load(
             H_net_cold=pt[PT.H_NET_COLD],
             H_net_hot=pt[PT.H_NET_HOT],
             is_heat_pumping=True,
@@ -518,7 +521,7 @@ def test_validate_hpr_required_returns_zero_for_all_nan_load_entries():
     )
 
 
-def test_validate_hpr_required_uses_period_load_for_selected_period_id():
+def test_resolve_hpr_target_load_uses_period_load_for_selected_period_id():
     pt = ProblemTable(
         {
             PT.T: [120.0, 80.0, 60.0],
@@ -533,7 +536,7 @@ def test_validate_hpr_required_uses_period_load_for_selected_period_id():
         }
     )
 
-    assert hp._validate_hpr_required(
+    assert resolve_hpr_target_load(
         H_net_cold=pt[PT.H_NET_COLD],
         H_net_hot=pt[PT.H_NET_HOT],
         is_heat_pumping=True,
@@ -543,7 +546,7 @@ def test_validate_hpr_required_uses_period_load_for_selected_period_id():
     ) == pytest.approx(25.0)
 
 
-def test_validate_hpr_required_rejects_missing_period_load():
+def test_resolve_hpr_target_load_rejects_missing_period_load():
     pt = ProblemTable(
         {
             PT.T: [120.0, 80.0, 60.0],
@@ -559,7 +562,7 @@ def test_validate_hpr_required_rejects_missing_period_load():
     )
 
     with pytest.raises(ValueError, match="does not define a load"):
-        hp._validate_hpr_required(
+        resolve_hpr_target_load(
             H_net_cold=pt[PT.H_NET_COLD],
             H_net_hot=pt[PT.H_NET_HOT],
             is_heat_pumping=True,
@@ -569,12 +572,12 @@ def test_validate_hpr_required_rejects_missing_period_load():
         )
 
 
-def test_validate_hpr_required_covers_load_modes_and_invalid_inputs():
+def test_resolve_hpr_target_load_covers_load_modes_and_invalid_inputs():
     H_net_cold = np.array([0.0, 100.0, 0.0])
     H_net_hot = np.array([0.0, -60.0, 0.0])
 
     with pytest.raises(ValueError, match="config"):
-        hp._validate_hpr_required(
+        resolve_hpr_target_load(
             H_net_cold=H_net_cold,
             H_net_hot=H_net_hot,
             is_heat_pumping=True,
@@ -582,27 +585,35 @@ def test_validate_hpr_required_covers_load_modes_and_invalid_inputs():
         )
 
     assert (
-        hp._validate_hpr_required(
+        resolve_hpr_target_load(
             H_net_cold=H_net_cold,
             H_net_hot=H_net_hot,
             config=Configuration(),
         )
         == 0
     )
-    assert hp._validate_hpr_required(
+    assert resolve_hpr_target_load(
         H_net_cold=H_net_cold,
         H_net_hot=H_net_hot,
         is_refrigeration=True,
         config=Configuration(options={"HPR_LOAD_MODE": "duty", "HPR_LOAD_DUTY": 80.0}),
     ) == pytest.approx(60.0)
-    assert hp._resolve_hpr_period_load(
-        {"1": 12.0},
+    assert resolve_hpr_target_load(
+        H_net_cold=H_net_cold,
+        H_net_hot=H_net_hot,
+        is_heat_pumping=True,
+        config=Configuration(
+            options={
+                "HPR_LOAD_MODE": "period_values",
+                "HPR_LOAD_PERIOD_VALUES": {"1": 12.0},
+            }
+        ),
         period_id="missing",
         period_idx=1,
     ) == pytest.approx(12.0)
 
     with pytest.raises(ValueError, match="Unsupported HPR_LOAD_MODE"):
-        hp._validate_hpr_required(
+        resolve_hpr_target_load(
             H_net_cold=H_net_cold,
             H_net_hot=H_net_hot,
             is_heat_pumping=True,

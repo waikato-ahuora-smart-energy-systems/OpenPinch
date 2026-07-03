@@ -68,7 +68,7 @@ def get_process_heat_cascade(
     )
     if len(pt) == 0:
         return pt
-        
+
     # Perform the heat cascade of the problem table
     problem_table_algorithm(
         pt=pt,

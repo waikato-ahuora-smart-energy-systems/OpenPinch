@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from ...classes.stream_collection import StreamCollection
 from ...classes.value import Value
@@ -79,8 +79,6 @@ class HPRPeriodCase(BaseModel):
     period_idx: int
     weight: float
     args: HeatPumpTargetInputs
-    base_target: Any = None
-    optimizer_pt: Any = None
 
 
 class MultiPeriodHPRTargetInputs(BaseModel):
@@ -95,19 +93,6 @@ class MultiPeriodHPRTargetInputs(BaseModel):
     max_multi_start: int
     bb_minimiser: str
     debug: bool = False
-
-
-class MultiPeriodHPRTargetOutputs(BaseModel):
-    """Internal all-period HPR optimisation result bundle."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    selected_output: Any
-    weighted_output: Any
-    period_outputs: dict[str, Any]
-    design_vector: Optional[np.ndarray] = None
-    period_ids: List[str] = Field(default_factory=list)
-    period_weights: List[float] = Field(default_factory=list)
 
 
 class HeatPumpTargetOutputs(BaseModel):
@@ -400,7 +385,6 @@ __all__ = [
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",
     "MultiPeriodHPRTargetInputs",
-    "MultiPeriodHPRTargetOutputs",
     "SimulatedHPRAnnualizedCostAccounting",
     "HPRParsedState",
     "HPRThermoArtifacts",
@@ -411,7 +395,6 @@ __all__ = [
 HeatPumpTargetInputs.model_rebuild()
 HPRPeriodCase.model_rebuild()
 MultiPeriodHPRTargetInputs.model_rebuild()
-MultiPeriodHPRTargetOutputs.model_rebuild()
 HeatPumpTargetOutputs.model_rebuild()
 SimulatedHPRAnnualizedCostAccounting.model_rebuild()
 HPRParsedState.model_rebuild()

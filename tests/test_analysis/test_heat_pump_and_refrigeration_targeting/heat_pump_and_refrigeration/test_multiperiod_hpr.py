@@ -26,6 +26,9 @@ from OpenPinch.services.heat_pump_integration import (
     heat_pump_and_refrigeration_entry as hp,
 )
 from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
+from OpenPinch.services.heat_pump_integration.targeting_services import (
+    multiperiod as hp_multiperiod,
+)
 
 from ..helpers import _base_args
 
@@ -52,6 +55,7 @@ def _backend_result(*, obj: float, utility_tot: float, period_idx: int):
         Q_amb_hot=0.0,
         Q_amb_cold=0.0,
         cop_h=3.0 + period_idx,
+        amb_streams=StreamCollection(),
         artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
     )
 
@@ -224,62 +228,125 @@ def test_solve_hpr_multiperiod_placement_fails_when_any_period_fails(monkeypatch
         )
 
 
-def test_align_hpr_problem_tables_uses_union_temperature_grid():
-    first = _pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])
-    second = _pt([140.0, 90.0, 60.0], [130.0, 40.0, 0.0], [0.0, -20.0, -80.0])
+def test_build_multiperiod_cases_aligns_period_temperature_grids(monkeypatch):
+    zone = Zone(
+        config=Configuration(
+            options={
+                "PROBLEM_PERIOD_IDS": ["p0", "p1"],
+                "PROBLEM_PERIOD_WEIGHTS": [1.0, 3.0],
+            }
+        )
+    )
+    base_by_period = {
+        "p0": _base_target(_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])),
+        "p1": _base_target(
+            _pt([140.0, 90.0, 60.0], [130.0, 40.0, 0.0], [0.0, -20.0, -80.0])
+        ),
+    }
+    monkeypatch.setattr(
+        hp_multiperiod,
+        "_compute_hpr_base_target_for_period",
+        lambda *, zone, period_args, is_direct: base_by_period[
+            period_args["period_id"]
+        ],
+    )
 
-    hp._align_hpr_problem_tables([first, second])
+    cases = hp_multiperiod.build_multiperiod_hpr_cases(
+        zone=zone,
+        is_heat_pumping=True,
+        is_direct=True,
+    )
 
-    np.testing.assert_allclose(first[PT.T], second[PT.T])
-    np.testing.assert_allclose(first[PT.T], np.array([140.0, 120.0, 90.0, 60.0]))
+    assert [case.period_id for case in cases] == ["p0", "p1"]
+    assert [case.weight for case in cases] == [1.0, 3.0]
+    np.testing.assert_allclose(cases[0].optimizer_pt[PT.T], cases[1].optimizer_pt[PT.T])
+    np.testing.assert_allclose(
+        cases[0].optimizer_pt[PT.T],
+        np.array([140.0, 120.0, 90.0, 60.0]),
+    )
 
 
 @pytest.mark.parametrize(
-    ("cycle", "expected_objective"),
+    "cycle",
     [
-        (HPRcycle.CascadeCarnot.value, "_compute_cascade_carnot_cycle_obj"),
-        (HPRcycle.ParallelCarnot.value, "_compute_parallel_carnot_hp_opt_obj"),
-        (HPRcycle.CascadeVapourComp.value, "_compute_cascade_hp_system_obj"),
-        (HPRcycle.ParallelVapourComp.value, "_compute_parallel_hp_system_obj"),
-        (HPRcycle.VapourCompMVR.value, "_compute_vc_mvr_system_obj"),
+        HPRcycle.CascadeCarnot.value,
+        HPRcycle.ParallelCarnot.value,
+        HPRcycle.CascadeVapourComp.value,
+        HPRcycle.ParallelVapourComp.value,
+        HPRcycle.VapourCompMVR.value,
     ],
 )
-def test_supported_hpr_cycles_route_to_multiperiod_setup(cycle, expected_objective):
+def test_supported_hpr_cycles_prepare_shared_target_inputs(
+    monkeypatch,
+    cycle,
+):
     cases = [
-        HPRPeriodCase(
+        hp_multiperiod.PreparedHPRPeriodCase(
             period_id="p0",
             period_idx=0,
             weight=1.0,
-            args=_input_args(
-                hpr_type=cycle,
-                initialise_simulated_cycle=False,
-                n_cond=2,
-                n_evap=2,
+            solver_case=HPRPeriodCase(
+                period_id="p0",
+                period_idx=0,
+                weight=1.0,
+                args=_input_args(
+                    hpr_type=cycle,
+                    initialise_simulated_cycle=False,
+                    n_cond=2,
+                    n_evap=2,
+                ),
             ),
+            base_target=_base_target(_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])),
+            optimizer_pt=_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0]),
         ),
-        HPRPeriodCase(
+        hp_multiperiod.PreparedHPRPeriodCase(
             period_id="p1",
             period_idx=1,
             weight=1.0,
-            args=_input_args(
-                hpr_type=cycle,
-                initialise_simulated_cycle=False,
-                n_cond=2,
-                n_evap=2,
+            solver_case=HPRPeriodCase(
+                period_id="p1",
                 period_idx=1,
+                weight=1.0,
+                args=_input_args(
+                    hpr_type=cycle,
+                    initialise_simulated_cycle=False,
+                    n_cond=2,
+                    n_evap=2,
+                    period_idx=1,
+                ),
             ),
+            base_target=_base_target(_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])),
+            optimizer_pt=_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0]),
         ),
     ]
+    captured = {}
 
-    x0_ls, bnds, objective = hp._get_multiperiod_hpr_opt_setup(
-        cases,
-        selected_case=cases[0],
+    def fake_solve_hpr_multiperiod_placement(*, f_obj, x0_ls, bnds, args):
+        captured["period_ids"] = [case.period_id for case in args.period_cases]
+        captured["hpr_type"] = args.hpr_type
+        captured["has_bounds"] = bool(bnds)
+        captured["has_initial_candidate"] = x0_ls is not None
+        return _backend_result(obj=1.0, utility_tot=2.0, period_idx=0)
+
+    monkeypatch.setattr(
+        hp_multiperiod,
+        "solve_hpr_multiperiod_placement",
+        fake_solve_hpr_multiperiod_placement,
     )
 
-    assert objective.__name__ == expected_objective
-    assert bnds
+    result = hp_multiperiod.get_multiperiod_hpr_targets(
+        period_cases=cases,
+        selected_period_id="p0",
+        selected_period_idx=0,
+    )
+
+    assert result.success is True
+    assert result.utility_tot == pytest.approx(2.0)
+    assert captured["period_ids"] == ["p0", "p1"]
+    assert captured["hpr_type"] == cycle
+    assert captured["has_bounds"] is True
     if cycle in {HPRcycle.CascadeCarnot.value, HPRcycle.ParallelCarnot.value}:
-        assert x0_ls is not None
+        assert captured["has_initial_candidate"] is True
 
 
 def test_hpr_multiperiod_flag_false_uses_selected_period_path(monkeypatch):
@@ -347,7 +414,7 @@ def test_hpr_multiperiod_flag_true_returns_selected_period_from_shared_design(
     captured = {}
 
     monkeypatch.setattr(
-        hp,
+        hp_multiperiod,
         "_compute_hpr_base_target_for_period",
         lambda *, zone, period_args, is_direct: base_by_period[
             period_args["period_id"]
@@ -368,7 +435,7 @@ def test_hpr_multiperiod_flag_true_returns_selected_period_from_shared_design(
             weighted_output="weighted",
         )
 
-    monkeypatch.setattr(hp, "_get_multiperiod_hpr_targets", fake_multiperiod_targets)
+    monkeypatch.setattr(hp, "get_multiperiod_hpr_targets", fake_multiperiod_targets)
     monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
     monkeypatch.setattr(
         hp,

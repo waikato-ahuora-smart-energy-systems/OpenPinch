@@ -366,7 +366,7 @@ def _aggregate_hpr_values(
 
     try:
         arrays = [np.asarray(value, dtype=float) for value in values]
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     shapes = {array.shape for array in arrays}
     if len(shapes) != 1:
@@ -401,7 +401,7 @@ def _merge_candidate_points(
     local_minima_f: list | np.ndarray,
     x0_arr: np.ndarray | None,
     f_obj: Callable,
-    args: HeatPumpTargetInputs,
+    args: HeatPumpTargetInputs | MultiPeriodHPRTargetInputs,
 ) -> tuple[np.ndarray, np.ndarray]:
     candidate_blocks = []
     objective_blocks = []
@@ -453,7 +453,7 @@ def _normalise_candidate_block(values: list | np.ndarray | None) -> np.ndarray |
 def _score_hpr_candidate_objective(
     f_obj: Callable,
     x: np.ndarray,
-    args: HeatPumpTargetInputs,
+    args: HeatPumpTargetInputs | MultiPeriodHPRTargetInputs,
 ) -> float:
     try:
         result = f_obj(x, args, debug=False)
@@ -466,7 +466,7 @@ def _score_hpr_candidate_objective(
 def _evaluate_hpr_candidate(
     f_obj: Callable,
     x: np.ndarray,
-    args: HeatPumpTargetInputs,
+    args: HeatPumpTargetInputs | MultiPeriodHPRTargetInputs,
 ) -> HPRBackendResult:
     result = f_obj(x, args, debug=args.debug)
     if not isinstance(result, HPRBackendResult):
