@@ -222,3 +222,17 @@ openhens_baseline_results/refactor/*/results/
 openhens_baseline_results/refactor/*/*/
 results/
 plans/
+
+# AI-DLC generated skill packages
+.agents/skills/
+
+# AI-DLC local cursors and runtime state
+aidlc/
+aidlc/active-space
+aidlc/spaces/*/intents/active-intent
+aidlc/.aidlc-clone-id
+aidlc/.aidlc-sessions/
+aidlc/spaces/*/intents/*/runtime-graph.json
+aidlc/spaces/*/intents/*/.aidlc-*
+.codex/
+AGENTS.md
