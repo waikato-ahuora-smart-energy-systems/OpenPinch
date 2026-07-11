@@ -2,7 +2,7 @@ name: CI Develop
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: ["develop"]
 
 env:
   PYTHON_VERSION: "3.14.2"
@@ -11,47 +11,88 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - name: Check uv.lock project version
-        run: python scripts/check_lockfile_version.py
-      - name: Install deps
-        run: |
+      - run: python scripts/check_lockfile_version.py
+      - run: |
           python -m pip install --upgrade pip
           pip install -e .
           pip install --group dev
-      - name: Run Ruff
-        run: ruff check .
-      - name: Run tests
-        run: pytest -q -m "not solver"
+      - run: ruff check .
+      - run: coverage run --source=OpenPinch -m pytest -m "not solver"
+      - run: coverage report --fail-under=95
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install --group dev
+      - run: python scripts/build_docs.py
 
   optional-install-smoke:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        surface: [core, dashboard, notebook, brayton_cycle]
+        surface: [core, dashboard, notebook, brayton_cycle, synthesis]
     steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+      - run: python -m pip install --upgrade pip
       - name: Install package surface
         run: |
-          python -m pip install --upgrade pip
           case "${{ matrix.surface }}" in
             core) pip install . ;;
-            dashboard) pip install ".[dashboard]" ;;
-            notebook) pip install ".[notebook]" ;;
-            brayton_cycle) pip install ".[brayton_cycle]" ;;
+            *) pip install ".[${{ matrix.surface }}]" ;;
           esac
-      - name: Run optional install smoke
-        run: python scripts/optional_install_smoke.py ${{ matrix.surface }}
+      - run: python scripts/optional_install_smoke.py ${{ matrix.surface }}
+
+  artifact-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python scripts/build_dist.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: openpinch-dist
+          path: dist/*
+
+  artifact-install-smoke:
+    needs: artifact-build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: openpinch-dist
+          path: dist
+      - run: python -m pip install "numpy<3" "pint<1" "pandas<3" "coolprop<8" "pydantic<3" "scipy<2"
+      - run: python -m pip install --no-index --find-links dist OpenPinch
+      - run: python scripts/artifact_install_smoke.py

@@ -34,7 +34,28 @@ jobs:
       - name: Run Ruff
         run: ruff check .
       - name: Run tests
-        run: pytest -q -m "not solver"
+        run: coverage run --source=OpenPinch -m pytest -m "not solver"
+      - name: Enforce coverage
+        run: coverage report --fail-under=95
+
+  docs:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install --group dev
+      - name: Build docs
+        run: python scripts/build_docs.py
 
   optional-install-smoke:
     if: ${{ github.event.pull_request.draft == false }}
@@ -42,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        surface: [core, dashboard, notebook, brayton_cycle]
+        surface: [core, dashboard, notebook, brayton_cycle, synthesis]
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -56,16 +77,62 @@ jobs:
           python -m pip install --upgrade pip
           case "${{ matrix.surface }}" in
             core) pip install . ;;
-            dashboard) pip install ".[dashboard]" ;;
-            notebook) pip install ".[notebook]" ;;
-            brayton_cycle) pip install ".[brayton_cycle]" ;;
+            *) pip install ".[${{ matrix.surface }}]" ;;
           esac
       - name: Run optional install smoke
         run: python scripts/optional_install_smoke.py ${{ matrix.surface }}
 
+  artifact-build:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python scripts/build_dist.py
+      - name: Upload distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: openpinch-dist
+          path: dist/*
+
+  artifact-install-smoke:
+    needs: artifact-build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Download distributions
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: openpinch-dist
+          path: dist
+      - name: Install runtime dependencies
+        run: python -m pip install "numpy<3" "pint<1" "pandas<3" "coolprop<8" "pydantic<3" "scipy<2"
+      - name: Install wheel without package index
+        run: python -m pip install --no-index --find-links dist OpenPinch
+      - name: Smoke installed artifact
+        run: python scripts/artifact_install_smoke.py
+
   bump-version:
     name: Bump version on PR head branch (no tags)
-    # needs: [test, optional-install-smoke]
+    needs: [test, optional-install-smoke]
     if: ${{ github.event.pull_request.draft == false && !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     permissions:

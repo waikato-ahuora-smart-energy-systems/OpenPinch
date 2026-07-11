@@ -104,26 +104,23 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
     }
 
     assert synthesis_only.isdisjoint(core_deps)
-    assert synthesis_only.isdisjoint(full_deps)
+    assert synthesis_only <= full_deps
     assert synthesis_only.isdisjoint(unrelated_optional_deps)
 
 
-def test_full_extra_aggregates_optional_runtime_surfaces():
-    assert _optional_deps()["full"] == [
-        "streamlit",
-        "plotly",
-        "openpyxl",
-        "pyxlsb",
-        "tespy",
-        "ipykernel>=7.2.0",
-        "nbformat>=5.10.4",
-    ]
+def test_full_extra_aggregates_every_optional_runtime_surface_without_duplicates():
+    optional_deps = _optional_deps()
+    full = optional_deps["full"]
+    full_names = [_dependency_name(dep) for dep in full]
+    expected_names = {
+        _dependency_name(dep)
+        for extra_name, dependencies in optional_deps.items()
+        if extra_name != "full"
+        for dep in dependencies
+    }
 
-
-def test_full_extra_does_not_include_solver_synthesis_stack():
-    full_deps = {_dependency_name(dep) for dep in _optional_deps()["full"]}
-
-    assert {"pyomo", "gekko", "kaleido", "wakepy", "idaes-pse"}.isdisjoint(full_deps)
+    assert set(full_names) == expected_names
+    assert len(full_names) == len(set(full_names))
 
 
 def test_dev_dependency_group_retains_notebook_dependencies():
@@ -241,3 +238,42 @@ def test_testpypi_publish_skips_existing_files_but_pypi_publish_does_not():
 
     assert "skip-existing: true" in testpypi_block
     assert "skip-existing: true" not in pypi_block
+
+
+def test_publish_workflow_is_tag_only_and_validation_gated():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'tags: ["v*.*.*"]' in workflow
+    assert "branches:" not in workflow
+    assert "workflow_dispatch:" not in workflow
+    assert 'python scripts/check_release_tag.py "${{ github.ref_name }}"' in workflow
+    assert "needs: [test, docs, optional-install-smoke]" in workflow
+    assert "coverage report --fail-under=95" in workflow
+    assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
+    assert "os: [ubuntu-latest, windows-latest, macos-latest]" in workflow
+
+
+def test_pr_version_bump_waits_for_validation():
+    workflow = (
+        REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml"
+    ).read_text(encoding="utf-8")
+    bump_block = workflow.split("  bump-version:", 1)[1]
+
+    assert "needs: [test, optional-install-smoke]" in bump_block
+    assert "coverage report --fail-under=95" in workflow
+    assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
+
+
+def test_core_dependencies_have_incompatible_major_release_ceilings():
+    dependencies = _read_pyproject()["project"]["dependencies"]
+
+    assert dependencies == [
+        "numpy<3",
+        "pint<1",
+        "pandas<3",
+        "coolprop<8",
+        "pydantic<3",
+        "scipy<2",
+    ]

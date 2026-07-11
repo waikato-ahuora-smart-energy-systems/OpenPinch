@@ -31,10 +31,17 @@ python -m pip install "openpinch[notebook]"      # Jupyter, Plotly graphs, Excel
 python -m pip install "openpinch[dashboard]"     # Streamlit dashboard
 python -m pip install "openpinch[synthesis]"     # HEN synthesis, then run: idaes get-extensions
 python -m pip install "openpinch[brayton_cycle]" # TESPy-backed Brayton-cycle tooling
-python -m pip install "openpinch[full]"          # combined optional surface
+python -m pip install "openpinch[full]"          # all optional surfaces, including synthesis
 ```
 
 OpenPinch currently requires Python `>=3.14.2`.
+
+Both `synthesis` and `full` install the IDAES/Pyomo synthesis stack. Complete
+the IDAES installation before running solver-backed workflows:
+
+```bash
+idaes get-extensions
+```
 
 ## First Solve
 
@@ -114,9 +121,31 @@ Excel export, dashboards, and advanced targeting happen through Python.
 Run the test suite locally:
 
 ```bash
-python -m pip install -e . pytest build "hatchling>=1.26"
-pytest
+python -m pip install -e .
+python -m pip install --group dev
+ruff check .
+coverage run --source=OpenPinch -m pytest -m "not solver"
+coverage report --fail-under=95
+python scripts/build_docs.py
+python scripts/build_dist.py
 ```
+
+Ubuntu runs the complete CI suite. Windows and macOS install the generated
+wheel and verify the core import, CLI, and packaged resources. Tests marked
+`solver` require external solver binaries and remain a manual pre-release
+check in a solver-enabled environment: `pytest -m solver`.
+
+## Release Process
+
+1. Merge a change only after the required CI checks pass.
+2. Confirm `pyproject.toml` and `uv.lock` contain the intended release version.
+3. Run the solver-marked tests in a solver-enabled environment.
+4. Create a signed or annotated `vX.Y.Z` tag at the intended commit and push it.
+5. Approve the protected `pypi` environment after TestPyPI publication succeeds.
+
+The publish workflow rejects malformed tags and tags that do not exactly match
+the project version. Pull-request automation updates versions with `--no-tag`;
+maintainers always create release tags explicitly.
 
 Build the documentation locally:
 

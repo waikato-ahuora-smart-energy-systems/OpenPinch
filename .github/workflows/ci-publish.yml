@@ -1,103 +1,124 @@
-# .github/workflows/ci-publish.yml
-name: CI & Publish
+name: Validate & Publish
 
 on:
   push:
-    branches: [ "main" ]
-    paths-ignore: [ ".github/**", ".vscode/**" ]
-  workflow_dispatch:
+    tags: ["v*.*.*"]
 
 env:
   PYTHON_VERSION: "3.14.2"
 
 jobs:
-  # test:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-  #     - name: Set up Python
-  #       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-  #         cache: pip
-  #     - name: Install deps
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -e .
-  #         pip install --group dev
-  #     - name: Run Ruff
-  #       run: ruff check .
-  #     - name: Run tests
-  #       run: pytest -q
-
-  # optional-install-smoke:
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       surface: [core, dashboard, notebook, brayton_cycle]
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-  #     - name: Set up Python
-  #       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-  #         cache: pip
-  #     - name: Install package surface
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         case "${{ matrix.surface }}" in
-  #           core) pip install . ;;
-  #           dashboard) pip install ".[dashboard]" ;;
-  #           notebook) pip install ".[notebook]" ;;
-  #           brayton_cycle) pip install ".[brayton_cycle]" ;;
-  #         esac
-  #     - name: Run optional install smoke
-  #       run: python scripts/optional_install_smoke.py ${{ matrix.surface }}
-
-  build:
+  release-tag:
     runs-on: ubuntu-latest
-    # needs: [test, optional-install-smoke] #bump-project-version
-    # if: needs.bump-project-version.outputs.bumped == 'true'
     steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        # with:
-        #   ref: ${{ needs.bump-project-version.outputs.new_commit_hash }}
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - run: python scripts/check_release_tag.py "${{ github.ref_name }}"
+
+  test:
+    needs: release-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - name: Check uv.lock project version
-        run: python scripts/check_lockfile_version.py
-      - name: Build sdist/wheel
+      - run: python scripts/check_lockfile_version.py
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install --group dev
+      - run: ruff check .
+      - run: coverage run --source=OpenPinch -m pytest -m "not solver"
+      - run: coverage report --fail-under=95
+
+  docs:
+    needs: release-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install --group dev
+      - run: python scripts/build_docs.py
+
+  optional-install-smoke:
+    needs: release-tag
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        surface: [core, dashboard, notebook, brayton_cycle, synthesis]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - name: Install package surface
         run: |
+          case "${{ matrix.surface }}" in
+            core) pip install . ;;
+            *) pip install ".[${{ matrix.surface }}]" ;;
+          esac
+      - run: python scripts/optional_install_smoke.py ${{ matrix.surface }}
+
+  build:
+    needs: [test, docs, optional-install-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: |
           python -m pip install --upgrade pip
           pip install build
           python scripts/build_dist.py
-      - name: Upload dist as artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: openpinch-dist
           path: dist/*
 
-  publish-testpypi:
+  artifact-install-smoke:
     needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write   # required for Trusted Publishing (even to TestPyPI)
-      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
         with:
           name: openpinch-dist
           path: dist
-      - name: Publish to TestPyPI (Trusted Publishing)
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - run: python -m pip install "numpy<3" "pint<1" "pandas<3" "coolprop<8" "pydantic<3" "scipy<2"
+      - run: python -m pip install --no-index --find-links dist OpenPinch
+      - run: python scripts/artifact_install_smoke.py
+
+  publish-testpypi:
+    needs: artifact-install-smoke
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: openpinch-dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
@@ -109,13 +130,11 @@ jobs:
       name: pypi
       url: https://pypi.org/project/OpenPinch/
     permissions:
-      id-token: write   # required for Trusted Publishing
+      id-token: write
       contents: read
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
         with:
           name: openpinch-dist
           path: dist
-      - name: Publish to PyPI (Trusted Publishing)
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
