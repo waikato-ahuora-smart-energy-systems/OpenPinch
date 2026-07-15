@@ -823,3 +823,11 @@ Github CI tests fail with the attached error message."
 - discopt-removal/build-and-test/build-and-test-summary.md
 
 ---
+
+## HEN Tier 0 and Tier 1 Exact Regression Request
+**Timestamp**: 2026-07-15T21:52:58Z
+**User Input**: "Given the suite of recent changes (especially multi-period cases, multi-segment streams), run the HEN synthesis at Tier 0 and 1 to confirm that exactly the same results as previously are obtained.  "
+**AI Response**: "Reopened Build and Test for a controlled exact HEN regression. Selected revision 973d2322, immediately before the segmented-stream HEN refactor, as the authoritative previous implementation because stored result files cover inconsistent and incomplete matrices. Defined a seven-case, two-tier, baseline-versus-current matrix using the same harness, fixtures, Python environment, solvers, fixed settings, task concurrency, and timeout, with exact field comparison excluding timing and path diagnostics."
+**Context**: CONSTRUCTION - Additional Build and Test regression requested by the user. Plan created at aidlc-docs/construction/discopt-removal/build-and-test/hens-tier-0-1-regression-plan.md. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial and supplemented by deterministic real-solver evidence.
+
+---
