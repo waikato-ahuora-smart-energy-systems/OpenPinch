@@ -69,6 +69,7 @@ class BaseHeatExchangerNetworkModel(ABC):
 
         self.solve_time = None
         self.solver_run = None
+        self._piecewise_active_mappings: list[dict[str, Any]] = []
 
         self.setup_model()
         self.setup()
@@ -143,6 +144,569 @@ class BaseHeatExchangerNetworkModel(ABC):
         if not formula_allowed:
             return (delta_1 if fallback_delta is None else fallback_delta) * active
         return active * float(compute_LMTD_from_dts(delta_1, delta_2))
+
+    def _apply_segment_recovery_areas(self, q_r) -> None:
+        """Replace aggregate-CP recovery areas with ordered local slice totals."""
+        if not hasattr(self, "solver_arrays"):
+            return
+        arrays = self.solver_arrays.arrays
+        if not {"hot_segment_count", "cold_segment_count"}.issubset(arrays):
+            return
+        if not (
+            np.any(np.asarray(arrays["hot_segment_count"]) > 1)
+            or np.any(np.asarray(arrays["cold_segment_count"]) > 1)
+        ):
+            return
+
+        from ..common.solver.piecewise import (
+            duty_aligned_area_contributions,
+            profile_from_solver_arrays,
+        )
+
+        contribution_grid = [
+            [
+                [[() for _k in range(self.S)] for _j in range(self.J)]
+                for _i in range(self.I)
+            ]
+            for _n in range(self.N_periods)
+        ]
+        area_grid = [
+            [
+                [[0.0 for _k in range(self.S)] for _j in range(self.J)]
+                for _i in range(self.I)
+            ]
+            for _n in range(self.N_periods)
+        ]
+        for n in range(self.N_periods):
+            period = str(self.period_ids[n])
+            for i in range(self.I):
+                hot_profile = profile_from_solver_arrays(
+                    self.solver_arrays,
+                    side="hot",
+                    parent_index=i,
+                    period_index=n,
+                )
+                for j in range(self.J):
+                    cold_profile = profile_from_solver_arrays(
+                        self.solver_arrays,
+                        side="cold",
+                        parent_index=j,
+                        period_index=n,
+                    )
+                    if len(hot_profile.duties) == len(cold_profile.duties) == 1:
+                        for k in range(self.S):
+                            area_grid[n][i][j][k] = self.area_r_by_period[n][i][j][k]
+                        continue
+                    for k in range(self.S):
+                        duty = float(q_r[n][i][j][k])
+                        if duty <= self.tol:
+                            continue
+                        contributions = duty_aligned_area_contributions(
+                            hot_profile,
+                            cold_profile,
+                            duty=duty,
+                            hot_inlet_temperature=self._active_binary_value(
+                                self.T_h_by_period[n][i][k]
+                            ),
+                            cold_inlet_temperature=self._active_binary_value(
+                                self.T_c_by_period[n][j][k + 1]
+                            ),
+                            period=period,
+                            tolerance=self.tol,
+                        )
+                        contribution_grid[n][i][j][k] = contributions
+                        area_grid[n][i][j][k] = sum(
+                            contribution.area for contribution in contributions
+                        )
+        self.segment_area_contributions_by_period = contribution_grid
+        self.area_r_by_period = area_grid
+        self.area_r = [
+            [
+                [
+                    max(area_grid[n][i][j][k] for n in range(self.N_periods))
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+
+    def _apply_segment_utility_areas(self, q_h, q_c) -> None:
+        """Use local process segments for hot- and cold-utility area totals."""
+        if not hasattr(self, "solver_arrays"):
+            return
+        if not (
+            any(self._solver_parent_is_segmented("hot", i) for i in range(self.I))
+            or any(self._solver_parent_is_segmented("cold", j) for j in range(self.J))
+        ):
+            return
+        from ..common.solver.piecewise import (
+            duty_aligned_area_contributions,
+            profile_from_solver_arrays,
+            utility_thermal_profile,
+        )
+
+        hot_utility_identity = self.solver_arrays.utility_identities["hot_utilities"][0]
+        cold_utility_identity = self.solver_arrays.utility_identities["cold_utilities"][
+            0
+        ]
+        self.segment_area_hu_contributions_by_period = [
+            [() for _j in range(self.J)] for _n in range(self.N_periods)
+        ]
+        self.segment_area_cu_contributions_by_period = [
+            [() for _i in range(self.I)] for _n in range(self.N_periods)
+        ]
+        for n in range(self.N_periods):
+            period = str(self.period_ids[n])
+            for j in range(self.J):
+                duty = float(q_h[n][j])
+                if duty <= self.tol or not self._solver_parent_is_segmented("cold", j):
+                    continue
+                contributions = duty_aligned_area_contributions(
+                    utility_thermal_profile(
+                        identity=hot_utility_identity,
+                        inlet_temperature=self.T_hu_in_period[n][0],
+                        outlet_temperature=self.T_hu_out_period[n][0],
+                        duty=duty,
+                        heat_transfer_coefficient=self.htc_hu_period[n][0],
+                    ),
+                    profile_from_solver_arrays(
+                        self.solver_arrays,
+                        side="cold",
+                        parent_index=j,
+                        period_index=n,
+                    ),
+                    duty=duty,
+                    hot_inlet_temperature=self.T_hu_in_period[n][0],
+                    cold_inlet_temperature=self._active_binary_value(
+                        self.T_c_by_period[n][j][0]
+                    ),
+                    period=period,
+                    tolerance=self.tol,
+                )
+                self.segment_area_hu_contributions_by_period[n][j] = contributions
+                self.area_hu_by_period[n][j] = sum(
+                    contribution.area for contribution in contributions
+                )
+
+            for i in range(self.I):
+                duty = float(q_c[n][i])
+                if duty <= self.tol or not self._solver_parent_is_segmented("hot", i):
+                    continue
+                contributions = duty_aligned_area_contributions(
+                    profile_from_solver_arrays(
+                        self.solver_arrays,
+                        side="hot",
+                        parent_index=i,
+                        period_index=n,
+                    ),
+                    utility_thermal_profile(
+                        identity=cold_utility_identity,
+                        inlet_temperature=self.T_cu_in_period[n][0],
+                        outlet_temperature=self.T_cu_out_period[n][0],
+                        duty=duty,
+                        heat_transfer_coefficient=self.htc_cu_period[n][0],
+                    ),
+                    duty=duty,
+                    hot_inlet_temperature=self._active_binary_value(
+                        self.T_h_by_period[n][i][self.S]
+                    ),
+                    cold_inlet_temperature=self.T_cu_in_period[n][0],
+                    period=period,
+                    tolerance=self.tol,
+                )
+                self.segment_area_cu_contributions_by_period[n][i] = contributions
+                self.area_cu_by_period[n][i] = sum(
+                    contribution.area for contribution in contributions
+                )
+
+    def _segment_exact_dqda(
+        self,
+        *,
+        period_index: int,
+        hot_parent_index: int,
+        cold_parent_index: int,
+        duty: float,
+        hot_inlet_temperature: float,
+        cold_inlet_temperature: float,
+    ) -> float | None:
+        """Return a local numerical dQ/dA from ordered segment-summed area."""
+        if not (
+            self._solver_parent_is_segmented("hot", hot_parent_index)
+            or self._solver_parent_is_segmented("cold", cold_parent_index)
+        ):
+            return None
+
+        from ..common.solver.piecewise import (
+            duty_aligned_area_contributions,
+            profile_from_solver_arrays,
+        )
+
+        hot_profile = profile_from_solver_arrays(
+            self.solver_arrays,
+            side="hot",
+            parent_index=hot_parent_index,
+            period_index=period_index,
+        )
+        cold_profile = profile_from_solver_arrays(
+            self.solver_arrays,
+            side="cold",
+            parent_index=cold_parent_index,
+            period_index=period_index,
+        )
+        hot_start = hot_profile.heat_at_temperature(hot_inlet_temperature)
+        cold_start = cold_profile.heat_at_temperature(cold_inlet_temperature)
+        maximum_duty = min(
+            hot_profile.total_duty - hot_start,
+            cold_profile.total_duty - cold_start,
+        )
+        epsilon = max(maximum_duty * 1e-5, self.tol * 10.0, 1e-6)
+        lower_duty = max(0.0, duty - epsilon)
+        upper_duty = min(maximum_duty, duty + epsilon)
+        if upper_duty - lower_duty <= self.tol:
+            return None
+
+        def area_at(value: float) -> float:
+            if value <= self.tol:
+                return 0.0
+            contributions = duty_aligned_area_contributions(
+                hot_profile,
+                cold_profile,
+                duty=value,
+                hot_inlet_temperature=hot_inlet_temperature,
+                cold_inlet_temperature=cold_inlet_temperature,
+                period=str(self.period_ids[period_index]),
+                tolerance=self.tol,
+            )
+            return sum(contribution.area for contribution in contributions)
+
+        try:
+            area_delta = area_at(upper_duty) - area_at(lower_duty)
+        except ValueError:
+            return None
+        if area_delta <= self.tol:
+            return None
+        return (upper_duty - lower_duty) / area_delta
+
+    def _register_piecewise_mapping(self, mapping) -> None:
+        if mapping is not None:
+            self._piecewise_active_mappings.append(mapping)
+
+    def _update_piecewise_active_segments(self) -> bool:
+        changed = False
+        for mapping in self._piecewise_active_mappings:
+            coordinate = self._solver_value(mapping["heat_coordinate"])
+            next_segment = mapping["profile"].segment_index_at_heat(coordinate)
+            if next_segment == mapping["active_segment"]:
+                continue
+            for index, selector in enumerate(mapping["selectors"]):
+                self._set_value(selector, 1.0 if index == next_segment else 0.0)
+            mapping["active_segment"] = next_segment
+            changed = True
+        return changed
+
+    def _set_piecewise_stage_heat_coordinates(self) -> None:
+        """Add parent cumulative-Q balances and ordered T(Q) mappings by period."""
+        if not hasattr(self, "solver_arrays"):
+            self._segmented_hot_parents = np.zeros(self.I, dtype=bool)
+            self._segmented_cold_parents = np.zeros(self.J, dtype=bool)
+            return
+        arrays = self.solver_arrays.arrays
+        self._segmented_hot_parents = (
+            np.asarray(arrays.get("hot_segment_count", np.ones(self.I)), dtype=int) > 1
+        )
+        self._segmented_cold_parents = (
+            np.asarray(arrays.get("cold_segment_count", np.ones(self.J)), dtype=int) > 1
+        )
+        if not (
+            np.any(self._segmented_hot_parents) or np.any(self._segmented_cold_parents)
+        ):
+            return
+
+        from ..common.solver.piecewise import (
+            add_piecewise_temperature_mapping,
+            profile_from_solver_arrays,
+        )
+
+        integer_capable = self.solver in {"apopt", "couenne"}
+        self.Q_coordinate_h_by_period = [
+            [[None for _k in range(self.K)] for _i in range(self.I)]
+            for _n in range(self.N_periods)
+        ]
+        self.Q_coordinate_c_by_period = [
+            [[None for _k in range(self.K)] for _j in range(self.J)]
+            for _n in range(self.N_periods)
+        ]
+        for n in range(self.N_periods):
+            for i in range(self.I):
+                if not self._segmented_hot_parents[i]:
+                    continue
+                if (
+                    hasattr(self, "z_i_active_period")
+                    and self.z_i_active_period[n][i] <= 0
+                ):
+                    continue
+                profile = profile_from_solver_arrays(
+                    self.solver_arrays,
+                    side="hot",
+                    parent_index=i,
+                    period_index=n,
+                ).clipped(self.T_h_in_period[n][i], self.T_h_out_period[n][i])
+                for k in range(self.K):
+                    initial_q = profile.total_duty * k / max(self.S, 1)
+                    coordinate = (
+                        self.m.Param(value=0.0, name=f"Qcoord_H{i}_B0_period{n}")
+                        if k == 0
+                        else self.m.Var(
+                            value=initial_q,
+                            lb=0.0,
+                            ub=profile.total_duty,
+                            name=f"Qcoord_H{i}_B{k}_period{n}",
+                        )
+                    )
+                    self.Q_coordinate_h_by_period[n][i][k] = coordinate
+                    self._register_piecewise_mapping(
+                        add_piecewise_temperature_mapping(
+                            self.m,
+                            coordinate,
+                            self.T_h_by_period[n][i][k],
+                            profile,
+                            name=f"TQ_H{i}_B{k}_period{n}",
+                            integer_capable=integer_capable,
+                            initial_segment=profile.segment_index_at_heat(initial_q),
+                        )
+                    )
+                self.m.Equations(
+                    [
+                        self.Q_coordinate_h_by_period[n][i][k + 1]
+                        - self.Q_coordinate_h_by_period[n][i][k]
+                        - sum(self.Q_r_by_period[n][i][j][k] for j in range(self.J))
+                        == 0.0
+                        for k in range(self.S)
+                    ]
+                )
+
+            for j in range(self.J):
+                if not self._segmented_cold_parents[j]:
+                    continue
+                if (
+                    hasattr(self, "z_j_active_period")
+                    and self.z_j_active_period[n][j] <= 0
+                ):
+                    continue
+                profile = profile_from_solver_arrays(
+                    self.solver_arrays,
+                    side="cold",
+                    parent_index=j,
+                    period_index=n,
+                ).clipped(self.T_c_in_period[n][j], self.T_c_out_period[n][j])
+                for k in range(self.K):
+                    initial_q = profile.total_duty * (self.S - k) / max(self.S, 1)
+                    coordinate = (
+                        self.m.Param(value=0.0, name=f"Qcoord_C{j}_B{self.S}_period{n}")
+                        if k == self.S
+                        else self.m.Var(
+                            value=initial_q,
+                            lb=0.0,
+                            ub=profile.total_duty,
+                            name=f"Qcoord_C{j}_B{k}_period{n}",
+                        )
+                    )
+                    self.Q_coordinate_c_by_period[n][j][k] = coordinate
+                    self._register_piecewise_mapping(
+                        add_piecewise_temperature_mapping(
+                            self.m,
+                            coordinate,
+                            self.T_c_by_period[n][j][k],
+                            profile,
+                            name=f"TQ_C{j}_B{k}_period{n}",
+                            integer_capable=integer_capable,
+                            initial_segment=profile.segment_index_at_heat(initial_q),
+                        )
+                    )
+                self.m.Equations(
+                    [
+                        self.Q_coordinate_c_by_period[n][j][k]
+                        - self.Q_coordinate_c_by_period[n][j][k + 1]
+                        - sum(self.Q_r_by_period[n][i][j][k] for i in range(self.I))
+                        == 0.0
+                        for k in range(self.S)
+                    ]
+                )
+
+    def _hot_parent_segmented(self, index: int) -> bool:
+        return bool(getattr(self, "_segmented_hot_parents", [False] * self.I)[index])
+
+    def _cold_parent_segmented(self, index: int) -> bool:
+        return bool(getattr(self, "_segmented_cold_parents", [False] * self.J)[index])
+
+    def _solver_parent_is_segmented(self, side: str, index: int) -> bool:
+        if not hasattr(self, "solver_arrays"):
+            return False
+        counts = self.solver_arrays.arrays.get(f"{side}_segment_count")
+        return counts is not None and int(counts[index]) > 1
+
+    def _parent_profile_duty(
+        self,
+        side: str,
+        period_index: int,
+        parent_index: int,
+        supply_temperature: float,
+        target_temperature: float,
+        aggregate_cp: float,
+    ) -> float:
+        if not self._solver_parent_is_segmented(side, parent_index):
+            return abs(supply_temperature - target_temperature) * aggregate_cp
+        from ..common.solver.piecewise import profile_from_solver_arrays
+
+        return (
+            profile_from_solver_arrays(
+                self.solver_arrays,
+                side=side,
+                parent_index=parent_index,
+                period_index=period_index,
+            )
+            .clipped(supply_temperature, target_temperature)
+            .total_duty
+        )
+
+    def _recovery_heat_upper_bound(
+        self,
+        *,
+        period_index: int,
+        hot_index: int,
+        cold_index: int,
+        hot_total_duty: float,
+        cold_total_duty: float,
+        hot_cp: float,
+        cold_cp: float,
+    ) -> float:
+        temperature_span = max(
+            self.T_h_in_period[period_index][hot_index]
+            - self.T_c_in_period[period_index][cold_index]
+            - self._recovery_approach_temperature(hot_index, cold_index, period_index),
+            0.0,
+        )
+        if self._solver_parent_is_segmented(
+            "hot", hot_index
+        ) or self._solver_parent_is_segmented("cold", cold_index):
+            return min(hot_total_duty, cold_total_duty) if temperature_span > 0 else 0.0
+        return temperature_span * min(hot_cp, cold_cp)
+
+    def _set_piecewise_match_outlet_equations(self) -> None:
+        """Map non-isothermal branch outlets through parent heat coordinates."""
+        if not hasattr(self, "X_by_period") or not hasattr(self, "Y_by_period"):
+            return
+        if not (
+            np.any(getattr(self, "_segmented_hot_parents", []))
+            or np.any(getattr(self, "_segmented_cold_parents", []))
+        ):
+            return
+
+        from ..common.solver.piecewise import (
+            add_piecewise_temperature_mapping,
+            profile_from_solver_arrays,
+        )
+
+        integer_capable = self.solver in {"apopt", "couenne"}
+        self.Q_coordinate_h_out_x_by_period = [
+            [
+                [[None for _k in range(self.S)] for _j in range(self.J)]
+                for _i in range(self.I)
+            ]
+            for _n in range(self.N_periods)
+        ]
+        self.Q_coordinate_c_out_y_by_period = [
+            [
+                [[None for _k in range(self.S)] for _i in range(self.I)]
+                for _j in range(self.J)
+            ]
+            for _n in range(self.N_periods)
+        ]
+        for n in range(self.N_periods):
+            for i in range(self.I):
+                hot_profile = (
+                    profile_from_solver_arrays(
+                        self.solver_arrays,
+                        side="hot",
+                        parent_index=i,
+                        period_index=n,
+                    ).clipped(self.T_h_in_period[n][i], self.T_h_out_period[n][i])
+                    if self._hot_parent_segmented(i)
+                    else None
+                )
+                for j in range(self.J):
+                    cold_profile = (
+                        profile_from_solver_arrays(
+                            self.solver_arrays,
+                            side="cold",
+                            parent_index=j,
+                            period_index=n,
+                        ).clipped(self.T_c_in_period[n][j], self.T_c_out_period[n][j])
+                        if self._cold_parent_segmented(j)
+                        else None
+                    )
+                    for k in range(self.S):
+                        if self.z_allowed[i][j][k] <= 0:
+                            continue
+                        if hot_profile is not None:
+                            q_in = self.Q_coordinate_h_by_period[n][i][k]
+                            q_out = self.m.Var(
+                                value=hot_profile.total_duty * (k + 1) / max(self.S, 1),
+                                lb=0.0,
+                                ub=hot_profile.total_duty,
+                                name=f"Qcoord_H{i}_out_C{j}_S{k}_period{n}",
+                            )
+                            self.Q_coordinate_h_out_x_by_period[n][i][j][k] = q_out
+                            self.m.Equation(
+                                self.Q_r_by_period[n][i][j][k]
+                                == self.X_by_period[n][i][j][k] * (q_out - q_in)
+                            )
+                            self._register_piecewise_mapping(
+                                add_piecewise_temperature_mapping(
+                                    self.m,
+                                    q_out,
+                                    self.T_h_out_x_by_period[n][i][j][k],
+                                    hot_profile,
+                                    name=f"TQ_H{i}_out_C{j}_S{k}_period{n}",
+                                    integer_capable=integer_capable,
+                                    initial_segment=hot_profile.segment_index_at_heat(
+                                        hot_profile.total_duty
+                                        * (k + 1)
+                                        / max(self.S, 1)
+                                    ),
+                                )
+                            )
+                        if cold_profile is not None:
+                            q_in = self.Q_coordinate_c_by_period[n][j][k + 1]
+                            q_out = self.m.Var(
+                                value=cold_profile.total_duty
+                                * (self.S - k)
+                                / max(self.S, 1),
+                                lb=0.0,
+                                ub=cold_profile.total_duty,
+                                name=f"Qcoord_C{j}_out_H{i}_S{k}_period{n}",
+                            )
+                            self.Q_coordinate_c_out_y_by_period[n][j][i][k] = q_out
+                            self.m.Equation(
+                                self.Q_r_by_period[n][i][j][k]
+                                == self.Y_by_period[n][j][i][k] * (q_out - q_in)
+                            )
+                            self._register_piecewise_mapping(
+                                add_piecewise_temperature_mapping(
+                                    self.m,
+                                    q_out,
+                                    self.T_c_out_y_by_period[n][j][i][k],
+                                    cold_profile,
+                                    name=f"TQ_C{j}_out_H{i}_S{k}_period{n}",
+                                    integer_capable=integer_capable,
+                                    initial_segment=cold_profile.segment_index_at_heat(
+                                        cold_profile.total_duty
+                                        * (self.S - k)
+                                        / max(self.S, 1)
+                                    ),
+                                )
+                            )
 
     def get_alpha_values(self) -> list:
         """Calculate source alpha flow-on values in a post-optimisation solve."""
@@ -756,13 +1320,59 @@ class BaseHeatExchangerNetworkModel(ABC):
     def optimise(self, print_output: bool) -> None:
         """Solve the concrete model and extract plain result data on success."""
 
-        self.solver_run = backend.solve_gekko_model(
-            self.m,
-            solver_name=self.solver,
-            disp=False,
-            debug=0,
+        total_solve_time = 0.0
+        piecewise_mappings = getattr(self, "_piecewise_active_mappings", [])
+        active_mapping_stable = not piecewise_mappings or getattr(
+            self, "integers", False
         )
-        self.solve_time = self.solver_run.solve_time
+        for _attempt in range(8):
+            self.solver_run = backend.solve_gekko_model(
+                self.m,
+                solver_name=self.solver,
+                disp=False,
+                debug=0,
+            )
+            total_solve_time += float(self.solver_run.solve_time or 0.0)
+            if self.solver_run.failure_reason is not None:
+                break
+            active_mapping_stable = (
+                True
+                if not piecewise_mappings
+                else not self._update_piecewise_active_segments()
+            )
+            if active_mapping_stable:
+                break
+        self.solve_time = total_solve_time
+
+        if (
+            self.solver_run.failure_reason is not None
+            and piecewise_mappings
+            and not getattr(self, "integers", False)
+        ):
+            self.solver_run = backend.SolverRun(
+                name=self.solver_run.name,
+                extension=self.solver_run.extension,
+                status=self.solver_run.status,
+                objective_value=self.solver_run.objective_value,
+                solve_time=total_solve_time,
+                failure_reason=(
+                    f"{self.solver_run.failure_reason}; segmented-stream active "
+                    "interval solve was unresolved, so use APOPT or Couenne"
+                ),
+            )
+
+        if self.solver_run.failure_reason is None and not active_mapping_stable:
+            self.solver_run = backend.SolverRun(
+                name=self.solver_run.name,
+                extension=self.solver_run.extension,
+                status=self.solver_run.status,
+                objective_value=self.solver_run.objective_value,
+                solve_time=total_solve_time,
+                failure_reason=(
+                    "piecewise active segments did not stabilise; use APOPT or "
+                    "Couenne for interval-disjunctive segmented-stream solving"
+                ),
+            )
 
         if self.solver_run.failure_reason is not None:
             self.mSuccess = 0

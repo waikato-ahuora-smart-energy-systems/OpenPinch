@@ -22,6 +22,7 @@ from ._stream_collection._helpers import (
 from ._stream_collection._numeric_view import (
     StreamCollectionNumericView,
     build_numeric_view,
+    build_segment_numeric_view,
     value_at_idx,
 )
 from .stream import Stream
@@ -50,7 +51,7 @@ class StreamCollection:
         self._sorted_cache: List[object] = []
         self._needs_sort: bool = True
         self._numeric_cache: dict[
-            tuple[int | None, tuple[tuple[int, int], ...]],
+            tuple[str, int | None, tuple],
             StreamCollectionNumericView,
         ] = {}
         self._num_periods: int | None = 1
@@ -268,11 +269,8 @@ class StreamCollection:
     def numeric_view(self, idx: int | None = None) -> StreamCollectionNumericView:
         """Return a cached dense numeric view for stream-analysis kernels."""
         period_idx = None if idx is None else int(idx)
-        signature = tuple(
-            (id(stream), int(getattr(stream, "_numeric_revision", 0)))
-            for stream in self._streams.values()
-        )
-        cache_key = (period_idx, signature)
+        signature = self._numeric_signature()
+        cache_key = ("parent", period_idx, signature)
         cached = self._numeric_cache.get(cache_key)
         if cached is not None:
             return cached
@@ -282,10 +280,47 @@ class StreamCollection:
         self._numeric_cache[cache_key] = view
         return view
 
+    def segment_numeric_view(
+        self,
+        idx: int | None = None,
+    ) -> StreamCollectionNumericView:
+        """Return a cached numeric view expanded to ordered thermal segments."""
+        period_idx = None if idx is None else int(idx)
+        signature = self._numeric_signature()
+        cache_key = ("segment", period_idx, signature)
+        cached = self._numeric_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        view = build_segment_numeric_view(
+            list(self._streams.values()),
+            period_idx,
+            keys=list(self._streams),
+        )
+        self._numeric_cache.clear()
+        self._numeric_cache[cache_key] = view
+        return view
+
+    def _numeric_signature(self) -> tuple:
+        return tuple(
+            (
+                id(stream),
+                int(getattr(stream, "_numeric_revision", 0)),
+                tuple(
+                    (id(segment), int(getattr(segment, "_numeric_revision", 0)))
+                    for segment in getattr(stream, "segments", ())
+                ),
+            )
+            for stream in self._streams.values()
+        )
+
     def _build_numeric_view(
         self, idx: int | None = None
     ) -> StreamCollectionNumericView:
-        return build_numeric_view(list(self._streams.values()), idx)
+        return build_numeric_view(
+            list(self._streams.values()),
+            idx,
+            keys=list(self._streams),
+        )
 
     @staticmethod
     def _value_at_idx(value, idx: int | None = None) -> float:
@@ -432,11 +467,16 @@ class StreamCollection:
 
         return output_path
 
-    def to_dict(self, idx: int | None = None) -> dict[str, list[Any]]:
+    def to_dict(
+        self,
+        idx: int | None = None,
+        *,
+        expand_segments: bool = False,
+    ) -> dict[str, list[Any]]:
         """Return stream data as serializable rows in standard reporting order."""
-        ordered_streams = sorted(
-            self._streams.values(),
-            key=lambda stream: self._dict_sort_key(stream, idx),
+        ordered_items = sorted(
+            self._streams.items(),
+            key=lambda item: self._dict_sort_key(item[1], idx),
         )
         columns = [
             "name",
@@ -451,8 +491,35 @@ class StreamCollection:
             "htc",
             "active",
         ]
+        if expand_segments:
+            columns = [
+                "parent_key",
+                "parent_name",
+                "segment_index",
+                "segment_identity",
+                *columns,
+            ]
+        report_streams = []
+        for parent_key, stream in ordered_items:
+            if expand_segments and stream.has_segments:
+                report_streams.extend(
+                    (
+                        parent_key,
+                        stream.name,
+                        index,
+                        f"{parent_key}.S{index + 1}",
+                        segment,
+                    )
+                    for index, segment in enumerate(stream.segments)
+                )
+            else:
+                report_streams.append((parent_key, stream.name, None, None, stream))
         rows = [
             {
+                "parent_key": parent_key,
+                "parent_name": parent_name,
+                "segment_index": segment_index,
+                "segment_identity": segment_identity,
                 "name": stream.name,
                 "category": self._dict_category(stream),
                 "type": stream.type,
@@ -465,7 +532,13 @@ class StreamCollection:
                 "htc": self._value_at_idx(stream._htc, idx),
                 "active": stream.active,
             }
-            for stream in ordered_streams
+            for (
+                parent_key,
+                parent_name,
+                segment_index,
+                segment_identity,
+                stream,
+            ) in report_streams
         ]
         return {column: [row[column] for row in rows] for column in columns}
 
@@ -519,6 +592,7 @@ class StreamCollection:
         subset = StreamCollection()
         subset._period_ids = self._period_ids
         subset._weights = self._weights
+        subset._num_periods = self._num_periods
         subset._sort_spec = self._sort_spec
         subset._rebuild_sort_key()
         subset._sort_reverse = self._sort_reverse

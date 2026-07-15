@@ -109,8 +109,14 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.Qtot_sh_period = np.array(
             [
                 [
-                    (self.T_h_in_period[n][i] - self.T_h_out_period[n][i])
-                    * self.f_h_period[n][i]
+                    self._parent_profile_duty(
+                        "hot",
+                        n,
+                        i,
+                        self.T_h_in_period[n][i],
+                        self.T_h_out_period[n][i],
+                        self.f_h_period[n][i],
+                    )
                     for i in range(self.I)
                 ]
                 for n in range(self.N_periods)
@@ -120,8 +126,14 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.Qtot_sc_period = np.array(
             [
                 [
-                    self.f_c_period[n][j]
-                    * (self.T_c_out_period[n][j] - self.T_c_in_period[n][j])
+                    self._parent_profile_duty(
+                        "cold",
+                        n,
+                        j,
+                        self.T_c_in_period[n][j],
+                        self.T_c_out_period[n][j],
+                        self.f_c_period[n][j],
+                    )
                     for j in range(self.J)
                 ]
                 for n in range(self.N_periods)
@@ -173,18 +185,16 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 [
                     [
                         max(
-                            self.T_h_in_period[n][i]
-                            - self.T_c_in_period[n][j]
-                            - self._recovery_approach_temperature(
-                                i,
-                                j,
-                                n,
+                            self._recovery_heat_upper_bound(
+                                period_index=n,
+                                hot_index=i,
+                                cold_index=j,
+                                hot_total_duty=self.Qtot_sh_period[n][i],
+                                cold_total_duty=self.Qtot_sc_period[n][j],
+                                hot_cp=self.f_h_period[n][i],
+                                cold_cp=self.f_c_period[n][j],
                             ),
                             0.0,
-                        )
-                        * min(
-                            self.f_h_period[n][i],
-                            self.f_c_period[n][j],
                         )
                         for j in range(self.J)
                     ]
@@ -432,6 +442,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.theta_1 = self.theta_1_by_period[0]
         self.theta_2 = self.theta_2_by_period[0]
 
+        self._set_piecewise_stage_heat_coordinates()
+
         for n in range(self.N_periods):
             self.m.Equations(
                 [
@@ -471,6 +483,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                     == 0
                     for k in range(self.S)
                     for i in range(self.I)
+                    if not self._hot_parent_segmented(i)
                 ]
             )
             self.m.Equations(
@@ -481,6 +494,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                     == 0
                     for k in range(self.S)
                     for j in range(self.J)
+                    if not self._cold_parent_segmented(j)
                 ]
             )
 
@@ -780,6 +794,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.T_h_out_x = self.T_h_out_x_by_period[0]
         self.T_c_out_y = self.T_c_out_y_by_period[0]
 
+        self._set_piecewise_match_outlet_equations()
+
         for n in range(self.N_periods):
             _ = [
                 (
@@ -827,7 +843,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         )
                         == 0.0
                     )
-                    if self.z_allowed[i][j][k] > 0
+                    if self.z_allowed[i][j][k] > 0 and not self._hot_parent_segmented(i)
                     else None
                 )
                 for k in range(self.S)
@@ -847,6 +863,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         == 0.0
                     )
                     if self.z_allowed[i][j][k] > 0
+                    and not self._cold_parent_segmented(j)
                     else None
                 )
                 for k in range(self.S)
@@ -2620,6 +2637,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             for n in range(self.N_periods)
         ]
 
+        self._apply_segment_utility_areas(q_h, q_c)
+
         self.LMTD_r = self.LMTD_r_by_period[0]
         self.LMTD_hu = self.LMTD_hu_by_period[0]
         self.LMTD_cu = self.LMTD_cu_by_period[0]
@@ -2635,6 +2654,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             ]
             for i in range(self.I)
         ]
+        self._apply_segment_recovery_areas(q_r)
         self.area_hu = [
             max(self.area_hu_by_period[n][j] for n in range(self.N_periods))
             for j in range(self.J)
@@ -2730,6 +2750,20 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         self.dqda[i][j][k] = self.U_r[i][j] * driving_force
                     else:
                         self.dqda[i][j][k] = 0.0
+                    exact_dqda = self._segment_exact_dqda(
+                        period_index=0,
+                        hot_parent_index=i,
+                        cold_parent_index=j,
+                        duty=float(q_r[0][i][j][k]),
+                        hot_inlet_temperature=self._active_binary_value(
+                            self.T_h_by_period[0][i][k]
+                        ),
+                        cold_inlet_temperature=self._active_binary_value(
+                            self.T_c_by_period[0][j][k + 1]
+                        ),
+                    )
+                    if exact_dqda is not None:
+                        self.dqda[i][j][k] = exact_dqda
         self.alpha = self.get_alpha_values()
         self.dtacda = [
             [[None for _k in range(self.S)] for _j in range(self.J)]
@@ -3038,6 +3072,28 @@ def _check_area_costs(
     abs_tol: float = 1.0,
     q_tol: float = 1e-2,
 ) -> bool:
+    if getattr(case, "segment_area_contributions_by_period", None):
+        recovery_area_cost = case.A_coeff[0] * sum(
+            case.area_r[i][j][k] ** case.A_exp[0]
+            for k in range(case.S)
+            for j in range(case.J)
+            for i in range(case.I)
+        )
+        hu_area_cost = case.hu_coeff[0] * sum(
+            case.area_hu[j] ** case.hu_exp[0] for j in range(case.J)
+        )
+        cu_area_cost = case.cu_coeff[0] * sum(
+            case.area_cu[i] ** case.cu_exp[0] for i in range(case.I)
+        )
+        return all(
+            math.isclose(expected, actual, rel_tol=rel_tol, abs_tol=abs_tol)
+            for expected, actual in (
+                (recovery_area_cost, case.recovery_area_cost_total),
+                (hu_area_cost, case.hu_area_cost_total),
+                (cu_area_cost, case.cu_area_cost_total),
+            )
+        )
+
     if hasattr(case, "area_r_shared"):
         return _check_shared_area_costs(
             case,

@@ -23,6 +23,7 @@ from ._canonicalization import (
     _validate_input_data,
     _validate_zone_tree_structure,
 )
+from ._stream_segment_preparation import _create_segmented_process_stream
 from ._utility_preparation import (
     _get_hot_and_cold_utilities,
     _set_utilities_for_zone_and_subzones,
@@ -199,6 +200,8 @@ def _validate_stream_temperatures(stream: StreamSchema):
 
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
+    if stream.segments is not None or stream.profile is not None:
+        return _create_segmented_process_stream(stream, zone)
     _validate_stream_temperatures(stream)
     stream_obj = Stream(
         name=stream.name,

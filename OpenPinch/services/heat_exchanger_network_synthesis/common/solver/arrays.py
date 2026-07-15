@@ -15,6 +15,7 @@ from .....lib.config import tol
 from ..indexing import ordered_mapping_keys
 
 _PreparedItem = tuple[str, Stream, Any | None]
+SEGMENT_PROFILE_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,8 @@ def problem_to_solver_arrays(
         period_weights=period_weights,
         zone=zone,
     )
+    arrays.update(_segment_profile_arrays("hot", hot_items, num_periods))
+    arrays.update(_segment_profile_arrays("cold", cold_items, num_periods))
 
     axis_maps = {
         "cold_process_streams": {
@@ -123,6 +126,8 @@ def problem_to_solver_arrays(
             str(stage): index for index, stage in enumerate(hens.stage_selection)
         },
         "periods": {period_id: index for index, period_id in enumerate(period_ids)},
+        "hot_segments": _segment_axis_map(hot_items),
+        "cold_segments": _segment_axis_map(cold_items),
     }
 
     return PreparedSolverArrays(
@@ -158,6 +163,7 @@ def problem_to_solver_arrays(
             "HENS_SOLVER_TDM": hens.solver_tdm,
             "HENS_STAGE_SELECTION": list(hens.stage_selection),
             "active_dTmin": float(dTmin),
+            "segment_profile_version": SEGMENT_PROFILE_VERSION,
             "active_dt_cont_multiplier": float(dTmin),
             "period_ids": list(period_ids),
             "period_weights": [float(weight) for weight in period_weights],
@@ -177,6 +183,8 @@ def problem_to_solver_arrays(
         stream_identities={
             "cold_process_streams": [key for key, _, _ in cold_items],
             "hot_process_streams": [key for key, _, _ in hot_items],
+            "cold_segments": _segment_identity_list(cold_items),
+            "hot_segments": _segment_identity_list(hot_items),
         },
         unit_conventions={
             "cost_coefficients": (
@@ -290,6 +298,100 @@ def _solver_array_mapping(
 # fmt: on
 
 
+def _segment_profile_arrays(
+    prefix: str,
+    items: list[_PreparedItem],
+    num_periods: int,
+) -> dict[str, np.ndarray]:
+    """Build padded segment tensors while keeping the solver parent axes intact."""
+    segment_rows = [_segments_for_solver(stream) for _, stream, _ in items]
+    max_segments = max(len(row) for row in segment_rows)
+    shape = (num_periods, len(items), max_segments)
+    temperatures_in = np.zeros(shape, dtype=float)
+    temperatures_out = np.zeros(shape, dtype=float)
+    duties = np.zeros(shape, dtype=float)
+    heat_capacity_flowrates = np.zeros(shape, dtype=float)
+    heat_transfer_coefficients = np.zeros(shape, dtype=float)
+    mask = np.zeros(shape, dtype=bool)
+    cumulative_duties = np.zeros(
+        (num_periods, len(items), max_segments + 1), dtype=float
+    )
+    identities = np.full((len(items), max_segments), "", dtype=object)
+
+    for parent_index, ((parent_key, _stream, _record), segments) in enumerate(
+        zip(items, segment_rows)
+    ):
+        for segment_index, segment in enumerate(segments):
+            identities[parent_index, segment_index] = _segment_identity(
+                parent_key,
+                segment_index,
+            )
+            for period_index in range(num_periods):
+                mask[period_index, parent_index, segment_index] = True
+                temperatures_in[period_index, parent_index, segment_index] = _value(
+                    segment.t_supply, "K", period_idx=period_index
+                )
+                temperatures_out[period_index, parent_index, segment_index] = _value(
+                    segment.t_target, "K", period_idx=period_index
+                )
+                duties[period_index, parent_index, segment_index] = _value(
+                    segment.heat_flow, "kW", period_idx=period_index
+                )
+                heat_capacity_flowrates[period_index, parent_index, segment_index] = (
+                    _value(segment.CP, "kW/delta_degC", period_idx=period_index)
+                )
+                heat_transfer_coefficients[
+                    period_index, parent_index, segment_index
+                ] = _value(
+                    segment.htc,
+                    "kW/m^2/delta_degC",
+                    period_idx=period_index,
+                )
+        cumulative_duties[:, parent_index, 1:] = np.cumsum(
+            duties[:, parent_index, :], axis=1
+        )
+
+    return {
+        f"{prefix}_segment_count": np.array(
+            [len(row) for row in segment_rows], dtype=int
+        ),
+        f"{prefix}_segment_mask_period": mask,
+        f"{prefix}_segment_t_in_period": temperatures_in,
+        f"{prefix}_segment_t_out_period": temperatures_out,
+        f"{prefix}_segment_duty_period": duties,
+        f"{prefix}_segment_cp_period": heat_capacity_flowrates,
+        f"{prefix}_segment_htc_period": heat_transfer_coefficients,
+        f"{prefix}_segment_cumulative_duty_period": cumulative_duties,
+        f"{prefix}_segment_identities": identities,
+    }
+
+
+def _segments_for_solver(stream: Stream) -> tuple[Stream, ...]:
+    return stream.segments if stream.has_segments else (stream,)
+
+
+def _segment_axis_map(items: list[_PreparedItem]) -> dict[str, int]:
+    return {
+        identity: flat_index
+        for flat_index, identity in enumerate(_segment_identity_list(items))
+    }
+
+
+def _segment_identity_list(items: list[_PreparedItem]) -> list[str]:
+    identities = []
+    for parent_key, stream, _record in items:
+        identities.extend(
+            _segment_identity(parent_key, segment_index)
+            for segment_index in range(len(_segments_for_solver(stream)))
+        )
+    return identities
+
+
+def _segment_identity(parent_key: str, segment_index: int) -> str:
+    """Return a canonical collision-free identity stable across periods."""
+    return f"{parent_key}.S{segment_index + 1}"
+
+
 def _period_ids_and_weights(zone: Zone) -> tuple[tuple[str, ...], tuple[float, ...]]:
     period_lookup = zone.period_ids or {"0": 0}
     ordered_period_ids = ordered_mapping_keys(period_lookup)
@@ -340,6 +442,11 @@ def _stream_heat_capacity_flowrate(
     *,
     period_idx: int = 0,
 ) -> float:
+    if getattr(stream, "has_segments", False):
+        # Parent axes retain this legacy array only for shape compatibility.
+        # A zero sentinel prevents segmented equations from accidentally using
+        # the parent's effective CP instead of the segment-profile tensors.
+        return 0.0
     raw_flowrate = getattr(record, "heat_capacity_flowrate", None)
     if raw_flowrate is not None:
         parsed = _optional_value(
@@ -462,4 +569,8 @@ def _str_array(values) -> np.ndarray:
     return np.array(list(values), dtype=str)
 
 
-__all__ = ["PreparedSolverArrays", "problem_to_solver_arrays"]
+__all__ = [
+    "SEGMENT_PROFILE_VERSION",
+    "PreparedSolverArrays",
+    "problem_to_solver_arrays",
+]

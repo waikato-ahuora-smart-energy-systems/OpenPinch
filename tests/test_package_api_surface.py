@@ -20,11 +20,15 @@ EXPECTED_EXPORTS = {
         "ProblemReport",
         "ReportMetric",
         "SampleCaseMetadata",
+        "StreamSegment",
+        "StreamSegmentSchema",
         "StreamSchema",
         "StreamType",
         "TargetInput",
         "TargetOutput",
         "TargetType",
+        "TemperatureHeatPointSchema",
+        "TemperatureHeatProfileSchema",
         "UtilitySchema",
         "ValidationIssue",
         "ValidationReport",
@@ -68,6 +72,7 @@ EXPECTED_EXPORTS = {
         "PinchWorkspace",
         "ProblemTable",
         "Stream",
+        "StreamSegment",
         "StreamCollection",
         "Value",
         "Zone",
@@ -140,3 +145,13 @@ def test_openhens_compatibility_surfaces_are_not_root_exported():
 
     for module in MODULES.values():
         assert forbidden_exports.isdisjoint(_public_exports(module))
+
+
+def test_heat_exchanger_area_slice_value_model_is_not_barrel_exported():
+    slice_type_names = {
+        "HeatExchangerSegmentAreaContribution",
+        "HeatExchangerAreaSlice",
+    }
+
+    assert slice_type_names.isdisjoint(_public_exports(OpenPinch))
+    assert slice_type_names.isdisjoint(_public_exports(OpenPinch.classes))

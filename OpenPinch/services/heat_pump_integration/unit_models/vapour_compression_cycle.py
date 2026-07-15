@@ -8,10 +8,12 @@ import CoolProp
 import numpy as np
 from scipy.optimize import brentq
 
-from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
 from ....lib.coolprop_fluids import build_coolprop_abstract_state
-from ....utils.stream_linearisation import get_piecewise_data_points
+from ....utils.stream_linearisation import (
+    build_segmented_stream_from_profile,
+    get_piecewise_data_points,
+)
 
 __all__ = ["VapourCompressionCycle"]
 
@@ -768,25 +770,22 @@ class VapourCompressionCycle:
 
         def _build_streams(profile: np.ndarray, is_condenser: bool = True):
             sc = StreamCollection()
-            for i in range(len(profile) - 1):
-                h1, T1 = profile[i]
-                h2, T2 = profile[i + 1]
-
-                if abs(T1 - T2) < 0.01:
-                    name = f"Heater_{i + 1}" if is_condenser else f"Cooler_{i + 1}"
-                    T2 = T1 - 0.01 if is_condenser else T1 + 0.01
-                else:
-                    name = f"Heater_{i + 1}" if T1 > T2 else f"Cooler_{i + 1}"
-
-                s = Stream(
+            if self._m_dot <= 0.0 or np.ptp(np.asarray(profile)[:, 0]) <= 0.0:
+                return sc
+            name = "Condenser" if is_condenser else "Evaporator"
+            is_hot_profile = bool(profile[0, 1] > profile[-1, 1])
+            if np.isclose(profile[0, 1], profile[-1, 1]):
+                is_hot_profile = is_condenser
+            sc.add(
+                build_segmented_stream_from_profile(
                     name=name,
-                    t_supply=T1,
-                    t_target=T2,
-                    heat_flow=self._m_dot * abs(h1 - h2),
+                    profile=profile,
+                    heat_scale=self._m_dot,
+                    is_hot_stream=is_hot_profile,
                     is_process_stream=is_process_stream,
                     dt_cont=self._dtcont,
                 )
-                sc.add(s)
+            )
             return sc
 
         if include_cond:

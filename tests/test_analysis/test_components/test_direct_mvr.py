@@ -94,7 +94,8 @@ def test_direct_mvr_solver_builds_multistage_replacement_streams():
     solved = solve_direct_gas_mvr_stream(source, settings=settings)
 
     assert len(solved.stage_results) == 2
-    assert len(solved.replacement_streams) >= 2
+    assert len(solved.replacement_streams) == 2
+    assert all(stream.has_segments for stream in solved.replacement_streams)
     assert sum(stage.work for stage in solved.stage_results) > 0.0
     assert sum(stage.heat_flow for stage in solved.stage_results) > 0.0
     for replacement in solved.replacement_streams:
@@ -385,11 +386,6 @@ def test_direct_mvr_value_stage_and_stage_count_helpers_cover_scalar_edges():
     )
     assert direct_mvr_helpers._stage_mass_flow(zero_delta_stage) == 0.0
     assert direct_mvr_helpers._stage_mass_flow(positive_stage) == pytest.approx(0.5)
-    assert direct_mvr_helpers._stage_segment_heat_flow(
-        positive_stage,
-        300.0,
-        200.0,
-    ).value == pytest.approx(50.0)
     assert direct_mvr_helpers._value(None, 0) is None
     assert direct_mvr_helpers._value(12.5, 99) == pytest.approx(12.5)
     assert direct_mvr_helpers._value(Value([1.0, 2.0], "kW"), 1, unit="W") == (

@@ -9,6 +9,7 @@ from typing import Any, Optional
 import numpy as np
 from pydantic import ValidationError
 
+from ...lib.config import tol
 from ...lib.config_metadata import CONFIG_FIELD_SPECS, input_unit_options_to_map
 from ...lib.enums import ST
 from ...lib.schemas.io import TargetInput
@@ -17,7 +18,7 @@ from ...lib.unit_system import standardise_input_value
 from ..value import Value
 
 ValidationContext = dict[str, list[dict[str, Any]]]
-_TEMPERATURE_EQUAL_TOL = 1e-12
+_TEMPERATURE_EQUAL_TOL = tol
 _STREAM_VALUE_FIELDS = (
     "t_supply",
     "t_target",
@@ -30,12 +31,15 @@ _STREAM_VALUE_FIELDS = (
     "htc",
 )
 _STREAM_OPTIONAL_VALUE_FIELDS = (
+    "t_supply",
+    "t_target",
     "p_supply",
     "p_target",
     "h_supply",
     "h_target",
     "dt_cont",
     "htc",
+    "heat_flow",
 )
 _UTILITY_VALUE_FIELDS = (
     "t_supply",
@@ -194,6 +198,26 @@ def semantic_issues(
                 record_label=label,
             )
         )
+        if stream.segments is not None:
+            issues.extend(
+                _validate_segmented_stream_states(
+                    stream,
+                    section="streams",
+                    record_index=index,
+                    record_label=label,
+                    config=input_unit_config,
+                )
+            )
+        elif stream.profile is not None:
+            issues.extend(
+                _validate_temperature_heat_profile_states(
+                    stream,
+                    section="streams",
+                    record_index=index,
+                    record_label=label,
+                    config=input_unit_config,
+                )
+            )
 
     for index, utility in enumerate(problem_inputs.utilities):
         label = validation_record_label("utilities", index, context)
@@ -388,8 +412,9 @@ def _format_validation_issue(
 ) -> str:
     record_label = issue.record_label or issue.path or "Input"
     field_prefix = ""
-    if issue.field:
-        field_prefix = f"field '{issue.field}' - "
+    field_path = issue.path or issue.field
+    if field_path:
+        field_prefix = f"field '{field_path}' - "
     warning_prefix = "Warning: " if include_warning_prefix else ""
     return f"- {record_label}: {warning_prefix}{field_prefix}{issue.message}"
 
@@ -583,6 +608,321 @@ def _validate_stream_record_states(
             )
         )
 
+    return issues
+
+
+def _validate_segmented_stream_states(
+    stream,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    config: dict[str, dict[str, Any]],
+) -> list[ValidationIssue]:
+    """Validate ordered child states with precise nested input paths."""
+    issues: list[ValidationIssue] = []
+    parsed: list[tuple[Value, Value, Value, Value]] = []
+    for index, segment in enumerate(stream.segments):
+        values = []
+        for field_name in ("t_supply", "t_target", "heat_flow", "htc"):
+            try:
+                raw_value = getattr(segment, field_name)
+                if field_name == "htc" and raw_value is None:
+                    raw_value = stream.htc
+                values.append(
+                    standardise_input_value(
+                        raw_value,
+                        field_name=field_name,
+                        config=config,
+                    )
+                )
+            except (TypeError, ValueError) as exc:
+                issues.append(
+                    _build_issue(
+                        severity="error",
+                        section=section,
+                        record_index=record_index,
+                        record_label=record_label,
+                        path_field=f"segments[{index}].{field_name}",
+                        field=f"segments[{index}].{field_name}",
+                        message=str(exc),
+                    )
+                )
+                values.append(None)
+        if all(isinstance(value, Value) for value in values):
+            parsed.append(tuple(values))
+
+    if len(parsed) != len(stream.segments):
+        return issues
+    num_periods = max(value.num_periods for row in parsed for value in row)
+
+    def states(value: Value) -> np.ndarray:
+        if value.num_periods == 1:
+            return np.full(num_periods, float(value.value), dtype=float)
+        if value.num_periods != num_periods:
+            raise ValueError("Segment values must use a consistent period count.")
+        return value.period_values
+
+    direction = None
+    for index, (supply_value, target_value, duty_value, htc_value) in enumerate(parsed):
+        try:
+            supply = states(supply_value)
+            target = states(target_value)
+            duty = states(duty_value)
+            htc = states(htc_value)
+        except ValueError as exc:
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}]",
+                    field=f"segments[{index}]",
+                    message=str(exc),
+                )
+            )
+            continue
+        delta = target - supply
+        if not np.isfinite(supply).all() or not np.isfinite(target).all():
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}].t_supply",
+                    field=f"segments[{index}].t_supply/t_target",
+                    message="Segment temperatures must be finite.",
+                )
+            )
+        if not np.isfinite(duty).all() or np.any(duty <= 0.0):
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}].heat_flow",
+                    field=f"segments[{index}].heat_flow",
+                    message="Segment heat flow must be finite and positive.",
+                )
+            )
+        if not np.isfinite(htc).all() or np.any(htc <= 0.0):
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}].htc",
+                    field=f"segments[{index}].htc",
+                    message="Segment HTC must be finite and positive.",
+                )
+            )
+        signs = np.sign(delta)
+        if np.any(np.abs(delta) <= _TEMPERATURE_EQUAL_TOL) or not np.all(
+            signs == signs[0]
+        ):
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}].t_target",
+                    field=f"segments[{index}].t_supply/t_target",
+                    message="Segment temperatures must have one non-zero direction.",
+                )
+            )
+        elif direction is None:
+            direction = signs[0]
+        elif signs[0] != direction:
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}].t_target",
+                    field=f"segments[{index}].t_target",
+                    message="All segments must preserve the parent thermal direction.",
+                )
+            )
+        if index:
+            previous_target = states(parsed[index - 1][1])
+            if not np.allclose(
+                previous_target,
+                supply,
+                atol=_TEMPERATURE_EQUAL_TOL,
+                rtol=0.0,
+            ):
+                issues.append(
+                    _build_issue(
+                        severity="error",
+                        section=section,
+                        record_index=record_index,
+                        record_label=record_label,
+                        path_field=f"segments[{index}].t_supply",
+                        field=f"segments[{index}].t_supply",
+                        message=(
+                            "Supply temperature must match the previous segment "
+                            "target temperature in every period."
+                        ),
+                    )
+                )
+    return issues
+
+
+def _validate_temperature_heat_profile_states(
+    stream,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    config: dict[str, dict[str, Any]],
+) -> list[ValidationIssue]:
+    """Validate authoritative cumulative-heat profiles before linearisation."""
+    issues: list[ValidationIssue] = []
+    parsed: list[tuple[Value, Value]] = []
+    for index, point in enumerate(stream.profile.points):
+        values = []
+        for schema_field, unit_field in (
+            ("cumulative_heat", "heat_flow"),
+            ("temperature", "t_supply"),
+        ):
+            try:
+                values.append(
+                    standardise_input_value(
+                        getattr(point, schema_field),
+                        field_name=unit_field,
+                        config=config,
+                    )
+                )
+            except (TypeError, ValueError) as exc:
+                issues.append(
+                    _build_issue(
+                        severity="error",
+                        section=section,
+                        record_index=record_index,
+                        record_label=record_label,
+                        path_field=f"profile.points[{index}].{schema_field}",
+                        field=f"profile.points[{index}].{schema_field}",
+                        message=str(exc),
+                    )
+                )
+                values.append(None)
+        if all(isinstance(value, Value) for value in values):
+            parsed.append(tuple(values))
+
+    if len(parsed) != len(stream.profile.points):
+        return issues
+    num_periods = max(value.num_periods for row in parsed for value in row)
+
+    def states(value: Value) -> np.ndarray:
+        if value.num_periods == 1:
+            return np.full(num_periods, float(value.value), dtype=float)
+        if value.num_periods != num_periods:
+            raise ValueError("Profile values must use a consistent period count.")
+        return value.period_values
+
+    directions = np.zeros(num_periods, dtype=float)
+    previous_heat: np.ndarray | None = None
+    previous_temperature: np.ndarray | None = None
+    for index, (heat_value, temperature_value) in enumerate(parsed):
+        try:
+            heat = states(heat_value)
+            temperature = states(temperature_value)
+        except ValueError as exc:
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"profile.points[{index}]",
+                    field=f"profile.points[{index}]",
+                    message=str(exc),
+                )
+            )
+            continue
+        if not np.isfinite(heat).all() or not np.isfinite(temperature).all():
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"profile.points[{index}]",
+                    field=f"profile.points[{index}]",
+                    message="Profile heat and temperature values must be finite.",
+                )
+            )
+        if previous_heat is not None and previous_temperature is not None:
+            heat_step = heat - previous_heat
+            temperature_step = temperature - previous_temperature
+            if np.any(heat_step <= tol):
+                issues.append(
+                    _build_issue(
+                        severity="error",
+                        section=section,
+                        record_index=record_index,
+                        record_label=record_label,
+                        path_field=f"profile.points[{index}].cumulative_heat",
+                        field=f"profile.points[{index}].cumulative_heat",
+                        message=(
+                            "Cumulative heat must increase strictly in every period."
+                        ),
+                    )
+                )
+            nonzero = np.abs(temperature_step) > tol
+            signs = np.sign(temperature_step)
+            conflicts = nonzero & (directions != 0.0) & (signs != directions)
+            if np.any(conflicts):
+                issues.append(
+                    _build_issue(
+                        severity="error",
+                        section=section,
+                        record_index=record_index,
+                        record_label=record_label,
+                        path_field=f"profile.points[{index}].temperature",
+                        field=f"profile.points[{index}].temperature",
+                        message=(
+                            "Profile temperatures must preserve one thermal direction."
+                        ),
+                    )
+                )
+            directions[(directions == 0.0) & nonzero] = signs[
+                (directions == 0.0) & nonzero
+            ]
+        previous_heat = heat
+        previous_temperature = temperature
+    if np.any(directions == 0.0):
+        issues.append(
+            _build_issue(
+                severity="error",
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                path_field="profile.points[-1].temperature",
+                field="profile.points[-1].temperature",
+                message=(
+                    "Profile temperatures must span a non-zero range in every period."
+                ),
+            )
+        )
+    elif not np.all(directions == directions[0]):
+        issues.append(
+            _build_issue(
+                severity="error",
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                path_field="profile.points[-1].temperature",
+                field="profile.points[-1].temperature",
+                message="Profile thermal direction must match across all periods.",
+            )
+        )
     return issues
 
 

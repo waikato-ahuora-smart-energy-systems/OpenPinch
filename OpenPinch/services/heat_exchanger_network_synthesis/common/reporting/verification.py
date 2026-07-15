@@ -222,8 +222,9 @@ def _check_minimum_approach(network: HeatExchangerNetwork) -> list[str]:
 
 def _check_exchanger_duty_balances(network: HeatExchangerNetwork) -> list[str]:
     metadata = network.source_metadata
+    segment_failures = _check_segment_contribution_balances(network.exchangers)
     if _uses_isothermal_stage_boundaries(metadata):
-        return []
+        return segment_failures
     hot_cp = _stream_value_map(
         network,
         "hot_process_streams",
@@ -235,11 +236,13 @@ def _check_exchanger_duty_balances(network: HeatExchangerNetwork) -> list[str]:
         metadata.get("cold_stream_heat_capacity_flowrates"),
     )
     if not hot_cp and not cold_cp:
-        return []
+        return segment_failures
 
-    failures: list[str] = []
+    failures: list[str] = list(segment_failures)
     for exchanger in network.exchangers:
         if not exchanger.active:
+            continue
+        if exchanger.segment_area_contributions:
             continue
         if exchanger.kind in {
             HeatExchangerKind.RECOVERY,
@@ -280,7 +283,17 @@ def _check_stream_heat_balances(network: HeatExchangerNetwork) -> list[str]:
         "cold_process_streams",
         metadata.get("cold_stream_heat_capacity_flowrates"),
     )
-    if not hot_cp and not cold_cp:
+    hot_total_duties = _stream_value_map(
+        network,
+        "hot_process_streams",
+        metadata.get("hot_stream_total_duties"),
+    )
+    cold_total_duties = _stream_value_map(
+        network,
+        "cold_process_streams",
+        metadata.get("cold_stream_total_duties"),
+    )
+    if not hot_cp and not cold_cp and not hot_total_duties and not cold_total_duties:
         return []
 
     failures: list[str] = []
@@ -305,8 +318,13 @@ def _check_stream_heat_balances(network: HeatExchangerNetwork) -> list[str]:
         metadata.get("cold_stream_target_temperatures"),
     )
 
-    for stream, cp in hot_cp.items():
-        expected = _heat_removed(cp, hot_supply.get(stream), hot_target.get(stream))
+    for stream in hot_cp.keys() | hot_total_duties.keys():
+        expected = hot_total_duties.get(stream)
+        if expected is None:
+            cp = hot_cp.get(stream)
+            if cp is None:
+                continue
+            expected = _heat_removed(cp, hot_supply.get(stream), hot_target.get(stream))
         if expected is None:
             continue
         observed = network.total_duty(
@@ -319,8 +337,13 @@ def _check_stream_heat_balances(network: HeatExchangerNetwork) -> list[str]:
                 f"match required heat load {expected:.6g}"
             )
 
-    for stream, cp in cold_cp.items():
-        expected = _heat_added(cp, cold_supply.get(stream), cold_target.get(stream))
+    for stream in cold_cp.keys() | cold_total_duties.keys():
+        expected = cold_total_duties.get(stream)
+        if expected is None:
+            cp = cold_cp.get(stream)
+            if cp is None:
+                continue
+            expected = _heat_added(cp, cold_supply.get(stream), cold_target.get(stream))
         if expected is None:
             continue
         observed = network.total_duty(
@@ -352,8 +375,9 @@ def _check_area_presence(
 
 def _check_area_consistency(network: HeatExchangerNetwork) -> list[str]:
     metadata = network.source_metadata
+    failures = _check_segment_contribution_areas(network.exchangers)
     if _uses_isothermal_stage_boundaries(metadata):
-        return []
+        return failures
     hot_htc = _stream_value_map(
         network,
         "hot_process_streams",
@@ -375,15 +399,16 @@ def _check_area_consistency(network: HeatExchangerNetwork) -> list[str]:
         metadata.get("cold_utility_heat_transfer_coefficients"),
     )
     if not any((hot_htc, cold_htc, hot_utility_htc, cold_utility_htc)):
-        return []
+        return failures
 
-    failures: list[str] = []
     for exchanger in network.exchangers:
         if (
             not exchanger.active
             or exchanger.duty <= _DUTY_ABS_TOL
             or exchanger.area is None
         ):
+            continue
+        if exchanger.segment_area_contributions:
             continue
         overall_htc = _overall_heat_transfer_coefficient(
             exchanger,
@@ -406,6 +431,69 @@ def _check_area_consistency(network: HeatExchangerNetwork) -> list[str]:
                 f"{exchanger.exchanger_id or exchanger.kind.value} area "
                 f"{exchanger.area:.6g} is below required area "
                 f"{required_area:.6g}"
+            )
+    return failures
+
+
+def _check_segment_contribution_balances(
+    exchangers: Iterable[HeatExchanger],
+) -> list[str]:
+    failures = []
+    for exchanger in exchangers:
+        contributions = exchanger.segment_area_contributions
+        if not exchanger.active or not contributions:
+            continue
+        period_duties = exchanger.segment_duty_by_period
+        if len(period_duties) == 1:
+            contribution_duty = next(iter(period_duties.values()))
+            if not _close(
+                contribution_duty,
+                exchanger.duty,
+                rel_tol=_DUTY_REL_TOL,
+                abs_tol=_DUTY_ABS_TOL,
+            ):
+                failures.append(
+                    f"{exchanger.exchanger_id or exchanger.kind.value} segment "
+                    f"duty {contribution_duty:.6g} does not match parent duty "
+                    f"{exchanger.duty:.6g}"
+                )
+    return failures
+
+
+def _check_segment_contribution_areas(
+    exchangers: Iterable[HeatExchanger],
+) -> list[str]:
+    failures = []
+    for exchanger in exchangers:
+        contributions = exchanger.segment_area_contributions
+        if not exchanger.active or not contributions or exchanger.area is None:
+            continue
+        for contribution in contributions:
+            required = contribution.duty / contribution.overall_htc / contribution.lmtd
+            if not _close(
+                required,
+                contribution.area,
+                rel_tol=_AREA_REL_TOL,
+                abs_tol=_AREA_ABS_TOL,
+            ):
+                failures.append(
+                    f"{exchanger.exchanger_id or exchanger.kind.value} segment "
+                    f"area {contribution.area:.6g} does not match local duty/U/LMTD "
+                    f"{required:.6g}"
+                )
+        design_area = exchanger.segment_design_area
+        if design_area is None:
+            continue
+        if not _close(
+            design_area,
+            exchanger.area,
+            rel_tol=_AREA_REL_TOL,
+            abs_tol=_AREA_ABS_TOL,
+        ):
+            failures.append(
+                f"{exchanger.exchanger_id or exchanger.kind.value} area "
+                f"{exchanger.area:.6g} does not match maximum period-total "
+                f"segment area {design_area:.6g}"
             )
     return failures
 

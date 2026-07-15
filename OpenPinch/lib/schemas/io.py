@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from ..config_metadata import validate_configuration_options
 from ..enums import ST, FluidPhase
@@ -15,18 +22,70 @@ from .reporting import TargetResults
 from .synthesis import HeatExchangerNetworkSynthesisResult
 
 
+class StreamSegmentSchema(BaseModel):
+    """One ordered linear interval in a variable-CP stream profile."""
+
+    name: Optional[str] = None
+    t_supply: ScalarOrVU
+    t_target: ScalarOrVU
+    heat_flow: ScalarOrVU
+    p_supply: Optional[ScalarOrVU] = None
+    p_target: Optional[ScalarOrVU] = None
+    h_supply: Optional[ScalarOrVU] = None
+    h_target: Optional[ScalarOrVU] = None
+    dt_cont: Optional[ScalarOrVU] = None
+    htc: Optional[ScalarOrVU] = None
+
+    model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
+
+
+class TemperatureHeatPointSchema(BaseModel):
+    """One temperature and cumulative-heat coordinate in an ordered profile."""
+
+    cumulative_heat: ScalarOrVU
+    temperature: ScalarOrVU
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class TemperatureHeatProfileSchema(BaseModel):
+    """Ordered temperature-cumulative-heat data for one physical stream."""
+
+    points: List[TemperatureHeatPointSchema]
+    linearisation_tolerance: float = 0.1
+
+    @field_validator("points")
+    @classmethod
+    def _require_two_points(
+        cls,
+        value: List[TemperatureHeatPointSchema],
+    ) -> List[TemperatureHeatPointSchema]:
+        if len(value) < 2:
+            raise ValueError("A temperature-heat profile requires at least two points.")
+        return value
+
+    @field_validator("linearisation_tolerance")
+    @classmethod
+    def _positive_tolerance(cls, value: float) -> float:
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError("linearisation_tolerance must be finite and positive.")
+        return float(value)
+
+
 class StreamSchema(BaseModel):
     """Process stream definition supplied to the targeting service."""
 
     zone: str
     name: str
-    t_supply: ScalarOrVU
-    t_target: ScalarOrVU
+    segments: Optional[List[StreamSegmentSchema]] = None
+    profile: Optional[TemperatureHeatProfileSchema] = None
+    t_supply: Optional[ScalarOrVU] = None
+    t_target: Optional[ScalarOrVU] = None
     p_supply: Optional[ScalarOrVU] = None
     p_target: Optional[ScalarOrVU] = None
     h_supply: Optional[ScalarOrVU] = None
     h_target: Optional[ScalarOrVU] = None
-    heat_flow: ScalarOrVU
+    heat_flow: Optional[ScalarOrVU] = None
     heat_capacity_flowrate: Optional[ScalarOrVU] = None
     dt_cont: Optional[ScalarOrVU] = 0.0
     htc: Optional[ScalarOrVU] = 1.0
@@ -34,7 +93,11 @@ class StreamSchema(BaseModel):
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True
 
-    model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+        validate_default=True,
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -66,6 +129,34 @@ class StreamSchema(BaseModel):
             return None
         text = str(value).strip()
         return FluidPhase.from_code_or_description(value) if text else None
+
+    @field_validator("t_supply", "t_target", "heat_flow")
+    @classmethod
+    def _require_ordinary_thermal_fields(
+        cls,
+        value: Optional[ScalarOrVU],
+        info: ValidationInfo,
+    ) -> Optional[ScalarOrVU]:
+        has_nested = (
+            info.data.get("segments") is not None
+            or info.data.get("profile") is not None
+        )
+        if value is None and not has_nested:
+            raise ValueError(f"Ordinary streams require {info.field_name}.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_thermal_definition(self) -> Self:
+        if self.segments is not None and self.profile is not None:
+            raise ValueError("Provide either segments or profile, not both.")
+        has_nested = self.segments is not None or self.profile is not None
+        if self.segments is not None and len(self.segments) == 0:
+            raise ValueError("segments must contain at least one segment.")
+        if has_nested and self.heat_capacity_flowrate is not None:
+            raise ValueError(
+                "heat_capacity_flowrate cannot be supplied with segments or profile."
+            )
+        return self
 
 
 class UtilitySchema(BaseModel):
@@ -167,8 +258,11 @@ class NonLinearStream(BaseModel):
 __all__ = [
     "NonLinearStream",
     "StreamSchema",
+    "StreamSegmentSchema",
     "TargetInput",
     "TargetOutput",
+    "TemperatureHeatPointSchema",
+    "TemperatureHeatProfileSchema",
     "UtilitySchema",
     "ZoneTreeSchema",
 ]

@@ -144,7 +144,7 @@ def create_problem_table_with_t_int(
         streams = StreamCollection()
 
     if isinstance(streams, StreamCollection):
-        numeric = streams.numeric_view(period_idx)
+        numeric = streams.segment_numeric_view(period_idx)
         if is_shifted:
             T_vals = np.concatenate((numeric.t_min_star, numeric.t_max_star))
         else:
@@ -298,7 +298,7 @@ def _sum_mcp_between_temperature_boundaries(
     if return_lists:
         streams = StreamCollection(list(streams))
 
-    numeric = streams.numeric_view(idx)
+    numeric = streams.segment_numeric_view(idx)
     t_min = numeric.t_min_star if is_shifted else numeric.t_min
     t_max = numeric.t_max_star if is_shifted else numeric.t_max
     active_streams = numeric.active & np.isfinite(t_min) & np.isfinite(t_max)

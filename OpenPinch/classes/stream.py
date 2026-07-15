@@ -8,9 +8,11 @@ from typing import Optional
 
 import numpy as np
 
+from ..lib.config import tol
 from ..lib.coolprop_fluids import validate_coolprop_fluid_name
-from ..lib.enums import ST, FluidPhase
+from ..lib.enums import FluidPhase
 from ..lib.schemas.common import MaybeVU
+from . import _stream_profile, _stream_thermodynamics, _stream_value_state
 from .value import Value
 
 _TEMPERATURE_EQUAL_TOL = 1e-12
@@ -91,8 +93,11 @@ class Stream:
         is_process_stream: bool = True,
         fluid_name: Optional[str] = None,
         fluid_phase: Optional[str | FluidPhase] = None,
+        segments: list["StreamSegment"] | tuple["StreamSegment", ...] | None = None,
     ):
         """Initialise a stream and infer hot/cold classification."""
+        self._segments: tuple[StreamSegment, ...] = ()
+        self._syncing_segments = False
         self._name = name
         self._is_process_stream = bool(is_process_stream)
         self._fluid_name = self._normalise_fluid_name(fluid_name)
@@ -142,6 +147,8 @@ class Stream:
         self._validate_num_periods()
         self._calculate_missing_properties()
         self.update_derived_properties()
+        if segments is not None:
+            self.replace_segments(segments)
 
     # === Core Properties ===
 
@@ -164,6 +171,8 @@ class Stream:
     def is_process_stream(self, value: bool):
         """Mark whether the stream is treated as process-side or utility-side."""
         self._is_process_stream = value
+        for segment in self._segments:
+            segment._is_process_stream = value
 
     @property
     def fluid_name(self) -> Optional[str]:
@@ -173,6 +182,8 @@ class Stream:
     @fluid_name.setter
     def fluid_name(self, value: Optional[str]):
         self._fluid_name = self._normalise_fluid_name(value)
+        for segment in self._segments:
+            segment._fluid_name = self._fluid_name
 
     @property
     def fluid_phase(self) -> Optional[str]:
@@ -182,6 +193,23 @@ class Stream:
     @fluid_phase.setter
     def fluid_phase(self, value: Optional[str | FluidPhase]):
         self._fluid_phase = self._normalise_fluid_phase(value)
+        for segment in self._segments:
+            segment._fluid_phase = self._fluid_phase
+
+    @property
+    def segments(self) -> tuple["StreamSegment", ...]:
+        """Ordered immutable view of the stream's piecewise thermal segments."""
+        return self._segments
+
+    @property
+    def has_segments(self) -> bool:
+        """Return whether this physical stream has an explicit thermal profile."""
+        return bool(self._segments)
+
+    @property
+    def segment_count(self) -> int:
+        """Return the number of explicit thermal segments."""
+        return len(self._segments)
 
     @property
     def type(self) -> Optional[str]:
@@ -279,6 +307,9 @@ class Stream:
         """Set the effective shifted-temperature contribution in active use."""
         if not self._dt_cont_multiplier_locked:
             self._dt_cont_multiplier = float(value)
+            for segment in self._segments:
+                segment._dt_cont_multiplier = self._dt_cont_multiplier
+                segment.update_derived_properties()
             self._bump_numeric_revision()
             self.update_derived_properties()
         else:
@@ -353,6 +384,9 @@ class Stream:
     def active(self, value: bool):
         """Activate or deactivate the stream for downstream analysis."""
         self._active = bool(value)
+        for segment in self._segments:
+            segment._active = self._active
+            segment._bump_numeric_revision()
         self._bump_numeric_revision()
 
     # === Computed Temperature Properties ===
@@ -498,6 +532,15 @@ class Stream:
         update_derived: bool = True,
     ) -> None:
         internal_name = self._resolve_attr_name(attr_name)
+        if (
+            self.has_segments
+            and not self._syncing_segments
+            and internal_name in {"_t_supply", "_t_target", "_heat_flow", "_htc"}
+        ):
+            raise ValueError(
+                f"{attr_name!r} is derived for segmented stream {self.name!r}; "
+                "update a segment or replace the complete profile instead."
+            )
         if value is None:
             setattr(self, internal_name, None)
             self._bump_numeric_revision()
@@ -558,6 +601,15 @@ class Stream:
         update_derived: bool = True,
     ):
         internal_name = self._resolve_attr_name(attr_name)
+        if (
+            self.has_segments
+            and not self._syncing_segments
+            and internal_name in {"_t_supply", "_t_target", "_heat_flow", "_htc"}
+        ):
+            raise ValueError(
+                f"{attr_name!r} is derived for segmented stream {self.name!r}; "
+                "update a segment or replace the complete profile instead."
+            )
         if internal_name not in self._CORE_VALUE_ATTRS:
             raise ValueError(
                 f"Attribute '{attr_name}' is not a mutable state property of Stream."
@@ -583,171 +635,64 @@ class Stream:
             self.update_derived_properties()
 
     def _coerce_to_value(self, value, attr_name: str) -> Value | None:
-        if value is None:
-            return None
-
-        raw_value = value
-        if hasattr(raw_value, "model_dump") and not isinstance(raw_value, Mapping):
-            raw_value = raw_value.model_dump(mode="python")
-
-        if isinstance(raw_value, Mapping) and self._is_period_value_data(raw_value):
-            raw_value = {
-                "values": raw_value.get("values"),
-                "unit": raw_value.get("unit"),
-            }
-
-        parsed = raw_value if isinstance(raw_value, Value) else Value(raw_value)
-        target_unit = self._VALUE_UNITS[attr_name]
-        if target_unit is None or parsed.unit == target_unit:
-            return parsed
-        if parsed.unit in {"", "-"}:
-            return Value(parsed.value, unit=target_unit)
-        return parsed.to(target_unit)
+        return _stream_value_state.coerce_to_value(
+            value,
+            target_unit=self._VALUE_UNITS[attr_name],
+        )
 
     def _calculate_missing_properties(self) -> None:
         """Calculate any missing core properties from available data."""
-        if self._t_supply is None:
-            if self._t_target is None:
-                self._t_supply = Value(15, "degC").to(self._VALUE_UNITS["_t_supply"])
-            else:
-                self._t_supply = Value(self._t_target).to(
-                    self._VALUE_UNITS["_t_supply"]
-                )
-        if self._t_target is None:
-            self._t_target = Value(self._t_supply).to(self._VALUE_UNITS["_t_target"])
-        if self._dt_cont is None:
-            self._dt_cont = Value(0.0, unit=self._VALUE_UNITS["_dt_cont"])
-        if self._heat_flow is None:
-            self._heat_flow = Value(0.0, unit=self._VALUE_UNITS["_heat_flow"])
-        if self._htc is None:
-            self._htc = Value(1.0, unit=self._VALUE_UNITS["_htc"])
-        if self._price is None:
-            self._price = Value(0.0, unit=self._VALUE_UNITS["_price"])
-
-        state_size = self._period_vector_size()
-
-        t_supply_arr = self._value_array(self._t_supply, size=state_size)
-        t_target_arr = self._value_array(self._t_target, size=state_size)
-        heat_flow_arr = self._value_array(self._heat_flow, size=state_size)
-
-        equal_mask = np.isclose(
-            t_supply_arr,
-            t_target_arr,
-            atol=_TEMPERATURE_EQUAL_TOL,
-            rtol=0.0,
+        completed = _stream_thermodynamics.complete_core_state(
+            t_supply=self._t_supply,
+            t_target=self._t_target,
+            dt_cont=self._dt_cont,
+            heat_flow=self._heat_flow,
+            htc=self._htc,
+            price=self._price,
+            value_units=self._VALUE_UNITS,
+            stream_name=self._name,
+            state_size=self._period_vector_size(),
+            temperature_equal_tol=_TEMPERATURE_EQUAL_TOL,
         )
-        if np.any(equal_mask):
-            adjusted_target_arr = t_target_arr.copy()
-            cold_mask = equal_mask & (heat_flow_arr > 0.0)
-            hot_mask = equal_mask & (heat_flow_arr < 0.0)
-            adjusted_target_arr[cold_mask] = t_supply_arr[cold_mask] + 0.01
-            adjusted_target_arr[hot_mask] = t_supply_arr[hot_mask] - 0.01
-            self._t_target = self._build_value(
-                adjusted_target_arr,
-                unit=self._t_supply.unit,
-            ).to(self._VALUE_UNITS["_t_target"])
+        self._t_supply = completed.t_supply
+        self._t_target = completed.t_target
+        self._dt_cont = completed.dt_cont
+        self._heat_flow = completed.heat_flow
+        self._htc = completed.htc
+        self._price = completed.price
 
     def update_derived_properties(self) -> None:
-        state_size = self._period_vector_size()
-        t_supply = self._value_array(self._t_supply, size=state_size)
-        t_target = self._value_array(self._t_target, size=state_size)
-        heat_flow = self._value_array(self._heat_flow, size=state_size)
-        htc = self._value_array(self._htc, size=state_size)
-        price = self._value_array(self._price, size=state_size)
-
-        dt_cont = self._value_array(self._dt_cont, size=state_size)
-        dt_cont_act = dt_cont * float(self._dt_cont_multiplier)
-        self._dt_cont_act = self._build_value(
-            dt_cont_act,
-            unit=self._VALUE_UNITS["_dt_cont_act"],
+        derived = _stream_thermodynamics.derive_stream_state(
+            t_supply=self._t_supply,
+            t_target=self._t_target,
+            dt_cont=self._dt_cont,
+            dt_cont_multiplier=self._dt_cont_multiplier,
+            heat_flow=self._heat_flow,
+            htc=self._htc,
+            price=self._price,
+            value_units=self._VALUE_UNITS,
+            stream_name=self._name,
+            state_size=self._period_vector_size(),
+            temperature_equal_tol=_TEMPERATURE_EQUAL_TOL,
         )
-
-        hot_states = t_supply > t_target + _TEMPERATURE_EQUAL_TOL
-        cold_states = t_supply < t_target - _TEMPERATURE_EQUAL_TOL
-
-        if np.any(hot_states):
-            self._type = ST.Hot.value
-            t_min = t_target
-            t_max = t_supply
-            t_min_star = t_min - dt_cont_act
-            t_max_star = t_max - dt_cont_act
-        elif np.any(cold_states):
-            self._type = ST.Cold.value
-            t_min = t_supply
-            t_max = t_target
-            t_min_star = t_min + dt_cont_act
-            t_max_star = t_max + dt_cont_act
-        else:
-            self._type = ST.Neutral.value
-            t_min = t_supply
-            t_max = t_target
-            t_min_star = t_min.copy()
-            t_max_star = t_max.copy()
-
-        delta_t = t_max - t_min
-        cp = np.zeros_like(delta_t, dtype=float)
-        valid_dt = np.abs(delta_t) > _TEMPERATURE_EQUAL_TOL
-        cp[valid_dt] = heat_flow[valid_dt] / delta_t[valid_dt]
-
-        htr = np.zeros_like(htc, dtype=float)
-        valid_htc = htc > 0.0
-        htr[valid_htc] = 1.0 / htc[valid_htc]
-
-        rcp_prod = np.zeros_like(cp, dtype=float)
-        rcp_prod[valid_htc] = cp[valid_htc] * htr[valid_htc]
-
-        cost = self._build_value(
-            price * heat_flow / 1000.0,
-            unit=self._VALUE_UNITS["_cost"],
-        )
-
-        self._t_min = self._build_value(t_min, unit=self._VALUE_UNITS["_t_min"])
-        self._t_max = self._build_value(t_max, unit=self._VALUE_UNITS["_t_max"])
-        self._t_min_star = self._build_value(
-            t_min_star,
-            unit=self._VALUE_UNITS["_t_min_star"],
-        )
-        self._t_max_star = self._build_value(
-            t_max_star,
-            unit=self._VALUE_UNITS["_t_max_star"],
-        )
-        t_supply_k = t_supply + 273.15
-        t_target_k = t_target + 273.15
-        with np.errstate(divide="ignore", invalid="ignore"):
-            t_entr_mean = (
-                (t_supply_k - t_target_k) / (np.log(t_supply_k) - np.log(t_target_k))
-            ) - 273.15
-        self._t_entr_mean = self._build_value(
-            t_entr_mean,
-            unit=self._VALUE_UNITS["_t_supply"],
-        )
-        self._cp = self._build_value(cp, unit=self._VALUE_UNITS["_cp"])
-        self._htr = self._build_value(htr, unit=self._VALUE_UNITS["_htr"])
-        self._rcp_prod = self._build_value(
-            rcp_prod,
-            unit=self._VALUE_UNITS["_rcp_prod"],
-        )
-        self._cost = cost
+        self._type = derived.stream_type
+        self._dt_cont_act = derived.dt_cont_act
+        self._t_min = derived.t_min
+        self._t_max = derived.t_max
+        self._t_min_star = derived.t_min_star
+        self._t_max_star = derived.t_max_star
+        self._t_entr_mean = derived.t_entr_mean
+        self._cp = derived.cp
+        self._htr = derived.htr
+        self._rcp_prod = derived.rcp_prod
+        self._cost = derived.cost
         self._bump_numeric_revision()
 
     def _validate_num_periods(self):
-        counts = np.asarray(
-            [
-                getattr(self, attr).num_periods
-                for attr in self._CORE_VALUE_ATTRS
-                if isinstance(getattr(self, attr), Value)
-            ],
-            dtype=int,
+        self._num_periods = _stream_value_state.validate_num_periods(
+            (getattr(self, attr) for attr in self._CORE_VALUE_ATTRS),
+            stream_name=self._name,
         )
-        period_value_counts = counts[counts > 1]
-        if period_value_counts.size == 0:
-            self._num_periods = 1
-            return
-        if int(period_value_counts.max()) != int(period_value_counts.min()):
-            raise ValueError(
-                f"Stream inputs for {self._name} have unequal period counts."
-            )
-        self._num_periods = int(period_value_counts.max())
 
     def invert(self) -> None:
         """Flip a utility stream into its generating process-stream analogue."""
@@ -756,6 +701,28 @@ class Stream:
                 "Logic error: Process streams cannot be inverted; only utility "
                 "streams may be inverted for generation."
             )
+        if self.has_segments:
+            inverted_segments = []
+            for segment in reversed(self._segments):
+                candidate = self._detached_segment(segment)
+                candidate._t_supply, candidate._t_target = (
+                    candidate._t_target,
+                    candidate._t_supply,
+                )
+                candidate._p_supply, candidate._p_target = (
+                    candidate._p_target,
+                    candidate._p_supply,
+                )
+                candidate._h_supply, candidate._h_target = (
+                    candidate._h_target,
+                    candidate._h_supply,
+                )
+                candidate._is_process_stream = True
+                candidate.update_derived_properties()
+                inverted_segments.append(candidate)
+            self._is_process_stream = True
+            self.replace_segments(inverted_segments)
+            return
         self._t_supply, self._t_target = self._t_target, self._t_supply
         self._p_supply, self._p_target = self._p_target, self._p_supply
         self._h_supply, self._h_target = self._h_target, self._h_supply
@@ -810,41 +777,185 @@ class Stream:
                 "Length of period_ids and weights must match eachother in length."
             )
         self._bump_numeric_revision()
+        for segment in self._segments:
+            segment.set_period_context(
+                period_ids=period_ids,
+                weights=weights,
+                num_periods=num_periods,
+            )
+
+    def replace_segments(
+        self,
+        segments: list["StreamSegment"] | tuple["StreamSegment", ...],
+    ) -> None:
+        """Atomically replace the ordered piecewise profile for this stream."""
+        candidates = tuple(self._detached_segment(segment) for segment in segments)
+        self._validate_segments(candidates)
+        previous = self._segments
+        try:
+            for segment in previous:
+                segment._owner = None
+            self._segments = candidates
+            for index, segment in enumerate(self._segments):
+                segment._owner = self
+                segment._segment_index = index
+                segment._is_process_stream = self._is_process_stream
+                segment._active = self._active
+                segment._fluid_name = self._fluid_name
+                segment._fluid_phase = self._fluid_phase
+                segment._dt_cont_multiplier = self._dt_cont_multiplier
+                if self._period_ids is not None and self._weights is not None:
+                    segment.set_period_context(
+                        period_ids=self._period_ids,
+                        weights=self._weights,
+                        num_periods=self._num_periods,
+                    )
+            self._sync_aggregate_from_segments()
+        except Exception:
+            for segment in candidates:
+                segment._owner = None
+            self._segments = previous
+            for index, segment in enumerate(previous):
+                segment._owner = self
+                segment._segment_index = index
+            raise
+
+    def update_segment(self, index: int, **changes) -> None:
+        """Apply one segment update transactionally and revalidate the profile."""
+        if not self.has_segments:
+            raise ValueError(f"Stream {self.name!r} has no explicit segments.")
+        if index < 0 or index >= len(self._segments):
+            raise IndexError(f"Segment index {index} is out of range.")
+        candidates = [self._detached_segment(segment) for segment in self._segments]
+        target = candidates[index]
+        for attr_name, value in changes.items():
+            if attr_name in {
+                "active",
+                "is_process_stream",
+                "fluid_name",
+                "fluid_phase",
+            }:
+                raise ValueError(
+                    f"{attr_name!r} is controlled by parent stream {self.name!r}."
+                )
+            target.set_value_attr(attr_name, value)
+        self.replace_segments(candidates)
+
+    @classmethod
+    def from_temperature_heat_profile(
+        cls,
+        *,
+        name: str,
+        points,
+        heat_scale: float = 1.0,
+        heat_unit: str = "kW",
+        dt_diff_max: float | None = None,
+        **stream_kwargs,
+    ) -> "Stream":
+        """Build one segmented stream from ordered ``[heat, temperature]`` points."""
+        specs = _stream_profile.temperature_heat_segment_specs(
+            name=name,
+            points=points,
+            heat_scale=heat_scale,
+            heat_unit=heat_unit,
+            dt_diff_max=dt_diff_max,
+            tolerance=tol,
+        )
+        common = dict(stream_kwargs)
+        segment_kwargs = {
+            key: common[key]
+            for key in (
+                "p_supply",
+                "p_target",
+                "dt_cont",
+                "dt_cont_multiplier",
+                "htc",
+                "price",
+                "is_process_stream",
+                "fluid_name",
+                "fluid_phase",
+            )
+            if key in common
+        }
+        segments = [
+            StreamSegment(
+                name=spec.name,
+                t_supply=spec.t_supply,
+                t_target=spec.t_target,
+                heat_flow=spec.heat_flow,
+                segment_index=spec.segment_index,
+                **segment_kwargs,
+            )
+            for spec in specs
+        ]
+        return cls(name=name, segments=segments, **common)
+
+    @staticmethod
+    def _detached_segment(segment: "StreamSegment") -> "StreamSegment":
+        return _stream_profile.detached_segment(
+            segment,
+            segment_type=StreamSegment,
+        )
+
+    def _validate_segments(self, segments: tuple["StreamSegment", ...]) -> None:
+        _stream_profile.validate_segments(
+            segments,
+            parent_num_periods=self._num_periods,
+            tolerance=tol,
+        )
+
+    def _sync_aggregate_from_segments(self) -> None:
+        if not self._segments:
+            return
+        aggregate = _stream_profile.aggregate_segments(
+            self._segments,
+            parent_num_periods=self._num_periods,
+        )
+        self._syncing_segments = True
+        try:
+            assignments = {
+                "_t_supply": aggregate.t_supply,
+                "_t_target": aggregate.t_target,
+                "_p_supply": aggregate.p_supply,
+                "_p_target": aggregate.p_target,
+                "_h_supply": aggregate.h_supply,
+                "_h_target": aggregate.h_target,
+                "_dt_cont": aggregate.dt_cont,
+                "_heat_flow": self._build_value(aggregate.heat_flow, unit="kW"),
+                "_htc": self._build_value(
+                    aggregate.effective_htc,
+                    unit="kW/m^2/delta_degC",
+                ),
+                "_price": aggregate.price,
+            }
+            for attr_name, value in assignments.items():
+                self.set_value_attr(attr_name, value, update_derived=False)
+            self._validate_num_periods()
+            self.update_derived_properties()
+        finally:
+            self._syncing_segments = False
+        self._bump_numeric_revision()
 
     def _bump_numeric_revision(self) -> None:
         self._numeric_revision = getattr(self, "_numeric_revision", 0) + 1
 
     def _period_vector_size(self) -> int:
-        counts = [
-            value.num_periods
-            for attr in self._CORE_VALUE_ATTRS
-            if isinstance((value := getattr(self, attr)), Value)
-        ]
-        return max(counts) if counts else 1
+        return _stream_value_state.period_vector_size(
+            getattr(self, attr) for attr in self._CORE_VALUE_ATTRS
+        )
 
     def _value_array(self, value: Value | None, *, size: int) -> np.ndarray:
-        if value is None:
-            return np.zeros(size, dtype=float)
-        if value.num_periods == 1:
-            return np.full(size, float(value.value), dtype=float)
-        arr = value.period_values.astype(float)
-        if arr.size != size:
-            raise ValueError(
-                f"Period count for stream '{self._name}' is inconsistent "
-                f"with its values."
-            )
-        return arr
+        return _stream_value_state.value_array(
+            value,
+            size=size,
+            stream_name=self._name,
+        )
 
     def _build_value(self, magnitudes, *, unit: str) -> Value:
-        arr = np.asarray(magnitudes, dtype=float).reshape(-1)
-        if arr.size == 1:
-            return Value(float(arr[0]), unit=unit)
-        return Value(arr, unit=unit)
+        return _stream_value_state.build_value(magnitudes, unit=unit)
 
     def _copy_value(self, value: Value | None) -> Value | None:
-        if value is None:
-            return None
-        return Value(value)
+        return _stream_value_state.copy_value(value)
 
     def _resolve_attr_name(self, attr_name: str) -> str:
         if attr_name in self._MUTABLE_VALUE_ATTRS:
@@ -857,20 +968,13 @@ class Stream:
 
     @staticmethod
     def _is_period_value_data(value: Mapping) -> bool:
-        keys = set(value)
-        return keys.issubset({"values", "period_ids", "weights", "unit"}) and (
-            "values" in keys or "period_ids" in keys or "weights" in keys
-        )
+        return _stream_value_state.is_period_value_data(value)
 
     @staticmethod
     def _normalise_period_ids(
         period_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
     ) -> dict[str, int] | None:
-        if period_ids is None:
-            return None
-        if isinstance(period_ids, dict):
-            return {str(key): int(val) for key, val in period_ids.items()}
-        return {str(period_id): idx for idx, period_id in enumerate(period_ids)}
+        return _stream_value_state.normalise_period_ids(period_ids)
 
     @staticmethod
     def _normalise_weights(
@@ -878,12 +982,163 @@ class Stream:
         *,
         expected_len: int,
     ) -> np.ndarray | None:
-        if weights is None:
-            return None
-        arr = np.asarray(weights, dtype=float).reshape(-1)
-        if arr.size != expected_len:
-            raise ValueError("weights length must match the number of periods.")
-        total = float(arr.sum())
-        if total > 0.0:
-            arr = arr / total
-        return arr
+        return _stream_value_state.normalise_weights(
+            weights,
+            expected_len=expected_len,
+        )
+
+
+class StreamSegment(Stream):
+    """One ordered linear interval owned by a physical parent :class:`Stream`."""
+
+    def __init__(self, *args, segment_index: int | None = None, **kwargs):
+        self._owner: Stream | None = None
+        self._segment_index = segment_index
+        super().__init__(*args, **kwargs)
+
+    @property
+    def parent(self) -> Stream | None:
+        """Return the owning parent stream, if the segment is attached."""
+        return self._owner
+
+    @property
+    def segment_index(self) -> int | None:
+        """Return the stable zero-based position within the parent profile."""
+        return self._segment_index
+
+    @property
+    def segment_id(self) -> str:
+        """Return a stable parent-qualified segment identifier."""
+        if self._owner is None or self._segment_index is None:
+            return self.name
+        return f"{self._owner.name}.S{self._segment_index + 1}"
+
+    @property
+    def dt_cont_multiplier(self) -> float:
+        """Return the zone shift multiplier inherited from the parent."""
+        return self._dt_cont_multiplier
+
+    @dt_cont_multiplier.setter
+    def dt_cont_multiplier(self, value: float) -> None:
+        if self._owner is not None:
+            raise ValueError(
+                "Segment zone shift multiplier is controlled by its parent stream."
+            )
+        Stream.dt_cont_multiplier.fset(self, value)
+
+    @property
+    def active(self) -> bool:
+        """Return the activity inherited from the parent when attached."""
+        return self._active
+
+    @active.setter
+    def active(self, value: bool) -> None:
+        if self._owner is not None:
+            raise ValueError("Segment activity is controlled by its parent stream.")
+        Stream.active.fset(self, value)
+
+    @property
+    def is_process_stream(self) -> bool:
+        """Return the process/utility role inherited from the parent."""
+        return self._is_process_stream
+
+    @is_process_stream.setter
+    def is_process_stream(self, value: bool) -> None:
+        if self._owner is not None:
+            raise ValueError("Segment role is controlled by its parent stream.")
+        Stream.is_process_stream.fset(self, value)
+
+    @property
+    def fluid_name(self) -> Optional[str]:
+        """Return fluid metadata inherited from the parent."""
+        return self._fluid_name
+
+    @fluid_name.setter
+    def fluid_name(self, value: Optional[str]) -> None:
+        if self._owner is not None:
+            raise ValueError(
+                "Segment fluid metadata is controlled by its parent stream."
+            )
+        Stream.fluid_name.fset(self, value)
+
+    @property
+    def fluid_phase(self) -> Optional[str]:
+        """Return phase metadata inherited from the parent."""
+        return self._fluid_phase
+
+    @fluid_phase.setter
+    def fluid_phase(self, value: Optional[str | FluidPhase]) -> None:
+        if self._owner is not None:
+            raise ValueError(
+                "Segment phase metadata is controlled by its parent stream."
+            )
+        Stream.fluid_phase.fset(self, value)
+
+    def set_value_attr(
+        self,
+        attr_name: str,
+        value: float | Value | np.ndarray | Mapping | None,
+        update_derived: bool = True,
+    ) -> None:
+        if self._owner is not None and not self._owner._syncing_segments:
+            self._owner.update_segment(self._segment_index, **{attr_name: value})
+            return
+        super().set_value_attr(attr_name, value, update_derived=update_derived)
+
+    def set_value_attr_at_idx(
+        self,
+        attr_name: str,
+        value: float | Value | np.ndarray = None,
+        idx: int = 0,
+        update_derived: bool = True,
+    ):
+        if self._owner is not None and not self._owner._syncing_segments:
+            candidate = self._detached_value_for_period(attr_name, value, idx)
+            self._owner.update_segment(self._segment_index, **{attr_name: candidate})
+            return
+        return super().set_value_attr_at_idx(
+            attr_name,
+            value,
+            idx=idx,
+            update_derived=update_derived,
+        )
+
+    def set_period_context(
+        self,
+        period_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
+        weights: np.ndarray | list[float] | tuple[float, ...] | None,
+        num_periods: int | None,
+    ) -> None:
+        if self._owner is not None:
+            expected_ids = self._owner.period_ids
+            expected_weights = self._owner.weights
+            same_ids = period_ids == expected_ids
+            same_weights = (
+                weights is not None
+                and expected_weights is not None
+                and np.array_equal(np.asarray(weights), expected_weights)
+            )
+            if (
+                not same_ids
+                or not same_weights
+                or num_periods != self._owner.num_periods
+            ):
+                raise ValueError(
+                    "Segment period context is controlled by its parent stream."
+                )
+        super().set_period_context(period_ids, weights, num_periods)
+
+    def _detached_value_for_period(self, attr_name: str, value, idx: int) -> Value:
+        internal_name = self._resolve_attr_name(attr_name)
+        current = getattr(self, internal_name)
+        if current is None:
+            current = Value(0.0, unit=self._VALUE_UNITS[internal_name])
+        candidate = Value(current)
+        target_size = self._period_vector_size()
+        if candidate.num_periods == 1 and target_size > 1:
+            candidate = Value(
+                np.full(target_size, float(candidate.value), dtype=float),
+                unit=candidate.unit,
+            )
+        candidate[idx if candidate.num_periods > 1 else 0] = value
+        return candidate

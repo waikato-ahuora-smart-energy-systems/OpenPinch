@@ -277,7 +277,7 @@ def _count_crossing_ranges(
     """Count process stream crossings across several temperature intervals."""
     if len(streams) == 0 or T_low.size == 0:
         return 0
-    numeric = streams.numeric_view(idx)
+    numeric = streams.segment_numeric_view(idx)
     t_max = numeric.t_max_star[:, np.newaxis]
     t_min = numeric.t_min_star[:, np.newaxis]
     T_low = T_low[np.newaxis, :]
@@ -287,7 +287,10 @@ def _count_crossing_ranges(
         | ((t_min >= T_low - tol) & (t_min < T_high - tol))
         | ((t_min < T_low - tol) & (t_max > T_high + tol))
     )
-    return int(np.sum(crossings))
+    return sum(
+        int(np.unique(numeric.parent_index[crossings[:, interval]]).size)
+        for interval in range(crossings.shape[1])
+    )
 
 
 def _count_utility_range_container(

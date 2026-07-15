@@ -505,15 +505,20 @@ def _load_converter_module():
 
 
 def _assert_axis_identities_match(current: dict, snapshot: dict) -> None:
-    assert set(current["axis_maps"]) == {*snapshot["axis_maps"], "periods"}
+    assert set(current["axis_maps"]) == {
+        *snapshot["axis_maps"],
+        "periods",
+        "hot_segments",
+        "cold_segments",
+    }
     assert current["axis_maps"]["periods"] == {"0": 0}
     for axis_name, expected_axis in snapshot["axis_maps"].items():
         assert current["axis_maps"][axis_name] == expected_axis
 
     for identity_group in ("stream_identities", "utility_identities"):
-        assert set(current[identity_group]) == set(snapshot[identity_group])
-        for axis_name, identities in current[identity_group].items():
-            assert identities == snapshot[identity_group][axis_name]
+        assert set(snapshot[identity_group]).issubset(current[identity_group])
+        for axis_name, identities in snapshot[identity_group].items():
+            assert current[identity_group][axis_name] == identities
 
 
 def _assert_array_matches_by_identity(

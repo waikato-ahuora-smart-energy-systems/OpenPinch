@@ -66,6 +66,18 @@ Input and Output Schemas
    :members:
    :no-index:
 
+.. autoclass:: OpenPinch.lib.schemas.io.StreamSegmentSchema
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.io.TemperatureHeatPointSchema
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.io.TemperatureHeatProfileSchema
+   :members:
+   :no-index:
+
 .. autoclass:: OpenPinch.lib.schemas.io.UtilitySchema
    :members:
    :no-index:

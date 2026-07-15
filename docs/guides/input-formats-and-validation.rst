@@ -63,6 +63,76 @@ Supported Source Shapes
 - ``TargetInput`` instances
 - plain mappings that already match the case-input structure
 
+Variable Heat-Capacity Streams
+------------------------------
+
+Structured Python and JSON inputs can describe one physical stream with an
+ordered piecewise thermal profile. The prepared problem retains one parent
+``Stream``; its children are ``StreamSegment`` objects used for interval,
+area, and network calculations.
+
+Explicit segment input supplies each piece in physical traversal order. Every
+segment target temperature must equal the next segment supply temperature.
+OpenPinch preserves this order and rejects gaps, overlaps, reversals, and
+non-positive segment duties or heat-transfer coefficients.
+
+.. code-block:: python
+
+   from OpenPinch import PinchProblem
+
+   problem = PinchProblem(
+       {
+           "streams": [
+               {
+                   "zone": "Site",
+                   "name": "Variable CP feed",
+                   "segments": [
+                       {
+                           "t_supply": 180.0,
+                           "t_target": 140.0,
+                           "heat_flow": 60.0,
+                           "htc": 1.5,
+                       },
+                       {
+                           "t_supply": 140.0,
+                           "t_target": 80.0,
+                           "heat_flow": 150.0,
+                           "htc": 0.9,
+                       },
+                   ],
+               }
+           ],
+           "utilities": [],
+       },
+       project_name="Site",
+   )
+
+A temperature--cumulative-heat profile is an alternative nested input. Its
+points are authoritative: OpenPinch infers parent endpoints and duty, and
+validates any duplicated parent values instead of rescaling the profile.
+Cumulative heat must increase strictly. Temperature plateaus follow the
+existing minimum sensible-temperature-span convention, while reversals are
+rejected before linearisation.
+
+.. code-block:: python
+
+   stream_input = {
+       "zone": "Site",
+       "name": "Calculated profile",
+       "profile": {
+           "points": [
+               {"temperature": 180.0, "cumulative_heat": 0.0},
+               {"temperature": 140.0, "cumulative_heat": 60.0},
+               {"temperature": 80.0, "cumulative_heat": 210.0},
+           ],
+           "linearisation_tolerance": 0.01,
+       },
+   }
+
+Nested profiles are supported by Python objects, JSON, and workspace inputs.
+Flat CSV and Excel stream rows remain unchanged and are never grouped by name
+or adjacent temperatures.
+
 Interpretation
 --------------
 

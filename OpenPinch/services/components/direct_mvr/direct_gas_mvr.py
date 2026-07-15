@@ -160,7 +160,7 @@ def solve_direct_gas_mvr_stream(
             dt_diff_max=settings.dt_diff_max,
             output_units=output_units,
         )
-        replacement_streams.add_many(_stage_to_streams(stream, stage, idx=idx))
+        replacement_streams.add(_stage_to_stream(stream, stage, idx=idx))
         stage_results.append(stage)
         p_in = _stage_pressure_to_pa(stage.p_out, stage.pressure_unit)
         t_in = t_target
@@ -507,37 +507,28 @@ def _profile_enthalpy_values(
     return np.asarray(h_values, dtype=float)
 
 
-def _stage_to_streams(
+def _stage_to_stream(
     source: Stream,
     stage: DirectGasMVRStageResult,
     *,
     idx: int,
-) -> list[Stream]:
-    profile = np.asarray(stage.linearised_profile, dtype=float)
-    streams: list[Stream] = []
-    for segment_idx, ((h1, t1), (h2, t2)) in enumerate(
-        zip(profile[:-1], profile[1:]),
-        start=1,
-    ):
-        if abs(t1 - t2) < 0.01:
-            t2 = t1 - 0.01
-        heat_flow = _stage_segment_heat_flow(stage, h1, h2)
-        streams.append(
-            Stream(
-                name=(f"{source.name}_direct_MVR_H{stage.stage_index}_S{segment_idx}"),
-                t_supply=Value(float(t1), stage.temperature_unit),
-                t_target=Value(float(t2), stage.temperature_unit),
-                p_supply=Value(stage.p_out, stage.pressure_unit),
-                p_target=Value(stage.p_out, stage.pressure_unit),
-                heat_flow=heat_flow,
-                dt_cont=_value(source.dt_cont, idx) or 0.0,
-                htc=_value(source.htc, idx) or 1.0,
-                is_process_stream=True,
-                fluid_name=source.fluid_name,
-                fluid_phase=source.fluid_phase,
-            )
-        )
-    return streams
+) -> Stream:
+    from ....utils.stream_linearisation import build_segmented_stream_from_profile
+
+    return build_segmented_stream_from_profile(
+        name=f"{source.name}_direct_MVR_H{stage.stage_index}",
+        profile=stage.linearised_profile,
+        heat_scale=_stage_mass_flow(stage),
+        heat_unit=stage.heat_flow_unit,
+        is_hot_stream=True,
+        p_supply=Value(stage.p_out, stage.pressure_unit),
+        p_target=Value(stage.p_out, stage.pressure_unit),
+        dt_cont=_value(source.dt_cont, idx) or 0.0,
+        htc=_value(source.htc, idx) or 1.0,
+        is_process_stream=True,
+        fluid_name=source.fluid_name,
+        fluid_phase=source.fluid_phase,
+    )
 
 
 def _stage_mass_flow(stage: DirectGasMVRStageResult) -> float:
@@ -552,15 +543,6 @@ def _stage_mass_flow(stage: DirectGasMVRStageResult) -> float:
         return 0.0
     heat_flow_w = Value(stage.heat_flow, stage.heat_flow_unit).to("W").value
     return heat_flow_w / delta_h
-
-
-def _stage_segment_heat_flow(
-    stage: DirectGasMVRStageResult,
-    h_start: float,
-    h_end: float,
-) -> Value:
-    delta_h = _enthalpy_delta_to_j_per_kg(h_start, h_end, stage.enthalpy_unit)
-    return Value(_stage_mass_flow(stage) * delta_h, "W").to(stage.heat_flow_unit)
 
 
 def _stage_pressure_to_pa(value: float, pressure_unit: str) -> float:

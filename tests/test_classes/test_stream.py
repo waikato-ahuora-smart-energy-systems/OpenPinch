@@ -437,6 +437,22 @@ def test_stream_period_context_helpers_validate_ids_and_lengths():
         stream.set_period_context(["base"], [0.5, 0.5], num_periods=2)
 
 
+def test_multiperiod_pressure_preserves_all_core_field_derived_broadcasting():
+    stream = Stream(
+        name="Pressure periods",
+        t_supply=200.0,
+        t_target=100.0,
+        p_supply=[200.0, 180.0],
+        p_target=[150.0, 140.0],
+        heat_flow=50.0,
+    )
+
+    assert stream.num_periods == 2
+    assert stream.CP.num_periods == 2
+    np.testing.assert_allclose(stream.CP.period_values, [0.5, 0.5])
+    np.testing.assert_allclose(stream.t_min.period_values, [100.0, 100.0])
+
+
 def test_stream_private_helpers_cover_defensive_edges():
     stream = Stream(**_stream_fixture("cold"))
 

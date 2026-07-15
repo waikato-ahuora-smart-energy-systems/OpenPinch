@@ -7,12 +7,16 @@ import warnings as _warnings
 from . import lib as lib
 from .classes.pinch_problem import PinchProblem
 from .classes.pinch_workspace import PinchWorkspace
+from .classes.stream import StreamSegment
 from .lib.config import Configuration
 from .lib.enums import GraphType, HPRcycle, StreamType, TargetType, ZoneType
 from .lib.schemas.io import (
     StreamSchema,
+    StreamSegmentSchema,
     TargetInput,
     TargetOutput,
+    TemperatureHeatPointSchema,
+    TemperatureHeatProfileSchema,
     UtilitySchema,
     ZoneTreeSchema,
 )
@@ -56,11 +60,15 @@ __all__ = [
     "ReportMetric",
     "SampleCaseMetadata",
     "StreamSchema",
+    "StreamSegmentSchema",
+    "StreamSegment",
     "StreamType",
     "TargetInput",
     "TargetOutput",
     "TargetType",
     "UtilitySchema",
+    "TemperatureHeatPointSchema",
+    "TemperatureHeatProfileSchema",
     "ValidationIssue",
     "ValidationReport",
     "ZoneTreeSchema",

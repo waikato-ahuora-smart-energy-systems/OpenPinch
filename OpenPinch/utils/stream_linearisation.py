@@ -7,7 +7,13 @@ from scipy.optimize import NonlinearConstraint, minimize
 
 from ..lib.schemas.io import NonLinearStream
 
-__all__ = ["get_piecewise_linearisation_for_streams", "get_piecewise_data_points"]
+__all__ = [
+    "align_temperature_heat_profiles",
+    "build_segmented_stream_from_profile",
+    "get_piecewise_data_points",
+    "get_piecewise_linearisation_for_streams",
+    "normalise_temperature_heat_profile",
+]
 
 
 ################################################################################
@@ -19,7 +25,7 @@ def get_piecewise_linearisation_for_streams(
     streams: List[NonLinearStream],
     t_h_data: list,
     dt_diff_max: float = 0.1,
-) -> np.array:
+) -> dict[str, list[list[list[float]]]]:
     """Generate piecewise-linear T-H profiles for non-linear streams."""
     if len(streams) != len(t_h_data):
         raise ValueError(
@@ -27,7 +33,7 @@ def get_piecewise_linearisation_for_streams(
             "streams and temperature-enthalpy datasets."
         )
 
-    return_data = {"t_h_points": []}
+    return_data: dict[str, list[list[list[float]]]] = {"t_h_points": []}
 
     # Create and Linearize stream
     for index, s in enumerate(streams):
@@ -36,9 +42,113 @@ def get_piecewise_linearisation_for_streams(
         mask_points = get_piecewise_data_points(
             curve=curve_points, dt_diff_max=dt_diff_max, is_hot_stream=is_hot_stream
         )
-        return_data["t_h_points"] = mask_points.tolist()
+        return_data["t_h_points"].append(mask_points.tolist())
 
     return return_data
+
+
+def normalise_temperature_heat_profile(
+    profile,
+    *,
+    is_hot_stream: bool,
+    minimum_temperature_span: float = 0.01,
+) -> np.ndarray:
+    """Preserve profile order while enforcing the sensible-stream span convention."""
+    points = np.asarray(profile, dtype=float).copy()
+    if points.ndim != 2 or points.shape[1] != 2 or len(points) < 2:
+        raise ValueError("A temperature-heat profile requires at least two points.")
+    if not np.isfinite(points).all():
+        raise ValueError("Temperature-heat profile points must be finite.")
+    if minimum_temperature_span <= 0.0:
+        raise ValueError("minimum_temperature_span must be positive.")
+    heat_steps = np.diff(points[:, 0])
+    if np.any(heat_steps == 0.0) or not np.all(
+        np.sign(heat_steps) == np.sign(heat_steps[0])
+    ):
+        raise ValueError("Profile heat coordinates must be strictly monotonic.")
+
+    direction = -1.0 if is_hot_stream else 1.0
+    directed = direction * points[:, 1]
+    total_span = directed[-1] - directed[0]
+    if total_span <= 0.0:
+        directed[-1] = directed[0] + minimum_temperature_span * (len(points) - 1)
+        total_span = directed[-1] - directed[0]
+    step = min(minimum_temperature_span, total_span / (len(points) - 1))
+    previous = directed[0]
+    for index in range(1, len(points) - 1):
+        lower = previous + step
+        upper = directed[-1] - step * (len(points) - 1 - index)
+        directed[index] = np.clip(directed[index], lower, upper)
+        previous = directed[index]
+    points[:, 1] = direction * directed
+    return points
+
+
+def align_temperature_heat_profiles(profiles) -> tuple[np.ndarray, ...]:
+    """Interpolate period profiles onto their union cumulative-duty-fraction grid."""
+    prepared: list[tuple[np.ndarray, np.ndarray]] = []
+    breakpoints: list[np.ndarray] = []
+    for profile in profiles:
+        points = np.asarray(profile, dtype=float)
+        if points.ndim != 2 or points.shape[1] != 2 or len(points) < 2:
+            raise ValueError(
+                "Every period profile requires at least two [heat, temperature] points."
+            )
+        if not np.isfinite(points).all():
+            raise ValueError("Temperature-heat profile points must be finite.")
+        heat_steps = np.diff(points[:, 0])
+        if np.any(heat_steps == 0.0) or not np.all(
+            np.sign(heat_steps) == np.sign(heat_steps[0])
+        ):
+            raise ValueError("Profile heat coordinates must be strictly monotonic.")
+        increments = np.abs(heat_steps)
+        cumulative = np.concatenate(([0.0], np.cumsum(increments)))
+        fractions = cumulative / cumulative[-1]
+        prepared.append((points, fractions))
+        breakpoints.append(fractions)
+
+    if not prepared:
+        raise ValueError("At least one period profile is required.")
+    union = np.unique(np.concatenate(breakpoints))
+    aligned = []
+    for points, fractions in prepared:
+        heat = np.interp(union, fractions, points[:, 0])
+        temperature = np.interp(union, fractions, points[:, 1])
+        aligned.append(np.column_stack((heat, temperature)))
+    return tuple(aligned)
+
+
+def build_segmented_stream_from_profile(
+    *,
+    name: str,
+    profile,
+    heat_scale: float = 1.0,
+    heat_unit: str = "kW",
+    is_hot_stream: bool,
+    minimum_temperature_span: float = 0.01,
+    **stream_kwargs,
+):
+    """Build one parent :class:`Stream` from an ordered linearised profile."""
+    from ..classes.stream import Stream
+
+    raw_points = np.asarray(profile, dtype=float)
+    if raw_points.ndim != 2 or raw_points.shape[1] != 2 or len(raw_points) < 2:
+        raise ValueError("A temperature-heat profile requires at least two points.")
+    keep = np.concatenate(
+        ([True], np.abs(np.diff(raw_points[:, 0])) > np.finfo(float).eps)
+    )
+    points = normalise_temperature_heat_profile(
+        raw_points[keep],
+        is_hot_stream=is_hot_stream,
+        minimum_temperature_span=minimum_temperature_span,
+    )
+    return Stream.from_temperature_heat_profile(
+        name=name,
+        points=points,
+        heat_scale=heat_scale,
+        heat_unit=heat_unit,
+        **stream_kwargs,
+    )
 
 
 def get_piecewise_data_points(

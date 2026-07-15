@@ -8,11 +8,15 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from CoolProp.CoolProp import PropsSI
 
-from ...classes.stream import Stream
+from ...classes.stream import Stream, StreamSegment
 from ...classes.value import Value
 from ...classes.zone import Zone
 from ...lib.config import tol
 from ...lib.enums import ST
+from ...utils.stream_linearisation import (
+    align_temperature_heat_profiles,
+    normalise_temperature_heat_profile,
+)
 from ..common.miscellaneous import get_period_index
 from .direct_mvr import (
     DirectGasMVRSettings,
@@ -280,83 +284,66 @@ def _build_multiperiod_stage_streams(
         stage_profiles = [
             solve.stage_results[stage_index - 1].linearised_profile for solve in solves
         ]
-        segment_count = max(len(profile) - 1 for profile in stage_profiles)
-        resampled_profiles = [
-            _resample_profile_to_segment_count(profile, segment_count)
-            for profile in stage_profiles
+        aligned_profiles = [
+            normalise_temperature_heat_profile(profile, is_hot_stream=True)
+            for profile in align_temperature_heat_profiles(stage_profiles)
         ]
+        segment_count = len(aligned_profiles[0]) - 1
         stages = [solve.stage_results[stage_index - 1] for solve in solves]
+        segments: list[StreamSegment] = []
         for segment_index in range(1, segment_count + 1):
             segment_points = [
                 (profile[segment_index - 1], profile[segment_index])
-                for profile in resampled_profiles
+                for profile in aligned_profiles
             ]
             temperature_unit = stages[0].temperature_unit
             pressure_unit = stages[0].pressure_unit
             heat_flow_unit = stages[0].heat_flow_unit
-            stream = Stream(
-                name=(
-                    f"{source_stream.name}_direct_MVR_H{stage_index}_S{segment_index}"
-                ),
-                t_supply=Value(
-                    [float(start[1]) for start, _end in segment_points],
-                    temperature_unit,
-                ),
-                t_target=Value(
-                    [
-                        _segment_target_temperature(start, end)
-                        for start, end in segment_points
+            segments.append(
+                StreamSegment(
+                    name=(
+                        f"{source_stream.name}_direct_MVR_H{stage_index}_S{segment_index}"
+                    ),
+                    t_supply=Value(
+                        [float(start[1]) for start, _end in segment_points],
+                        temperature_unit,
+                    ),
+                    t_target=Value(
+                        [float(end[1]) for _start, end in segment_points],
+                        temperature_unit,
+                    ),
+                    p_supply=Value([stage.p_out for stage in stages], pressure_unit),
+                    p_target=Value([stage.p_out for stage in stages], pressure_unit),
+                    heat_flow=Value(
+                        [
+                            _stage_segment_heat_flow(stage, start[0], end[0]).value
+                            for stage, (start, end) in zip(stages, segment_points)
+                        ],
+                        heat_flow_unit,
+                    ),
+                    dt_cont=[
+                        _value_at_idx(source_stream.dt_cont, idx) or 0.0
+                        for idx in range(n_periods)
                     ],
-                    temperature_unit,
-                ),
-                p_supply=Value([stage.p_out for stage in stages], pressure_unit),
-                p_target=Value([stage.p_out for stage in stages], pressure_unit),
-                heat_flow=Value(
-                    [
-                        _stage_segment_heat_flow(stage, start[0], end[0]).value
-                        for stage, (start, end) in zip(stages, segment_points)
+                    htc=[
+                        _value_at_idx(source_stream.htc, idx) or 1.0
+                        for idx in range(n_periods)
                     ],
-                    heat_flow_unit,
-                ),
-                dt_cont=[
-                    _value_at_idx(source_stream.dt_cont, idx) or 0.0
-                    for idx in range(n_periods)
-                ],
-                htc=[
-                    _value_at_idx(source_stream.htc, idx) or 1.0
-                    for idx in range(n_periods)
-                ],
-                is_process_stream=True,
-                fluid_name=source_stream.fluid_name,
-                fluid_phase=source_stream.fluid_phase,
+                    is_process_stream=True,
+                    fluid_name=source_stream.fluid_name,
+                    fluid_phase=source_stream.fluid_phase,
+                )
             )
-            stream.active = True
-            streams.append(stream)
+        stream = Stream(
+            name=f"{source_stream.name}_direct_MVR_H{stage_index}",
+            segments=segments,
+            is_process_stream=True,
+            fluid_name=source_stream.fluid_name,
+            fluid_phase=source_stream.fluid_phase,
+        )
+        stream.active = True
+        streams.append(stream)
     return streams
-
-
-def _resample_profile_to_segment_count(
-    profile,
-    segment_count: int,
-) -> np.ndarray:
-    profile = np.asarray(profile, dtype=float)
-    if len(profile) == segment_count + 1:
-        return profile
-    h_start = float(profile[0, 0])
-    h_end = float(profile[-1, 0])
-    h_values = np.linspace(h_start, h_end, segment_count + 1)
-    xp = profile[::-1, 0]
-    fp = profile[::-1, 1]
-    t_values = np.interp(h_values[::-1], xp, fp)[::-1]
-    return np.column_stack((h_values, t_values))
-
-
-def _segment_target_temperature(start, end) -> float:
-    t_start = float(start[1])
-    t_end = float(end[1])
-    if abs(t_start - t_end) < 0.01:
-        return t_start - 0.01
-    return t_end
 
 
 def _stage_mass_flow(stage: DirectGasMVRStageResult) -> float:

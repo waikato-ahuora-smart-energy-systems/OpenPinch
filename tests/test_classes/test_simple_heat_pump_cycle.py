@@ -56,18 +56,34 @@ def _validate_results(
     assert np.isclose(cycle.q_cond - cycle.q_evap - cycle.w_net, 0)
     assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0)
     assert np.isclose(cycle.Q_cond - cycle.Q_heat - cycle.Q_cas_heat, 0)
+    assert len(cond_streams) <= 1
+    assert len(evap_streams) <= 1
+    assert all(stream.has_segments for stream in [*cond_streams, *evap_streams])
     assert np.isclose(sum([s.heat_flow for s in cond_streams]) - cycle.Q_heat, 0)
-    assert np.isclose(
-        min([s.t_target for s in cond_streams]) - (T_cond - dT_subcool), 0, atol=0.02
-    )
-    assert np.isclose(evap_streams[-1].t_target - (T_evap + dT_superheat), 0, atol=0.02)
+    if cond_streams:
+        assert np.isclose(
+            min(
+                segment.t_target
+                for stream in cond_streams
+                for segment in stream.segments
+            )
+            - (T_cond - dT_subcool),
+            0,
+            atol=0.02,
+        )
+    if evap_streams:
+        assert np.isclose(
+            evap_streams[-1].t_target - (T_evap + dT_superheat), 0, atol=0.02
+        )
 
-    if evap_streams[0].type == ST.Cold.value:
+    if evap_streams and evap_streams[0].type == ST.Cold.value:
         assert np.isclose(sum([s.heat_flow for s in evap_streams]) - cycle.Q_cool, 0)
-    else:
+    elif evap_streams:
         assert np.isclose(
             sum([s.heat_flow for s in evap_streams]) - cycle.Q_cool * -1, 0
         )
+    else:
+        assert np.isclose(cycle.Q_cool, 0)
 
     assert cycle.COP_h >= 1 if cycle.q_evap >= 0 else cycle.COP_h < 1
     assert cycle.COP_r >= 0 if cycle.q_evap >= 0 else cycle.COP_r < 0
@@ -468,12 +484,14 @@ def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
     assert np.isclose(sum(s.heat_flow for s in evap_streams), cycle.Q_cool, 0.0)
 
     # Zeotropic blends should preserve glide across the phase-change profiles.
-    assert min(s.t_target for s in cond_streams) < T_cond
-    assert max(s.t_target for s in cond_streams) > T_cond
-    assert min(s.t_supply for s in evap_streams) < T_evap
-    assert max(s.t_target for s in evap_streams) > T_evap
-    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in cond_streams)
-    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in evap_streams)
+    cond_segments = [segment for stream in cond_streams for segment in stream.segments]
+    evap_segments = [segment for stream in evap_streams for segment in stream.segments]
+    assert min(s.t_target for s in cond_segments) < T_cond
+    assert max(s.t_target for s in cond_segments) > T_cond
+    assert min(s.t_supply for s in evap_segments) < T_evap
+    assert max(s.t_target for s in evap_segments) > T_evap
+    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in cond_segments)
+    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in evap_segments)
 
 
 def test_heat_pump_cycle_accepts_binary_mole_fraction_refrigerant_string():

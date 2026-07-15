@@ -146,7 +146,7 @@ def test_add_process_mvr_applies_replacements_and_registers_component():
     assert "Site/Evaporation Train" in component.affected_zone_paths
     assert any(stream is source for _key, stream in zone.hot_streams.items())
     assert any(
-        ".mvr_1.Evaporator vapour_direct_MVR_H1_S" in key
+        ".mvr_1.Evaporator vapour_direct_MVR_H1" in key
         for key, _stream in zone.hot_streams.items()
     )
 
@@ -408,6 +408,12 @@ def test_process_mvr_solves_all_periods_for_multiperiod_streams():
 
     assert set(component.stage_results_by_period) == {"0", "peak"}
     replacement = component.replacement_streams[0]
+    assert len(component.replacement_streams) == 1
+    assert replacement.has_segments
+    assert all(segment.t_supply.num_periods == 2 for segment in replacement.segments)
+    assert [segment.segment_index for segment in replacement.segments] == list(
+        range(replacement.segment_count)
+    )
     assert float(replacement.heat_flow[0]) > 0.0
     assert float(replacement.heat_flow[1]) > 0.0
     assert min(
@@ -621,28 +627,8 @@ def test_process_mvr_stream_matching_and_source_validation_errors():
 
 
 def test_process_mvr_profile_stage_and_component_id_helpers():
-    payload = _process_mvr_edge_cases()
-    profile = np.asarray(payload["stage_profile"], dtype=float)
-    coarse_profile = np.asarray(payload["coarse_profile"], dtype=float)
     positive_stage = _stage_result_from_fixture("positive_stage")
     zero_delta_stage = _stage_result_from_fixture("zero_delta_stage")
-
-    unchanged = process_mvr_helpers._resample_profile_to_segment_count(profile, 2)
-    resampled = process_mvr_helpers._resample_profile_to_segment_count(
-        coarse_profile, 2
-    )
-
-    assert unchanged is profile
-    np.testing.assert_allclose(unchanged, profile)
-    np.testing.assert_allclose(resampled, profile)
-    assert process_mvr_helpers._segment_target_temperature(
-        [300.0, 100.0],
-        [299.0, 99.995],
-    ) == pytest.approx(99.99)
-    assert process_mvr_helpers._segment_target_temperature(
-        [300.0, 100.0],
-        [299.0, 90.0],
-    ) == pytest.approx(90.0)
     assert process_mvr_helpers._stage_mass_flow(zero_delta_stage) == 0.0
     assert process_mvr_helpers._stage_mass_flow(positive_stage) == pytest.approx(0.5)
     assert process_mvr_helpers._stage_segment_heat_flow(

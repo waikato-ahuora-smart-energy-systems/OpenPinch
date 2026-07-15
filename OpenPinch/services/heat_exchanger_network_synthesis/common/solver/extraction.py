@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import numpy as np
+
 from .....classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
@@ -14,7 +16,11 @@ from .....classes.heat_exchanger_network import HeatExchangerNetwork
 from .....lib.config import tol
 from .....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
 from ..indexing import ordered_mapping_keys
-from .arrays import PreparedSolverArrays
+from .arrays import SEGMENT_PROFILE_VERSION, PreparedSolverArrays
+from .piecewise import (
+    duty_aligned_area_contributions,
+    profile_from_solver_arrays,
+)
 
 
 def extract_heat_exchanger_network(
@@ -41,6 +47,7 @@ def extract_heat_exchanger_network(
     exchangers.extend(
         _recovery_exchangers(
             solved_model,
+            solver_arrays=solver_arrays,
             hot_streams=hot_streams,
             cold_streams=cold_streams,
             stage_total=stage_total,
@@ -110,6 +117,7 @@ def extract_heat_exchanger_network(
                 getattr(solved_model, "non_isothermal_model", False)
             ),
             "solver_dTmin": _optional_float(getattr(solved_model, "dTmin", None)),
+            "segment_profile_version": SEGMENT_PROFILE_VERSION,
             "operating_periods": _operating_state_metadata(solved_model),
             "hot_stream_heat_capacity_flowrates": _float_list(
                 getattr(solved_model, "f_h", None)
@@ -141,6 +149,12 @@ def extract_heat_exchanger_network(
             "cold_stream_target_temperatures": _float_list(
                 getattr(solved_model, "T_c_out", None)
             ),
+            "hot_stream_total_duties": _segment_parent_total_duties(
+                solver_arrays, "hot"
+            ),
+            "cold_stream_total_duties": _segment_parent_total_duties(
+                solver_arrays, "cold"
+            ),
             "hot_stage_boundary_temperatures": _boundary_temperature_matrix(
                 getattr(solved_model, "T_h", None),
                 rows=len(hot_streams),
@@ -153,6 +167,16 @@ def extract_heat_exchanger_network(
             ),
         },
     )
+
+
+def _segment_parent_total_duties(
+    solver_arrays: PreparedSolverArrays,
+    side: str,
+) -> list[float]:
+    values = solver_arrays.arrays.get(f"{side}_segment_duty_period")
+    if values is None:
+        return []
+    return np.sum(np.asarray(values, dtype=float)[0], axis=1).tolist()
 
 
 def extract_network_synthesis_result(
@@ -205,6 +229,7 @@ def extract_network_synthesis_result(
 def _recovery_exchangers(
     solved_model: Any,
     *,
+    solver_arrays: PreparedSolverArrays,
     hot_streams: tuple[str, ...],
     cold_streams: tuple[str, ...],
     stage_total: int | None,
@@ -228,6 +253,19 @@ def _recovery_exchangers(
                 if not active and not include_inactive:
                     continue
                 stage = k + 1
+                segment_contributions = _recovery_segment_contributions(
+                    solved_model,
+                    solver_arrays,
+                    hot_index=i,
+                    cold_index=j,
+                    stage_index=k,
+                    tolerance=tolerance,
+                )
+                aggregate_area = _optional_float(
+                    _index(getattr(solved_model, "area_r", None), i, j, k)
+                )
+                if segment_contributions:
+                    aggregate_area = None
                 exchangers.append(
                     HeatExchanger(
                         exchanger_id=f"recovery:{hot_stream}->{cold_stream}:S{stage}",
@@ -238,9 +276,8 @@ def _recovery_exchangers(
                         sink_stream_role=HeatExchangerStreamRole.PROCESS,
                         stage=stage,
                         duty=duty,
-                        area=_optional_float(
-                            _index(getattr(solved_model, "area_r", None), i, j, k)
-                        ),
+                        area=aggregate_area,
+                        segment_area_contributions=segment_contributions,
                         active=active,
                         match_allowed=_allowed(
                             _index(getattr(solved_model, "z_allowed", None), i, j, k)
@@ -276,6 +313,114 @@ def _recovery_exchangers(
     return tuple(exchangers)
 
 
+def _recovery_segment_contributions(
+    solved_model: Any,
+    solver_arrays: PreparedSolverArrays,
+    *,
+    hot_index: int,
+    cold_index: int,
+    stage_index: int,
+    tolerance: float,
+):
+    model_contributions = _model_recovery_segment_contributions(
+        solved_model,
+        hot_index=hot_index,
+        cold_index=cold_index,
+        stage_index=stage_index,
+    )
+    if model_contributions:
+        return model_contributions
+    arrays = solver_arrays.arrays
+    required = {"hot_segment_count", "cold_segment_count"}
+    if not required.issubset(arrays):
+        return ()
+    if (
+        int(arrays["hot_segment_count"][hot_index]) == 1
+        and int(arrays["cold_segment_count"][cold_index]) == 1
+    ):
+        return ()
+
+    period_ids = [str(value) for value in arrays.get("period_ids", ["0"])]
+    q_by_period = getattr(solved_model, "Q_r_by_period", None)
+    hot_temperatures = getattr(solved_model, "T_h_by_period", None)
+    cold_temperatures = getattr(solved_model, "T_c_by_period", None)
+    contributions = []
+    for period_index, period_id in enumerate(period_ids):
+        duty_value = (
+            _index(q_by_period, period_index, hot_index, cold_index, stage_index)
+            if q_by_period is not None
+            else _index(
+                getattr(solved_model, "Q_r", None),
+                hot_index,
+                cold_index,
+                stage_index,
+            )
+        )
+        duty = _optional_float(duty_value) or 0.0
+        if duty <= tolerance:
+            continue
+        hot_inlet = _optional_float(
+            _index(hot_temperatures, period_index, hot_index, stage_index)
+            if hot_temperatures is not None
+            else _index(getattr(solved_model, "T_h", None), hot_index, stage_index)
+        )
+        cold_inlet = _optional_float(
+            _index(cold_temperatures, period_index, cold_index, stage_index + 1)
+            if cold_temperatures is not None
+            else _index(getattr(solved_model, "T_c", None), cold_index, stage_index + 1)
+        )
+        if hot_inlet is None or cold_inlet is None:
+            raise ValueError(
+                "Segment-aware HEN extraction requires stage boundary temperatures."
+            )
+        contributions.extend(
+            duty_aligned_area_contributions(
+                profile_from_solver_arrays(
+                    solver_arrays,
+                    side="hot",
+                    parent_index=hot_index,
+                    period_index=period_index,
+                ),
+                profile_from_solver_arrays(
+                    solver_arrays,
+                    side="cold",
+                    parent_index=cold_index,
+                    period_index=period_index,
+                ),
+                duty=duty,
+                hot_inlet_temperature=hot_inlet,
+                cold_inlet_temperature=cold_inlet,
+                period=period_id,
+                tolerance=tolerance,
+            )
+        )
+    return tuple(contributions)
+
+
+def _model_recovery_segment_contributions(
+    solved_model: Any,
+    *,
+    hot_index: int,
+    cold_index: int,
+    stage_index: int,
+):
+    grid = getattr(solved_model, "segment_area_contributions_by_period", None)
+    if grid is None:
+        return ()
+    contributions = []
+    for period_index in range(len(grid)):
+        values = _index(
+            grid,
+            period_index,
+            hot_index,
+            cold_index,
+            stage_index,
+        )
+        if values:
+            contributions.extend(values)
+    return tuple(contributions)
+
+
 def _hot_utility_exchangers(
     solved_model: Any,
     *,
@@ -297,6 +442,14 @@ def _hot_utility_exchangers(
         )
         if not active and not include_inactive:
             continue
+        segment_contributions = _model_utility_segment_contributions(
+            solved_model,
+            "segment_area_hu_contributions_by_period",
+            j,
+        )
+        area = _optional_float(_index(getattr(solved_model, "area_hu", None), j))
+        if segment_contributions:
+            area = None
         exchangers.append(
             HeatExchanger(
                 exchanger_id=f"hot-utility:{hot_utility}->{cold_stream}",
@@ -306,7 +459,8 @@ def _hot_utility_exchangers(
                 source_stream_role=HeatExchangerStreamRole.UTILITY,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 duty=duty,
-                area=_optional_float(_index(getattr(solved_model, "area_hu", None), j)),
+                area=area,
+                segment_area_contributions=segment_contributions,
                 active=active,
                 match_allowed=_allowed(
                     _index(getattr(solved_model, "z_hu_allowed", None), j)
@@ -350,6 +504,14 @@ def _cold_utility_exchangers(
         )
         if not active and not include_inactive:
             continue
+        segment_contributions = _model_utility_segment_contributions(
+            solved_model,
+            "segment_area_cu_contributions_by_period",
+            i,
+        )
+        area = _optional_float(_index(getattr(solved_model, "area_cu", None), i))
+        if segment_contributions:
+            area = None
         exchangers.append(
             HeatExchanger(
                 exchanger_id=f"cold-utility:{hot_stream}->{cold_utility}",
@@ -359,7 +521,8 @@ def _cold_utility_exchangers(
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.UTILITY,
                 duty=duty,
-                area=_optional_float(_index(getattr(solved_model, "area_cu", None), i)),
+                area=area,
+                segment_area_contributions=segment_contributions,
                 active=active,
                 match_allowed=_allowed(
                     _index(getattr(solved_model, "z_cu_allowed", None), i)
@@ -379,6 +542,22 @@ def _cold_utility_exchangers(
             )
         )
     return tuple(exchangers)
+
+
+def _model_utility_segment_contributions(
+    solved_model: Any,
+    attribute_name: str,
+    parent_index: int,
+):
+    grid = getattr(solved_model, attribute_name, None)
+    if grid is None:
+        return ()
+    contributions = []
+    for period_values in grid:
+        values = _index(period_values, parent_index)
+        if values:
+            contributions.extend(values)
+    return tuple(contributions)
 
 
 def _identities_by_axis(

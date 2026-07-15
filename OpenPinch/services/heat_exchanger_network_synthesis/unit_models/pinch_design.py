@@ -230,9 +230,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.Qtot_sh_period = np.array(
             build_index_grid(
                 lambda n, i: (
-                    (self.T_h_in_period[n][i] - self.T_h_out_period[n][i])
-                    * self.f_h_period[n][i]
-                    * self.z_i_active_period[n][i]
+                    self._parent_profile_duty(
+                        "hot",
+                        n,
+                        i,
+                        self.T_h_in_period[n][i],
+                        self.T_h_out_period[n][i],
+                        self.f_h_period[n][i],
+                    )
+                    if self.z_i_active_period[n][i]
+                    else 0.0
                 ),
                 (self.N_periods, self.I),
             ),
@@ -241,9 +248,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.Qtot_sc_period = np.array(
             build_index_grid(
                 lambda n, j: (
-                    self.f_c_period[n][j]
-                    * (self.T_c_out_period[n][j] - self.T_c_in_period[n][j])
-                    * self.z_j_active_period[n][j]
+                    self._parent_profile_duty(
+                        "cold",
+                        n,
+                        j,
+                        self.T_c_in_period[n][j],
+                        self.T_c_out_period[n][j],
+                        self.f_c_period[n][j],
+                    )
+                    if self.z_j_active_period[n][j]
+                    else 0.0
                 ),
                 (self.N_periods, self.J),
             ),
@@ -286,17 +300,14 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.U_cu = self.U_cu_period[0].copy()
         self.Q_max_period = np.array(
             build_index_grid(
-                lambda n, i, j: (
-                    max(
-                        self.T_h_in_period[n][i]
-                        - self.T_c_in_period[n][j]
-                        - self._recovery_approach_temperature(i, j, n),
-                        0.0,
-                    )
-                    * min(
-                        self.f_h_period[n][i] * self.z_i_active_period[n][i],
-                        self.f_c_period[n][j] * self.z_j_active_period[n][j],
-                    )
+                lambda n, i, j: self._recovery_heat_upper_bound(
+                    period_index=n,
+                    hot_index=i,
+                    cold_index=j,
+                    hot_total_duty=self.Qtot_sh_period[n][i],
+                    cold_total_duty=self.Qtot_sc_period[n][j],
+                    hot_cp=(self.f_h_period[n][i] * self.z_i_active_period[n][i]),
+                    cold_cp=(self.f_c_period[n][j] * self.z_j_active_period[n][j]),
                 ),
                 (self.N_periods, self.I, self.J),
             ),
@@ -407,6 +418,8 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.T_h = self.T_h_by_period[0]
         self.T_c = self.T_c_by_period[0]
 
+        self._set_piecewise_stage_heat_coordinates()
+
         for n in range(self.N_periods):
             _ = [
                 (
@@ -451,6 +464,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         == 0
                     )
                     if self.z_i_active_period[n][i] > 0
+                    and not self._hot_parent_segmented(i)
                     else None
                 )
                 for k in range(self.S)
@@ -465,6 +479,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         == 0
                     )
                     if self.z_j_active_period[n][j] > 0
+                    and not self._cold_parent_segmented(j)
                     else None
                 )
                 for k in range(self.S)
@@ -799,6 +814,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             ),
             (self.I, self.J, self.S),
         )
+        self._apply_segment_recovery_areas(q_r)
 
         self.LMTD_hu_by_period = build_index_grid(
             lambda n, j: self._post_process_lmtd(
@@ -852,6 +868,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             ),
             (self.N_periods, self.I),
         )
+        self._apply_segment_utility_areas(q_h, q_c)
         self.LMTD_hu = self.LMTD_hu_by_period[0]
         self.LMTD_cu = self.LMTD_cu_by_period[0]
 

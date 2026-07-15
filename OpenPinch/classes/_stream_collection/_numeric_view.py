@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -25,9 +25,21 @@ class StreamCollectionNumericView:
     is_hot: np.ndarray
     is_cold: np.ndarray
     active: np.ndarray
+    parent_index: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=int))
+    segment_index: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=int))
+    parent_name: np.ndarray = field(
+        default_factory=lambda: np.asarray([], dtype=object)
+    )
+    parent_key: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=object))
+    period_index: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=int))
 
 
-def build_numeric_view(streams: list[object], idx: int | None = None):
+def build_numeric_view(
+    streams: list[object],
+    idx: int | None = None,
+    *,
+    keys: list[str] | None = None,
+):
     """Build a dense numeric view from stream objects."""
     n_streams = len(streams)
     t_min = np.empty(n_streams, dtype=float)
@@ -67,6 +79,75 @@ def build_numeric_view(streams: list[object], idx: int | None = None):
         is_hot=is_hot,
         is_cold=is_cold,
         active=active,
+        parent_index=np.arange(n_streams, dtype=int),
+        segment_index=np.full(n_streams, -1, dtype=int),
+        parent_name=np.asarray(
+            [
+                getattr(stream, "name", str(index))
+                for index, stream in enumerate(streams)
+            ],
+            dtype=object,
+        ),
+        parent_key=np.asarray(
+            keys
+            if keys is not None
+            else [
+                getattr(stream, "name", str(index))
+                for index, stream in enumerate(streams)
+            ],
+            dtype=object,
+        ),
+        period_index=np.full(n_streams, 0 if idx is None else int(idx), dtype=int),
+    )
+
+
+def build_segment_numeric_view(
+    streams: list[object],
+    idx: int | None = None,
+    *,
+    keys: list[str] | None = None,
+):
+    """Build a thermal view expanded to explicit segments with parent metadata."""
+    expanded = []
+    parent_index = []
+    segment_index = []
+    parent_name = []
+    parent_key = []
+    for stream_index, stream in enumerate(streams):
+        children = getattr(stream, "segments", ())
+        rows = children if children else (stream,)
+        for child_index, row in enumerate(rows):
+            expanded.append(row)
+            parent_index.append(stream_index)
+            segment_index.append(child_index if children else -1)
+            parent_name.append(getattr(stream, "name", str(stream_index)))
+            parent_key.append(
+                keys[stream_index]
+                if keys is not None
+                else getattr(stream, "name", str(stream_index))
+            )
+    view = build_numeric_view(expanded, idx)
+    return StreamCollectionNumericView(
+        t_min=view.t_min,
+        t_max=view.t_max,
+        t_min_star=view.t_min_star,
+        t_max_star=view.t_max_star,
+        cp=view.cp,
+        rcp=view.rcp,
+        heat_flow=view.heat_flow,
+        dt_cont=view.dt_cont,
+        is_hot=view.is_hot,
+        is_cold=view.is_cold,
+        active=view.active,
+        parent_index=np.asarray(parent_index, dtype=int),
+        segment_index=np.asarray(segment_index, dtype=int),
+        parent_name=np.asarray(parent_name, dtype=object),
+        parent_key=np.asarray(parent_key, dtype=object),
+        period_index=np.full(
+            len(expanded),
+            0 if idx is None else int(idx),
+            dtype=int,
+        ),
     )
 
 

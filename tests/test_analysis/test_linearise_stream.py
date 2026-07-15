@@ -39,7 +39,7 @@ def test_get_piecewise_linearisation_for_streams_mismatched_lengths():
         )
 
 
-def test_get_piecewise_linearisation_for_streams_returns_last_mask_points():
+def test_get_piecewise_linearisation_for_streams_returns_every_profile():
     streams = [
         SimpleNamespace(t_supply=150.0, t_target=80.0),
         SimpleNamespace(t_supply=60.0, t_target=120.0),
@@ -55,7 +55,11 @@ def test_get_piecewise_linearisation_for_streams_returns_last_mask_points():
 
     assert isinstance(out, dict)
     assert "t_h_points" in out
-    assert out["t_h_points"][0] == [0.0, 60.0]
+    assert len(out["t_h_points"]) == 2
+    assert out["t_h_points"][0][0] == [0.0, 150.0]
+    assert out["t_h_points"][0][-1] == [2.0, 80.0]
+    assert out["t_h_points"][1][0] == [0.0, 60.0]
+    assert out["t_h_points"][1][-1] == [2.0, 120.0]
 
 
 def test_get_piecewise_data_points_falls_back_to_rdp(monkeypatch):

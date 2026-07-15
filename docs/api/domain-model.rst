@@ -14,10 +14,18 @@ Core Objects
 
 ``Stream``
    Process or utility stream with supply/target states, shifted temperatures,
-   and active/base ``dt_cont`` behavior.
+   and active/base ``dt_cont`` behavior. A variable-heat-capacity parent owns
+   an immutable ordered view of ``StreamSegment`` children while retaining one
+   physical stream identity.
+
+``StreamSegment``
+   One ordered, locally linear thermal piece owned by a parent ``Stream``.
+   Segment mutations are transactional and revalidate the complete profile.
 
 ``StreamCollection``
    Ordered container with hot/cold filtering and utility inversion helpers.
+   Ordinary iteration and reports remain parent-based; explicit expanded
+   exports include canonical parent keys and ordered segment identities.
 
 ``ProblemTable``
    Numerical temperature-interval table behind composite curves, pinch
@@ -34,6 +42,12 @@ Core Objects
    records, total-duty helpers, and
    ``build_grid_diagram(...)`` for Plotly grid inspection.
 
+``HeatExchanger``
+   One physical parent-level match in a synthesized network. For segmented
+   streams, ``segment_area_contributions`` contains ordered diagnostic slices;
+   the exchanger exposes period duty and area totals plus the maximum
+   period-total design area without treating those slices as topology nodes.
+
 These are the objects you inspect when you need to understand how a case was
 prepared or why a target changed after mutating the in-memory model.
 
@@ -48,6 +62,10 @@ Key Classes
    :members:
    :no-index:
 
+.. autoclass:: OpenPinch.classes.stream.StreamSegment
+   :members:
+   :no-index:
+
 .. autoclass:: OpenPinch.classes.stream_collection.StreamCollection
    :members:
    :no-index:
@@ -57,6 +75,10 @@ Key Classes
    :no-index:
 
 .. autoclass:: OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.classes.heat_exchanger.HeatExchanger
    :members:
    :no-index:
 

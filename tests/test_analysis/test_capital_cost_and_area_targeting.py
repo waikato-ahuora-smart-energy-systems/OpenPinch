@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import OpenPinch.services.common.capital_cost_and_area_targeting as area_targeting
-from OpenPinch.classes import Stream, StreamCollection
+from OpenPinch.classes import Stream, StreamCollection, StreamSegment
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import PT
 from OpenPinch.services.common.capital_cost_and_area_targeting import (
@@ -316,6 +316,45 @@ def test_area_targeting_private_interval_helpers_cover_empty_and_scalar_paths():
             utilities,
         )
         == 0
+    )
+
+
+def test_crossing_ranges_deduplicates_segments_within_each_range_only():
+    streams = StreamCollection(
+        [
+            Stream(
+                name="Parent",
+                segments=[
+                    StreamSegment(
+                        t_supply=400.0,
+                        t_target=300.0,
+                        heat_flow=100.0,
+                    ),
+                    StreamSegment(
+                        t_supply=300.0,
+                        t_target=200.0,
+                        heat_flow=100.0,
+                    ),
+                ],
+            )
+        ]
+    )
+
+    assert (
+        _count_crossing_ranges(
+            np.asarray([250.0]),
+            np.asarray([350.0]),
+            streams,
+        )
+        == 1
+    )
+    assert (
+        _count_crossing_ranges(
+            np.asarray([350.0, 250.0]),
+            np.asarray([375.0, 275.0]),
+            streams,
+        )
+        == 2
     )
 
 

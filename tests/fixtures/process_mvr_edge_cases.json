@@ -4,10 +4,6 @@
     [200.0, 140.0],
     [100.0, 120.0]
   ],
-  "coarse_profile": [
-    [300.0, 160.0],
-    [100.0, 120.0]
-  ],
   "positive_stage": {
     "source_stream": "HotGas",
     "stage_index": 1,

@@ -8,6 +8,9 @@ from typing import Any, Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..lib.enums import HeatExchangerKind, HeatExchangerStreamRole
+from . import _heat_exchanger_area
+
+HeatExchangerAreaSlice = _heat_exchanger_area.HeatExchangerAreaSlice
 
 
 class HeatExchanger(BaseModel):
@@ -36,6 +39,9 @@ class HeatExchanger(BaseModel):
     capital_cost: float | None = None
     operating_cost: float | None = None
     total_annual_cost: float | None = None
+    segment_area_contributions: tuple[HeatExchangerAreaSlice, ...] = Field(
+        default_factory=tuple
+    )
     solver_metadata: dict[str, Any] = Field(
         default_factory=dict,
         exclude=True,
@@ -164,6 +170,41 @@ class HeatExchanger(BaseModel):
             raise ValueError("recovery exchangers must include a synthesis stage")
 
         return self
+
+    @model_validator(mode="after")
+    def _validate_segment_design_area(self) -> Self:
+        design_area = _heat_exchanger_area.validate_segment_design_area(
+            self.area,
+            self.segment_area_contributions,
+        )
+        if self.area is None and design_area is not None:
+            object.__setattr__(self, "area", design_area)
+        return self
+
+    @property
+    def has_segment_area_contributions(self) -> bool:
+        """Return whether exact local segment-area slices are available."""
+
+        return bool(self.segment_area_contributions)
+
+    @property
+    def segment_duty_by_period(self) -> dict[str, float]:
+        """Return local slice duty totals grouped by operating period."""
+        return _heat_exchanger_area.segment_duty_by_period(
+            self.segment_area_contributions
+        )
+
+    @property
+    def segment_area_by_period(self) -> dict[str, float]:
+        """Return local slice area totals grouped by operating period."""
+        return _heat_exchanger_area.segment_area_by_period(
+            self.segment_area_contributions
+        )
+
+    @property
+    def segment_design_area(self) -> float | None:
+        """Return the maximum period-total slice area when slices are available."""
+        return _heat_exchanger_area.segment_design_area(self.segment_area_contributions)
 
     def involves_stream(self, stream_id: str) -> bool:
         """Return whether this exchanger uses ``stream_id`` as source or sink."""

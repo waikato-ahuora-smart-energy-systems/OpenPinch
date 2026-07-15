@@ -314,11 +314,8 @@ def test_mvr_liquid_injection_and_process_stream_edge_branches():
 
     streams = streams_cycle._build_process_condenser_streams(stage_index=2)
 
-    assert sorted(stream.name for stream in streams) == [
-        "MVR_condense_H2",
-        "MVR_desuperheat_H2",
-        "MVR_subcool_H2",
-    ]
+    assert [stream.name for stream in streams] == ["MVR_process_H2"]
+    assert streams[0].segment_count == 3
 
 
 def test_mvr_accepts_generic_coolprop_fluid_and_motor_efficiency_changes_work():
@@ -797,15 +794,11 @@ def test_vc_mvr_cascade_routes_split_and_excludes_internal_streams():
     mvr_process_streams = [
         stream for stream in external_streams if str(stream.name).startswith("MVR_")
     ]
-    assert not any(
-        str(stream.name).startswith("MVR_desuperheat") for stream in mvr_process_streams
+    assert mvr_process_streams
+    assert all(
+        str(stream.name).startswith("MVR_process") for stream in mvr_process_streams
     )
-    assert any(
-        str(stream.name).startswith("MVR_condense") for stream in mvr_process_streams
-    )
-    assert any(
-        str(stream.name).startswith("MVR_subcool") for stream in mvr_process_streams
-    )
+    assert all(stream.has_segments for stream in mvr_process_streams)
     assert sum(stream.heat_flow.value for stream in mvr_process_streams) == (
         pytest.approx(cascade.mvr_stage_heat.sum())
     )
