@@ -244,6 +244,25 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
     assert record["solver_call_role"] == "pdm_above"
 
 
+def test_benchmark_solver_tracer_records_effective_forced_solver(monkeypatch) -> None:
+    benchmark = _load_benchmark_module()
+
+    def fake_solve(model, *, solver_name, disp=False, debug=0):
+        del model, solver_name, disp, debug
+        return benchmark.solver_backend.SolverRun(name="apopt", status=1)
+
+    monkeypatch.setattr(benchmark.solver_backend, "solve_gekko_model", fake_solve)
+    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=0)
+
+    with tracer.patched_backend():
+        benchmark.solver_backend.solve_gekko_model(
+            object(),
+            solver_name="ipopt-pyomo",
+        )
+
+    assert tracer.records[0]["solver_name"] == "apopt"
+
+
 def test_benchmark_solver_call_summaries_aggregate_by_layer() -> None:
     benchmark = _load_benchmark_module()
 

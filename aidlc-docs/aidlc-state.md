@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Read the Docs Documentation Review Complete
+- **Current Stage**: CONSTRUCTION - Experimental Discopt Removal Build and Test Review
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -53,20 +53,65 @@
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Unit**: Stream model refactor
-- **Current Stage**: Read the Docs Documentation Review - Complete
-- **Status**: The complete staged patch passed architecture, numerical,
-  compatibility, test, documentation, CI, packaging, and coverage review.
-  The CI-equivalent non-solver run passed 1,947 tests at 99% coverage against
-  the enforced 95% threshold; five segmented solver-marked tests also passed.
-  The Read the Docs configuration remains current. Navigation, capability and
-  stability pages, and the HEN guide now document segmented-parent topology,
-  solver behavior, local area slices, and the accepted Chen-surrogate boundary.
+- **Current Unit**: HEN solver benchmark
+- **Current Stage**: Follow-up Requirements Selection
+- **Status**: Steps 1 through 9 are complete. Aggregation compares total annual
+  cost only within each fixture and only for OpenPinch-verified networks, while
+  retaining timeouts, failures, termination evidence, and solver-call errors.
+  The smoke matrix verified all three APOPT networks; Couenne and Discopt both
+  constructed and attempted all three networks but reached the common
+  60-second case limit. Their raw traces and solver limitations are preserved.
+  The seven-case, three-repetition canonical matrix completed all 63 attempts.
+  APOPT returned 15 verified networks across five fixtures; Couenne and Discopt
+  returned no verified networks under the common 60-second case limit. The raw
+  JSON, derived summary, and per-case-first Markdown report are complete.
+  Engineering verification passed: 107 focused tests, 1,964 non-solver tests,
+  98% line coverage, 3 passed and 1 intentionally skipped solver-marked tests,
+  Ruff format/lint, artifact validation, and patch hygiene checks. Documentation
+  and final handoff. Sphinx documentation and wheel/sdist builds also pass.
+  Discopt remains a private benchmark-only optional bridge pending separately
+  approved public integration work. Post-run triage is complete and the next
+  implementation unit is awaiting selection in
+  `aidlc-docs/inception/requirements/hen-benchmark-follow-up-questions.md`.
 - **Deferred Follow-up**: Exact logarithmic LMTD in the continuous NLP
   formulation may be revisited later; it is not an immediate next step, and
   the Chen surrogate remains the accepted baseline
 
+## Experimental Discopt Removal Progress
+
+- [x] INCEPTION - Workspace Detection resumed from the completed benchmark.
+- [x] INCEPTION - Reverse Engineering skipped because current repository
+  artifacts already cover the affected HEN solver subsystem.
+- [x] INCEPTION - Minimal Requirements Analysis completed.
+- [x] INCEPTION - Requirements approved by the user.
+- [x] INCEPTION - Workflow Planning completed.
+- [x] INCEPTION - Workflow plan approved by the user.
+- [x] CONSTRUCTION - Code Generation Part 1 plan completed.
+- [x] CONSTRUCTION - Code Generation plan approved by the user.
+- [x] CONSTRUCTION - Code Generation Part 2 implementation completed.
+- [x] CONSTRUCTION - Generated code approved by the user.
+- [x] CONSTRUCTION - Build and Test completed.
+- [ ] CONSTRUCTION - Build and Test approval.
+- [ ] CONSTRUCTION - Build and Test.
+- [ ] OPERATIONS - Placeholder; no deployment work requested.
+- **Requirements artifact**: `aidlc-docs/inception/requirements/discopt-removal-requirements.md`.
+- **Workflow artifact**: `aidlc-docs/inception/plans/discopt-removal-execution-plan.md`.
+- **Code Generation plan**: `aidlc-docs/construction/plans/discopt-removal-code-generation-plan.md`.
+- **Code Generation summary**: `aidlc-docs/construction/discopt-removal/code/code-generation-summary.md`.
+- **Build and Test summary**: `aidlc-docs/construction/discopt-removal/build-and-test/build-and-test-summary.md`.
+- **Current gate**: Build and Test approval before closing at the Operations
+  placeholder.
+
 ## Follow-up Plans
+- **Read the Docs configuration verification**: Workspace detection is complete.
+  The tracked root `.readthedocs.yaml` matches the current repository and the
+  official Read the Docs v2 schema. Hosted-build troubleshooting was selected;
+  the stable-version resolution is awaiting an answer in
+  `aidlc-docs/inception/requirements/readthedocs-stable-resolution-questions.md`.
+- **Couenne vs APOPT vs Discopt v0.6.0 HEN benchmark**: Feasibility review and
+  implementation plan created at
+  `aidlc-docs/construction/plans/couenne-apopt-discopt-hen-benchmark-plan.md`;
+  approved with a Python 3.14 source-build amendment and now executing Step 7.
 - **Staged change quality audit**: Complete at
   `aidlc-docs/construction/plans/staged-change-quality-audit-plan.md`.
 - **Stream model refactor**: Requirements and the detailed implementation plan
@@ -81,6 +126,13 @@
   checklist is at
   `aidlc-docs/construction/plans/hen-area-slice-code-generation-plan.md`.
 
+## Read the Docs Configuration Follow-up Progress
+- [x] INCEPTION - Workspace Detection
+- [ ] INCEPTION - Requirements Analysis (version-policy answer pending)
+- [ ] INCEPTION - Workflow Planning
+- [ ] CONSTRUCTION - Code Generation
+- [ ] CONSTRUCTION - Build and Test
+
 ## Workspace Detection Summary
 - Existing code was detected: 322 tracked Python files, plus tests, documentation, examples, scripts, notebooks, and project resources.
 - The project is packaged as `OpenPinch` version 0.4.5 and targets Python 3.14.2 or newer.
@@ -88,3 +140,24 @@
 - Optional dependency groups cover dashboards, heat-pump cycles, notebooks, and heat-exchanger-network synthesis.
 - No previous AI-DLC state or reverse-engineering documentation existed at workflow start.
 - Reverse Engineering is complete; the next stage is Requirements Analysis after explicit approval.
+
+## GitHub CI Regression Follow-up Progress
+- [x] INCEPTION - Workspace Detection
+- [x] INCEPTION - Requirements Analysis
+- [x] INCEPTION - User Stories assessment (skipped: isolated internal bug fix)
+- [x] INCEPTION - Workflow Planning
+- [x] CONSTRUCTION - Code Generation
+- [x] CONSTRUCTION - Build and Test
+- [ ] OPERATIONS - Placeholder (no deployment work requested)
+- **Requirements artifact**: Approved minimal requirements at
+  `aidlc-docs/inception/requirements/github-ci-heat-pump-zero-duty-requirements.md`.
+- **Workflow artifact**: Focused execution plan ready for review at
+  `aidlc-docs/inception/plans/github-ci-heat-pump-zero-duty-execution-plan.md`.
+- **Code Generation plan**: Ready for review at
+  `aidlc-docs/construction/plans/heat-pump-zero-duty-ci-code-generation-plan.md`.
+- **Code Generation summary**: Generated-code details are available at
+  `aidlc-docs/construction/github-ci-heat-pump-zero-duty/code/code-generation-summary.md`.
+- **Build and Test summary**: Verified results are recorded at
+  `aidlc-docs/construction/build-and-test/build-and-test-summary.md`.
+- **Current gate**: Build and Test is complete; explicit approval is required
+  before closing at the Operations placeholder.

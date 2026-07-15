@@ -4,12 +4,14 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from hypothesis import given
 
 import OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle as shp_mod
 from OpenPinch.lib.enums import *
 from OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle import (
     VapourCompressionCycle,
 )
+from tests.strategies.heat_pump_cycles import zero_duty_stream_side_cases
 
 pytest.importorskip("CoolProp")
 
@@ -37,6 +39,77 @@ class _FakeState:
 
     def T(self):
         return self._T
+
+
+@pytest.mark.parametrize(
+    "is_condenser",
+    [True, False],
+    ids=["condenser", "evaporator"],
+)
+def test_zero_process_duty_skips_roundoff_profile(is_condenser):
+    """A one-ULP property residue must not create a zero-duty process stream."""
+    cycle = VapourCompressionCycle()
+    cycle._solved = True
+    cycle._m_dot = 0.005
+    cycle._Q_heat = 0.0
+    cycle._Q_cool = 0.0
+    enthalpy = 230_289.987
+    temperature = 22.0
+    target_temperature = temperature - 0.01 if is_condenser else temperature + 0.01
+    profile = np.array(
+        [
+            [enthalpy, temperature],
+            [np.nextafter(enthalpy, np.inf), target_temperature],
+        ]
+    )
+    profile_calls = 0
+
+    def _profile_with_roundoff():
+        nonlocal profile_calls
+        profile_calls += 1
+        return profile
+
+    if is_condenser:
+        cycle._build_condenser_profile = _profile_with_roundoff
+    else:
+        cycle._build_evaporator_profile = _profile_with_roundoff
+
+    streams = cycle.build_stream_collection(
+        include_cond=is_condenser,
+        include_evap=not is_condenser,
+    )
+
+    assert len(streams) == 0
+    assert profile_calls == 0
+
+
+@given(zero_duty_stream_side_cases())
+def test_zero_process_duty_omission_invariant(case):
+    """Every process duty within project tolerance omits its derived stream."""
+    cycle = VapourCompressionCycle()
+    cycle._solved = True
+    cycle._m_dot = case.mass_flow
+    cycle._Q_heat = case.duty if case.is_condenser else None
+    cycle._Q_cool = None if case.is_condenser else case.duty
+    profile_calls = 0
+
+    def _generated_profile():
+        nonlocal profile_calls
+        profile_calls += 1
+        return np.asarray(case.profile)
+
+    if case.is_condenser:
+        cycle._build_condenser_profile = _generated_profile
+    else:
+        cycle._build_evaporator_profile = _generated_profile
+
+    streams = cycle.build_stream_collection(
+        include_cond=case.is_condenser,
+        include_evap=not case.is_condenser,
+    )
+
+    assert len(streams) == 0
+    assert profile_calls == 0
 
 
 def _validate_results(

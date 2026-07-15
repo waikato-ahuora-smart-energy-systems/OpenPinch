@@ -30,3 +30,18 @@ uv run python scripts/build_dist.py --output-dir /tmp/openpinch-dist
 ```
 
 Both the warning-free documentation build and wheel/source-distribution build passed.
+
+## GitHub CI Heat-Pump Zero-Duty Follow-Up
+
+### Heat-Pump and Segmented-Profile Integration
+
+```bash
+uv run pytest -q --hypothesis-seed=20260715 \
+  tests/test_classes/test_simple_heat_pump_cycle.py \
+  tests/test_classes/test_cascade_heat_pump_cycle.py \
+  tests/test_classes/test_stream_segments.py
+```
+
+Verified result: 79 passed in 4.81 seconds. This covers process-duty
+classification, cascade collection union behavior, positive and negative
+duties, and strict segmented-profile invariants.

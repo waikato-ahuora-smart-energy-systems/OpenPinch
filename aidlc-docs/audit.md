@@ -408,3 +408,418 @@ Needs refactoring."
 **Context**: CONSTRUCTION - Read the Docs documentation currency review complete; Security and Resiliency extensions disabled (N/A), Property-Based Testing extension not applicable to documentation-only changes.
 
 ---
+
+## HEN Solver Benchmark Request
+**Timestamp**: 2026-07-15T19:17:02Z
+**User Input**: "Couenne vs APOPT vs Discopt v0.6.0 HEN Benchmark"
+**AI Response**: "Resumed the deferred solver benchmark work, began locating the saved plan and existing OpenHENS benchmark fixtures, and started verifying the exact Discopt v0.6.0 Pyomo contract and local Couenne, APOPT, and Discopt availability before modifying the benchmark harness or reporting results."
+**Context**: CONSTRUCTION - HEN solver benchmark feasibility and execution planning in progress.
+
+---
+
+## HEN Solver Benchmark Plan Approval Prompt
+**Timestamp**: 2026-07-15T19:21:19Z
+**User Input**: "No new user input; recording the required benchmark-plan approval prompt."
+**AI Response**: "Created a decision-complete nine-step implementation and execution plan for a controlled Couenne, APOPT, and Discopt v0.6.0 comparison. The plan uses all seven maintained OpenHENS fixtures after a three-case smoke gate, separates cold and repeated timing, independently verifies every reported network, preserves failures as data, and requires the 95% coverage gate. It also records the need for one shared Python 3.12 compatibility environment because Discopt v0.6.0 has no Apple-silicon Python 3.14 wheel and the machine has no Rust source-build toolchain. Please record A, B, or C after the [Answer]: tag in aidlc-docs/construction/plans/couenne-apopt-discopt-hen-benchmark-approval-questions.md."
+**Context**: CONSTRUCTION - Code Generation Part 1 plan complete; explicit approval required before implementation or benchmark execution.
+
+---
+
+## Read the Docs Configuration Request
+**Timestamp**: 2026-07-15T19:26:09Z
+**User Input**: "I think I need a .readthedocs.yaml"
+**AI Response**: "Started the mandatory AI-DLC workflow, displayed the welcome message, loaded common workflow rules and extension opt-in prompts, and performed workspace detection for the Read the Docs configuration request."
+**Context**: INCEPTION - Workspace Detection for a new documentation-configuration follow-up.
+
+---
+
+## Read the Docs Workspace Detection Findings
+**Timestamp**: 2026-07-15T19:26:09Z
+**User Input**: "I think I need a .readthedocs.yaml"
+**AI Response**: "Detected the existing brownfield Python library and current reverse-engineering artifacts. Found a tracked root .readthedocs.yaml that already selects Read the Docs configuration v2, Ubuntu 24.04, Python 3.14, docs/conf.py, strict Sphinx warnings, package installation, and docs/requirements.txt. Proceeded to minimal Requirements Analysis to determine whether confirmation or build troubleshooting is intended."
+**Context**: INCEPTION - Workspace Detection complete; Reverse Engineering reused; Requirements Analysis started.
+
+---
+
+## Read the Docs Extension Configuration
+**Timestamp**: 2026-07-15T19:26:09Z
+**User Input**: "I think I need a .readthedocs.yaml"
+**AI Response**: "Reused the project extension decisions already recorded in aidlc-state.md: Security Baseline disabled, Resiliency Baseline disabled, and Property-Based Testing partial. Security and Resiliency rules were skipped; Property-Based Testing is not applicable to configuration-presence verification."
+**Context**: INCEPTION - Extension discovery and conditional-enforcement check.
+
+---
+
+## Read the Docs Requirements Clarification Prompt
+**Timestamp**: 2026-07-15T19:26:09Z
+**User Input**: "I think I need a .readthedocs.yaml"
+**AI Response**: "Verified the existing configuration against the repository and current official Read the Docs v2 reference, and confirmed all 13 documentation-consistency tests pass. Created readthedocs-configuration-questions.md to determine whether the intended outcome is confirmation, hosted-build troubleshooting, or a configuration change."
+**Context**: INCEPTION - Requirements Analysis question gate; awaiting the user's answer in the question file.
+
+---
+
+## Read the Docs Hosted-Build Log
+**Timestamp**: 2026-07-15T19:31:10Z
+**User Input**: "Read the Docs build information
+Build id: 33605415
+Project: openpinch
+Version: stable
+Commit: None
+Date: 2026-07-15T19:21:17.833514Z
+State: finished
+Success: False
+
+
+[rtd-command-info] start-time: 2026-07-15T19:21:18.337285Z, end-time: 2026-07-15T19:21:23.583961Z, duration: 5, exit-code: 0
+git clone --depth 1 https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch.git .
+Cloning into '.'...
+
+[rtd-command-info] start-time: 2026-07-15T19:21:23.622788Z, end-time: 2026-07-15T19:21:23.994924Z, duration: 0, exit-code: 0
+git fetch origin --force --prune --prune-tags --depth 50 5c1e44ce613a5decb0b2440dd3ede3340ced06d5
+From https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch
+- branch            5c1e44ce613a5decb0b2440dd3ede3340ced06d5 -> FETCH_HEAD
+
+[rtd-command-info] start-time: 2026-07-15T19:21:24.078583Z, end-time: 2026-07-15T19:21:24.207772Z, duration: 0, exit-code: 0
+git checkout --force 5c1e44ce613a5decb0b2440dd3ede3340ced06d5
+Note: switching to '5c1e44ce613a5decb0b2440dd3ede3340ced06d5'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 5c1e44c packaging
+
+[rtd-command-info] start-time: 2026-07-15T19:21:24.245829Z, end-time: 2026-07-15T19:21:24.291912Z, duration: 0, exit-code: 1
+cat .readthedocs.yaml
+cat: .readthedocs.yaml: No such file or directory"
+**AI Response**: "Recorded choice B from the requirements question file and began tracing why the Read the Docs stable version resolves to commit 5c1e44c, which predates the repository's Read the Docs configuration."
+**Context**: INCEPTION - Requirements Analysis for hosted Read the Docs build troubleshooting.
+
+---
+
+## HEN Solver Benchmark Plan Approval
+**Timestamp**: 2026-07-15T19:29:02Z
+**User Input**: "See answer"
+**AI Response**: "Read the recorded answer: 'C. Run in Python 3.14. Get Rust toolchain to build a compatible discopt.' Accepted the custom environment requirement, amended the benchmark plan to use a shared Python 3.14 environment, and began Step 1 with an exact Discopt v0.6.0 source build and recorded Rust/source/wheel provenance."
+**Context**: CONSTRUCTION - Code Generation plan approved with amendment; reproducible benchmark environment construction started.
+
+---
+
+## HEN Benchmark Environment Completion
+**Timestamp**: 2026-07-15T19:36:38Z
+**User Input**: "No new user input; completed approved benchmark Step 1."
+**AI Response**: "Installed a minimal Rust 1.97.0 toolchain without modifying shell profiles, created an isolated CPython 3.14.2 environment, synchronized OpenPinch synthesis packages to the repository lock, verified the Discopt v0.6.0 source hash, and built a native cp314 arm64 wheel. The first build exposed PyO3 0.23.5's Python 3.13 version gate; the documented PYO3_USE_ABI3_FORWARD_COMPATIBILITY mode produced a working Python 3.14 extension. Couenne 0.5.8, APOPT through GEKKO 1.3.2, and Discopt 0.6.0 all solved the same smoke MINLP to objective 1.0 within numerical tolerance. Recorded complete environment, hashes, package versions, and smoke results in results/hen_solver_benchmark/environment.json."
+**Context**: CONSTRUCTION - HEN benchmark Step 1 complete; Step 2 benchmark adapter implementation started.
+
+---
+
+## HEN Benchmark Discopt Adapter Completion
+**Timestamp**: 2026-07-15T19:36:38Z
+**User Input**: "No new user input; completed approved benchmark Step 2."
+**AI Response**: "Added a lazy optional Discopt Pyomo bridge for GEKKO-generated HEN equations, preserved public defaults and optional-dependency isolation, retained solver termination, reported time, bounds, and node counts, and normalized GEKKO's stringified bounds and options for Discopt. Twelve focused backend tests pass, and a real Python 3.14 four-stream HEN run confirmed Discopt solves the PDM and EVM models. The run also identified hard-coded APOPT stage reduction and IPOPT evolution branches; the solver-comparison harness will override those only at the benchmark solve boundary so every measured call uses the selected stack."
+**Context**: CONSTRUCTION - HEN benchmark Step 2 complete; Step 3 solver-comparison harness started.
+
+---
+
+## HEN Solver-Comparison Harness Completion
+**Timestamp**: 2026-07-15T19:51:12Z
+**User Input**: "No new user input; completed approved benchmark Step 3."
+**AI Response**: "Added scripts/benchmark_hen_solvers.py with deterministic serial solver/case/repetition order, preflight, solver and case selection, fresh-process external timeouts, solver-native Discopt limits, forced benchmark solve boundaries, incremental atomic JSON, and environment-manifest linkage. Extended solver-call traces with effective solver identity and native termination, timing, bounds, and nodes. A one-case integration check retained Couenne and Discopt 90-second timeouts and an APOPT verified success; every trace used only its selected solver. Fourteen focused benchmark tests pass."
+**Context**: CONSTRUCTION - HEN benchmark Step 3 complete; Step 4 verification and aggregation started.
+
+---
+
+## HEN Benchmark Verification and Test Completion
+**Timestamp**: 2026-07-15T19:55:20Z
+**User Input**: "No new user input; completed approved benchmark Steps 4 and 5."
+**AI Response**: "Added explicit OpenPinch verification evidence, verified-only per-fixture objective comparison, within-case objective deltas, status and termination counts, solver guarantee classifications, median timing, and incremental summary JSON. Added optional-dependency, forced-solver, deterministic matrix, aggregation, timeout/partial-output, and status tests. Added reusable domain-specific Hypothesis strategies and invariant/round-trip properties with CI seed compatibility. Seventeen benchmark tests and seven focused Discopt/backend tests pass."
+**Context**: CONSTRUCTION - HEN benchmark Steps 4 and 5 complete; Step 6 three-case smoke benchmark started. PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 compliant.
+
+---
+
+## Read the Docs Stable-Version Resolution Prompt
+**Timestamp**: 2026-07-15T19:31:10Z
+**User Input**: "No new user input; recording the required stable-version resolution prompt."
+**AI Response**: "Confirmed that the remote exposes only v0.0.1 at the failing commit while the published OpenPinch 0.4.5 release commit contains the valid Read the Docs configuration. Created readthedocs-stable-resolution-questions.md with mutually exclusive choices for an immutable documentation tag, a stable branch, latest-only hosting, or deferral to the next retained release tag."
+**Context**: INCEPTION - Requirements Analysis clarification gate; version-policy decision required before requirements completion.
+
+---
+
+## GitHub CI Failure Request
+**Timestamp**: 2026-07-15T19:41:00Z
+**User Input**: "# Files mentioned by the user:
+
+## =================================== FAILURES ==================================…: /Users/timothyw/.codex/attachments/9c092f7e-a333-40d5-88b8-86452e279810/pasted-text.txt
+
+## My request for Codex:
+Github CI tests fail with the attached error message."
+**AI Response**: "Started the mandatory AI-DLC workflow for a focused CI regression, loaded the GitHub Actions CI-fix skill and common workflow rules, and read the complete attached failure log. Identified three deterministic heat-pump stream-construction failures caused by duplicate enthalpy coordinates reaching the strict segmented-profile validator."
+**Context**: INCEPTION - Workspace Detection for a focused GitHub CI bug fix.
+
+---
+
+## GitHub CI Workspace Detection Findings
+**Timestamp**: 2026-07-15T19:41:00Z
+**User Input**: "Github CI tests fail with the attached error message."
+**AI Response**: "Detected the existing brownfield Python library, reused current reverse-engineering artifacts, and confirmed the failure is scoped to heat-pump stream construction and stream-profile validation. GitHub CLI is not installed in the workspace, so the supplied complete Actions log and available GitHub connector are being used for CI evidence."
+**Context**: INCEPTION - Workspace Detection complete; proceeding automatically to minimal Requirements Analysis.
+
+---
+
+## GitHub CI Requirements Analysis Approval Prompt
+**Timestamp**: 2026-07-15T19:50:50Z
+**User Input**: "No new user input; recording the required approval prompt before presentation."
+**AI Response**: "Diagnosed the platform-dependent zero-duty condenser residue, generated minimal requirements at aidlc-docs/inception/requirements/github-ci-heat-pump-zero-duty-requirements.md, and requested explicit approval before Workflow Planning. The proposed scope omits zero external condenser and evaporator duties using the authoritative duty magnitude, preserves negative evaporator duties, and leaves strict generic segmented-profile validation unchanged."
+**Context**: INCEPTION - Requirements Analysis complete and awaiting explicit approval.
+
+---
+
+## GitHub CI Requirements Approval
+**Timestamp**: 2026-07-15T19:54:59Z
+**User Input**: "pprove & Continue"
+**AI Response**: "Interpreted the evident leading-character typo as explicit 'Approve & Continue', approved the focused requirements, and advanced to User Stories assessment and Workflow Planning."
+**Context**: INCEPTION - Requirements Analysis approved.
+
+---
+
+## GitHub CI User Stories Assessment
+**Timestamp**: 2026-07-15T19:57:22Z
+**User Input**: "No new user input; continued from the approved requirements."
+**AI Response**: "Skipped User Stories because this is an isolated internal numerical bug fix with no persona, user journey, API, or user-facing workflow change. Documented the assessment in aidlc-docs/inception/plans/user-stories-assessment.md."
+**Context**: INCEPTION - User Stories assessment complete; stage skipped.
+
+---
+
+## GitHub CI Workflow Diagram Validation
+**Timestamp**: 2026-07-15T19:57:22Z
+**User Input**: "No new user input; continued from the approved requirements."
+**AI Response**: "The first preflight checker incorrectly rejected the valid rounded Start node because of its own regular expression. Corrected the checker without changing the diagram; the second preflight passed with 17 defined IDs, balanced brackets and quotes, and all edges and style targets resolved. A text alternative is included in the execution plan."
+**Context**: INCEPTION - Mandatory content validation completed before workflow plan creation.
+
+---
+
+## GitHub CI Workflow Planning Approval Prompt
+**Timestamp**: 2026-07-15T19:57:22Z
+**User Input**: "No new user input; recording the required approval prompt before presentation."
+**AI Response**: "# 📋 Workflow Planning Complete\n\nCreated a focused execution plan for one unit-model guard, deterministic and property-based regression tests, and focused/full verification. Recommended executing Code Generation and Build and Test, while skipping Application Design, Units Generation, Functional Design, NFR Requirements, NFR Design, Infrastructure Design, and Operations because no new architecture, contracts, infrastructure, or deployment work is required. Requested explicit approval to proceed to Code Generation planning."
+**Context**: INCEPTION - Workflow Planning complete and awaiting explicit approval.
+
+---
+
+## GitHub CI Workflow Plan Approval
+**Timestamp**: 2026-07-15T20:00:05Z
+**User Input**: "Go"
+**AI Response**: "Accepted 'Go' as explicit approval of the focused workflow plan and advanced to Code Generation Part 1 planning."
+**Context**: INCEPTION - Workflow Planning approved; Code Generation planning started.
+
+---
+
+## GitHub CI Code Generation Plan Approval Prompt
+**Timestamp**: 2026-07-15T20:02:49Z
+**User Input**: "No new user input; recording the mandatory Code Generation plan gate."
+**AI Response**: "Prepared and content-validated the 30-checkbox Code Generation plan at aidlc-docs/construction/plans/heat-pump-zero-duty-ci-code-generation-plan.md. The plan creates a constrained heat-pump Hypothesis strategy, adds deterministic condenser/evaporator one-ULP regressions and an invariant property test, implements the authoritative duty-magnitude guard, preserves shared validation, records a generated-code summary, and defers test execution to Build and Test. Requested explicit approval before editing application code."
+**Context**: CONSTRUCTION - Code Generation Part 1 complete and awaiting explicit approval.
+
+---
+
+## HEN Benchmark User Continuation
+**Timestamp**: 2026-07-15T20:02:43Z
+**User Input**: "See answer"
+**AI Response**: "Resumed the approved Python 3.14 and Rust-backed Discopt v0.6.0 benchmark implementation from the saved state and continued the active three-case smoke gate."
+**Context**: CONSTRUCTION - HEN benchmark Step 6 continuation.
+
+---
+
+## HEN Benchmark Smoke Completion
+**Timestamp**: 2026-07-15T20:02:43Z
+**User Input**: "No new user input; continued the approved benchmark execution."
+**AI Response**: "Completed and inspected the canonical three-case smoke matrix. APOPT produced three OpenPinch-verified networks in 2.12 to 3.10 seconds. Couenne and Discopt constructed and attempted every case but reached the identical 60-second external case limit. Raw traces confirmed the selected solver at every solve boundary, no status mistranslation, no false verified result, and stable model execution. Discopt's unbounded-auxiliary and unsupported nonconstant-division relaxation warnings were classified as solver capability limitations and retained without solver-specific model tuning. Marked all Step 6 checkboxes complete and advanced to Step 7."
+**Context**: CONSTRUCTION - HEN benchmark Step 6 complete; Property-Based Testing extension remains compliant under Partial enforcement, while disabled Security and Resiliency extensions remain skipped.
+
+---
+
+## HEN Benchmark Canonical Matrix Completion
+**Timestamp**: 2026-07-15T20:41:53Z
+**User Input**: "No new user input; continued the approved benchmark execution."
+**AI Response**: "Completed the serial seven-fixture, three-solver, three-repetition canonical matrix with identical 60-second case limits and 30-second native Discopt limits. Validated all 63 unique solver/case/repetition identities, 21 attempts per solver, seven fixtures, exact solver forcing at every captured solve boundary, and clean JSON and Markdown generation. APOPT produced 15 OpenPinch-verified networks across five fixtures. Couenne and Discopt each recorded 18 timeouts and three common Spray Dryer decomposition failures, with no verified objectives. APOPT recorded three nine-stream decomposition failures and the three common Spray Dryer failures. Marked all Step 7 checkboxes complete and advanced to Step 8."
+**Context**: CONSTRUCTION - HEN benchmark Step 7 complete; raw objectives remain unaggregated across cases and only verified objectives enter per-case comparisons.
+
+---
+
+## HEN Benchmark Engineering Verification Completion
+**Timestamp**: 2026-07-15T20:50:18Z
+**User Input**: "No new user input; continued the approved benchmark execution."
+**AI Response**: "Completed Step 8 engineering verification. The focused backend and benchmark suite passed 107 tests; Ruff format and lint passed for all 14 changed Python files; the CI-equivalent non-solver suite passed 1,964 tests with four solver tests deselected and 98% line coverage against the 95% floor; the solver-marked suite passed three tests with one intentionally skipped nine-stream benchmark. Validated three JSON artifacts and the generated Markdown report, corrected the report to distinguish the common external timeout from Discopt's additional native timeout, confirmed Discopt is absent from pyproject.toml and uv.lock, and found no hard-coded local paths or diff whitespace errors. Marked all Step 8 checkboxes complete and advanced to Step 9."
+**Context**: CONSTRUCTION - HEN benchmark Step 8 complete; Property-Based Testing extension compliant under Partial enforcement. Security and Resiliency extensions remain disabled and skipped.
+
+---
+
+## HEN Benchmark Documentation and Handoff Completion
+**Timestamp**: 2026-07-15T20:51:00Z
+**User Input**: "No new user input; continued the approved benchmark execution."
+**AI Response**: "Completed Step 9. Documented the canonical command, Python 3.14 and Discopt source-build constraints, result contract, stack-level timing scope, timeout semantics, objective-verification rule, and certificate limitations. Built Sphinx documentation without warnings and successfully built the wheel and source distribution. Linked the Markdown report, raw canonical JSON, derived summary, and environment manifest from the completed plan. Recorded Discopt as a private benchmark-only optional bridge, absent from package metadata and defaults, pending separately approved public integration. Marked all plan and state checkboxes complete."
+**Context**: CONSTRUCTION - HEN benchmark workflow complete. Extension compliance: Property-Based Testing compliant under Partial enforcement; Security Baseline skipped because disabled; Resiliency Baseline skipped because disabled.
+
+---
+
+## HEN Benchmark Post-Run Continuation
+**Timestamp**: 2026-07-15T20:58:28Z
+**User Input**: "Continue"
+**AI Response**: "Continued with a read-only post-benchmark triage to locate solver-specific stalls and common workflow failures. Kept public Discopt integration and HEN formulation changes outside scope pending separate approval."
+**Context**: Post-completion analysis; no new implementation phase or source mutation authorized.
+
+---
+
+## HEN Benchmark Post-Run Triage and Follow-up Prompt
+**Timestamp**: 2026-07-15T20:58:28Z
+**User Input**: "No new user input; continued the requested post-run analysis."
+**AI Response**: "Localized Couenne timeouts to the first EVM solve after fast successful PDM calls. Localized Discopt timeouts to repeated time-limited feasible EVM subproblems after successful PDM calls; the 11-call EVM sequence cannot finish within the external limit. Confirmed APOPT completes three PDM and eleven EVM calls on five fixtures. Confirmed the Spray Dryer has four above-pinch stages and zero below-pinch active streams, so the common failure occurs before any solver call because the decomposition contract rejects S=0. Confirmed the APOPT nine-stream failure is a solver-status-zero result in the below-pinch PDM after the above-pinch PDM succeeds. Created hen-benchmark-follow-up-questions.md with mutually exclusive next-unit choices and requested selection before implementation."
+**Context**: INCEPTION - Follow-up Requirements Selection. Markdown question content validated: no diagrams or embedded code, balanced headings, blank-line-separated options, mandatory final Other option, and an empty [Answer]: field.
+
+---
+
+## Discopt Implementation Recommendation
+**Timestamp**: 2026-07-15T21:09:18Z
+**User Input**: "Should Discopt be implemented?"
+**AI Response**: "Recommended against exposing Discopt as a supported or default OpenPinch solver at this time. The private benchmark adapter should remain for research. The decision is based on zero verified Discopt HEN results in 21 canonical attempts, repeated EVM timeouts, infinite-bound and unsupported-relaxation diagnostics, an exact v0.6.0 package classified Alpha without declared Python 3.14 classifier support, and the need for formulation-specific finite bounds and relaxation coverage before certification claims are credible. Defined reconsideration gates for Python 3.14 distribution support, warning-free HEN formulation compatibility, verified benchmark parity, certificate validation, and packaging/license review."
+**Context**: Architecture recommendation only; no source or package-contract changes authorized.
+
+---
+
+## GitHub CI Code Generation Plan Approval
+**Timestamp**: 2026-07-15T20:05:32Z
+**User Input**: "Start Code Generation exactly as specified"
+**AI Response**: "Recorded explicit approval of the complete Code Generation checklist and began executing Steps 1 through 5 exactly as specified."
+**Context**: CONSTRUCTION - Code Generation Part 2 started.
+
+---
+
+## GitHub CI Code Generation Completion
+**Timestamp**: 2026-07-15T20:10:00Z
+**User Input**: "No new user input; completed the approved Code Generation checklist."
+**AI Response**: "Implemented the authoritative external-duty guard in vapour_compression_cycle.py, created a constrained zero-duty heat-pump Hypothesis strategy, added deterministic condenser/evaporator one-ULP regression tests and a generated invariant, and recorded the code-generation summary. Python AST parsing, scoped whitespace checks, git diff checks, duplicate-file detection, and unrelated-worktree review passed. Test execution remains deferred to Build and Test. Requested generated-code approval using the standardized two-option gate."
+**Context**: CONSTRUCTION - Code Generation implementation complete; approval required before Build and Test.
+
+---
+
+## GitHub CI Code Generation Approval
+**Timestamp**: 2026-07-15T20:21:12Z
+**User Input**: "Approve code generation and proceed to **Build & Test**"
+**AI Response**: "Recorded explicit approval of generated code, marked Code Generation complete, and started the Build and Test verification ladder."
+**Context**: CONSTRUCTION - Code Generation approved; Build and Test started.
+
+---
+
+## GitHub CI Build and Test Stage
+**Timestamp**: 2026-07-15T20:28:11Z
+**User Input**: "No new user input; completed the approved Build and Test stage."
+**AI Response**: "Built the OpenPinch 0.4.5 wheel and source distribution, passed the six reported/new regressions, passed 79 focused heat-pump/profile tests, passed the full 1,964-test CI-selected non-solver suite with four deselections, passed the CI 95% coverage gate at 98%, and passed scoped Ruff formatting and lint checks. Updated all five required build/test instruction and summary files and requested approval to close at the Operations placeholder."
+**Context**: CONSTRUCTION - Build and Test complete; all checks pass and no PBT blocking finding exists.
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated or Updated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+
+---
+
+## Experimental Discopt Removal Request
+**Timestamp**: 2026-07-15T21:13:14Z
+**User Input**: "Remove the experimental Discopt integration"
+**AI Response**: "Started a focused AI-DLC removal workflow. Resumed the brownfield workspace from the completed solver benchmark, loaded the existing reverse-engineering and benchmark artifacts, retained the established extension decisions, and inspected the exact Discopt-related runtime, benchmark, test, and documentation changes without modifying source code."
+**Context**: INCEPTION - Workspace Detection complete; minimal Requirements Analysis started.
+
+---
+
+## Experimental Discopt Removal Requirements Approval Prompt
+**Timestamp**: 2026-07-15T21:13:14Z
+**User Input**: "No new user input; recording the mandatory Requirements Analysis approval prompt."
+**AI Response**: "Created and content-validated the minimal removal requirements at aidlc-docs/inception/requirements/discopt-removal-requirements.md. The scope removes all executable and documented Discopt integration while preserving historical benchmark evidence and unrelated working-tree changes. Requested explicit approval before Workflow Planning."
+**Context**: INCEPTION - Requirements Analysis complete and awaiting explicit approval. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial and not applicable to removed experimental-only contracts.
+
+---
+
+## Experimental Discopt Removal Requirements Approval
+**Timestamp**: 2026-07-15T21:18:58Z
+**User Input**: "Approved"
+**AI Response**: "Recorded explicit approval of the experimental Discopt removal requirements and advanced to focused Workflow Planning."
+**Context**: INCEPTION - Requirements Analysis approved; Workflow Planning started.
+
+---
+
+## Experimental Discopt Removal Workflow Planning Approval Prompt
+**Timestamp**: 2026-07-15T21:18:58Z
+**User Input**: "No new user input; recording the mandatory Workflow Planning approval prompt."
+**AI Response**: "Created and content-validated the focused execution plan at aidlc-docs/inception/plans/discopt-removal-execution-plan.md. Recommended one Code Generation removal unit followed by Build and Test, while skipping new user stories, design, NFR, infrastructure, and operations stages. Requested explicit approval before Code Generation planning."
+**Context**: INCEPTION - Workflow Planning complete and awaiting explicit approval. Mermaid preflight: node IDs, edges, styles, quotes, and brackets validated; a text alternative is included. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial and not applicable to removed experimental-only contracts.
+
+---
+
+## Experimental Discopt Removal Workflow Plan Approval
+**Timestamp**: 2026-07-15T21:20:43Z
+**User Input**: "Approve"
+**AI Response**: "Recorded explicit approval of the focused experimental Discopt removal workflow and advanced to Code Generation Part 1 planning."
+**Context**: INCEPTION - Workflow Planning approved; Code Generation planning started.
+
+---
+
+## Experimental Discopt Removal Code Generation Plan Approval Prompt
+**Timestamp**: 2026-07-15T21:20:43Z
+**User Input**: "No new user input; recording the mandatory Code Generation plan approval prompt."
+**AI Response**: "Created and content-validated the 32-checkbox Code Generation plan at aidlc-docs/construction/plans/discopt-removal-code-generation-plan.md. The plan surgically restores the supported HEN backend, removes experimental files and tests, preserves independent generic benchmark metrics, verifies the active repository is Discopt-free, and records a generated-code summary before Build and Test. Requested explicit approval before editing application code."
+**Context**: CONSTRUCTION - Code Generation Part 1 complete and awaiting explicit approval. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial and the removed experimental strategy requires no replacement.
+
+---
+
+## Experimental Discopt Removal Code Generation Plan Approval
+**Timestamp**: 2026-07-15T21:24:06Z
+**User Input**: "Approve"
+**AI Response**: "Recorded explicit approval of the complete 32-checkbox removal plan and began Code Generation Part 2. Re-read the approved artifacts, captured the dirty-worktree and Discopt reference baseline, recorded unchanged package and lockfile hashes, and separated historical evidence and unrelated changes from the executable removal set."
+**Context**: CONSTRUCTION - Code Generation Part 2 started; Step 1 complete. Baseline hashes: pyproject.toml 722fc7975d2a6c120e0126d446285045655fd1e369dfcbbdd3e16383f270e859; uv.lock 20842cfc4883efd175c32225a626082ac0801e030dcdea20f3a408ed19914497.
+
+---
+
+## Experimental Discopt Removal Code Generation Completion
+**Timestamp**: 2026-07-15T21:27:18Z
+**User Input**: "No new user input; completed the approved Code Generation checklist."
+**AI Response**: "Removed the private Discopt bridge, dedicated three-stack benchmark harness, benchmark tests, and Hypothesis strategy; restored the HEN backend, model contracts, backend tests, and developer policy to their tracked pre-Discopt content; removed Discopt-only telemetry; and retained independent solver-neutral benchmark verification, duty, count, and effective-backend diagnostics. Active repository search, AST parsing, package/lock hash verification, duplicate-file checks, scoped diff review, and git diff --check passed. Created the generated-code summary and requested approval before Build and Test."
+**Context**: CONSTRUCTION - Code Generation Part 2 complete. All 32 plan checkboxes are complete. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial with no replacement required for the deleted experimental-only strategy.
+
+---
+
+## Experimental Discopt Removal Generated-Code Approval
+**Timestamp**: 2026-07-15T21:44:48Z
+**User Input**: "Go"
+**AI Response**: "Accepted 'Go' as explicit approval of the generated removal and started Build and Test with focused HEN regressions, lint, CI coverage, solver-marked tests, documentation, and distributions."
+**Context**: CONSTRUCTION - Code Generation approved; Build and Test started.
+
+---
+
+## Experimental Discopt Removal Build and Test Stage
+**Timestamp**: 2026-07-15T21:51:37Z
+**User Input**: "No new user input; completed the approved Build and Test stage."
+**AI Response**: "Passed 138 focused HEN tests, repository Ruff lint, formatting for all five modified Python files, 1,952 CI-selected non-solver tests, the 95% coverage gate at 99%, three solver-marked tests with one intentional skip, clean warnings-as-errors Sphinx builds, and wheel/sdist builds. Verified active source, tests, developer docs, package metadata, lockfile, fresh documentation output, wheel, and sdist contain no Discopt integration. Created dedicated build and test instructions and requested approval to close at the Operations placeholder."
+**Context**: CONSTRUCTION - Build and Test complete. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial and compliant with reproducible seed 20260715.
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated or Updated**:
+- discopt-removal/build-and-test/build-instructions.md
+- discopt-removal/build-and-test/unit-test-instructions.md
+- discopt-removal/build-and-test/integration-test-instructions.md
+- discopt-removal/build-and-test/performance-test-instructions.md
+- discopt-removal/build-and-test/build-and-test-summary.md
+
+---

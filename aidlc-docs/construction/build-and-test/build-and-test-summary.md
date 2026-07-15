@@ -72,3 +72,49 @@ the deferred refinement is not part of the immediate next steps.
   - PBT-07: reusable constrained heat-exchanger and stream strategies are used.
   - PBT-08: Hypothesis shrinking and CI seed reporting remain enabled.
   - PBT-09: Hypothesis remains configured through pytest and project dependencies.
+
+## GitHub CI Heat-Pump Zero-Duty Follow-Up
+
+### Build Status
+
+- **Build**: Success.
+- **Artifacts**: OpenPinch 0.4.5 wheel (504 KiB) and sdist (391 KiB).
+- **Artifact location**: Isolated temporary directory outside the worktree.
+
+### Test Execution Summary
+
+- **Reported plus new regression tests**: 6 passed in 2.37 seconds.
+- **Heat-pump/profile integration suite**: 79 passed in 4.81 seconds.
+- **Full CI-selected non-solver suite**: 1,964 passed, 4 deselected.
+- **Coverage**: 98% across 22,521 statements; required floor is 95%.
+- **Ruff formatting**: 3 scoped files already formatted.
+- **Ruff lint**: All scoped checks passed.
+- **Failures**: 0.
+
+### Property-Based Testing Compliance
+
+- **PBT-02**: N/A; no round-trip operation changed.
+- **PBT-03**: Compliant; generated cases verify zero-duty stream omission.
+- **PBT-07**: Compliant; the reusable strategy constrains side, duty, mass flow,
+  and finite one-ULP profiles.
+- **PBT-08**: Compliant; shrinking is enabled and the CI seed `20260715` was
+  used in focused and full runs.
+- **PBT-09**: Compliant; Hypothesis 6.156.6 ran through pytest.
+- **Blocking PBT findings**: None.
+
+### Additional Test Categories
+
+- **Performance**: N/A; no performance-affecting feature was introduced.
+- **Contract/API**: N/A; no public contract changed.
+- **Security**: N/A; Security Baseline is disabled and no security surface changed.
+- **End-to-end**: Covered by the full repository non-solver suite.
+- **Resiliency**: N/A; Resiliency Baseline is disabled.
+
+### Overall Status
+
+- **Build**: Success.
+- **Tests**: Pass.
+- **Coverage gate**: Pass.
+- **Ready for Operations**: Yes; no deployment or hosted-state mutation was
+  requested. The prior GitHub run will remain failed until these local changes
+  are committed and pushed to trigger a new run.

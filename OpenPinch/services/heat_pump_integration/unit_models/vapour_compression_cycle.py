@@ -9,6 +9,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from ....classes.stream_collection import StreamCollection
+from ....lib.config import tol
 from ....lib.coolprop_fluids import build_coolprop_abstract_state
 from ....utils.stream_linearisation import (
     build_segmented_stream_from_profile,
@@ -788,12 +789,12 @@ class VapourCompressionCycle:
             )
             return sc
 
-        if include_cond:
+        if include_cond and abs(float(self._Q_heat)) > tol:
             streams += _build_streams(
                 self._build_condenser_profile(),
                 is_condenser=True,
             )
-        if include_evap:
+        if include_evap and abs(float(self._Q_cool)) > tol:
             streams += _build_streams(
                 self._build_evaporator_profile(),
                 is_condenser=False,

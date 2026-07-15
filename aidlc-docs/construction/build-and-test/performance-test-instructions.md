@@ -16,3 +16,10 @@ Measure construction of `StreamCollection.segment_numeric_view()`, problem-table
 ## Regression Thresholds
 
 No new release-blocking wall-time threshold was introduced by this refactor. Flag super-linear growth in numeric-view or solver-array preparation relative to total expanded segment rows, and compare HEN solve time only within the same solver, topology, and convergence tolerance.
+
+## GitHub CI Heat-Pump Zero-Duty Follow-Up
+
+No performance test is required for this isolated guard. Zero-duty process
+sides now skip CoolProp profile generation, so the repair removes work from that
+path and introduces no loop, allocation, solver, network, or scaling behavior.
+The full non-solver runtime remained approximately two minutes locally.

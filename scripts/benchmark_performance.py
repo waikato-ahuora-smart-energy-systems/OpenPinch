@@ -176,7 +176,7 @@ class BenchmarkSolverCallTracer:
                 "method": context.get("method"),
                 "model_name": _solver_model_name(model),
                 "model_path": _solver_model_path(model),
-                "solver_name": solver_name,
+                "solver_name": (_solver_run_attr(solver_run, "name") or solver_name),
                 "duration_seconds": duration_seconds,
                 "solver_reported_seconds": _solver_run_attr(solver_run, "solve_time"),
                 "solver_status": _solver_run_attr(solver_run, "status"),
@@ -462,6 +462,10 @@ def time_hens_tier_case(
         "variant": f"tier_{tier}",
         "tier": int(tier),
         "status": "success",
+        "verification": {
+            "verified": True,
+            "source": "OpenPinch solved-model verification",
+        },
         "total_seconds": elapsed,
         "method": design.method,
         "stage_count": design.stage_count,
@@ -473,6 +477,12 @@ def time_hens_tier_case(
         "total_annual_cost": network.total_annual_cost,
         "utility_cost": network.utility_cost,
         "capital_cost": network.capital_cost,
+        "exchanger_count": sum(
+            1 for exchanger in network.exchangers if exchanger.active
+        ),
+        "recovery_duty": network.total_duty(kind="recovery"),
+        "hot_utility_duty": network.total_duty(kind="hot_utility"),
+        "cold_utility_duty": network.total_duty(kind="cold_utility"),
         "task_id": design.task_id,
         "selected_settings": _manifest_settings(manifest),
         "fallback_usage": _fallback_usage(network.summary_metrics),
