@@ -9,8 +9,9 @@
 OpenPinch is an open-source Python toolkit for advanced Pinch Analysis and
 Total Site Integration. It supports direct and indirect heat integration
 targeting, graph interpretation, Heat Pump and refrigeration screening, exergy
-and cogeneration post-processing, heat exchanger network synthesis, and
-file-backed or schema-first workflows.
+and cogeneration post-processing, heat exchanger network synthesis,
+multi-period analysis, stream piece-wise linearisation (for variable heat capacity
+and phase change streams), and file-backed or schema-first workflows.
 
 Full documentation is available at
 https://openpinch.readthedocs.io/en/latest/.
