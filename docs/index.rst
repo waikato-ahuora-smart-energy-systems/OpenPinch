@@ -1,5 +1,5 @@
-OpenPinch Documentation
-=======================
+OpenPinch Guide
+===============
 
 OpenPinch is a Python toolkit for Pinch Analysis, Total Site heat integration,
 graph interpretation, Heat Pump and refrigeration screening, exergy
@@ -45,6 +45,8 @@ What OpenPinch Covers
 - hierarchical zone modeling from unit operation to site scale
 - Composite Curve, Grand Composite Curve, Total Site profile, and SUGCC graphs
 - JSON, Excel, CSV-bundle, schema-first, and packaged sample-case inputs
+- structured variable-heat-capacity streams with one physical parent identity
+  and ordered piecewise thermal segments
 - Heat Pump and refrigeration screening, including simulated-cycle backends
 - direct gas/vapour MVR process-component studies
 - exergy and cogeneration post-processing on solved thermal targets

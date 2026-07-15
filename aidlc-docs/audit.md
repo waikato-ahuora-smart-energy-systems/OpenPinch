@@ -392,3 +392,19 @@ Needs refactoring."
 **Context**: CONSTRUCTION - Staged change quality audit complete; no unresolved review findings.
 
 ---
+
+## Read the Docs Review Request
+**Timestamp**: 2026-07-15T19:02:03Z
+**User Input**: "Review RTD are up-to-date."
+**AI Response**: "Interpreted RTD as the Read the Docs/Sphinx documentation set and began checking configuration, navigation, public API coverage, segmented-stream guides, HEN behavior, and warning-free rendering against the current implementation."
+**Context**: CONSTRUCTION - Read the Docs documentation currency review in progress.
+
+---
+
+## Read the Docs Review Completion
+**Timestamp**: 2026-07-15T19:05:14Z
+**User Input**: "No new user input; completed the requested Read the Docs review."
+**AI Response**: "Verified against current official Read the Docs configuration guidance that version 2, Ubuntu 24.04, Python 3.14, Sphinx configuration, strict warning handling, and requirements-file installation remain supported. Updated overview, capability, stability, and HEN synthesis documentation for segmented streams, parent topology, solver-specific piecewise behavior, local area contributions, multiperiod design area, and the accepted Chen-surrogate boundary. Added a documentation consistency regression. Fourteen documentation tests, Ruff, patch validation, and a warning-free Sphinx HTML build passed."
+**Context**: CONSTRUCTION - Read the Docs documentation currency review complete; Security and Resiliency extensions disabled (N/A), Property-Based Testing extension not applicable to documentation-only changes.
+
+---

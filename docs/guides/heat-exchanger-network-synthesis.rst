@@ -86,6 +86,65 @@ evolution from an existing network.
 When Couenne is unavailable for Couenne-backed stages, OpenPinch warns and
 attempts the configured network-evolution route where possible.
 
+Segmented Variable-Heat-Capacity Streams
+----------------------------------------
+
+A variable-heat-capacity process stream remains one physical parent on the
+hot or cold solver axis. Its ordered ``StreamSegment`` children define the
+local temperature--duty relation, heat-transfer coefficients, and exchanger
+area calculations. Segment count therefore does not inflate physical stream,
+match, exchanger, or stage-position counts.
+
+HEN preparation carries ordered segment temperatures, cumulative duties,
+local heat-capacity flowrates, heat-transfer coefficients, and stable segment
+identities alongside the parent axes. Stage balances advance a cumulative
+parent heat coordinate and map that coordinate through the piecewise
+``T(Q)`` profile. Pinch decomposition may clip or split the active profile,
+but it preserves the parent identity.
+
+The supported solver behavior is explicit:
+
+- APOPT and Couenne use interval-disjunctive piecewise mappings.
+- IPOPT uses active-segment refinement and repeats the continuous solve until
+  the selected intervals stabilize.
+- An unresolved active-segment solve is rejected with guidance to use APOPT or
+  Couenne. OpenPinch does not silently substitute an average parent ``CP``.
+
+Each selected parent-level exchanger can expose ordered
+``segment_area_contributions``. A contribution records its period, hot and
+cold segment identities, slice duty, local endpoint temperatures, local heat-
+transfer coefficients, LMTD, and area. The exchanger duty is the sum of its
+local slices for the applicable period. Its multiperiod design area is the
+maximum period-total slice area, not a sum of per-segment maxima drawn from
+different periods.
+
+.. code-block:: python
+
+   for exchanger in design.network.exchangers:
+       if exchanger.has_segment_area_contributions:
+           print(exchanger.exchanger_id)
+           print(exchanger.segment_area_by_period)
+           print(exchanger.segment_design_area)
+
+Grid diagrams and controllability remain parent-based. Segment details are
+diagnostic metadata and do not become additional topology nodes.
+
+Area Objective and Reported Area
+--------------------------------
+
+The nonlinear topology and total-cost objective retains the smooth Chen area
+surrogate. After a solution is found, OpenPinch calculates the reported
+exchanger area from ordered, duty-aligned segment slices using their local
+terminal temperatures and heat-transfer coefficients. Those segment-summed
+areas are also used for result verification and downstream ranking and
+derivative calculations.
+
+This separation is intentional: the Chen expression remains the accepted
+optimization baseline, while exact local LMTD areas remain authoritative for
+reported segmented exchangers. A possible future exact logarithmic-LMTD
+formulation is limited to the continuous NLP path and is not part of the
+current public behavior.
+
 Migration and Support Notes
 ---------------------------
 

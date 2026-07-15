@@ -247,6 +247,37 @@ def test_hen_synthesis_docs_keep_public_cutover_and_dependency_notes():
     assert "HeatExchangerNetworkDesignMethod" in schemas_config
 
 
+def test_segmented_stream_docs_cover_input_targeting_and_hen_contracts():
+    input_guide = _read(GUIDES_ROOT / "input-formats-and-validation.rst")
+    hen_guide = _read(GUIDES_ROOT / "heat-exchanger-network-synthesis.rst")
+    domain_model = _read(API_ROOT / "domain-model.rst")
+    capability_matrix = _read(DOCS_ROOT / "overview" / "capability-matrix.rst")
+    normalized_input_guide = " ".join(input_guide.split())
+    normalized_hen_guide = " ".join(hen_guide.split())
+
+    for phrase in (
+        "Variable Heat-Capacity Streams",
+        "segments",
+        "profile",
+        "target temperature must equal the next segment supply temperature",
+    ):
+        assert phrase in normalized_input_guide
+
+    for phrase in (
+        "Segmented Variable-Heat-Capacity Streams",
+        "one physical parent",
+        "does not silently substitute an average parent ``CP``",
+        "segment_area_contributions",
+        "maximum period-total slice area",
+        "Chen area surrogate",
+        "continuous NLP path",
+    ):
+        assert phrase in normalized_hen_guide
+
+    assert "StreamSegment" in domain_model
+    assert "Variable heat-capacity streams" in capability_matrix
+
+
 def test_heat_pump_docs_keep_advanced_workflow_boundaries():
     guide = _read(GUIDES_ROOT / "heat-pump-workflows.rst")
     fundamentals = _read(

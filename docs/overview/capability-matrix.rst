@@ -38,6 +38,11 @@ typical outputs, dependency notes, and support status.
      - typed ``TargetOutput``
      - base
      - Stable
+   * - Variable heat-capacity streams
+     - ``StreamSchema.segments`` or ``StreamSchema.profile``
+     - parent-level targets and reports; explicit ordered segment diagnostics
+     - base; synthesis extra for solver-backed HEN design
+     - Advanced
    * - Packaged learning assets
      - ``OpenPinch.resources`` and ``openpinch notebook``
      - sample JSON cases and clean notebook sources

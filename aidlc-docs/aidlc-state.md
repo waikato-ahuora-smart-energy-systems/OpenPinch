@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Staged Change Quality Audit
+- **Current Stage**: CONSTRUCTION - Read the Docs Documentation Review Complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -54,11 +54,14 @@
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
 - **Current Unit**: Stream model refactor
-- **Current Stage**: Staged Change Quality Audit - Complete
+- **Current Stage**: Read the Docs Documentation Review - Complete
 - **Status**: The complete staged patch passed architecture, numerical,
   compatibility, test, documentation, CI, packaging, and coverage review.
   The CI-equivalent non-solver run passed 1,947 tests at 99% coverage against
   the enforced 95% threshold; five segmented solver-marked tests also passed.
+  The Read the Docs configuration remains current. Navigation, capability and
+  stability pages, and the HEN guide now document segmented-parent topology,
+  solver behavior, local area slices, and the accepted Chen-surrogate boundary.
 - **Deferred Follow-up**: Exact logarithmic LMTD in the continuous NLP
   formulation may be revisited later; it is not an immediate next step, and
   the Chen surrogate remains the accepted baseline
