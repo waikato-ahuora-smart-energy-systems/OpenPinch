@@ -47,11 +47,11 @@ def topology_restrictions_from_network(
             source_stream=exchanger.source_stream,
             sink_stream=exchanger.sink_stream,
             stage=exchanger.stage,
-            duty=exchanger.duty,
+            duty=max(state.duty for state in exchanger.period_states),
         )
         for exchanger in network.exchangers
         if exchanger.kind is HeatExchangerKind.RECOVERY
-        and exchanger.active
+        and any(state.active for state in exchanger.period_states)
         and exchanger.match_allowed
         and exchanger.stage is not None
     )
@@ -80,7 +80,7 @@ def stage_count_from_network(
         int(exchanger.stage)
         for exchanger in network.exchangers
         if exchanger.kind is HeatExchangerKind.RECOVERY
-        and exchanger.active
+        and any(state.active for state in exchanger.period_states)
         and exchanger.match_allowed
         and exchanger.stage is not None
     ]
@@ -104,9 +104,10 @@ def approach_temperature_from_network(
     if isinstance(value, int | float) and value > 0.0:
         return float(value)
     for exchanger in network.exchangers:
-        for approach_temperature in exchanger.approach_temperatures:
-            if approach_temperature > 0.0:
-                return float(approach_temperature)
+        for state in exchanger.period_states:
+            for approach_temperature in state.approach_temperatures:
+                if approach_temperature > 0.0:
+                    return float(approach_temperature)
     return float(settings.approach_temperatures[0])
 
 

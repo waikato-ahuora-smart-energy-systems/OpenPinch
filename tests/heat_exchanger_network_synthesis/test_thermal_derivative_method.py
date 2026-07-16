@@ -7,6 +7,7 @@ import pytest
 from OpenPinch.classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
@@ -367,9 +368,15 @@ def _seed_network(*, method: str) -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=100.0,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=100.0,
+                        approach_temperatures=(10.0,),
+                    ),
+                ),
                 area=10.0,
-                approach_temperatures=(10.0,),
             ),
         ),
         run_id="seed-run",

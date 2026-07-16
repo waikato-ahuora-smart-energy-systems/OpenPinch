@@ -5,6 +5,7 @@ from __future__ import annotations
 from OpenPinch.classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
@@ -43,7 +44,18 @@ def test_seeded_network_evolution_prefers_solver_dtmin_metadata() -> None:
             "exchangers": (
                 _seed_network(method="thermal_derivative_method")
                 .exchangers[0]
-                .model_copy(update={"approach_temperatures": (99.0,)}),
+                .model_copy(
+                    update={
+                        "period_states": (
+                            HeatExchangerPeriodState(
+                                period_id="0",
+                                period_idx=0,
+                                duty=100.0,
+                                approach_temperatures=(99.0,),
+                            ),
+                        )
+                    }
+                ),
             ),
         },
     )
@@ -132,6 +144,12 @@ def _recovery_exchanger(hot: str, cold: str, stage: int) -> HeatExchanger:
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=stage,
-        duty=100.0,
-        approach_temperatures=(10.0,),
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="0",
+                period_idx=0,
+                duty=100.0,
+                approach_temperatures=(10.0,),
+            ),
+        ),
     )

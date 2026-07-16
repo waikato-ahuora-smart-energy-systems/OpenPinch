@@ -478,7 +478,9 @@ def time_hens_tier_case(
         "utility_cost": network.utility_cost,
         "capital_cost": network.capital_cost,
         "exchanger_count": sum(
-            1 for exchanger in network.exchangers if exchanger.active
+            1
+            for exchanger in network.exchangers
+            if any(state.active for state in exchanger.period_states)
         ),
         "recovery_duty": network.total_duty(kind="recovery"),
         "hot_utility_duty": network.total_duty(kind="hot_utility"),

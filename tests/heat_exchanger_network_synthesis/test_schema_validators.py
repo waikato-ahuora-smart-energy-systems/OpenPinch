@@ -244,10 +244,12 @@ def test_synthesis_result_grid_diagram_uses_base_network_when_unranked(monkeypat
     def fake_build_grid_diagram(
         self,
         *,
+        period_id: str | None,
         stream_line_width: float,
         temperature_scaled: bool,
     ):
         calls["network"] = self
+        calls["period_id"] = period_id
         calls["stream_line_width"] = stream_line_width
         calls["temperature_scaled"] = temperature_scaled
         return {"diagram": "ok"}
@@ -264,6 +266,7 @@ def test_synthesis_result_grid_diagram_uses_base_network_when_unranked(monkeypat
     ) == {"diagram": "ok"}
     assert calls == {
         "network": result.network,
+        "period_id": None,
         "stream_line_width": 7.0,
         "temperature_scaled": True,
     }

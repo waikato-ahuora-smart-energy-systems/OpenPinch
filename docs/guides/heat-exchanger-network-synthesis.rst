@@ -42,7 +42,8 @@ Runnable Workflow
 
    design = problem.design.enhanced_synthesis_method(quality_tier=2)
    network = design.network
-   diagram = network.build_grid_diagram()
+   period_id = network.period_ids[0]
+   diagram = network.build_grid_diagram(period_id=period_id)
 
 Explicit design-method accessors are also available:
 
@@ -67,7 +68,11 @@ Successful synthesis stores a design result on ``TargetOutput.design`` and
 - ``design.manifest.method_sequence`` for executed task-level methods
 - ``design.network`` for the selected network
 - ``design.ranked_networks`` for ranked unique candidates
-- ``design.network.build_grid_diagram(...)`` for visual topology inspection
+- ``design.network.exchangers[0].state(period_id)`` for one match's operating
+  duty, activity, approaches, split fractions, and temperatures
+- ``design.network.total_duty(period_id=period_id)`` for period duty totals
+- ``design.network.build_grid_diagram(period_id=period_id)`` for visual
+  topology inspection
 
 Interpretation
 --------------
@@ -85,6 +90,12 @@ evolution from an existing network.
 
 When Couenne is unavailable for Couenne-backed stages, OpenPinch warns and
 attempts the configured network-evolution route where possible.
+
+Each exchanger stores shared design topology, area, and capital values once;
+ordered ``HeatExchangerPeriodState`` records hold operating values. A
+single-period network allows ``exchanger.state()`` and omitted query periods.
+A multiperiod network requires the explicit identity for duty, temperature,
+diagram, export, and controllability access.
 
 Segmented Variable-Heat-Capacity Streams
 ----------------------------------------

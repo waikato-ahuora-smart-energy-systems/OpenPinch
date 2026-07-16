@@ -153,12 +153,14 @@
   implementation request.
 - [x] CONSTRUCTION - PR 1 Domain and Input Correctness.
 - [x] CONSTRUCTION - PR 2 Period-Native PDM and Utility Constraints.
-- [ ] CONSTRUCTION - PR 3 Period-Native HEN Results.
+- [x] CONSTRUCTION - PR 3 Period-Native HEN Results.
 - [ ] CONSTRUCTION - PR 4 Summary Isolation and HPR Economics.
 - [ ] CONSTRUCTION - Final Build and Test.
-- **Current stage**: Code Generation Part 2 - PR 3 period-native HEN results.
-  PR 1 and PR 2 are independently green with implementation, documentation,
-  packaging, solver, canonical benchmark, and Build and Test evidence complete.
+- **Current stage**: Code Generation Part 2 - PR 4 summary isolation and HPR
+  economics. PR 1, PR 2, and PR 3 are independently green with implementation,
+  documentation, packaging, solver, canonical benchmark, and Build and Test
+  evidence complete. PR 3 records bounded tier-1 solver timeouts separately
+  from its green correctness matrix.
 - **Compatibility policy**: Pre-release clean breaks; no compatibility shims.
 - **Plan**: `aidlc-docs/construction/plans/pre-release-corrective-code-generation-plan.md`.
 

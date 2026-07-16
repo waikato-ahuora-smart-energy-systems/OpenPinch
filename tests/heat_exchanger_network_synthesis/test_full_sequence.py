@@ -817,12 +817,20 @@ def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
     assert network_structure_signature(duplicate_network) == (
         network_structure_signature(single_network)
     )
+    single_period_id = single_network.period_ids[0]
     for kind in HeatExchangerKind:
-        assert duplicate_network.total_duty(kind=kind) == pytest.approx(
-            single_network.total_duty(kind=kind),
-            abs=1e-5,
-            rel=1e-9,
-        )
+        for duplicate_period_id in duplicate_network.period_ids:
+            assert duplicate_network.total_duty(
+                kind=kind,
+                period_id=duplicate_period_id,
+            ) == pytest.approx(
+                single_network.total_duty(
+                    kind=kind,
+                    period_id=single_period_id,
+                ),
+                abs=1e-5,
+                rel=1e-9,
+            )
 
 
 def test_direct_design_run_computes_targets_when_cache_is_empty(monkeypatch) -> None:
@@ -941,10 +949,10 @@ def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
         if exchanger.kind is HeatExchangerKind.RECOVERY
     )
 
-    assert recovery.source_inlet_temperature == pytest.approx(650.0)
-    assert recovery.source_outlet_temperature > 273.15
-    assert recovery.sink_inlet_temperature == pytest.approx(410.0)
-    assert recovery.sink_outlet_temperature > 273.15
+    assert recovery.state().source_inlet_temperature == pytest.approx(650.0)
+    assert recovery.state().source_outlet_temperature > 273.15
+    assert recovery.state().sink_inlet_temperature == pytest.approx(410.0)
+    assert recovery.state().sink_outlet_temperature > 273.15
     assert design.network.summary_metrics["approach_temperature"] == pytest.approx(2.0)
 
 

@@ -72,14 +72,18 @@ def verify_network_feasibility(
         return ("network output is missing",)
 
     failures: list[str] = []
-    failures.extend(_check_summary_totals(network))
+    period_ids = network.period_ids
+    if len(period_ids) <= 1:
+        failures.extend(_check_summary_totals(network))
     failures.extend(_check_cost_consistency(network))
-    failures.extend(_check_temperature_order(network.exchangers))
-    failures.extend(_check_minimum_approach(network))
-    failures.extend(_check_exchanger_duty_balances(network))
-    failures.extend(_check_stream_heat_balances(network))
-    failures.extend(_check_area_presence(network.exchangers))
-    failures.extend(_check_area_consistency(network))
+    for period_id in period_ids:
+        failures.extend(_check_temperature_order(network.exchangers, period_id))
+        failures.extend(_check_minimum_approach(network, period_id))
+        failures.extend(_check_exchanger_duty_balances(network, period_id))
+        failures.extend(_check_area_presence(network.exchangers, period_id))
+        failures.extend(_check_area_consistency(network, period_id))
+    if len(period_ids) <= 1:
+        failures.extend(_check_stream_heat_balances(network))
     return tuple(failures)
 
 
@@ -147,30 +151,32 @@ def _check_cost_consistency(network: HeatExchangerNetwork) -> list[str]:
 
 def _check_temperature_order(
     exchangers: Iterable[HeatExchanger],
+    period_id: str,
 ) -> list[str]:
     failures: list[str] = []
     for exchanger in exchangers:
-        if not exchanger.active:
+        state = exchanger.state(period_id)
+        if not state.active:
             continue
         if (
-            exchanger.source_inlet_temperature is not None
-            and exchanger.source_outlet_temperature is not None
+            state.source_inlet_temperature is not None
+            and state.source_outlet_temperature is not None
         ):
             if (
-                exchanger.source_outlet_temperature
-                > exchanger.source_inlet_temperature + _TEMPERATURE_ABS_TOL
+                state.source_outlet_temperature
+                > state.source_inlet_temperature + _TEMPERATURE_ABS_TOL
             ):
                 failures.append(
                     f"{exchanger.exchanger_id or exchanger.kind.value} source "
                     "temperature increases across a heat source"
                 )
         if (
-            exchanger.sink_inlet_temperature is not None
-            and exchanger.sink_outlet_temperature is not None
+            state.sink_inlet_temperature is not None
+            and state.sink_outlet_temperature is not None
         ):
             if (
-                exchanger.sink_outlet_temperature + _TEMPERATURE_ABS_TOL
-                < exchanger.sink_inlet_temperature
+                state.sink_outlet_temperature + _TEMPERATURE_ABS_TOL
+                < state.sink_inlet_temperature
             ):
                 failures.append(
                     f"{exchanger.exchanger_id or exchanger.kind.value} sink "
@@ -178,20 +184,20 @@ def _check_temperature_order(
                 )
         if exchanger.kind is HeatExchangerKind.RECOVERY:
             if (
-                exchanger.source_inlet_temperature is not None
-                and exchanger.sink_outlet_temperature is not None
-                and exchanger.source_inlet_temperature + _TEMPERATURE_ABS_TOL
-                < exchanger.sink_outlet_temperature
+                state.source_inlet_temperature is not None
+                and state.sink_outlet_temperature is not None
+                and state.source_inlet_temperature + _TEMPERATURE_ABS_TOL
+                < state.sink_outlet_temperature
             ):
                 failures.append(
                     f"{exchanger.exchanger_id or exchanger.kind.value} hot inlet "
                     "is colder than cold outlet"
                 )
             if (
-                exchanger.source_outlet_temperature is not None
-                and exchanger.sink_inlet_temperature is not None
-                and exchanger.source_outlet_temperature + _TEMPERATURE_ABS_TOL
-                < exchanger.sink_inlet_temperature
+                state.source_outlet_temperature is not None
+                and state.sink_inlet_temperature is not None
+                and state.source_outlet_temperature + _TEMPERATURE_ABS_TOL
+                < state.sink_inlet_temperature
             ):
                 failures.append(
                     f"{exchanger.exchanger_id or exchanger.kind.value} hot outlet "
@@ -200,18 +206,22 @@ def _check_temperature_order(
     return failures
 
 
-def _check_minimum_approach(network: HeatExchangerNetwork) -> list[str]:
+def _check_minimum_approach(
+    network: HeatExchangerNetwork,
+    period_id: str,
+) -> list[str]:
     d_tmin = _optional_float(network.source_metadata.get("solver_dTmin"))
     if d_tmin is None:
         return []
 
     failures: list[str] = []
     for exchanger in network.exchangers:
-        if not exchanger.active or exchanger.kind is not HeatExchangerKind.RECOVERY:
+        state = exchanger.state(period_id)
+        if not state.active or exchanger.kind is not HeatExchangerKind.RECOVERY:
             continue
-        approaches = exchanger.approach_temperatures
+        approaches = state.approach_temperatures
         if not approaches:
-            approaches = _recovery_terminal_approaches(exchanger)
+            approaches = _recovery_terminal_approaches(state)
         if approaches and min(approaches) + _TEMPERATURE_ABS_TOL < d_tmin:
             failures.append(
                 f"{exchanger.exchanger_id or exchanger.kind.value} minimum "
@@ -220,27 +230,40 @@ def _check_minimum_approach(network: HeatExchangerNetwork) -> list[str]:
     return failures
 
 
-def _check_exchanger_duty_balances(network: HeatExchangerNetwork) -> list[str]:
+def _check_exchanger_duty_balances(
+    network: HeatExchangerNetwork,
+    period_id: str,
+) -> list[str]:
     metadata = network.source_metadata
-    segment_failures = _check_segment_contribution_balances(network.exchangers)
+    segment_failures = _check_segment_contribution_balances(
+        network.exchangers,
+        period_id,
+    )
     if _uses_isothermal_stage_boundaries(metadata):
         return segment_failures
-    hot_cp = _stream_value_map(
+    hot_cp = _period_stream_value_map(
         network,
         "hot_process_streams",
-        metadata.get("hot_stream_heat_capacity_flowrates"),
+        metadata=metadata,
+        period_id=period_id,
+        scalar_key="hot_stream_heat_capacity_flowrates",
+        period_key="hot_stream_heat_capacity_flowrates_by_period",
     )
-    cold_cp = _stream_value_map(
+    cold_cp = _period_stream_value_map(
         network,
         "cold_process_streams",
-        metadata.get("cold_stream_heat_capacity_flowrates"),
+        metadata=metadata,
+        period_id=period_id,
+        scalar_key="cold_stream_heat_capacity_flowrates",
+        period_key="cold_stream_heat_capacity_flowrates_by_period",
     )
     if not hot_cp and not cold_cp:
         return segment_failures
 
     failures: list[str] = list(segment_failures)
     for exchanger in network.exchangers:
-        if not exchanger.active:
+        state = exchanger.state(period_id)
+        if not state.active:
             continue
         if exchanger.segment_area_contributions:
             continue
@@ -251,11 +274,16 @@ def _check_exchanger_duty_balances(network: HeatExchangerNetwork) -> list[str]:
             cp = hot_cp.get(exchanger.source_stream)
             if cp is not None:
                 expected = _heat_removed(
-                    cp,
-                    exchanger.source_inlet_temperature,
-                    exchanger.source_outlet_temperature,
+                    cp
+                    * (
+                        state.source_split_fraction
+                        if state.source_split_fraction is not None
+                        else 1.0
+                    ),
+                    state.source_inlet_temperature,
+                    state.source_outlet_temperature,
                 )
-                failures.extend(_duty_failure(exchanger, "source", expected))
+                failures.extend(_duty_failure(exchanger, state, "source", expected))
         if exchanger.kind in {
             HeatExchangerKind.RECOVERY,
             HeatExchangerKind.HOT_UTILITY,
@@ -263,11 +291,16 @@ def _check_exchanger_duty_balances(network: HeatExchangerNetwork) -> list[str]:
             cp = cold_cp.get(exchanger.sink_stream)
             if cp is not None:
                 expected = _heat_added(
-                    cp,
-                    exchanger.sink_inlet_temperature,
-                    exchanger.sink_outlet_temperature,
+                    cp
+                    * (
+                        state.sink_split_fraction
+                        if state.sink_split_fraction is not None
+                        else 1.0
+                    ),
+                    state.sink_inlet_temperature,
+                    state.sink_outlet_temperature,
                 )
-                failures.extend(_duty_failure(exchanger, "sink", expected))
+                failures.extend(_duty_failure(exchanger, state, "sink", expected))
     return failures
 
 
@@ -360,10 +393,12 @@ def _check_stream_heat_balances(network: HeatExchangerNetwork) -> list[str]:
 
 def _check_area_presence(
     exchangers: Iterable[HeatExchanger],
+    period_id: str,
 ) -> list[str]:
     failures = []
     for exchanger in exchangers:
-        if not exchanger.active or exchanger.duty <= _DUTY_ABS_TOL:
+        state = exchanger.state(period_id)
+        if not state.active or state.duty <= _DUTY_ABS_TOL:
             continue
         if exchanger.area is None or exchanger.area <= 0.0:
             failures.append(
@@ -373,9 +408,12 @@ def _check_area_presence(
     return failures
 
 
-def _check_area_consistency(network: HeatExchangerNetwork) -> list[str]:
+def _check_area_consistency(
+    network: HeatExchangerNetwork,
+    period_id: str,
+) -> list[str]:
     metadata = network.source_metadata
-    failures = _check_segment_contribution_areas(network.exchangers)
+    failures = _check_segment_contribution_areas(network.exchangers, period_id)
     if _uses_isothermal_stage_boundaries(metadata):
         return failures
     hot_htc = _stream_value_map(
@@ -402,11 +440,8 @@ def _check_area_consistency(network: HeatExchangerNetwork) -> list[str]:
         return failures
 
     for exchanger in network.exchangers:
-        if (
-            not exchanger.active
-            or exchanger.duty <= _DUTY_ABS_TOL
-            or exchanger.area is None
-        ):
+        state = exchanger.state(period_id)
+        if not state.active or state.duty <= _DUTY_ABS_TOL or exchanger.area is None:
             continue
         if exchanger.segment_area_contributions:
             continue
@@ -417,10 +452,10 @@ def _check_area_consistency(network: HeatExchangerNetwork) -> list[str]:
             hot_utility_htc=hot_utility_htc,
             cold_utility_htc=cold_utility_htc,
         )
-        terminal_lmtd = _terminal_lmtd(exchanger)
+        terminal_lmtd = _terminal_lmtd(state)
         if overall_htc is None or terminal_lmtd is None:
             continue
-        required_area = exchanger.duty / overall_htc / terminal_lmtd
+        required_area = state.duty / overall_htc / terminal_lmtd
         if exchanger.area + _AREA_ABS_TOL < required_area and not _close(
             required_area,
             exchanger.area,
@@ -437,38 +472,44 @@ def _check_area_consistency(network: HeatExchangerNetwork) -> list[str]:
 
 def _check_segment_contribution_balances(
     exchangers: Iterable[HeatExchanger],
+    period_id: str,
 ) -> list[str]:
     failures = []
     for exchanger in exchangers:
+        state = exchanger.state(period_id)
         contributions = exchanger.segment_area_contributions
-        if not exchanger.active or not contributions:
+        if not state.active or not contributions:
             continue
         period_duties = exchanger.segment_duty_by_period
-        if len(period_duties) == 1:
-            contribution_duty = next(iter(period_duties.values()))
+        if period_id in period_duties:
+            contribution_duty = period_duties[period_id]
             if not _close(
                 contribution_duty,
-                exchanger.duty,
+                state.duty,
                 rel_tol=_DUTY_REL_TOL,
                 abs_tol=_DUTY_ABS_TOL,
             ):
                 failures.append(
                     f"{exchanger.exchanger_id or exchanger.kind.value} segment "
                     f"duty {contribution_duty:.6g} does not match parent duty "
-                    f"{exchanger.duty:.6g}"
+                    f"{state.duty:.6g} in period {period_id!r}"
                 )
     return failures
 
 
 def _check_segment_contribution_areas(
     exchangers: Iterable[HeatExchanger],
+    period_id: str,
 ) -> list[str]:
     failures = []
     for exchanger in exchangers:
+        state = exchanger.state(period_id)
         contributions = exchanger.segment_area_contributions
-        if not exchanger.active or not contributions or exchanger.area is None:
+        if not state.active or not contributions or exchanger.area is None:
             continue
         for contribution in contributions:
+            if contribution.period != period_id:
+                continue
             required = contribution.duty / contribution.overall_htc / contribution.lmtd
             if not _close(
                 required,
@@ -522,8 +563,8 @@ def _overall_heat_transfer_coefficient(
     return 1.0 / (1.0 / source_htc + 1.0 / sink_htc)
 
 
-def _terminal_lmtd(exchanger: HeatExchanger) -> float | None:
-    approaches = _recovery_terminal_approaches(exchanger)
+def _terminal_lmtd(state) -> float | None:
+    approaches = _recovery_terminal_approaches(state)
     if len(approaches) != 2:
         return None
     delta_1, delta_2 = approaches
@@ -541,7 +582,8 @@ def _count_active(
     return sum(
         1
         for exchanger in exchangers
-        if exchanger.active and (kind is None or exchanger.kind is kind)
+        if any(state.active for state in exchanger.period_states)
+        and (kind is None or exchanger.kind is kind)
     )
 
 
@@ -558,6 +600,23 @@ def _stream_value_map(
         for index, stream in enumerate(stream_order)
         if index < len(values) and _finite(values[index])
     }
+
+
+def _period_stream_value_map(
+    network: HeatExchangerNetwork,
+    axis_name: str,
+    *,
+    metadata: dict,
+    period_id: str,
+    scalar_key: str,
+    period_key: str,
+) -> dict[str, float]:
+    period_values = metadata.get(period_key)
+    if isinstance(period_values, list | tuple):
+        period_idx = network.period_ids.index(period_id)
+        if period_idx < len(period_values):
+            return _stream_value_map(network, axis_name, period_values[period_idx])
+    return _stream_value_map(network, axis_name, metadata.get(scalar_key))
 
 
 def _stream_order(
@@ -605,15 +664,15 @@ def _heat_added(
     return heat_capacity_flowrate * (outlet_temperature - inlet_temperature)
 
 
-def _recovery_terminal_approaches(exchanger: HeatExchanger) -> tuple[float, ...]:
+def _recovery_terminal_approaches(state) -> tuple[float, ...]:
     values = (
         _temperature_difference(
-            exchanger.source_inlet_temperature,
-            exchanger.sink_outlet_temperature,
+            state.source_inlet_temperature,
+            state.sink_outlet_temperature,
         ),
         _temperature_difference(
-            exchanger.source_outlet_temperature,
-            exchanger.sink_inlet_temperature,
+            state.source_outlet_temperature,
+            state.sink_inlet_temperature,
         ),
     )
     return tuple(value for value in values if value is not None)
@@ -630,16 +689,17 @@ def _temperature_difference(
 
 def _duty_failure(
     exchanger: HeatExchanger,
+    state,
     side: str,
     expected: float | None,
 ) -> list[str]:
     if expected is None:
         return []
-    if _close(expected, exchanger.duty, abs_tol=_DUTY_ABS_TOL):
+    if _close(expected, state.duty, abs_tol=_DUTY_ABS_TOL):
         return []
     return [
         f"{exchanger.exchanger_id or exchanger.kind.value} {side} heat balance "
-        f"{expected:.6g} does not match duty {exchanger.duty:.6g}"
+        f"{expected:.6g} does not match duty {state.duty:.6g}"
     ]
 
 

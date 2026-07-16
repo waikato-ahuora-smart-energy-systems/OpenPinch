@@ -7,7 +7,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
+from OpenPinch.classes import (
+    HeatExchanger,
+    HeatExchangerKind,
+    HeatExchangerNetwork,
+    HeatExchangerPeriodState,
+    HeatExchangerStreamRole,
+)
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisExportRecord,
@@ -247,6 +253,29 @@ def test_export_ranking_and_result_summary_edge_paths(monkeypatch, tmp_path: Pat
     with pytest.raises(RuntimeError, match="Run problem.design"):
         exports.export_heat_exchanger_network_synthesis_results(problem, tmp_path)
 
+    multiperiod_network = HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                exchanger_id="H1-C1-1",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
+                    HeatExchangerPeriodState(period_id="peak", period_idx=1, duty=20.0),
+                ),
+            ),
+        )
+    )
+    problem._results = SimpleNamespace(
+        design=SimpleNamespace(network=multiperiod_network)
+    )
+    with pytest.raises(ValueError, match="period_id is required"):
+        exports.export_heat_exchanger_network_synthesis_results(problem, tmp_path)
+
     design = SimpleNamespace(
         manifest=None,
         run_id="run-1",
@@ -263,6 +292,7 @@ def test_export_ranking_and_result_summary_edge_paths(monkeypatch, tmp_path: Pat
                 path="manifest.json",
             ),
         ),
+        period_id="annual",
         problem_id="problem-1",
         workspace_variant="baseline",
     )

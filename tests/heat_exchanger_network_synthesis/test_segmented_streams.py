@@ -646,7 +646,7 @@ def test_extraction_retains_one_parent_exchanger_with_segment_area_details():
     exchanger = network.exchangers[0]
     assert exchanger.source_stream.endswith("Hot parent")
     assert exchanger.sink_stream.endswith("Cold parent")
-    assert exchanger.duty == pytest.approx(120.0)
+    assert exchanger.state().duty == pytest.approx(120.0)
     assert exchanger.area == pytest.approx(3.6630468947)
     assert len(exchanger.segment_area_contributions) == 3
 

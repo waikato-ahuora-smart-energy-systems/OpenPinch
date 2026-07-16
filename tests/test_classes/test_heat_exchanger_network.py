@@ -11,6 +11,7 @@ from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerNetwork,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from OpenPinch.lib.enums import HeatExchangerNetworkLabel as HEN
@@ -22,6 +23,7 @@ def _recovery_exchanger(
     *,
     stage: int = 1,
     duty: float = 100.0,
+    period_states: tuple[HeatExchangerPeriodState, ...] | None = None,
 ) -> HeatExchanger:
     return HeatExchanger(
         exchanger_id=f"{source}-{sink}-{stage}",
@@ -31,16 +33,21 @@ def _recovery_exchanger(
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=stage,
-        duty=duty,
+        period_states=period_states
+        or (
+            HeatExchangerPeriodState(
+                period_id="base",
+                period_idx=0,
+                duty=duty,
+                approach_temperatures=(12.0, 8.0),
+                source_inlet_temperature=180.0,
+                source_outlet_temperature=120.0,
+                sink_inlet_temperature=60.0,
+                sink_outlet_temperature=110.0,
+            ),
+        ),
         area=25.0,
-        approach_temperatures=(12.0, 8.0),
-        source_inlet_temperature=180.0,
-        source_outlet_temperature=120.0,
-        sink_inlet_temperature=60.0,
-        sink_outlet_temperature=110.0,
         capital_cost=5000.0,
-        operating_cost=200.0,
-        total_annual_cost=5200.0,
         solver_metadata={"array": "Q_r", "i": 0, "j": 0, "k": stage - 1},
     )
 
@@ -52,7 +59,9 @@ def _hot_utility_exchanger() -> HeatExchanger:
         sink_stream="C1",
         source_stream_role=HeatExchangerStreamRole.UTILITY,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
-        duty=30.0,
+        period_states=(
+            HeatExchangerPeriodState(period_id="base", period_idx=0, duty=30.0),
+        ),
         area=8.0,
     )
 
@@ -64,7 +73,9 @@ def _cold_utility_exchanger() -> HeatExchanger:
         sink_stream="CoolingWater",
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.UTILITY,
-        duty=20.0,
+        period_states=(
+            HeatExchangerPeriodState(period_id="base", period_idx=0, duty=20.0),
+        ),
         area=5.0,
     )
 
@@ -74,8 +85,8 @@ def test_heat_exchanger_serialization_round_trip_excludes_solver_metadata():
 
     round_tripped = HeatExchanger.model_validate_json(exchanger.model_dump_json())
 
-    assert exchanger.source_mid_temperature == pytest.approx(150.0)
-    assert exchanger.sink_mid_temperature == pytest.approx(85.0)
+    assert exchanger.state().source_mid_temperature == pytest.approx(150.0)
+    assert exchanger.state().sink_mid_temperature == pytest.approx(85.0)
     assert round_tripped == exchanger.model_copy(
         update={"solver_metadata": {}, "source_metadata": {}}
     )
@@ -83,26 +94,23 @@ def test_heat_exchanger_serialization_round_trip_excludes_solver_metadata():
     assert "source_metadata" not in exchanger.model_dump()
 
 
-def test_heat_exchanger_preserves_explicit_mid_temperatures():
-    exchanger = HeatExchanger(
-        exchanger_id="explicit-midpoints",
-        kind=HeatExchangerKind.RECOVERY,
-        source_stream="H1",
-        sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
-        stage=1,
-        duty=100.0,
-        source_inlet_temperature=180.0,
-        source_outlet_temperature=120.0,
-        source_mid_temperature=155.0,
-        sink_inlet_temperature=60.0,
-        sink_outlet_temperature=110.0,
-        sink_mid_temperature=82.0,
-    )
-
-    assert exchanger.source_mid_temperature == pytest.approx(155.0)
-    assert exchanger.sink_mid_temperature == pytest.approx(82.0)
+def test_heat_exchanger_rejects_retired_scalar_operating_fields():
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        HeatExchanger(
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="Steam",
+            sink_stream="C1",
+            source_stream_role=HeatExchangerStreamRole.UTILITY,
+            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            period_states=(
+                HeatExchangerPeriodState(
+                    period_id="base",
+                    period_idx=0,
+                    duty=10.0,
+                ),
+            ),
+            duty=10.0,
+        )
 
 
 def test_heat_exchanger_does_not_infer_mid_temperature_from_one_endpoint():
@@ -114,17 +122,23 @@ def test_heat_exchanger_does_not_infer_mid_temperature_from_one_endpoint():
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=1,
-        duty=100.0,
-        source_inlet_temperature=180.0,
-        sink_outlet_temperature=110.0,
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="base",
+                period_idx=0,
+                duty=100.0,
+                source_inlet_temperature=180.0,
+                sink_outlet_temperature=110.0,
+            ),
+        ),
     )
 
-    assert exchanger.source_mid_temperature is None
-    assert exchanger.sink_mid_temperature is None
+    assert exchanger.state().source_mid_temperature is None
+    assert exchanger.state().sink_mid_temperature is None
 
-    exchanger.source_outlet_temperature = 120.0
+    exchanger.period_states[0].source_outlet_temperature = 120.0
 
-    assert exchanger.source_mid_temperature == pytest.approx(150.0)
+    assert exchanger.state().source_mid_temperature == pytest.approx(150.0)
 
 
 def test_heat_exchanger_direction_semantics_are_enforced():
@@ -136,7 +150,9 @@ def test_heat_exchanger_direction_semantics_are_enforced():
             source_stream_role=HeatExchangerStreamRole.UTILITY,
             sink_stream_role=HeatExchangerStreamRole.PROCESS,
             stage=1,
-            duty=10.0,
+            period_states=(
+                HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
+            ),
         )
 
     with pytest.raises(ValidationError, match="recovery exchangers must include"):
@@ -146,39 +162,42 @@ def test_heat_exchanger_direction_semantics_are_enforced():
             sink_stream="C1",
             source_stream_role=HeatExchangerStreamRole.PROCESS,
             sink_stream_role=HeatExchangerStreamRole.PROCESS,
-            duty=10.0,
+            period_states=(
+                HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
+            ),
         )
 
 
 def test_heat_exchanger_validators_reject_invalid_edge_values():
     assert HeatExchanger._validate_identity(None) is None
-    assert HeatExchanger._validate_finite_temperature(None) is None
+    assert HeatExchangerPeriodState._validate_finite_temperature(None) is None
 
     with pytest.raises(ValidationError, match="non-empty strings"):
         _recovery_exchanger(source=" ")
     with pytest.raises(ValidationError, match="positive integer"):
         _recovery_exchanger(stage=0)
     with pytest.raises(ValidationError, match="finite and non-negative"):
-        _recovery_exchanger(duty=-1.0)
+        HeatExchangerPeriodState(period_id="base", period_idx=0, duty=-1.0)
     with pytest.raises(ValidationError, match="temperatures must be finite"):
-        HeatExchanger(
-            kind=HeatExchangerKind.HOT_UTILITY,
-            source_stream="Steam",
-            sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.UTILITY,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        HeatExchangerPeriodState(
+            period_id="base",
+            period_idx=0,
             duty=10.0,
             source_inlet_temperature=float("inf"),
         )
     with pytest.raises(ValidationError, match="approach temperatures"):
-        HeatExchanger(
-            kind=HeatExchangerKind.HOT_UTILITY,
-            source_stream="Steam",
-            sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.UTILITY,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        HeatExchangerPeriodState(
+            period_id="base",
+            period_idx=0,
             duty=10.0,
             approach_temperatures=(-1.0,),
+        )
+    with pytest.raises(ValidationError, match="split fractions"):
+        HeatExchangerPeriodState(
+            period_id="base",
+            period_idx=0,
+            duty=10.0,
+            source_split_fraction=1.1,
         )
     with pytest.raises(ValidationError, match="must be distinct"):
         _recovery_exchanger(source="H1", sink="H1")
@@ -222,11 +241,15 @@ def test_heat_exchanger_network_delegates_grid_and_controllability(monkeypatch):
     assert network.quantify_controllability(mode="steady") == {"rank": 1}
     assert calls["grid_network"] is network
     assert calls["grid_kwargs"] == {
+        "period_id": "base",
         "stream_line_width": 7.0,
         "temperature_scaled": False,
     }
     assert calls["controllability_network"] is network
-    assert calls["controllability_kwargs"] == {"mode": "steady"}
+    assert calls["controllability_kwargs"] == {
+        "mode": "steady",
+        "period_id": "base",
+    }
 
 
 def test_heat_exchanger_network_labelled_access_and_totals():
@@ -309,6 +332,94 @@ def test_heat_exchanger_network_labelled_access_and_totals():
     assert "solver_axis_metadata" not in network.model_dump()
 
 
+def test_multiperiod_queries_require_explicit_period_identity():
+    exchanger = _recovery_exchanger(
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="base",
+                period_idx=0,
+                duty=0.0,
+                active=False,
+                source_inlet_temperature=180.0,
+                source_outlet_temperature=180.0,
+                sink_inlet_temperature=60.0,
+                sink_outlet_temperature=60.0,
+            ),
+            HeatExchangerPeriodState(
+                period_id="peak",
+                period_idx=1,
+                duty=125.0,
+                active=True,
+                approach_temperatures=(15.0, 10.0),
+                source_split_fraction=0.5,
+                sink_split_fraction=0.4,
+                source_inlet_temperature=190.0,
+                source_outlet_temperature=130.0,
+                sink_inlet_temperature=70.0,
+                sink_outlet_temperature=120.0,
+            ),
+        )
+    )
+    network = HeatExchangerNetwork(exchangers=(exchanger,))
+
+    assert (
+        HeatExchanger.model_validate_json(exchanger.model_dump_json()).model_dump()
+        == exchanger.model_dump()
+    )
+    assert exchanger.state("peak").duty == pytest.approx(125.0)
+    assert exchanger.state("peak").source_split_fraction == pytest.approx(0.5)
+    assert exchanger.state("peak").sink_split_fraction == pytest.approx(0.4)
+    assert network.total_duty(period_id="base") == pytest.approx(0.0)
+    assert network.total_duty(period_id="peak") == pytest.approx(125.0)
+    assert network.labelled_value(
+        HEN.MATCH_ACTIVE,
+        source_stream="H1",
+        sink_stream="C1",
+        stage=1,
+        period_id="peak",
+    )
+    with pytest.raises(ValueError, match="period_id is required"):
+        exchanger.state()
+    with pytest.raises(ValueError, match="period_id is required"):
+        network.total_duty()
+    with pytest.raises(ValueError, match="period_id is required"):
+        network.build_grid_diagram()
+    with pytest.raises(ValueError, match="period_id is required"):
+        network.quantify_controllability()
+
+
+def test_period_states_reject_out_of_order_or_duplicate_identities():
+    with pytest.raises(ValidationError, match="ordered by contiguous period_idx"):
+        _recovery_exchanger(
+            period_states=(
+                HeatExchangerPeriodState(period_id="peak", period_idx=1, duty=1.0),
+            )
+        )
+
+    with pytest.raises(ValidationError, match="same ordered period_ids"):
+        HeatExchangerNetwork(
+            exchangers=(
+                _recovery_exchanger("H1", "C1"),
+                _recovery_exchanger(
+                    "H2",
+                    "C2",
+                    period_states=(
+                        HeatExchangerPeriodState(
+                            period_id="peak", period_idx=0, duty=2.0
+                        ),
+                    ),
+                ),
+            )
+        )
+    with pytest.raises(ValidationError, match="unique period_id"):
+        _recovery_exchanger(
+            period_states=(
+                HeatExchangerPeriodState(period_id="base", period_idx=0, duty=1.0),
+                HeatExchangerPeriodState(period_id="base", period_idx=1, duty=2.0),
+            )
+        )
+
+
 def test_heat_exchanger_network_rejects_ambiguous_or_incompatible_labels():
     duplicate_network = HeatExchangerNetwork(
         exchangers=(
@@ -335,7 +446,7 @@ def test_heat_exchanger_network_rejects_ambiguous_or_incompatible_labels():
 
 def test_heat_exchanger_network_totals_honour_active_stream_stage_and_none_values():
     inactive = _recovery_exchanger("H2", "C2", stage=2, duty=80.0)
-    inactive.active = False
+    inactive.period_states[0].active = False
     no_area = _recovery_exchanger("H3", "C3", stage=3, duty=10.0)
     no_area.area = None
     network = HeatExchangerNetwork(

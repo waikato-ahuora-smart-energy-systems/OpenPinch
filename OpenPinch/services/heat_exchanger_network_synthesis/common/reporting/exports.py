@@ -18,6 +18,7 @@ def export_heat_exchanger_network_synthesis_results(
     output_dir: str | Path,
     *,
     workspace_variant: str | None = None,
+    period_id: str | None = None,
 ) -> HeatExchangerNetworkSynthesisManifest:
     """Write optional JSON/CSV views from one problem-owned design result."""
     if not isinstance(problem, PinchProblem):
@@ -30,6 +31,7 @@ def export_heat_exchanger_network_synthesis_results(
         )
 
     design = problem.results.design
+    resolved_period_id = design.network.resolve_period_id(period_id)
     root = Path(output_dir)
     results_dir = root / "results"
     metrics_dir = root / "metrics"
@@ -103,6 +105,7 @@ def export_heat_exchanger_network_synthesis_results(
         records=tuple(records),
         problem_id=design.problem_id or problem.project_name,
         workspace_variant=workspace_variant or design.workspace_variant,
+        period_id=resolved_period_id,
     )
     manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
     return manifest
@@ -114,6 +117,7 @@ def _manifest_with_export_records(
     records: tuple[HeatExchangerNetworkSynthesisExportRecord, ...],
     problem_id: str | None,
     workspace_variant: str | None,
+    period_id: str | None,
 ) -> HeatExchangerNetworkSynthesisManifest:
     base = design.manifest
     if base is None:
@@ -129,14 +133,14 @@ def _manifest_with_export_records(
             ),
             problem_id=problem_id,
             workspace_variant=workspace_variant,
-            period_id=design.period_id,
+            period_id=period_id,
             export_records=records,
         )
     return base.model_copy(
         update={
             "problem_id": problem_id,
             "workspace_variant": workspace_variant,
-            "period_id": design.period_id,
+            "period_id": period_id,
             "export_records": records,
         }
     )

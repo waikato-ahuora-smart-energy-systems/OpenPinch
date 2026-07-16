@@ -378,8 +378,8 @@ def test_public_design_accessor_returns_ranked_networks(
     assert helper.total_cold_utility == selected_network.total_duty(
         kind=HeatExchangerKind.COLD_UTILITY
     )
-    assert helper.utility(hot_utility.source_stream) == hot_utility.duty
-    assert helper.utility(cold_utility.sink_stream) == cold_utility.duty
+    assert helper.utility(hot_utility.source_stream) == hot_utility.state().duty
+    assert helper.utility(cold_utility.sink_stream) == cold_utility.state().duty
     assert helper.utility(hot_utility.sink_stream) == 0.0
     with pytest.raises(ValueError, match="utility name"):
         helper.utility("")

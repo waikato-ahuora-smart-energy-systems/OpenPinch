@@ -118,3 +118,42 @@ Verification for this unit:
 - Security Baseline: disabled; not enforced.
 - Resiliency Baseline: disabled; not enforced.
 - Property-Based Testing (Partial): compliant through domain-specific generators, bounded examples, shrinking, deterministic CI seeds, serialization and continuity invariants, target parity, and area-slice invariants.
+
+## Pre-Release Period-Native HEN Results
+
+Heat exchanger operating results now use non-empty, ordered
+`HeatExchangerPeriodState` records. Each state carries period identity, duty,
+activity, approach temperatures, split fractions, and source/sink inlet and
+outlet temperatures. `HeatExchanger` retains only shared topology, area, and
+capital design data. Multiperiod network totals, labels, diagrams, exports, and
+controllability queries require an explicit period; omission remains valid only
+for a single-period result.
+
+Recovery and utility extraction now traverses every solver period, retains
+matches that are active only after the first period, and prefers explicit
+non-isothermal branch temperatures. Shared exchanger topology is derived from
+any-period activity. Verification applies period-specific heat-capacity data
+and split fractions when checking explicit branch temperatures. Small negative
+solver duties within the established numerical tolerance are normalized to
+zero, while materially negative duties remain invalid.
+
+All internal consumers, serialized schemas, diagram rendering, exports,
+ranking, controllability analysis, the packaged HEN notebook, tests, and public
+documentation use the period-native result contract. No scalar operating-data
+aliases or period-zero compatibility fields were retained.
+
+Verification for this unit:
+
+- Focused result, extraction, diagram, export, controllability, and area tests
+  passed: 307 tests with nine intentional deselections, plus 52 reporting tests
+  and 25 focused controllability/thermal tests.
+- The complete non-solver repository suite passed: 1,999 tests with four
+  solver-marked cases deselected.
+- The solver-marked suite passed three tests with one intentional skip, and the
+  canonical Four-stream live-solver baseline passed.
+- The canonical tier 0/1 benchmark produced twelve accepted networks. The
+  Nine-stream and Six-stream Yee tier 1 cases reached their bounded solve
+  timeouts; neither solver invocation returned a result for extraction. The
+  complete solver-marked correctness matrix remained green.
+- Repository Ruff lint, changed-file formatting, notebook JSON validation,
+  warning-free Sphinx, wheel/sdist packaging, and `git diff --check` passed.

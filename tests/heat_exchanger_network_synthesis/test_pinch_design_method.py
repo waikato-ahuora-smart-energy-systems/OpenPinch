@@ -45,6 +45,9 @@ from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.execut
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
     workflow_settings_from_problem,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.verification import (
+    verify_network_feasibility,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
     arrays as arrays_module,
 )
@@ -1539,13 +1542,13 @@ def test_extraction_converts_solver_arrays_to_identity_labelled_network() -> Non
         kind=HeatExchangerKind.RECOVERY,
     )
     assert recovery is not None
-    assert recovery.duty == 10.0
+    assert recovery.state().duty == 10.0
     assert recovery.area == 1.5
-    assert recovery.source_inlet_temperature == 650.0
-    assert recovery.source_outlet_temperature == 620.0
-    assert recovery.sink_inlet_temperature == 420.0
-    assert recovery.sink_outlet_temperature == 450.0
-    assert recovery.approach_temperatures == (200.0, 170.0)
+    assert recovery.state().source_inlet_temperature == 650.0
+    assert recovery.state().source_outlet_temperature == 620.0
+    assert recovery.state().sink_inlet_temperature == 420.0
+    assert recovery.state().sink_outlet_temperature == 450.0
+    assert recovery.state().approach_temperatures == (200.0, 170.0)
 
     hot_utility = network.exchanger_between(
         source_stream="hot-utility",
@@ -1559,8 +1562,8 @@ def test_extraction_converts_solver_arrays_to_identity_labelled_network() -> Non
     )
     assert hot_utility is not None
     assert cold_utility is not None
-    assert hot_utility.duty == 5.0
-    assert cold_utility.duty == 3.0
+    assert hot_utility.state().duty == 5.0
+    assert cold_utility.state().duty == 3.0
     assert network.total_duty(kind=HeatExchangerKind.RECOVERY) == 30.0
     assert network.summary_metrics == {
         "total_units": 4,
@@ -1589,6 +1592,79 @@ def test_extraction_converts_solver_arrays_to_identity_labelled_network() -> Non
     ]
     assert network.source_metadata["hot_utility_heat_transfer_coefficients"] == [5.0]
     assert network.source_metadata["cold_utility_heat_transfer_coefficients"] == [6.0]
+
+
+def test_extraction_retains_later_period_only_match_and_explicit_branch_states() -> (
+    None
+):
+    zero_match_grid = [[[0.0], [0.0]], [[0.0], [0.0]]]
+    peak_match_grid = [[[40.0], [0.0]], [[0.0], [0.0]]]
+    zero_hot_branch = [[[0.0], [0.0]], [[0.0], [0.0]]]
+    peak_hot_branch = [[[470.0], [0.0]], [[0.0], [0.0]]]
+    zero_cold_branch = [[[0.0], [0.0]], [[0.0], [0.0]]]
+    peak_cold_branch = [[[360.0], [0.0]], [[0.0], [0.0]]]
+    solved = SimpleNamespace(
+        N_periods=2,
+        period_ids=["base", "peak"],
+        period_weights=[1.0, 2.0],
+        S=1,
+        Q_r_by_period=[zero_match_grid, peak_match_grid],
+        Q_h_by_period=[[0.0, 0.0], [0.0, 0.0]],
+        Q_c_by_period=[[0.0, 0.0], [0.0, 0.0]],
+        Q_r=zero_match_grid,
+        Q_h=[0.0, 0.0],
+        Q_c=[0.0, 0.0],
+        z=[[[1.0], [0.0]], [[0.0], [0.0]]],
+        z_hu=[0.0, 0.0],
+        z_cu=[0.0, 0.0],
+        z_allowed=[[[1.0], [0.0]], [[0.0], [0.0]]],
+        z_hu_allowed=[1.0, 1.0],
+        z_cu_allowed=[1.0, 1.0],
+        T_h_by_period=[
+            [[500.0, 450.0], [480.0, 430.0]],
+            [[500.0, 450.0], [480.0, 430.0]],
+        ],
+        T_c_by_period=[
+            [[350.0, 300.0], [340.0, 290.0]],
+            [[350.0, 300.0], [340.0, 290.0]],
+        ],
+        T_h_out_x_by_period=[zero_hot_branch, peak_hot_branch],
+        T_c_out_y_by_period=[zero_cold_branch, peak_cold_branch],
+        X_by_period=[zero_match_grid, [[[40.0 / 300.0], [0.0]], [[0.0], [0.0]]]],
+        Y_by_period=[zero_match_grid, [[[40.0 / 600.0], [0.0]], [[0.0], [0.0]]]],
+        theta_1_by_period=[zero_match_grid, [[[140.0], [0.0]], [[0.0], [0.0]]]],
+        theta_2_by_period=[zero_match_grid, [[[110.0], [0.0]], [[0.0], [0.0]]]],
+        f_h_period=[[10.0, 10.0], [10.0, 10.0]],
+        f_c_period=[[10.0, 10.0], [10.0, 10.0]],
+        T_hu_in_period=[[700.0], [700.0]],
+        T_hu_out_period=[[680.0], [680.0]],
+        T_cu_in_period=[[280.0], [280.0]],
+        T_cu_out_period=[[300.0], [300.0]],
+        T_h_out_period=[[450.0, 430.0], [450.0, 430.0]],
+        T_c_out_period=[[350.0, 340.0], [350.0, 340.0]],
+    )
+
+    network = extract_heat_exchanger_network(
+        solved,
+        _solver_arrays(),
+        run_id="later-only",
+    )
+
+    assert len(network.exchangers) == 1
+    exchanger = network.exchangers[0]
+    assert exchanger.period_ids == ("base", "peak")
+    assert exchanger.state("base").active is False
+    assert exchanger.state("base").duty == pytest.approx(0.0)
+    assert exchanger.state("peak").active is True
+    assert exchanger.state("peak").duty == pytest.approx(40.0)
+    assert exchanger.state("peak").source_outlet_temperature == pytest.approx(470.0)
+    assert exchanger.state("peak").sink_outlet_temperature == pytest.approx(360.0)
+    assert exchanger.state("peak").source_split_fraction == pytest.approx(40.0 / 300.0)
+    assert exchanger.state("peak").sink_split_fraction == pytest.approx(40.0 / 600.0)
+    assert network.total_duty(period_id="peak") == pytest.approx(40.0)
+    assert not any(
+        "heat balance" in failure for failure in verify_network_feasibility(network)
+    )
 
 
 def test_internal_problem_result_serializes_without_solver_arrays() -> None:
@@ -2431,6 +2507,9 @@ def test_extraction_private_helpers_cover_temperature_and_metadata_edges() -> No
         == 22.0
     )
     assert extraction_module._allowed(None) is True
+    assert extraction_module._normalized_solver_duty(-1e-5, tolerance=1e-6) == 0.0
+    with pytest.raises(ValueError, match="below zero beyond tolerance"):
+        extraction_module._normalized_solver_duty(-1e-3, tolerance=1e-6)
     assert extraction_module._third_dimension(1.0) == 0
     assert extraction_module._index([[1.0]], None) is None
 

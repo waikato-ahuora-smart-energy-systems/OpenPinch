@@ -39,3 +39,19 @@ Period-native PDM and utility constraints
 - Segmented utilities use local per-segment ``dt_cont`` values. The inlet uses
   the first segment contribution, the solved match outlet uses the traversed
   segment contribution, and an exact boundary uses the larger adjacent value.
+
+Period-native HEN results
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``HeatExchanger`` retains shared topology, design area, and capital fields.
+  Operational duty, activity, approaches, split fractions, and source/sink
+  temperatures are stored in non-empty ordered ``period_states`` containing
+  ``HeatExchangerPeriodState`` records.
+- The retired exchanger-level operating scalar fields do not exist. Use
+  ``exchanger.state(period_id)``; omission is accepted only for an exchanger
+  with exactly one period state.
+- Multiperiod duty, temperature, diagram, export, and controllability queries
+  require ``period_id``. No implicit period-zero selection is provided.
+- Extraction walks every period array, retains matches active only outside the
+  first period, and prefers explicit non-isothermal branch outlet temperatures.
+  Solved branch split fractions keep downstream duty checks physically valid.

@@ -10,6 +10,7 @@ import numpy as np
 from .....classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
@@ -21,6 +22,8 @@ from .piecewise import (
     duty_aligned_area_contributions,
     profile_from_solver_arrays,
 )
+
+_SOLVER_NEGATIVE_DUTY_NOISE = 1e-4
 
 
 def extract_heat_exchanger_network(
@@ -42,6 +45,7 @@ def extract_heat_exchanger_network(
     hot_utilities = _identities_by_axis(solver_arrays, "hot_utilities")
     cold_utilities = _identities_by_axis(solver_arrays, "cold_utilities")
     stage_total = stage_count or _optional_int(getattr(solved_model, "S", None))
+    period_ids = _period_ids(solved_model, solver_arrays)
 
     exchangers: list[HeatExchanger] = []
     exchangers.extend(
@@ -51,6 +55,7 @@ def extract_heat_exchanger_network(
             hot_streams=hot_streams,
             cold_streams=cold_streams,
             stage_total=stage_total,
+            period_ids=period_ids,
             tolerance=tolerance,
             include_inactive=include_inactive,
         )
@@ -60,6 +65,7 @@ def extract_heat_exchanger_network(
             solved_model,
             hot_utility=_single_utility(hot_utilities, "hot utility"),
             cold_streams=cold_streams,
+            period_ids=period_ids,
             tolerance=tolerance,
             include_inactive=include_inactive,
         )
@@ -69,6 +75,7 @@ def extract_heat_exchanger_network(
             solved_model,
             cold_utility=_single_utility(cold_utilities, "cold utility"),
             hot_streams=hot_streams,
+            period_ids=period_ids,
             tolerance=tolerance,
             include_inactive=include_inactive,
         )
@@ -122,8 +129,14 @@ def extract_heat_exchanger_network(
             "hot_stream_heat_capacity_flowrates": _float_list(
                 getattr(solved_model, "f_h", None)
             ),
+            "hot_stream_heat_capacity_flowrates_by_period": _float_matrix(
+                getattr(solved_model, "f_h_period", None)
+            ),
             "cold_stream_heat_capacity_flowrates": _float_list(
                 getattr(solved_model, "f_c", None)
+            ),
+            "cold_stream_heat_capacity_flowrates_by_period": _float_matrix(
+                getattr(solved_model, "f_c_period", None)
             ),
             "hot_stream_heat_transfer_coefficients": _float_list(
                 getattr(solved_model, "htc_h", None)
@@ -233,24 +246,38 @@ def _recovery_exchangers(
     hot_streams: tuple[str, ...],
     cold_streams: tuple[str, ...],
     stage_total: int | None,
+    period_ids: tuple[str, ...],
     tolerance: float,
     include_inactive: bool,
 ) -> tuple[HeatExchanger, ...]:
     q_values = getattr(solved_model, "Q_r", None)
-    if q_values is None:
+    q_values_by_period = getattr(solved_model, "Q_r_by_period", None)
+    if q_values is None and q_values_by_period is None:
         return ()
-    stages = stage_total or _third_dimension(q_values)
+    stages = stage_total or _optional_int(getattr(solved_model, "S", None))
+    if stages is None:
+        stages = _third_dimension(q_values)
+    if not stages and q_values_by_period is not None:
+        stages = _third_dimension(_index(q_values_by_period, 0))
     exchangers: list[HeatExchanger] = []
     for i, hot_stream in enumerate(hot_streams):
         for j, cold_stream in enumerate(cold_streams):
             for k in range(stages):
-                duty = _optional_float(_index(q_values, i, j, k)) or 0.0
-                active = _is_active(
-                    duty,
-                    _index(getattr(solved_model, "z", None), i, j, k),
-                    tolerance,
+                states = tuple(
+                    _recovery_period_state(
+                        solved_model,
+                        period_id=period_id,
+                        period_idx=period_idx,
+                        hot_index=i,
+                        cold_index=j,
+                        stage_index=k,
+                        q_values=q_values,
+                        q_values_by_period=q_values_by_period,
+                        tolerance=tolerance,
+                    )
+                    for period_idx, period_id in enumerate(period_ids)
                 )
-                if not active and not include_inactive:
+                if not any(state.active for state in states) and not include_inactive:
                     continue
                 stage = k + 1
                 segment_contributions = _recovery_segment_contributions(
@@ -275,42 +302,111 @@ def _recovery_exchangers(
                         source_stream_role=HeatExchangerStreamRole.PROCESS,
                         sink_stream_role=HeatExchangerStreamRole.PROCESS,
                         stage=stage,
-                        duty=duty,
+                        period_states=states,
                         area=aggregate_area,
                         segment_area_contributions=segment_contributions,
-                        active=active,
                         match_allowed=_allowed(
                             _index(getattr(solved_model, "z_allowed", None), i, j, k)
-                        ),
-                        approach_temperatures=_approach_temperatures(
-                            solved_model,
-                            i,
-                            j,
-                            k,
-                        ),
-                        source_inlet_temperature=_optional_float(
-                            _index(getattr(solved_model, "T_h", None), i, k)
-                        ),
-                        source_outlet_temperature=_hot_recovery_outlet(
-                            solved_model,
-                            i,
-                            j,
-                            k,
-                            duty,
-                        ),
-                        sink_inlet_temperature=_optional_float(
-                            _index(getattr(solved_model, "T_c", None), j, k + 1)
-                        ),
-                        sink_outlet_temperature=_cold_recovery_outlet(
-                            solved_model,
-                            i,
-                            j,
-                            k,
-                            duty,
                         ),
                     )
                 )
     return tuple(exchangers)
+
+
+def _recovery_period_state(
+    solved_model: Any,
+    *,
+    period_id: str,
+    period_idx: int,
+    hot_index: int,
+    cold_index: int,
+    stage_index: int,
+    q_values: Any,
+    q_values_by_period: Any,
+    tolerance: float,
+) -> HeatExchangerPeriodState:
+    duty_source = (
+        _index(
+            q_values_by_period,
+            period_idx,
+            hot_index,
+            cold_index,
+            stage_index,
+        )
+        if q_values_by_period is not None
+        else _index(q_values, hot_index, cold_index, stage_index)
+    )
+    duty = _normalized_solver_duty(duty_source, tolerance=tolerance)
+    active = _is_active(
+        duty,
+        _index(getattr(solved_model, "z", None), hot_index, cold_index, stage_index),
+        tolerance,
+    )
+    hot_boundaries = getattr(solved_model, "T_h_by_period", None)
+    cold_boundaries = getattr(solved_model, "T_c_by_period", None)
+    source_inlet = _optional_float(
+        _index(hot_boundaries, period_idx, hot_index, stage_index)
+        if hot_boundaries is not None
+        else _index(getattr(solved_model, "T_h", None), hot_index, stage_index)
+    )
+    sink_inlet = _optional_float(
+        _index(cold_boundaries, period_idx, cold_index, stage_index + 1)
+        if cold_boundaries is not None
+        else _index(
+            getattr(solved_model, "T_c", None),
+            cold_index,
+            stage_index + 1,
+        )
+    )
+    return HeatExchangerPeriodState(
+        period_id=period_id,
+        period_idx=period_idx,
+        duty=duty,
+        active=active,
+        approach_temperatures=_approach_temperatures(
+            solved_model,
+            hot_index,
+            cold_index,
+            stage_index,
+            period_idx=period_idx,
+        ),
+        source_split_fraction=_recovery_split_fraction(
+            solved_model,
+            side="hot",
+            period_idx=period_idx,
+            hot_index=hot_index,
+            cold_index=cold_index,
+            stage_index=stage_index,
+            tolerance=tolerance,
+        ),
+        sink_split_fraction=_recovery_split_fraction(
+            solved_model,
+            side="cold",
+            period_idx=period_idx,
+            hot_index=hot_index,
+            cold_index=cold_index,
+            stage_index=stage_index,
+            tolerance=tolerance,
+        ),
+        source_inlet_temperature=source_inlet,
+        source_outlet_temperature=_hot_recovery_outlet(
+            solved_model,
+            hot_index,
+            cold_index,
+            stage_index,
+            duty,
+            period_idx=period_idx,
+        ),
+        sink_inlet_temperature=sink_inlet,
+        sink_outlet_temperature=_cold_recovery_outlet(
+            solved_model,
+            hot_index,
+            cold_index,
+            stage_index,
+            duty,
+            period_idx=period_idx,
+        ),
+    )
 
 
 def _recovery_segment_contributions(
@@ -426,21 +522,29 @@ def _hot_utility_exchangers(
     *,
     hot_utility: str,
     cold_streams: tuple[str, ...],
+    period_ids: tuple[str, ...],
     tolerance: float,
     include_inactive: bool,
 ) -> tuple[HeatExchanger, ...]:
     q_values = getattr(solved_model, "Q_h", None)
-    if q_values is None:
+    q_values_by_period = getattr(solved_model, "Q_h_by_period", None)
+    if q_values is None and q_values_by_period is None:
         return ()
     exchangers: list[HeatExchanger] = []
     for j, cold_stream in enumerate(cold_streams):
-        duty = _optional_float(_index(q_values, j)) or 0.0
-        active = _is_active(
-            duty,
-            _index(getattr(solved_model, "z_hu", None), j),
-            tolerance,
+        states = tuple(
+            _hot_utility_period_state(
+                solved_model,
+                period_id=period_id,
+                period_idx=period_idx,
+                cold_index=j,
+                q_values=q_values,
+                q_values_by_period=q_values_by_period,
+                tolerance=tolerance,
+            )
+            for period_idx, period_id in enumerate(period_ids)
         )
-        if not active and not include_inactive:
+        if not any(state.active for state in states) and not include_inactive:
             continue
         segment_contributions = _model_utility_segment_contributions(
             solved_model,
@@ -458,28 +562,78 @@ def _hot_utility_exchangers(
                 sink_stream=cold_stream,
                 source_stream_role=HeatExchangerStreamRole.UTILITY,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
-                duty=duty,
+                period_states=states,
                 area=area,
                 segment_area_contributions=segment_contributions,
-                active=active,
                 match_allowed=_allowed(
                     _index(getattr(solved_model, "z_hu_allowed", None), j)
-                ),
-                source_inlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_hu_in", None), 0)
-                ),
-                source_outlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_hu_out", None), 0)
-                ),
-                sink_inlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_c", None), j, 0)
-                ),
-                sink_outlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_c_out", None), j)
                 ),
             )
         )
     return tuple(exchangers)
+
+
+def _hot_utility_period_state(
+    solved_model: Any,
+    *,
+    period_id: str,
+    period_idx: int,
+    cold_index: int,
+    q_values: Any,
+    q_values_by_period: Any,
+    tolerance: float,
+) -> HeatExchangerPeriodState:
+    duty = _normalized_solver_duty(
+        _index(q_values_by_period, period_idx, cold_index)
+        if q_values_by_period is not None
+        else _index(q_values, cold_index),
+        tolerance=tolerance,
+    )
+    source_inlet = _period_value(
+        solved_model,
+        "T_hu_in_period",
+        "T_hu_in",
+        period_idx,
+        0,
+    )
+    source_outlet = _utility_outlet_temperature(
+        solved_model,
+        side="hot",
+        period_idx=period_idx,
+        match_index=cold_index,
+        duty=duty,
+    )
+    sink_inlet = _period_value(
+        solved_model,
+        "T_c_by_period",
+        "T_c",
+        period_idx,
+        cold_index,
+        0,
+    )
+    sink_outlet = _period_value(
+        solved_model,
+        "T_c_out_period",
+        "T_c_out",
+        period_idx,
+        cold_index,
+    )
+    active = _is_active(
+        duty,
+        _index(getattr(solved_model, "z_hu", None), cold_index),
+        tolerance,
+    )
+    return HeatExchangerPeriodState(
+        period_id=period_id,
+        period_idx=period_idx,
+        duty=duty,
+        active=active,
+        approach_temperatures=(),
+        source_inlet_temperature=source_inlet,
+        source_outlet_temperature=source_outlet,
+        sink_inlet_temperature=sink_inlet,
+        sink_outlet_temperature=sink_outlet,
+    )
 
 
 def _cold_utility_exchangers(
@@ -487,22 +641,31 @@ def _cold_utility_exchangers(
     *,
     cold_utility: str,
     hot_streams: tuple[str, ...],
+    period_ids: tuple[str, ...],
     tolerance: float,
     include_inactive: bool,
 ) -> tuple[HeatExchanger, ...]:
     q_values = getattr(solved_model, "Q_c", None)
-    if q_values is None:
+    q_values_by_period = getattr(solved_model, "Q_c_by_period", None)
+    if q_values is None and q_values_by_period is None:
         return ()
     exchangers: list[HeatExchanger] = []
     last_stage = _optional_int(getattr(solved_model, "S", None))
     for i, hot_stream in enumerate(hot_streams):
-        duty = _optional_float(_index(q_values, i)) or 0.0
-        active = _is_active(
-            duty,
-            _index(getattr(solved_model, "z_cu", None), i),
-            tolerance,
+        states = tuple(
+            _cold_utility_period_state(
+                solved_model,
+                period_id=period_id,
+                period_idx=period_idx,
+                hot_index=i,
+                last_stage=last_stage,
+                q_values=q_values,
+                q_values_by_period=q_values_by_period,
+                tolerance=tolerance,
+            )
+            for period_idx, period_id in enumerate(period_ids)
         )
-        if not active and not include_inactive:
+        if not any(state.active for state in states) and not include_inactive:
             continue
         segment_contributions = _model_utility_segment_contributions(
             solved_model,
@@ -520,28 +683,79 @@ def _cold_utility_exchangers(
                 sink_stream=cold_utility,
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.UTILITY,
-                duty=duty,
+                period_states=states,
                 area=area,
                 segment_area_contributions=segment_contributions,
-                active=active,
                 match_allowed=_allowed(
                     _index(getattr(solved_model, "z_cu_allowed", None), i)
-                ),
-                source_inlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_h", None), i, last_stage)
-                ),
-                source_outlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_h_out", None), i)
-                ),
-                sink_inlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_cu_in", None), 0)
-                ),
-                sink_outlet_temperature=_optional_float(
-                    _index(getattr(solved_model, "T_cu_out", None), 0)
                 ),
             )
         )
     return tuple(exchangers)
+
+
+def _cold_utility_period_state(
+    solved_model: Any,
+    *,
+    period_id: str,
+    period_idx: int,
+    hot_index: int,
+    last_stage: int | None,
+    q_values: Any,
+    q_values_by_period: Any,
+    tolerance: float,
+) -> HeatExchangerPeriodState:
+    duty = _normalized_solver_duty(
+        _index(q_values_by_period, period_idx, hot_index)
+        if q_values_by_period is not None
+        else _index(q_values, hot_index),
+        tolerance=tolerance,
+    )
+    source_inlet = _period_value(
+        solved_model,
+        "T_h_by_period",
+        "T_h",
+        period_idx,
+        hot_index,
+        last_stage,
+    )
+    source_outlet = _period_value(
+        solved_model,
+        "T_h_out_period",
+        "T_h_out",
+        period_idx,
+        hot_index,
+    )
+    sink_inlet = _period_value(
+        solved_model,
+        "T_cu_in_period",
+        "T_cu_in",
+        period_idx,
+        0,
+    )
+    sink_outlet = _utility_outlet_temperature(
+        solved_model,
+        side="cold",
+        period_idx=period_idx,
+        match_index=hot_index,
+        duty=duty,
+    )
+    active = _is_active(
+        duty,
+        _index(getattr(solved_model, "z_cu", None), hot_index),
+        tolerance,
+    )
+    return HeatExchangerPeriodState(
+        period_id=period_id,
+        period_idx=period_idx,
+        duty=duty,
+        active=active,
+        approach_temperatures=(),
+        source_inlet_temperature=source_inlet,
+        source_outlet_temperature=source_outlet,
+        sink_inlet_temperature=sink_inlet,
+        sink_outlet_temperature=sink_outlet,
+    )
 
 
 def _model_utility_segment_contributions(
@@ -586,17 +800,130 @@ def _hot_recovery_outlet(
     j: int,
     k: int,
     duty: float,
+    *,
+    period_idx: int = 0,
 ) -> float | None:
-    inlet = _optional_float(_index(getattr(solved_model, "T_h", None), i, k))
-    heat_capacity = _optional_float(_index(getattr(solved_model, "f_h", None), i))
-    if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
-        return inlet - duty / heat_capacity
     explicit = _optional_float(
-        _index(getattr(solved_model, "T_h_out_x", None), i, j, k)
+        _index(
+            getattr(solved_model, "T_h_out_x_by_period", None),
+            period_idx,
+            i,
+            j,
+            k,
+        )
     )
+    if explicit is None:
+        explicit = _optional_float(
+            _index(getattr(solved_model, "T_h_out_x", None), i, j, k)
+        )
     if explicit is not None:
         return explicit
-    return _optional_float(_index(getattr(solved_model, "T_h", None), i, k + 1))
+    inlet = _period_value(
+        solved_model,
+        "T_h_by_period",
+        "T_h",
+        period_idx,
+        i,
+        k,
+    )
+    heat_capacity = _period_value(
+        solved_model,
+        "f_h_period",
+        "f_h",
+        period_idx,
+        i,
+    )
+    if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
+        return inlet - duty / heat_capacity
+    return _period_value(
+        solved_model,
+        "T_h_by_period",
+        "T_h",
+        period_idx,
+        i,
+        k + 1,
+    )
+
+
+def _recovery_split_fraction(
+    solved_model: Any,
+    *,
+    side: str,
+    period_idx: int,
+    hot_index: int,
+    cold_index: int,
+    stage_index: int,
+    tolerance: float,
+) -> float | None:
+    if side == "hot":
+        explicit = _optional_float(
+            _index(
+                getattr(solved_model, "T_h_out_x_by_period", None),
+                period_idx,
+                hot_index,
+                cold_index,
+                stage_index,
+            )
+        )
+        if explicit is None:
+            explicit = _optional_float(
+                _index(
+                    getattr(solved_model, "T_h_out_x", None),
+                    hot_index,
+                    cold_index,
+                    stage_index,
+                )
+            )
+        if explicit is None:
+            return None
+        value = _period_value(
+            solved_model,
+            "X_by_period",
+            "X",
+            period_idx,
+            hot_index,
+            cold_index,
+            stage_index,
+        )
+    elif side == "cold":
+        explicit = _optional_float(
+            _index(
+                getattr(solved_model, "T_c_out_y_by_period", None),
+                period_idx,
+                cold_index,
+                hot_index,
+                stage_index,
+            )
+        )
+        if explicit is None:
+            explicit = _optional_float(
+                _index(
+                    getattr(solved_model, "T_c_out_y", None),
+                    cold_index,
+                    hot_index,
+                    stage_index,
+                )
+            )
+        if explicit is None:
+            return None
+        value = _period_value(
+            solved_model,
+            "Y_by_period",
+            "Y",
+            period_idx,
+            cold_index,
+            hot_index,
+            stage_index,
+        )
+    else:
+        raise ValueError("side must be 'hot' or 'cold'")
+    if value is None:
+        return None
+    if value < -tolerance or value > 1.0 + tolerance:
+        raise ValueError(
+            f"solved {side} split fraction {value:.6g} is outside zero to one"
+        )
+    return min(max(value, 0.0), 1.0)
 
 
 def _cold_recovery_outlet(
@@ -605,17 +932,114 @@ def _cold_recovery_outlet(
     j: int,
     k: int,
     duty: float,
+    *,
+    period_idx: int = 0,
 ) -> float | None:
-    inlet = _optional_float(_index(getattr(solved_model, "T_c", None), j, k + 1))
-    heat_capacity = _optional_float(_index(getattr(solved_model, "f_c", None), j))
-    if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
-        return inlet + duty / heat_capacity
     explicit = _optional_float(
-        _index(getattr(solved_model, "T_c_out_y", None), j, i, k)
+        _index(
+            getattr(solved_model, "T_c_out_y_by_period", None),
+            period_idx,
+            j,
+            i,
+            k,
+        )
     )
+    if explicit is None:
+        explicit = _optional_float(
+            _index(getattr(solved_model, "T_c_out_y", None), j, i, k)
+        )
     if explicit is not None:
         return explicit
-    return _optional_float(_index(getattr(solved_model, "T_c", None), j, k))
+    inlet = _period_value(
+        solved_model,
+        "T_c_by_period",
+        "T_c",
+        period_idx,
+        j,
+        k + 1,
+    )
+    heat_capacity = _period_value(
+        solved_model,
+        "f_c_period",
+        "f_c",
+        period_idx,
+        j,
+    )
+    if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
+        return inlet + duty / heat_capacity
+    return _period_value(
+        solved_model,
+        "T_c_by_period",
+        "T_c",
+        period_idx,
+        j,
+        k,
+    )
+
+
+def _period_ids(
+    solved_model: Any,
+    solver_arrays: PreparedSolverArrays,
+) -> tuple[str, ...]:
+    raw_ids = getattr(solved_model, "period_ids", None)
+    if raw_ids is None:
+        raw_ids = solver_arrays.arrays.get("period_ids")
+    period_ids = (
+        tuple(str(value) for value in list(raw_ids)) if raw_ids is not None else ()
+    )
+    period_count = _optional_int(getattr(solved_model, "N_periods", None))
+    if period_count is None:
+        period_count = len(period_ids) or 1
+    if not period_ids:
+        period_ids = tuple(str(index) for index in range(period_count))
+    if len(period_ids) != period_count:
+        raise ValueError("solver period_ids must match N_periods during extraction")
+    if len(set(period_ids)) != len(period_ids):
+        raise ValueError("solver period_ids must be unique during extraction")
+    return period_ids
+
+
+def _period_value(
+    solved_model: Any,
+    period_attribute: str,
+    scalar_attribute: str,
+    period_idx: int,
+    *indexes: int | None,
+) -> float | None:
+    period_values = getattr(solved_model, period_attribute, None)
+    if period_values is not None:
+        return _optional_float(_index(period_values, period_idx, *indexes))
+    return _optional_float(
+        _index(getattr(solved_model, scalar_attribute, None), *indexes)
+    )
+
+
+def _utility_outlet_temperature(
+    solved_model: Any,
+    *,
+    side: str,
+    period_idx: int,
+    match_index: int,
+    duty: float,
+) -> float | None:
+    resolver = getattr(solved_model, "_utility_solved_outlet_temperature", None)
+    if callable(resolver):
+        return _optional_float(resolver(side, period_idx, match_index, duty))
+    if side == "hot":
+        return _period_value(
+            solved_model,
+            "T_hu_out_period",
+            "T_hu_out",
+            period_idx,
+            0,
+        )
+    return _period_value(
+        solved_model,
+        "T_cu_out_period",
+        "T_cu_out",
+        period_idx,
+        0,
+    )
 
 
 def _boundary_temperature_matrix(
@@ -637,10 +1061,22 @@ def _approach_temperatures(
     i: int,
     j: int,
     k: int,
+    *,
+    period_idx: int = 0,
 ) -> tuple[float, ...]:
+    theta_1_period = getattr(solved_model, "theta_1_by_period", None)
+    theta_2_period = getattr(solved_model, "theta_2_by_period", None)
     values = (
-        _optional_float(_index(getattr(solved_model, "theta_1", None), i, j, k)),
-        _optional_float(_index(getattr(solved_model, "theta_2", None), i, j, k)),
+        _optional_float(
+            _index(theta_1_period, period_idx, i, j, k)
+            if theta_1_period is not None
+            else _index(getattr(solved_model, "theta_1", None), i, j, k)
+        ),
+        _optional_float(
+            _index(theta_2_period, period_idx, i, j, k)
+            if theta_2_period is not None
+            else _index(getattr(solved_model, "theta_2", None), i, j, k)
+        ),
     )
     return tuple(value for value in values if value is not None)
 
@@ -748,6 +1184,12 @@ def _float_list(values: Any) -> list[float]:
     ]
 
 
+def _float_matrix(values: Any) -> list[list[float]]:
+    if values is None:
+        return []
+    return [_float_list(row) for row in values]
+
+
 def _result_method(method: str | None):
     return {
         "PDM": "pinch_design_method",
@@ -761,6 +1203,16 @@ def _is_active(duty: float, binary_value: Any, tolerance: float) -> bool:
     if binary is not None:
         return binary > tolerance and duty > tolerance
     return duty > tolerance
+
+
+def _normalized_solver_duty(value: Any, *, tolerance: float) -> float:
+    duty = _optional_float(value) or 0.0
+    negative_tolerance = max(tolerance, _SOLVER_NEGATIVE_DUTY_NOISE)
+    if duty < -negative_tolerance:
+        raise ValueError(
+            f"solved exchanger duty {duty:.6g} is below zero beyond tolerance"
+        )
+    return max(duty, 0.0)
 
 
 def _allowed(value: Any) -> bool:

@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from .....classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
@@ -105,6 +106,7 @@ def _fake_network(
     )
     hot_utility_duty = round(duty * 0.1, 6)
     cold_utility_duty = round(duty * 0.08, 6)
+    period_id = task.period_id or "0"
 
     exchangers = (
         HeatExchanger(
@@ -115,18 +117,23 @@ def _fake_network(
             source_stream_role=HeatExchangerStreamRole.PROCESS,
             sink_stream_role=HeatExchangerStreamRole.PROCESS,
             stage=stage_count,
-            duty=duty,
-            area=round(duty / 10.0, 6),
-            approach_temperatures=(
-                temperatures["source_inlet"] - temperatures["sink_outlet"],
-                temperatures["source_outlet"] - temperatures["sink_inlet"],
+            period_states=(
+                HeatExchangerPeriodState(
+                    period_id=period_id,
+                    period_idx=0,
+                    duty=duty,
+                    approach_temperatures=(
+                        temperatures["source_inlet"] - temperatures["sink_outlet"],
+                        temperatures["source_outlet"] - temperatures["sink_inlet"],
+                    ),
+                    source_inlet_temperature=temperatures["source_inlet"],
+                    source_outlet_temperature=temperatures["source_outlet"],
+                    sink_inlet_temperature=temperatures["sink_inlet"],
+                    sink_outlet_temperature=temperatures["sink_outlet"],
+                ),
             ),
-            source_inlet_temperature=temperatures["source_inlet"],
-            source_outlet_temperature=temperatures["source_outlet"],
-            sink_inlet_temperature=temperatures["sink_inlet"],
-            sink_outlet_temperature=temperatures["sink_outlet"],
+            area=round(duty / 10.0, 6),
             capital_cost=capital_cost,
-            total_annual_cost=total_annual_cost,
         ),
         HeatExchanger(
             exchanger_id=f"{task.task_id}-hot-utility",
@@ -135,13 +142,18 @@ def _fake_network(
             sink_stream=cold_key,
             source_stream_role=HeatExchangerStreamRole.UTILITY,
             sink_stream_role=HeatExchangerStreamRole.PROCESS,
-            duty=hot_utility_duty,
+            period_states=(
+                HeatExchangerPeriodState(
+                    period_id=period_id,
+                    period_idx=0,
+                    duty=hot_utility_duty,
+                    source_inlet_temperature=temperatures["hot_utility_inlet"],
+                    source_outlet_temperature=temperatures["hot_utility_outlet"],
+                    sink_inlet_temperature=temperatures["sink_outlet"],
+                    sink_outlet_temperature=temperatures["sink_outlet"] + 10.0,
+                ),
+            ),
             area=round(hot_utility_duty / 10.0, 6),
-            source_inlet_temperature=temperatures["hot_utility_inlet"],
-            source_outlet_temperature=temperatures["hot_utility_outlet"],
-            sink_inlet_temperature=temperatures["sink_outlet"],
-            sink_outlet_temperature=temperatures["sink_outlet"] + 10.0,
-            operating_cost=round(utility_cost * 0.5, 6),
         ),
         HeatExchanger(
             exchanger_id=f"{task.task_id}-cold-utility",
@@ -150,13 +162,18 @@ def _fake_network(
             sink_stream=cold_utility_key,
             source_stream_role=HeatExchangerStreamRole.PROCESS,
             sink_stream_role=HeatExchangerStreamRole.UTILITY,
-            duty=cold_utility_duty,
+            period_states=(
+                HeatExchangerPeriodState(
+                    period_id=period_id,
+                    period_idx=0,
+                    duty=cold_utility_duty,
+                    source_inlet_temperature=temperatures["source_outlet"],
+                    source_outlet_temperature=temperatures["source_outlet"] - 10.0,
+                    sink_inlet_temperature=temperatures["cold_utility_inlet"],
+                    sink_outlet_temperature=temperatures["cold_utility_outlet"],
+                ),
+            ),
             area=round(cold_utility_duty / 10.0, 6),
-            source_inlet_temperature=temperatures["source_outlet"],
-            source_outlet_temperature=temperatures["source_outlet"] - 10.0,
-            sink_inlet_temperature=temperatures["cold_utility_inlet"],
-            sink_outlet_temperature=temperatures["cold_utility_outlet"],
-            operating_cost=round(utility_cost * 0.5, 6),
         ),
     )
     return HeatExchangerNetwork(

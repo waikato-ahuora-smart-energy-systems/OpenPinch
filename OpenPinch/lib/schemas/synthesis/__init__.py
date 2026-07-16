@@ -436,6 +436,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
         self,
         solution_rank: int = 1,
         *,
+        period_id: str | None = None,
         stream_line_width: float = 5.0,
         temperature_scaled: bool = False,
     ):
@@ -465,6 +466,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
             network = selected.network
 
         return network.build_grid_diagram(
+            period_id=period_id,
             stream_line_width=stream_line_width,
             temperature_scaled=temperature_scaled,
         )

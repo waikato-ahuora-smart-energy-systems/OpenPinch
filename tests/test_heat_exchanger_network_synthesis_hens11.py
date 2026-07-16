@@ -225,7 +225,7 @@ def test_best_esm_network_snapshot_matches_identity_labelled_network(
         assert exchanger.sink_stream == expected_exchanger["sink_stream"]
         assert exchanger.stage == expected_exchanger["stage"]
         _assert_close(
-            exchanger.duty,
+            exchanger.state().duty,
             expected_exchanger["duty"],
             abs_tol=tolerances["duty_abs"],
             rel_tol=tolerances["duty_rel"],
@@ -522,7 +522,7 @@ def _assert_network_matches_snapshot(
         assert exchanger.sink_stream == expected_exchanger["sink_stream"]
         assert exchanger.stage == expected_exchanger["stage"]
         _assert_close(
-            exchanger.duty,
+            exchanger.state().duty,
             expected_exchanger["duty"],
             abs_tol=tolerances["duty_abs"],
             rel_tol=tolerances["duty_rel"],
@@ -884,7 +884,7 @@ def _assert_process_stream_heat_balances(
             arrays.arrays["T_c_out"][index] - arrays.arrays["T_c_in"][index]
         ) * arrays.arrays["f_c"][index]
         actual_heat_flow = sum(
-            exchanger.duty
+            exchanger.state().duty
             for exchanger in network.exchangers
             if exchanger.sink_stream == stream_id
         )
@@ -918,22 +918,23 @@ def _assert_temperature_feasibility(
     for exchanger in network.exchangers:
         assert exchanger.area is not None
         assert exchanger.area >= 0.0
-        if exchanger.source_inlet_temperature is not None:
-            assert exchanger.source_outlet_temperature is not None
+        state = exchanger.state()
+        if state.source_inlet_temperature is not None:
+            assert state.source_outlet_temperature is not None
             assert (
-                exchanger.source_inlet_temperature + TEMPERATURE_ABS_TOL
-                >= exchanger.source_outlet_temperature
+                state.source_inlet_temperature + TEMPERATURE_ABS_TOL
+                >= state.source_outlet_temperature
             )
-        if exchanger.sink_inlet_temperature is not None:
-            assert exchanger.sink_outlet_temperature is not None
+        if state.sink_inlet_temperature is not None:
+            assert state.sink_outlet_temperature is not None
             assert (
-                exchanger.sink_outlet_temperature + TEMPERATURE_ABS_TOL
-                >= exchanger.sink_inlet_temperature
+                state.sink_outlet_temperature + TEMPERATURE_ABS_TOL
+                >= state.sink_inlet_temperature
             )
         if exchanger.kind is HeatExchangerKind.RECOVERY:
-            approach_temperatures = exchanger.approach_temperatures or (
-                exchanger.source_inlet_temperature - exchanger.sink_outlet_temperature,
-                exchanger.source_outlet_temperature - exchanger.sink_inlet_temperature,
+            approach_temperatures = state.approach_temperatures or (
+                state.source_inlet_temperature - state.sink_outlet_temperature,
+                state.source_outlet_temperature - state.sink_inlet_temperature,
             )
             assert min(approach_temperatures) + TEMPERATURE_ABS_TOL >= d_tmin
 

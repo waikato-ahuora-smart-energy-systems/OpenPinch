@@ -263,10 +263,16 @@ def test_notebook_7_covers_hen_design_service_four_stream_problem(tmp_path: Path
     assert "top_ranked_networks" in combined_source
     assert "get_n_best_networks(3)" in combined_source
     assert "select_network(solution_rank=2)" in combined_source
-    assert "problem.design.network.total_heat_recovery" in combined_source
-    assert "problem.design.network.total_hot_utility" in combined_source
-    assert "problem.design.network.total_cold_utility" in combined_source
+    assert 'network.total_duty(kind="recovery", period_id=period_id)' in combined_source
+    assert (
+        'network.total_duty(kind="hot_utility", period_id=period_id)' in combined_source
+    )
+    assert (
+        'network.total_duty(kind="cold_utility", period_id=period_id)'
+        in combined_source
+    )
     assert "problem.design.network.utility(" in combined_source
+    assert "exchanger.state(period_id)" in combined_source
     assert "from OpenPinch.lib import" not in combined_source
     assert "HeatExchangerKind" not in combined_source
     assert "HeatExchangerNetworkLabel" not in combined_source

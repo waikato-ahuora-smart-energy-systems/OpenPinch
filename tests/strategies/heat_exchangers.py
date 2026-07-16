@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from hypothesis import strategies as st
 
-from OpenPinch.classes.heat_exchanger import HeatExchanger, HeatExchangerAreaSlice
+from OpenPinch.classes.heat_exchanger import (
+    HeatExchanger,
+    HeatExchangerAreaSlice,
+    HeatExchangerPeriodState,
+)
 from OpenPinch.lib.enums import HeatExchangerKind, HeatExchangerStreamRole
 
 _POSITIVE_FLOATS = st.floats(
@@ -73,6 +77,13 @@ def heat_exchangers_with_area_slices(draw) -> HeatExchanger:
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=1,
-        duty=period_duties[0],
+        period_states=tuple(
+            HeatExchangerPeriodState(
+                period_id=f"period-{period_index}",
+                period_idx=period_index,
+                duty=period_duty,
+            )
+            for period_index, period_duty in enumerate(period_duties)
+        ),
         segment_area_contributions=tuple(slices),
     )

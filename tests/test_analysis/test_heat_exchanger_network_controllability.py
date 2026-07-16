@@ -10,6 +10,7 @@ from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerNetwork,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from OpenPinch.services.heat_exchanger_network_controllability import (
@@ -41,8 +42,14 @@ def _recovery_exchanger(
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=stage,
-        duty=duty,
-        approach_temperatures=(approach,),
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="0",
+                period_idx=0,
+                duty=duty,
+                approach_temperatures=(approach,),
+            ),
+        ),
     )
 
 
@@ -59,8 +66,14 @@ def _hot_utility_exchanger(
         sink_stream=sink,
         source_stream_role=HeatExchangerStreamRole.UTILITY,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
-        duty=duty,
-        approach_temperatures=(7.0,),
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="0",
+                period_idx=0,
+                duty=duty,
+                approach_temperatures=(7.0,),
+            ),
+        ),
     )
 
 
@@ -77,8 +90,14 @@ def _cold_utility_exchanger(
         sink_stream="CoolingWater",
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.UTILITY,
-        duty=duty,
-        approach_temperatures=(6.0,),
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="0",
+                period_idx=0,
+                duty=duty,
+                approach_temperatures=(6.0,),
+            ),
+        ),
     )
 
 
@@ -183,7 +202,9 @@ def test_controllability_result_serializes_and_round_trips() -> None:
 
 
 def test_empty_network_returns_poor_zero_score() -> None:
-    result = quantify_heat_exchanger_network_controllability(HeatExchangerNetwork())
+    result = quantify_heat_exchanger_network_controllability(
+        HeatExchangerNetwork(period_id="0")
+    )
 
     assert result.score == pytest.approx(0.0)
     assert result.rating == "poor"
@@ -282,7 +303,7 @@ def test_multistage_utility_streams_create_independent_actuators() -> None:
 
 def test_output_feedback_case_does_not_require_temperature_measurements() -> None:
     exchanger = _hot_utility_exchanger(sink="ControlledOutlet", duty=30.0)
-    assert exchanger.sink_outlet_temperature is None
+    assert exchanger.state().sink_outlet_temperature is None
 
     result = HeatExchangerNetwork(exchangers=(exchanger,)).quantify_controllability()
 
@@ -429,10 +450,11 @@ def test_controllability_service_option_validation_and_helper_edges() -> None:
         )
 
     zero_duty = _recovery_exchanger("zero", "H0", "C0", duty=0.0)
-    assert controllability_service._build_outputs((zero_duty,)) == ()
+    assert controllability_service._build_outputs((zero_duty,), period_id="0") == ()
     assert (
         controllability_service._build_actuators(
             (zero_duty,),
+            period_id="0",
             include_utility_actuators=True,
         )
         == ()
@@ -443,6 +465,7 @@ def test_controllability_service_option_validation_and_helper_edges() -> None:
             _recovery_exchanger("dup", "H1", "C1", duty=1.0),
             _recovery_exchanger("dup", "H1", "C2", duty=1.0),
         ),
+        period_id="0",
         include_utility_actuators=True,
     )
     assert [actuator.actuator_id for actuator in duplicate_actuators] == [
@@ -495,6 +518,7 @@ def test_controllability_service_option_validation_and_helper_edges() -> None:
     )
     assert controllability_service._thermal_margin_score(
         (_recovery_exchanger("margin", "H1", "C1", duty=1.0),),
+        period_id="0",
         minimum_approach_temperature=0.0,
     ) == (1.0, 8.0)
     assert controllability_service._rating(0.3) == "weak"

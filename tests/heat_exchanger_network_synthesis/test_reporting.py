@@ -10,6 +10,7 @@ from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerNetwork,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from OpenPinch.lib.schemas.synthesis import (
@@ -401,12 +402,16 @@ def test_network_feasibility_reports_summary_and_temperature_failures() -> None:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=10.0,
+                period_states=(
+                    _period_state(
+                        duty=10.0,
+                        source_inlet_temperature=100.0,
+                        source_outlet_temperature=120.0,
+                        sink_inlet_temperature=80.0,
+                        sink_outlet_temperature=70.0,
+                    ),
+                ),
                 area=10.0,
-                source_inlet_temperature=100.0,
-                source_outlet_temperature=120.0,
-                sink_inlet_temperature=80.0,
-                sink_outlet_temperature=70.0,
             ),
             HeatExchanger(
                 exchanger_id="crossed-terminal",
@@ -416,12 +421,16 @@ def test_network_feasibility_reports_summary_and_temperature_failures() -> None:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=10.0,
+                period_states=(
+                    _period_state(
+                        duty=10.0,
+                        source_inlet_temperature=100.0,
+                        source_outlet_temperature=70.0,
+                        sink_inlet_temperature=80.0,
+                        sink_outlet_temperature=120.0,
+                    ),
+                ),
                 area=10.0,
-                source_inlet_temperature=100.0,
-                source_outlet_temperature=70.0,
-                sink_inlet_temperature=80.0,
-                sink_outlet_temperature=120.0,
             ),
         ),
         run_id="temperature",
@@ -436,13 +445,17 @@ def test_network_feasibility_reports_summary_and_temperature_failures() -> None:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=10.0,
+                period_states=(
+                    _period_state(
+                        duty=10.0,
+                        active=False,
+                        source_inlet_temperature=100.0,
+                        source_outlet_temperature=120.0,
+                        sink_inlet_temperature=80.0,
+                        sink_outlet_temperature=70.0,
+                    ),
+                ),
                 area=None,
-                active=False,
-                source_inlet_temperature=100.0,
-                source_outlet_temperature=120.0,
-                sink_inlet_temperature=80.0,
-                sink_outlet_temperature=70.0,
             ),
         ),
         run_id="inactive",
@@ -521,12 +534,16 @@ def test_network_feasibility_checks_area_presence_and_utility_area_branches() ->
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=20.0,
+                period_states=(
+                    _period_state(
+                        duty=20.0,
+                        source_inlet_temperature=150.0,
+                        source_outlet_temperature=120.0,
+                        sink_inlet_temperature=60.0,
+                        sink_outlet_temperature=90.0,
+                    ),
+                ),
                 area=None,
-                source_inlet_temperature=150.0,
-                source_outlet_temperature=120.0,
-                sink_inlet_temperature=60.0,
-                sink_outlet_temperature=90.0,
             ),
         ),
         run_id="missing-area",
@@ -540,12 +557,16 @@ def test_network_feasibility_checks_area_presence_and_utility_area_branches() ->
                 sink_stream="C1",
                 source_stream_role=HeatExchangerStreamRole.UTILITY,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
-                duty=200.0,
+                period_states=(
+                    _period_state(
+                        duty=200.0,
+                        source_inlet_temperature=250.0,
+                        source_outlet_temperature=240.0,
+                        sink_inlet_temperature=100.0,
+                        sink_outlet_temperature=150.0,
+                    ),
+                ),
                 area=0.01,
-                source_inlet_temperature=250.0,
-                source_outlet_temperature=240.0,
-                sink_inlet_temperature=100.0,
-                sink_outlet_temperature=150.0,
             ),
         ),
         run_id="hot-utility-area",
@@ -569,12 +590,16 @@ def test_network_feasibility_checks_area_presence_and_utility_area_branches() ->
                 sink_stream="CU1",
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.UTILITY,
-                duty=200.0,
+                period_states=(
+                    _period_state(
+                        duty=200.0,
+                        source_inlet_temperature=250.0,
+                        source_outlet_temperature=200.0,
+                        sink_inlet_temperature=80.0,
+                        sink_outlet_temperature=90.0,
+                    ),
+                ),
                 area=0.01,
-                source_inlet_temperature=250.0,
-                source_outlet_temperature=200.0,
-                sink_inlet_temperature=80.0,
-                sink_outlet_temperature=90.0,
             ),
         ),
         run_id="cold-utility-area",
@@ -617,12 +642,16 @@ def test_network_feasibility_skips_match_level_checks_for_isothermal_stage_model
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=999.0,
+                period_states=(
+                    _period_state(
+                        duty=999.0,
+                        source_inlet_temperature=300.0,
+                        source_outlet_temperature=250.0,
+                        sink_inlet_temperature=100.0,
+                        sink_outlet_temperature=150.0,
+                    ),
+                ),
                 area=0.01,
-                source_inlet_temperature=300.0,
-                source_outlet_temperature=250.0,
-                sink_inlet_temperature=100.0,
-                sink_outlet_temperature=150.0,
             ),
         ),
         run_id="isothermal-stage",
@@ -667,10 +696,14 @@ def test_network_feasibility_reports_cold_stream_balance_and_handles_missing_tem
                     sink_stream="C1",
                     source_stream_role=HeatExchangerStreamRole.UTILITY,
                     sink_stream_role=HeatExchangerStreamRole.PROCESS,
-                    duty=50.0,
+                    period_states=(
+                        _period_state(
+                            duty=50.0,
+                            sink_inlet_temperature=350.0,
+                            sink_outlet_temperature=360.0,
+                        ),
+                    ),
                     area=10.0,
-                    sink_inlet_temperature=350.0,
-                    sink_outlet_temperature=360.0,
                 ),
             )
         }
@@ -685,10 +718,14 @@ def test_network_feasibility_reports_cold_stream_balance_and_handles_missing_tem
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=20.0,
+                period_states=(
+                    _period_state(
+                        duty=20.0,
+                        source_inlet_temperature=150.0,
+                        sink_inlet_temperature=60.0,
+                    ),
+                ),
                 area=10.0,
-                source_inlet_temperature=150.0,
-                sink_inlet_temperature=60.0,
             ),
         ),
         run_id="missing-temperature",
@@ -732,10 +769,14 @@ def test_verification_numeric_helpers_cover_invalid_inputs_and_defensive_branche
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=1,
-        duty=10.0,
+        period_states=(
+            _period_state(
+                duty=10.0,
+                source_inlet_temperature=100.0,
+                sink_inlet_temperature=80.0,
+            ),
+        ),
         area=1.0,
-        source_inlet_temperature=100.0,
-        sink_inlet_temperature=80.0,
     )
     negative_terminal = HeatExchanger(
         exchanger_id="negative-terminal",
@@ -745,12 +786,16 @@ def test_verification_numeric_helpers_cover_invalid_inputs_and_defensive_branche
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=1,
-        duty=10.0,
+        period_states=(
+            _period_state(
+                duty=10.0,
+                source_inlet_temperature=100.0,
+                source_outlet_temperature=80.0,
+                sink_inlet_temperature=90.0,
+                sink_outlet_temperature=120.0,
+            ),
+        ),
         area=1.0,
-        source_inlet_temperature=100.0,
-        source_outlet_temperature=80.0,
-        sink_inlet_temperature=90.0,
-        sink_outlet_temperature=120.0,
     )
     invalid_kind = HeatExchanger.model_construct(
         exchanger_id="invalid-kind",
@@ -760,12 +805,12 @@ def test_verification_numeric_helpers_cover_invalid_inputs_and_defensive_branche
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=1,
-        duty=10.0,
+        period_states=(_period_state(duty=10.0),),
         area=1.0,
     )
 
-    assert _terminal_lmtd(missing_terminal) is None
-    assert _terminal_lmtd(negative_terminal) is None
+    assert _terminal_lmtd(missing_terminal.state()) is None
+    assert _terminal_lmtd(negative_terminal.state()) is None
     assert (
         _overall_heat_transfer_coefficient(
             invalid_kind,
@@ -1212,6 +1257,7 @@ def test_grid_renderer_helper_edges_cover_temperature_and_split_fallbacks() -> N
 
     empty_model = HeatExchangerNetworkGridModel(
         network=HeatExchangerNetwork(),
+        period_id="0",
         hot_streams=(),
         cold_streams=(),
         stages=(),
@@ -1238,6 +1284,7 @@ def test_grid_renderer_draw_streams_handles_empty_cold_branch_and_stage_lines() 
     go = pytest.importorskip("plotly.graph_objects")
     cold_only_model = HeatExchangerNetworkGridModel(
         network=HeatExchangerNetwork(),
+        period_id="0",
         hot_streams=(),
         cold_streams=("C1",),
         stages=(1,),
@@ -1459,12 +1506,16 @@ def _feasible_balance_network(
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=recovery_duty,
+                period_states=(
+                    _period_state(
+                        duty=recovery_duty,
+                        source_inlet_temperature=500.0,
+                        source_outlet_temperature=450.0,
+                        sink_inlet_temperature=300.0,
+                        sink_outlet_temperature=350.0,
+                    ),
+                ),
                 area=recovery_area,
-                source_inlet_temperature=500.0,
-                source_outlet_temperature=450.0,
-                sink_inlet_temperature=300.0,
-                sink_outlet_temperature=350.0,
             ),
             HeatExchanger(
                 exchanger_id="CU1",
@@ -1473,12 +1524,16 @@ def _feasible_balance_network(
                 sink_stream="CU",
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.UTILITY,
-                duty=cold_utility_duty,
+                period_states=(
+                    _period_state(
+                        duty=cold_utility_duty,
+                        source_inlet_temperature=450.0,
+                        source_outlet_temperature=400.0,
+                        sink_inlet_temperature=290.0,
+                        sink_outlet_temperature=300.0,
+                    ),
+                ),
                 area=25.0,
-                source_inlet_temperature=450.0,
-                source_outlet_temperature=400.0,
-                sink_inlet_temperature=290.0,
-                sink_outlet_temperature=300.0,
             ),
         ),
         run_id=run_id,
@@ -1518,6 +1573,29 @@ def _feasible_balance_network(
 
 def _require_plotly() -> None:
     pytest.importorskip("plotly")
+
+
+def _period_state(
+    *,
+    duty: float,
+    active: bool = True,
+    approach_temperatures: tuple[float, ...] = (),
+    source_inlet_temperature: float | None = None,
+    source_outlet_temperature: float | None = None,
+    sink_inlet_temperature: float | None = None,
+    sink_outlet_temperature: float | None = None,
+) -> HeatExchangerPeriodState:
+    return HeatExchangerPeriodState(
+        period_id="0",
+        period_idx=0,
+        duty=duty,
+        active=active,
+        approach_temperatures=approach_temperatures,
+        source_inlet_temperature=source_inlet_temperature,
+        source_outlet_temperature=source_outlet_temperature,
+        sink_inlet_temperature=sink_inlet_temperature,
+        sink_outlet_temperature=sink_outlet_temperature,
+    )
 
 
 def _task(
@@ -1657,11 +1735,15 @@ def _supply_side_hot_utility_network() -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=1200.0,
-                source_inlet_temperature=650.0,
-                source_outlet_temperature=570.0,
-                sink_inlet_temperature=300.0,
-                sink_outlet_temperature=390.0,
+                period_states=(
+                    _period_state(
+                        duty=1200.0,
+                        source_inlet_temperature=650.0,
+                        source_outlet_temperature=570.0,
+                        sink_inlet_temperature=300.0,
+                        sink_outlet_temperature=390.0,
+                    ),
+                ),
             ),
             HeatExchanger(
                 exchanger_id="HU1-C1",
@@ -1670,9 +1752,13 @@ def _supply_side_hot_utility_network() -> HeatExchangerNetwork:
                 sink_stream="C1",
                 source_stream_role=HeatExchangerStreamRole.UTILITY,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
-                duty=350.0,
-                sink_inlet_temperature=270.0,
-                sink_outlet_temperature=300.0,
+                period_states=(
+                    _period_state(
+                        duty=350.0,
+                        sink_inlet_temperature=270.0,
+                        sink_outlet_temperature=300.0,
+                    ),
+                ),
             ),
         ),
         run_id="supply-side-hot-utility",
@@ -1692,13 +1778,15 @@ def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=800.0,
-                source_inlet_temperature=520.0,
-                source_outlet_temperature=500.0,
-                source_mid_temperature=500.0,
-                sink_inlet_temperature=290.0,
-                sink_outlet_temperature=330.0,
-                sink_mid_temperature=310.0,
+                period_states=(
+                    _period_state(
+                        duty=800.0,
+                        source_inlet_temperature=520.0,
+                        source_outlet_temperature=500.0,
+                        sink_inlet_temperature=290.0,
+                        sink_outlet_temperature=330.0,
+                    ),
+                ),
             ),
             HeatExchanger(
                 exchanger_id="high-source-low-sink",
@@ -1708,13 +1796,15 @@ def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=900.0,
-                source_inlet_temperature=720.0,
-                source_outlet_temperature=680.0,
-                source_mid_temperature=700.0,
-                sink_inlet_temperature=500.0,
-                sink_outlet_temperature=560.0,
-                sink_mid_temperature=250.0,
+                period_states=(
+                    _period_state(
+                        duty=900.0,
+                        source_inlet_temperature=720.0,
+                        source_outlet_temperature=680.0,
+                        sink_inlet_temperature=500.0,
+                        sink_outlet_temperature=560.0,
+                    ),
+                ),
             ),
             HeatExchanger(
                 exchanger_id="high-source-high-sink",
@@ -1724,13 +1814,15 @@ def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=850.0,
-                source_inlet_temperature=690.0,
-                source_outlet_temperature=650.0,
-                source_mid_temperature=700.0,
-                sink_inlet_temperature=430.0,
-                sink_outlet_temperature=470.0,
-                sink_mid_temperature=450.0,
+                period_states=(
+                    _period_state(
+                        duty=850.0,
+                        source_inlet_temperature=690.0,
+                        source_outlet_temperature=650.0,
+                        sink_inlet_temperature=430.0,
+                        sink_outlet_temperature=470.0,
+                    ),
+                ),
             ),
         ),
         run_id="out-of-order-midpoints",
@@ -1750,11 +1842,15 @@ def _temperature_scaled_network() -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=1200.0,
-                source_inlet_temperature=700.0,
-                source_outlet_temperature=600.0,
-                sink_inlet_temperature=300.0,
-                sink_outlet_temperature=400.0,
+                period_states=(
+                    _period_state(
+                        duty=1200.0,
+                        source_inlet_temperature=700.0,
+                        source_outlet_temperature=600.0,
+                        sink_inlet_temperature=300.0,
+                        sink_outlet_temperature=400.0,
+                    ),
+                ),
             ),
             HeatExchanger(
                 exchanger_id="HU1-C1",
@@ -1763,9 +1859,13 @@ def _temperature_scaled_network() -> HeatExchangerNetwork:
                 sink_stream="C1",
                 source_stream_role=HeatExchangerStreamRole.UTILITY,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
-                duty=200.0,
-                sink_inlet_temperature=200.0,
-                sink_outlet_temperature=300.0,
+                period_states=(
+                    _period_state(
+                        duty=200.0,
+                        sink_inlet_temperature=200.0,
+                        sink_outlet_temperature=300.0,
+                    ),
+                ),
             ),
             HeatExchanger(
                 exchanger_id="H1-CU1",
@@ -1774,9 +1874,13 @@ def _temperature_scaled_network() -> HeatExchangerNetwork:
                 sink_stream="CU1",
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.UTILITY,
-                duty=250.0,
-                source_inlet_temperature=600.0,
-                source_outlet_temperature=500.0,
+                period_states=(
+                    _period_state(
+                        duty=250.0,
+                        source_inlet_temperature=600.0,
+                        source_outlet_temperature=500.0,
+                    ),
+                ),
             ),
         ),
         run_id="temperature-scaled",
@@ -1801,12 +1905,16 @@ def _recovery(
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=stage,
-        duty=duty,
+        period_states=(
+            _period_state(
+                duty=duty,
+                source_inlet_temperature=650.0,
+                source_outlet_temperature=source_outlet_temperature,
+                sink_inlet_temperature=300.0,
+                sink_outlet_temperature=400.0,
+            ),
+        ),
         area=123.4,
-        source_inlet_temperature=650.0,
-        source_outlet_temperature=source_outlet_temperature,
-        sink_inlet_temperature=300.0,
-        sink_outlet_temperature=400.0,
     )
 
 
@@ -1822,10 +1930,14 @@ def _hot_utility(
         sink_stream=cold_stream,
         source_stream_role=HeatExchangerStreamRole.UTILITY,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
-        duty=duty,
+        period_states=(
+            _period_state(
+                duty=duty,
+                sink_inlet_temperature=365.0,
+                sink_outlet_temperature=400.0,
+            ),
+        ),
         area=45.6,
-        sink_inlet_temperature=365.0,
-        sink_outlet_temperature=400.0,
     )
 
 
@@ -1841,10 +1953,14 @@ def _cold_utility(
         sink_stream=cold_utility,
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.UTILITY,
-        duty=duty,
+        period_states=(
+            _period_state(
+                duty=duty,
+                source_inlet_temperature=560.0,
+                source_outlet_temperature=550.0,
+            ),
+        ),
         area=67.8,
-        source_inlet_temperature=560.0,
-        source_outlet_temperature=550.0,
     )
 
 

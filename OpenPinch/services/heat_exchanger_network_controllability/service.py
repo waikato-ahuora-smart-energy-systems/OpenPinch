@@ -35,6 +35,7 @@ _COMPOSITE_WEIGHTS = {
 def quantify_heat_exchanger_network_controllability(
     network: "HeatExchangerNetwork",
     *,
+    period_id: str | None = None,
     active_only: bool = True,
     include_utility_actuators: bool = True,
     minimum_interaction: float = 1e-9,
@@ -60,14 +61,18 @@ def quantify_heat_exchanger_network_controllability(
         condition_warning_threshold=condition_warning_threshold,
     )
 
+    resolved_period_id = network.resolve_period_id(period_id)
+    if resolved_period_id is None:
+        raise ValueError("period_id cannot be resolved for an empty-period network")
     exchangers = tuple(
         exchanger
         for exchanger in network.exchangers
-        if exchanger.active or not active_only
+        if exchanger.state(resolved_period_id).active or not active_only
     )
-    outputs = _build_outputs(exchangers)
+    outputs = _build_outputs(exchangers, period_id=resolved_period_id)
     actuators = _build_actuators(
         exchangers,
+        period_id=resolved_period_id,
         include_utility_actuators=include_utility_actuators,
     )
     matrix = _build_interaction_matrix(outputs, actuators)
@@ -89,6 +94,7 @@ def quantify_heat_exchanger_network_controllability(
     )
     thermal_margin_score, minimum_observed_approach = _thermal_margin_score(
         exchangers,
+        period_id=resolved_period_id,
         minimum_approach_temperature=minimum_approach_temperature,
     )
 
@@ -162,10 +168,13 @@ def _validate_options(
 
 def _build_outputs(
     exchangers: tuple[HeatExchanger, ...],
+    *,
+    period_id: str,
 ) -> tuple[HeatExchangerNetworkControllabilityEndpoint, ...]:
     totals: OrderedDict[str, dict[str, float | int | str]] = OrderedDict()
 
     for exchanger in exchangers:
+        state = exchanger.state(period_id)
         for side, stream_id in _process_endpoints(exchanger):
             output_id = f"{side}:{stream_id}"
             if output_id not in totals:
@@ -177,7 +186,7 @@ def _build_outputs(
                 }
             totals[output_id]["total_duty"] = float(
                 totals[output_id]["total_duty"]
-            ) + float(exchanger.duty)
+            ) + float(state.duty)
             totals[output_id]["exchanger_count"] = (
                 int(totals[output_id]["exchanger_count"]) + 1
             )
@@ -198,13 +207,15 @@ def _build_outputs(
 def _build_actuators(
     exchangers: tuple[HeatExchanger, ...],
     *,
+    period_id: str,
     include_utility_actuators: bool,
 ) -> tuple[HeatExchangerNetworkControllabilityActuator, ...]:
     actuators = []
     seen_ids: dict[str, int] = {}
 
     for index, exchanger in enumerate(exchangers, start=1):
-        if exchanger.duty <= 0.0:
+        state = exchanger.state(period_id)
+        if state.duty <= 0.0:
             continue
         if (
             not include_utility_actuators
@@ -222,7 +233,7 @@ def _build_actuators(
                 sink_stream=exchanger.sink_stream,
                 stage=exchanger.stage,
                 manipulated_variable=_manipulated_variable(exchanger.kind),
-                duty=exchanger.duty,
+                duty=state.duty,
             )
         )
 
@@ -373,12 +384,13 @@ def _redundancy_score(
 def _thermal_margin_score(
     exchangers: tuple[HeatExchanger, ...],
     *,
+    period_id: str,
     minimum_approach_temperature: float,
 ) -> tuple[float | None, float | None]:
     margins = [
-        min(exchanger.approach_temperatures)
+        min(exchanger.state(period_id).approach_temperatures)
         for exchanger in exchangers
-        if exchanger.approach_temperatures
+        if exchanger.state(period_id).approach_temperatures
     ]
     if not margins:
         return None, None

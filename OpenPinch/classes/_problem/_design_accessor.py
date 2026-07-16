@@ -38,15 +38,17 @@ class _DesignNetworkAccessor:
 
         return self._selected_network().total_duty(kind=HeatExchangerKind.COLD_UTILITY)
 
-    def utility(self, name: str) -> float:
+    def utility(self, name: str, *, period_id: str | None = None) -> float:
         """Return selected-network hot/cold utility exchanger duty for ``name``."""
         from ..heat_exchanger import HeatExchangerKind
 
         if not isinstance(name, str) or not name.strip():
             raise ValueError("utility name must be a non-empty string")
         utility_name = name.strip()
+        network = self._selected_network()
+        resolved_period_id = network.resolve_period_id(period_id)
         total = 0.0
-        for exchanger in self._selected_network().exchangers:
+        for exchanger in network.exchangers:
             if (
                 exchanger.kind is HeatExchangerKind.HOT_UTILITY
                 and exchanger.source_stream == utility_name
@@ -54,7 +56,9 @@ class _DesignNetworkAccessor:
                 exchanger.kind is HeatExchangerKind.COLD_UTILITY
                 and exchanger.sink_stream == utility_name
             ):
-                total += float(exchanger.duty)
+                state = exchanger.state(resolved_period_id)
+                if state.active:
+                    total += float(state.duty)
         return total
 
     def _selected_network(self) -> "HeatExchangerNetwork":

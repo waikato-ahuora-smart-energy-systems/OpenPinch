@@ -81,7 +81,7 @@ def test_four_stream_best_esm_snapshot_matches_identity_labelled_network() -> No
         assert exchanger.sink_stream == expected_exchanger["sink_stream"]
         assert exchanger.stage == expected_exchanger["stage"]
         _assert_close(
-            exchanger.duty,
+            exchanger.state().duty,
             expected_exchanger["duty"],
             abs_tol=tolerances["duty_abs"],
             rel_tol=tolerances["duty_rel"],

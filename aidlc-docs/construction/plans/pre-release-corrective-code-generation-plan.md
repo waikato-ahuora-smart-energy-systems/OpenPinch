@@ -57,17 +57,17 @@ its work completes.
 
 ## Step 3 - PR 3: Period-Native HEN Results
 
-- [ ] Add failing later-period-only match, explicit non-isothermal temperature,
+- [x] Add failing later-period-only match, explicit non-isothermal temperature,
   period-state serialization, and ambiguous-access regression tests.
-- [ ] Introduce `HeatExchangerPeriodState` and replace exchanger operational
+- [x] Introduce `HeatExchangerPeriodState` and replace exchanger operational
   scalar fields with non-empty ordered period states.
-- [ ] Require explicit period identity for multiperiod network queries, diagrams,
+- [x] Require explicit period identity for multiperiod network queries, diagrams,
   exports, and controllability; allow omission only for single-period networks.
-- [ ] Extract all period recovery and utility states, retain later-only matches,
+- [x] Extract all period recovery and utility states, retain later-only matches,
   and prefer explicit branch outlet temperatures over CP arithmetic.
-- [ ] Migrate internal consumers, public schemas, exports, diagrams, notebooks,
+- [x] Migrate internal consumers, public schemas, exports, diagrams, notebooks,
   examples, fixtures, and documentation to the period-native contract.
-- [ ] Run focused, solver-marked, canonical HEN tier 0/1, full, Ruff,
+- [x] Run focused, solver-marked, canonical HEN tier 0/1, full, Ruff,
   documentation, packaging, and patch-hygiene checks; record PR 3 evidence.
 
 ## Step 4 - PR 4: Summary Isolation and HPR Economics

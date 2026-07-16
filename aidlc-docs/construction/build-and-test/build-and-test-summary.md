@@ -219,3 +219,43 @@ committed as the first stacked pre-release change.
 
 PR 2 Period-Native PDM and Utility Constraints is independently green and
 ready to be committed as the second stacked pre-release change.
+
+## Pre-Release Corrective PR 3 Evidence
+
+### Results
+
+- Focused HEN result suites: 307 passed with nine intentional deselections;
+  reporting added 52 passes and focused controllability/thermal coverage added
+  25 passes.
+- Complete non-solver repository matrix: 1,999 passed and four solver-marked
+  cases deselected in 127.17 seconds.
+- Solver-marked matrix: three passed and one intentionally skipped in 79.24
+  seconds.
+- Canonical live-solver baseline: Four-stream Linnhoff/Ahmad passed in 69.80
+  seconds.
+- Canonical tier 0/1 benchmark: twelve case/tier results succeeded. Nine-stream
+  tier 1 and Six-stream Yee tier 1 reached their bounded solve timeouts. The
+  latter also timed out in isolated 180-second serial and parallel retries;
+  the solve did not return a network to the PR 3 extraction/result code.
+- Benchmark harness regressions: 10 passed.
+- Ruff: repository-wide lint passed and all 34 changed Python files were already
+  formatted. A whole-repository format check reported six unrelated existing
+  formatting drifts outside this change.
+- Documentation and artifacts: notebook JSON parsing, a warning-free 59-source
+  Sphinx build, and isolated OpenPinch 0.4.6 wheel/source builds passed.
+- Patch hygiene: `git diff --check` passed and all benchmark, Sphinx, and build
+  outputs remained outside the worktree.
+
+### Extension Compliance
+
+- Security Baseline: disabled; N/A for this stage.
+- Resiliency Baseline: disabled; N/A for this stage.
+- Property-Based Testing (Partial): compliant. Existing generated transaction,
+  serialization, and multiperiod invariants remained green; PR 3 adds explicit
+  deterministic period-state contract and serialization coverage.
+
+### Status
+
+PR 3 Period-Native HEN Results is independently green and ready to be committed
+as the third stacked pre-release change. The two bounded tier-1 solve timeouts
+are recorded as performance observations, not correctness passes.

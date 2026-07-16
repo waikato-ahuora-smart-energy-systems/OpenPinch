@@ -101,7 +101,8 @@ The selected heat exchanger network can construct its own grid diagram through
 .. code-block:: python
 
    design = problem.results.design
-   diagram = design.network.build_grid_diagram()
+   period_id = design.network.period_ids[0]
+   diagram = design.network.build_grid_diagram(period_id=period_id)
 
 The standalone service remains available for batch rendering one or more
 :class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
@@ -118,12 +119,16 @@ Solved heat exchanger networks can also be screened for steady-state
 controllability. The service treats process-stream outlet temperatures as
 controlled outputs and practical bypass or utility-flow adjustments as
 manipulated variables, then scores the resulting duty-normalised interaction
-matrix:
+matrix.
+
+For multiperiod networks, pass ``period_id`` to both diagram and
+controllability services. OpenPinch does not silently select period zero.
 
 .. code-block:: python
 
    design = problem.results.design
-   assessment = design.network.quantify_controllability()
+   period_id = design.network.period_ids[0]
+   assessment = design.network.quantify_controllability(period_id=period_id)
    assessment.score
    assessment.components.rank
 

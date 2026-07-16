@@ -134,13 +134,16 @@ network at ``problem.design.network``:
 ``utility(name)``.
 
 Grid diagrams for the selected network are created with
-``design.network.build_grid_diagram(...)``. The standalone
+``design.network.build_grid_diagram(period_id=...)``. The standalone
 :func:`OpenPinch.services.network_grid_diagram.build_grid_diagram` service still
 accepts one or more
 :class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
 objects, and
-``design.grid_diagram(solution_rank=...)`` remains available as a convenience
-wrapper that selects a ranked network first. The returned object wraps the
+``design.grid_diagram(solution_rank=..., period_id=...)`` remains available as
+a convenience wrapper that selects a ranked network first. Multiperiod networks
+require an explicit period for duties, temperatures, diagrams, exports, and
+controllability; omission is accepted only for a single-period network. The
+returned object wraps the
 Plotly ``fig``, a lightweight drawing adapter ``ax``, the selected ``network``,
 and the normalized ``grid_model`` used to draw the topology.
 

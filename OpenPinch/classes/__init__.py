@@ -3,6 +3,7 @@
 from .heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from .heat_exchanger_network import HeatExchangerNetwork
@@ -18,6 +19,7 @@ __all__ = [
     "HeatExchanger",
     "HeatExchangerKind",
     "HeatExchangerNetwork",
+    "HeatExchangerPeriodState",
     "HeatExchangerStreamRole",
     "ProblemTable",
     "Stream",

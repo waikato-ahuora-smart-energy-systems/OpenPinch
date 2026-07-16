@@ -17,6 +17,7 @@ def build_grid_diagram(
     networks: HeatExchangerNetwork | Sequence[HeatExchangerNetwork],
     *,
     index: int | None = None,
+    period_id: str | None = None,
     stream_line_width: float = _DEFAULT_STREAM_LINE_WIDTH,
     temperature_scaled: bool = False,
 ) -> HeatExchangerNetworkGridDiagram | tuple[HeatExchangerNetworkGridDiagram, ...]:
@@ -26,6 +27,7 @@ def build_grid_diagram(
             raise IndexError("index is 0-based and must be 0 for a single network")
         return _build_single_grid_diagram(
             networks,
+            period_id=period_id,
             stream_line_width=stream_line_width,
             temperature_scaled=temperature_scaled,
         )
@@ -46,6 +48,7 @@ def build_grid_diagram(
         return tuple(
             _build_single_grid_diagram(
                 network,
+                period_id=period_id,
                 stream_line_width=stream_line_width,
                 temperature_scaled=temperature_scaled,
             )
@@ -60,6 +63,7 @@ def build_grid_diagram(
         )
     return _build_single_grid_diagram(
         selected_networks[index],
+        period_id=period_id,
         stream_line_width=stream_line_width,
         temperature_scaled=temperature_scaled,
     )
@@ -77,10 +81,11 @@ def _validate_network_sequence(networks: Sequence[Any]) -> None:
 def _build_single_grid_diagram(
     network: HeatExchangerNetwork,
     *,
+    period_id: str | None,
     stream_line_width: float,
     temperature_scaled: bool,
 ) -> HeatExchangerNetworkGridDiagram:
-    grid_model = build_grid_model(network)
+    grid_model = build_grid_model(network, period_id=period_id)
     plotly_go = require_network_grid_diagram_dependency(
         "plotly.graph_objects",
         package="plotly",

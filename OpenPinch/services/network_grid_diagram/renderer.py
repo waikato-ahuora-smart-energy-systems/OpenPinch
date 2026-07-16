@@ -651,8 +651,8 @@ class _PlotlyGridRenderer:
         stage_index: int,
     ) -> tuple[bool, float, bool, float, int, int]:
         match = self.recovery_match_by_position[(hot_index, cold_index, stage_index)]
-        source_mid_temperature = match.exchanger.source_mid_temperature
-        sink_mid_temperature = match.exchanger.sink_mid_temperature
+        source_mid_temperature = match.state.source_mid_temperature
+        sink_mid_temperature = match.state.sink_mid_temperature
         return (
             source_mid_temperature is None,
             0.0 if source_mid_temperature is None else -source_mid_temperature,
@@ -1095,13 +1095,13 @@ class _PlotlyGridRenderer:
                     x,
                     node_y,
                     match,
-                    match.exchanger.source_inlet_temperature,
+                    match.state.source_inlet_temperature,
                 )
                 for x, node_y, match in positions
                 if match.source_stream == stream
                 and match.exchanger.kind
                 in (HeatExchangerKind.RECOVERY, HeatExchangerKind.COLD_UTILITY)
-                and match.exchanger.source_inlet_temperature is not None
+                and match.state.source_inlet_temperature is not None
             ]
             candidates.sort(key=lambda item: item[0])
         else:
@@ -1110,13 +1110,13 @@ class _PlotlyGridRenderer:
                     x,
                     node_y,
                     match,
-                    match.exchanger.sink_inlet_temperature,
+                    match.state.sink_inlet_temperature,
                 )
                 for x, node_y, match in positions
                 if match.sink_stream == stream
                 and match.exchanger.kind
                 in (HeatExchangerKind.RECOVERY, HeatExchangerKind.HOT_UTILITY)
-                and match.exchanger.sink_inlet_temperature is not None
+                and match.state.sink_inlet_temperature is not None
             ]
             candidates.sort(key=lambda item: item[0], reverse=True)
 
@@ -1228,14 +1228,14 @@ class _PlotlyGridRenderer:
         return (
             self._x_from_temperature(
                 _midpoint_temperature(
-                    match.exchanger.source_inlet_temperature,
-                    match.exchanger.source_outlet_temperature,
+                    match.state.source_inlet_temperature,
+                    match.state.source_outlet_temperature,
                 )
             ),
             self._x_from_temperature(
                 _midpoint_temperature(
-                    match.exchanger.sink_inlet_temperature,
-                    match.exchanger.sink_outlet_temperature,
+                    match.state.sink_inlet_temperature,
+                    match.state.sink_outlet_temperature,
                 )
             ),
         )
@@ -1244,8 +1244,8 @@ class _PlotlyGridRenderer:
         if self.temperature_scaled:
             return self._x_from_temperature(
                 _midpoint_temperature(
-                    match.exchanger.sink_inlet_temperature,
-                    match.exchanger.sink_outlet_temperature,
+                    match.state.sink_inlet_temperature,
+                    match.state.sink_outlet_temperature,
                 )
             )
         return self.x_start + (self.stage_start - self.x_start) / 2
@@ -1254,8 +1254,8 @@ class _PlotlyGridRenderer:
         if self.temperature_scaled:
             return self._x_from_temperature(
                 _midpoint_temperature(
-                    match.exchanger.source_inlet_temperature,
-                    match.exchanger.source_outlet_temperature,
+                    match.state.source_inlet_temperature,
+                    match.state.source_outlet_temperature,
                 )
             )
         return (
@@ -1282,50 +1282,50 @@ def _stream_endpoint_temperatures(
     cold_out: dict[str, float] = {}
 
     for match in grid_model.recovery_matches:
-        exchanger = match.exchanger
-        if exchanger.source_inlet_temperature is not None:
+        state = match.state
+        if state.source_inlet_temperature is not None:
             hot_in[match.source_stream] = max(
-                hot_in.get(match.source_stream, exchanger.source_inlet_temperature),
-                exchanger.source_inlet_temperature,
+                hot_in.get(match.source_stream, state.source_inlet_temperature),
+                state.source_inlet_temperature,
             )
-        if exchanger.source_outlet_temperature is not None:
+        if state.source_outlet_temperature is not None:
             hot_out[match.source_stream] = min(
-                hot_out.get(match.source_stream, exchanger.source_outlet_temperature),
-                exchanger.source_outlet_temperature,
+                hot_out.get(match.source_stream, state.source_outlet_temperature),
+                state.source_outlet_temperature,
             )
-        if exchanger.sink_inlet_temperature is not None:
+        if state.sink_inlet_temperature is not None:
             cold_in[match.sink_stream] = min(
-                cold_in.get(match.sink_stream, exchanger.sink_inlet_temperature),
-                exchanger.sink_inlet_temperature,
+                cold_in.get(match.sink_stream, state.sink_inlet_temperature),
+                state.sink_inlet_temperature,
             )
-        if exchanger.sink_outlet_temperature is not None:
+        if state.sink_outlet_temperature is not None:
             cold_out[match.sink_stream] = max(
-                cold_out.get(match.sink_stream, exchanger.sink_outlet_temperature),
-                exchanger.sink_outlet_temperature,
+                cold_out.get(match.sink_stream, state.sink_outlet_temperature),
+                state.sink_outlet_temperature,
             )
     for match in grid_model.hot_utility_matches:
-        exchanger = match.exchanger
-        if exchanger.sink_inlet_temperature is not None:
+        state = match.state
+        if state.sink_inlet_temperature is not None:
             cold_in[match.sink_stream] = min(
-                cold_in.get(match.sink_stream, exchanger.sink_inlet_temperature),
-                exchanger.sink_inlet_temperature,
+                cold_in.get(match.sink_stream, state.sink_inlet_temperature),
+                state.sink_inlet_temperature,
             )
-        if exchanger.sink_outlet_temperature is not None:
+        if state.sink_outlet_temperature is not None:
             cold_out[match.sink_stream] = max(
-                cold_out.get(match.sink_stream, exchanger.sink_outlet_temperature),
-                exchanger.sink_outlet_temperature,
+                cold_out.get(match.sink_stream, state.sink_outlet_temperature),
+                state.sink_outlet_temperature,
             )
     for match in grid_model.cold_utility_matches:
-        exchanger = match.exchanger
-        if exchanger.source_inlet_temperature is not None:
+        state = match.state
+        if state.source_inlet_temperature is not None:
             hot_in[match.source_stream] = max(
-                hot_in.get(match.source_stream, exchanger.source_inlet_temperature),
-                exchanger.source_inlet_temperature,
+                hot_in.get(match.source_stream, state.source_inlet_temperature),
+                state.source_inlet_temperature,
             )
-        if exchanger.source_outlet_temperature is not None:
+        if state.source_outlet_temperature is not None:
             hot_out[match.source_stream] = min(
-                hot_out.get(match.source_stream, exchanger.source_outlet_temperature),
-                exchanger.source_outlet_temperature,
+                hot_out.get(match.source_stream, state.source_outlet_temperature),
+                state.source_outlet_temperature,
             )
 
     return {
@@ -1341,34 +1341,34 @@ def _temperature_scale(
 ) -> tuple[float, float]:
     temperatures: list[float] = []
     for match in grid_model.recovery_matches:
-        exchanger = match.exchanger
+        state = match.state
         temperatures.extend(
             temperature
             for temperature in (
-                exchanger.source_inlet_temperature,
-                exchanger.source_outlet_temperature,
-                exchanger.sink_inlet_temperature,
-                exchanger.sink_outlet_temperature,
+                state.source_inlet_temperature,
+                state.source_outlet_temperature,
+                state.sink_inlet_temperature,
+                state.sink_outlet_temperature,
             )
             if temperature is not None
         )
     for match in grid_model.hot_utility_matches:
-        exchanger = match.exchanger
+        state = match.state
         temperatures.extend(
             temperature
             for temperature in (
-                exchanger.sink_inlet_temperature,
-                exchanger.sink_outlet_temperature,
+                state.sink_inlet_temperature,
+                state.sink_outlet_temperature,
             )
             if temperature is not None
         )
     for match in grid_model.cold_utility_matches:
-        exchanger = match.exchanger
+        state = match.state
         temperatures.extend(
             temperature
             for temperature in (
-                exchanger.source_inlet_temperature,
-                exchanger.source_outlet_temperature,
+                state.source_inlet_temperature,
+                state.source_outlet_temperature,
             )
             if temperature is not None
         )

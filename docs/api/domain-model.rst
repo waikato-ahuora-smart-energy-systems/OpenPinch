@@ -48,14 +48,20 @@ prices differ again.
 
 ``HeatExchangerNetwork``
    Selected heat exchanger network design result with ordered exchanger
-   records, total-duty helpers, and
-   ``build_grid_diagram(...)`` for Plotly grid inspection.
+   records, period-aware total-duty helpers, and
+   ``build_grid_diagram(period_id=...)`` for Plotly grid inspection. Period
+   identity may be omitted only when the network has exactly one period.
 
 ``HeatExchanger``
    One physical parent-level match in a synthesized network. For segmented
    streams, ``segment_area_contributions`` contains ordered diagnostic slices;
-   the exchanger exposes period duty and area totals plus the maximum
-   period-total design area without treating those slices as topology nodes.
+   shared topology, maximum design area, and capital data remain on the
+   exchanger. Operating data is read from ``state(period_id)``.
+
+``HeatExchangerPeriodState``
+   One ordered operating-period record for an exchanger, containing duty,
+   activity, terminal approaches, branch split fractions, and source/sink
+   inlet and outlet temperatures. Multiperiod access always names the period.
 
 These are the objects you inspect when you need to understand how a case was
 prepared or why a target changed after mutating the in-memory model.
@@ -88,6 +94,10 @@ Key Classes
    :no-index:
 
 .. autoclass:: OpenPinch.classes.heat_exchanger.HeatExchanger
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.classes.heat_exchanger.HeatExchangerPeriodState
    :members:
    :no-index:
 

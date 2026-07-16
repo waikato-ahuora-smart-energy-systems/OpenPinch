@@ -18,6 +18,7 @@ from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerNetwork,
+    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from OpenPinch.classes.pinch_problem import PinchProblem
@@ -66,7 +67,13 @@ def _network() -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=100.0,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=100.0,
+                    ),
+                ),
                 area=20.0,
             ),
         ),
@@ -533,8 +540,14 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=3,
-                duty=100.0,
-                approach_temperatures=(12.0,),
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=100.0,
+                        approach_temperatures=(12.0,),
+                    ),
+                ),
             ),
         ),
         source_metadata={"solver_dTmin": 9.0},
@@ -547,7 +560,13 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
                 sink_stream="C1",
                 source_stream_role=HeatExchangerStreamRole.UTILITY,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
-                duty=10.0,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=10.0,
+                    ),
+                ),
             ),
         )
     )
@@ -560,8 +579,14 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=100.0,
-                approach_temperatures=(7.0,),
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=100.0,
+                        approach_temperatures=(7.0,),
+                    ),
+                ),
             ),
         )
     )

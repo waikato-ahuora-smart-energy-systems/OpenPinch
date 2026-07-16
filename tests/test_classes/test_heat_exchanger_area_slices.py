@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 from hypothesis import given, settings
 
-from OpenPinch.classes.heat_exchanger import HeatExchanger, HeatExchangerAreaSlice
+from OpenPinch.classes.heat_exchanger import (
+    HeatExchanger,
+    HeatExchangerAreaSlice,
+    HeatExchangerPeriodState,
+)
 from OpenPinch.lib.enums import HeatExchangerKind, HeatExchangerStreamRole
 from tests.strategies.heat_exchangers import heat_exchangers_with_area_slices
 
@@ -35,7 +39,9 @@ def _exchanger(*, slices=(), area=None) -> HeatExchanger:
         source_stream_role=HeatExchangerStreamRole.PROCESS,
         sink_stream_role=HeatExchangerStreamRole.PROCESS,
         stage=1,
-        duty=10.0,
+        period_states=(
+            HeatExchangerPeriodState(period_id="0", period_idx=0, duty=10.0),
+        ),
         area=area,
         segment_area_contributions=tuple(slices),
     )
