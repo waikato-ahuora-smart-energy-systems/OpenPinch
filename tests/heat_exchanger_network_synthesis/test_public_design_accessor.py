@@ -23,7 +23,7 @@ from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib import HeatExchangerKind
 from OpenPinch.lib.schemas.io import TargetInput
-from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
+from OpenPinch.lib.schemas.synthesis.common import HeatExchangerNetworkSynthesisManifest
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.fake_executor import (
     FakeSynthesisExecutor,
 )

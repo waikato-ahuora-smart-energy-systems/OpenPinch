@@ -11,7 +11,7 @@ from OpenPinch.classes.heat_exchanger import (
     HeatExchangerStreamRole,
 )
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
-from OpenPinch.lib.schemas.synthesis import (
+from OpenPinch.lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )

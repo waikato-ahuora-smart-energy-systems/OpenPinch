@@ -12,35 +12,19 @@ import logging
 import math
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
 
 from ..common.indexing import build_index_grid
 from ..common.solver.arrays import PreparedSolverArrays
+from ._stagewise.evolution import (
+    _EvolutionBranchState,
+    _EvolutionCandidateSpec,
+)
 from .base import BaseHeatExchangerNetworkModel
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class _EvolutionCandidateSpec:
-    kind: Literal["minus", "plus"]
-    unit: int
-    branch_index: int
-    rank: int
-    prev_case: Any
-    position: tuple[int, int, int]
-    z_allowed: list
-    signature: tuple[tuple[int, int, int], ...]
-
-
-@dataclass
-class _EvolutionBranchState:
-    model: Any
-    best_tac: float
-    stale_depths: int = 0
 
 
 class StageWiseModel(BaseHeatExchangerNetworkModel):

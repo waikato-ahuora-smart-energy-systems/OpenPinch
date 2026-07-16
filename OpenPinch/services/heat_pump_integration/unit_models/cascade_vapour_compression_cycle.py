@@ -590,7 +590,7 @@ class CascadeVapourCompressionCycle:
         def _finite_positive_sum(values) -> float:
             try:
                 arr = np.asarray(values, dtype=float).reshape(-1)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return 0.0
             finite = arr[np.isfinite(arr)]
             if finite.size == 0:

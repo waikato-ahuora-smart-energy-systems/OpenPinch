@@ -5,12 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from .....lib.schemas.synthesis import (
+from .....lib.schemas.synthesis.common import (
     HeatExchangerNetworkSynthesisManifest,
-    HeatExchangerNetworkSynthesisResult,
+    SynthesisMethod,
+)
+from .....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
+from .....lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
-    SynthesisMethod,
 )
 from ..errors import WorkflowContractError
 from ..execution.pathways import pathways_from_metadata

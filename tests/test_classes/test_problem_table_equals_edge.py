@@ -15,6 +15,7 @@ from OpenPinch.classes._problem_table.equality import (
     tables_have_matching_shapes,
     try_cast_object_column_to_float,
 )
+from OpenPinch.classes._problem_table.intervals import TemperatureIntervalEngine
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.lib.enums import ProblemTableLabel as PT
 
@@ -318,25 +319,28 @@ def test_insert_temperature_interval_helper_guard_paths():
     assert pt_none.insert_temperature_interval([120.0]) == 0
 
     pt = _default_table()
-    assert pt._Ts_needing_insertion(np.array([], dtype=float)).size == 0
-    deduped = pt._dedupe_monotonic(np.array([5.0, 5.0, 4.0], dtype=float))
+    engine = TemperatureIntervalEngine(pt)
+    assert engine._Ts_needing_insertion(np.array([], dtype=float)).size == 0
+    deduped = engine._dedupe_monotonic(np.array([5.0, 5.0, 4.0], dtype=float))
     assert deduped.tolist() == [5.0, 4.0]
 
-    same_data, inserted = pt._apply_interval_map({}, np.array([]), np.array([]))
+    same_data, inserted = engine._apply_interval_map({}, np.array([]), np.array([]))
     assert inserted == 0
     assert np.allclose(same_data, pt.data, equal_nan=True)
 
-    rows, top_adj, bot_adj = pt._build_mid_block(pt.data[0], pt.data[1], np.array([]))
+    rows, top_adj, bot_adj = engine._build_mid_block(
+        pt.data[0], pt.data[1], np.array([])
+    )
     assert rows.size == 0
     assert top_adj.shape == pt.data[0].shape
     assert bot_adj.shape == pt.data[1].shape
 
     new_data = np.zeros((2, pt.data.shape[1]))
     row_meta = [{"type": "top"}, {"type": "top"}]
-    pt._rebuild_edge_block(new_data, row_meta, positions=[0], is_top=True)
+    engine._rebuild_edge_block(new_data, row_meta, positions=[0], is_top=True)
 
-    pt._insert_mid_block(new_data, positions=[], upper_pos=0, lower_pos=1)
-    pt._insert_mid_block(new_data, positions=[0], upper_pos=-1, lower_pos=-1)
+    engine._insert_mid_block(new_data, positions=[], upper_pos=0, lower_pos=1)
+    engine._insert_mid_block(new_data, positions=[0], upper_pos=-1, lower_pos=-1)
 
 
 def test_temperature_block_and_interpolation_edge_paths():
@@ -347,7 +351,8 @@ def test_temperature_block_and_interpolation_edge_paths():
         },
         add_default_labels=False,
     )
-    empty_block, _ = mini._build_top_or_bottom_block(
+    mini_engine = TemperatureIntervalEngine(mini)
+    empty_block, _ = mini_engine._build_top_or_bottom_block(
         row_neighbor=np.array([100.0, 0.0], dtype=float),
         T_vals=np.array([]),
         is_top_block=True,
@@ -355,21 +360,22 @@ def test_temperature_block_and_interpolation_edge_paths():
     assert empty_block.shape == (0, 2)
 
     full = _default_table()
+    engine = TemperatureIntervalEngine(full)
     row_neighbor = full.data[0].copy()
-    block, _ = full._build_top_or_bottom_block(
+    block, _ = engine._build_top_or_bottom_block(
         row_neighbor=row_neighbor,
         T_vals=np.array([220.0, 240.0, 260.0], dtype=float),
         is_top_block=True,
     )
     assert block.shape[0] == 3
 
-    rows0, (t_idx, delta_idx) = full._initialise_insert_rows(
+    rows0, (t_idx, delta_idx) = engine._initialise_insert_rows(
         full.data[0], full.data[1], np.array([])
     )
     assert rows0.shape[0] == 0
     assert isinstance(t_idx, int) and isinstance(delta_idx, int)
 
-    full._interpolate_heat_columns(
+    engine._interpolate_heat_columns(
         rows=np.empty((0, full.data.shape[1])),
         row_top=full.data[0],
         row_bot=full.data[1],
@@ -379,7 +385,7 @@ def test_temperature_block_and_interpolation_edge_paths():
     same_top = full.data[0].copy()
     same_bot = full.data[0].copy()
     rows_same = np.array([same_top.copy()])
-    full._interpolate_heat_columns(
+    engine._interpolate_heat_columns(
         rows=rows_same,
         row_top=same_top,
         row_bot=same_bot,
@@ -392,7 +398,7 @@ def test_temperature_block_and_interpolation_edge_paths():
     bot[full.col_index[PT.H_HOT.value]] = 11.0
     rows = np.array([top.copy()])
     rows[0, full.col_index[PT.T.value]] = 150.0
-    full._interpolate_heat_columns(
+    engine._interpolate_heat_columns(
         rows=rows,
         row_top=top,
         row_bot=bot,
@@ -400,7 +406,7 @@ def test_temperature_block_and_interpolation_edge_paths():
     )
     assert rows[0, full.col_index[PT.H_HOT.value]] == pytest.approx(11.0)
 
-    adjusted = full._adjust_bottom_row(
+    adjusted = engine._adjust_bottom_row(
         row_bot=bot,
         rows=np.empty((0, full.data.shape[1])),
         t_idx=full.col_index[PT.T.value],

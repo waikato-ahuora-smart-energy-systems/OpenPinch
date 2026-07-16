@@ -12,11 +12,14 @@ import pytest
 from OpenPinch.classes import Zone
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.lib import *
-from OpenPinch.services.common.graph_data import (
+from OpenPinch.services.common._graph_data.metadata import GraphSeriesMeta
+from OpenPinch.services.common._graph_data.specifications import (
     COMPOSITE_GRAPH_SPECS,
     GCC_GRAPH_SPECS,
     GRAPH_BUILD_SPECS,
     GraphBuildSpec,
+)
+from OpenPinch.services.common.graph_data import (
     _build_gcc_segments,
     _classify_segment,
     _column_to_list,
@@ -39,7 +42,6 @@ from OpenPinch.services.common.graph_data import (
     get_output_graph_data,
     iter_available_graph_specs,
 )
-from OpenPinch.services.common.graph_series_meta import GraphSeriesMeta
 
 GRAPH_FIXTURE = (
     Path(__file__).resolve().parents[1] / "fixtures" / "graph_data_cases.json"

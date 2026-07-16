@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .....lib.enums import HeatExchangerNetworkDesignMethod, HENDesignMethod
-from .....lib.schemas.synthesis import SynthesisMethod
+from .....lib.schemas.synthesis.common import SynthesisMethod
 from .pathways import tier_evm_branch_breadth, tier_pdm_multipliers
 
 StagePackingScope = str

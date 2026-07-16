@@ -8,10 +8,8 @@ minimal so user projects can layer additional controls as needed.
 
 from __future__ import annotations
 
-import sys
-from dataclasses import dataclass
 from io import BytesIO
-from typing import Dict, Iterator, List, Mapping, MutableMapping, Optional, Tuple
+from typing import Dict, Iterator, List, Mapping, Optional, Tuple
 
 import pandas as pd
 
@@ -20,10 +18,14 @@ from ..classes.zone import Zone
 from ..lib.enums import LineColour
 from ..lib.schemas.targets import BaseTargetModel
 from ..services.common.graph_data import get_output_graph_data
-from ..utils.optional_dependencies import optional_dependency_error
+from ._web_graphing.dependencies import (
+    _require_openpyxl,
+    _require_plotly,
+    _require_streamlit,
+)
+from ._web_graphing.state import StreamlitGraphSet as _StreamlitGraphSet
 
 __all__ = [
-    "StreamlitGraphSet",
     "collect_targets",
     "problem_table_to_dataframe",
     "render_streamlit_dashboard",
@@ -39,75 +41,6 @@ _SEGMENT_COLOUR_MAP: Dict[int, str] = {
     LineColour.Other.value: "#7f7f7f",  # neutral grey
     LineColour.Black.value: "#111111",
 }
-
-
-def _require_plotly():
-    try:
-        import plotly.graph_objects as go
-    except ImportError as exc:  # pragma: no cover - optional dependency guard
-        raise ImportError(
-            optional_dependency_error(
-                package="Plotly",
-                purpose="graph rendering",
-                extras=("notebook", "dashboard"),
-                docs="the graphing and exporting results guides",
-            )
-        ) from exc
-    else:
-        return go
-
-
-def _require_streamlit():
-    streamlit_mod = sys.modules.get("streamlit")
-    if streamlit_mod is not None:
-        return streamlit_mod
-
-    try:
-        import streamlit as st
-    except ImportError as exc:  # pragma: no cover - optional dependency guard
-        raise ImportError(
-            optional_dependency_error(
-                package="Streamlit",
-                purpose="render_streamlit_dashboard",
-                extras="dashboard",
-                docs="the first-solve Python guide",
-            )
-        ) from exc
-    else:
-        return st
-
-
-def _require_openpyxl():
-    try:
-        import openpyxl
-    except ImportError as exc:  # pragma: no cover - optional dependency guard
-        raise ImportError(
-            optional_dependency_error(
-                package="OpenPyXL",
-                purpose="dashboard Excel downloads",
-                extras=("dashboard", "notebook"),
-                docs="the exporting results guide",
-            )
-        ) from exc
-    return openpyxl
-
-
-@dataclass(slots=True)
-class StreamlitGraphSet:
-    """Convenience wrapper storing graphs grouped by target name."""
-
-    name: str
-    graphs: List[MutableMapping]
-
-    @classmethod
-    def from_graph_data(
-        cls, graph_set_data: Mapping[str, object]
-    ) -> "StreamlitGraphSet":
-        """Build a graph-set wrapper from JSON-style graph data."""
-        return cls(
-            name=str(graph_set_data.get("name", "Graph Set")),
-            graphs=list(graph_set_data.get("graphs", [])),
-        )
 
 
 def collect_targets(zone: Zone) -> Dict[str, BaseTargetModel]:
@@ -182,7 +115,7 @@ def render_streamlit_dashboard(
 
     graph_data = graph_data or get_output_graph_data(zone)
     graph_sets = {
-        name: StreamlitGraphSet.from_graph_data(graph_set_data)
+        name: _StreamlitGraphSet.from_graph_data(graph_set_data)
         for name, graph_set_data in graph_data.items()
     }
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
+import numpy as np
+
 
 @lru_cache(maxsize=256)
 def normalise_unit_text(unit: str | None) -> str | None:
@@ -38,3 +40,45 @@ def clean_unit_text(text: str) -> str:
 def unit_object(registry, unit: str):
     """Return one registry unit; registry-level caching remains authoritative."""
     return registry.Unit(unit)
+
+
+def format_units(units) -> str:
+    """Format units for display using stable OpenPinch spellings."""
+    return clean_unit_text(format(units, "~"))
+
+
+def serialise_units(units) -> str:
+    """Format units for stable serialized output."""
+    return clean_unit_text(format(units, "~"))
+
+
+def unit_from_normalised(registry, unit: str):
+    """Resolve an already-normalized unit through the owning registry."""
+    return unit_object(registry, unit)
+
+
+def quantity_is_dimensionless(quantity) -> bool:
+    """Return whether a Pint quantity is dimensionless."""
+    return str(quantity.units) == "dimensionless"
+
+
+def same_dimensionality(quantity, unit: str, *, quantity_factory, registry) -> bool:
+    """Safely compare quantity dimensionality with a normalized unit."""
+    try:
+        expected = quantity_factory(1.0, unit_object(registry, unit))
+        return quantity.dimensionality == expected.dimensionality
+    except Exception:
+        return False
+
+
+def normalise_weights(weights, *, expected_len: int) -> np.ndarray | None:
+    """Validate and normalize optional passive period weights."""
+    if weights is None:
+        return None
+    values = np.asarray(weights, dtype=float).reshape(-1)
+    if values.size != expected_len:
+        raise ValueError("weights length must match the number of periods.")
+    total = float(values.sum())
+    if total > 0.0:
+        values = values / total
+    return values

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
-from .....lib.schemas.synthesis import HeatExchangerNetworkTopologyRestriction
+from .....lib.schemas.synthesis.topology import HeatExchangerNetworkTopologyRestriction
 from ...targeting_services.topology import (
     canonical_topology_restrictions,
     topology_restriction_signature,
@@ -13,10 +13,8 @@ from ...targeting_services.topology import (
 from .verification import is_network_feasible
 
 if TYPE_CHECKING:
-    from .....lib.schemas.synthesis import (
-        HeatExchangerNetworkSynthesisResult,
-        HeatExchangerNetworkSynthesisTaskOutcome,
-    )
+    from .....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
+from .....lib.schemas.synthesis.task import HeatExchangerNetworkSynthesisTaskOutcome
 
 
 def rank_unique_network_outcomes(

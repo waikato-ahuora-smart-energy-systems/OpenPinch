@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 
@@ -32,6 +31,7 @@ from ..common.shared import (
     solve_hpr_multiperiod_placement,
     validate_vapour_hp_refrigerant_ls,
 )
+from ._multiperiod.period_case import PreparedHPRPeriodCase as _PreparedHPRPeriodCase
 from .cascade_carnot import (
     _compute_cascade_carnot_cycle_obj,
     _get_cascade_carnot_hp_opt_setup,
@@ -58,24 +58,11 @@ from .vapour_compression_mvr import (
 )
 
 __all__ = [
-    "PreparedHPRPeriodCase",
     "build_multiperiod_hpr_cases",
     "get_multiperiod_hpr_targets",
     "period_case_by_id",
     "period_id_for_index",
 ]
-
-
-@dataclass
-class PreparedHPRPeriodCase:
-    """Runtime data for one period in a shared HPR design solve."""
-
-    period_id: str
-    period_idx: int
-    weight: float
-    solver_case: HPRPeriodCase
-    base_target: Any
-    optimizer_pt: ProblemTable
 
 
 def build_multiperiod_hpr_cases(
@@ -84,7 +71,7 @@ def build_multiperiod_hpr_cases(
     is_heat_pumping: bool,
     is_direct: bool,
     args: dict | None = None,
-) -> list[PreparedHPRPeriodCase]:
+) -> list[_PreparedHPRPeriodCase]:
     """Prepare aligned single-period HPR inputs for one shared design vector."""
     raw_cases = []
     weights = _canonical_period_weights(zone)
@@ -138,7 +125,7 @@ def build_multiperiod_hpr_cases(
                 f"period {period_id!r}."
             )
         period_cases.append(
-            PreparedHPRPeriodCase(
+            _PreparedHPRPeriodCase(
                 period_id=period_id,
                 period_idx=period_idx,
                 weight=case["weight"],
@@ -166,7 +153,7 @@ def build_multiperiod_hpr_cases(
 
 def get_multiperiod_hpr_targets(
     *,
-    period_cases: list[PreparedHPRPeriodCase],
+    period_cases: list[_PreparedHPRPeriodCase],
     selected_period_id: str,
     selected_period_idx: int,
 ) -> HeatPumpTargetOutputs:
@@ -203,9 +190,9 @@ def period_id_for_index(zone: Zone, period_idx: int) -> str:
 
 
 def period_case_by_id(
-    period_cases: list[PreparedHPRPeriodCase],
+    period_cases: list[_PreparedHPRPeriodCase],
     period_id: str,
-) -> PreparedHPRPeriodCase:
+) -> _PreparedHPRPeriodCase:
     for case in period_cases:
         if str(case.period_id) == str(period_id):
             return case

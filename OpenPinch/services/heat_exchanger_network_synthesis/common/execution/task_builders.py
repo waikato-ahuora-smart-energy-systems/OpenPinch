@@ -6,11 +6,9 @@ from typing import Sequence
 
 from .....classes.heat_exchanger import HeatExchangerKind
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
-from .....lib.schemas.synthesis import (
-    HeatExchangerNetworkSynthesisTaskOutcome,
-    HeatExchangerNetworkTopologyRestriction,
-    SynthesisMethod,
-)
+from .....lib.schemas.synthesis.common import SynthesisMethod
+from .....lib.schemas.synthesis.task import HeatExchangerNetworkSynthesisTaskOutcome
+from .....lib.schemas.synthesis.topology import HeatExchangerNetworkTopologyRestriction
 from ..errors import WorkflowContractError
 from .settings import SynthesisWorkflowSettings
 

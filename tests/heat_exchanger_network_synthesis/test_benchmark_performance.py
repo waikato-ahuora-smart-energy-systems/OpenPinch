@@ -8,7 +8,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from OpenPinch import PinchProblem
-from OpenPinch.lib.schemas.synthesis import (
+from OpenPinch.lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )

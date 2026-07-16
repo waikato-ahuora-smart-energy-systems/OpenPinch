@@ -11,10 +11,10 @@ from .....classes.heat_exchanger import (
     HeatExchangerStreamRole,
 )
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
-from .....lib.schemas.synthesis import (
+from .....lib.schemas.synthesis.common import SynthesisMethod
+from .....lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
-    SynthesisMethod,
 )
 from ..errors import WorkflowContractError
 

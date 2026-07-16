@@ -15,9 +15,11 @@ from OpenPinch.classes import (
 )
 from OpenPinch.classes._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.lib.schemas.synthesis import (
+from OpenPinch.lib.schemas.synthesis.common import (
     HeatExchangerNetworkSynthesisExportRecord,
     HeatExchangerNetworkSynthesisManifest,
+)
+from OpenPinch.lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )

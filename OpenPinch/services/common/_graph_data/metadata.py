@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ...lib.enums import PT, LegendSeries, StreamLoc
+from ....lib.enums import PT, LegendSeries, StreamLoc
 
 
 @dataclass(frozen=True)

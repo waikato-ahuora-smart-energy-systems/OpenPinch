@@ -22,7 +22,7 @@ from OpenPinch import PinchProblem
 from OpenPinch.classes.heat_exchanger import HeatExchangerKind
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib.config import tol
-from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisTask
+from OpenPinch.lib.schemas.synthesis.task import HeatExchangerNetworkSynthesisTask
 from OpenPinch.services.heat_exchanger_network_synthesis.common.errors import (
     WorkflowContractError,
 )
@@ -112,10 +112,10 @@ import sys
 
 import OpenPinch
 from OpenPinch.services.heat_exchanger_network_synthesis.unit_models import (
-    InternalHeatExchangerNetworkProblem,
+    BaseHeatExchangerNetworkModel,
 )
 
-_ = InternalHeatExchangerNetworkProblem
+_ = BaseHeatExchangerNetworkModel
 
 forbidden = {SYNTHESIS_ONLY_MODULES!r}
 loaded = [name for name in forbidden if name in sys.modules]

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Pre-Release Corrective PR 3 Code Generation
+- **Current Stage**: CONSTRUCTION - Remove Compatibility Facades Complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -107,6 +107,15 @@
   contract; focused multiperiod and segmented-stream tests also pass.
 
 ## Follow-up Plans
+- **Remove compatibility facades**: The user requested a package-wide clean
+  break from compatibility-only synthesis import and pickle paths. Requirements
+  are approved and Code Generation is active. Intentional root/lib/schema API
+  barrels remain; synthesis exports route directly to concrete owners.
+- **Package-wide owner-oriented reorganization**: The user approved four
+  dependency-ordered units covering completed class extractions, schemas and
+  lazy barrels, service-owned helpers, and HEN solver decomposition. Unit 1 is
+  active. The detailed checklist is
+  `aidlc-docs/construction/plans/package-wide-owner-reorganization-code-generation-plan.md`.
 - **Private helper reorganization and parent-owned runtime records**: The user
   approved an intentional breaking cleanup of `OpenPinch.classes`. Inception
   planning is complete and Code Generation is active. The detailed checklist is
@@ -172,6 +181,54 @@
   completed, including documentation updates. The completed code-generation
   checklist is at
   `aidlc-docs/construction/plans/hen-area-slice-code-generation-plan.md`.
+
+## Package-Wide Owner Reorganization Progress
+
+- [x] INCEPTION - Workspace Detection
+- [x] INCEPTION - Reverse Engineering (reused current artifacts and focused
+  package scan)
+- [x] INCEPTION - Requirements Analysis
+- [x] INCEPTION - User Stories assessment (skipped: internal refactor)
+- [x] INCEPTION - Workflow Planning
+- [x] INCEPTION - Application Design (approved owner/composition design)
+- [x] INCEPTION - Units Generation (four approved units)
+- [x] CONSTRUCTION - Unit 1 Complete Existing Class Extractions
+- [x] CONSTRUCTION - Unit 2 Schemas and Package Barrels
+- [x] CONSTRUCTION - Unit 3 Service-Owned Helpers and Runtime Records
+- [x] CONSTRUCTION - Unit 4 HEN Equation and Solver Internals
+- [x] CONSTRUCTION - Build and Test
+- [x] OPERATIONS - N/A
+- **Compatibility policy**: Preserve documented APIs and public schemas; remove
+  only the runtime and solver-state aliases named in the approved plan.
+- **Extension configuration**: Security disabled; Resiliency disabled;
+  Property-Based Testing Partial enabled and blocking where applicable.
+- **Unit 1 evidence**: Semantic logic, interval insertion, segment transactions,
+  Value coercion/units, and workspace views now have concrete owner modules.
+  Focused seeded tests passed (130 tests) and focused Ruff checks passed.
+- **Unit 2 evidence**: Synthesis models now have concrete common/topology/method/
+  task/result owners with compatibility facades and no reverse barrel imports.
+  The classes, lib, and schemas barrels are typed and lazy. Schema, pickle,
+  cold-import, public API, structural, and Ruff checks passed (108 tests).
+- **Final evidence**: 2,018 non-solver tests passed at 98% coverage; solver tests
+  passed 3 with 1 skip. Ruff lint/format, warning-free Sphinx, ten notebook
+  parses, isolated wheel/sdist builds, stale-path checks, and patch hygiene pass.
+
+## Remove Compatibility Facades Progress
+
+- [x] INCEPTION - Workspace Detection and continuity
+- [x] INCEPTION - Focused Requirements Analysis
+- [x] INCEPTION - User Stories assessment (skipped: import cleanup)
+- [x] INCEPTION - Workflow Planning
+- [x] CONSTRUCTION - Code Generation
+- [x] CONSTRUCTION - Build and Test
+- [x] OPERATIONS - N/A
+- **Outcome**: Synthesis compatibility modules and package re-exports are
+  removed. Public lib/schema barrels map directly to concrete schema owners.
+- **Verification**: 2,019 non-solver tests at 98% coverage; 3 solver tests
+  passed with 1 skip; Ruff, Sphinx, notebooks, distributions, stale-path, built
+  artifact, and patch checks passed.
+- **Extensions**: Security and Resiliency disabled (N/A); partial PBT is N/A
+  because this cleanup changes import ownership without algorithmic behavior.
 
 ## Pre-Release Corrective Review Progress
 

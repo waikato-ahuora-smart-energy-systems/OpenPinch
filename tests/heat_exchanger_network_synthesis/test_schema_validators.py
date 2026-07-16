@@ -11,7 +11,22 @@ from pydantic import ValidationError
 
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib.enums import HeatExchangerNetworkDesignMethod
-from OpenPinch.lib.schemas import synthesis
+from OpenPinch.lib.schemas.synthesis.common import (
+    HeatExchangerNetworkSynthesisManifest,
+)
+from OpenPinch.lib.schemas.synthesis.method import (
+    HeatExchangerNetworkSynthesisMethodOutput,
+)
+from OpenPinch.lib.schemas.synthesis.result import (
+    HeatExchangerNetworkSynthesisResult,
+)
+from OpenPinch.lib.schemas.synthesis.task import (
+    HeatExchangerNetworkSynthesisTask,
+    HeatExchangerNetworkSynthesisTaskOutcome,
+)
+from OpenPinch.lib.schemas.synthesis.topology import (
+    HeatExchangerNetworkTopologyRestriction,
+)
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parents[1] / "fixtures" / "synthesis_schema_cases.json"
@@ -22,14 +37,14 @@ def _fixture() -> dict:
     return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
 
 
-def _task(**updates) -> synthesis.HeatExchangerNetworkSynthesisTask:
+def _task(**updates) -> HeatExchangerNetworkSynthesisTask:
     data = {**_fixture()["task"], **updates}
-    return synthesis.HeatExchangerNetworkSynthesisTask.model_validate(data)
+    return HeatExchangerNetworkSynthesisTask.model_validate(data)
 
 
-def _manifest(**updates) -> synthesis.HeatExchangerNetworkSynthesisManifest:
+def _manifest(**updates) -> HeatExchangerNetworkSynthesisManifest:
     data = {**_fixture()["manifest"], **updates}
-    return synthesis.HeatExchangerNetworkSynthesisManifest.model_validate(data)
+    return HeatExchangerNetworkSynthesisManifest.model_validate(data)
 
 
 def _network(**updates) -> HeatExchangerNetwork:
@@ -72,7 +87,7 @@ def test_synthesis_task_rejects_invalid_identity_and_numeric_values(
 
 
 def test_topology_restriction_validates_stream_stage_and_duty_edges():
-    valid = synthesis.HeatExchangerNetworkTopologyRestriction(
+    valid = HeatExchangerNetworkTopologyRestriction(
         source_stream=" H1 ",
         sink_stream=" C1 ",
         stage=1,
@@ -82,18 +97,16 @@ def test_topology_restriction_validates_stream_stage_and_duty_edges():
     assert valid.sink_stream == "C1"
 
     with pytest.raises(ValueError, match="stream identities"):
-        synthesis.HeatExchangerNetworkTopologyRestriction._validate_stream_identity(
-            None
-        )
+        HeatExchangerNetworkTopologyRestriction._validate_stream_identity(None)
     with pytest.raises(ValidationError, match="positive integer"):
-        synthesis.HeatExchangerNetworkTopologyRestriction(
+        HeatExchangerNetworkTopologyRestriction(
             source_stream="H1",
             sink_stream="C1",
             stage=0,
             duty=1.0,
         )
     with pytest.raises(ValidationError, match="non-negative"):
-        synthesis.HeatExchangerNetworkTopologyRestriction(
+        HeatExchangerNetworkTopologyRestriction(
             source_stream="H1",
             sink_stream="C1",
             stage=1,
@@ -141,14 +154,12 @@ def test_synthesis_manifest_rejects_invalid_static_edges(
 
 def test_manifest_task_count_validator_rejects_none_method_key():
     with pytest.raises(ValueError, match="keys must be non-empty"):
-        synthesis.HeatExchangerNetworkSynthesisManifest._validate_task_count_by_method(
-            {None: 1}
-        )
+        HeatExchangerNetworkSynthesisManifest._validate_task_count_by_method({None: 1})
 
 
 def test_method_output_fills_method_from_task_and_validates_optional_fields():
     task = _task()
-    output = synthesis.HeatExchangerNetworkSynthesisMethodOutput(
+    output = HeatExchangerNetworkSynthesisMethodOutput(
         task=task,
         status="success",
         objective_value=0.0,
@@ -161,31 +172,31 @@ def test_method_output_fills_method_from_task_and_validates_optional_fields():
     assert output.solver_status == "solved"
     assert output.diagnostic_references == ("log-1",)
 
-    empty_objective = synthesis.HeatExchangerNetworkSynthesisMethodOutput(
+    empty_objective = HeatExchangerNetworkSynthesisMethodOutput(
         status="skipped",
         objective_value=None,
     )
     assert empty_objective.objective_value is None
 
     with pytest.raises(ValidationError, match="non-negative"):
-        synthesis.HeatExchangerNetworkSynthesisMethodOutput(
+        HeatExchangerNetworkSynthesisMethodOutput(
             status="failed",
             objective_value=-1.0,
         )
     with pytest.raises(ValidationError, match="identity fields"):
-        synthesis.HeatExchangerNetworkSynthesisMethodOutput(
+        HeatExchangerNetworkSynthesisMethodOutput(
             status="failed",
             solver_status=" ",
         )
     with pytest.raises(ValidationError, match="identity fields"):
-        synthesis.HeatExchangerNetworkSynthesisMethodOutput(
+        HeatExchangerNetworkSynthesisMethodOutput(
             status="failed",
             diagnostic_references=(" ",),
         )
 
 
 def test_synthesis_result_validates_objectives_and_empty_rank_selection():
-    result = synthesis.HeatExchangerNetworkSynthesisResult(
+    result = HeatExchangerNetworkSynthesisResult(
         network=_network(stage_count=1),
         run_id="schema-run-1",
         task_id=" task-1 ",
@@ -231,11 +242,11 @@ def test_synthesis_result_rejects_invalid_static_edges(
     } | updates
 
     with pytest.raises(ValidationError, match=message):
-        synthesis.HeatExchangerNetworkSynthesisResult(**data)
+        HeatExchangerNetworkSynthesisResult(**data)
 
 
 def test_synthesis_result_grid_diagram_uses_base_network_when_unranked(monkeypatch):
-    result = synthesis.HeatExchangerNetworkSynthesisResult(
+    result = HeatExchangerNetworkSynthesisResult(
         network=_network(),
         run_id="schema-run-1",
     )
@@ -284,20 +295,20 @@ def test_synthesis_result_selects_ranked_network_and_copies_metrics(monkeypatch)
         utility_cost=4.0,
         capital_cost=6.0,
     )
-    outcome = synthesis.HeatExchangerNetworkSynthesisTaskOutcome(
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(
         task=task,
         status="success",
         network=selected_network,
         objective_value=10.0,
         solver_status="optimal",
     )
-    result = synthesis.HeatExchangerNetworkSynthesisResult(
+    result = HeatExchangerNetworkSynthesisResult(
         network=_network(stage_count=1),
         run_id="schema-run-1",
     )
 
     monkeypatch.setattr(
-        synthesis.HeatExchangerNetworkSynthesisResult,
+        HeatExchangerNetworkSynthesisResult,
         "get_n_best_networks",
         lambda self, n=None: (outcome,),
     )
@@ -321,12 +332,12 @@ def test_synthesis_result_selects_ranked_network_and_copies_metrics(monkeypatch)
 def test_synthesis_result_grid_diagram_uses_ranked_network(monkeypatch):
     task = _task()
     selected_network = _network(stage_count=2)
-    outcome = synthesis.HeatExchangerNetworkSynthesisTaskOutcome(
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(
         task=task,
         status="success",
         network=selected_network,
     )
-    result = synthesis.HeatExchangerNetworkSynthesisResult(
+    result = HeatExchangerNetworkSynthesisResult(
         network=_network(stage_count=1),
         run_id="schema-run-1",
     )
@@ -338,7 +349,7 @@ def test_synthesis_result_grid_diagram_uses_ranked_network(monkeypatch):
         return self
 
     monkeypatch.setattr(
-        synthesis.HeatExchangerNetworkSynthesisResult,
+        HeatExchangerNetworkSynthesisResult,
         "get_n_best_networks",
         lambda self, n=None: (outcome,),
     )
@@ -356,18 +367,18 @@ def test_synthesis_result_grid_diagram_uses_ranked_network(monkeypatch):
 
 
 def test_synthesis_result_ranked_selection_rejects_missing_network(monkeypatch):
-    missing_network = synthesis.HeatExchangerNetworkSynthesisTaskOutcome(
+    missing_network = HeatExchangerNetworkSynthesisTaskOutcome(
         task=_task(),
         status="success",
         network=None,
     )
-    result = synthesis.HeatExchangerNetworkSynthesisResult(
+    result = HeatExchangerNetworkSynthesisResult(
         network=_network(),
         run_id="schema-run-1",
     )
 
     monkeypatch.setattr(
-        synthesis.HeatExchangerNetworkSynthesisResult,
+        HeatExchangerNetworkSynthesisResult,
         "get_n_best_networks",
         lambda self, n=None: (missing_network,),
     )

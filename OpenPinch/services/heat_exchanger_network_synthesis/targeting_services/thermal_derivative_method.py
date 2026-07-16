@@ -8,7 +8,7 @@ from typing import Sequence
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
 from ....lib.enums import HENDesignMethod
-from ....lib.schemas.synthesis import (
+from ....lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )

@@ -256,9 +256,9 @@ def test_publish_workflow_is_tag_only_and_validation_gated():
 
 
 def test_pr_version_bump_waits_for_validation():
-    workflow = (
-        REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml"
-    ).read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml").read_text(
+        encoding="utf-8"
+    )
     bump_block = workflow.split("  bump-version:", 1)[1]
 
     assert "needs: [test, optional-install-smoke]" in bump_block

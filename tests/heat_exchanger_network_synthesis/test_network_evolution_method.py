@@ -9,9 +9,7 @@ from OpenPinch.classes.heat_exchanger import (
     HeatExchangerStreamRole,
 )
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
-from OpenPinch.lib.schemas.synthesis import (
-    HeatExchangerNetworkSynthesisTask,
-)
+from OpenPinch.lib.schemas.synthesis.task import HeatExchangerNetworkSynthesisTask
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.executor import (
     _legacy_task_dTmin,
 )

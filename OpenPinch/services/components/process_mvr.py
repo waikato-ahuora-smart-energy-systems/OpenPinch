@@ -19,6 +19,12 @@ from ...utils.stream_linearisation import (
     normalise_temperature_heat_profile,
 )
 from ..common.miscellaneous import get_period_index
+from ._process_mvr.records import (
+    ProcessMVRStreamRecord as _ProcessMVRStreamRecord,
+)
+from ._process_mvr.records import (
+    StreamMembership as _StreamMembership,
+)
 from .direct_mvr import (
     DirectGasMVRSettings,
     DirectGasMVRStageResult,
@@ -32,32 +38,12 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class StreamMembership:
-    """One occurrence of a stream inside a zone hot-stream collection."""
-
-    zone: Zone
-    key: str
-
-
-@dataclass
-class ProcessMVRStreamRecord:
-    """Original and replacement streams for one MVR source stream."""
-
-    original_stream: Stream
-    original_memberships: list[StreamMembership]
-    replacement_streams: list[Stream]
-    replacement_memberships: list[StreamMembership]
-    stage_results_by_period: dict[str, list[DirectGasMVRStageResult]]
-    period_label_by_index: dict[int, str] = field(default_factory=dict)
-
-
-@dataclass
 class ProcessMVRComponent(ProcessComponent):
     """Memory-only direct process MVR component."""
 
     settings: DirectGasMVRSettings = field(default_factory=DirectGasMVRSettings)
     source_selectors: list[Any] = field(default_factory=list)
-    stream_records: list[ProcessMVRStreamRecord] = field(default_factory=list)
+    stream_records: list[_ProcessMVRStreamRecord] = field(default_factory=list)
     component_type: str = "process_mvr"
 
     def activate(self):
@@ -227,11 +213,11 @@ def _resolve_stage_t_lift_alias(
 def _build_process_mvr_stream_record(
     *,
     source_stream: Stream,
-    memberships: list[StreamMembership],
+    memberships: list[_StreamMembership],
     settings: DirectGasMVRSettings,
     period_ids: dict[str, int] | None,
     num_periods: int | None,
-) -> ProcessMVRStreamRecord:
+) -> _ProcessMVRStreamRecord:
     if not memberships:
         raise ValueError(f"MVR source stream {source_stream.name!r} is not in a zone.")
     period_lookup = period_ids or {"0": 0}
@@ -250,7 +236,7 @@ def _build_process_mvr_stream_record(
     stage_results_by_period = {
         period_labels[idx]: solves[idx].stage_results for idx in range(n_periods)
     }
-    return ProcessMVRStreamRecord(
+    return _ProcessMVRStreamRecord(
         original_stream=source_stream,
         original_memberships=memberships,
         replacement_streams=replacement_streams,
@@ -261,7 +247,7 @@ def _build_process_mvr_stream_record(
 
 
 def _add_replacement_streams_to_memberships(
-    record: ProcessMVRStreamRecord,
+    record: _ProcessMVRStreamRecord,
     component_id: str,
 ) -> None:
     for membership in record.original_memberships:
@@ -269,7 +255,7 @@ def _add_replacement_streams_to_memberships(
             key = f"{membership.key}.{component_id}.{stream.name}"
             membership.zone.hot_streams.add(stream, key=key, prevent_overwrite=False)
             record.replacement_memberships.append(
-                StreamMembership(zone=membership.zone, key=key)
+                _StreamMembership(zone=membership.zone, key=key)
             )
 
 
@@ -575,7 +561,7 @@ def _period_values_or_scalar(values: list[float]):
     return values[0] if len(values) == 1 else values
 
 
-def _record_affects_zone(record: ProcessMVRStreamRecord, zone: Zone) -> bool:
+def _record_affects_zone(record: _ProcessMVRStreamRecord, zone: Zone) -> bool:
     zone_address = zone.address
     for membership in record.original_memberships:
         member_address = membership.zone.address
@@ -587,7 +573,7 @@ def _record_affects_zone(record: ProcessMVRStreamRecord, zone: Zone) -> bool:
 
 
 def _record_stage_results_for_period(
-    record: ProcessMVRStreamRecord,
+    record: _ProcessMVRStreamRecord,
     *,
     period_id: str | None,
     period_idx: int | None,
@@ -601,12 +587,12 @@ def _record_stage_results_for_period(
     return next(iter(record.stage_results_by_period.values()), [])
 
 
-def _find_hot_stream_memberships(root: Zone, stream: Stream) -> list[StreamMembership]:
-    memberships: list[StreamMembership] = []
+def _find_hot_stream_memberships(root: Zone, stream: Stream) -> list[_StreamMembership]:
+    memberships: list[_StreamMembership] = []
     for zone in _walk_zones(root):
         for key, candidate in zone.hot_streams.items():
             if candidate is stream:
-                memberships.append(StreamMembership(zone=zone, key=key))
+                memberships.append(_StreamMembership(zone=zone, key=key))
     return memberships
 
 

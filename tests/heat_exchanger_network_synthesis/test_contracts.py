@@ -13,7 +13,6 @@ import OpenPinch
 import OpenPinch.classes
 import OpenPinch.lib
 import OpenPinch.lib.schemas as schemas
-import OpenPinch.lib.schemas.synthesis as synthesis_schemas
 from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
@@ -29,12 +28,16 @@ from OpenPinch.lib.enums import (
     HeatExchangerNetworkLabel,
 )
 from OpenPinch.lib.schemas.io import TargetInput, TargetOutput
-from OpenPinch.lib.schemas.synthesis import (
+from OpenPinch.lib.schemas.synthesis.common import (
     HeatExchangerNetworkSynthesisExportRecord,
     HeatExchangerNetworkSynthesisManifest,
+)
+from OpenPinch.lib.schemas.synthesis.method import (
     HeatExchangerNetworkSynthesisMethodInput,
     HeatExchangerNetworkSynthesisMethodOutput,
-    HeatExchangerNetworkSynthesisResult,
+)
+from OpenPinch.lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
+from OpenPinch.lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
@@ -721,7 +724,10 @@ def test_removed_prototype_hen_options_are_not_accepted(removed_key):
 
 
 def test_public_synthesis_exports_are_openpinch_native():
-    from OpenPinch.lib.schemas.synthesis import methods, results, tasks
+    synthesis_package = __import__(
+        "OpenPinch.lib.schemas.synthesis",
+        fromlist=["*"],
+    )
 
     expected_class_exports = {
         "HeatExchanger",
@@ -742,41 +748,21 @@ def test_public_synthesis_exports_are_openpinch_native():
 
     assert expected_class_exports <= set(OpenPinch.classes.__all__)
     assert expected_schema_exports <= set(schemas.__all__)
-    assert expected_schema_exports <= set(synthesis_schemas.__all__)
     assert "HeatExchangerNetworkSynthesisResult" in OpenPinch.lib.__all__
     assert "HeatExchangerKind" in OpenPinch.lib.__all__
     assert "HeatExchangerNetworkLabel" in OpenPinch.lib.__all__
     assert "HeatExchangerStreamRole" in OpenPinch.lib.__all__
     assert OpenPinch.lib.HeatExchangerKind is HeatExchangerKind
     assert OpenPinch.lib.HeatExchangerStreamRole is HeatExchangerStreamRole
-    assert methods.HeatExchangerNetworkSynthesisMethodInput is (
-        synthesis_schemas.HeatExchangerNetworkSynthesisMethodInput
-    )
-    assert methods.HeatExchangerNetworkSynthesisMethodOutput is (
-        synthesis_schemas.HeatExchangerNetworkSynthesisMethodOutput
-    )
-    assert methods.SynthesisDesignMethod is synthesis_schemas.SynthesisDesignMethod
-    assert methods.SynthesisMethod is synthesis_schemas.SynthesisMethod
-    assert methods.SynthesisTaskStatus is synthesis_schemas.SynthesisTaskStatus
-    assert results.HeatExchangerNetworkSynthesisExportRecord is (
-        synthesis_schemas.HeatExchangerNetworkSynthesisExportRecord
-    )
-    assert results.HeatExchangerNetworkSynthesisManifest is (
-        synthesis_schemas.HeatExchangerNetworkSynthesisManifest
-    )
-    assert results.HeatExchangerNetworkSynthesisResult is (
-        synthesis_schemas.HeatExchangerNetworkSynthesisResult
-    )
-    assert results.SynthesisOutputFormat is synthesis_schemas.SynthesisOutputFormat
-    assert tasks.HeatExchangerNetworkSynthesisTask is (
-        synthesis_schemas.HeatExchangerNetworkSynthesisTask
-    )
-    assert tasks.HeatExchangerNetworkSynthesisTaskOutcome is (
-        synthesis_schemas.HeatExchangerNetworkSynthesisTaskOutcome
-    )
-    assert tasks.HeatExchangerNetworkTopologyRestriction is (
-        synthesis_schemas.HeatExchangerNetworkTopologyRestriction
-    )
+    assert not hasattr(synthesis_package, "__all__")
+    assert expected_schema_exports.isdisjoint(vars(synthesis_package))
+    for compatibility_module in ("methods", "results", "tasks"):
+        assert (
+            importlib.util.find_spec(
+                f"OpenPinch.lib.schemas.synthesis.{compatibility_module}"
+            )
+            is None
+        )
     assert isinstance(
         HeatExchangerNetworkLabel.RECOVERY_DUTY.value,
         str,

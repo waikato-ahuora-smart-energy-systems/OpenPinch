@@ -169,3 +169,28 @@ def test_parent_owned_runtime_records_are_absent_from_public_modules():
     assert not hasattr(heat_exchanger, "HeatExchangerPeriodState")
     assert not hasattr(heat_exchanger, "HeatExchangerAreaSlice")
     assert hasattr(OpenPinch, "StreamSegmentSchema")
+
+
+def test_service_runtime_records_and_graph_specs_are_not_public() -> None:
+    from OpenPinch.services import components
+    from OpenPinch.services.common import graph_data
+    from OpenPinch.services.heat_pump_integration.targeting_services import multiperiod
+    from OpenPinch.streamlit_webviewer import web_graphing
+
+    assert not hasattr(components, "ProcessMVRStreamRecord")
+    assert not hasattr(graph_data, "GraphBuildSpec")
+    assert not hasattr(graph_data, "GraphSeriesMeta")
+    assert not hasattr(multiperiod, "PreparedHPRPeriodCase")
+    assert not hasattr(web_graphing, "StreamlitGraphSet")
+
+
+def test_hen_unit_model_barrel_excludes_solver_runtime_state() -> None:
+    from OpenPinch.services.heat_exchanger_network_synthesis import unit_models
+
+    forbidden = {
+        "InternalHeatExchangerNetworkProblem",
+        "ModelSliceUnavailableError",
+        "SolverRun",
+    }
+    assert forbidden.isdisjoint(unit_models.__all__)
+    assert all(not hasattr(unit_models, name) for name in forbidden)

@@ -12,7 +12,6 @@ from ..common.solver.backend import (
     GEKKO_SOLVERS,
     PYOMO_SOLVER_BINARIES,
     PYOMO_SOLVERS,
-    SolverRun,
     configure_gekko_solver,
     create_gekko_model,
     require_solver_backend,
@@ -24,21 +23,14 @@ from ..common.solver.extraction import (
 )
 from .base import BaseHeatExchangerNetworkModel
 from .pinch_design import PinchDecompModel
-from .problem import (
-    InternalHeatExchangerNetworkProblem,
-    ModelSliceUnavailableError,
-)
 from .stagewise import StageWiseModel
 
 __all__ = [
     "BaseHeatExchangerNetworkModel",
     "GEKKO_SOLVERS",
-    "InternalHeatExchangerNetworkProblem",
-    "ModelSliceUnavailableError",
     "PinchDecompModel",
     "PYOMO_SOLVERS",
     "PYOMO_SOLVER_BINARIES",
-    "SolverRun",
     "StageWiseModel",
     "configure_gekko_solver",
     "create_gekko_model",

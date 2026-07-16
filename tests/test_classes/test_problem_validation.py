@@ -46,7 +46,7 @@ def test_validation_report_and_warning_semantics(validation_cases):
 
     validated = TargetInput.model_validate(validation_cases["warning_problem"])
     with pytest.warns(UserWarning, match="warning"):
-        semantics.validate_problem_semantics(validated, context={})
+        validation.validate_problem_semantics(validated, context={})
 
 
 def test_validation_report_rejects_discontinuous_segmented_utility_before_loading():
@@ -207,7 +207,7 @@ def test_schema_error_formatting_and_record_context_helpers():
 
 def test_value_coercion_and_missing_raw_value_edges():
     record = SimpleNamespace(t_supply={"value": 10.0, "unit": "not-a-unit"})
-    values, issues = validation._coerce_validation_values(
+    values, issues = semantics._coerce_validation_values(
         record,
         section="streams",
         record_index=0,
@@ -225,15 +225,15 @@ def test_value_coercion_and_missing_raw_value_edges():
             assert mode == "python"
             return {"values": [None, None]}
 
-    assert validation._raw_value_is_missing(None) is True
-    assert validation._raw_value_is_missing(DumpValue()) is True
-    assert validation._raw_value_is_missing({"value": None}) is True
-    assert validation._raw_value_is_missing({"values": None}) is True
-    assert validation._raw_value_is_missing({"values": [None, None]}) is True
-    assert validation._raw_value_is_missing({}) is False
-    assert validation._raw_value_is_missing(12.0) is False
+    assert semantics._raw_value_is_missing(None) is True
+    assert semantics._raw_value_is_missing(DumpValue()) is True
+    assert semantics._raw_value_is_missing({"value": None}) is True
+    assert semantics._raw_value_is_missing({"values": None}) is True
+    assert semantics._raw_value_is_missing({"values": [None, None]}) is True
+    assert semantics._raw_value_is_missing({}) is False
+    assert semantics._raw_value_is_missing(12.0) is False
 
-    optional_values, optional_issues = validation._coerce_validation_values(
+    optional_values, optional_issues = semantics._coerce_validation_values(
         SimpleNamespace(dt_cont={"value": None}),
         section="streams",
         record_index=0,
@@ -255,7 +255,7 @@ def test_stream_value_state_validation_edges():
         "htc": Value([1.0, 2.0, 3.0], "kW/m^2/K"),
     }
 
-    issues = validation._validate_stream_record_states(
+    issues = semantics._validate_stream_record_states(
         values,
         section="streams",
         record_index=0,
@@ -264,7 +264,7 @@ def test_stream_value_state_validation_edges():
 
     assert any("must differ" in issue.message for issue in issues)
     assert (
-        validation._validate_stream_record_states(
+        semantics._validate_stream_record_states(
             {"t_supply": None, "t_target": values["t_target"]},
             section="streams",
             record_index=0,
@@ -290,13 +290,13 @@ def test_stream_classification_and_utility_state_edges():
         "htc": Value([1.0, 1.0, 1.0, 1.0], "kW/m^2/K"),
     }
 
-    issues = validation._validate_stream_record_states(
+    issues = semantics._validate_stream_record_states(
         values,
         section="streams",
         record_index=0,
         record_label="Stream 1",
     )
-    utility_issues = validation._validate_utility_record_states(
+    utility_issues = semantics._validate_utility_record_states(
         {
             "t_supply": Value([180.0, 181.0], "degC"),
             "t_target": Value([120.0, 121.0], "degC"),
@@ -322,14 +322,14 @@ def test_finiteness_non_negative_and_period_suffix_helpers():
         def __getitem__(self, index):
             return self.period_values[index]
 
-    finite_issues = validation._validate_value_finiteness(
+    finite_issues = semantics._validate_value_finiteness(
         PeriodValues([None, float("inf"), 1.0]),
         section="streams",
         record_index=0,
         record_label="Stream 1",
         field_name="heat_flow",
     )
-    non_negative_issues = validation._validate_non_negative_states(
+    non_negative_issues = semantics._validate_non_negative_states(
         PeriodValues([None, float("inf"), -1.0, 0.0]),
         section="streams",
         record_index=0,
@@ -343,5 +343,5 @@ def test_finiteness_non_negative_and_period_suffix_helpers():
     assert non_negative_issues[0].message == (
         "Value must be non-negative for period_id '2'."
     )
-    assert validation._period_suffix(None) == ""
-    assert validation._with_period_suffix("No period.", None) == "No period."
+    assert semantics._period_suffix(None) == ""
+    assert semantics._with_period_suffix("No period.", None) == "No period."

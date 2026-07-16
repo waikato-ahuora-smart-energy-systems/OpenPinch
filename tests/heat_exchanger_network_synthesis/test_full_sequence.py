@@ -19,8 +19,8 @@ from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib import HeatExchangerKind
 from OpenPinch.lib.enums import HENDesignMethod
-from OpenPinch.lib.schemas.synthesis import (
-    HeatExchangerNetworkSynthesisManifest,
+from OpenPinch.lib.schemas.synthesis.common import HeatExchangerNetworkSynthesisManifest
+from OpenPinch.lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )

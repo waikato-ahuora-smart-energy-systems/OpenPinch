@@ -29,6 +29,9 @@ from OpenPinch.services.heat_pump_integration.common import shared as hp_shared
 from OpenPinch.services.heat_pump_integration.targeting_services import (
     multiperiod as hp_multiperiod,
 )
+from OpenPinch.services.heat_pump_integration.targeting_services._multiperiod.period_case import (
+    PreparedHPRPeriodCase,
+)
 
 from ..helpers import _base_args
 
@@ -413,7 +416,7 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
     cycle,
 ):
     cases = [
-        hp_multiperiod.PreparedHPRPeriodCase(
+        PreparedHPRPeriodCase(
             period_id="p0",
             period_idx=0,
             weight=1.0,
@@ -431,7 +434,7 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
             base_target=_base_target(_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])),
             optimizer_pt=_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0]),
         ),
-        hp_multiperiod.PreparedHPRPeriodCase(
+        PreparedHPRPeriodCase(
             period_id="p1",
             period_idx=1,
             weight=1.0,

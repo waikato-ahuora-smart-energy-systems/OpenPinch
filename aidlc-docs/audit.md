@@ -8,6 +8,93 @@
 
 ---
 
+## Remove Compatibility Facades - Implementation Request
+**Timestamp**: 2026-07-16T17:35:52Z
+**User Input**: "Remove compatibility facades across the package."
+**AI Response**: "Inventoried compatibility-only and intentional public barrels. Scoped the clean break to the synthesis schema compatibility modules and old barrel-qualified pickle/import paths, while retaining intentional root, lib, and schemas API barrels mapped directly to concrete owners. Recorded requirements and the Code Generation checklist and began implementation."
+**Context**: INCEPTION and CONSTRUCTION Code Generation Part 1. Existing reverse-engineering and package-owner artifacts are reused; the imperative request supplies approval.
+
+---
+
+## Package-Wide Owner Reorganization - Approved Implementation Request
+**Timestamp**: 2026-07-16T13:33:50Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Package-Wide Owner-Oriented Reorganization
+
+## Summary
+
+Continue the current cleanup as four dependency-ordered units. First complete the extractions that are presently thin forwarding modules, then correct schema/barrel structure, reorganize service-owned helpers and records, and finally decompose the high-risk HEN solver internals.
+
+Use the selected curated-cleanup policy: preserve documented user-facing APIs, but remove aliases for records explicitly serving as internal runtime or solver state.
+
+## Implementation Changes
+
+1. **Complete the existing class refactor**
+
+   - Move substantive semantic validation from `validation.py` into `semantics.py`; leave schema parsing, issue formatting, and report assembly in validation.
+   - Move the complete interval insertion engine out of `ProblemTable`, segment transactions out of `Stream`, and input coercion/unit work out of `Value`. Parent methods remain delegates.
+   - Split workspace view shaping by input, graph, problem-table, and variant comparison responsibility.
+   - Keep core domain state, arithmetic, indexing, and public methods on their parent classes. Do not introduce mixins or line-count targets.
+
+2. **Correct schemas and package barrels**
+
+   - Move HEN synthesis definitions out of `lib.schemas.synthesis.__init__` into concrete common, topology, method, task, and result modules. Make `__init__` a lightweight compatibility barrel.
+   - Preserve all existing public synthesis-schema imports, model names, validation, JSON schemas, and old barrel-based pickle loading.
+   - Convert the eager `classes`, `lib`, and `lib.schemas` barrels to typed lazy exports using `__getattr__`, `__dir__`, `TYPE_CHECKING`, and unchanged `__all__` lists. The root `OpenPinch` API remains eager and unchanged.
+   - Remove reverse imports where leaf schema modules currently import definitions from their parent barrel.
+
+3. **Reorganize service-owned helpers and runtime records**
+
+   - Make `ProcessMVRComponent` own private membership and stream-record types. Split selection, replacement-stream construction, work accounting, and record state into `_process_mvr`; retain the public component and factory.
+   - Keep direct-MVR settings, output units, stage results, stream solve results, and solve functions public, but separate public models, thermodynamics, unit conversion, and solver execution behind the existing import facades.
+   - Move multiperiod HPR preparation, private period cases, and shared-design execution into `_multiperiod`.
+   - Split graph construction into private specifications, composite/GCC builders, metadata, and serialization; split energy-transfer processing into selection, cascade transformation, diagram construction, and serialization.
+   - Split Streamlit graphing into dependency guards, Plotly conversion, dashboard rendering, exports, and private state. Split network-grid rendering into Plotly adapters, geometry/layout, labels, and temperature mapping.
+
+4. **Decompose HEN equation and solver internals**
+
+   - Retain `BaseHeatExchangerNetworkModel`, `StageWiseModel`, and `PinchDecompModel` at their existing advanced import paths.
+   - Extract base-model piecewise equations, parameter loading, approach constraints, and solver execution into private composition helpers.
+   - Extract stagewise setup, equations, warm starts, evolution, objectives, post-processing, and verification into `_stagewise`; move evolution records with their owner.
+   - Extract pinch-design preprocessing, equations, amalgamation, and post-processing into `_pinch_design`.
+   - Split solver result extraction into recovery, utility, period-state, segment-area, and metadata modules.
+   - Pass model state explicitly to helper functions; do not introduce inheritance mixins or alter solver axes, equation order, warm-start behavior, tolerances, numerical ordering, or result structures.
+
+## API and Compatibility
+
+- Preserve all root APIs, public schemas, `ProcessMVRComponent`, direct-MVR public models, HEN result models, and documented HEN equation-model classes.
+- Remove without aliases:
+
+  - `ProcessMVRStreamRecord` from the components barrel and public documentation.
+  - `PreparedHPRPeriodCase`.
+  - `StreamlitGraphSet`.
+  - Public-looking graph specification/metadata classes.
+  - `InternalHeatExchangerNetworkProblem`, `ModelSliceUnavailableError`, and `SolverRun` from the HEN unit-model barrel and curated documentation.
+
+- Internal records may remain inspectable through their owning result or component but cannot be imported or constructed through public modules.
+- No migration is provided for imports or pickles of removed internal records. Public schema aliases continue resolving old pickle paths.
+
+## Test Plan
+
+- Add structural tests for lightweight barrels, concrete schema ownership, private owner packages, retired paths, and absence of reverse barrel imports.
+- Add fresh-process cold-import tests for the root package, each public barrel, synthesis schema leaves, dashboard helpers, and solver modules with optional dependencies absent.
+- Assert the curated public API snapshot and explicitly forbidden internal names.
+- Preserve synthesis JSON schema/model-dump round trips and add a regression proving old barrel-qualified schema pickles still load.
+- Add ownership, copying, pickling, rollback, ordering, and generated invariants for completed Stream, Value, ProblemTable, MVR, and HPR extractions using seed `20260715`.
+- Run focused tests after each unit. Finish with the complete non-solver suite and coverage, available solver tests, Ruff lint/format, warning-free Sphinx, notebook parsing, wheel/sdist builds, stale-path checks, public API checks, and `git diff --check`.
+
+## Assumptions
+
+- The unanswered scope choice defaults to the recommended full phased sweep.
+- Existing uncommitted reorganization work is the baseline and must be preserved.
+- Heat-pump cycle model files, enums, configuration metadata, `Zone`, and smaller cohesive services remain intact unless extraction reveals duplicated shared logic.
+- No dependency change, data migration, version bump, compatibility package, deployment work, or arbitrary file-size target is included.
+- AI-DLC requirements, design, code-generation, audit, state, and build/test artifacts are updated per unit with immediate checkbox tracking."
+**AI Response**: "Resumed the approved brownfield workflow, confirmed the clean completed classes-refactor baseline, recorded the package-wide requirements, four-unit execution plan, detailed Code Generation checklist, extension policy, and active Unit 1 state."
+**Context**: INCEPTION approval and CONSTRUCTION Code Generation Part 1. The user's supplied plan provides explicit approval for Requirements Analysis, Workflow Planning, Units Generation, and Code Generation execution.
+
+---
+
 ## Private Helper Reorganization - Build and Test Complete
 **Timestamp**: 2026-07-16T13:14:37Z
 **User Input**: "No new user input."
@@ -1291,5 +1378,37 @@ Resolve all 15 findings in four dependency-ordered PRs based on local `756c1128`
 **User Input**: "No new user input."
 **AI Response**: "Completed the final local review and Build and Test matrix. All fifteen review findings are closed by passing regressions; the four stacked commits are clean and independently evidenced; 2,004 non-solver tests, three runnable solver tests, 98% coverage, Ruff, notebook parsing, warning-free Sphinx, packaging, and patch integrity passed. GitHub publication could not proceed because the required gh CLI is absent, GitHub DNS is unavailable, and local develop contains four approved baseline commits not present on origin/develop. No remote state was changed."
 **Context**: CONSTRUCTION - Final Build and Test complete. GitHub publication remains the only unchecked plan item. The GitHub publish workflow was paused at its mandatory prerequisite rather than assuming a remote base or pushing local develop.
+
+---
+
+## Package-Wide Owner Reorganization - Unit 1 Completion
+**Timestamp**: 2026-07-16T13:33:50Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Unit 1. Semantic validation now owns the complete semantic engine; ProblemTable delegates to a private interval engine; Stream delegates segment attachment and sparse transactions; Value delegates coercion and unit handling; workspace view shaping is split into common, input, graph, problem-table, and variant modules. Focused seeded tests passed (130 tests) and focused Ruff checks passed. Updated all Unit 1 plan checkboxes and stage state in the same interaction."
+**Context**: CONSTRUCTION - Code Generation Part 2, Unit 1 complete. Security and Resiliency are disabled (N/A); partial Property-Based Testing remains compliant through seed `20260715`. Unit 2 is active.
+
+---
+
+## Package-Wide Owner Reorganization - Unit 2 Completion
+**Timestamp**: 2026-07-16T13:33:50Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Unit 2. HEN synthesis schemas now have concrete common, topology, method, task, and result owners; plural compatibility facades and the public barrel preserve imports and old public-schema pickle resolution. `classes`, `lib`, and `lib.schemas` are typed lazy barrels with unchanged `__all__`, while root `OpenPinch` remains eager. Structural, schema, pickle, optional-dependency cold-import, API, and Ruff verification passed (108 tests)."
+**Context**: CONSTRUCTION - Code Generation Part 2, Unit 2 complete. All Unit 2 plan checkboxes and stage state were updated immediately. Unit 3 is active.
+
+---
+
+## Package-Wide Owner Reorganization - Final Completion
+**Timestamp**: 2026-07-16T14:04:01Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Units 3 and 4 and the package-wide Build and Test stage. Service runtime records and graph specifications are private to owner packages; direct-MVR public models retain their facades; HEN base solver execution, stagewise evolution records, pinch preprocessing, and extraction metadata use explicit private composition helpers; curated unit-model runtime aliases are removed. The complete non-solver suite passed 2,018 tests at 98% coverage, solver tests passed 3 with 1 skip, and Ruff, Sphinx, notebook, wheel/sdist, stale-path, API, and patch checks passed."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete. All detailed plan and stage checkboxes were updated in the same interaction. Security and Resiliency are disabled (N/A); partial Property-Based Testing is compliant with seed `20260715`.
+
+---
+
+## Remove Compatibility Facades - Completion
+**Timestamp**: 2026-07-16T17:53:02Z
+**User Input**: "No new user input."
+**AI Response**: "Removed the synthesis `methods`, `tasks`, and `results` compatibility modules and package-level schema re-exports. Routed production code, scripts, tests, docs, and lazy public exports directly to concrete schema owners; old barrel imports and pickle paths are unsupported. After correcting stale benchmark and autodoc imports, 2,019 non-solver tests passed at 98% coverage, solver tests passed 3 with 1 skip, and Ruff, warning-free Sphinx, notebook parsing, wheel/sdist builds, retired-path/artifact checks, and patch hygiene passed."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete. All checklist and state updates were recorded in the same interaction. Security and Resiliency are disabled (N/A); partial PBT is N/A for this import-only cleanup.
 
 ---

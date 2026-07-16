@@ -41,14 +41,14 @@ from ._pinch_problem.input.loading import (
     load_problem_source,
     prepare_in_memory_problem_source,
 )
-from ._pinch_problem.input.semantics import (
-    validate_problem_semantics as _validate_problem_semantics,
-)
 from ._pinch_problem.input.validation import (
     build_validation_report,
 )
 from ._pinch_problem.input.validation import (
     format_schema_validation_error as _format_schema_validation_error,
+)
+from ._pinch_problem.input.validation import (
+    validate_problem_semantics as _validate_problem_semantics,
 )
 from ._pinch_problem.output.reporting import (
     build_graph_data,

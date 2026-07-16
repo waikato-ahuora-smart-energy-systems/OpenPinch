@@ -19,7 +19,7 @@ from ..enums import ST, FluidPhase
 from .common import ScalarOrVU
 from .graphs import GraphSet
 from .reporting import TargetResults
-from .synthesis import HeatExchangerNetworkSynthesisResult
+from .synthesis.result import HeatExchangerNetworkSynthesisResult
 
 
 class StreamSegmentSchema(BaseModel):

@@ -6,7 +6,7 @@ from dataclasses import replace
 from time import perf_counter
 
 from ....lib.enums import HENDesignMethod
-from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisTask
+from ....lib.schemas.synthesis.task import HeatExchangerNetworkSynthesisTask
 from ..common.execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..common.execution.pathways import (
     TierPathway,

@@ -16,6 +16,14 @@ from ..common.service_orchestration import (
     record_selected_period,
     target_matches_requested_period,
 )
+from ._energy_transfer.serialization import (
+    _as_float_array,
+    _clean_array,
+    _clean_optional,
+    _clean_value,
+    _decimal_places,
+    _save_graph_data,
+)
 
 __all__ = [
     "compute_energy_transfer_target",
@@ -705,28 +713,3 @@ def _interp_descending_temperature(
         left=source_heat[-1],
         right=source_heat[0],
     )
-
-
-def _save_graph_data(diagram: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {GT.ETD.value: diagram}
-
-
-def _as_float_array(values) -> np.ndarray:
-    return np.asarray(values, dtype=float)
-
-
-def _decimal_places() -> int:
-    return int(-np.log10(tol))
-
-
-def _clean_array(values: np.ndarray) -> np.ndarray:
-    return np.where(np.abs(values) <= tol, 0.0, values)
-
-
-def _clean_optional(value: float | None) -> float | None:
-    return None if value is None else _clean_value(value)
-
-
-def _clean_value(value: float) -> float:
-    value = float(value)
-    return 0.0 if abs(value) <= tol else value

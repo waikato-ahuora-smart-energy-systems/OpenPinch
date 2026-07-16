@@ -14,7 +14,6 @@ from pydantic import ValidationError
 
 from OpenPinch import PinchProblem, PinchWorkspace, config_options
 from OpenPinch.classes._pinch_workspace import case_inputs
-from OpenPinch.classes._pinch_workspace import views as workspace_views
 from OpenPinch.classes._pinch_workspace.case_inputs import (
     canonical_case_input_from_source,
     normalise_case_input,
@@ -27,7 +26,13 @@ from OpenPinch.classes._pinch_workspace.execution import (
     workflow_support_level,
     workflow_warnings,
 )
+from OpenPinch.classes._pinch_workspace.views import common as workspace_common
+from OpenPinch.classes._pinch_workspace.views import inputs as workspace_inputs
+from OpenPinch.classes._pinch_workspace.views import (
+    problem_tables as workspace_problem_tables,
+)
 from OpenPinch.classes._pinch_workspace.views import summary_metric_deltas
+from OpenPinch.classes._pinch_workspace.views import variants as workspace_variants
 from OpenPinch.lib.enums import HPRcycle
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.workspace import (
@@ -334,13 +339,18 @@ def test_pinch_workspace_accepts_packaged_sample_case_name_as_source():
 
 
 def test_workspace_view_helpers_handle_empty_and_mixed_inputs():
-    assert workspace_views.problem_table_views(SimpleNamespace(master_zone=None)) == []
-    assert workspace_views.summary_rows_by_target(None) == {}
-    assert workspace_views.count_changed_cells(None, None, []) is None
-    assert workspace_views.zone_tree_view("not-a-tree") == []
-    assert workspace_views.record_views({"name": "not-a-list"}, section="streams") == []
+    assert (
+        workspace_problem_tables.problem_table_views(SimpleNamespace(master_zone=None))
+        == []
+    )
+    assert workspace_variants.summary_rows_by_target(None) == {}
+    assert workspace_variants.count_changed_cells(None, None, []) is None
+    assert workspace_inputs.zone_tree_view("not-a-tree") == []
+    assert (
+        workspace_inputs.record_views({"name": "not-a-list"}, section="streams") == []
+    )
 
-    records = workspace_views.record_views(
+    records = workspace_inputs.record_views(
         ["skip-me", {"name": "Feed", "zone": ""}],
         section="streams",
     )
@@ -355,18 +365,21 @@ def test_workspace_problem_table_views_skip_empty_generated_tables(monkeypatch):
     target = SimpleNamespace(pt=object(), pt_real=object())
 
     monkeypatch.setattr(
-        workspace_views,
+        workspace_problem_tables,
         "collect_targets",
         lambda _zone: {"Target": target},
     )
     monkeypatch.setattr(
-        workspace_views,
+        workspace_problem_tables,
         "problem_table_to_dataframe",
-        lambda *_args, **_kwargs: workspace_views.pd.DataFrame(),
+        lambda *_args, **_kwargs: workspace_common.pd.DataFrame(),
     )
 
     assert (
-        workspace_views.problem_table_views(SimpleNamespace(master_zone=object())) == []
+        workspace_problem_tables.problem_table_views(
+            SimpleNamespace(master_zone=object())
+        )
+        == []
     )
 
 
@@ -393,7 +406,7 @@ def test_workspace_diff_helpers_count_cell_changes_and_missing_tables():
     )
 
     assert (
-        workspace_views.count_changed_cells(
+        workspace_variants.count_changed_cells(
             base_table,
             variant_table,
             ["temperature", "duty"],
@@ -432,13 +445,13 @@ def test_workspace_diff_helpers_count_cell_changes_and_missing_tables():
         problem_tables=[],
     )
 
-    changed = workspace_views.problem_table_diffs(
+    changed = workspace_variants.problem_table_diffs(
         "baseline",
         base_view,
         "variant",
         variant_view,
     )
-    missing = workspace_views.problem_table_diffs(
+    missing = workspace_variants.problem_table_diffs(
         "baseline",
         base_view,
         "missing",
@@ -455,33 +468,33 @@ def test_workspace_scalar_metadata_helpers_cover_annotation_and_numeric_edges():
     class Color(Enum):
         RED = "red"
 
-    assert workspace_views.annotation_metadata(str, enum_cls=Color) == ("enum", False)
-    assert workspace_views.annotation_metadata(List[str], enum_cls=None) == (
+    assert workspace_inputs.annotation_metadata(str, enum_cls=Color) == ("enum", False)
+    assert workspace_inputs.annotation_metadata(List[str], enum_cls=None) == (
         "string_list",
         True,
     )
-    assert workspace_views.annotation_metadata(list[str], enum_cls=None) == (
+    assert workspace_inputs.annotation_metadata(list[str], enum_cls=None) == (
         "string_list",
         True,
     )
-    assert workspace_views.annotation_metadata("bool option", enum_cls=None) == (
+    assert workspace_inputs.annotation_metadata("bool option", enum_cls=None) == (
         "boolean",
         False,
     )
-    assert workspace_views.annotation_metadata("dict option", enum_cls=None) == (
+    assert workspace_inputs.annotation_metadata("dict option", enum_cls=None) == (
         "object",
         False,
     )
-    assert workspace_views.annotation_metadata(object(), enum_cls=None) == (
+    assert workspace_inputs.annotation_metadata(object(), enum_cls=None) == (
         "string",
         False,
     )
-    assert workspace_views.numeric_delta(True, 1) is None
-    assert workspace_views.numeric_delta(2.5, 5) == 2.5
-    assert workspace_views.maybe_float(None) is None
-    assert workspace_views.maybe_float("3.5") == 3.5
-    assert workspace_views.maybe_float("not-a-number") is None
-    assert workspace_views.maybe_float(float("inf")) is None
+    assert workspace_common.numeric_delta(True, 1) is None
+    assert workspace_common.numeric_delta(2.5, 5) == 2.5
+    assert workspace_common.maybe_float(None) is None
+    assert workspace_common.maybe_float("3.5") == 3.5
+    assert workspace_common.maybe_float("not-a-number") is None
+    assert workspace_common.maybe_float(float("inf")) is None
 
 
 def test_workspace_json_safe_handles_enum_paths_and_model_like_objects():
@@ -514,20 +527,20 @@ def test_workspace_json_safe_handles_enum_paths_and_model_like_objects():
         def __str__(self):
             return "failing-dict"
 
-    assert workspace_views.json_safe(Color.RED) == "red"
-    assert workspace_views.json_safe(Path("data.json")) == "data.json"
-    assert workspace_views.json_safe(ItemValue()) == 12
-    assert workspace_views.json_safe(FailingItem()) == "failing-item"
-    assert workspace_views.json_safe(workspace_views.pd.Timestamp("2024-01-02")) == (
+    assert workspace_common.json_safe(Color.RED) == "red"
+    assert workspace_common.json_safe(Path("data.json")) == "data.json"
+    assert workspace_common.json_safe(ItemValue()) == 12
+    assert workspace_common.json_safe(FailingItem()) == "failing-item"
+    assert workspace_common.json_safe(workspace_common.pd.Timestamp("2024-01-02")) == (
         "2024-01-02T00:00:00"
     )
-    assert workspace_views.json_safe(workspace_views.pd.NA) is None
-    assert workspace_views.json_safe(DumpValue()) == {
+    assert workspace_common.json_safe(workspace_common.pd.NA) is None
+    assert workspace_common.json_safe(DumpValue()) == {
         "mode": "python",
         "path": "artifact.json",
     }
-    assert workspace_views.json_safe(DictValue()) == {"value": 3}
-    assert workspace_views.json_safe(FailingDictValue()) == "failing-dict"
+    assert workspace_common.json_safe(DictValue()) == {"value": 3}
+    assert workspace_common.json_safe(FailingDictValue()) == "failing-dict"
 
 
 def test_workspace_json_safe_ignores_isna_errors(monkeypatch):
@@ -538,9 +551,9 @@ def test_workspace_json_safe_ignores_isna_errors(monkeypatch):
     def raise_isna(_value):
         raise RuntimeError("cannot inspect")
 
-    monkeypatch.setattr(workspace_views.pd, "isna", raise_isna)
+    monkeypatch.setattr(workspace_common.pd, "isna", raise_isna)
 
-    assert workspace_views.json_safe(IsnaError()) == "isna-error"
+    assert workspace_common.json_safe(IsnaError()) == "isna-error"
 
 
 def test_workspace_from_json_repr_and_load_none_delegation():

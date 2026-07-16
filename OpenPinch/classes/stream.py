@@ -821,14 +821,8 @@ class Stream:
         *,
         idx: int | None = None,
     ) -> None:
-        """Apply one value mutation to every segment and commit atomically."""
-        self._update_segments_transaction(
-            {
-                segment_index: {attr_name: value}
-                for segment_index in range(self.segment_count)
-            },
-            idx=idx,
-        )
+        """Delegate an all-child value mutation to the transaction owner."""
+        _stream_segments.update_all_value_attributes(self, attr_name, value, idx=idx)
 
     def _update_segments_transaction(
         self,
@@ -836,104 +830,19 @@ class Stream:
         *,
         idx: int | None = None,
     ) -> None:
-        """Clone, mutate, validate, and commit a sparse set of child updates."""
-        if not self.has_segments:
-            raise ValueError(f"Stream {self.name!r} has no explicit segments.")
-        normalised: dict[int, dict[str, object]] = {}
-        for segment_index, changes in updates.items():
-            if isinstance(segment_index, bool) or not isinstance(segment_index, int):
-                raise TypeError("Segment update indexes must be integers.")
-            if segment_index < 0 or segment_index >= self.segment_count:
-                raise IndexError(f"Segment index {segment_index} is out of range.")
-            if not isinstance(changes, Mapping):
-                raise TypeError("Each segment update must be an attribute mapping.")
-            validated_changes: dict[str, object] = {}
-            for attr_name, value in changes.items():
-                if not isinstance(attr_name, str):
-                    raise TypeError("Segment update attribute names must be strings.")
-                if attr_name in {
-                    "active",
-                    "is_process_stream",
-                    "fluid_name",
-                    "fluid_phase",
-                }:
-                    raise ValueError(
-                        f"{attr_name!r} is controlled by parent stream {self.name!r}."
-                    )
-                internal_name = self._resolve_attr_name(attr_name)
-                if internal_name not in self._CORE_VALUE_ATTRS:
-                    raise ValueError(
-                        f"Attribute {attr_name!r} is not mutable segment state."
-                    )
-                validated_changes[internal_name] = value
-            normalised[segment_index] = validated_changes
+        """Delegate sparse child updates to the transaction owner."""
+        _stream_segments.update_transaction(self, updates, idx=idx)
 
-        if not normalised:
-            return
-
-        candidates = [self._detached_segment(segment) for segment in self._segments]
-        for segment_index, changes in normalised.items():
-            candidate = candidates[segment_index]
-            for attr_name, value in changes.items():
-                if idx is None:
-                    candidate.set_value_attr(attr_name, value)
-                else:
-                    candidate.set_value_attr_at_idx(attr_name, value, idx=idx)
-        self.replace_segments(candidates)
-
-    def replace_segments(
-        self,
-        segments,
-    ) -> None:
-        """Normalize and atomically replace this stream's piecewise profile."""
-        candidates = _stream_segments.normalise_segment_inputs(
-            segments,
-            segment_type=_StreamSegment,
-        )
-        self._validate_segments(candidates)
-        previous = self._segments
-        try:
-            for segment in previous:
-                segment._owner = None
-            self._segments = candidates
-            for index, segment in enumerate(self._segments):
-                segment._owner = self
-                segment._segment_index = index
-                segment._is_process_stream = self._is_process_stream
-                segment._active = self._active
-                segment._fluid_name = self._fluid_name
-                segment._fluid_phase = self._fluid_phase
-                segment._dt_cont_multiplier = self._dt_cont_multiplier
-                if self._period_ids is not None and self._weights is not None:
-                    segment.set_period_context(
-                        period_ids=self._period_ids,
-                        weights=self._weights,
-                        num_periods=self._num_periods,
-                    )
-            self._sync_aggregate_from_segments()
-        except Exception:
-            for segment in candidates:
-                segment._owner = None
-            self._segments = previous
-            for index, segment in enumerate(previous):
-                segment._owner = self
-                segment._segment_index = index
-            raise
+    def replace_segments(self, segments) -> None:
+        """Normalize and atomically replace the piecewise profile."""
+        _stream_segments.replace(self, segments, segment_type=_StreamSegment)
 
     def update_segment(self, index: int, **changes) -> None:
         """Apply one segment update transactionally and revalidate the profile."""
         self.update_segments({index: changes})
 
-    def update_segments(
-        self,
-        updates: Mapping[int, Mapping[str, object]],
-    ) -> None:
-        """Atomically apply sparse attribute changes to ordered child segments.
-
-        All indexes and attributes are validated before detached candidates are
-        mutated. The complete profile is committed only after continuity and
-        period validation succeeds.
-        """
+    def update_segments(self, updates: Mapping[int, Mapping[str, object]]) -> None:
+        """Atomically apply sparse attribute changes to ordered child segments."""
         if not isinstance(updates, Mapping):
             raise TypeError("updates must map segment indexes to attribute mappings.")
         if not updates:
@@ -991,49 +900,13 @@ class Stream:
 
     @staticmethod
     def _detached_segment(segment: "_StreamSegment") -> "_StreamSegment":
-        return _stream_profile.detached_segment(
-            segment,
-            segment_type=_StreamSegment,
-        )
+        return _stream_segments.detached(segment, segment_type=_StreamSegment)
 
     def _validate_segments(self, segments: tuple["_StreamSegment", ...]) -> None:
-        _stream_profile.validate_segments(
-            segments,
-            parent_num_periods=self._num_periods,
-            tolerance=tol,
-        )
+        _stream_segments.validate(self, segments)
 
     def _sync_aggregate_from_segments(self) -> None:
-        if not self._segments:
-            return
-        aggregate = _stream_profile.aggregate_segments(
-            self._segments,
-            parent_num_periods=self._num_periods,
-        )
-        self._syncing_segments = True
-        try:
-            assignments = {
-                "_t_supply": aggregate.t_supply,
-                "_t_target": aggregate.t_target,
-                "_p_supply": aggregate.p_supply,
-                "_p_target": aggregate.p_target,
-                "_h_supply": aggregate.h_supply,
-                "_h_target": aggregate.h_target,
-                "_dt_cont": aggregate.dt_cont,
-                "_heat_flow": self._build_value(aggregate.heat_flow, unit="kW"),
-                "_htc": self._build_value(
-                    aggregate.effective_htc,
-                    unit="kW/m^2/delta_degC",
-                ),
-                "_price": aggregate.price,
-            }
-            for attr_name, value in assignments.items():
-                self.set_value_attr(attr_name, value, update_derived=False)
-            self._validate_num_periods()
-            self.update_derived_properties()
-        finally:
-            self._syncing_segments = False
-        self._bump_numeric_revision()
+        _stream_segments.sync_aggregate(self)
 
     def _bump_numeric_revision(self) -> None:
         self._numeric_revision = getattr(self, "_numeric_revision", 0) + 1

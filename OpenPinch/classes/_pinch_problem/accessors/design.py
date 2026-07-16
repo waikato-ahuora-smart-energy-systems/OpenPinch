@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 if TYPE_CHECKING:
     from ....lib.enums import HeatExchangerNetworkDesignMethod
-    from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+    from ....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
     from ...heat_exchanger_network import HeatExchangerNetwork
     from ...pinch_problem import PinchProblem
 

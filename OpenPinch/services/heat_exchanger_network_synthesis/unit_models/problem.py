@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Mapping, Sequence
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
-from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from ....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
 from ..common.solver.arrays import PreparedSolverArrays
 from ..common.solver.extraction import (
     extract_heat_exchanger_network,

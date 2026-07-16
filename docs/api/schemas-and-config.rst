@@ -90,7 +90,7 @@ Heat Exchanger Network Design Results
 -------------------------------------
 
 ``TargetOutput.design`` stores a
-:class:`~OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult`
+:class:`~OpenPinch.lib.schemas.synthesis.result.HeatExchangerNetworkSynthesisResult`
 after ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
 ``problem.design.open_hens_method()``,
 ``problem.design.heat_exchanger_network_synthesis()``, or one of the direct
@@ -147,15 +147,15 @@ returned object wraps the
 Plotly ``fig``, a lightweight drawing adapter ``ax``, the selected ``network``,
 and the normalized ``grid_model`` used to draw the topology.
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult
+.. autoclass:: OpenPinch.lib.schemas.synthesis.result.HeatExchangerNetworkSynthesisResult
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisMethodInput
+.. autoclass:: OpenPinch.lib.schemas.synthesis.method.HeatExchangerNetworkSynthesisMethodInput
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisMethodOutput
+.. autoclass:: OpenPinch.lib.schemas.synthesis.method.HeatExchangerNetworkSynthesisMethodOutput
    :members:
    :no-index:
 

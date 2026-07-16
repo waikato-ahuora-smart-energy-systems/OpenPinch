@@ -5,10 +5,10 @@ from __future__ import annotations
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Callable, Protocol, Sequence
 
-from .....lib.schemas.synthesis import (
+from .....lib.schemas.synthesis.common import SynthesisMethod
+from .....lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
-    SynthesisMethod,
 )
 from ...unit_models.problem import InternalHeatExchangerNetworkProblem
 from ..errors import WorkflowContractError

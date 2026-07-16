@@ -23,10 +23,10 @@ from pathlib import Path
 from typing import Any
 
 from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.lib.schemas.synthesis import (
+from OpenPinch.lib.schemas.synthesis.common import SynthesisMethod
+from OpenPinch.lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
-    SynthesisMethod,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution import (
     executor as executor_module,

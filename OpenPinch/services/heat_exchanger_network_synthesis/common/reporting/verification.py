@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 from .....classes.heat_exchanger import HeatExchanger, HeatExchangerKind
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
-from .....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from .....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
 from ..indexing import ordered_mapping_keys
 
 _DUTY_ABS_TOL = 1.0

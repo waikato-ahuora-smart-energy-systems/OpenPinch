@@ -12,12 +12,12 @@ from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.value import Value
 from OpenPinch.classes.zone import Zone
 from OpenPinch.services.components import process_mvr as process_mvr_helpers
-from OpenPinch.services.components.direct_mvr import DirectGasMVRStageResult
-from OpenPinch.services.components.process_mvr import (
-    ProcessMVRComponent,
+from OpenPinch.services.components._process_mvr.records import (
     ProcessMVRStreamRecord,
     StreamMembership,
 )
+from OpenPinch.services.components.direct_mvr import DirectGasMVRStageResult
+from OpenPinch.services.components.process_mvr import ProcessMVRComponent
 
 PROCESS_MVR_EDGE_CASES = (
     Path(__file__).parents[1] / "fixtures" / "process_mvr_edge_cases.json"

@@ -14,6 +14,7 @@ from ....utils.heat_exchanger import compute_LMTD_from_dts
 from ..common.indexing import build_index_grid
 from ..common.solver import backend
 from ..common.solver.arrays import PreparedSolverArrays
+from ._base import solver_execution as _solver_execution
 
 logger = logging.getLogger(__name__)
 
@@ -1761,101 +1762,8 @@ class BaseHeatExchangerNetworkModel(ABC):
             self.z_cu_allowed = self.z_cu_feasible
 
     def optimise(self, print_output: bool) -> None:
-        """Solve the concrete model and extract plain result data on success."""
-
-        total_solve_time = 0.0
-        piecewise_mappings = getattr(self, "_piecewise_active_mappings", [])
-        active_mapping_stable = not piecewise_mappings or getattr(
-            self, "integers", False
-        )
-        for _attempt in range(8):
-            self.solver_run = backend.solve_gekko_model(
-                self.m,
-                solver_name=self.solver,
-                disp=False,
-                debug=0,
-            )
-            total_solve_time += float(self.solver_run.solve_time or 0.0)
-            if self.solver_run.failure_reason is not None:
-                break
-            active_mapping_stable = (
-                True
-                if not piecewise_mappings
-                else not self._update_piecewise_active_segments()
-            )
-            if active_mapping_stable:
-                break
-        self.solve_time = total_solve_time
-
-        if (
-            self.solver_run.failure_reason is not None
-            and piecewise_mappings
-            and not getattr(self, "integers", False)
-        ):
-            self.solver_run = backend.SolverRun(
-                name=self.solver_run.name,
-                extension=self.solver_run.extension,
-                status=self.solver_run.status,
-                objective_value=self.solver_run.objective_value,
-                solve_time=total_solve_time,
-                failure_reason=(
-                    f"{self.solver_run.failure_reason}; segmented-stream active "
-                    "interval solve was unresolved, so use APOPT or Couenne"
-                ),
-            )
-
-        if self.solver_run.failure_reason is None and not active_mapping_stable:
-            self.solver_run = backend.SolverRun(
-                name=self.solver_run.name,
-                extension=self.solver_run.extension,
-                status=self.solver_run.status,
-                objective_value=self.solver_run.objective_value,
-                solve_time=total_solve_time,
-                failure_reason=(
-                    "piecewise active segments did not stabilise; use APOPT or "
-                    "Couenne for interval-disjunctive segmented-stream solving"
-                ),
-            )
-
-        if self.solver_run.failure_reason is not None:
-            self.mSuccess = 0
-            logger.error("[Failed] [model: %s] [path: %s]", self.name, self.m._path)
-        elif self.m.options.SOLVESTATUS == 1:
-            if self.m.options.objfcnval + self.tol < 0:
-                self.mSuccess = 0
-                self.solver_run = backend.SolverRun(
-                    name=self.solver_run.name,
-                    extension=self.solver_run.extension,
-                    status=self.solver_run.status,
-                    objective_value=self.solver_run.objective_value,
-                    solve_time=self.solver_run.solve_time,
-                    failure_reason="negative objective value",
-                )
-                logger.error(
-                    "[Failed] [model: %s] [path: %s]",
-                    self.name,
-                    self.m._path,
-                )
-            else:
-                self.mSuccess = self.m.options.SOLVESTATUS
-                logger.info(
-                    "[Success] [model: %s] [path: %s]",
-                    self.name,
-                    self.m._path,
-                )
-        else:
-            self.mSuccess = self.m.options.SOLVESTATUS
-            logger.error(
-                "[Failed] [model: %s] [path: %s] [status: %s]",
-                self.name,
-                self.m._path,
-                self.m.options.SOLVESTATUS,
-            )
-
-        if self.mSuccess:
-            self.get_post_process()
-            if print_output:
-                self.output_to_cmd_line()
+        """Delegate solver execution with explicit model state."""
+        _solver_execution.optimise(self, print_output)
 
     def output_to_cmd_line(self) -> None:
         """Emit the same solved-array diagnostics as the source base model."""
