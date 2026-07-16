@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from hypothesis import strategies as st
 
-from OpenPinch import StreamSegment
 from OpenPinch.classes import Stream
+from OpenPinch.classes._stream.segment import StreamSegment
 
 
 @st.composite

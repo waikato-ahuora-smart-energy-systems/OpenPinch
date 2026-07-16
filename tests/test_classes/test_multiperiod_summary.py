@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import openpyxl
 import pytest
 
-from OpenPinch.classes._problem._multiperiod import (
+from OpenPinch.classes._pinch_problem.periods.aggregation import (
     WEIGHTED_AVERAGE_PERIOD_ID,
     weighted_average_output,
 )

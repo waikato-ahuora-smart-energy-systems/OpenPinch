@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from hypothesis import strategies as st
 
-from OpenPinch.classes.heat_exchanger import (
-    HeatExchanger,
-    HeatExchangerAreaSlice,
-    HeatExchangerPeriodState,
-)
+from OpenPinch.classes._heat_exchanger.area import HeatExchangerAreaSlice
+from OpenPinch.classes._heat_exchanger.period_state import HeatExchangerPeriodState
+from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.lib.enums import HeatExchangerKind, HeatExchangerStreamRole
 
 _POSITIVE_FLOATS = st.floats(

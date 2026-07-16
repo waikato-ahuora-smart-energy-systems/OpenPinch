@@ -92,7 +92,7 @@ When Couenne is unavailable for Couenne-backed stages, OpenPinch warns and
 attempts the configured network-evolution route where possible.
 
 Each exchanger stores shared design topology, area, and capital values once;
-ordered ``HeatExchangerPeriodState`` records hold operating values. A
+ordered parent-owned period-state records hold operating values. A
 single-period network allows ``exchanger.state()`` and omitted query periods.
 A multiperiod network requires the explicit identity for duty, temperature,
 diagram, export, and controllability access.
@@ -101,7 +101,7 @@ Segmented Variable-Heat-Capacity Streams
 ----------------------------------------
 
 A variable-heat-capacity process stream remains one physical parent on the
-hot or cold solver axis. Its ordered ``StreamSegment`` children define the
+hot or cold solver axis. Its ordered internal segment records define the
 local temperature--duty relation, heat-transfer coefficients, and exchanger
 area calculations. Segment count therefore does not inflate physical stream,
 match, exchanger, or stage-position counts.

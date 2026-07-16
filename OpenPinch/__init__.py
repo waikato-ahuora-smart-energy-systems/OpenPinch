@@ -7,7 +7,6 @@ import warnings as _warnings
 from . import lib as lib
 from .classes.pinch_problem import PinchProblem
 from .classes.pinch_workspace import PinchWorkspace
-from .classes.stream import StreamSegment
 from .lib.config import Configuration
 from .lib.enums import GraphType, HPRcycle, StreamType, TargetType, ZoneType
 from .lib.schemas.io import (
@@ -61,7 +60,6 @@ __all__ = [
     "SampleCaseMetadata",
     "StreamSchema",
     "StreamSegmentSchema",
-    "StreamSegment",
     "StreamType",
     "TargetInput",
     "TargetOutput",

@@ -13,17 +13,19 @@ from typing import Any, Callable, List, Tuple, Union
 import numpy as np
 
 from ..lib.enums import ST
-from ._stream_collection._helpers import (
-    _is_picklable,
-    _sort_by_attr,
-    _sort_by_attrs,
-    _stream_attr_value,
-)
-from ._stream_collection._numeric_view import (
+from ._stream_collection.filters import build_stream_subset
+from ._stream_collection.numeric_view import (
     StreamCollectionNumericView,
     build_numeric_view,
     build_segment_numeric_view,
     value_at_idx,
+)
+from ._stream_collection.serialization import collection_to_dict
+from ._stream_collection.sorting import (
+    _is_picklable,
+    _sort_by_attr,
+    _sort_by_attrs,
+    _stream_attr_value,
 )
 from .stream import Stream
 
@@ -474,73 +476,11 @@ class StreamCollection:
         expand_segments: bool = False,
     ) -> dict[str, list[Any]]:
         """Return stream data as serializable rows in standard reporting order."""
-        ordered_items = sorted(
-            self._streams.items(),
-            key=lambda item: self._dict_sort_key(item[1], idx),
+        return collection_to_dict(
+            self,
+            idx=idx,
+            expand_segments=expand_segments,
         )
-        columns = [
-            "name",
-            "category",
-            "type",
-            "is_process_stream",
-            "t_supply",
-            "t_target",
-            "heat_flow",
-            "dt_cont",
-            "dt_cont_multiplier",
-            "htc",
-            "active",
-        ]
-        if expand_segments:
-            columns = [
-                "parent_key",
-                "parent_name",
-                "segment_index",
-                "segment_identity",
-                *columns,
-            ]
-        report_streams = []
-        for parent_key, stream in ordered_items:
-            if expand_segments and stream.has_segments:
-                report_streams.extend(
-                    (
-                        parent_key,
-                        stream.name,
-                        index,
-                        f"{parent_key}.S{index + 1}",
-                        segment,
-                    )
-                    for index, segment in enumerate(stream.segments)
-                )
-            else:
-                report_streams.append((parent_key, stream.name, None, None, stream))
-        rows = [
-            {
-                "parent_key": parent_key,
-                "parent_name": parent_name,
-                "segment_index": segment_index,
-                "segment_identity": segment_identity,
-                "name": stream.name,
-                "category": self._dict_category(stream),
-                "type": stream.type,
-                "is_process_stream": stream.is_process_stream,
-                "t_supply": self._value_at_idx(stream._t_supply, idx),
-                "t_target": self._value_at_idx(stream._t_target, idx),
-                "heat_flow": self._value_at_idx(stream._heat_flow, idx),
-                "dt_cont": self._value_at_idx(stream._dt_cont, idx),
-                "dt_cont_multiplier": stream.dt_cont_multiplier,
-                "htc": self._value_at_idx(stream._htc, idx),
-                "active": stream.active,
-            }
-            for (
-                parent_key,
-                parent_name,
-                segment_index,
-                segment_identity,
-                stream,
-            ) in report_streams
-        ]
-        return {column: [row[column] for row in rows] for column in columns}
 
     @staticmethod
     def _descending_sort_value(value: float) -> float:
@@ -585,49 +525,14 @@ class StreamCollection:
         invert_utility: bool = False,
         sort_attr: str | None = None,
     ) -> "StreamCollection":
-        if invert_utility:
-            include_process_streams = False
-            include_utility_streams = True
-
-        subset = StreamCollection()
-        subset._period_ids = self._period_ids
-        subset._weights = self._weights
-        subset._num_periods = self._num_periods
-        subset._sort_spec = self._sort_spec
-        subset._rebuild_sort_key()
-        subset._sort_reverse = self._sort_reverse
-
-        for key, stream in self._streams.items():
-            if stream.is_process_stream:
-                if not include_process_streams:
-                    continue
-                if target_type is None or stream.type == target_type:
-                    subset._streams[key] = stream
-                continue
-
-            if not include_utility_streams:
-                continue
-
-            if invert_utility:
-                opposite_type = (
-                    ST.Cold.value if target_type == ST.Hot.value else ST.Hot.value
-                )
-                if stream.type != opposite_type:
-                    continue
-                inverted_stream = copy(stream)
-                inverted_stream.invert()
-                subset._streams[key] = inverted_stream
-            elif target_type is None or stream.type == target_type:
-                subset._streams[key] = stream
-
-        if sort_attr is None:
-            subset._sort_spec = self._sort_spec
-            subset._rebuild_sort_key()
-            subset._sort_reverse = self._sort_reverse
-        else:
-            subset.set_sort_key(sort_attr, reverse=self._sort_reverse)
-        subset._needs_sort = True
-        return subset
+        return build_stream_subset(
+            self,
+            target_type=target_type,
+            include_process_streams=include_process_streams,
+            include_utility_streams=include_utility_streams,
+            invert_utility=invert_utility,
+            sort_attr=sort_attr,
+        )
 
     def get_hot_streams(
         self,

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from OpenPinch.classes._problem import _validation as validation
+from OpenPinch.classes._pinch_problem.input import semantics, validation
 from OpenPinch.classes.value import Value
 from OpenPinch.lib.schemas.io import TargetInput
 
@@ -46,7 +46,7 @@ def test_validation_report_and_warning_semantics(validation_cases):
 
     validated = TargetInput.model_validate(validation_cases["warning_problem"])
     with pytest.warns(UserWarning, match="warning"):
-        validation._validate_problem_semantics(validated, context={})
+        semantics.validate_problem_semantics(validated, context={})
 
 
 def test_validation_report_rejects_discontinuous_segmented_utility_before_loading():

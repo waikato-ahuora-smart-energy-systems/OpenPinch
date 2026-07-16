@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from ....classes._stream_value_state import resolve_period_weights
+from ....classes._stream.value_state import resolve_period_weights
 from ....classes.problem_table import ProblemTable
 from ....classes.zone import Zone
 from ....lib.config import tol

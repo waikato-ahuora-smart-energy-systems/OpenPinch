@@ -7,7 +7,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from ...classes._stream_value_state import resolve_period_weights
+from ...classes._stream.value_state import resolve_period_weights
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.value import Value

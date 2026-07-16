@@ -10,14 +10,21 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from OpenPinch.classes._problem._loading import (
+from OpenPinch.classes._pinch_problem.accessors.plot import (
+    _gallery_index_html,
+    _graph_set_matches_zone_selector,
+    _PlotAccessor,
+    _slugify,
+)
+from OpenPinch.classes._pinch_problem.accessors.target import _TargetAccessor
+from OpenPinch.classes._pinch_problem.input.loading import (
     _load_json_inputs,
     _packaged_sample_case_name,
     _ProblemSourceAdapters,
     find_zone_tree_node,
     load_problem_source,
 )
-from OpenPinch.classes._problem._output import (
+from OpenPinch.classes._pinch_problem.output.reporting import (
     _target_attr,
     build_graph_availability,
     build_graph_data,
@@ -26,13 +33,6 @@ from OpenPinch.classes._problem._output import (
     format_res,
     locate_summary_row,
 )
-from OpenPinch.classes._problem._plot_accessor import (
-    _gallery_index_html,
-    _graph_set_matches_zone_selector,
-    _PlotAccessor,
-    _slugify,
-)
-from OpenPinch.classes._problem._target_accessor import _TargetAccessor
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.classes.zone import Zone
 from OpenPinch.lib.schemas.io import TargetInput
@@ -2510,7 +2510,7 @@ def test_target_all_periods_supports_thread_parallel_execution():
 def test_target_all_periods_uses_validated_output_period_id_for_parallel_keys(
     monkeypatch,
 ):
-    mod = sys.modules[PinchProblem.__module__]
+    from OpenPinch.classes._pinch_problem.periods import execution
 
     payload = {
         "streams": [
@@ -2534,8 +2534,8 @@ def test_target_all_periods_uses_validated_output_period_id_for_parallel_keys(
     }
 
     monkeypatch.setattr(
-        mod,
-        "_solve_default_target_for_period",
+        execution,
+        "solve_default_target_for_period",
         lambda problem_inputs, project_name, period_id: {
             "name": project_name,
             "period_id": f"{period_id}-resolved",

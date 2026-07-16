@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from .....classes._stream_value_state import resolve_period_weights
+from .....classes._stream.value_state import resolve_period_weights
 from .....classes.pinch_problem import PinchProblem
 from .....classes.stream import Stream
 from .....classes.value import Value

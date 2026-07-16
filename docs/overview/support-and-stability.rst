@@ -15,7 +15,7 @@ Stable surfaces are the preferred way to build user workflows:
 - ``pinch_analysis_service``
 - root package imports listed in :mod:`OpenPinch`
 - ``TargetInput``, ``TargetOutput``, and the main I/O schema models
-- ``StreamSegment`` and the nested segment/profile input schemas
+- nested segment/profile input schemas, including ``StreamSegmentSchema``
 - packaged resource helpers such as ``list_sample_cases()`` and
   ``copy_notebook()``
 - ``openpinch notebook`` for copying notebooks only

@@ -3,11 +3,9 @@ from __future__ import annotations
 import pytest
 from hypothesis import given, settings
 
-from OpenPinch.classes.heat_exchanger import (
-    HeatExchanger,
-    HeatExchangerAreaSlice,
-    HeatExchangerPeriodState,
-)
+from OpenPinch.classes._heat_exchanger.area import HeatExchangerAreaSlice
+from OpenPinch.classes._heat_exchanger.period_state import HeatExchangerPeriodState
+from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.lib.enums import HeatExchangerKind, HeatExchangerStreamRole
 from tests.strategies.heat_exchangers import heat_exchangers_with_area_slices
 

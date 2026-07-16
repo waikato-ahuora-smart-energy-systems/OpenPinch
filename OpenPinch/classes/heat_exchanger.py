@@ -8,105 +8,11 @@ from typing import Any, Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..lib.enums import HeatExchangerKind, HeatExchangerStreamRole
-from . import _heat_exchanger_area
-
-HeatExchangerAreaSlice = _heat_exchanger_area.HeatExchangerAreaSlice
-
-
-class HeatExchangerPeriodState(BaseModel):
-    """One exchanger's operational state for one ordered operating period."""
-
-    model_config = ConfigDict(extra="forbid", validate_assignment=True)
-
-    period_id: str
-    period_idx: int
-    duty: float
-    active: bool = True
-    approach_temperatures: tuple[float, ...] = Field(default_factory=tuple)
-    source_split_fraction: float | None = None
-    sink_split_fraction: float | None = None
-    source_inlet_temperature: float | None = None
-    source_outlet_temperature: float | None = None
-    sink_inlet_temperature: float | None = None
-    sink_outlet_temperature: float | None = None
-
-    @field_validator("period_id")
-    @classmethod
-    def _validate_period_id(cls, value: str) -> str:
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("period_id must be a non-empty string")
-        return value.strip()
-
-    @field_validator("period_idx")
-    @classmethod
-    def _validate_period_idx(cls, value: int) -> int:
-        if value < 0:
-            raise ValueError("period_idx must be non-negative")
-        return int(value)
-
-    @field_validator("duty")
-    @classmethod
-    def _validate_duty(cls, value: float) -> float:
-        if not math.isfinite(value) or value < 0.0:
-            raise ValueError("period duty must be finite and non-negative")
-        return float(value)
-
-    @field_validator(
-        "source_split_fraction",
-        "sink_split_fraction",
-    )
-    @classmethod
-    def _validate_split_fraction(cls, value: float | None) -> float | None:
-        if value is None:
-            return value
-        if not math.isfinite(value) or not 0.0 <= value <= 1.0:
-            raise ValueError("split fractions must be finite values from zero to one")
-        return float(value)
-
-    @field_validator(
-        "source_inlet_temperature",
-        "source_outlet_temperature",
-        "sink_inlet_temperature",
-        "sink_outlet_temperature",
-    )
-    @classmethod
-    def _validate_finite_temperature(cls, value: float | None) -> float | None:
-        if value is None:
-            return value
-        if not math.isfinite(value):
-            raise ValueError("temperatures must be finite values")
-        return float(value)
-
-    @field_validator("approach_temperatures")
-    @classmethod
-    def _validate_approach_temperatures(
-        cls,
-        value: tuple[float, ...],
-    ) -> tuple[float, ...]:
-        for approach_temperature in value:
-            if not math.isfinite(approach_temperature) or approach_temperature < 0.0:
-                raise ValueError(
-                    "approach temperatures must be finite non-negative values"
-                )
-        return tuple(float(approach_temperature) for approach_temperature in value)
-
-    @property
-    def source_mid_temperature(self) -> float | None:
-        """Return the source midpoint temperature when both endpoints exist."""
-
-        return _midpoint_temperature(
-            self.source_inlet_temperature,
-            self.source_outlet_temperature,
-        )
-
-    @property
-    def sink_mid_temperature(self) -> float | None:
-        """Return the sink midpoint temperature when both endpoints exist."""
-
-        return _midpoint_temperature(
-            self.sink_inlet_temperature,
-            self.sink_outlet_temperature,
-        )
+from ._heat_exchanger import area as _area
+from ._heat_exchanger.area import HeatExchangerAreaSlice as _HeatExchangerAreaSlice
+from ._heat_exchanger.period_state import (
+    HeatExchangerPeriodState as _HeatExchangerPeriodState,
+)
 
 
 class HeatExchanger(BaseModel):
@@ -121,11 +27,11 @@ class HeatExchanger(BaseModel):
     source_stream_role: HeatExchangerStreamRole
     sink_stream_role: HeatExchangerStreamRole
     stage: int | None = None
-    period_states: tuple[HeatExchangerPeriodState, ...] = Field(min_length=1)
+    period_states: tuple[_HeatExchangerPeriodState, ...] = Field(min_length=1)
     area: float | None = None
     match_allowed: bool = True
     capital_cost: float | None = None
-    segment_area_contributions: tuple[HeatExchangerAreaSlice, ...] = Field(
+    segment_area_contributions: tuple[_HeatExchangerAreaSlice, ...] = Field(
         default_factory=tuple
     )
     solver_metadata: dict[str, Any] = Field(
@@ -216,7 +122,7 @@ class HeatExchanger(BaseModel):
 
     @model_validator(mode="after")
     def _validate_segment_design_area(self) -> Self:
-        design_area = _heat_exchanger_area.validate_segment_design_area(
+        design_area = _area.validate_segment_design_area(
             self.area,
             self.segment_area_contributions,
         )
@@ -233,21 +139,17 @@ class HeatExchanger(BaseModel):
     @property
     def segment_duty_by_period(self) -> dict[str, float]:
         """Return local slice duty totals grouped by operating period."""
-        return _heat_exchanger_area.segment_duty_by_period(
-            self.segment_area_contributions
-        )
+        return _area.segment_duty_by_period(self.segment_area_contributions)
 
     @property
     def segment_area_by_period(self) -> dict[str, float]:
         """Return local slice area totals grouped by operating period."""
-        return _heat_exchanger_area.segment_area_by_period(
-            self.segment_area_contributions
-        )
+        return _area.segment_area_by_period(self.segment_area_contributions)
 
     @property
     def segment_design_area(self) -> float | None:
         """Return the maximum period-total slice area when slices are available."""
-        return _heat_exchanger_area.segment_design_area(self.segment_area_contributions)
+        return _area.segment_design_area(self.segment_area_contributions)
 
     @property
     def period_ids(self) -> tuple[str, ...]:
@@ -255,7 +157,7 @@ class HeatExchanger(BaseModel):
 
         return tuple(state.period_id for state in self.period_states)
 
-    def state(self, period_id: str | None = None) -> HeatExchangerPeriodState:
+    def state(self, period_id: str | None = None) -> _HeatExchangerPeriodState:
         """Return one period state, requiring identity for multiperiod results."""
 
         if period_id is None:
@@ -288,18 +190,8 @@ class HeatExchanger(BaseModel):
         return stage is None or self.stage == stage
 
 
-def _midpoint_temperature(
-    inlet_temperature: float | None,
-    outlet_temperature: float | None,
-) -> float | None:
-    if inlet_temperature is None or outlet_temperature is None:
-        return None
-    return (inlet_temperature + outlet_temperature) / 2
-
-
 __all__ = [
     "HeatExchanger",
-    "HeatExchangerPeriodState",
     "HeatExchangerKind",
     "HeatExchangerStreamRole",
 ]

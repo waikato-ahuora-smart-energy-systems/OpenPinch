@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from OpenPinch.classes._problem import _target_dispatch as td
-from OpenPinch.classes._problem._target_plan import (
+from OpenPinch.classes._pinch_problem.targeting import dispatch as td
+from OpenPinch.classes._pinch_problem.targeting.plan import (
     TARGETING_METHOD_SPECS,
     TargetingMethodSpec,
     TargetingPlan,

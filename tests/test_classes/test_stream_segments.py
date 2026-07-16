@@ -9,9 +9,10 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 import OpenPinch
-from OpenPinch import PinchWorkspace, StreamSegment
+from OpenPinch import PinchWorkspace
 from OpenPinch.classes import Stream
-from OpenPinch.classes._problem._validation import validate_problem_inputs
+from OpenPinch.classes._pinch_problem.input.validation import validate_problem_inputs
+from OpenPinch.classes._stream.segment import StreamSegment
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.config import tol
 from OpenPinch.lib.schemas.io import TargetInput
@@ -607,10 +608,14 @@ def test_segment_price_and_parent_cost_conservation_invariant(stream, base_price
     )
 
 
-def test_stream_refactor_preserves_public_class_identity_and_defining_module():
-    assert OpenPinch.StreamSegment is StreamSegment
+def test_stream_segment_is_private_and_preserves_internal_model_name():
+    assert not hasattr(OpenPinch, "StreamSegment")
+    assert not hasattr(OpenPinch.classes, "StreamSegment")
+    assert not hasattr(
+        __import__("OpenPinch.classes.stream", fromlist=["*"]), "StreamSegment"
+    )
     assert Stream.__module__ == "OpenPinch.classes.stream"
-    assert StreamSegment.__module__ == "OpenPinch.classes.stream"
+    assert StreamSegment.__module__ == "OpenPinch.classes._stream.segment"
 
 
 def test_workspace_bundle_and_case_copy_preserve_nested_segment_order(tmp_path):

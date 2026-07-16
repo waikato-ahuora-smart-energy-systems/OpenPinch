@@ -16,8 +16,6 @@ Use the package root when you want the supported front door:
 - :func:`OpenPinch.pinch_analysis_service` for typed programmatic execution
 - :func:`OpenPinch.get_piecewise_linearisation_for_streams` for nonlinear
   stream segmentation utilities
-- :class:`OpenPinch.StreamSegment` for an ordered piece of a variable-heat-
-  capacity parent ``Stream``
 - resource helpers such as ``list_sample_cases()``, ``sample_case_metadata()``,
   ``list_notebooks()``, and ``copy_notebook()``
 - report helpers such as ``problem.validation_report()``, ``problem.report()``,
@@ -35,8 +33,7 @@ metadata helpers, and resource helpers most users need:
    * - Group
      - Exports
    * - Workflow objects
-     - ``PinchProblem``, ``PinchWorkspace``, ``StreamSegment``,
-       ``pinch_analysis_service``
+     - ``PinchProblem``, ``PinchWorkspace``, ``pinch_analysis_service``
    * - Input and output schemas
      - ``TargetInput``, ``TargetOutput``, ``StreamSchema``,
        ``StreamSegmentSchema``, ``TemperatureHeatPointSchema``,

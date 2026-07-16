@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 from ..lib.config import Configuration
 from ..lib.enums import ZT
 from ..lib.schemas.targets import BaseTargetModel
-from ._stream_value_state import resolve_period_weights
+from ._stream.value_state import resolve_period_weights
 from .stream_collection import StreamCollection
 
 if TYPE_CHECKING:

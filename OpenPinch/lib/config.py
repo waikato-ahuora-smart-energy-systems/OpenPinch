@@ -107,7 +107,7 @@ class Configuration:
     @classmethod
     def options_catalog(cls):
         """Return declarative metadata for all supported flat option keys."""
-        from ..classes._workspace.views import configuration_field_metadata
+        from ..classes._pinch_workspace.views import configuration_field_metadata
 
         return configuration_field_metadata()
 

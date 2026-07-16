@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from OpenPinch.classes import *
-from OpenPinch.classes._stream_collection._numeric_view import value_at_idx
+from OpenPinch.classes._stream_collection.numeric_view import value_at_idx
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib import *

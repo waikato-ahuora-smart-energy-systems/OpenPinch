@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from .....classes._heat_exchanger.period_state import HeatExchangerPeriodState
 from .....classes.heat_exchanger import (
     HeatExchanger,
     HeatExchangerKind,
-    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
 from .....classes.heat_exchanger_network import HeatExchangerNetwork

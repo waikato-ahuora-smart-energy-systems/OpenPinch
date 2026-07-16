@@ -18,9 +18,9 @@ from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerNetwork,
-    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
+from OpenPinch.classes._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.config_metadata import CONFIG_FIELD_SPECS

@@ -6,7 +6,8 @@ from typing import Any
 
 import numpy as np
 
-from ...classes.stream import Stream, StreamSegment
+from ...classes._stream.segment import StreamSegment
+from ...classes.stream import Stream
 from ...classes.value import Value
 from ...classes.zone import Zone
 from ...lib.config import tol
@@ -406,7 +407,7 @@ def _validate_nested_record_semantics(
     section: str,
 ) -> None:
     """Apply the same nested semantic checks used by validation reports."""
-    from ...classes._problem._validation import segmented_record_issues
+    from ...classes._pinch_problem.input.semantics import segmented_record_issues
 
     issues = segmented_record_issues(
         schema,

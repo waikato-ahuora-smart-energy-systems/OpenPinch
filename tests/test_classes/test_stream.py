@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from OpenPinch.classes._stream_value_state import resolve_period_weights
+from OpenPinch.classes._stream.value_state import resolve_period_weights
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.value import Value
 from OpenPinch.lib.enums import ST, FluidPhase

@@ -10,9 +10,9 @@ from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerNetwork,
-    HeatExchangerPeriodState,
     HeatExchangerStreamRole,
 )
+from OpenPinch.classes._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.lib.schemas.synthesis import (
     HeatExchangerNetworkSynthesisResult,
     HeatExchangerNetworkSynthesisTask,

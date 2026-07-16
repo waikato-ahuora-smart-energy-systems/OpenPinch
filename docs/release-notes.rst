@@ -9,7 +9,7 @@ Domain and input contracts
 
 This pre-release changes the following contracts without compatibility shims:
 
-- Values owned by ``Stream`` and ``StreamSegment`` are read-only. Mutations use
+- Values owned by a ``Stream`` and its segment records are read-only. Mutations use
   explicit stream assignment, indexed-value, or segment-update APIs.
 - Period weights use one validation policy: omitted trailing weights become
   ``1.0``; excess, non-finite, negative, and all-zero vectors are rejected.
@@ -20,6 +20,19 @@ This pre-release changes the following contracts without compatibility shims:
   unknown versions, and the retired ``payload`` field are rejected.
 - Segmented process streams and utilities share the same semantic validation in
   reports and preparation, including parent aggregate consistency.
+
+Private helper ownership
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Private class helpers are grouped under owner-oriented packages for streams,
+  values, collections, problem tables, problem orchestration, workspaces, and
+  heat exchangers.
+- Runtime stream-segment, exchanger-period, and exchanger-area-slice record
+  classes are parent-owned implementation details. Construct them through
+  ``Stream`` and ``HeatExchanger`` mappings; ``StreamSegmentSchema`` remains the
+  supported external segment input contract.
+- The former public record imports and their Python pickle paths are removed
+  without aliases or compatibility shims.
 
 Period-native PDM and utility constraints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -46,7 +59,7 @@ Period-native HEN results
 - ``HeatExchanger`` retains shared topology, design area, and capital fields.
   Operational duty, activity, approaches, split fractions, and source/sink
   temperatures are stored in non-empty ordered ``period_states`` containing
-  ``HeatExchangerPeriodState`` records.
+  parent-owned period-state records.
 - The retired exchanger-level operating scalar fields do not exist. Use
   ``exchanger.state(period_id)``; omission is accepted only for an exchanger
   with exactly one period state.

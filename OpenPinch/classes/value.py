@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
-from functools import lru_cache
 from typing import Any
 
 import numpy as np
 from pint import UnitRegistry, set_application_registry
 from pint.errors import DimensionalityError
+
+from ._value.coercion import is_bool_like as _is_bool_like
+from ._value.coercion import is_value_with_unit as _is_value_with_unit
+from ._value.units import clean_unit_text as _clean_unit_text
+from ._value.units import normalise_unit_text as _normalise_unit_text
+from ._value.units import unit_object as _registry_unit_object
 
 ureg = UnitRegistry()
 try:
@@ -27,40 +31,8 @@ _SERIALIZED_SCALAR_KEYS = {"value", "unit"}
 _SERIALIZED_PERIOD_KEYS = {"values", "period_ids", "weights", "unit"}
 
 
-@lru_cache(maxsize=256)
-def _normalise_unit_text(unit: str | None) -> str | None:
-    if unit is None:
-        return None
-    text = str(unit).strip().replace("$", "USD")
-    if text in {"", "-", "dimensionless", "1"}:
-        return "dimensionless"
-    if text == "fraction":
-        return "dimensionless"
-    if text in {"USD/y", "USD/yr", "USD/year"}:
-        return "USD/year"
-    if text in {"C", "°C"}:
-        return "degC"
-    if text == "degK":
-        return "K"
-    text = re.sub(r"(?<=[A-Za-z])2(?=($|[./*]))", "^2", text)
-    text = re.sub(r"(?<=[A-Za-z])3(?=($|[./*]))", "^3", text)
-    text = text.replace(".K", "/K").replace(".degC", "/degC")
-    return text
-
-
-@lru_cache(maxsize=256)
 def _unit_object(unit: str):
-    return ureg.Unit(unit)
-
-
-def _is_value_with_unit(data: Any) -> bool:
-    """Return ``True`` for objects that look like ``ValueWithUnit`` instances."""
-    return hasattr(data, "value") and hasattr(data, "unit")
-
-
-def _is_bool_like(data: Any) -> bool:
-    """Return ``True`` for bool scalars including numpy bools."""
-    return isinstance(data, (bool, np.bool_))
+    return _registry_unit_object(ureg, unit)
 
 
 class Value:
@@ -636,12 +608,7 @@ class Value:
 
     @staticmethod
     def _clean_unit_text(text: str) -> str:
-        text = text.replace("USD", "$").replace("NZD", "$").replace(" ", "")
-        text = text.replace("°", "deg")
-        text = text.replace("ΔdegC", "delta_degC").replace("Δ°C", "delta_degC")
-        text = text.replace("**2", "^2").replace("**3", "^3")
-        text = text.replace("$/a", "$/y").replace("$/year", "$/y")
-        return "-" if text == "" else text
+        return _clean_unit_text(text)
 
     @staticmethod
     def _normalise_unit_input(unit: str | None) -> str | None:

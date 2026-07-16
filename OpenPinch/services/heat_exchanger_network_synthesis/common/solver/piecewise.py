@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .....classes.heat_exchanger import HeatExchangerAreaSlice
+from .....classes._heat_exchanger.area import HeatExchangerAreaSlice
 from .....lib.config import tol
 from .....utils.heat_exchanger import compute_LMTD_from_dts
 from .arrays import PreparedSolverArrays

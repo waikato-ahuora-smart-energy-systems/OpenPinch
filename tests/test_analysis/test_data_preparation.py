@@ -53,6 +53,7 @@ import pytest
 from pydantic import ValidationError
 
 from OpenPinch.classes import *
+from OpenPinch.classes._stream.segment import StreamSegment
 from OpenPinch.lib import *
 from OpenPinch.services.input_data_processing._canonicalization import (
     _apply_zone_dt_cont_multiplier,

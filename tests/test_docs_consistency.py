@@ -274,7 +274,7 @@ def test_segmented_stream_docs_cover_input_targeting_and_hen_contracts():
     ):
         assert phrase in normalized_hen_guide
 
-    assert "StreamSegment" in domain_model
+    assert "Runtime segment record classes are private" in domain_model
     assert "Variable heat-capacity streams" in capability_matrix
 
 

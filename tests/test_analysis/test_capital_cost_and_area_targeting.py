@@ -7,7 +7,8 @@ import numpy as np
 import pytest
 
 import OpenPinch.services.common.capital_cost_and_area_targeting as area_targeting
-from OpenPinch.classes import Stream, StreamCollection, StreamSegment
+from OpenPinch.classes import Stream, StreamCollection
+from OpenPinch.classes._stream.segment import StreamSegment
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.enums import PT
 from OpenPinch.services.common.capital_cost_and_area_targeting import (

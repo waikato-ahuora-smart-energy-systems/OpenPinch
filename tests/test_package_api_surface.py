@@ -20,7 +20,6 @@ EXPECTED_EXPORTS = {
         "ProblemReport",
         "ReportMetric",
         "SampleCaseMetadata",
-        "StreamSegment",
         "StreamSegmentSchema",
         "StreamSchema",
         "StreamType",
@@ -72,7 +71,6 @@ EXPECTED_EXPORTS = {
         "PinchWorkspace",
         "ProblemTable",
         "Stream",
-        "StreamSegment",
         "StreamCollection",
         "Value",
         "Zone",
@@ -155,3 +153,19 @@ def test_heat_exchanger_area_slice_value_model_is_not_barrel_exported():
 
     assert slice_type_names.isdisjoint(_public_exports(OpenPinch))
     assert slice_type_names.isdisjoint(_public_exports(OpenPinch.classes))
+
+
+def test_parent_owned_runtime_records_are_absent_from_public_modules():
+    from OpenPinch.classes import heat_exchanger, stream
+
+    private_records = {
+        "StreamSegment",
+        "HeatExchangerPeriodState",
+        "HeatExchangerAreaSlice",
+    }
+    assert private_records.isdisjoint(_public_exports(OpenPinch))
+    assert private_records.isdisjoint(_public_exports(OpenPinch.classes))
+    assert not hasattr(stream, "StreamSegment")
+    assert not hasattr(heat_exchanger, "HeatExchangerPeriodState")
+    assert not hasattr(heat_exchanger, "HeatExchangerAreaSlice")
+    assert hasattr(OpenPinch, "StreamSegmentSchema")

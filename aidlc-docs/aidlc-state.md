@@ -107,11 +107,37 @@
   contract; focused multiperiod and segmented-stream tests also pass.
 
 ## Follow-up Plans
+- **Private helper reorganization and parent-owned runtime records**: The user
+  approved an intentional breaking cleanup of `OpenPinch.classes`. Inception
+  planning is complete and Code Generation is active. The detailed checklist is
+  `aidlc-docs/construction/plans/classes-private-helper-reorganization-code-generation-plan.md`.
 - **Pre-release corrective review findings**: The user approved a four-PR
   breaking-change implementation plan closing fifteen validated review findings.
   Code Generation Part 1 is complete; PR 1 Domain and Input Correctness is the
   active unit. The execution checklist is
   `aidlc-docs/construction/plans/pre-release-corrective-code-generation-plan.md`.
+
+## Private Helper Reorganization Progress
+
+- [x] INCEPTION - Workspace Detection
+- [x] INCEPTION - Reverse Engineering (reused existing artifacts; focused
+  affected-module analysis complete)
+- [x] INCEPTION - Requirements Analysis
+- [x] INCEPTION - User Stories assessment (skipped: internal refactor)
+- [x] INCEPTION - Workflow Planning
+- [x] INCEPTION - Application Design assessment (skipped: existing component
+  boundaries and approved ownership design)
+- [x] INCEPTION - Units Generation assessment (skipped: one coupled unit)
+- [x] CONSTRUCTION - Code Generation
+- [x] CONSTRUCTION - Build and Test
+- [x] OPERATIONS - N/A
+- **Current stage**: Complete. The owner-oriented hierarchy, parent-owned
+  runtime records, integration updates, documentation, generated properties,
+  and complete verification matrix are green.
+- **Compatibility policy**: Intentional clean break; no public aliases,
+  compatibility imports, pickle migration, or version bump.
+- **Extension configuration**: Security disabled; Resiliency disabled;
+  Property-Based Testing Partial enabled and blocking where applicable.
 - **Segment batch update and pricing**: Approved Code Generation plan created at
   `aidlc-docs/construction/plans/segment-batch-update-and-pricing-code-generation-plan.md`.
   Implementation and Build and Test are complete. Segment prices remain

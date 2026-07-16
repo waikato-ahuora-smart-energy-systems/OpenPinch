@@ -7,8 +7,9 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from OpenPinch import PinchProblem, StreamSegment
+from OpenPinch import PinchProblem
 from OpenPinch.classes import Stream, Zone
+from OpenPinch.classes._stream.segment import StreamSegment
 from OpenPinch.lib.enums import ST
 from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.verification import (
     verify_network_feasibility,

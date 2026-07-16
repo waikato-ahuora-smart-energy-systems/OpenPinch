@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ...classes.heat_exchanger import HeatExchanger, HeatExchangerPeriodState
+from ...classes._heat_exchanger.period_state import HeatExchangerPeriodState
+from ...classes.heat_exchanger import HeatExchanger
 from ...classes.heat_exchanger_network import HeatExchangerNetwork
 
 

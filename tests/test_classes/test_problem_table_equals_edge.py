@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from OpenPinch.classes._problem_table._equality import (
+from OpenPinch.classes._problem_table.equality import (
     arrays_are_empty,
     numeric_arrays_equal,
     object_columns_equal,

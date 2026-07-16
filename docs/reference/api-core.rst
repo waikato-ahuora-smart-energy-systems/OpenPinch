@@ -87,16 +87,9 @@ modules.
 - :func:`~OpenPinch.main.pinch_analysis_service` validates the incoming input data,
   prepares the zone hierarchy, runs the appropriate direct and indirect
   targeting steps, and returns a structured response.
-- :func:`~OpenPinch.classes._problem.run_targeting_for_zone_and_subzones` accepts an already prepared
-  :class:`~OpenPinch.classes.zone.Zone` tree and dispatches it to the correct
-  zone-level targeting routine.
-- :func:`~OpenPinch.classes._problem.extract_results` converts the solved in-memory zone
-  hierarchy into the dictionary structure consumed by
-  :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 
-.. autofunction:: OpenPinch.classes._problem.run_targeting_for_zone_and_subzones
-
-.. autofunction:: OpenPinch.classes._problem.extract_results
+Private dispatch and result-extraction helpers support the public problem and
+service entry points but are not documented as stable user interfaces.
 
 .. automodule:: OpenPinch.main
    :no-members:

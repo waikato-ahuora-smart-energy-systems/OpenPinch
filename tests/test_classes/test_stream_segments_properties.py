@@ -6,7 +6,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from OpenPinch.classes import Stream
-from OpenPinch.classes._stream_value_state import resolve_period_weights
+from OpenPinch.classes._stream.value_state import resolve_period_weights
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.config import tol
 from OpenPinch.lib.schemas.io import TargetInput

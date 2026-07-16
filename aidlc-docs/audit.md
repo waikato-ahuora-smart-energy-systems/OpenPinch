@@ -8,6 +8,147 @@
 
 ---
 
+## Private Helper Reorganization - Build and Test Complete
+**Timestamp**: 2026-07-16T13:14:37Z
+**User Input**: "No new user input."
+**AI Response**: "Completed final Build and Test. The seeded non-solver suite passed 2,011 tests at 98% coverage, all three runnable solver tests passed with one intentional skip, and Ruff, formatting, warning-free Sphinx, notebook parsing, wheel/sdist builds, cold imports, public API assertions, stale-path searches, and patch hygiene passed."
+**Context**: CONSTRUCTION - Build and Test complete. Sandbox-only Chrome, multiprocessing semaphore, package-download, and intersphinx restrictions were rerun with scoped external permission and passed. Security and Resiliency are disabled (N/A); Property-Based Testing Partial is compliant.
+
+---
+
+## Private Helper Reorganization - Code Generation Complete
+**Timestamp**: 2026-07-16T13:10:00Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the owner-oriented private package hierarchy, removed retired helper packages and public runtime-record exports, added parent normalization, extracted targeting/multiperiod/workspace/collection/value/problem-table responsibilities, updated integrations and documentation, and added deterministic and generated invariants. Focused domain and orchestration suites pass."
+**Context**: CONSTRUCTION - Code Generation Part 2 complete. Security and Resiliency extensions are disabled (N/A). Partial Property-Based Testing rules PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant through bounded generated round trips, normalization equivalence, interval invariants, deterministic seed use, and failure reproduction settings.
+
+---
+
+## Private Helper Reorganization - Implementation Approval
+**Timestamp**: 2026-07-16T12:28:05Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Reorganize and Privatize `OpenPinch.classes` Helpers
+
+## Summary
+
+Reorganize helper code into owner-oriented private packages, extract cohesive responsibilities from the largest class modules, and make `StreamSegment`, `HeatExchangerPeriodState`, and `HeatExchangerAreaSlice` internal parent-owned records.
+
+Callers interact with those records only through `Stream` and `HeatExchanger`. No public aliases or compatibility shims remain.
+
+## Target Structure
+
+```text
+OpenPinch/classes/
+  _heat_exchanger/
+    area.py
+    period_state.py
+  _pinch_problem/
+    accessors/{component,design,plot,target}.py
+    input/{loading,semantics,validation}.py
+    output/{reporting,result_extraction}.py
+    periods/{aggregation,execution}.py
+    targeting/{dispatch,execution,plan}.py
+  _pinch_workspace/
+    case_inputs.py
+    comparison.py
+    execution.py
+    state.py
+    views.py
+  _problem_table/
+    constants.py
+    equality.py
+    intervals.py
+  _stream/
+    profile.py
+    segment.py
+    segments.py
+    thermodynamics.py
+    value_state.py
+  _stream_collection/
+    filters.py
+    numeric_view.py
+    serialization.py
+    sorting.py
+  _value/
+    coercion.py
+    units.py
+```
+
+Private package `__init__.py` files remain lightweight. Public modules import concrete helpers under underscore-prefixed aliases to prevent accidental re-export.
+
+## API and Model Changes
+
+- Remove `StreamSegment` from `OpenPinch`, `OpenPinch.classes`, `stream.py`, public documentation, and stability guarantees.
+- Remove `HeatExchangerPeriodState` from `OpenPinch.classes`, `heat_exchanger.py`, and public class documentation.
+- Remove the existing `HeatExchangerAreaSlice` alias from `heat_exchanger.py`.
+- Keep the internal class names unchanged inside private modules to preserve Pydantic model names, diagnostics, and serialized field structures.
+- Keep `StreamSegmentSchema` public; it remains the external input contract for segments.
+- Make parent APIs responsible for normalization:
+
+  - `Stream` construction and `replace_segments()` accept private segment instances, mappings, or objects with `model_dump()` such as `StreamSegmentSchema`.
+  - `Stream.from_temperature_heat_profile()` continues creating internal segments.
+  - `Stream.segments` returns an immutable tuple of internal records for inspection; all mutation still uses parent methods.
+  - `HeatExchanger` accepts mappings for `period_states` and `segment_area_contributions`, relying on Pydantic to create internal records.
+  - `HeatExchanger.state()`, `period_states`, and `segment_area_contributions` continue returning typed internal records whose attributes may be inspected.
+
+- Public parent classes, method signatures, input schemas, JSON structures, exceptions, ordering, and numerical behavior otherwise remain unchanged.
+- This is an intentional breaking cleanup: old imports and Python pickles referencing the removed class paths are not migrated.
+
+## Implementation Changes
+
+1. **Domain foundations**
+
+   - Move the three record classes to `_stream/segment.py`, `_heat_exchanger/period_state.py`, and `_heat_exchanger/area.py`.
+   - Introduce segment input normalization before validation and transactional attachment.
+   - Extract stream segment transactions, `Value` coercion/units, collection filtering/serialization, and the `ProblemTable` interval engine.
+   - Normalize existing `_problem_table` and `_stream_collection` helper filenames.
+
+2. **Problem orchestration**
+
+   - Replace `_problem` with `_pinch_problem` and group accessors, loading/validation, reporting, targeting, and period processing by responsibility.
+   - Move `_TargetRunSpec` and private targeting/multiperiod execution from `pinch_problem.py`.
+   - Split the oversized validation helper into report/schema handling and semantic validation.
+   - Retain public methods as delegates; remove extracted private class-method aliases.
+
+3. **Workspace and integration**
+
+   - Replace `_workspace` with `_pinch_workspace`.
+   - Extract variant solving, comparison, and cache/state operations.
+   - Update all services, schemas, tests, notebooks, and documentation to import runtime records only from private modules.
+   - Update release notes and AI-DLC audit, state, requirements, design, code-generation, and build/test artifacts with immediate checkbox tracking.
+
+Smaller cohesive modules such as `zone.py` and `heat_exchanger_network.py` remain intact. No mixins or arbitrary line-count targets are introduced.
+
+## Test Plan
+
+- Assert the three class names are absent from public module attributes and `__all__` barrels while `StreamSegmentSchema` remains public.
+- Add parent-owned construction tests:
+
+  - Construct equivalent segmented streams from mappings, `StreamSegmentSchema`, and internal records.
+  - Verify normalization, ownership, ordering, rollback, read-only values, pickle/deep-copy behavior, and serialization.
+  - Construct `HeatExchanger` records from mappings and verify period lookup, area aggregation, Pydantic schema, validation, and model dumps.
+
+- Add structural tests for the new owner-package hierarchy, absence of loose root helpers and retired private packages, and cold importability without cycles.
+- Under partial property-based-testing enforcement:
+
+  - Add `Value.to_dict()`/`Value.from_dict()` round-trip properties.
+  - Add mapping-versus-schema segment normalization invariants.
+  - Add generated `ProblemTable` insertion ordering, preservation, row-count, and repeat-insertion invariants.
+  - Continue seeded segment transaction, schema round-trip, ownership, and conservation properties using seed `20260715`.
+
+- Run focused tests after each implementation unit, then the full non-solver suite with coverage, available solver tests, Ruff lint/format checks, warning-free Sphinx documentation, notebook parsing, wheel/sdist builds, stale-path searches, public API checks, and `git diff --check`.
+
+## Assumptions
+
+- Internal record objects may remain observable through their parent properties, but importing or constructing their classes directly is unsupported.
+- Mapping/schema construction replaces public runtime-record construction.
+- Security and Resiliency extensions remain disabled; partial PBT rules remain blocking.
+- No dependency change, data migration, compatibility layer, or version bump is included."
+**AI Response**: "Accepted the supplied plan as explicit approval, reused the existing reverse-engineering baseline, documented minimal requirements and the dependency-ordered execution checklist, and started Code Generation with domain foundations."
+**Context**: INCEPTION completion and CONSTRUCTION Code Generation Part 1 approval. The user-supplied plan resolves the preceding ownership and visibility decisions; no additional approval gate is required before implementation.
+
+---
+
 ## Workspace Detection Findings
 **Timestamp**: 2026-07-12T21:17:32Z
 **User Input**: "Do a thorough review of the repo and identify weaknesses."

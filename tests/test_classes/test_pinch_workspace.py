@@ -13,21 +13,21 @@ import pytest
 from pydantic import ValidationError
 
 from OpenPinch import PinchProblem, PinchWorkspace, config_options
-from OpenPinch.classes._workspace import case_inputs
-from OpenPinch.classes._workspace import views as workspace_views
-from OpenPinch.classes._workspace.case_inputs import (
+from OpenPinch.classes._pinch_workspace import case_inputs
+from OpenPinch.classes._pinch_workspace import views as workspace_views
+from OpenPinch.classes._pinch_workspace.case_inputs import (
     canonical_case_input_from_source,
     normalise_case_input,
     project_name_from_case_input,
 )
-from OpenPinch.classes._workspace.execution import (
+from OpenPinch.classes._pinch_workspace.execution import (
     WorkspaceExecutionError,
     normalise_workflow_name,
     run_problem_workflow,
     workflow_support_level,
     workflow_warnings,
 )
-from OpenPinch.classes._workspace.views import summary_metric_deltas
+from OpenPinch.classes._pinch_workspace.views import summary_metric_deltas
 from OpenPinch.lib.enums import HPRcycle
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.workspace import (

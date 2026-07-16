@@ -15,13 +15,14 @@ import pandas as pd
 from ..lib.config import tol
 from ..lib.enums import ProblemTableLabel
 from ..lib.problem_table_types import ProblemTableColumnUpdates
-from ._problem_table._equality import (
-    problem_tables_equal,
-)
-from ._problem_table._problem_table_constants import (
+from ._problem_table.constants import (
     HEAT_CAPACITY_PAIRS,
     INTERPOLATION_KEYS,
 )
+from ._problem_table.equality import (
+    problem_tables_equal,
+)
+from ._problem_table.intervals import insert_temperature_intervals
 
 PT = ProblemTableLabel
 
@@ -405,23 +406,7 @@ class ProblemTable:
 
     def insert_temperature_interval(self, T_ls: List[float] | float) -> int:
         """Insert any missing temperature intervals and return count inserted."""
-        if self.data is None or self.data.shape[0] < 2 == 0:
-            return 0
-        T_vals = np.atleast_1d(np.asarray(T_ls, dtype=float))
-        # Get unique missing values
-        T_insert = self._Ts_needing_insertion(T_vals)
-        # S
-        top_temps, interval_map, bottom_temps = self._categorise_insertion_targets(
-            T_insert
-        )
-        if top_temps.size == 0 and bottom_temps.size == 0 and not interval_map:
-            return 0
-
-        new_data, inserted = self._apply_interval_map(
-            interval_map, top_temps, bottom_temps
-        )
-        self.data = new_data
-        return inserted
+        return insert_temperature_intervals(self, T_ls)
 
     def _Ts_needing_insertion(self, T_vals: np.ndarray) -> np.ndarray:
         """Filter temperatures that are not within tolerance of existing rows."""

@@ -15,15 +15,14 @@ Core Objects
 ``Stream``
    Process or utility stream with supply/target states, shifted temperatures,
    and active/base ``dt_cont`` behavior. A variable-heat-capacity parent owns
-   an immutable ordered view of ``StreamSegment`` children while retaining one
+   an immutable ordered view of internal segment records while retaining one
    physical stream identity.
 
-``StreamSegment``
-   One ordered, locally linear thermal piece owned by a parent ``Stream``.
-   Segment mutations are transactional and revalidate the complete profile.
-   ``Stream.update_segments(...)`` applies sparse changes to several children
-   in one atomic commit; an invalid index, attribute, or resulting profile
-   leaves the parent and every child unchanged.
+Segment mutations are transactional and revalidate the complete profile.
+``Stream.update_segments(...)`` applies sparse changes to several children in
+one atomic commit; an invalid index, attribute, or resulting profile leaves the
+parent and every child unchanged. Runtime segment record classes are private;
+construct them through ``Stream`` mappings or ``StreamSegmentSchema`` inputs.
 
 For segmented utilities, child prices may differ. The parent ``price`` is the
 duty-weighted effective value for each operating period, so the derived parent
@@ -58,10 +57,10 @@ prices differ again.
    shared topology, maximum design area, and capital data remain on the
    exchanger. Operating data is read from ``state(period_id)``.
 
-``HeatExchangerPeriodState``
-   One ordered operating-period record for an exchanger, containing duty,
-   activity, terminal approaches, branch split fractions, and source/sink
-   inlet and outlet temperatures. Multiperiod access always names the period.
+Operating-period records are owned by each ``HeatExchanger`` and contain duty,
+activity, terminal approaches, branch split fractions, and source/sink inlet
+and outlet temperatures. Their runtime classes are private; multiperiod access
+always names the period through ``exchanger.state(period_id)``.
 
 These are the objects you inspect when you need to understand how a case was
 prepared or why a target changed after mutating the in-memory model.
@@ -74,10 +73,6 @@ Key Classes
    :no-index:
 
 .. autoclass:: OpenPinch.classes.stream.Stream
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.classes.stream.StreamSegment
    :members:
    :no-index:
 
@@ -94,10 +89,6 @@ Key Classes
    :no-index:
 
 .. autoclass:: OpenPinch.classes.heat_exchanger.HeatExchanger
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.classes.heat_exchanger.HeatExchangerPeriodState
    :members:
    :no-index:
 

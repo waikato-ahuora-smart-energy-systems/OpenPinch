@@ -13,14 +13,14 @@ from ..lib.schemas.io import TargetInput
 from ..lib.schemas.workspace import (
     ConfigurationFieldMetadata,
     PinchWorkspaceBundle,
-    ScenarioComparisonView,
     ScenarioVariantBundleEntry,
     ScenarioVariantView,
     ScenarioWorkflowConfig,
     VariantInputView,
 )
-from ._problem._validation import build_validation_report
-from ._workspace.case_inputs import (
+from ._pinch_problem.input.validation import build_validation_report
+from ._pinch_workspace import state as _workspace_state
+from ._pinch_workspace.case_inputs import (
     JsonDict,
     PathLike,
     canonical_case_input_from_source,
@@ -28,23 +28,22 @@ from ._workspace.case_inputs import (
     normalise_case_input,
     project_name_from_case_input,
 )
-from ._workspace.execution import (
+from ._pinch_workspace.comparison import build_variant_comparison
+from ._pinch_workspace.execution import (
     WorkspaceExecutionError,
     run_problem_workflow,
     workflow_support_level,
     workflow_warnings,
 )
-from ._workspace.views import (
+from ._pinch_workspace.views import (
     configuration_field_metadata as _configuration_field_metadata,
 )
-from ._workspace.views import (
+from ._pinch_workspace.views import (
     error_variant_view,
     invalid_variant_view,
     json_safe,
-    problem_table_diffs,
     problem_to_variant_view,
     record_views,
-    summary_metric_deltas,
     zone_tree_view,
 )
 from .pinch_problem import PinchProblem
@@ -293,7 +292,7 @@ class PinchWorkspace:
         variant_names: Optional[Iterable[str]] = None,
         *,
         base: Optional[str] = None,
-    ) -> ScenarioComparisonView:
+    ):
         """Return a deterministic comparison view across solved variants."""
         names = list(variant_names or self.list_variants())
         if not names:
@@ -304,26 +303,10 @@ class PinchWorkspace:
             names.insert(0, base_name)
 
         views = {name: self._ensure_solved_view(name) for name in names}
-        base_view = views[base_name]
-        metric_deltas = []
-        problem_diffs = []
-
-        for name in names:
-            if name == base_name:
-                continue
-            metric_deltas.extend(
-                summary_metric_deltas(base_name, base_view, name, views[name])
-            )
-            problem_diffs.extend(
-                problem_table_diffs(base_name, base_view, name, views[name])
-            )
-
-        return ScenarioComparisonView(
-            base_variant=base_name,
-            variant_names=names,
-            metric_deltas=metric_deltas,
-            graph_catalogs={name: views[name].graph_catalog for name in names},
-            problem_table_diffs=problem_diffs,
+        return build_variant_comparison(
+            names=names,
+            base_name=base_name,
+            views=views,
         )
 
     def list_cases(self) -> list[str]:
@@ -625,27 +608,10 @@ class PinchWorkspace:
         return _configuration_field_metadata()
 
     def _resolve_case_name(self, name: Optional[str]) -> str:
-        if name is None:
-            default_name = self._default_case_name()
-            if default_name is None:
-                raise KeyError("No cases are loaded in this PinchWorkspace.")
-            return default_name
-
-        if name not in self._variant_inputs:
-            available = ", ".join(self.list_cases())
-            raise KeyError(f"Unknown case {name!r}. Available cases: {available}")
-        return name
+        return _workspace_state.resolve_case_name(self, name)
 
     def _default_case_name(self) -> Optional[str]:
-        if self._active_case_name in self._variant_inputs:
-            return self._active_case_name
-        if self.baseline_name in self._variant_inputs:
-            self._active_case_name = self.baseline_name
-            return self._active_case_name
-        if self._variant_inputs:
-            self._active_case_name = next(iter(self._variant_inputs))
-            return self._active_case_name
-        return None
+        return _workspace_state.default_case_name(self)
 
     def _get_variant_input(self, name: str) -> JsonDict:
         self._sync_case_input(name)
@@ -680,18 +646,10 @@ class PinchWorkspace:
 
     def _invalidate_variant_state(self, name: str) -> None:
         """Drop cached case and view state for one variant case input."""
-        self._cached_views.pop(name, None)
-        self._case_cache.pop(name, None)
+        _workspace_state.invalidate_variant_state(self, name)
 
     def _sync_case_input(self, name: str) -> None:
-        problem = self._case_cache.get(name)
-        if problem is None:
-            return
-
-        case_input = problem.canonical_problem_json()
-        if self._variant_inputs.get(name) != case_input:
-            self._variant_inputs[name] = case_input
-            self._cached_views.pop(name, None)
+        _workspace_state.sync_case_input(self, name)
 
     def _sync_all_cases(self) -> None:
         for name in list(self._case_cache):

@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from CoolProp.CoolProp import PropsSI
 
-from ...classes.stream import Stream, StreamSegment
+from ...classes._stream.segment import StreamSegment
+from ...classes.stream import Stream
 from ...classes.value import Value
 from ...classes.zone import Zone
 from ...lib.config import tol

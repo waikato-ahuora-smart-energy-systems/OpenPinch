@@ -77,11 +77,11 @@ Variable Heat-Capacity Streams
 
 Structured Python and JSON inputs can describe one physical stream with an
 ordered piecewise thermal profile. The prepared problem retains one parent
-``Stream``; its children are ``StreamSegment`` objects used for interval,
-area, and network calculations.
+``Stream``; its internal child records are used for interval, area, and network
+calculations.
 
-Every ``Value`` exposed by a prepared ``Stream`` or ``StreamSegment`` is a
-read-only view. Change domain state by assigning the stream property, calling
+Every ``Value`` exposed by a prepared parent or child segment is a read-only
+view. Change domain state by assigning the stream property, calling
 ``set_value_attr_at_idx(...)``, or using ``update_segment(...)`` and
 ``update_segments(...)``. These APIs validate a mutable candidate and commit
 the complete change transactionally.
