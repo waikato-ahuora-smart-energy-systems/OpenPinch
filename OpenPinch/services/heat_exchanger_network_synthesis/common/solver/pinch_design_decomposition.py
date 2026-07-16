@@ -197,9 +197,33 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
     minimum_dt_cont = float(dTmin) / 2.0
     zone.dt_cont_multiplier = 1.0
     for stream in zone.all_streams:
-        stream.dt_cont = _stream_dt_cont_with_minimum(
-            stream,
-            minimum_dt_cont=minimum_dt_cont,
+        if stream.has_segments:
+            _apply_segment_dt_cont_minimum(
+                stream,
+                minimum_dt_cont=minimum_dt_cont,
+            )
+        else:
+            stream.dt_cont = _stream_dt_cont_with_minimum(
+                stream,
+                minimum_dt_cont=minimum_dt_cont,
+            )
+
+
+def _apply_segment_dt_cont_minimum(
+    stream: Stream,
+    *,
+    minimum_dt_cont: float,
+) -> None:
+    """Apply the HEN contribution to every child used by numeric targeting."""
+
+    for segment_index in range(stream.segment_count):
+        segment = stream.segments[segment_index]
+        stream.update_segment(
+            segment_index,
+            dt_cont=_stream_dt_cont_with_minimum(
+                segment,
+                minimum_dt_cont=minimum_dt_cont,
+            ),
         )
 
 
@@ -297,8 +321,9 @@ def _build_decomposition(
             "utility_targets": "kW",
         },
         dt_cont_convention=(
-            "Copied stream dt_cont values are max(prepared stream dt_cont, "
-            "dTmin / 2), and the copied zone dt_cont_multiplier is set to 1.0."
+            "Copied stream and explicit segment dt_cont values are "
+            "max(prepared dt_cont, dTmin / 2), and the copied zone "
+            "dt_cont_multiplier is set to 1.0."
         ),
     )
 

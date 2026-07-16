@@ -7,9 +7,14 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from OpenPinch import PinchProblem
+from OpenPinch import PinchProblem, StreamSegment
+from OpenPinch.classes import Stream, Zone
+from OpenPinch.lib.enums import ST
 from OpenPinch.services.heat_exchanger_network_synthesis.common.reporting.verification import (
     verify_network_feasibility,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
+    pinch_design_decomposition as pdm_decomposition,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
     problem_to_solver_arrays,
@@ -31,6 +36,7 @@ from OpenPinch.services.heat_exchanger_network_synthesis.unit_models.stagewise i
     StageWiseModel,
     _check_area_costs,
 )
+from tests.strategies.stream_segments import segmented_streams
 
 
 def _profile(prefix: str, *, hot: bool) -> PiecewiseThermalProfile:
@@ -135,6 +141,124 @@ def test_solver_arrays_keep_parent_axes_and_add_ordered_segment_tensors():
     assert arrays.arrays["f_c_period"][0, 0] == 0.0
     assert len(arrays.axis_maps["hot_process_streams"]) == 1
     assert len(arrays.axis_maps["cold_process_streams"]) == 1
+
+
+def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
+    problem = _segmented_problem()
+    observed = {}
+
+    def capture_targeting_zone(zone):
+        numeric = zone.process_streams.segment_numeric_view()
+        observed["dt_cont"] = numeric.dt_cont.copy()
+        observed["t_min_star"] = numeric.t_min_star.copy()
+        observed["t_max_star"] = numeric.t_max_star.copy()
+        return SimpleNamespace(
+            hot_utility_target=10.0,
+            cold_utility_target=10.0,
+            heat_recovery_target=140.0,
+            hot_pinch=100.0,
+            cold_pinch=90.0,
+        )
+
+    monkeypatch.setattr(
+        pdm_decomposition,
+        "compute_direct_integration_targets",
+        capture_targeting_zone,
+    )
+
+    pdm_decomposition._calculate_openpinch_targets(problem, dTmin=10.0)
+
+    np.testing.assert_allclose(observed["dt_cont"], [5.0, 5.0, 5.0, 5.0])
+    np.testing.assert_allclose(
+        observed["t_min_star"],
+        [145.0, 95.0, 55.0, 105.0],
+    )
+    np.testing.assert_allclose(
+        observed["t_max_star"],
+        [195.0, 145.0, 105.0, 155.0],
+    )
+    for stream in problem.master_zone.process_streams:
+        assert float(stream.dt_cont.to("delta_degC").value) == 0.0
+        assert all(
+            float(segment.dt_cont.to("delta_degC").value) == 0.0
+            for segment in stream.segments
+        )
+
+
+def test_pdm_dt_cont_minimum_is_applied_per_segment_and_period():
+    stream = Stream(
+        name="Multiperiod segmented hot stream",
+        segments=[
+            StreamSegment(
+                t_supply=[200.0, 210.0],
+                t_target=[150.0, 160.0],
+                heat_flow=[50.0, 60.0],
+                dt_cont=[1.0, 9.0],
+            ),
+            StreamSegment(
+                t_supply=[150.0, 160.0],
+                t_target=[100.0, 110.0],
+                heat_flow=[100.0, 120.0],
+                dt_cont=[8.0, 2.0],
+            ),
+        ],
+    )
+    zone = SimpleNamespace(all_streams=(stream,), dt_cont_multiplier=2.0)
+
+    pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=14.0)
+
+    assert zone.dt_cont_multiplier == 1.0
+    np.testing.assert_allclose(
+        stream.segments[0].dt_cont.to("delta_degC").period_values,
+        [7.0, 9.0],
+    )
+    np.testing.assert_allclose(
+        stream.segments[1].dt_cont.to("delta_degC").period_values,
+        [8.0, 7.0],
+    )
+    np.testing.assert_allclose(
+        stream.dt_cont.to("delta_degC").period_values,
+        [7.0, 9.0],
+    )
+
+
+@given(
+    segmented_streams(),
+    st.floats(
+        min_value=0.0,
+        max_value=100.0,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
+@settings(max_examples=30)
+def test_pdm_dt_cont_minimum_holds_for_all_generated_segments(stream, dTmin):
+    minimum = dTmin / 2.0
+    original = []
+    for index in range(stream.segment_count):
+        value = minimum / 2.0 if index % 2 == 0 else minimum * 2.0 + index
+        stream.update_segment(index, dt_cont=value)
+        original.append(value)
+
+    zone = Zone()
+    destination = zone.hot_streams if stream.type == ST.Hot.value else zone.cold_streams
+    destination.add(stream)
+
+    pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=dTmin)
+
+    expected = np.maximum(original, minimum)
+    numeric = zone.process_streams.segment_numeric_view()
+    np.testing.assert_allclose(numeric.dt_cont, expected)
+    np.testing.assert_allclose(
+        [
+            float(segment.dt_cont.to("delta_degC").value)
+            for segment in next(iter(zone.process_streams)).segments
+        ],
+        expected,
+    )
+    assert float(next(iter(zone.process_streams)).dt_cont.to("delta_degC").value) == (
+        pytest.approx(expected[0])
+    )
 
 
 def test_duty_aligned_area_slices_use_local_htcs_and_sum_exactly():

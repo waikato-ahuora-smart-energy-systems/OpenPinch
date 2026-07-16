@@ -34,6 +34,27 @@ HEN synthesis retains parent streams and parent match binaries while evaluating 
 
 The internal `HeatExchangerAreaSlice` value model and pure period aggregation/design-area calculations now live in the private `_heat_exchanger_area.py` helper. `HeatExchanger` retains its existing field, validation, property, direct-module import, and serialized payload contracts through thin delegation.
 
+## Segmented PDM dTmin Propagation Correction
+
+PDM copied-zone preparation now applies `max(prepared dt_cont, dTmin / 2)` to
+every explicit child segment before direct-integration targeting. Flat streams
+retain the existing parent assignment. Segment updates use the transactional
+parent API, so each child's per-period values are preserved above the minimum,
+the parent aggregate is re-derived, numeric-view revisions are invalidated, and
+the source problem remains unchanged because PDM operates on its copied zone.
+
+Verification for this correction:
+
+- 78 focused PDM and segmented-stream tests passed with Hypothesis seed
+  `20260716`.
+- 79 direct-targeting, problem-table, and segment-domain tests passed.
+- 385 broader non-solver HEN tests passed; one solver-marked test was deselected.
+- The complete CI-selected non-solver suite passed: 1,955 tests with four solver
+  tests deselected.
+- Total line coverage remained 99%, above the 95% project gate; the modified PDM
+  decomposition module reached 100%.
+- Ruff formatting, Ruff lint, and `git diff --check` passed.
+
 ## Extension Compliance
 
 - Security Baseline: disabled; not enforced.
