@@ -35,6 +35,7 @@ class StreamSegmentSchema(BaseModel):
     h_target: Optional[ScalarOrVU] = None
     dt_cont: Optional[ScalarOrVU] = None
     htc: Optional[ScalarOrVU] = None
+    price: Optional[ScalarOrVU] = None
 
     model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
 
@@ -164,7 +165,9 @@ class UtilitySchema(BaseModel):
 
     name: str
     type: ST
-    t_supply: ScalarOrVU
+    segments: Optional[List[StreamSegmentSchema]] = None
+    profile: Optional[TemperatureHeatProfileSchema] = None
+    t_supply: Optional[ScalarOrVU] = None
     t_target: Optional[ScalarOrVU] = None
     p_supply: Optional[ScalarOrVU] = None
     p_target: Optional[ScalarOrVU] = None
@@ -178,7 +181,34 @@ class UtilitySchema(BaseModel):
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+        validate_default=True,
+    )
+
+    @field_validator("t_supply")
+    @classmethod
+    def _require_ordinary_supply_temperature(
+        cls,
+        value: Optional[ScalarOrVU],
+        info: ValidationInfo,
+    ) -> Optional[ScalarOrVU]:
+        has_nested = (
+            info.data.get("segments") is not None
+            or info.data.get("profile") is not None
+        )
+        if value is None and not has_nested:
+            raise ValueError("Ordinary utilities require t_supply.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_thermal_definition(self) -> Self:
+        if self.segments is not None and self.profile is not None:
+            raise ValueError("Provide either segments or profile, not both.")
+        if self.segments is not None and len(self.segments) == 0:
+            raise ValueError("segments must contain at least one segment.")
+        return self
 
     @field_validator("fluid_name")
     @classmethod

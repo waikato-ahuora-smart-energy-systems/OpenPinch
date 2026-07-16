@@ -21,6 +21,15 @@ Core Objects
 ``StreamSegment``
    One ordered, locally linear thermal piece owned by a parent ``Stream``.
    Segment mutations are transactional and revalidate the complete profile.
+   ``Stream.update_segments(...)`` applies sparse changes to several children
+   in one atomic commit; an invalid index, attribute, or resulting profile
+   leaves the parent and every child unchanged.
+
+For segmented utilities, child prices may differ. The parent ``price`` is the
+duty-weighted effective value for each operating period, so the derived parent
+cost equals the sum of the child costs. Assigning ``parent.price`` is an
+explicit broadcast to every child; updating one child afterwards may make the
+prices differ again.
 
 ``StreamCollection``
    Ordered container with hot/cold filtering and utility inversion helpers.

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Segmented Stream dt_cont Transaction Code Generation Complete
+- **Current Stage**: CONSTRUCTION - Segment Batch Update and Pricing Code Generation
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -107,6 +107,12 @@
   contract; focused multiperiod and segmented-stream tests also pass.
 
 ## Follow-up Plans
+- **Segment batch update and pricing**: Approved Code Generation plan created at
+  `aidlc-docs/construction/plans/segment-batch-update-and-pricing-code-generation-plan.md`.
+  Implementation and Build and Test are complete. Segment prices remain
+  independent, utility parent price is duty-weighted, current HEN utility
+  selection is preserved, all 1,978 non-solver tests pass at 98% coverage, and
+  the solver-marked, Ruff, documentation, packaging, and patch-hygiene gates pass.
 - **Segmented parent dt_cont transaction**: Focused Code Generation plan created
   at `aidlc-docs/construction/plans/segmented-stream-dt-cont-transaction-code-generation-plan.md`.
   The plan propagates full and indexed parent assignments through detached child

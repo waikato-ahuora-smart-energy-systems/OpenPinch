@@ -31,6 +31,17 @@ uv run python scripts/build_dist.py --output-dir /tmp/openpinch-dist
 
 Both the warning-free documentation build and wheel/source-distribution build passed.
 
+## Segmented Utility Cost Integration
+
+The segmented synthesis module exercises exact ordered utility costs for partial
+segment use, exact boundary use, boundary crossing, complete profile use, hot
+and cold utilities, local exchanger area slices, and the IPOPT active-segment
+solve-or-guidance path. It is included in the complete non-solver and
+solver-marked acceptance commands above.
+
+The complete notebook/resource, direct and indirect integration, HPR, packaging,
+and documentation tests are included in the 1,978-test non-solver result.
+
 ## GitHub CI Heat-Pump Zero-Duty Follow-Up
 
 ### Heat-Pump and Segmented-Profile Integration

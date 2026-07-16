@@ -118,3 +118,38 @@ the deferred refinement is not part of the immediate next steps.
 - **Ready for Operations**: Yes; no deployment or hosted-state mutation was
   requested. The prior GitHub run will remain failed until these local changes
   are committed and pushed to trigger a new run.
+
+## Segment Batch Update and Pricing Acceptance
+
+### Build Status
+
+- Build: success.
+- Documentation: warning-free Sphinx HTML build.
+- Distribution artifacts: OpenPinch 0.4.6 wheel and source distribution in an
+  isolated temporary directory.
+
+### Test Execution Summary
+
+- Non-solver suite: 1,978 passed, 4 deselected, 0 failed in 120.22 seconds.
+- Solver-marked HEN suite: 3 passed, 1 intentional environment-dependent skip,
+  0 failed in 85.49 seconds.
+- Coverage: 98% across 22,658 statements; required floor is 95%.
+- Static quality: repository Ruff lint passed; all 15 changed Python files were
+  already formatted; `git diff --check` passed.
+- Notebook, end-to-end, structured-input, direct/indirect integration, HPR, and
+  documentation smoke coverage passed within the complete suite.
+
+### Extension Compliance
+
+- Security Baseline: disabled; N/A.
+- Resiliency Baseline: disabled; N/A.
+- Property-Based Testing (Partial): compliant. Domain-specific transaction and
+  price/cost invariants ran with normal shrinking and seed `20260715`.
+- Performance: no blocking threshold introduced; parent solver axes are unchanged.
+
+### Overall Status
+
+- Build: success.
+- Tests: pass.
+- Coverage gate: pass.
+- Ready for Operations placeholder: yes; no deployment work was requested.

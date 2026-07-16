@@ -29,6 +29,19 @@ git diff --name-only -- '*.py' | xargs uv run ruff format --check
 
 The repository contains three pre-existing files that the current Ruff formatter would change. Acceptance therefore applied the formatting check to all changed Python files and the lint check to the full source and test trees.
 
+## Segment Batch Update and Pricing Acceptance
+
+```bash
+uv run coverage run --source=OpenPinch -m pytest \
+  --hypothesis-seed=20260715 -m "not solver"
+uv run coverage report --fail-under=95
+uv run pytest -q -m solver
+```
+
+Verified result: 1,978 non-solver tests passed, four solver tests were excluded
+from that run, total line coverage was 98%, and the solver-marked run completed
+with three passes and one intentional environment-dependent skip.
+
 ## GitHub CI Heat-Pump Zero-Duty Follow-Up
 
 ### Reported and New Regression Tests

@@ -24,6 +24,16 @@ uv run sphinx-build -W -b html docs docs/_build/html
 
 The segmented-stream API and input guide build warning-free.
 
+## Segment Batch Update and Pricing Acceptance Build
+
+```bash
+uv run python scripts/build_dist.py \
+  --output-dir /private/tmp/openpinch-segment-pricing-20260716
+```
+
+Verified result: OpenPinch 0.4.6 wheel and source distribution built
+successfully without modifying tracked release artifacts.
+
 ## GitHub CI Heat-Pump Zero-Duty Follow-Up
 
 ### Verified Environment

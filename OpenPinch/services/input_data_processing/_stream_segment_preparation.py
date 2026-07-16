@@ -10,7 +10,8 @@ from ...classes.stream import Stream, StreamSegment
 from ...classes.value import Value
 from ...classes.zone import Zone
 from ...lib.config import tol
-from ...lib.schemas.io import StreamSchema
+from ...lib.enums import ST
+from ...lib.schemas.io import StreamSchema, UtilitySchema
 from ...lib.unit_system import standardise_input_value
 
 
@@ -81,6 +82,11 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
                     field_name="htc",
                     config=zone.config,
                 ),
+                price=standardise_input_value(
+                    segment.price,
+                    field_name="price",
+                    config=zone.config,
+                ),
                 dt_cont_multiplier=zone.dt_cont_multiplier,
                 is_process_stream=True,
                 fluid_name=stream.fluid_name,
@@ -90,7 +96,7 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
             for index, segment in enumerate(stream.segments)
         ]
     else:
-        segments = _segments_from_profile(stream, zone, common)
+        segments = _segments_from_profile(stream, zone.config, common)
 
     parent = Stream(name=stream.name, segments=segments, **common)
     parent.active = stream.active
@@ -99,8 +105,8 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
 
 
 def _segments_from_profile(
-    stream: StreamSchema,
-    zone: Zone,
+    stream: StreamSchema | UtilitySchema,
+    config,
     common: dict[str, Any],
 ) -> list[StreamSegment]:
     from ...utils.stream_linearisation import (
@@ -115,7 +121,7 @@ def _segments_from_profile(
             standardise_input_value(
                 point.temperature,
                 field_name="t_supply",
-                config=zone.config,
+                config=config,
             )
         )
         for point in profile.points
@@ -125,7 +131,7 @@ def _segments_from_profile(
             standardise_input_value(
                 point.cumulative_heat,
                 field_name="heat_flow",
-                config=zone.config,
+                config=config,
             )
         )
         for point in profile.points
@@ -147,10 +153,12 @@ def _segments_from_profile(
             "dt_cont",
             "dt_cont_multiplier",
             "htc",
+            "price",
             "is_process_stream",
             "fluid_name",
             "fluid_phase",
         )
+        if key in common
     }
     period_profiles = []
     thermal_direction: float | None = None
@@ -226,11 +234,140 @@ def _segments_from_profile(
     return segments
 
 
+def _create_segmented_utility_stream(
+    utility: UtilitySchema,
+    *,
+    utility_type: str,
+    config,
+    dt_cont_multiplier: float,
+) -> Stream:
+    """Create one ordered segmented utility, preserving local segment prices."""
+    common = {
+        "dt_cont": standardise_input_value(
+            utility.dt_cont,
+            field_name="dt_cont",
+            config=config,
+        ),
+        "dt_cont_multiplier": dt_cont_multiplier,
+        "htc": standardise_input_value(
+            utility.htc,
+            field_name="htc",
+            config=config,
+        ),
+        "is_process_stream": False,
+        "fluid_name": utility.fluid_name,
+        "fluid_phase": utility.fluid_phase,
+    }
+    parent_price = standardise_input_value(
+        utility.price,
+        field_name="price",
+        config=config,
+    )
+    if utility.segments is not None:
+        segments = [
+            StreamSegment(
+                name=segment.name or f"{utility.name}.S{index + 1}",
+                t_supply=standardise_input_value(
+                    segment.t_supply,
+                    field_name="t_supply",
+                    config=config,
+                ),
+                t_target=standardise_input_value(
+                    segment.t_target,
+                    field_name="t_target",
+                    config=config,
+                ),
+                p_supply=standardise_input_value(
+                    segment.p_supply,
+                    field_name="p_supply",
+                    config=config,
+                ),
+                p_target=standardise_input_value(
+                    segment.p_target,
+                    field_name="p_target",
+                    config=config,
+                ),
+                h_supply=standardise_input_value(
+                    segment.h_supply,
+                    field_name="h_supply",
+                    config=config,
+                ),
+                h_target=standardise_input_value(
+                    segment.h_target,
+                    field_name="h_target",
+                    config=config,
+                ),
+                heat_flow=standardise_input_value(
+                    segment.heat_flow,
+                    field_name="heat_flow",
+                    config=config,
+                ),
+                dt_cont=standardise_input_value(
+                    segment.dt_cont if segment.dt_cont is not None else utility.dt_cont,
+                    field_name="dt_cont",
+                    config=config,
+                ),
+                htc=standardise_input_value(
+                    segment.htc if segment.htc is not None else utility.htc,
+                    field_name="htc",
+                    config=config,
+                ),
+                price=standardise_input_value(
+                    segment.price if segment.price is not None else utility.price,
+                    field_name="price",
+                    config=config,
+                ),
+                dt_cont_multiplier=dt_cont_multiplier,
+                is_process_stream=False,
+                fluid_name=utility.fluid_name,
+                fluid_phase=utility.fluid_phase,
+                segment_index=index,
+            )
+            for index, segment in enumerate(utility.segments)
+        ]
+    else:
+        segments = _segments_from_profile(
+            utility,
+            config,
+            {**common, "price": parent_price},
+        )
+
+    parent = Stream(name=utility.name, segments=segments, price=None, **common)
+    parent.active = utility.active
+    _validate_supplied_parent_aggregates(utility, parent, config)
+    if parent.type != utility_type:
+        candidates = []
+        for segment in reversed(parent.segments):
+            candidate = parent._detached_segment(segment)
+            candidate._t_supply, candidate._t_target = (
+                candidate._t_target,
+                candidate._t_supply,
+            )
+            candidate._p_supply, candidate._p_target = (
+                candidate._p_target,
+                candidate._p_supply,
+            )
+            candidate._h_supply, candidate._h_target = (
+                candidate._h_target,
+                candidate._h_supply,
+            )
+            candidate.update_derived_properties()
+            candidates.append(candidate)
+        parent.replace_segments(candidates)
+    if parent.type != utility_type or utility_type not in {ST.Hot.value, ST.Cold.value}:
+        raise ValueError(
+            f"Segmented utility {utility.name!r} cannot be oriented as "
+            f"{utility_type!r}."
+        )
+    return parent
+
+
 def _validate_supplied_parent_aggregates(
-    schema: StreamSchema,
+    schema: StreamSchema | UtilitySchema,
     parent: Stream,
-    zone: Zone,
+    zone_or_config,
 ) -> None:
+    config = getattr(zone_or_config, "config", zone_or_config)
     fields = {
         "t_supply": parent.t_supply,
         "t_target": parent.t_target,
@@ -244,7 +381,7 @@ def _validate_supplied_parent_aggregates(
             standardise_input_value(
                 supplied,
                 field_name=field_name,
-                config=zone.config,
+                config=config,
             )
         ).to(actual.unit)
         expected_values = expected.period_values

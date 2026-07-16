@@ -197,6 +197,15 @@ def aggregate_segments(
         out=np.zeros_like(duty),
         where=resistance > 0.0,
     )
+    prices = np.asarray(
+        [segment._value_array(segment._price, size=state_size) for segment in segments]
+    )
+    effective_price = np.divide(
+        np.sum(prices * duties, axis=0),
+        duty,
+        out=np.zeros_like(duty),
+        where=duty > 0.0,
+    )
     return SegmentAggregateState(
         t_supply=first._t_supply,
         t_target=last._t_target,
@@ -207,7 +216,7 @@ def aggregate_segments(
         dt_cont=first._dt_cont,
         heat_flow=duty,
         effective_htc=effective_htc,
-        price=first._price,
+        price=Value(effective_price, unit="$/MW/h"),
     )
 
 

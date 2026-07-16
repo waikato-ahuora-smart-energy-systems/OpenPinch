@@ -238,6 +238,8 @@ class BaseHeatExchangerNetworkModel(ABC):
         if not (
             any(self._solver_parent_is_segmented("hot", i) for i in range(self.I))
             or any(self._solver_parent_is_segmented("cold", j) for j in range(self.J))
+            or self._utility_is_segmented("hot")
+            or self._utility_is_segmented("cold")
         ):
             return
         from ..common.solver.piecewise import (
@@ -260,16 +262,29 @@ class BaseHeatExchangerNetworkModel(ABC):
             period = str(self.period_ids[n])
             for j in range(self.J):
                 duty = float(q_h[n][j])
-                if duty <= self.tol or not self._solver_parent_is_segmented("cold", j):
+                if duty <= self.tol or not (
+                    self._solver_parent_is_segmented("cold", j)
+                    or self._utility_is_segmented("hot")
+                ):
                     continue
-                contributions = duty_aligned_area_contributions(
-                    utility_thermal_profile(
+                hot_utility_profile = (
+                    profile_from_solver_arrays(
+                        self.solver_arrays,
+                        side="hot_utility",
+                        parent_index=0,
+                        period_index=n,
+                    )
+                    if self._utility_is_segmented("hot")
+                    else utility_thermal_profile(
                         identity=hot_utility_identity,
                         inlet_temperature=self.T_hu_in_period[n][0],
                         outlet_temperature=self.T_hu_out_period[n][0],
                         duty=duty,
                         heat_transfer_coefficient=self.htc_hu_period[n][0],
-                    ),
+                    )
+                )
+                contributions = duty_aligned_area_contributions(
+                    hot_utility_profile,
                     profile_from_solver_arrays(
                         self.solver_arrays,
                         side="cold",
@@ -291,8 +306,27 @@ class BaseHeatExchangerNetworkModel(ABC):
 
             for i in range(self.I):
                 duty = float(q_c[n][i])
-                if duty <= self.tol or not self._solver_parent_is_segmented("hot", i):
+                if duty <= self.tol or not (
+                    self._solver_parent_is_segmented("hot", i)
+                    or self._utility_is_segmented("cold")
+                ):
                     continue
+                cold_utility_profile = (
+                    profile_from_solver_arrays(
+                        self.solver_arrays,
+                        side="cold_utility",
+                        parent_index=0,
+                        period_index=n,
+                    )
+                    if self._utility_is_segmented("cold")
+                    else utility_thermal_profile(
+                        identity=cold_utility_identity,
+                        inlet_temperature=self.T_cu_in_period[n][0],
+                        outlet_temperature=self.T_cu_out_period[n][0],
+                        duty=duty,
+                        heat_transfer_coefficient=self.htc_cu_period[n][0],
+                    )
+                )
                 contributions = duty_aligned_area_contributions(
                     profile_from_solver_arrays(
                         self.solver_arrays,
@@ -300,13 +334,7 @@ class BaseHeatExchangerNetworkModel(ABC):
                         parent_index=i,
                         period_index=n,
                     ),
-                    utility_thermal_profile(
-                        identity=cold_utility_identity,
-                        inlet_temperature=self.T_cu_in_period[n][0],
-                        outlet_temperature=self.T_cu_out_period[n][0],
-                        duty=duty,
-                        heat_transfer_coefficient=self.htc_cu_period[n][0],
-                    ),
+                    cold_utility_profile,
                     duty=duty,
                     hot_inlet_temperature=self._active_binary_value(
                         self.T_h_by_period[n][i][self.S]
@@ -392,6 +420,91 @@ class BaseHeatExchangerNetworkModel(ABC):
         if mapping is not None:
             self._piecewise_active_mappings.append(mapping)
 
+    def _utility_is_segmented(self, side: str) -> bool:
+        if not hasattr(self, "solver_arrays"):
+            return False
+        values = self.solver_arrays.arrays.get(f"{side}_utility_parent_segmented")
+        return bool(values is not None and np.asarray(values, dtype=bool)[0])
+
+    def _utility_cost_expression(
+        self,
+        side: str,
+        period_index: int,
+        heat_duty,
+        *,
+        name: str,
+    ):
+        """Return the flat or exact piecewise utility-cost solver expression."""
+        price_attr = "hu_cost_period" if side == "hot" else "cu_cost_period"
+        if not self._utility_is_segmented(side):
+            if hasattr(self, price_attr):
+                price = getattr(self, price_attr)[period_index][0]
+            else:
+                price = getattr(self, "hu_cost" if side == "hot" else "cu_cost")[0]
+            return price * heat_duty
+
+        from ..common.solver.piecewise import (
+            add_piecewise_cost_mapping,
+            profile_from_solver_arrays,
+        )
+
+        profile = profile_from_solver_arrays(
+            self.solver_arrays,
+            side=f"{side}_utility",
+            parent_index=0,
+            period_index=period_index,
+        )
+        coordinate = self.m.Var(
+            value=0.0,
+            lb=0.0,
+            ub=profile.total_duty,
+            name=f"{name}_duty",
+        )
+        cost = self.m.Var(
+            value=0.0,
+            lb=0.0,
+            ub=float(profile.cumulative_costs[-1]),
+            name=f"{name}_cost",
+        )
+        self.m.Equation(coordinate == heat_duty)
+        self._register_piecewise_mapping(
+            add_piecewise_cost_mapping(
+                self.m,
+                coordinate,
+                cost,
+                profile,
+                name=name,
+                integer_capable=self.solver in {"apopt", "couenne"},
+            )
+        )
+        return cost
+
+    def _utility_cost_value(
+        self,
+        side: str,
+        period_index: int,
+        heat_duty: float,
+    ) -> float:
+        """Return exact solved utility cost for reporting and verification."""
+        duty = max(float(heat_duty), 0.0)
+        price_attr = "hu_cost_period" if side == "hot" else "cu_cost_period"
+        if not self._utility_is_segmented(side):
+            return float(getattr(self, price_attr)[period_index][0]) * duty
+
+        from ..common.solver.piecewise import profile_from_solver_arrays
+
+        profile = profile_from_solver_arrays(
+            self.solver_arrays,
+            side=f"{side}_utility",
+            parent_index=0,
+            period_index=period_index,
+        )
+        if duty > profile.total_duty + self.tol:
+            raise ValueError(
+                f"Solved {side} utility duty exceeds its segmented profile capacity."
+            )
+        return profile.cost_at_heat(duty)
+
     def _update_piecewise_active_segments(self) -> bool:
         changed = False
         for mapping in self._piecewise_active_mappings:
@@ -412,6 +525,7 @@ class BaseHeatExchangerNetworkModel(ABC):
             self._segmented_cold_parents = np.zeros(self.J, dtype=bool)
             return
         arrays = self.solver_arrays.arrays
+        self._set_segmented_utility_capacity_constraints()
         self._segmented_hot_parents = (
             np.asarray(arrays.get("hot_segment_count", np.ones(self.I)), dtype=int) > 1
         )
@@ -533,6 +647,28 @@ class BaseHeatExchangerNetworkModel(ABC):
                         for k in range(self.S)
                     ]
                 )
+
+    def _set_segmented_utility_capacity_constraints(self) -> None:
+        """Bound selected utility load by each explicit ordered profile."""
+        from ..common.solver.piecewise import profile_from_solver_arrays
+
+        for n in range(self.N_periods):
+            if self._utility_is_segmented("hot"):
+                hot_profile = profile_from_solver_arrays(
+                    self.solver_arrays,
+                    side="hot_utility",
+                    parent_index=0,
+                    period_index=n,
+                )
+                self.m.Equation(sum(self.Q_h_by_period[n]) <= hot_profile.total_duty)
+            if self._utility_is_segmented("cold"):
+                cold_profile = profile_from_solver_arrays(
+                    self.solver_arrays,
+                    side="cold_utility",
+                    parent_index=0,
+                    period_index=n,
+                )
+                self.m.Equation(sum(self.Q_c_by_period[n]) <= cold_profile.total_duty)
 
     def _hot_parent_segmented(self, index: int) -> bool:
         return bool(getattr(self, "_segmented_hot_parents", [False] * self.I)[index])

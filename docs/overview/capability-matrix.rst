@@ -39,7 +39,7 @@ typical outputs, dependency notes, and support status.
      - base
      - Stable
    * - Variable heat-capacity streams
-     - ``StreamSchema.segments`` or ``StreamSchema.profile``
+     - ``StreamSchema`` or ``UtilitySchema`` nested segments/profile
      - parent-level targets and reports; explicit ordered segment diagnostics
      - base; synthesis extra for solver-backed HEN design
      - Advanced

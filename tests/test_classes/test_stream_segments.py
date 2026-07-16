@@ -74,6 +74,167 @@ def test_segment_mutation_is_transactional_and_updates_parent_revision():
     assert stream._numeric_revision > original_revision
 
 
+def test_sparse_batch_segment_mutation_commits_once_and_preserves_order(monkeypatch):
+    stream = Stream(name="Variable CP", segments=_hot_segments())
+    original_names = [segment.name for segment in stream.segments]
+    replace_calls = 0
+    original_replace = stream.replace_segments
+
+    def counted_replace(segments):
+        nonlocal replace_calls
+        replace_calls += 1
+        original_replace(segments)
+
+    monkeypatch.setattr(stream, "replace_segments", counted_replace)
+
+    stream.update_segments(
+        {
+            0: {"heat_flow": 60.0, "htc": 2.0},
+            1: {"heat_flow": 120.0},
+        }
+    )
+
+    assert replace_calls == 1
+    assert [segment.name for segment in stream.segments] == original_names
+    assert [float(segment.heat_flow) for segment in stream.segments] == pytest.approx(
+        [60.0, 120.0]
+    )
+    assert float(stream.heat_flow) == pytest.approx(180.0)
+
+
+def test_batch_segment_mutation_validates_every_update_before_commit():
+    stream = Stream(name="Variable CP", segments=_hot_segments())
+    original_segments = stream.segments
+    original_revision = stream._numeric_revision
+
+    with pytest.raises(ValueError, match="controlled by parent"):
+        stream.update_segments({0: {"heat_flow": 60.0}, 1: {"active": False}})
+
+    assert stream.segments == original_segments
+    assert stream._numeric_revision == original_revision
+    assert [float(segment.heat_flow) for segment in stream.segments] == pytest.approx(
+        [50.0, 100.0]
+    )
+
+
+def test_batch_segment_mutation_rejects_bad_indexes_and_empty_mapping_is_noop():
+    stream = Stream(name="Variable CP", segments=_hot_segments())
+    original_segments = stream.segments
+    original_revision = stream._numeric_revision
+
+    stream.update_segments({})
+    assert stream.segments is original_segments
+    assert stream._numeric_revision == original_revision
+
+    with pytest.raises(IndexError, match="out of range"):
+        stream.update_segments({2: {"heat_flow": 10.0}})
+    with pytest.raises(TypeError, match="indexes must be integers"):
+        stream.update_segments({"0": {"heat_flow": 10.0}})
+
+    assert stream.segments is original_segments
+    assert stream._numeric_revision == original_revision
+
+
+def test_segmented_parent_price_is_duty_weighted_and_cost_conserves_children():
+    stream = Stream(
+        name="Priced utility",
+        is_process_stream=False,
+        segments=[
+            StreamSegment(
+                t_supply=200.0,
+                t_target=150.0,
+                heat_flow=50.0,
+                price=20.0,
+                is_process_stream=False,
+            ),
+            StreamSegment(
+                t_supply=150.0,
+                t_target=100.0,
+                heat_flow=100.0,
+                price=80.0,
+                is_process_stream=False,
+            ),
+        ],
+    )
+
+    assert float(stream.price) == pytest.approx(60.0)
+    assert float(stream.ut_cost) == pytest.approx(9.0)
+    assert float(stream.ut_cost) == pytest.approx(
+        sum(float(segment.ut_cost) for segment in stream.segments)
+    )
+
+
+def test_segmented_parent_explicit_price_broadcasts_but_child_can_diverge():
+    stream = Stream(
+        name="Priced utility",
+        price=40.0,
+        is_process_stream=False,
+        segments=[
+            StreamSegment(
+                t_supply=200.0,
+                t_target=150.0,
+                heat_flow=50.0,
+                price=20.0,
+                is_process_stream=False,
+            ),
+            StreamSegment(
+                t_supply=150.0,
+                t_target=100.0,
+                heat_flow=100.0,
+                price=80.0,
+                is_process_stream=False,
+            ),
+        ],
+    )
+
+    assert [float(segment.price) for segment in stream.segments] == pytest.approx(
+        [40.0, 40.0]
+    )
+    stream.update_segment(0, price=10.0)
+    assert [float(segment.price) for segment in stream.segments] == pytest.approx(
+        [10.0, 40.0]
+    )
+    assert float(stream.price) == pytest.approx(30.0)
+
+    stream.price = 25.0
+    assert [float(segment.price) for segment in stream.segments] == pytest.approx(
+        [25.0, 25.0]
+    )
+
+
+def test_segmented_parent_multiperiod_price_and_cost_are_derived_per_period():
+    stream = Stream(
+        name="Multiperiod priced utility",
+        is_process_stream=False,
+        segments=[
+            StreamSegment(
+                t_supply=[200.0, 210.0],
+                t_target=[150.0, 160.0],
+                heat_flow=[50.0, 100.0],
+                price=[20.0, 40.0],
+                is_process_stream=False,
+            ),
+            StreamSegment(
+                t_supply=[150.0, 160.0],
+                t_target=[100.0, 110.0],
+                heat_flow=[100.0, 100.0],
+                price=[80.0, 20.0],
+                is_process_stream=False,
+            ),
+        ],
+    )
+
+    np.testing.assert_allclose(stream.price.period_values, [60.0, 30.0])
+    np.testing.assert_allclose(stream.ut_cost.period_values, [9.0, 6.0])
+    stream.set_value_attr_at_idx("price", 50.0, idx=1)
+    np.testing.assert_allclose(stream.price.period_values, [60.0, 50.0])
+    for segment in stream.segments:
+        np.testing.assert_allclose(
+            segment.price.period_values[:,],
+            [float(segment.price.period_values[0]), 50.0],
+        )
+
+
 def test_multiperiod_continuity_is_enforced_for_every_period():
     with pytest.raises(ValueError, match="in every period"):
         Stream(
@@ -351,6 +512,62 @@ def test_pickle_round_trip_preserves_order_ownership_and_continuity():
     )
 
 
+def test_copy_and_pickle_preserve_independent_segment_prices_and_parent_cost():
+    original = Stream(
+        name="Priced utility",
+        is_process_stream=False,
+        segments=[
+            StreamSegment(
+                t_supply=200.0,
+                t_target=150.0,
+                heat_flow=50.0,
+                price=20.0,
+                is_process_stream=False,
+            ),
+            StreamSegment(
+                t_supply=150.0,
+                t_target=100.0,
+                heat_flow=100.0,
+                price=80.0,
+                is_process_stream=False,
+            ),
+        ],
+    )
+
+    for restored in (deepcopy(original), pickle.loads(pickle.dumps(original))):
+        assert [float(segment.price) for segment in restored.segments] == pytest.approx(
+            [20.0, 80.0]
+        )
+        assert float(restored.price) == pytest.approx(60.0)
+        assert float(restored.ut_cost) == pytest.approx(9.0)
+
+
+@given(
+    segmented_streams(),
+    st.floats(
+        min_value=0.0,
+        max_value=500.0,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
+@settings(max_examples=30)
+def test_segment_price_and_parent_cost_conservation_invariant(stream, base_price):
+    stream.update_segments(
+        {index: {"price": base_price + index} for index in range(stream.segment_count)}
+    )
+
+    duties = np.asarray([float(segment.heat_flow) for segment in stream.segments])
+    prices = np.asarray([float(segment.price) for segment in stream.segments])
+    expected_price = float(np.sum(duties * prices) / np.sum(duties))
+    expected_cost = float(np.sum(duties * prices) / 1000.0)
+    assert float(stream.price) == pytest.approx(expected_price)
+    assert float(stream.ut_cost) == pytest.approx(expected_cost)
+    assert float(stream.ut_cost) == pytest.approx(
+        sum(float(segment.ut_cost) for segment in stream.segments)
+    )
+
+
 def test_stream_refactor_preserves_public_class_identity_and_defining_module():
     assert OpenPinch.StreamSegment is StreamSegment
     assert Stream.__module__ == "OpenPinch.classes.stream"
@@ -404,6 +621,118 @@ def test_structured_segment_input_creates_one_prepared_parent():
     assert len(zone.process_streams) == 1
     assert stream.segment_count == 2
     assert float(stream.heat_flow) == pytest.approx(150.0)
+
+
+def test_structured_segmented_utility_preserves_child_price_overrides():
+    inputs = TargetInput.model_validate(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "Hot process",
+                    "t_supply": 200,
+                    "t_target": 100,
+                    "heat_flow": 100,
+                },
+                {
+                    "zone": "Site",
+                    "name": "Cold process",
+                    "t_supply": 50,
+                    "t_target": 150,
+                    "heat_flow": 100,
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "Segmented steam",
+                    "type": "Hot",
+                    "price": 40,
+                    "segments": [
+                        {
+                            "t_supply": 250,
+                            "t_target": 220,
+                            "heat_flow": 50,
+                            "price": 20,
+                        },
+                        {
+                            "t_supply": 220,
+                            "t_target": 180,
+                            "heat_flow": 100,
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    zone = prepare_problem(
+        streams=inputs.streams,
+        utilities=inputs.utilities,
+        project_name="Site",
+    )
+    utility = next(
+        stream for stream in zone.hot_utilities if stream.name == "Segmented steam"
+    )
+
+    assert utility.segment_count == 2
+    assert utility.is_process_stream is False
+    assert [float(segment.price) for segment in utility.segments] == pytest.approx(
+        [20.0, 40.0]
+    )
+    assert float(utility.price) == pytest.approx(100.0 / 3.0)
+    assert float(utility.ut_cost) == pytest.approx(5.0)
+
+
+def test_structured_utility_profile_uses_one_parent_price_for_all_segments():
+    inputs = TargetInput.model_validate(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "Hot process",
+                    "t_supply": 200,
+                    "t_target": 100,
+                    "heat_flow": 100,
+                },
+                {
+                    "zone": "Site",
+                    "name": "Cold process",
+                    "t_supply": 50,
+                    "t_target": 150,
+                    "heat_flow": 100,
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "Profile steam",
+                    "type": "Hot",
+                    "price": 30,
+                    "profile": {
+                        "points": [
+                            {"temperature": 250, "cumulative_heat": 0},
+                            {"temperature": 220, "cumulative_heat": 50},
+                            {"temperature": 180, "cumulative_heat": 150},
+                        ]
+                    },
+                }
+            ],
+        }
+    )
+
+    zone = prepare_problem(
+        streams=inputs.streams,
+        utilities=inputs.utilities,
+        project_name="Site",
+    )
+    utility = next(
+        stream for stream in zone.hot_utilities if stream.name == "Profile steam"
+    )
+
+    assert utility.has_segments
+    assert all(
+        float(segment.price) == pytest.approx(30.0) for segment in utility.segments
+    )
+    assert float(utility.price) == pytest.approx(30.0)
 
 
 def test_adjacent_flat_rows_remain_independent_physical_streams():

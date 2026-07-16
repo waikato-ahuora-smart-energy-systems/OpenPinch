@@ -1979,19 +1979,27 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                     )
                 )
             elif self.minimisation_goal == "utility costs":
+                hot_costs = [
+                    self._utility_cost_expression(
+                        "hot",
+                        n,
+                        self.m.sum([self.Q_h_by_period[n][j] for j in range(self.J)]),
+                        name=f"hot_utility_period_{n}",
+                    )
+                    for n in range(self.N_periods)
+                ]
+                cold_costs = [
+                    self._utility_cost_expression(
+                        "cold",
+                        n,
+                        self.m.sum([self.Q_c_by_period[n][i] for i in range(self.I)]),
+                        name=f"cold_utility_period_{n}",
+                    )
+                    for n in range(self.N_periods)
+                ]
                 self.m.Minimize(
                     self._weighted_state_average(
-                        [
-                            self.hu_cost_period[n][0]
-                            * self.m.sum(
-                                [self.Q_h_by_period[n][j] for j in range(self.J)]
-                            )
-                            + self.cu_cost_period[n][0]
-                            * self.m.sum(
-                                [self.Q_c_by_period[n][i] for i in range(self.I)]
-                            )
-                            for n in range(self.N_periods)
-                        ]
+                        [hot_costs[n] + cold_costs[n] for n in range(self.N_periods)]
                     )
                 )
             elif self.minimisation_goal == "heat recovery":
@@ -2031,10 +2039,19 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 + self.m.sum([self.Q_c[i] for i in range(self.I)])
             )
         elif self.minimisation_goal == "utility costs":
-            self.m.Minimize(
-                self.hu_cost[0] * self.m.sum([self.Q_h[j] for j in range(self.J)])
-                + self.cu_cost[0] * self.m.sum([self.Q_c[i] for i in range(self.I)])
+            hot_cost = self._utility_cost_expression(
+                "hot",
+                0,
+                self.m.sum([self.Q_h[j] for j in range(self.J)]),
+                name="hot_utility",
             )
+            cold_cost = self._utility_cost_expression(
+                "cold",
+                0,
+                self.m.sum([self.Q_c[i] for i in range(self.I)]),
+                name="cold_utility",
+            )
+            self.m.Minimize(hot_cost + cold_cost)
         elif self.minimisation_goal == "heat recovery":
             self.m.Maximize(
                 self.m.sum(
@@ -2059,11 +2076,21 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
 
     def _set_source_total_cost_objective(self) -> None:
         self.hu_cost_total = self.m.Intermediate(
-            self.hu_cost[0] * self.m.sum([self.Q_h[j] for j in range(self.J)]),
+            self._utility_cost_expression(
+                "hot",
+                0,
+                self.m.sum([self.Q_h[j] for j in range(self.J)]),
+                name="hot_utility_total_cost",
+            ),
             name="Hot utility cost",
         )
         self.cu_cost_total = self.m.Intermediate(
-            self.cu_cost[0] * self.m.sum([self.Q_c[i] for i in range(self.I)]),
+            self._utility_cost_expression(
+                "cold",
+                0,
+                self.m.sum([self.Q_c[i] for i in range(self.I)]),
+                name="cold_utility_total_cost",
+            ),
             name="Cold utility cost",
         )
         self.recovery_area_cost_filtered = [
@@ -2207,16 +2234,24 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     def _set_multiperiod_total_cost_objective(self) -> None:
         self.hu_cost_total_by_period = [
             self.m.Intermediate(
-                self.hu_cost_period[n][0]
-                * self.m.sum([self.Q_h_by_period[n][j] for j in range(self.J)]),
+                self._utility_cost_expression(
+                    "hot",
+                    n,
+                    self.m.sum([self.Q_h_by_period[n][j] for j in range(self.J)]),
+                    name=f"hot_utility_total_cost_period_{n}",
+                ),
                 name=f"Hot utility cost state {n}",
             )
             for n in range(self.N_periods)
         ]
         self.cu_cost_total_by_period = [
             self.m.Intermediate(
-                self.cu_cost_period[n][0]
-                * self.m.sum([self.Q_c_by_period[n][i] for i in range(self.I)]),
+                self._utility_cost_expression(
+                    "cold",
+                    n,
+                    self.m.sum([self.Q_c_by_period[n][i] for i in range(self.I)]),
+                    name=f"cold_utility_total_cost_period_{n}",
+                ),
                 name=f"Cold utility cost state {n}",
             )
             for n in range(self.N_periods)
@@ -2680,8 +2715,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_period)
 
         self.operating_cost_by_period = [
-            self.hu_cost_period[n][0] * self.Q_hu_total_by_period[n]
-            + self.cu_cost_period[n][0] * self.Q_cu_total_by_period[n]
+            self._utility_cost_value("hot", n, self.Q_hu_total_by_period[n])
+            + self._utility_cost_value("cold", n, self.Q_cu_total_by_period[n])
             for n in range(self.N_periods)
         ]
         self.weighted_operating_cost_value = self._weighted_numeric_average(
@@ -2703,13 +2738,13 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         )
         self.hu_cost_total = self._weighted_numeric_average(
             [
-                self.hu_cost_period[n][0] * self.Q_hu_total_by_period[n]
+                self._utility_cost_value("hot", n, self.Q_hu_total_by_period[n])
                 for n in range(self.N_periods)
             ]
         )
         self.cu_cost_total = self._weighted_numeric_average(
             [
-                self.cu_cost_period[n][0] * self.Q_cu_total_by_period[n]
+                self._utility_cost_value("cold", n, self.Q_cu_total_by_period[n])
                 for n in range(self.N_periods)
             ]
         )
@@ -3032,24 +3067,42 @@ def _check_utility_costs(
     rel_tol: float = 0.1,
     abs_tol: float = 1.0,
 ) -> bool:
+    def utility_cost(side: str, period_index: int, duty: float) -> float:
+        if hasattr(case, "_utility_cost_value"):
+            return case._utility_cost_value(side, period_index, duty)
+        prices = case.hu_cost_period if side == "hot" else case.cu_cost_period
+        return float(prices[period_index][0]) * duty
+
     if hasattr(case, "Q_h_by_period"):
         post_hot_utility = case._weighted_numeric_average(
             [
-                case.hu_cost_period[n][0]
-                * sum(_value(case.Q_h_by_period[n][j]) for j in range(case.J))
+                utility_cost(
+                    "hot",
+                    n,
+                    sum(_value(case.Q_h_by_period[n][j]) for j in range(case.J)),
+                )
                 for n in range(case.N_periods)
             ]
         )
         post_cold_utility = case._weighted_numeric_average(
             [
-                case.cu_cost_period[n][0]
-                * sum(_value(case.Q_c_by_period[n][i]) for i in range(case.I))
+                utility_cost(
+                    "cold",
+                    n,
+                    sum(_value(case.Q_c_by_period[n][i]) for i in range(case.I)),
+                )
                 for n in range(case.N_periods)
             ]
         )
     else:
-        post_hot_utility = case.hu_cost[0] * sum(case.Q_h[j][0] for j in range(case.J))
-        post_cold_utility = case.cu_cost[0] * sum(case.Q_c[i][0] for i in range(case.I))
+        hot_duty = sum(case.Q_h[j][0] for j in range(case.J))
+        cold_duty = sum(case.Q_c[i][0] for i in range(case.I))
+        if hasattr(case, "_utility_cost_value"):
+            post_hot_utility = case._utility_cost_value("hot", 0, hot_duty)
+            post_cold_utility = case._utility_cost_value("cold", 0, cold_duty)
+        else:
+            post_hot_utility = case.hu_cost[0] * hot_duty
+            post_cold_utility = case.cu_cost[0] * cold_duty
     model_hot_utility = _value(case.hu_cost_total)
     model_cold_utility = _value(case.cu_cost_total)
     return math.isclose(

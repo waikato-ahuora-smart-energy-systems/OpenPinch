@@ -110,6 +110,19 @@ The supported solver behavior is explicit:
 - An unresolved active-segment solve is rejected with guidance to use APOPT or
   Couenne. OpenPinch does not silently substitute an average parent ``CP``.
 
+The selected hot and cold utility parents may also be segmented. Their local
+prices are integrated over the utility duty actually traversed, including a
+partial final segment. Cost objectives, solved totals, verification, and
+ranking therefore use the exact piecewise utility cost instead of multiplying
+total duty by an average parent price. APOPT and Couenne use the interval
+mapping; IPOPT uses the same active-segment refinement policy described above.
+The current one-hot-utility and one-cold-utility HEN selection behavior is
+unchanged; optimization across multiple utility parents is a future extension.
+
+Segmented utility HTCs and temperatures are also retained in the post-solve
+duty-aligned area slices. Flat utilities continue to behave as one virtual
+segment and retain their previous objective and reporting results.
+
 Each selected parent-level exchanger can expose ordered
 ``segment_area_contributions``. A contribution records its period, hot and
 cold segment identities, slice duty, local endpoint temperatures, local heat-

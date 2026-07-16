@@ -25,6 +25,7 @@ from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.extractio
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.piecewise import (
     PiecewiseThermalProfile,
     duty_aligned_area_contributions,
+    profile_from_solver_arrays,
 )
 from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.pinch_design_decomposition import (
     build_pinch_design_decomposition,
@@ -58,7 +59,76 @@ def _profile(prefix: str, *, hot: bool) -> PiecewiseThermalProfile:
     )
 
 
-def _segmented_problem(*, cold_second_duty: float = 100.0) -> PinchProblem:
+def _segmented_problem(
+    *,
+    cold_second_duty: float = 100.0,
+    segmented_utility: bool = False,
+    segmented_cold_utility: bool = False,
+) -> PinchProblem:
+    hot_utility = (
+        {
+            "zone": "Site",
+            "name": "HU",
+            "type": "Hot",
+            "segments": [
+                {
+                    "t_supply": 250.0,
+                    "t_target": 225.0,
+                    "heat_flow": 50.0,
+                    "htc": 2.0,
+                    "price": 20.0,
+                },
+                {
+                    "t_supply": 225.0,
+                    "t_target": 200.0,
+                    "heat_flow": 100.0,
+                    "htc": 1.0,
+                    "price": 80.0,
+                },
+            ],
+        }
+        if segmented_utility
+        else {
+            "zone": "Site",
+            "name": "HU",
+            "type": "Hot",
+            "t_supply": 250.0,
+            "t_target": 249.99,
+            "htc": 2.0,
+        }
+    )
+    cold_utility = (
+        {
+            "zone": "Site",
+            "name": "CU",
+            "type": "Cold",
+            "segments": [
+                {
+                    "t_supply": 20.0,
+                    "t_target": 45.0,
+                    "heat_flow": 50.0,
+                    "htc": 2.0,
+                    "price": 30.0,
+                },
+                {
+                    "t_supply": 45.0,
+                    "t_target": 70.0,
+                    "heat_flow": 100.0,
+                    "htc": 1.0,
+                    "price": 90.0,
+                },
+            ],
+        }
+        if segmented_cold_utility
+        else {
+            "zone": "Site",
+            "name": "CU",
+            "type": "Cold",
+            "t_supply": 20.0,
+            "t_target": 20.01,
+            "htc": 2.0,
+        }
+    )
     return PinchProblem(
         {
             "streams": [
@@ -100,22 +170,8 @@ def _segmented_problem(*, cold_second_duty: float = 100.0) -> PinchProblem:
                 },
             ],
             "utilities": [
-                {
-                    "zone": "Site",
-                    "name": "HU",
-                    "type": "Hot",
-                    "t_supply": 250.0,
-                    "t_target": 249.99,
-                    "htc": 2.0,
-                },
-                {
-                    "zone": "Site",
-                    "name": "CU",
-                    "type": "Cold",
-                    "t_supply": 20.0,
-                    "t_target": 20.01,
-                    "htc": 2.0,
-                },
+                hot_utility,
+                cold_utility,
             ],
         },
         project_name="Site",
@@ -141,6 +197,125 @@ def test_solver_arrays_keep_parent_axes_and_add_ordered_segment_tensors():
     assert arrays.arrays["f_c_period"][0, 0] == 0.0
     assert len(arrays.axis_maps["hot_process_streams"]) == 1
     assert len(arrays.axis_maps["cold_process_streams"]) == 1
+
+
+def test_segmented_utility_arrays_and_cost_profile_use_local_prices_exactly():
+    problem = _segmented_problem(segmented_utility=True)
+    arrays = problem_to_solver_arrays(problem, 10.0)
+    profile = profile_from_solver_arrays(
+        arrays,
+        side="hot_utility",
+        parent_index=0,
+        period_index=0,
+    )
+
+    assert arrays.arrays["hot_utility_parent_segmented"].tolist() == [True]
+    np.testing.assert_allclose(profile.prices, [20.0, 80.0])
+    np.testing.assert_allclose(profile.cumulative_costs, [0.0, 1000.0, 9000.0])
+    assert profile.cost_at_heat(25.0) == pytest.approx(500.0)
+    assert profile.cost_at_heat(50.0) == pytest.approx(1000.0)
+    assert profile.cost_at_heat(75.0) == pytest.approx(3000.0)
+    assert profile.cost_at_heat(150.0) == pytest.approx(9000.0)
+
+
+@given(
+    st.floats(min_value=1.0, max_value=100.0, allow_nan=False),
+    st.floats(min_value=1.0, max_value=100.0, allow_nan=False),
+    st.floats(min_value=0.0, max_value=500.0, allow_nan=False),
+    st.floats(min_value=0.0, max_value=500.0, allow_nan=False),
+)
+@settings(max_examples=30)
+def test_piecewise_utility_cost_conserves_full_segment_cost(
+    first_duty,
+    second_duty,
+    first_price,
+    second_price,
+):
+    profile = PiecewiseThermalProfile(
+        identities=("HU.S1", "HU.S2"),
+        temperatures_in=np.array([500.0, 450.0]),
+        temperatures_out=np.array([450.0, 400.0]),
+        duties=np.array([first_duty, second_duty]),
+        heat_capacity_flowrates=np.array([first_duty / 50.0, second_duty / 50.0]),
+        heat_transfer_coefficients=np.array([1.0, 1.0]),
+        prices=np.array([first_price, second_price]),
+    )
+
+    expected = first_price * first_duty + second_price * second_duty
+    assert profile.cost_at_heat(profile.total_duty) == pytest.approx(expected)
+
+
+def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
+    def period_value(values, unit):
+        return {"values": values, "unit": unit}
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "Hot process",
+                    "t_supply": 200.0,
+                    "t_target": 100.0,
+                    "heat_flow": period_value([150.0, 150.0], "kW"),
+                },
+                {
+                    "zone": "Site",
+                    "name": "Cold process",
+                    "t_supply": 50.0,
+                    "t_target": 150.0,
+                    "heat_flow": period_value([225.0, 225.0], "kW"),
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "HU",
+                    "type": "Hot",
+                    "segments": [
+                        {
+                            "t_supply": period_value([250.0, 260.0], "degC"),
+                            "t_target": period_value([225.0, 235.0], "degC"),
+                            "heat_flow": period_value([50.0, 100.0], "kW"),
+                            "price": period_value([20.0, 40.0], "$/MWh"),
+                        },
+                        {
+                            "t_supply": period_value([225.0, 235.0], "degC"),
+                            "t_target": period_value([200.0, 210.0], "degC"),
+                            "heat_flow": period_value([100.0, 100.0], "kW"),
+                            "price": period_value([80.0, 20.0], "$/MWh"),
+                        },
+                    ],
+                },
+                {
+                    "name": "CU",
+                    "type": "Cold",
+                    "t_supply": 20.0,
+                    "t_target": 20.01,
+                },
+            ],
+            "options": {
+                "PROBLEM_PERIOD_IDS": ["base", "peak"],
+                "PROBLEM_PERIOD_WEIGHTS": [1.0, 3.0],
+            },
+        },
+        project_name="Site",
+    )
+    arrays = problem_to_solver_arrays(problem, 10.0)
+    profiles = [
+        profile_from_solver_arrays(
+            arrays,
+            side="hot_utility",
+            parent_index=0,
+            period_index=period_index,
+        )
+        for period_index in range(2)
+    ]
+
+    assert profiles[0].identities == profiles[1].identities
+    np.testing.assert_allclose(profiles[0].cumulative_duties, [0.0, 50.0, 150.0])
+    np.testing.assert_allclose(profiles[1].cumulative_duties, [0.0, 100.0, 200.0])
+    assert profiles[0].cost_at_heat(75.0) == pytest.approx(3000.0)
+    assert profiles[1].cost_at_heat(150.0) == pytest.approx(5000.0)
 
 
 def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
@@ -503,6 +678,130 @@ def test_apopt_utility_exchanger_uses_segment_area_contributions():
     )
     assert model.area_cu[0] == pytest.approx(sum(item.area for item in contributions))
     assert model.verify() == (True, [])
+
+
+@pytest.mark.synthesis
+@pytest.mark.parametrize(
+    ("cold_second_duty", "expected_load", "expected_cost", "expected_segments"),
+    [
+        (150.0, 50.0, 1000.0, 1),
+        (175.0, 75.0, 3000.0, 2),
+    ],
+)
+def test_apopt_segmented_hot_utility_uses_exact_traversed_segment_cost(
+    cold_second_duty,
+    expected_load,
+    expected_cost,
+    expected_segments,
+):
+    pytest.importorskip("gekko")
+    model = StageWiseModel(
+        name="segmented-priced-hot-utility",
+        framework="TDM",
+        solver="apopt",
+        solver_arrays=problem_to_solver_arrays(
+            _segmented_problem(
+                cold_second_duty=cold_second_duty,
+                segmented_utility=True,
+            ),
+            10.0,
+        ),
+        stages=1,
+        dTmin=10.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+    )
+
+    model.optimise(False)
+
+    assert model.mSuccess == 1
+    assert model.Q_hu_total_by_period[0] == pytest.approx(expected_load)
+    assert model.hu_cost_total == pytest.approx(expected_cost)
+    assert model.hu_cost_total != pytest.approx(
+        model.hu_cost_period[0][0] * model.Q_hu_total_by_period[0]
+    )
+    contributions = model.segment_area_hu_contributions_by_period[0][0]
+    assert contributions
+    assert len({item.hot_segment_identity for item in contributions}) == (
+        expected_segments
+    )
+
+
+@pytest.mark.synthesis
+def test_apopt_segmented_cold_utility_uses_exact_traversed_segment_cost():
+    pytest.importorskip("gekko")
+    model = StageWiseModel(
+        name="segmented-priced-cold-utility",
+        framework="TDM",
+        solver="apopt",
+        solver_arrays=problem_to_solver_arrays(
+            _segmented_problem(
+                cold_second_duty=50.0,
+                segmented_cold_utility=True,
+            ),
+            10.0,
+        ),
+        stages=1,
+        dTmin=10.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+    )
+
+    model.optimise(False)
+
+    assert model.mSuccess == 1
+    assert model.Q_cu_total_by_period[0] == pytest.approx(50.0)
+    assert model.cu_cost_total == pytest.approx(1500.0)
+    assert model.cu_cost_total != pytest.approx(
+        model.cu_cost_period[0][0] * model.Q_cu_total_by_period[0]
+    )
+    contributions = model.segment_area_cu_contributions_by_period[0][0]
+    assert contributions
+    assert {item.cold_segment_identity for item in contributions} == {
+        model.solver_arrays.stream_identities["cold_utility_segments"][0]
+    }
+
+
+@pytest.mark.synthesis
+def test_ipopt_segmented_utility_cost_stabilises_or_reports_guidance():
+    pytest.importorskip("gekko")
+    model = StageWiseModel(
+        name="segmented-priced-hot-utility-ipopt",
+        framework="TDM",
+        solver="ipopt-GEKKO",
+        solver_arrays=problem_to_solver_arrays(
+            _segmented_problem(
+                cold_second_duty=150.0,
+                segmented_utility=True,
+            ),
+            10.0,
+        ),
+        stages=1,
+        dTmin=10.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        integers=False,
+        tol=1e-6,
+    )
+
+    model.optimise(False)
+
+    assert model._piecewise_active_mappings
+    if model.mSuccess == 1:
+        assert model.Q_hu_total_by_period[0] == pytest.approx(50.0)
+        assert model.hu_cost_total == pytest.approx(1000.0)
+    else:
+        assert "use APOPT or Couenne" in model.solver_run.failure_reason
 
 
 @pytest.mark.synthesis

@@ -133,6 +133,41 @@ Nested profiles are supported by Python objects, JSON, and workspace inputs.
 Flat CSV and Excel stream rows remain unchanged and are never grouped by name
 or adjacent temperatures.
 
+Segmented Utilities and Prices
+------------------------------
+
+Structured utility inputs accept the same mutually exclusive ``segments`` or
+``profile`` shapes. Explicit segments may each provide a different ``price``.
+A segment price overrides the parent utility price; the parent price fills any
+missing child price, and the existing utility default applies when neither is
+provided. The prepared utility remains one parent stream, whose displayed
+price is the duty-weighted effective value.
+
+.. code-block:: python
+
+   segmented_steam = {
+       "name": "Segmented steam",
+       "type": "Hot",
+       "price": 40.0,
+       "segments": [
+           {
+               "t_supply": 250.0,
+               "t_target": 220.0,
+               "heat_flow": 50.0,
+               "price": 20.0,
+           },
+           {
+               "t_supply": 220.0,
+               "t_target": 180.0,
+               "heat_flow": 100.0,
+           },
+       ],
+   }
+
+Here the first segment costs 20 per energy unit and the second inherits 40.
+Temperature--heat ``profile`` input deliberately accepts one parent/default
+price only; use explicit segments when interval prices differ.
+
 Interpretation
 --------------
 

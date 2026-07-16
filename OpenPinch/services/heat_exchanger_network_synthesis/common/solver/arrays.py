@@ -15,7 +15,7 @@ from .....lib.config import tol
 from ..indexing import ordered_mapping_keys
 
 _PreparedItem = tuple[str, Stream, Any | None]
-SEGMENT_PROFILE_VERSION = 1
+SEGMENT_PROFILE_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -108,6 +108,12 @@ def problem_to_solver_arrays(
     )
     arrays.update(_segment_profile_arrays("hot", hot_items, num_periods))
     arrays.update(_segment_profile_arrays("cold", cold_items, num_periods))
+    arrays.update(
+        _segment_profile_arrays("hot_utility", hot_utility_items, num_periods)
+    )
+    arrays.update(
+        _segment_profile_arrays("cold_utility", cold_utility_items, num_periods)
+    )
 
     axis_maps = {
         "cold_process_streams": {
@@ -128,6 +134,8 @@ def problem_to_solver_arrays(
         "periods": {period_id: index for index, period_id in enumerate(period_ids)},
         "hot_segments": _segment_axis_map(hot_items),
         "cold_segments": _segment_axis_map(cold_items),
+        "cold_utility_segments": _segment_axis_map(cold_utility_items),
+        "hot_utility_segments": _segment_axis_map(hot_utility_items),
     }
 
     return PreparedSolverArrays(
@@ -185,6 +193,8 @@ def problem_to_solver_arrays(
             "hot_process_streams": [key for key, _, _ in hot_items],
             "cold_segments": _segment_identity_list(cold_items),
             "hot_segments": _segment_identity_list(hot_items),
+            "cold_utility_segments": _segment_identity_list(cold_utility_items),
+            "hot_utility_segments": _segment_identity_list(hot_utility_items),
         },
         unit_conventions={
             "cost_coefficients": (
@@ -312,6 +322,7 @@ def _segment_profile_arrays(
     duties = np.zeros(shape, dtype=float)
     heat_capacity_flowrates = np.zeros(shape, dtype=float)
     heat_transfer_coefficients = np.zeros(shape, dtype=float)
+    prices = np.zeros(shape, dtype=float)
     mask = np.zeros(shape, dtype=bool)
     cumulative_duties = np.zeros(
         (num_periods, len(items), max_segments + 1), dtype=float
@@ -347,6 +358,11 @@ def _segment_profile_arrays(
                     "kW/m^2/delta_degC",
                     period_idx=period_index,
                 )
+                prices[period_index, parent_index, segment_index] = _value(
+                    segment.price,
+                    "$/MW/h",
+                    period_idx=period_index,
+                )
         cumulative_duties[:, parent_index, 1:] = np.cumsum(
             duties[:, parent_index, :], axis=1
         )
@@ -361,8 +377,13 @@ def _segment_profile_arrays(
         f"{prefix}_segment_duty_period": duties,
         f"{prefix}_segment_cp_period": heat_capacity_flowrates,
         f"{prefix}_segment_htc_period": heat_transfer_coefficients,
+        f"{prefix}_segment_price_period": prices,
         f"{prefix}_segment_cumulative_duty_period": cumulative_duties,
         f"{prefix}_segment_identities": identities,
+        f"{prefix}_parent_segmented": np.asarray(
+            [stream.has_segments for _, stream, _ in items],
+            dtype=bool,
+        ),
     }
 
 

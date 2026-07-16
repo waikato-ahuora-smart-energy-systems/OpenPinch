@@ -901,8 +901,8 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.Q_cu_total = self._weighted_numeric_average(self.Q_cu_total_by_period)
         self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_period)
         self.operating_cost_by_period = [
-            self.hu_cost_period[n][0] * self.Q_hu_total_by_period[n]
-            + self.cu_cost_period[n][0] * self.Q_cu_total_by_period[n]
+            self._utility_cost_value("hot", n, self.Q_hu_total_by_period[n])
+            + self._utility_cost_value("cold", n, self.Q_cu_total_by_period[n])
             for n in range(self.N_periods)
         ]
         self.weighted_operating_cost_value = self._weighted_numeric_average(
@@ -924,13 +924,13 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         )
         self.hu_cost_total = self._weighted_numeric_average(
             [
-                self.hu_cost_period[n][0] * self.Q_hu_total_by_period[n]
+                self._utility_cost_value("hot", n, self.Q_hu_total_by_period[n])
                 for n in range(self.N_periods)
             ]
         )
         self.cu_cost_total = self._weighted_numeric_average(
             [
-                self.cu_cost_period[n][0] * self.Q_cu_total_by_period[n]
+                self._utility_cost_value("cold", n, self.Q_cu_total_by_period[n])
                 for n in range(self.N_periods)
             ]
         )

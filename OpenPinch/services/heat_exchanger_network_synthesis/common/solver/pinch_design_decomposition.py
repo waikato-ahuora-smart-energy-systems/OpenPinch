@@ -216,15 +216,17 @@ def _apply_segment_dt_cont_minimum(
 ) -> None:
     """Apply the HEN contribution to every child used by numeric targeting."""
 
-    for segment_index in range(stream.segment_count):
-        segment = stream.segments[segment_index]
-        stream.update_segment(
-            segment_index,
-            dt_cont=_stream_dt_cont_with_minimum(
-                segment,
-                minimum_dt_cont=minimum_dt_cont,
-            ),
-        )
+    stream.update_segments(
+        {
+            segment_index: {
+                "dt_cont": _stream_dt_cont_with_minimum(
+                    segment,
+                    minimum_dt_cont=minimum_dt_cont,
+                )
+            }
+            for segment_index, segment in enumerate(stream.segments)
+        }
+    )
 
 
 def _stream_dt_cont_with_minimum(

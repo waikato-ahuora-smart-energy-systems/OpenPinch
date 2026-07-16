@@ -23,3 +23,10 @@ No performance test is required for this isolated guard. Zero-duty process
 sides now skip CoolProp profile generation, so the repair removes work from that
 path and introduces no loop, allocation, solver, network, or scaling behavior.
 The full non-solver runtime remained approximately two minutes locally.
+
+## Segment Pricing Follow-Up
+
+No new release-blocking performance threshold is required. Exact utility cost is
+piecewise linear in the already-prepared segment count and preserves parent HEN
+axes. The complete non-solver suite finished in 120.22 seconds, and the four-case
+solver-marked run finished in 85.49 seconds in the acceptance environment.

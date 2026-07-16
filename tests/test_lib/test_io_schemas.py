@@ -31,6 +31,46 @@ def test_target_input_utilities_default_is_not_shared():
     assert second.utilities == []
 
 
+def test_utility_schema_accepts_one_nested_thermal_definition():
+    segmented = UtilitySchema.model_validate(
+        {
+            "name": "Segmented steam",
+            "type": "Hot",
+            "segments": [
+                {
+                    "t_supply": 250.0,
+                    "t_target": 200.0,
+                    "heat_flow": 100.0,
+                    "price": 20.0,
+                }
+            ],
+        }
+    )
+    assert segmented.t_supply is None
+    assert segmented.segments[0].price == pytest.approx(20.0)
+
+    with pytest.raises(ValidationError, match="either segments or profile"):
+        UtilitySchema.model_validate(
+            {
+                "name": "Ambiguous",
+                "type": "Hot",
+                "segments": [
+                    {
+                        "t_supply": 250.0,
+                        "t_target": 200.0,
+                        "heat_flow": 100.0,
+                    }
+                ],
+                "profile": {
+                    "points": [
+                        {"temperature": 250.0, "cumulative_heat": 0.0},
+                        {"temperature": 200.0, "cumulative_heat": 100.0},
+                    ]
+                },
+            }
+        )
+
+
 def test_target_input_accepts_period_value_payloads():
     payload = {
         "streams": [

@@ -22,14 +22,20 @@ class PiecewiseThermalProfile:
     duties: np.ndarray
     heat_capacity_flowrates: np.ndarray
     heat_transfer_coefficients: np.ndarray
+    prices: np.ndarray | None = None
 
     def __post_init__(self) -> None:
+        if self.prices is None:
+            object.__setattr__(
+                self, "prices", np.zeros(len(self.identities), dtype=float)
+            )
         arrays = (
             self.temperatures_in,
             self.temperatures_out,
             self.duties,
             self.heat_capacity_flowrates,
             self.heat_transfer_coefficients,
+            self.prices,
         )
         lengths = {len(values) for values in arrays}
         if not self.identities or lengths != {len(self.identities)}:
@@ -44,6 +50,8 @@ class PiecewiseThermalProfile:
             raise ValueError("Piecewise profile heat capacities must be positive.")
         if np.any(self.heat_transfer_coefficients <= tol):
             raise ValueError("Piecewise profile HTCs must be positive.")
+        if np.any(self.prices < 0.0):
+            raise ValueError("Piecewise profile prices must be non-negative.")
         temperature_steps = self.temperatures_out - self.temperatures_in
         if len(self.identities) > 1 and (
             np.any(np.abs(temperature_steps) <= tol)
@@ -67,6 +75,18 @@ class PiecewiseThermalProfile:
     @property
     def total_duty(self) -> float:
         return float(np.sum(self.duties))
+
+    @property
+    def cumulative_costs(self) -> np.ndarray:
+        """Cumulative utility cost using the HEN solver's price-duty convention."""
+        return np.concatenate(([0.0], np.cumsum(self.prices * self.duties)))
+
+    def cost_at_heat(self, heat_coordinate: float) -> float:
+        """Return exact cumulative cost through the traversed ordered segments."""
+        q = min(max(float(heat_coordinate), 0.0), self.total_duty)
+        index = self.segment_index_at_heat(q)
+        q_start = self.cumulative_duties[index]
+        return float(self.cumulative_costs[index] + self.prices[index] * (q - q_start))
 
     def segment_index_at_heat(self, heat_coordinate: float) -> int:
         q = min(max(float(heat_coordinate), 0.0), self.total_duty)
@@ -124,6 +144,7 @@ class PiecewiseThermalProfile:
         duties = []
         cps = []
         htcs = []
+        prices = []
         for index in range(len(self.duties)):
             local_start = max(q_start, self.cumulative_duties[index])
             local_end = min(q_end, self.cumulative_duties[index + 1])
@@ -135,6 +156,7 @@ class PiecewiseThermalProfile:
             duties.append(local_end - local_start)
             cps.append(self.heat_capacity_flowrates[index])
             htcs.append(self.heat_transfer_coefficients[index])
+            prices.append(self.prices[index])
         return PiecewiseThermalProfile(
             identities=tuple(identities),
             temperatures_in=np.asarray(temperatures_in, dtype=float),
@@ -142,6 +164,7 @@ class PiecewiseThermalProfile:
             duties=np.asarray(duties, dtype=float),
             heat_capacity_flowrates=np.asarray(cps, dtype=float),
             heat_transfer_coefficients=np.asarray(htcs, dtype=float),
+            prices=np.asarray(prices, dtype=float),
         )
 
 
@@ -173,6 +196,10 @@ def profile_from_solver_arrays(
         heat_transfer_coefficients=arrays.arrays[f"{prefix}_htc_period"][
             period_index, parent_index, :count
         ].astype(float),
+        prices=arrays.arrays.get(
+            f"{prefix}_price_period",
+            np.zeros((period_index + 1, parent_index + 1, count), dtype=float),
+        )[period_index, parent_index, :count].astype(float),
     )
 
 
@@ -183,6 +210,7 @@ def utility_thermal_profile(
     outlet_temperature: float,
     duty: float,
     heat_transfer_coefficient: float,
+    price: float = 0.0,
 ) -> PiecewiseThermalProfile:
     """Represent one utility duty as a flat virtual segment for local slicing."""
     delta = abs(float(inlet_temperature) - float(outlet_temperature))
@@ -194,6 +222,7 @@ def utility_thermal_profile(
         duties=np.array([duty], dtype=float),
         heat_capacity_flowrates=np.array([cp], dtype=float),
         heat_transfer_coefficients=np.array([heat_transfer_coefficient], dtype=float),
+        prices=np.array([price], dtype=float),
     )
 
 
@@ -366,8 +395,91 @@ def add_piecewise_temperature_mapping(
     }
 
 
+def add_piecewise_cost_mapping(
+    model,
+    heat_coordinate,
+    cost,
+    profile: PiecewiseThermalProfile,
+    *,
+    name: str,
+    integer_capable: bool,
+    initial_segment: int = 0,
+):
+    """Constrain cumulative utility cost to exact ordered segment prices."""
+    q_points = profile.cumulative_duties
+    cost_points = profile.cumulative_costs
+    if len(profile.duties) == 1:
+        model.Equation(cost == profile.prices[0] * heat_coordinate)
+        return None
+
+    if integer_capable:
+        lambdas = [
+            model.Var(
+                value=1.0 if index == 0 else 0.0,
+                lb=0.0,
+                ub=1.0,
+                name=f"{name}_lambda_{index}",
+            )
+            for index in range(len(q_points))
+        ]
+        intervals = [
+            model.Var(
+                value=1 if index == initial_segment else 0,
+                lb=0,
+                ub=1,
+                integer=True,
+                name=f"{name}_interval_{index}",
+            )
+            for index in range(len(profile.duties))
+        ]
+        model.Equation(sum(lambdas) == 1.0)
+        model.Equation(sum(intervals) == 1.0)
+        model.Equation(
+            heat_coordinate
+            == sum(lambdas[index] * q_points[index] for index in range(len(q_points)))
+        )
+        model.Equation(
+            cost
+            == sum(
+                lambdas[index] * cost_points[index] for index in range(len(cost_points))
+            )
+        )
+        model.Equation(lambdas[0] <= intervals[0])
+        model.Equation(lambdas[-1] <= intervals[-1])
+        for index in range(1, len(lambdas) - 1):
+            model.Equation(lambdas[index] <= intervals[index - 1] + intervals[index])
+        return None
+
+    active_segment = min(max(initial_segment, 0), len(profile.duties) - 1)
+    selectors = [
+        model.Param(
+            value=1.0 if index == active_segment else 0.0,
+            name=f"{name}_active_{index}",
+        )
+        for index in range(len(profile.duties))
+    ]
+    for index, selector in enumerate(selectors):
+        q_start = q_points[index]
+        model.Equation(
+            selector
+            * (
+                cost
+                - cost_points[index]
+                - profile.prices[index] * (heat_coordinate - q_start)
+            )
+            == 0.0
+        )
+    return {
+        "heat_coordinate": heat_coordinate,
+        "profile": profile,
+        "selectors": selectors,
+        "active_segment": active_segment,
+    }
+
+
 __all__ = [
     "PiecewiseThermalProfile",
+    "add_piecewise_cost_mapping",
     "add_piecewise_temperature_mapping",
     "duty_aligned_area_contributions",
     "profile_from_solver_arrays",

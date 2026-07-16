@@ -89,7 +89,7 @@ class Stream:
         dt_cont_multiplier: float = 1.0,
         heat_flow: MaybeVU = 0.0,
         htc: MaybeVU = 1.0,
-        price: MaybeVU = 0.0,
+        price: Optional[MaybeVU] = None,
         is_process_stream: bool = True,
         fluid_name: Optional[str] = None,
         fluid_phase: Optional[str | FluidPhase] = None,
@@ -149,6 +149,8 @@ class Stream:
         self.update_derived_properties()
         if segments is not None:
             self.replace_segments(segments)
+            if price is not None:
+                self.price = price
 
     # === Core Properties ===
 
@@ -535,7 +537,7 @@ class Stream:
         if (
             self.has_segments
             and not self._syncing_segments
-            and internal_name == "_dt_cont"
+            and internal_name in {"_dt_cont", "_price"}
         ):
             self._update_all_segments_value_attr(internal_name, value)
             return
@@ -611,7 +613,7 @@ class Stream:
         if (
             self.has_segments
             and not self._syncing_segments
-            and internal_name == "_dt_cont"
+            and internal_name in {"_dt_cont", "_price"}
         ):
             self._update_all_segments_value_attr(internal_name, value, idx=idx)
             return
@@ -806,12 +808,63 @@ class Stream:
         idx: int | None = None,
     ) -> None:
         """Apply one value mutation to every segment and commit atomically."""
+        self._update_segments_transaction(
+            {
+                segment_index: {attr_name: value}
+                for segment_index in range(self.segment_count)
+            },
+            idx=idx,
+        )
+
+    def _update_segments_transaction(
+        self,
+        updates: Mapping[int, Mapping[str, object]],
+        *,
+        idx: int | None = None,
+    ) -> None:
+        """Clone, mutate, validate, and commit a sparse set of child updates."""
+        if not self.has_segments:
+            raise ValueError(f"Stream {self.name!r} has no explicit segments.")
+        normalised: dict[int, dict[str, object]] = {}
+        for segment_index, changes in updates.items():
+            if isinstance(segment_index, bool) or not isinstance(segment_index, int):
+                raise TypeError("Segment update indexes must be integers.")
+            if segment_index < 0 or segment_index >= self.segment_count:
+                raise IndexError(f"Segment index {segment_index} is out of range.")
+            if not isinstance(changes, Mapping):
+                raise TypeError("Each segment update must be an attribute mapping.")
+            validated_changes: dict[str, object] = {}
+            for attr_name, value in changes.items():
+                if not isinstance(attr_name, str):
+                    raise TypeError("Segment update attribute names must be strings.")
+                if attr_name in {
+                    "active",
+                    "is_process_stream",
+                    "fluid_name",
+                    "fluid_phase",
+                }:
+                    raise ValueError(
+                        f"{attr_name!r} is controlled by parent stream {self.name!r}."
+                    )
+                internal_name = self._resolve_attr_name(attr_name)
+                if internal_name not in self._CORE_VALUE_ATTRS:
+                    raise ValueError(
+                        f"Attribute {attr_name!r} is not mutable segment state."
+                    )
+                validated_changes[internal_name] = value
+            normalised[segment_index] = validated_changes
+
+        if not normalised:
+            return
+
         candidates = [self._detached_segment(segment) for segment in self._segments]
-        for candidate in candidates:
-            if idx is None:
-                candidate.set_value_attr(attr_name, value)
-            else:
-                candidate.set_value_attr_at_idx(attr_name, value, idx=idx)
+        for segment_index, changes in normalised.items():
+            candidate = candidates[segment_index]
+            for attr_name, value in changes.items():
+                if idx is None:
+                    candidate.set_value_attr(attr_name, value)
+                else:
+                    candidate.set_value_attr_at_idx(attr_name, value, idx=idx)
         self.replace_segments(candidates)
 
     def replace_segments(
@@ -852,24 +905,23 @@ class Stream:
 
     def update_segment(self, index: int, **changes) -> None:
         """Apply one segment update transactionally and revalidate the profile."""
-        if not self.has_segments:
-            raise ValueError(f"Stream {self.name!r} has no explicit segments.")
-        if index < 0 or index >= len(self._segments):
-            raise IndexError(f"Segment index {index} is out of range.")
-        candidates = [self._detached_segment(segment) for segment in self._segments]
-        target = candidates[index]
-        for attr_name, value in changes.items():
-            if attr_name in {
-                "active",
-                "is_process_stream",
-                "fluid_name",
-                "fluid_phase",
-            }:
-                raise ValueError(
-                    f"{attr_name!r} is controlled by parent stream {self.name!r}."
-                )
-            target.set_value_attr(attr_name, value)
-        self.replace_segments(candidates)
+        self.update_segments({index: changes})
+
+    def update_segments(
+        self,
+        updates: Mapping[int, Mapping[str, object]],
+    ) -> None:
+        """Atomically apply sparse attribute changes to ordered child segments.
+
+        All indexes and attributes are validated before detached candidates are
+        mutated. The complete profile is committed only after continuity and
+        period validation succeeds.
+        """
+        if not isinstance(updates, Mapping):
+            raise TypeError("updates must map segment indexes to attribute mappings.")
+        if not updates:
+            return
+        self._update_segments_transaction(updates)
 
     @classmethod
     def from_temperature_heat_profile(

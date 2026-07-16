@@ -510,6 +510,8 @@ def _assert_axis_identities_match(current: dict, snapshot: dict) -> None:
         "periods",
         "hot_segments",
         "cold_segments",
+        "hot_utility_segments",
+        "cold_utility_segments",
     }
     assert current["axis_maps"]["periods"] == {"0": 0}
     for axis_name, expected_axis in snapshot["axis_maps"].items():
